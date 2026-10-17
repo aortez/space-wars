@@ -98,10 +98,10 @@ fn run_stats(mut event: DuckEvent, label: &str) -> RunStats {
         let navigation = after.navigation.unwrap();
         let planning = navigation.planning.unwrap();
         if last_landing.is_some()
-            && let Some(world) = &event.world
+            && let Some(motion) = event.world.as_ref().and_then(|w| w.motion(DUCK_BODY))
         {
-            moving_since_landing &= world.motion(DUCK_BODY).unwrap().linear_velocity.x.abs()
-                > event.movement.run_speed * 0.05;
+            moving_since_landing &=
+                motion.linear_velocity.x.abs() > event.movement.run_speed * 0.05;
         }
         if stats.first_crossing == 0 {
             if navigation.wall_tags.iter().sum::<u32>() > 0 {
@@ -122,7 +122,7 @@ fn run_stats(mut event: DuckEvent, label: &str) -> RunStats {
                 stats.stopped_before_first_wall += 1;
             }
         }
-        assert!(event.physics_counts().0 <= planner::MAX_SURFACES + 1);
+        assert!(event.physics_counts().0 <= planner::MAX_SURFACES + 1 + event.flap_body_count());
         if after.jumps > before.jumps {
             assert!(before.grounded, "{label}: airborne jump");
             chained_flight = false;

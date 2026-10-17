@@ -1,0 +1,406 @@
+{
+  "source_commit": "efb77e5c2c5dd3a6adf5a0026d4becd163a4214c",
+  "fixture_seed": 42,
+  "capture_method": "Local source-generated scenario frames. The actor is placed just above the flap, settles through real contacts, then jumps normally. Raster uses the production raster adapter; vector uses production vector geometry through the Slint SVG loader with native text overlay. No device/GPU capture.",
+  "viewports": [
+    [
+      800,
+      480
+    ],
+    [
+      1024,
+      768
+    ],
+    [
+      480,
+      800
+    ]
+  ],
+  "fixture_frames": 48,
+  "adapter_images": 96,
+  "peak_primitives": 607,
+  "peak_bodies": 9,
+  "peak_flap_bodies": 2,
+  "selected": [
+    {
+      "image": "flap-800x480-left-course-standing-raster.png",
+      "sha256": "c72ab5bee6ef07021a86124a0293e79c7f6f10f1a03819f1c30be969c7ae0654",
+      "fixture": {
+        "bodies": 9,
+        "colliders": 9,
+        "duck": {
+          "cleared_obstacles": 0,
+          "entrance_open_milli": 1000,
+          "exit_open_milli": 1000,
+          "flaps": [
+            {
+              "angle_milliradians": 1571,
+              "angular_velocity_milliradians": 0,
+              "body_id": 2100,
+              "generation": 0,
+              "hinge_milli": [
+                -400000,
+                -167600
+              ],
+              "hold": "standing",
+              "open_milli": 1000,
+              "requested_open_milli": 0,
+              "velocity_milli": [
+                0,
+                0
+              ]
+            },
+            {
+              "angle_milliradians": -1571,
+              "angular_velocity_milliradians": 0,
+              "body_id": 2101,
+              "generation": 0,
+              "hinge_milli": [
+                400000,
+                -167600
+              ],
+              "hold": null,
+              "open_milli": 1000,
+              "requested_open_milli": 1000,
+              "velocity_milli": [
+                0,
+                0
+              ]
+            }
+          ],
+          "grounded": true,
+          "jumps": 0,
+          "left_to_right": true,
+          "navigation": null,
+          "obstacle_count": 4,
+          "outcome": null,
+          "position_milli": [
+            -383000,
+            -149059
+          ],
+          "visit": {
+            "phase": "exiting",
+            "phase_tick": 26,
+            "submerged_milli": 0,
+            "tick": 106,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        },
+        "height": 480,
+        "moving_floor": false,
+        "name": "flap-800x480-left-course-standing",
+        "primitive_count": 607,
+        "seed": 42,
+        "stage": "standing",
+        "width": 800
+      }
+    },
+    {
+      "image": "flap-800x480-left-course-closing-raster.png",
+      "sha256": "ce3fe6557667e37f79282a74090cf38b317db19c2c346cd5b52adb61fe3b42e6",
+      "fixture": {
+        "bodies": 9,
+        "colliders": 9,
+        "duck": {
+          "cleared_obstacles": 0,
+          "entrance_open_milli": 417,
+          "exit_open_milli": 1000,
+          "flaps": [
+            {
+              "angle_milliradians": 591,
+              "angular_velocity_milliradians": -5795,
+              "body_id": 2100,
+              "generation": 0,
+              "hinge_milli": [
+                -400000,
+                -167600
+              ],
+              "hold": null,
+              "open_milli": 417,
+              "requested_open_milli": 0,
+              "velocity_milli": [
+                -60793,
+                -83292
+              ]
+            },
+            {
+              "angle_milliradians": -1571,
+              "angular_velocity_milliradians": 0,
+              "body_id": 2101,
+              "generation": 0,
+              "hinge_milli": [
+                400000,
+                -167600
+              ],
+              "hold": null,
+              "open_milli": 1000,
+              "requested_open_milli": 1000,
+              "velocity_milli": [
+                0,
+                0
+              ]
+            }
+          ],
+          "grounded": false,
+          "jumps": 1,
+          "left_to_right": true,
+          "navigation": null,
+          "obstacle_count": 4,
+          "outcome": null,
+          "position_milli": [
+            -383000,
+            -118249
+          ],
+          "visit": {
+            "phase": "exiting",
+            "phase_tick": 42,
+            "submerged_milli": 0,
+            "tick": 122,
+            "velocity_milli": [
+              0,
+              63039
+            ]
+          }
+        },
+        "height": 480,
+        "moving_floor": false,
+        "name": "flap-800x480-left-course-closing",
+        "primitive_count": 607,
+        "seed": 42,
+        "stage": "closing",
+        "width": 800
+      }
+    },
+    {
+      "image": "flap-800x480-left-course-closed-raster.png",
+      "sha256": "f3b2aab8b03c99a082605e22c9c9e40a59a3127e805e86b20c1c16ae20fa1c72",
+      "fixture": {
+        "bodies": 8,
+        "colliders": 8,
+        "duck": {
+          "cleared_obstacles": 0,
+          "entrance_open_milli": 0,
+          "exit_open_milli": 1000,
+          "flaps": [
+            {
+              "angle_milliradians": 0,
+              "angular_velocity_milliradians": 0,
+              "body_id": null,
+              "generation": 0,
+              "hinge_milli": [
+                -400000,
+                -167600
+              ],
+              "hold": null,
+              "open_milli": 0,
+              "requested_open_milli": 0,
+              "velocity_milli": [
+                0,
+                0
+              ]
+            },
+            {
+              "angle_milliradians": -1571,
+              "angular_velocity_milliradians": 0,
+              "body_id": 2101,
+              "generation": 0,
+              "hinge_milli": [
+                400000,
+                -167600
+              ],
+              "hold": null,
+              "open_milli": 1000,
+              "requested_open_milli": 1000,
+              "velocity_milli": [
+                0,
+                0
+              ]
+            }
+          ],
+          "grounded": false,
+          "jumps": 1,
+          "left_to_right": true,
+          "navigation": null,
+          "obstacle_count": 4,
+          "outcome": null,
+          "position_milli": [
+            -383000,
+            -137146
+          ],
+          "visit": {
+            "phase": "exiting",
+            "phase_tick": 72,
+            "submerged_milli": 0,
+            "tick": 152,
+            "velocity_milli": [
+              0,
+              -136961
+            ]
+          }
+        },
+        "height": 480,
+        "moving_floor": false,
+        "name": "flap-800x480-left-course-closed",
+        "primitive_count": 593,
+        "seed": 42,
+        "stage": "closed",
+        "width": 800
+      }
+    },
+    {
+      "image": "flap-1024x768-right-moving-standing-vector.png",
+      "sha256": "85866c8428297f6a79c74d211d14f070296497946611002578cb08dbb35359aa",
+      "fixture": {
+        "bodies": 6,
+        "colliders": 6,
+        "duck": {
+          "cleared_obstacles": 0,
+          "entrance_open_milli": 1000,
+          "exit_open_milli": 1000,
+          "flaps": [
+            {
+              "angle_milliradians": -1571,
+              "angular_velocity_milliradians": 0,
+              "body_id": 2100,
+              "generation": 0,
+              "hinge_milli": [
+                320000,
+                -174400
+              ],
+              "hold": "standing",
+              "open_milli": 1000,
+              "requested_open_milli": 0,
+              "velocity_milli": [
+                0,
+                0
+              ]
+            },
+            {
+              "angle_milliradians": 1571,
+              "angular_velocity_milliradians": 0,
+              "body_id": 2101,
+              "generation": 0,
+              "hinge_milli": [
+                -320000,
+                -174400
+              ],
+              "hold": null,
+              "open_milli": 1000,
+              "requested_open_milli": 1000,
+              "velocity_milli": [
+                0,
+                0
+              ]
+            }
+          ],
+          "grounded": true,
+          "jumps": 0,
+          "left_to_right": false,
+          "navigation": null,
+          "obstacle_count": 0,
+          "outcome": null,
+          "position_milli": [
+            306400,
+            -157456
+          ],
+          "visit": {
+            "phase": "exiting",
+            "phase_tick": 26,
+            "submerged_milli": 0,
+            "tick": 106,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        },
+        "height": 768,
+        "moving_floor": true,
+        "name": "flap-1024x768-right-moving-standing",
+        "primitive_count": 599,
+        "seed": 42,
+        "stage": "standing",
+        "width": 1024
+      }
+    },
+    {
+      "image": "flap-480x800-left-course-jump-vector.png",
+      "sha256": "83b38dd3159538d01c9720c922dc7da2e5f3746e314f4a0adaa1768e9664dce4",
+      "fixture": {
+        "bodies": 9,
+        "colliders": 9,
+        "duck": {
+          "cleared_obstacles": 0,
+          "entrance_open_milli": 833,
+          "exit_open_milli": 1000,
+          "flaps": [
+            {
+              "angle_milliradians": 1454,
+              "angular_velocity_milliradians": -2932,
+              "body_id": 2100,
+              "generation": 0,
+              "hinge_milli": [
+                -144000,
+                -189360
+              ],
+              "hold": null,
+              "open_milli": 833,
+              "requested_open_milli": 0,
+              "velocity_milli": [
+                7601,
+                -18717
+              ]
+            },
+            {
+              "angle_milliradians": -1571,
+              "angular_velocity_milliradians": 0,
+              "body_id": 2101,
+              "generation": 0,
+              "hinge_milli": [
+                144000,
+                -189360
+              ],
+              "hold": null,
+              "open_milli": 1000,
+              "requested_open_milli": 1000,
+              "velocity_milli": [
+                0,
+                0
+              ]
+            }
+          ],
+          "grounded": false,
+          "jumps": 1,
+          "left_to_right": true,
+          "navigation": null,
+          "obstacle_count": 4,
+          "outcome": null,
+          "position_milli": [
+            -137880,
+            -174792
+          ],
+          "visit": {
+            "phase": "exiting",
+            "phase_tick": 32,
+            "submerged_milli": 0,
+            "tick": 112,
+            "velocity_milli": [
+              0,
+              46694
+            ]
+          }
+        },
+        "height": 800,
+        "moving_floor": false,
+        "name": "flap-480x800-left-course-jump",
+        "primitive_count": 599,
+        "seed": 42,
+        "stage": "jump",
+        "width": 480
+      }
+    }
+  ]
+}

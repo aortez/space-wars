@@ -1067,8 +1067,31 @@ pub struct ClockDuckNavigationState {
     pub recovery: ClockDuckRecoveryState,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClockDuckFlapHold {
+    Standing,
+    Attachment,
+    Obstructed,
+}
+
+/// One rigid door flap. A missing body means the panel has closed or retired.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckFlapState {
+    pub generation: u64,
+    pub body_id: Option<u64>,
+    pub requested_open_milli: u32,
+    pub open_milli: u32,
+    pub hinge_milli: [i32; 2],
+    pub angle_milliradians: i32,
+    pub velocity_milli: [i32; 2],
+    pub angular_velocity_milliradians: i32,
+    pub hold: Option<ClockDuckFlapHold>,
+}
+
 /// Temporary course/controller telemetry. Position is in thousandths of render
-/// world units; the duck and its physics are absent during opening/resetting.
+/// world units. The character is absent during opening/resetting; its doors
+/// can still be moving in the shared physics world.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockDuckState {
     #[serde(default)]
@@ -1081,6 +1104,9 @@ pub struct ClockDuckState {
     pub obstacle_count: usize,
     pub entrance_open_milli: u32,
     pub exit_open_milli: u32,
+    /// Entrance then exit, independent of screen-side mirroring.
+    #[serde(default)]
+    pub flaps: [ClockDuckFlapState; 2],
     pub outcome: Option<ClockDuckOutcome>,
     /// Additive diagnostics: old schema-8 payloads may omit this object.
     #[serde(default)]

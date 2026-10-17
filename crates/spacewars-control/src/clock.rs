@@ -484,6 +484,19 @@ mod tests {
                 obstacle_count: 3,
                 entrance_open_milli: 0,
                 exit_open_milli: 1000,
+                flaps: [
+                    engine_common::ClockDuckFlapState {
+                        generation: 2,
+                        body_id: Some(2100),
+                        requested_open_milli: 0,
+                        open_milli: 1000,
+                        hinge_milli: [-400000, -167600],
+                        angle_milliradians: 1571,
+                        hold: Some(engine_common::ClockDuckFlapHold::Attachment),
+                        ..Default::default()
+                    },
+                    Default::default(),
+                ],
                 outcome: None,
                 navigation: None,
             },
@@ -964,6 +977,7 @@ mod tests {
             obstacle_count: 3,
             entrance_open_milli: 0,
             exit_open_milli: 700,
+            flaps: Default::default(),
             outcome: Some(engine_common::ClockDuckOutcome::Exited),
             navigation: Some(engine_common::ClockDuckNavigationState {
                 recovery: engine_common::ClockDuckRecoveryState {
@@ -1143,6 +1157,7 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("navigation");
+        old_payload["duck"].as_object_mut().unwrap().remove("flaps");
         state.duck.as_mut().unwrap().navigation = None;
         assert_eq!(
             ClockState::from_json(&old_payload.to_string()).unwrap(),

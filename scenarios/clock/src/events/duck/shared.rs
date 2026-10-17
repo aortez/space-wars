@@ -86,7 +86,7 @@ impl DuckEvent {
     pub fn release_arena(&mut self) {
         assert!(self.arena_claimed);
         self.arena_claimed = false;
-        if self.phase == EventPhase::Resetting {
+        if self.phase == EventPhase::Resetting && self.door_panels().iter().all(Option::is_none) {
             self.world = None;
         }
     }
@@ -94,11 +94,13 @@ impl DuckEvent {
     pub fn retire_from_arena(&mut self) {
         assert!(self.arena_claimed);
         self.reset(ClockDuckOutcome::Dismissed);
+        self.remove_flaps();
         self.player = None;
     }
 
     pub fn rejoin_arena(&mut self, session_id: u64, seat: u8) {
         assert!(self.arena_claimed && self.player.is_none());
+        self.remove_flaps();
         if self.entry_arena_opacity.is_some() {
             self.entry_arena_opacity = Some(self.arena_opacity());
         }

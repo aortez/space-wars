@@ -378,6 +378,7 @@ fn shared_burst_survives_departure_rejoin_and_removes_only_its_own_bodies() {
         ticks(&mut state, 90);
         state.finish_event();
         let base = (state.body_count(), state.collider_count());
+        let base_flaps = state.flap_body_count();
         let player = state.player_duck_state();
         state.preview_event(ClockEventKind::Explosion);
         assert_eq!(state.player_duck_state(), player);
@@ -392,7 +393,7 @@ fn shared_burst_survives_departure_rejoin_and_removes_only_its_own_bodies() {
         toggle(&mut state, 1);
         ticks(&mut state, 30);
         assert!(state.duck_visit.is_none());
-        assert_eq!(state.body_count(), base.0 + count - 1);
+        assert_eq!(state.body_count(), base.0 + count - 1 - base_flaps);
         assert_ne!(cells(&state), before, "retained arena keeps simulating");
         let before = world(&state).motions().collect::<Vec<_>>();
         toggle(&mut state, 2);

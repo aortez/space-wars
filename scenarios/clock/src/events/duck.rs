@@ -1,11 +1,14 @@
 //! A bounded, event-local obstacle course. The round body is physical; the
-//! upright pixel character and side doors are presentation, not articulated rigs.
+//! upright pixel character is presentation. Rigid side doors share the world.
 
 pub(crate) mod arena;
 mod controller;
 #[cfg(test)]
 mod debris_tests;
 mod drain;
+#[cfg(test)]
+mod flap_tests;
+pub(crate) mod flaps;
 mod flow;
 #[cfg(test)]
 mod movement_tests;
@@ -98,6 +101,7 @@ pub(crate) struct DuckEvent {
     jumps: u32,
     outcome: Option<ClockDuckOutcome>,
     player: Option<PlayerControl>,
+    flaps: flaps::Flaps,
 }
 
 impl DuckEvent {
@@ -309,6 +313,7 @@ impl DuckEvent {
             jumps: 0,
             outcome: None,
             player: None,
+            flaps: flaps::Flaps::default(),
         }
     }
 
@@ -323,7 +328,7 @@ impl DuckEvent {
             collect_events: false,
             ..PhysicsWorldConfig::default()
         });
-        // One dynamic body; all course surfaces are fixed, bounded geometry.
+        // One dynamic character and at most two rigid, kinematic door flaps.
         let count = self
             .course
             .as_ref()
@@ -333,7 +338,7 @@ impl DuckEvent {
         } else {
             count + usize::from(self.player.is_some())
         };
-        world.reserve(count, count, 0);
+        world.reserve(count + 2, count + 2, 0);
         let pit = self.obstacles[1];
         let floor = self.layout.floor_y;
         let geometry = if let Some(responsive) = &self.responsive_floor {
@@ -543,7 +548,18 @@ impl DuckEvent {
         } else {
             None
         };
-        let support_velocity = contact.map_or(Vec2::ZERO, |c| c.velocity);
+        let support_velocity = contact.map_or(Vec2::ZERO, |c| {
+            // A held flap has stopped for this solve. Its previous angular
+            // velocity must not give the next jump a spurious boost or penalty.
+            let body = world.collider_body(c.collider);
+            if body == Some(flaps::body(0)) || body == Some(flaps::body(1)) {
+                let motion = world.incoming_motion(body.unwrap(), DT).unwrap();
+                let offset = c.position - motion.position;
+                motion.linear_velocity + Vec2::new(-offset.y, offset.x) * motion.angular_velocity
+            } else {
+                c.velocity
+            }
+        });
         let debris = if self.player.is_none() && support.is_none() {
             contact
                 .and_then(|c| world.collider_body(c.collider))
@@ -656,13 +672,10 @@ impl DuckEvent {
 
     fn reset(&mut self, outcome: ClockDuckOutcome) {
         self.outcome = Some(outcome);
-        if self.arena_claimed {
-            if let Some(world) = &mut self.world {
-                world.remove_entity(DUCK_ENTITY);
-            }
-        } else {
-            self.world = None;
+        if let Some(world) = &mut self.world {
+            world.remove_entity(DUCK_ENTITY);
         }
+        self.release_flap_attachment();
         self.buoyant = None;
         self.water_report = BuoyancyReport::default();
         self.paddling = false;
@@ -693,25 +706,33 @@ impl DuckEvent {
         panels_advanced: bool,
     ) -> bool {
         self.advance_panels(panels_advanced);
-        // Before the door opens and after the character leaves, an event's
-        // bodies still advance exactly once. Running owns its step in run().
-        if self.arena_claimed && !matches!(self.phase, EventPhase::Running | EventPhase::Exiting) {
-            self.world.as_mut().expect("leased arena").step(DT);
-        }
         self.tick += 1;
         self.phase_tick += 1;
-        match self.phase {
-            EventPhase::Opening if self.phase_tick >= OPENING_TICKS => {
+        if self.phase != EventPhase::Resetting {
+            self.ensure_world();
+        }
+        if self.phase == EventPhase::Opening {
+            self.advance_flaps();
+            self.world.as_mut().unwrap().step(DT);
+            // Preserve the actor's first simulation tick. Shared scenery steps
+            // once before spawning, just as it does before a visit joins.
+            if self.phase_tick >= OPENING_TICKS {
                 if self.responsive_floor.is_some() {
                     self.prepare_responsive_spawn(water);
                 }
                 self.spawn();
                 self.enter(EventPhase::Running);
             }
+            return false;
+        }
+        if self.phase == EventPhase::Running && self.exit_visible() {
+            self.enter(EventPhase::Exiting);
+        }
+        if self.world.is_some() {
+            self.advance_flaps();
+        }
+        match self.phase {
             EventPhase::Running | EventPhase::Exiting => {
-                if self.phase == EventPhase::Running && self.exit_visible() {
-                    self.enter(EventPhase::Exiting);
-                }
                 self.run(water);
                 let position = self.position().expect("running duck");
                 if !position.x.is_finite()
@@ -739,10 +760,20 @@ impl DuckEvent {
                     self.reset(ClockDuckOutcome::TimedOut);
                 }
             }
-            _ => {}
+            _ => {
+                if let Some(world) = &mut self.world {
+                    world.step(DT);
+                }
+            }
+        }
+        if self.phase == EventPhase::Resetting
+            && !self.arena_claimed
+            && self.door_panels().iter().all(Option::is_none)
+        {
+            self.world = None;
         }
         // Keep the catalog's fixed envelope even after an early recovery. The
-        // course fades out, physics is already dropped, and live time continues.
+        // course and doors finish closing, and live time continues.
         self.visit_finished()
     }
 
@@ -754,11 +785,11 @@ impl DuckEvent {
         }
     }
 
+    #[cfg(test)]
     pub fn entrance_visible(&self) -> bool {
         // Finish closing behind the spawned duck, then keep this door hidden
         // for the rest of the visit, including return trips to the entrance wall.
-        self.phase == EventPhase::Opening
-            || (self.phase == EventPhase::Running && self.door_openness().0 > 0.0)
+        self.phase == EventPhase::Opening || self.door_openness().0 > 0.0
     }
 
     pub fn exit_visible(&self) -> bool {
@@ -788,7 +819,7 @@ impl DuckEvent {
         }))
     }
 
-    pub fn door_openness(&self) -> (f32, f32) {
+    fn requested_door_openness(&self) -> (f32, f32) {
         match self.phase {
             EventPhase::Opening => (self.phase_tick as f32 / OPENING_TICKS as f32, 0.0),
             EventPhase::Running => (
@@ -796,14 +827,6 @@ impl DuckEvent {
                 0.0,
             ),
             EventPhase::Exiting => (0.0, (self.phase_tick as f32 / 24.0).min(1.0)),
-            EventPhase::Resetting => (
-                0.0,
-                if self.outcome == Some(ClockDuckOutcome::Exited) {
-                    (1.0 - self.phase_tick as f32 / RESET_TICKS as f32).max(0.0)
-                } else {
-                    0.0
-                },
-            ),
             _ => (0.0, 0.0),
         }
     }
@@ -861,6 +884,7 @@ impl DuckEvent {
             },
             entrance_open_milli: (entrance * 1000.0).round() as u32,
             exit_open_milli: (exit * 1000.0).round() as u32,
+            flaps: self.flap_diagnostics(),
             outcome: self.outcome,
             navigation: self.player.is_none().then(|| ClockDuckNavigationState {
                 recovery: self.controller.recovery.stats,
