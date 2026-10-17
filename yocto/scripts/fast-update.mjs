@@ -14,7 +14,7 @@ const HELPER = '/usr/sbin/spacewars-fast-update';
 const HASH = /^[a-f0-9]{64}$/;
 
 export function parseArgs(args) {
-  const options = { host: 'spacewars.local', user: 'root', skipBuild: false, dryRun: false, prompt: false };
+  const options = { host: 'spacewars.local', user: 'swadmin', skipBuild: false, dryRun: false, prompt: false };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (['--target', '--host', '--user'].includes(arg)) {
@@ -29,7 +29,7 @@ export function parseArgs(args) {
     }
   }
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(options.host)) throw new Error('Invalid target hostname or IPv4 address.');
-  if (options.user !== 'root') throw new Error('Fast updates require separately provisioned root operator access (--user root). The kiosk account cannot install unsigned binaries.');
+  if (!['root', 'swadmin'].includes(options.user)) throw new Error('Fast updates require swadmin with passwordless sudo, or separately provisioned root access. The kiosk account cannot install unsigned binaries.');
   return options;
 }
 
@@ -63,6 +63,10 @@ export function checkRemoteIdentity(reply, expected) {
 
 export async function fastUpdate(options, { execute = run, bundleDir = join(defaultImageDir(), 'spacewars-fast'), loadBundle = readBundle } = {}) {
   const target = `${options.user}@${options.host}`;
+  const privileged = command => options.user === 'root' ? command
+    : `sudo -n /bin/sh -c '${command.replaceAll("'", "'\\''")}'`;
+  const operatorExecute = (program, args, settings) => execute(program,
+    program === 'ssh' ? [...args.slice(0, -1), privileged(args.at(-1))] : args, settings);
   console.log(`Fast update: ${target} (client + CLI, application restart, no reboot)`);
   if (options.dryRun) {
     console.log(`${options.skipBuild ? 'Use existing' : 'Build --target spacewars, then use'} bundle: ${bundleDir}`);
@@ -71,11 +75,11 @@ export async function fastUpdate(options, { execute = run, bundleDir = join(defa
     return;
   }
 
-  const ssh = (command, capture = false) => execute('ssh', [...SSH_OPTIONS, target, command], { capture });
+  const ssh = (command, capture = false) => operatorExecute('ssh', [...SSH_OPTIONS, target, command], { capture });
   // Fail before an expensive build if this image has not been bootstrapped.
   let identity;
   try { identity = await ssh(`${HELPER} --check`, true); }
-  catch (error) { throw new Error(`Cannot use fast updates on ${target}: ${error.message}. Provision root access and the matching maintenance guard through supervised bootstrap.`); }
+  catch (error) { throw new Error(`Cannot use fast updates on ${target}: ${error.message}. Provision owner access and the matching maintenance guard through a current image or supervised bootstrap.`); }
   if (!/^spacewars-fast-update-v2 [a-f0-9]{64}$/.test(identity)) {
     throw new Error('Missing/unsupported operator helper; use supervised root bootstrap first.');
   }
@@ -94,14 +98,25 @@ export async function fastUpdate(options, { execute = run, bundleDir = join(defa
     } finally { prompt.close(); }
   }
 
-  await withDeploymentHold({ target, execute }, async hold => {
+  await withDeploymentHold({ target, execute: operatorExecute }, async hold => {
     const stage = await ssh('mktemp -d /tmp/spacewars-fast.XXXXXXXXXX', true);
     if (!/^\/tmp\/spacewars-fast\.[a-zA-Z0-9]{10}$/.test(stage)) throw new Error('Unexpected remote staging directory.');
     try {
       // Only a validated fixed staging path reaches the remote shell. The
       // installer checks hashes again and retains its lock through health/rollback.
       await hold.ensure();
-      await execute('scp', [...SSH_OPTIONS, ...NAMES.map(name => join(bundleDir, name)), `${target}:${stage}/`]);
+      if (options.user === 'root') {
+        await execute('scp', [...SSH_OPTIONS, ...NAMES.map(name => join(bundleDir, name)), `${target}:${stage}/`]);
+      } else {
+        // The existing installer requires a root-owned private stage. Stream
+        // into it through the authenticated admin's sudo, without granting the
+        // runtime account access or weakening the installer's ownership checks.
+        for (const name of NAMES) {
+          await hold.ensure();
+          await operatorExecute('ssh', [...SSH_OPTIONS, target, `umask 077; cat > ${stage}/${name}`],
+            { input: readFileSync(join(bundleDir, name)), capture: true });
+        }
+      }
       await hold.ensure();
       await ssh(`${HELPER} ${stage} ${manifest.compatibility} ${NAMES.map(name => manifest.binaries[name].sha256).join(' ')}`);
     } finally {

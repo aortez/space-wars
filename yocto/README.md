@@ -147,7 +147,42 @@ the boot partition; back up custom boot overrides separately from `/data`.
 The flash script follows the DirtSim flow: it uses `bmaptool` when a
 `.wic.bmap` exists, otherwise falls back to `gzip | dd`, injects your SSH public
 key, writes `/boot/hostname.txt`, grows the `/data` partition, and preserves an
-existing `/data` partition when requested.
+existing `/data` partition by default through a verified backup and restore.
+
+Current images include an SSH-only owner account, `swadmin` (UID 1001), with
+passwordless sudo. The kiosk still runs as `spacewars` (UID 1000) with its
+limited permissions. Neither account has a usable password, and images contain
+no shared login key. Flashing provisions the selected `--ssh-key` for both
+roles; use `--admin-ssh-key /path/to/owner.pub` to select a separate owner key.
+After boot, use `ssh swadmin@HOST.local` and `sudo -i` for administration.
+
+Login keys live in root-owned `/data/spacewars-access/{root,spacewars,swadmin}`.
+Updates and rollbacks retain those files, including deliberate empty-file
+revocations. Restoring an older data partition without an admin role provisions
+the selected owner key. Existing admin keys are preserved; explicitly pass
+`--replace-admin-key` to replace them or re-enable revoked admin access. The
+running image never copies kiosk keys into the admin role. An existing owner
+can explicitly import `/home/swadmin/.ssh/authorized_keys` into an empty role
+with `sudo engine-os-manager maintenance import-admin-keys`.
+
+Full flashing recreates the partition table; it does not leave `/data` in place.
+The flash utility now backs up an existing data partition by default, preserving
+numeric owners, modes, hardlinks, symlinks, ACLs and extended attributes. It
+verifies file contents and metadata before writing the image, then verifies the
+restored copy. A failure stops the operation. Backups remain under
+`target/flash-backups/` until the owner removes them after checking the new boot.
+Saved `backup_data: false` settings no longer bypass preservation; use the
+explicit `--discard-data` option to start without saved settings, ROMs, Wi-Fi
+profiles, Bluetooth pairings or SSH identities. Unmount desktop-auto-mounted
+partitions before flashing. Existing OTA recovery journals require a deliberate
+migration; they cannot be copied onto newly assigned root-slot identities.
+
+For example, preview a Picade reflash using the verified removable drive:
+
+```sh
+npm run flash -- --profile picade --hostname sw-picade \
+  --device /dev/sdX --ssh-key ~/.ssh/id_ed25519.pub --dry-run
+```
 
 To configure Wi-Fi on first boot, create `wifi-creds.local` before flashing:
 
@@ -192,9 +227,11 @@ authenticated operator access. Kernel, firmware and shared boot changes remain
 outside ordinary rootfs updates. SSH host identity remains in `/data/ssh`.
 
 For client-only iteration after that bootstrap installs the maintenance guard,
-use `./update.sh --fast --user root --target picade.local` from the repository
-root (or `npm run update -- --fast --user root --target picade.local` here).
-Fast mode defaults to the separately provisioned `root` SSH identity; the
+use `./update.sh --fast --target picade.local` from the repository
+root (or `npm run update -- --fast --target picade.local` here).
+Fast mode defaults to `swadmin`, using noninteractive sudo for the guarded
+installer, root-owned staging and deployment network holds. `--user root`
+remains available for separately provisioned root SSH access. The
 runtime `spacewars` account remains available for diagnostics and data transfer.
 This builds just the
 application recipe and deploys the matching client/CLI pair, checks runtime

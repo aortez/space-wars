@@ -75,6 +75,12 @@ pub fn import_root_keys() -> Result<engine_ota::access_linux::AccessStatus> {
     Ok(engine_ota::access_linux::import_root_key(&lock)?)
 }
 
+pub fn import_admin_keys() -> Result<engine_ota::access_linux::AccessStatus> {
+    let lock = InstallLock::acquire()?;
+    authorize(&lock)?;
+    Ok(engine_ota::access_linux::import_admin_key(&lock)?)
+}
+
 fn authorize(lock: &InstallLock) -> Result<()> {
     engine_ota::bootstrap::require_no_active_bootstrap(lock)?;
     // New, unprovisioned development images may use the operator tools. Once

@@ -33,7 +33,7 @@ Usage:
 Options:
   --target <host>       Target host [default: spacewars.local]
   --host <host>         Alias for --target
-  --user <user>         SSH user [legacy: spacewars; fast: root]
+  --user <user>         SSH user [legacy: spacewars; fast: swadmin]
   --fast                Build/copy client + CLI and restart (no flash or reboot)
   --remote-tmp <path>   Remote staging directory [default: /tmp]
   --image <path>        Use a specific rootfs .ext4.gz image

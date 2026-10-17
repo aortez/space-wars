@@ -517,15 +517,18 @@ their own path. Desktop and CPU-only headless benchmarks are unchanged.
 
 ### Fast application updates
 
-After supervised bootstrap provisions root operator access and the v2 maintenance guard:
+After a current flash provisions `swadmin` and the v2 maintenance guard:
 
 ```sh
-./update.sh --fast --user root --target picade.local
-./update.sh --fast --user root --target picade.local --skip-build
-./update.sh --fast --user root --target picade.local --dry-run
+./update.sh --fast --target picade.local
+./update.sh --fast --target picade.local --skip-build
+./update.sh --fast --target picade.local --dry-run
 ```
 
-The default host is still `spacewars.local`; always specify `picade.local` for
+The default SSH user is `swadmin`; noninteractive sudo supplies the operator
+privileges. `--user root` remains supported for an independently provisioned
+root login. See the [flash access and data-preservation flow](../yocto/README.md#flash)
+for owner-key provisioning. The default host is still `spacewars.local`; always specify `picade.local` for
 the cabinet. Fast mode builds the `spacewars` recipe only (no rootfs/image),
 exports the stripped `engine-client` and `spacewars-cli` together to
 `tmp/deploy/images/raspberrypi-spacewars/spacewars-fast/`, checks their AArch64
@@ -545,7 +548,7 @@ user data/ROMs. Use the rootfs update/bootstrap path for those changes and `sync
 The fingerprint is a conservative guard, not a general OS/package upgrade tool.
 
 The runtime kiosk UID has no fast-update sudo permission. The separately
-authenticated root operator invokes `/usr/sbin/spacewars-fast-update`; its fixed
+authenticated owner invokes `/usr/sbin/spacewars-fast-update` as root; its fixed
 device-manager entry point validates arguments, acquires the shared OTA/recovery
 lock, and rejects an unresolved trial or uncompleted trial watchdog. It then
 executes a fixed private worker with the lock inherited. The worker accepts a

@@ -40,8 +40,14 @@ impl Fixture {
         let owners = Owners {
             root: unsafe { libc::geteuid() },
             kiosk: unsafe { libc::geteuid() },
+            admin: unsafe { libc::geteuid() },
         };
-        for name in ["root/.ssh", "home/spacewars/.ssh", "data"] {
+        for name in [
+            "root/.ssh",
+            "home/spacewars/.ssh",
+            "home/swadmin/.ssh",
+            "data",
+        ] {
             fs::create_dir_all(temp.path().join(name)).unwrap();
         }
         for name in [
@@ -50,6 +56,8 @@ impl Fixture {
             "home",
             "home/spacewars",
             "home/spacewars/.ssh",
+            "home/swadmin",
+            "home/swadmin/.ssh",
             "data",
         ] {
             fs::set_permissions(temp.path().join(name), Permissions::from_mode(0o755)).unwrap();
@@ -85,7 +93,7 @@ fn bootstrap_requires_both_preserved_roles_without_importing_or_promoting_keys()
     assert!(fixture.stored("root").is_empty());
     fixture.put("root/.ssh/authorized_keys", key().as_bytes());
     assert!(preserved_under(&fixture.data, fixture.owners.root).is_err());
-    import_under(&fixture.root, &fixture.data, fixture.owners).unwrap();
+    import_under(&fixture.root, &fixture.data, fixture.owners, Role::Root).unwrap();
     let status = preserved_under(&fixture.data, fixture.owners.root).unwrap();
     assert_eq!(status.root_keys, 1);
     assert_eq!(status.runtime_keys, 1);
@@ -95,6 +103,84 @@ fn bootstrap_requires_both_preserved_roles_without_importing_or_promoting_keys()
     )
     .unwrap();
     assert!(preserved_under(&fixture.data, fixture.owners.root).is_err());
+}
+
+#[test]
+fn admin_is_a_separate_persistent_role_and_revocations_survive_new_images() {
+    let fixture = Fixture::new();
+    let admin = format!("# owner provisioned during flashing\n{}", key());
+    fixture.put("home/swadmin/.ssh/authorized_keys", admin.as_bytes());
+    let status = fixture.init().unwrap();
+    assert_eq!(
+        (status.admin_keys, status.root_keys, status.runtime_keys),
+        (1, 0, 0)
+    );
+    assert_eq!(fixture.stored("swadmin"), admin.as_bytes());
+    let path = fixture.temp.path().join("data/spacewars-access/swadmin");
+    assert_eq!(fs::metadata(&path).unwrap().mode() & 0o777, 0o644);
+    fs::write(&path, b"# revoked\n").unwrap();
+    assert_eq!(fixture.init().unwrap().admin_keys, 0);
+    assert_eq!(fixture.stored("swadmin"), b"# revoked\n");
+}
+
+#[test]
+fn old_store_adds_only_an_empty_admin_role_until_an_operator_imports_it() {
+    let fixture = Fixture::new();
+    fixture.put("home/spacewars/.ssh/authorized_keys", key().as_bytes());
+    fixture.init().unwrap();
+    fs::remove_file(fixture.temp.path().join("data/spacewars-access/swadmin")).unwrap();
+    fixture.put("home/swadmin/.ssh/authorized_keys", key().as_bytes());
+    let before = fixture.stored("spacewars");
+    assert_eq!(fixture.init().unwrap().admin_keys, 0);
+    assert!(fixture.stored("swadmin").is_empty());
+    let status = import_under(&fixture.root, &fixture.data, fixture.owners, Role::Admin).unwrap();
+    assert_eq!((status.admin_keys, status.root_keys), (1, 0));
+    assert_eq!(fixture.stored("spacewars"), before);
+    fixture.put("home/swadmin/.ssh/authorized_keys", b"bad replacement\n");
+    assert_eq!(
+        import_under(&fixture.root, &fixture.data, fixture.owners, Role::Admin)
+            .unwrap()
+            .admin_keys,
+        1
+    );
+}
+
+#[test]
+fn admin_keys_reject_unsafe_files_and_do_not_inherit_runtime_authority() {
+    for fault in ["symlink", "mode", "malformed", "runtime-owner"] {
+        let mut fixture = Fixture::new();
+        fixture.put("home/spacewars/.ssh/authorized_keys", key().as_bytes());
+        fixture.init().unwrap();
+        assert_eq!(fixture.init().unwrap().admin_keys, 0);
+        assert!(import_under(&fixture.root, &fixture.data, fixture.owners, Role::Admin).is_err());
+        let path = fixture.temp.path().join("data/spacewars-access/swadmin");
+        match fault {
+            "symlink" => {
+                fs::remove_file(&path).unwrap();
+                symlink(
+                    fixture
+                        .temp
+                        .path()
+                        .join("home/spacewars/.ssh/authorized_keys"),
+                    &path,
+                )
+                .unwrap();
+            }
+            "mode" => fs::set_permissions(&path, Permissions::from_mode(0o666)).unwrap(),
+            "malformed" => fs::write(&path, b"invalid public key\n").unwrap(),
+            _ => {
+                fixture.put("home/swadmin/.ssh/authorized_keys", key().as_bytes());
+                // Model kiosk ownership: this UID is neither the selected
+                // root owner nor the configured administrator UID.
+                fixture.owners.root += 1;
+                fixture.owners.admin += 2;
+                assert!(source(&fixture.root, Role::Admin, fixture.owners).is_err());
+                continue;
+            }
+        }
+        assert!(fixture.init().is_err(), "{fault}");
+        assert!(import_under(&fixture.root, &fixture.data, fixture.owners, Role::Admin).is_err());
+    }
 }
 
 #[test]
@@ -137,7 +223,8 @@ fn first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys() {
         AccessStatus {
             initialized: true,
             root_keys: 1,
-            runtime_keys: 1
+            runtime_keys: 1,
+            admin_keys: 0
         }
     );
     assert_eq!(fixture.stored("root"), operator.as_bytes());
@@ -164,7 +251,8 @@ fn first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys() {
         AccessStatus {
             initialized: false,
             root_keys: 0,
-            runtime_keys: 0
+            runtime_keys: 0,
+            admin_keys: 0
         }
     );
     fixture.put("root/.ssh/authorized_keys", b"now malformed");
@@ -183,17 +271,18 @@ fn runtime_only_flash_never_creates_root_authority_and_operator_import_is_explic
         AccessStatus {
             initialized: true,
             root_keys: 0,
-            runtime_keys: 1
+            runtime_keys: 1,
+            admin_keys: 0
         }
     );
     assert!(fixture.stored("root").is_empty());
-    assert!(import_under(&fixture.root, &fixture.data, fixture.owners).is_err());
+    assert!(import_under(&fixture.root, &fixture.data, fixture.owners, Role::Root).is_err());
     let root = format!("# root operator\n{}", key());
     fixture.put("root/.ssh/authorized_keys", root.as_bytes());
     assert_eq!(fixture.init().unwrap().root_keys, 0);
     let before = fixture.stored("spacewars");
     assert_eq!(
-        import_under(&fixture.root, &fixture.data, fixture.owners)
+        import_under(&fixture.root, &fixture.data, fixture.owners, Role::Root)
             .unwrap()
             .root_keys,
         1
@@ -205,7 +294,7 @@ fn runtime_only_flash_never_creates_root_authority_and_operator_import_is_explic
         b"changed source, do not replace persistent root keys",
     );
     assert_eq!(
-        import_under(&fixture.root, &fixture.data, fixture.owners)
+        import_under(&fixture.root, &fixture.data, fixture.owners, Role::Root)
             .unwrap()
             .root_keys,
         1
@@ -256,7 +345,7 @@ fn invalid_or_incomplete_persistent_store_never_falls_back_to_image_keys() {
         }
         assert!(fixture.init().is_err(), "{fault}");
         assert!(
-            import_under(&fixture.root, &fixture.data, fixture.owners).is_err(),
+            import_under(&fixture.root, &fixture.data, fixture.owners, Role::Root).is_err(),
             "{fault}"
         );
     }

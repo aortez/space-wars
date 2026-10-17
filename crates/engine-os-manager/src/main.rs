@@ -105,6 +105,8 @@ enum MaintenanceCommand {
     },
     /// Explicitly import /root/.ssh/authorized_keys into an empty persistent root key file.
     ImportRootKeys,
+    /// Explicitly import /home/swadmin/.ssh/authorized_keys into an empty persistent admin role.
+    ImportAdminKeys,
     /// Install a compatible development client/CLI pair under the OTA lock.
     Fast {
         #[arg(allow_hyphen_values = true)]
@@ -376,6 +378,10 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                 MaintenanceCommand::ImportRootKeys => println!(
                     "{}",
                     serde_json::to_string(&engine_os_manager::maintenance::import_root_keys()?)?
+                ),
+                MaintenanceCommand::ImportAdminKeys => println!(
+                    "{}",
+                    serde_json::to_string(&engine_os_manager::maintenance::import_admin_keys()?)?
                 ),
                 MaintenanceCommand::Fast { arguments } => run(Request::fast(arguments)?)?,
                 MaintenanceCommand::Renderer { renderer } => run(Request::renderer(renderer)?)?,

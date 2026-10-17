@@ -5,12 +5,40 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { checkRemoteIdentity, fastUpdate, parseArgs, readBundle } from '../scripts/fast-update.mjs';
+import { checkRemoteIdentity, fastUpdate, parseArgs as parseOriginalArgs, readBundle } from '../scripts/fast-update.mjs';
 import { MACHINE, YOCTO_DIR } from '../scripts/paths.mjs';
 import { NETWORK_PROBE } from '../scripts/deployment-network.mjs';
 
+// Keep the existing direct-root transport controls; admin transport has its own test.
+const parseArgs = args => parseOriginalArgs(['--user', 'root', ...args]);
+
 const compat = 'a'.repeat(64);
 const identity = `spacewars-fast-update-v2 ${compat}`;
+
+test('default owner transport uses sudo for protection and private root-owned staging', async t => {
+  assert.equal(parseOriginalArgs([]).user, 'swadmin');
+  const f = fixture(t);
+  const calls = [];
+  const execute = async (program, args, settings) => {
+    assert.equal(program, 'ssh');
+    assert.ok(args.includes('swadmin@spacewars.local'));
+    const command = args.at(-1);
+    assert.ok(command.startsWith('sudo -n /bin/sh -c '));
+    calls.push({ command, settings });
+    if (command.includes('--check')) return identity;
+    if (command.includes('network status') || command.includes('network deployment')) {
+      return JSON.stringify({ schema: 1, error: null, availability: 'wireless-ready', status: { policy: { policy: { partial_offline: true } } } });
+    }
+    if (command.includes('mktemp -d')) return '/tmp/spacewars-fast.A123456789';
+    return '';
+  };
+  await fastUpdate(parseOriginalArgs(['--skip-build']), { execute, bundleDir: f.directory });
+  const transfers = calls.filter(call => call.settings?.input instanceof Buffer);
+  assert.equal(transfers.length, 2);
+  for (const call of transfers) assert.match(call.command, /umask 077; cat > \/tmp\/spacewars-fast\.A123456789\/(engine-client|spacewars-cli)'$/);
+  assert.match(calls.at(-2).command, /rm -f -- .*rmdir/);
+  assert.match(calls.at(-1).command, /network deployment release/);
+});
 
 function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'spacewars-fast-test-'));

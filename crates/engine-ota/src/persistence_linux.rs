@@ -57,6 +57,7 @@ const REQUIRED: &[Requirement] = &[
     // old keys. The supervised bootstrap separately requires both login roles.
     Requirement::key("data/spacewars-access/root", 0o600, true),
     Requirement::key("data/spacewars-access/spacewars", 0o644, true),
+    Requirement::key("data/spacewars-access/swadmin", 0o644, true),
 ];
 
 struct Entry {

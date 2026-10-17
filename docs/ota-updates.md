@@ -777,12 +777,13 @@ Both boards have an owner-confirmed local or independent recovery path for
 subsequent controlled trials; no failure, reboot or firmware experiment has
 yet been performed.
 
-The owner selected root-shell bootstrap access on both boards, preserving the
-existing data partitions. Root connection details remain pending; an earlier
-read-only root SSH check on the Pi 5 was rejected. Both ordinary accounts are
-now reachable, and fresh read-only inventories confirm Pi 5 slot B and Picade
-slot A. Their restricted update helpers are not a substitute for separately
-authorized root/operator access.
+The owner subsequently confirmed that no root login is available and selected
+fresh flashes with data preservation instead of the root-shell bootstrap.
+Both ordinary accounts are reachable, but their existing sudo policy permits
+only the old fixed helpers. Those grants cannot create an admin account.
+Current source adds the separate `swadmin` owner account and a data-aware flash
+flow; see [flashing and owner access](../yocto/README.md#flash). Fresh images,
+actual boot-drive selection and physical verification are still required.
 
 Workstation bootstrap packaging, legacy-device preflight, preservation tools
 and a supervised inactive-root installer are available. The first-boot runtime
@@ -1124,11 +1125,18 @@ A/B installation, fast binary replacement or generic `systemctl reboot`.
 Their `ab-update` and `ab-update-with-key` commands reject all calls, and
 `ab-boot-manager switch` is disabled. The workstation legacy script detects the
 new manager and stops before transferring an image. Existing devices retain
-their old permissions until the supervised root bootstrap migrates both slots;
+their old permissions until a fresh flash or supervised root bootstrap replaces them;
 no live Pi privilege has been changed by this source work.
 
-`./update.sh --fast --user root --target HOST` uses a separately provisioned
-root SSH identity and requires the v2 helper. The public fast-update and
+Current images include the SSH-only `swadmin` account with passwordless sudo,
+provisioned with an owner-selected public key during flashing. Its persistent
+key role is separate from the kiosk and root roles. Existing admin keys and
+revocations survive later images; a missing admin role on an older store is
+initialized empty unless an explicit operator/flash operation provisions it.
+
+`./update.sh --fast --target HOST` defaults to `swadmin` and uses noninteractive
+sudo while retaining the v2 helper's private root-owned staging. Direct root
+SSH remains available with `--user root`. The public fast-update and
 renderer wrappers enter fixed `engine-os-manager maintenance` operations. The
 manager clears inherited environment settings, validates arguments and holds
 `/run/spacewars-install/lock` across `exec` into a fixed private worker. It

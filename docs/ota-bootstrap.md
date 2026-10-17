@@ -1,6 +1,13 @@
 # Preparing the existing Pis for OTA
 
-The selected migration uses separately authenticated root access on each Pi
+The owner has selected fresh flashes for the two current Pis because neither
+has an available root login. The [flash utility](../yocto/README.md#flash)
+preserves and verifies `/data` and provisions the separate `swadmin` owner
+account. The root-shell migration below remains an alternative for devices
+that already have separately authenticated privileged access; an ordinary
+kiosk login cannot grant that access to itself.
+
+This alternative migration uses separately authenticated root access on each Pi
 and preserves its existing `/data` partition. Normal rootfs OTA cannot perform
 this first migration: the new kernel and recovery initramfs differ from the
 installed boot assets.

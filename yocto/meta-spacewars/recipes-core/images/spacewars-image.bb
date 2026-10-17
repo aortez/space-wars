@@ -21,6 +21,9 @@ EXTRA_USERS_PARAMS = " \
     groupadd -g 1000 spacewars; \
     useradd -m -u 1000 -s /bin/bash -g spacewars -G input,video,audio spacewars; \
     usermod -p '*' spacewars; \
+    groupadd -g 1001 swadmin; \
+    useradd -m -u 1001 -s /bin/bash -g swadmin swadmin; \
+    usermod -p '*' swadmin; \
 "
 
 setup_spacewars_home() {
@@ -28,6 +31,10 @@ setup_spacewars_home() {
     touch ${IMAGE_ROOTFS}/home/spacewars/.ssh/authorized_keys
     chmod 600 ${IMAGE_ROOTFS}/home/spacewars/.ssh/authorized_keys
     chown -R spacewars:spacewars ${IMAGE_ROOTFS}/home/spacewars
+    install -d -m 700 ${IMAGE_ROOTFS}/home/swadmin/.ssh
+    touch ${IMAGE_ROOTFS}/home/swadmin/.ssh/authorized_keys
+    chmod 600 ${IMAGE_ROOTFS}/home/swadmin/.ssh/authorized_keys
+    chown -R swadmin:swadmin ${IMAGE_ROOTFS}/home/swadmin
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " setup_spacewars_home;"
 
@@ -39,6 +46,12 @@ setup_spacewars_ota_sudoers() {
 # Do not restore legacy installer or general reboot grants for the kiosk UID.
 EOF
     chmod 0440 ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-ota
+    # Owner access is provisioned by the flash utility, never inherited from
+    # the kiosk's login keys. The image contains no password or shared key.
+    cat > ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-admin << 'EOF'
+swadmin ALL=(root) NOPASSWD: ALL
+EOF
+    chmod 0440 ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-admin
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " setup_spacewars_ota_sudoers;"
 
