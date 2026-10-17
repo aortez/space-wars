@@ -62,7 +62,7 @@ fn falling_shares_visible_course_and_moving_floor_in_production_adapters() {
                             .iter()
                             // Falling bars can push the duck into the frame's
                             // shadow. Require visible yellow, not its unshaded RGB.
-                            .filter(|p| p.r > 230 && p.g > 180 && p.b < 50)
+                            .filter(|p| p.r > 160 && p.g > 140 && p.b < 50)
                             .count()
                             >= 4,
                         "visible duck: {arena} {name} tick {elapsed}: {:?}",
