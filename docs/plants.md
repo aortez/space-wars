@@ -284,3 +284,89 @@ blocker diagnostics, support translation/rotation and tissue-removal refresh,
 fixed-sequence replay, aggregate local/external overflow, external identity
 conflicts and publication-tag validation. These are headless adapter claims,
 not visible host acceptance.
+
+## Grass policy (#211)
+
+`engine_core::plants::grass` adds the inspectable P3 policy toward the Garden Lab
+milestone. Policy identity is `0x6772617373000001` (grass version 1). `Traits`
+identity 1 defaults to a four-cell Chebyshev spread radius, 32 total tissues,
+size-two absorbing roots, size-one blades/runners, one growth opportunity per
+fixed tick (`growth_interval_ticks = 1`), and a finite `[30,30,30]`
+planting endowment. Retain the full `Grass` value, including trait identity,
+origin, support and local up, with host replay inputs. Traits select geometry
+and initial planting reserves; they never replace `Config` costs or survival.
+`plant()` is an explicit host planting action, not part of policy updates. It
+creates one root representing the planted germinating seed. Reproduction and
+seed dispersal are absent. Dead patches never call planting automatically.
+
+The policy consumes the shared owned `Observation` and a borrowed environment,
+returning a `Plan` of shared `Intent`s. It prioritizes establishing blades, then
+absorbing roots below runners, then lateral runner expansion, breaking ties in
+ascending tissue ID and positive/negative tangent order. It purchases at most
+one adjacent tissue per tick. All living components spend their own canonical
+shares; no lineage-wide pool crosses a severed edge. Each candidate records
+parent, target role/size/cell, available component resources, configured cost
+and an occupied/size/spread/space/support/population/work/resource/proposed limit.
+A slower configured growth cadence records `Plan::waiting = Cadence` without
+skipping physiology or maintenance.
+The authoritative ledger supplies the final post-maintenance outcome. Resource
+estimates precede that tick's intake and upkeep, so a proposal can still be
+rejected after upkeep. Each failed candidate remains inspectable. The policy
+never screens candidates by light: blades can enter shade and acquire the
+runtime's local deficit independently of their sunlit neighbors.
+
+`engine_rapier::grass::GrassEnvironment` composes the measured physiology view
+with stricter grass placement. Roots AND runners require actual solid dirt at
+the cell center. Blades require air within the terrain domain. Tissue is still
+lightweight; no per-cell rigid bodies are created. `local_up()` rotates actual
+world gravity into the canonical support's frame, then selects its dominant
+cardinal axis (ties choose Y). It rejects zero/nonfinite gravity. Construct or
+refresh the policy's up from this input when host gravity relative to support
+changes. The tangent is perpendicular to that local up, not screen horizontal.
+
+Host boundary order is: finish canonical movement/terrain synchronization;
+apply cuts/crushing via `Plants::damage` and explicit debris removal via
+`remove`; call `detach_invalid` against current grass placement/support; observe
+the remaining complete support-local tissue set; publish `PlantLight` once;
+wrap its matching environment with `GrassEnvironment`; plan and submit one
+fixed `Plants::tick`. For external lightweight occluders use the existing
+`publish_with_occluders` combined admission, never separate capped publications.
+The host must reserve the namespace and monotonically tag geometry revisions.
+Pause/zero elapsed time skips publication and physiology entirely. Accelerated
+viewing repeats these same boundaries. Fixtures use 1000 ms ticks, unchanged
+foundation costs/intake coefficients, and actual root/light inputs: size-two
+roots offer up to 8 nutrients/6 water per tick; size-one full-sun blades offer
+8 energy, while dim-room blades offer zero after integer flooring. Starting
+reserves are never topped up by the policy.
+
+Damage accepts 0..100 health loss. Killed tissue loses its canonical resource
+share and ceases intake, maintenance and growth. Its occupied cell and optical
+footprint persist until explicit removal. Surviving health can recover through
+ordinary physiology; removed blades can be repurchased from living remnants.
+`detach_invalid` removes cells whose support is lost/stale or whose current
+substrate/space is invalid, discarding their existing shares. Surviving fragments
+retain their original policy/lineage and component-local resources. A severed
+shoot can use only its retained nutrients/water and actual light; disconnection
+does not grant new soil supply. Hosts must consume the immediate topology-loss
+ledger before the next tick resets it.
+
+Planning visits at most four candidate sites per living tissue and proposes
+at most one intent. Component pools are built once using bounded graph walks;
+site scans cost O(N²), and storage is O(N) plus the at-most-4N decision trace.
+Runtime's stricter configured population/intent limits still apply. Lighting's
+256 combined local/external admission and publication-wide ray/geometry ceilings
+remain unchanged and failures must propagate to the host. Do not use multiple
+publishers to bypass those limits. The grass default of 32 tissues leaves room
+for other admitted optical geometry but is not a reservation for it.
+
+Non-ignored `grass_policy_contract` fixtures cover paid topology, policy identity,
+exact fixed-seed replay, population/decision limits, pause/zero behavior,
+inspectable resource/spread limits, sever conservation, invalid damage atomicity
+and sustained no-revival after total death. `grass_growth_contract` fixtures use
+canonical terrain and directional lighting for multi-shoot runner spread,
+translated/rotated support equivalence, independent nutrient/water/light limits,
+actual roof shade expansion and local death with healthy sunlit tissue,
+restoration before death, underground shade exemption, paid cutting/regrowth,
+query ceilings and support-loss accounting. These are deterministic headless
+claims. Garden Lab visuals, device captures, reproduction and evolution remain
+outside #211; no visible presentation or device performance is established here.

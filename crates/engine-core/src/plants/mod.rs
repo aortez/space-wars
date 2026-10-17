@@ -1,6 +1,8 @@
 //! Shared, headless plant physiology. See `docs/plants.md` for units and order.
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod grass;
+
 pub type TissueId = u64;
 pub type OrganismId = u64;
 /// Nutrients, water, chemical energy, in abstract integer resource units.
@@ -159,6 +161,17 @@ pub trait Environment {
     fn exposure(&self, tissue: &Tissue) -> Exposure;
     fn space_available(&self, cell: [i32; 2], role: Role, size: u16) -> bool;
     fn support_valid(&self, support: Option<Support>, cell: [i32; 2]) -> bool;
+}
+impl<E: Environment + ?Sized> Environment for &E {
+    fn exposure(&self, tissue: &Tissue) -> Exposure {
+        (**self).exposure(tissue)
+    }
+    fn space_available(&self, cell: [i32; 2], role: Role, size: u16) -> bool {
+        (**self).space_available(cell, role, size)
+    }
+    fn support_valid(&self, support: Option<Support>, cell: [i32; 2]) -> bool {
+        (**self).support_valid(support, cell)
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Observation {
@@ -650,6 +663,25 @@ impl Plants {
     }
     /// External damage/topology events occur between ticks. Their loss is
     /// inspectable immediately in the current ledger, before its next reset.
+    /// Cutting/crushing reduces health; a killed tissue loses its canonical share.
+    /// Dead cells remain occupied until the host explicitly removes them.
+    pub fn damage(&mut self, id: TissueId, amount: u16) -> Result<(), Rejection> {
+        if amount > 100 || !self.tissues.contains_key(&id) {
+            return Err(Rejection::Invalid);
+        }
+        if amount == 0 {
+            return Ok(());
+        }
+        self.normalize();
+        let t = self.tissues.get_mut(&id).unwrap();
+        t.health = t.health.saturating_sub(amount);
+        if t.health == 0 {
+            add(&mut self.ledger.loss, t.stores);
+            t.stores = [0; 3];
+        }
+        self.normalize();
+        Ok(())
+    }
     pub fn sever(&mut self, a: u64, b: u64) -> Result<(), Rejection> {
         if !self.edges.contains(&edge(a, b)) {
             return Err(Rejection::Invalid);
