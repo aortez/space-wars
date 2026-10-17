@@ -108,6 +108,51 @@ control/history/replay tests, and the rendered Training test at 800×480,
 1024×768 and 480×800. The final executable repeated both historical replay
 checks successfully. Formatting and whitespace checks passed.
 
+## Varied-population training trial
+
+A subsequent trial ran three generations of the unchanged v3 recipe with
+Auto at 75%: 16 candidates per generation, 172 episodes per candidate, **8,256
+episodes** total. The first population contained the retained parent and 15
+independently randomized genomes. All three populations had 16 distinct genome
+IDs, with precision completions ranging from 0 to 157. This exercises weak
+candidates as well as the retained controller.
+
+| Generation | Execution | Evaluation wall time |
+| --- | --- | ---: |
+| 1 | New run, Auto starts at one worker | 17.0 s |
+| 2 | Same process | 12.2 s |
+| 3 | Resume after saving generation 2; Auto starts at one again | 21.0 s |
+
+These times include candidate saves and exclude approximately **34 seconds of
+source reconstruction per process**. The separate preflight also took 34
+seconds. External checkpoint polling captured every candidate boundary at
+100 ms intervals; timings have approximately 0.1 second sampling uncertainty.
+Peak process RSS was **489 MiB**, including source preparation and evaluation.
+
+Auto reached an allowance of ten workers after the first two generations and
+seven after the resumed generation. Mean total machine CPU during evaluation
+was 32% and 30%, respectively. This short trial did not reach the 75% target;
+the gradual ramp and available queued work govern dispatch. It used ordinary
+background load. The separate benchmark above covers reduction under imposed
+CPU contention.
+
+Every population ID, fitness value, selected genome and generation history
+entry matched the first three generations of the historical run exactly.
+Fresh physical source receipts matched apart from the executable runtime ID.
+Both bounded invocations passed the actual checkpoint reload checks, and the
+resumed generation preserved the preceding history. The historical checkpoint
+and finalist remained unchanged.
+
+This verifies scheduling and checkpoint continuation with an evolving
+population; the saved run remains incomplete at **3 of 24 generations**. It
+does not qualify a new learned controller. The [compact trial results](data/adaptive-training-worker-trial.json)
+record the code commit, binary and recipe hashes, timings, resource observations
+and checks. Raw logs, observer scripts, all candidate checkpoints and the
+resumable run are retained in
+`data/training-experiments/training-worker-trial-20261017/`.
+
+## Reproduce the scaling benchmark
+
 `learned_guidance_worker_scaling` replays the historical finalist on all 172
 training episodes. It checks source hashes, saved fitness, and complete episode
 results. Fixed 1/2/4/8 each run three times in interleaved order. It then runs

@@ -1,0 +1,190 @@
+{
+  "source_commit": "a03e2fbcebc5a3b318bda4abc5e81996d6eff23e",
+  "binary_sha256": "b72c0be839c9bf562218555e554dc77f76174899418584395a139b343168879a",
+  "recipe": "docs/data/learned-guidance-match-training-v3-plan.json",
+  "recipe_sha256": "3476822c8624a0f9425720c2a3950a87acc0800bd8d2b7f441730b032f9e13ad",
+  "hardware": "AMD Ryzen 7 9800X3D, 8 cores / 16 hardware threads",
+  "profile": "ci, Rust 1.89.0",
+  "workers": {
+    "mode": "auto",
+    "target_cpu_percent": 75,
+    "max_workers": 0
+  },
+  "raw": "data/training-experiments/training-worker-trial-20261017",
+  "scope": "First three generations of the unchanged 24-generation v3 recipe; 32 candidate stop then 16 candidate resume. No finalist or promotion.",
+  "measurement": "wait4 per-process peak RSS and CPU; 100 ms external polling of all candidate checkpoint publications; worker snapshots at candidate boundaries. Generation times exclude source reconstruction, include saves, and have approximately 0.1 second sampling uncertainty. No induced background load.",
+  "checks": {
+    "physical_preflight_parity": true,
+    "history_population_and_fitness_parity": true,
+    "resume_preserved_history": true,
+    "historical_artifacts_unchanged": true,
+    "complete_experiment": false,
+    "completed_generations": 3,
+    "completed_candidates": 48,
+    "completed_episodes": 8256,
+    "checks_passed": true,
+    "peak_rss_kib": 500960
+  },
+  "final_checkpoint_sha256": "42fb342235c19eadf55156fc1eb5bc8747c02be498eb2e6ebe19dd9a7950eb82",
+  "phases": [
+    {
+      "mode": "preflight",
+      "wall_seconds": 33.876299429997744,
+      "peak_rss_mib": 367.75
+    },
+    {
+      "mode": "train",
+      "wall_seconds": 63.16547323899431,
+      "peak_rss_mib": 489.21875,
+      "setup_seconds": 33.774957074994745,
+      "evaluation_seconds": 29.289592370005266,
+      "episodes": 5504,
+      "mean_machine_cpu_percent_during_evaluation": 32.33728227144051,
+      "observed_all_candidate_checkpoints": true,
+      "final_allowed_workers": 10,
+      "worker_transitions": [
+        {
+          "evaluation_seconds": 2.305729733001499,
+          "allowed": 2,
+          "machine_cpu_percent": 13.607990012484395
+        },
+        {
+          "evaluation_seconds": 5.2134924860001775,
+          "allowed": 3,
+          "machine_cpu_percent": 14.191729323308271
+        },
+        {
+          "evaluation_seconds": 7.31947477599897,
+          "allowed": 4,
+          "machine_cpu_percent": 19.19096895578551
+        },
+        {
+          "evaluation_seconds": 10.227820770000108,
+          "allowed": 5,
+          "machine_cpu_percent": 25.22635029659694
+        },
+        {
+          "evaluation_seconds": 13.135949939001875,
+          "allowed": 6,
+          "machine_cpu_percent": 29.98435054773083
+        },
+        {
+          "evaluation_seconds": 18.654382510001597,
+          "allowed": 7,
+          "machine_cpu_percent": 34.679186228482
+        },
+        {
+          "evaluation_seconds": 22.56646158300282,
+          "allowed": 8,
+          "machine_cpu_percent": 40.21604938271605
+        },
+        {
+          "evaluation_seconds": 26.58089928800473,
+          "allowed": 9,
+          "machine_cpu_percent": 49.95296331138288
+        },
+        {
+          "evaluation_seconds": 29.289592370005266,
+          "allowed": 10,
+          "machine_cpu_percent": 45.75101912825337
+        }
+      ]
+    },
+    {
+      "mode": "resume",
+      "wall_seconds": 54.73858686300082,
+      "peak_rss_mib": 487.6875,
+      "setup_seconds": 33.675221274999785,
+      "evaluation_seconds": 20.96219107700017,
+      "episodes": 2752,
+      "mean_machine_cpu_percent_during_evaluation": 29.76781605601354,
+      "observed_all_candidate_checkpoints": true,
+      "final_allowed_workers": 7,
+      "worker_transitions": [
+        {
+          "evaluation_seconds": 2.305985963997955,
+          "allowed": 2,
+          "machine_cpu_percent": 18.09494451294698
+        },
+        {
+          "evaluation_seconds": 4.712154215994815,
+          "allowed": 3,
+          "machine_cpu_percent": 21.944357611753674
+        },
+        {
+          "evaluation_seconds": 6.518263972997374,
+          "allowed": 4,
+          "machine_cpu_percent": 33.55058969584109
+        },
+        {
+          "evaluation_seconds": 13.137835918001656,
+          "allowed": 5,
+          "machine_cpu_percent": 27.547169811320753
+        },
+        {
+          "evaluation_seconds": 18.55431564099854,
+          "allowed": 6,
+          "machine_cpu_percent": 31.7794028031688
+        },
+        {
+          "evaluation_seconds": 20.96219107700017,
+          "allowed": 7,
+          "machine_cpu_percent": 34.72396486825596
+        }
+      ]
+    }
+  ],
+  "generations": [
+    {
+      "generation": 1,
+      "phase": "train",
+      "seconds": 17.049179893001565,
+      "episodes": 2752,
+      "unique_population_ids": 16,
+      "retained_completed_range": [
+        0,
+        157
+      ],
+      "approach_completed_range": [
+        0,
+        10
+      ],
+      "best_id": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb"
+    },
+    {
+      "generation": 2,
+      "phase": "train",
+      "seconds": 12.240412477003701,
+      "episodes": 2752,
+      "unique_population_ids": 16,
+      "retained_completed_range": [
+        0,
+        157
+      ],
+      "approach_completed_range": [
+        0,
+        10
+      ],
+      "best_id": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb"
+    },
+    {
+      "generation": 3,
+      "phase": "resume",
+      "seconds": 20.96219107700017,
+      "episodes": 2752,
+      "unique_population_ids": 16,
+      "retained_completed_range": [
+        0,
+        157
+      ],
+      "approach_completed_range": [
+        2,
+        10
+      ],
+      "best_id": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb"
+    }
+  ],
+  "source_preparation_note": "Each harness invocation reconstructs the physical sources, taking approximately 34 seconds before candidate evaluations. The standalone preflight is additional. Generation times exclude that setup.",
+  "auto_note": "Short batches allowed gradual growth under ordinary background load; this trial did not reach the 75 percent target or inject competing CPU load. The separate scaling benchmark exercises backing off under load. Resume starts a fresh pool at one worker.",
+  "interpretation": "Performance and reproducibility check only. Three of 24 planned generations completed; no new learning conclusion, reserved validation, finalist, or deployment."
+}
