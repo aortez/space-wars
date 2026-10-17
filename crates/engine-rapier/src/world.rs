@@ -36,8 +36,9 @@ mod forecast_body;
 mod query_snapshot;
 mod surface_drive;
 pub use query_snapshot::{
-    AreaValidation, CapsuleQuery, QueryArea, QueryChange, QueryColliderState, QueryFrame,
-    QueryRegion, QuerySnapshot, RegionChanges,
+    AreaValidation, CapsuleQuery, LightingVisibility, MAX_LIGHT_COLLIDERS, MAX_LIGHT_FOOTPRINTS,
+    MAX_OPTICAL_EXCLUSIONS, OpaqueFootprint, QueryArea, QueryChange, QueryColliderState,
+    QueryFrame, QueryRegion, QuerySnapshot, RegionChanges, VisibilityCounters, light_collider_id,
 };
 pub use surface_drive::SurfaceDrive;
 
@@ -725,8 +726,26 @@ struct PhysicsSnapshot {
     collect_events: bool,
 }
 
+/// Calling-thread counters for detecting accidental worlds/steps in consumers.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PhysicsActivity {
+    pub worlds: u64,
+    pub steps: u64,
+}
+thread_local! {
+    static PHYSICS_ACTIVITY: std::cell::Cell<PhysicsActivity> = const { std::cell::Cell::new(PhysicsActivity { worlds: 0, steps: 0 }) };
+}
+pub fn physics_activity() -> PhysicsActivity {
+    PHYSICS_ACTIVITY.get()
+}
+
 impl PhysicsWorld {
     pub fn new(config: PhysicsWorldConfig) -> Self {
+        PHYSICS_ACTIVITY.with(|cell| {
+            let mut c = cell.get();
+            c.worlds += 1;
+            cell.set(c);
+        });
         let config = normalized_world_config(config);
         let mut raw = RapierWorld {
             gravity: to_rapier(config.gravity),
@@ -1226,6 +1245,11 @@ impl PhysicsWorld {
             self.sensor_intersections.clear();
             return PhysicsStepMetrics::default();
         }
+        PHYSICS_ACTIVITY.with(|cell| {
+            let mut c = cell.get();
+            c.steps += 1;
+            cell.set(c);
+        });
         self.raw.integration_parameters.dt = dt_seconds;
 
         // Rapier 0.34 interpolates a position-based target over each CCD

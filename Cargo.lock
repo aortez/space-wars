@@ -1487,6 +1487,7 @@ dependencies = [
  "engine-common",
  "engine-core",
  "engine-nes",
+ "engine-rapier",
  "engine-terrain",
  "femtovg",
  "futures-lite",

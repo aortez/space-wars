@@ -29,6 +29,8 @@ mod ipc;
 #[cfg(test)]
 mod keyboard_tests;
 mod launcher;
+#[cfg(test)]
+mod lighting_presentation_contract;
 mod match_world;
 mod native_video;
 mod nes_audio;

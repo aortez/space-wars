@@ -6,6 +6,7 @@ pub mod bounds;
 pub mod color;
 pub mod config;
 pub mod constants;
+pub mod lighting;
 pub mod math;
 pub mod physics;
 pub mod planning;
