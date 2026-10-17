@@ -63,13 +63,14 @@ fixture also passed the remaining provisioning operation against the actual
 archived access store and account files from the frozen image, preserving all
 role files unchanged and leaving root access empty.
 
-Resume this particular drive with
-`python3 target/flash-spacewars-replacement.py --finish-access`. This verifies
-the installed image and restored data, finishes access provisioning, and
-performs the final read-only data check. It does not repeat the image write,
-partition resize or data restoration. `--finish-access --dry-run` passed.
-Execution still needs the owner's interactive workstation sudo authentication;
-do not boot until it prints `READY`.
+The owner's `--finish-access` execution has now completed. It verified the
+installed image and all 18,148 restored entries, preserved administrator access,
+and passed the final read-only data check before unmounting and printing
+`READY`. The workstation completion receipt was inspected, and all four USB
+partitions were independently observed unmounted. No image write, partition
+resize or data restoration was repeated during this final invocation.
+The replacement is ready to move to the powered-off Pi 5; first boot, network
+access, running image/media identity and kiosk health still need verification.
 
 This operator command pins the reviewed image, data archive and helper hashes,
 plus the connected disk's model, capacity, USB path and connection sequence. Its
@@ -92,8 +93,8 @@ Seven focused tests passed in an isolated root container, including foreign
 numeric owners, hard/symbolic links, xattrs, damaged archives, unsafe paths and
 destination conflicts. A further isolated root-container rehearsal restored
 the actual archive's entire selected tree and verified all 18,148 entries,
-including numeric ownership. Replacement-device restoration has now passed;
-completion of access provisioning, final readback and boot remain pending.
+including numeric ownership. Replacement-device restoration, access
+provisioning and final readback have passed; first boot remains pending.
 The complete Yocto suite passes 70 Node tests and 87 Python tests, with one
 skipped in each. The focused hardware suite has 16 passing tests.
 A fresh flash still needs its own recovery-baseline qualification; these tests

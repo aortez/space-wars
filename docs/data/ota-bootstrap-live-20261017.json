@@ -11,7 +11,7 @@
     "active_slot": "a",
     "target_slot": "b",
     "package_sha256": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
-    "status": "blocked by source medium read errors before root installation",
+    "status": "original disk migration stopped on medium errors; replacement flashed, restored and verified, awaiting first boot",
     "raw_backup_failure": {
       "partition": "/dev/sda3",
       "copied_bytes": 3123773440,
@@ -82,8 +82,7 @@
       "device_written": true,
       "physical_restore_verified": true,
       "boot_verified": false,
-      "pending": "interactive workstation sudo authentication to finish access provisioning and final readback; subsequent Pi 5 boot",
-      "resume_command": "python3 target/flash-spacewars-replacement.py --finish-access",
+      "pending": "move the replacement drive to the powered-off Pi 5 and verify first boot, running image/media identity, SSH access and kiosk health",
       "resume_dry_run_passed": true,
       "completed_before_profile_failure": {
         "evidence": "owner-provided terminal output; independently observed resulting partition layout",
@@ -101,7 +100,7 @@
         "regression_reproduced_exact_error": true,
         "fix": "privileged presence/identity reads and profile write readback; finish path repeats provisioning after checking image identity",
         "hardware_tests_passed": 16,
-        "physical_finish_pending": true
+        "physical_finish_pending": false
       },
       "full_data_restore_rehearsal": {
         "archive": {
@@ -123,7 +122,7 @@
         "extended_attributes_verified": true,
         "scope": "actual selected data archive restored into isolated root-container tmpfs; replacement-device restoration and boot remain pending"
       },
-      "physical_final_readback_verified": false,
+      "physical_final_readback_verified": true,
       "restoration_completed": {
         "evidence": "owner-provided --finish execution output",
         "boot_and_root_identity_verified": true,
@@ -151,6 +150,31 @@
         "root_access_remained_empty": true,
         "role_bytes_owners_modes_and_link_counts_unchanged": true,
         "scope": "isolated root fixture with actual archived access store and frozen-image account files; no physical disk changes"
+      },
+      "access_provisioning_completed": true,
+      "ready_for_first_boot": true,
+      "completed_resume_command": "python3 target/flash-spacewars-replacement.py --finish-access",
+      "completion": {
+        "receipt_path": "target/spacewars-replacement-complete.json",
+        "receipt_sha256": "8fdb09536efb9e796c9d16ddba0a3126c3bc2700b0934add796d0c1168d2f06d",
+        "receipt": {
+          "schema": 1,
+          "image_source": "04b6cb75f8639772e2de4bd86fe1ae795614be04",
+          "device": "/dev/sdb",
+          "archive": {
+            "bytes": 1504819712,
+            "sha256": "019a557c17edee5034a6c34ce1aa28ef69507b11fdf5c04864882b67e7405b8b"
+          },
+          "mapped_image_readback_this_invocation": false,
+          "data_restored_this_invocation": false,
+          "data_and_access_verified": true,
+          "filesystems_unmounted": true
+        },
+        "receipt_inspected": true,
+        "user_reported_administrator_access": "preserved",
+        "user_reported_final_verified_entries": 18148,
+        "all_four_partitions_observed_unmounted": true,
+        "boot_verified": false
       }
     }
   },
@@ -176,7 +200,7 @@
     }
   },
   "remaining": [
-    "Flash the selected Pi 5 replacement, verify its restored data and boot, then prepare a new bootstrap binding.",
+    "Verify first boot and hardware identity on the completed Pi 5 replacement, then prepare a new bootstrap binding.",
     "Revalidate the Picade after its reboot, then complete root installation, staged/canonical health checks and baseline handoff.",
     "Qualify failure recovery and physical restoration on both board types.",
     "Provision production trust, publish signed candidates and integrate user installation policy."
