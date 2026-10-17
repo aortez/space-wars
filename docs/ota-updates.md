@@ -17,8 +17,12 @@ integration and Pi failure qualification remain outstanding.
 [#256](https://github.com/aortez/space-wars/issues/256), plus a separate network
 coordinator and scheduled download worker, described below. Its local APIs expose
 bounded time/update checks, channel selection and network policy. Installation,
-reboot and arbitrary-command operations are not exposed. The service has not yet
-been enabled on either physical kiosk.
+reboot and arbitrary-command operations are not exposed. The freshly flashed
+kiosks run the device service; production trust and automatic installation
+remain unprovisioned. The [live bootstrap record](data/ota-bootstrap-live-20261017.json)
+tracks the current migration and preservation checks. Pi 5 migration is stopped
+before installation because its USB drive reported medium read errors; its
+data/configuration archive has been independently exported and checked.
 
 Remaining work retains the full OTA scope:
 

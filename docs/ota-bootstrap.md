@@ -1,11 +1,10 @@
 # Preparing the existing Pis for OTA
 
-The owner has selected fresh flashes for the two current Pis because neither
-has an available root login. The [flash utility](../yocto/README.md#flash)
-preserves and verifies `/data` and provisions the separate `swadmin` owner
-account. The root-shell migration below remains an alternative for devices
-that already have separately authenticated privileged access; an ordinary
-kiosk login cannot grant that access to itself.
+The initial fresh flashes provisioned the separate `swadmin` owner account on
+the Pis. The [flash utility](../yocto/README.md#flash) preserves and verifies
+`/data` during that operation. The supervised migration below now uses this
+separately authenticated privileged access; an ordinary kiosk login cannot
+grant that access to itself.
 
 This alternative migration uses separately authenticated root access on each Pi
 and preserves its existing `/data` partition. Normal rootfs OTA cannot perform
@@ -20,11 +19,56 @@ inactive-root installer, independent-export verifiers, restartable boot staging,
 consumed one-shot activation, a first-boot recovery coordinator, and restartable
 canonical asset preparation/activation with separate staged and canonical
 normal-boot health checks, and an explicit archive/cleanup/recovery handoff.
-**Remaining:** live preservation and independent exports, effective legacy
-privilege/access/service qualification, live root installation and staging,
+**Remaining:** completing preservation on the Pi 5 after resolving its storage
+fault, effective legacy privilege/access/service qualification, live root installation and staging,
 live one-shot trial activation, supervised staged/canonical boot verification,
 live finalization and physical failure qualification. A package is not a signed
 OTA candidate or an enabled updater.
+
+The [2026-10-17 hardware record](data/ota-bootstrap-live-20261017.json) tracks
+the current run. The Picade has completed raw, data/configuration and original-file
+backups with independently verified workstation exports, plus the fixed fallback
+file replacements and independent administrator/runtime access checks. SSH was
+lost before the inactive-root installation command began. A subsequent check
+found a new boot ID, the original slot A still selected, the replacement manager
+intact, and both kiosk and device services active. Installation and staging have
+not started; the cause of that reboot has not been established.
+
+The Pi 5's raw
+inactive-root copy stopped on medium read errors before installation; its boot
+copy and a separate data/configuration export are retained off-device.
+
+### Replacement Pi 5 USB drive
+
+The owner selected the connected 128 GB SanDisk Extreme Pro as the replacement
+for `spacewars.local` and explicitly approved erasing its Ubuntu installer and
+writable partition. The prepared workstation command is
+`python3 target/flash-spacewars-replacement.py`, with `--dry-run` for inspection.
+The dry run passed; no replacement-device write has occurred yet. Execution
+still needs the owner's interactive workstation sudo authentication.
+
+This operator command pins the reviewed image, data archive and helper hashes,
+plus the connected disk's model, capacity, USB path and connection sequence. Its
+serial is all zeroes, so that value alone is insufficient to select the disk.
+After exact-path confirmation, it removes the old partition signatures, writes
+the clean `04b6cb7` image, reads back all 637,599,744 mapped image bytes, grows
+`/data`, and selects hostname `spacewars` and the HyperPixel profile.
+
+The [archive restoration helper](../yocto/scripts/recovery_archive.py) restores
+only the archived `/data` tree into the separately mounted offline partition.
+It verifies 18,148 selected entries, including real numeric owners, contents,
+modes, links, nanosecond timestamps and extended attributes. Root configuration
+from the failing disk stays in the recovery archive; active bootstrap/recovery
+journals are rejected. Existing unrelated destination files or mismatched path
+types also stop restoration. Wi-Fi, SSH host identity and the separate access
+store are in the selected data. Access provisioning is followed by another
+read-only data verification before the command prints `READY`.
+
+Seven focused tests passed in an isolated root container, including foreign
+numeric owners, hard/symbolic links, xattrs, damaged archives, unsafe paths and
+destination conflicts. The actual replacement restore and boot remain pending.
+A fresh flash still needs its own recovery-baseline qualification; these tests
+do not enable automatic OTA installation.
 
 ## Read the existing device
 
@@ -148,7 +192,11 @@ The older schema 2 workstation kits are
 clean `c14c53f` rootfs and its exact replacement assets. Their board, profile and
 slot choices still require a fresh live preflight on the intended device. They
 predate the bootstrap runtime and preservation checks and are rejected by the
-current package checker. No schema 3 runtime image or kits have been built yet.
+current package checker. Clean source `04b6cb7` now has a protocol-5 Yocto image
+and schema-3 kits for both freshly flashed devices, targeting slot B. Those
+artifacts include the corrected watchdog kernel and SSH admission fixes.
+The [live preservation record](data/ota-bootstrap-live-20261017.json) records
+their use and the hardware limitations; neither kit is a signed OTA release.
 
 ## Root package check and preparation reservation
 
@@ -271,7 +319,10 @@ Raw-copy completion still reports `ready_for_write: false`. These copies do not
 cover current `/data` contents or all configuration on the running root; that
 preservation, independent recovery availability, legacy privilege closure,
 installation checkpoints and physical restore testing remain required. No raw
-backup command has been executed on either installed Pi yet.
+backup is installation authority. The Pi 5's first live inactive-root copy
+stopped on repeated medium read errors; its completed boot copy was exported,
+and no root image or selector was changed. Keep the incomplete copy and
+reservation as evidence, and resolve the storage fault before retrying migration.
 
 ```sh
 cargo build --locked -p engine-ota --example bootstrap_backup \
@@ -342,9 +393,11 @@ cargo run --locked -p engine-ota --example bootstrap_verify_data_backup -- \
 
 Restoration must first be rehearsed in a fresh private directory using a tool
 that preserves tar extended attributes. Neither this command nor its verifier
-restores an archive onto a live root/data filesystem. No data/configuration copy
-has been taken from an installed Pi yet; actual root access, independent export
-and supervised restore qualification remain outstanding.
+restores an archive onto a live root/data filesystem. The current Picade archive
+has passed independent export verification and workstation extraction checks
+for contents, modes, links and nanosecond timestamps. Numeric owners remain in
+the archive; the unprivileged rehearsal did not recreate those owners or qualify
+physical restoration.
 
 ## Direct off-device data recovery
 
@@ -379,7 +432,7 @@ not an atomic snapshot of the running filesystem.
 It writes only private preparation files on `/data`; it never replaces a live
 root file or changes a service, boot selector or radio state.
 
-The fixed selection is the manager executable plus the 17 package replacements.
+The fixed selection is the manager executable plus the 20 package replacements.
 The record includes each destination path, intended mode and replacement hash;
 each original's contents, numeric ownership, mode, inode/device, modification
 and change timestamps, and extended attributes; and the identities or absence
@@ -396,7 +449,7 @@ and record, and publishes them together by a no-replace directory rename:
 ```text
 /data/spacewars-bootstrap/active/legacy-root/
   record.json
-  original-00.bin ... original-17.bin
+  original-00.bin ... original-20.bin
 ```
 
 The numbered files correspond to the explicitly recorded replacement list;
@@ -423,8 +476,8 @@ cargo run --locked -p engine-ota --example bootstrap_verify_legacy -- \
   /path/to/exported-active DEVICE_REPORTED_RECEIPT_SHA256
 ```
 
-These original copies do not restore files onto a live device. No installed Pi
-original-file preparation has run yet.
+These original copies do not restore files onto a live device. The current
+Picade's 21 originals have been captured and independently exported and verified.
 
 ## Replace fixed fallback-root files
 
@@ -445,7 +498,7 @@ and non-sticky writable directories are rejected. These checks complement the
 supervised quiet window; they do not exclude another root operator deliberately
 changing files or launching commands concurrently.
 
-The fixed 18 destinations and their modes come from the checked preservation
+The fixed 21 destinations and their modes come from the checked preservation
 receipt. Missing parent directories are created in parent order. An additional
 root-filesystem capacity check allows space to retain old inodes. The journal is
 private `/data/spacewars-bootstrap/active/legacy-migration/record.json`, bound to
@@ -474,7 +527,13 @@ and exchanged old inodes are not deleted by this phase.
 The report always says `ready_for_trial: false`. This command does not reload
 services, alter boot selectors, open a watchdog, write partition images or reboot.
 Effective sudo/SSH/service validation and separate operator/runtime login tests must
-follow before any trial. Neither installed Pi root has been changed by this work.
+follow before any trial. The Picade has completed this phase and its independent
+administrator/runtime login and denial checks. The first native attempt exposed
+an EOF cursor retained by package validation; `6d350bd` rewinds each source before
+verification. Its regression reproduced the failure before the fix, and all 16
+replacement tests passed afterward. The failed attempt wrote no migration journal
+or root files; the corrected operator tool replaced all 21 checked files using
+the unchanged `04b6cb7` package.
 
 ## Check access after replacement
 
