@@ -27,6 +27,11 @@ const DAY: i64 = 24 * 60 * 60;
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub prepared_at: Timestamp,
+    /// A publisher journal can reserve a later version after an interrupted or
+    /// abandoned attempt. It must advance the supplied signed parent; the
+    /// selected number is bound into the proposal before any key is read.
+    #[serde(default)]
+    pub version: Option<NonZeroU64>,
     pub change: Change,
 }
 
@@ -201,7 +206,7 @@ impl Authority {
                     .transpose()?;
                 let mut next = Targets::new(
                     "1.0.0".into(),
-                    next_version(prior.as_ref().map(|p| p.version))?,
+                    next_version(prior.as_ref().map(|p| p.version), request.version)?,
                     expires,
                 );
                 if let Some(prior) = &prior {
@@ -236,7 +241,7 @@ impl Authority {
             }
             Change::TargetsRenewal {} => {
                 let mut next = self.targets.clone();
-                next.version = next_version(Some(next.version))?;
+                next.version = next_version(Some(next.version), request.version)?;
                 if expires < next.expires {
                     return Err(invalid("policy renewal would shorten its expiry"));
                 }
@@ -285,7 +290,7 @@ impl Authority {
                     .transpose()?;
                 let mut next = Snapshot::new(
                     "1.0.0".into(),
-                    next_version(prior.as_ref().map(|p| p.version))?,
+                    next_version(prior.as_ref().map(|p| p.version), request.version)?,
                     expires,
                 );
                 next.meta = HashMap::from([
@@ -320,7 +325,7 @@ impl Authority {
                     .transpose()?;
                 let mut next = tough::schema::Timestamp::new(
                     "1.0.0".into(),
-                    next_version(prior.as_ref().map(|p| p.version))?,
+                    next_version(prior.as_ref().map(|p| p.version), request.version)?,
                     after(request.prepared_at, 7 * DAY)?,
                 );
                 next.meta.insert(
@@ -348,6 +353,23 @@ impl Authority {
             body,
             approval_bytes,
         })
+    }
+
+    /// Reconstruct an already signed response after an interrupted collection.
+    /// This permits verification after the approval's one-day signing window,
+    /// while enforcing current authority and the original metadata expiry.
+    /// sign() still refuses to read credentials for an old proposal.
+    pub fn prepare_verification(&self, request: Request, now: UsableTime) -> Result<Proposal> {
+        self.current(now)?;
+        let prepared_at = request.prepared_at;
+        if prepared_at > now.0 {
+            return Err(invalid("signed response is future-dated"));
+        }
+        let proposal = self.prepare(request, UsableTime(prepared_at))?;
+        if proposal.body.expires() <= now.0 {
+            return Err(invalid("signed response metadata has expired"));
+        }
+        Ok(proposal)
     }
 
     /// Keys are first read after approval, current authority and proposal age
@@ -436,28 +458,59 @@ impl Authority {
             Body::Snapshot(snapshot) => sign(snapshot.clone(), &holder, &loaded).await?,
             Body::Timestamp(timestamp) => sign(timestamp.clone(), &holder, &loaded).await?,
         };
-        if bytes.len() > MAX_METADATA_BYTES {
-            return Err(invalid("signed role exceeds metadata limit"));
+        self.verify_signed(proposal, approved, &bytes, now)?;
+        Ok(bytes)
+    }
+
+    /// Check a separately produced signature before retaining its exact bytes.
+    /// This reads no credentials and does not authorize the proposal itself.
+    pub fn verify_signed(
+        &self,
+        proposal: &Proposal,
+        approved: Sha256,
+        bytes: &[u8],
+        now: UsableTime,
+    ) -> Result<()> {
+        if proposal.authority != self.fingerprint || proposal.digest() != approved {
+            return Err(invalid(
+                "signed response differs from independently admitted approval",
+            ));
+        }
+        self.current(now)?;
+        if proposal.prepared_at > now.0 || proposal.body.expires() <= now.0 {
+            return Err(invalid("signed response is future-dated or expired"));
+        }
+        let value: serde_json::Value = parse(bytes)?;
+        if canonical(&value["signed"])? != canonical(&proposal.body.value()?)? {
+            return Err(invalid("signed response differs from the exact proposal"));
         }
         match &proposal.body {
             Body::Channel(channel, _) => {
-                self.channel_role(*channel, &bytes)?;
+                self.channel_role(*channel, bytes)?;
             }
             Body::Targets(_) => {
-                self.root_role::<Targets>(&bytes)?;
+                self.root_role::<Targets>(bytes)?;
             }
             Body::Snapshot(_) => {
-                self.root_role::<Snapshot>(&bytes)?;
+                self.root_role::<Snapshot>(bytes)?;
             }
             Body::Timestamp(_) => {
-                self.root_role::<tough::schema::Timestamp>(&bytes)?;
+                self.root_role::<tough::schema::Timestamp>(bytes)?;
             }
         }
-        Ok(bytes)
+        Ok(())
     }
 }
 
 impl Body {
+    fn expires(&self) -> Timestamp {
+        match self {
+            Self::Channel(_, targets) | Self::Targets(targets) => targets.expires,
+            Self::Snapshot(snapshot) => snapshot.expires,
+            Self::Timestamp(timestamp) => timestamp.expires,
+        }
+    }
+
     fn name(&self) -> &'static str {
         match self {
             Self::Channel(channel, _) => channel.name(),
@@ -528,12 +581,19 @@ fn metafile(version: NonZeroU64, bytes: &[u8]) -> Metafile {
         _extra: HashMap::new(),
     }
 }
-fn next_version(previous: Option<NonZeroU64>) -> Result<NonZeroU64> {
-    previous
+fn next_version(previous: Option<NonZeroU64>, reserved: Option<NonZeroU64>) -> Result<NonZeroU64> {
+    let next = previous
         .map_or(0, NonZeroU64::get)
         .checked_add(1)
         .and_then(NonZeroU64::new)
-        .ok_or_else(|| invalid("metadata version exhausted"))
+        .ok_or_else(|| invalid("metadata version exhausted"))?;
+    match reserved {
+        Some(version) if version < next => {
+            Err(invalid("reserved metadata version must advance the parent"))
+        }
+        Some(version) => Ok(version),
+        None => Ok(next),
+    }
 }
 fn fresh(prepared: Timestamp, now: UsableTime) -> Result<()> {
     if prepared > now.0 || now.0 > after(prepared, DAY)? {

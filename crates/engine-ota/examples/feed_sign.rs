@@ -81,7 +81,7 @@ mod linux {
         clock: impl Fn() -> UsableTime,
     ) -> Result<(Vec<u8>, Option<Sha256>), Box<dyn std::error::Error + Send + Sync>> {
         if args.len() < 4 {
-            return Err("usage: feed_sign TRUSTED_ROOT TRUSTED_TARGETS REQUEST preview|APPROVED_SHA256 [PRIVATE_KEY ...]".into());
+            return Err("usage: feed_sign TRUSTED_ROOT TRUSTED_TARGETS REQUEST preview | APPROVED_SHA256 PRIVATE_KEY... | verify APPROVED_SHA256 SIGNED_ROLE".into());
         }
         let now = clock();
         let authority = Authority::load(
@@ -89,15 +89,32 @@ mod linux {
             &read(Path::new(&args[1]), MAX_METADATA_BYTES, false)?,
             now,
         )?;
-        let proposal = authority.prepare(
-            Request::parse(&read(Path::new(&args[2]), MAX_REQUEST_BYTES, false)?)?,
-            now,
-        )?;
+        let request = Request::parse(&read(Path::new(&args[2]), MAX_REQUEST_BYTES, false)?)?;
+        let proposal = if args[3] == "verify" {
+            authority.prepare_verification(request, now)?
+        } else {
+            authority.prepare(request, now)?
+        };
         if args[3] == "preview" {
             if args.len() != 4 {
                 return Err("preview must not receive signing credentials".into());
             }
             Ok((proposal.approval_bytes().to_vec(), Some(proposal.digest())))
+        } else if args[3] == "verify" {
+            if args.len() != 6 {
+                return Err(
+                    "verification requires only the approved digest and signed role".into(),
+                );
+            }
+            let approved = Sha256::try_from(args[4].to_str().ok_or("invalid digest")?.to_owned())?;
+            let bytes = read(Path::new(&args[5]), MAX_METADATA_BYTES, false)?;
+            authority.verify_signed(&proposal, approved, &bytes, clock())?;
+            let receipt = serde_json::json!({
+                "schema": 1,
+                "proposal_sha256": proposal.digest(),
+                "signed_sha256": Sha256::digest(&bytes),
+            });
+            Ok((serde_json::to_vec(&receipt)?, None))
         } else {
             let approved = Sha256::try_from(args[3].to_str().ok_or("invalid digest")?.to_owned())?;
             let keys: Vec<Box<dyn KeySource>> = args[4..]
@@ -245,6 +262,37 @@ mod linux {
             args[3] = digest.unwrap().to_string().into();
             let (signed, preview) = execute(&args, || support::time().unwrap()).await.unwrap();
             assert!(preview.is_none());
+            let response = directory.path().join("signed-response.json");
+            std::fs::write(&response, &signed).unwrap();
+            drop(file);
+            std::fs::remove_file(&args[4]).unwrap();
+            let verify = [
+                args[0].clone(),
+                args[1].clone(),
+                args[2].clone(),
+                "verify".into(),
+                digest.unwrap().to_string().into(),
+                response.into(),
+            ];
+            let (receipt, _) = execute(&verify, || support::time().unwrap()).await.unwrap();
+            let receipt: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+            assert_eq!(receipt["proposal_sha256"], digest.unwrap().to_string());
+            assert_eq!(
+                receipt["signed_sha256"],
+                Sha256::digest(&signed).to_string()
+            );
+            let later = UsableTime(
+                support::time()
+                    .unwrap()
+                    .0
+                    .checked_add(jiff::SignedDuration::from_secs(86401))
+                    .unwrap(),
+            );
+            let (retained, _) = execute(&verify, || later).await.unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&retained).unwrap(),
+                receipt
+            );
             let signed: tough::schema::Signed<tough::schema::Targets> =
                 serde_json::from_slice(&signed).unwrap();
             top.signed()

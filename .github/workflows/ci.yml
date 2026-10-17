@@ -32,11 +32,18 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Install image fixture tools
-        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends e2fsprogs
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends e2fsprogs python3-cryptography
       - name: Test updater, metadata, image and publisher fixtures
         # Reexec/crash-recovery tests share an executable: do not rebuild it
         # concurrently, and run these fixtures serially in their own job.
         run: cargo test --locked -p engine-ota --features publisher --all-targets -- --test-threads=1
+      - name: Build publisher fixture tools
+        run: cargo build --locked -p engine-ota --features publisher --example feed_sign --example feed_inventory
+      - name: Exercise resumable publication with disposable keys
+        run: |
+          /usr/bin/python3 .github/ci/ota_publisher_fixture.py \
+            --signer target/debug/examples/feed_sign \
+            --inventory target/debug/examples/feed_inventory
       - name: Lint OTA publisher
         run: cargo clippy --locked -p engine-ota --features publisher --all-targets -- -D warnings
 

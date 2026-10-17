@@ -18,11 +18,228 @@ async fn context(images: &[ImageDescriptor]) -> (Fixture, support::MemoryTranspo
 fn request(change: Change) -> Request {
     Request {
         prepared_at: support::NOW.parse().unwrap(),
+        version: None,
         change,
     }
 }
 fn text(feed: &support::MemoryTransport, name: &str) -> String {
     String::from_utf8(feed.files[name].clone()).unwrap()
+}
+
+#[tokio::test]
+async fn reserved_versions_skip_abandoned_numbers_and_bind_every_role_proposal() {
+    let (_, feed, authority) = context(&[]).await;
+    let changes = [
+        Change::Channel {
+            channel: Channel::Nightly,
+            previous: Some(text(&feed, "1.nightly.json")),
+            image: None,
+        },
+        Change::Channel {
+            channel: Channel::Release,
+            previous: Some(text(&feed, "1.release.json")),
+            image: None,
+        },
+        Change::TargetsRenewal {},
+        Change::Snapshot {
+            previous: Some(text(&feed, "1.snapshot.json")),
+            targets: text(&feed, "1.targets.json"),
+            release: text(&feed, "1.release.json"),
+            nightly: text(&feed, "1.nightly.json"),
+        },
+        Change::Timestamp {
+            previous: Some(text(&feed, "timestamp.json")),
+            snapshot: text(&feed, "1.snapshot.json"),
+        },
+    ];
+    for change in changes {
+        let mut selected = request(change);
+        selected.version = NonZeroU64::new(9);
+        let proposal = authority
+            .prepare(selected, support::time().unwrap())
+            .unwrap();
+        let approval: serde_json::Value =
+            serde_json::from_slice(proposal.approval_bytes()).unwrap();
+        assert_eq!(approval["signed"]["version"], 9);
+    }
+    let ordinary = authority
+        .prepare(request(Change::TargetsRenewal {}), support::time().unwrap())
+        .unwrap();
+    let mut selected = request(Change::TargetsRenewal {});
+    selected.version = NonZeroU64::new(9);
+    let reserved = authority
+        .prepare(selected, support::time().unwrap())
+        .unwrap();
+    assert_ne!(ordinary.digest(), reserved.digest());
+    let mut selected = request(Change::TargetsRenewal {});
+    selected.version = NonZeroU64::new(1);
+    assert!(
+        authority
+            .prepare(selected, support::time().unwrap())
+            .is_err()
+    );
+}
+
+#[test]
+fn version_reservations_reject_zero_rollback_and_exhaustion() {
+    assert_eq!(next_version(None, None).unwrap().get(), 1);
+    assert_eq!(
+        next_version(NonZeroU64::new(4), NonZeroU64::new(9))
+            .unwrap()
+            .get(),
+        9
+    );
+    assert!(next_version(NonZeroU64::new(4), NonZeroU64::new(4)).is_err());
+    assert!(next_version(NonZeroU64::new(u64::MAX), None).is_err());
+    assert!(next_version(NonZeroU64::new(u64::MAX), NonZeroU64::new(u64::MAX)).is_err());
+    for version in ["0", "18446744073709551616"] {
+        let raw = format!(
+            r#"{{"prepared_at":"{}","version":{},"change":{{"role":"targets-renewal"}}}}"#,
+            support::NOW,
+            version
+        );
+        assert!(Request::parse(raw.as_bytes()).is_err());
+    }
+}
+
+#[tokio::test]
+async fn returned_signature_must_match_exact_approved_body_and_authority() {
+    let (fixture, feed, authority) = context(&[]).await;
+    let proposal = authority
+        .prepare(
+            request(Change::Channel {
+                channel: Channel::Nightly,
+                previous: Some(text(&feed, "1.nightly.json")),
+                image: None,
+            }),
+            support::time().unwrap(),
+        )
+        .unwrap();
+    let signed = authority
+        .sign(
+            &proposal,
+            proposal.digest(),
+            &fixture.signing_keys(&[6]),
+            support::time().unwrap(),
+        )
+        .await
+        .unwrap();
+    authority
+        .verify_signed(
+            &proposal,
+            proposal.digest(),
+            &signed,
+            support::time().unwrap(),
+        )
+        .unwrap();
+    assert!(
+        authority
+            .verify_signed(
+                &proposal,
+                Sha256::digest(b"other approval"),
+                &signed,
+                support::time().unwrap()
+            )
+            .is_err()
+    );
+    let mut changed: serde_json::Value = serde_json::from_slice(&signed).unwrap();
+    changed["signed"]["version"] = 3.into();
+    assert!(
+        authority
+            .verify_signed(
+                &proposal,
+                proposal.digest(),
+                &serde_json::to_vec(&changed).unwrap(),
+                support::time().unwrap()
+            )
+            .is_err()
+    );
+    let mut changed: serde_json::Value = serde_json::from_slice(&signed).unwrap();
+    changed["signatures"][0]["sig"] = "00".repeat(64).into();
+    assert!(
+        authority
+            .verify_signed(
+                &proposal,
+                proposal.digest(),
+                &serde_json::to_vec(&changed).unwrap(),
+                support::time().unwrap()
+            )
+            .is_err()
+    );
+    let (_, _, other) = context(&[]).await;
+    assert!(
+        other
+            .verify_signed(
+                &proposal,
+                proposal.digest(),
+                &signed,
+                support::time().unwrap()
+            )
+            .is_err()
+    );
+    let later = UsableTime(after(support::time().unwrap().0, DAY + 1).unwrap());
+    authority
+        .verify_signed(&proposal, proposal.digest(), &signed, later)
+        .unwrap();
+}
+
+#[tokio::test]
+async fn retained_response_verification_does_not_reopen_signing_or_extend_expiry() {
+    let (fixture, feed, authority) = context(&[]).await;
+    let selected = || {
+        request(Change::Timestamp {
+            previous: Some(text(&feed, "timestamp.json")),
+            snapshot: text(&feed, "1.snapshot.json"),
+        })
+    };
+    let now = support::time().unwrap();
+    let proposal = authority.prepare(selected(), now).unwrap();
+    let signed = authority
+        .sign(
+            &proposal,
+            proposal.digest(),
+            &fixture.signing_keys(&[3]),
+            now,
+        )
+        .await
+        .unwrap();
+    let later = UsableTime(after(now.0, DAY + 1).unwrap());
+    let retained = authority.prepare_verification(selected(), later).unwrap();
+    assert_eq!(retained.digest(), proposal.digest());
+    authority
+        .verify_signed(&retained, proposal.digest(), &signed, later)
+        .unwrap();
+    let reads = Arc::new(AtomicUsize::new(0));
+    let keys: Vec<Box<dyn KeySource>> = fixture
+        .signing_keys(&[3])
+        .into_iter()
+        .map(|inner| {
+            Box::new(Counted {
+                reads: reads.clone(),
+                inner,
+            }) as Box<dyn KeySource>
+        })
+        .collect();
+    assert!(
+        authority
+            .sign(&retained, proposal.digest(), &keys, later)
+            .await
+            .is_err()
+    );
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+    let expired = UsableTime(after(now.0, 7 * DAY).unwrap());
+    assert!(authority.prepare_verification(selected(), expired).is_err());
+    assert!(
+        authority
+            .verify_signed(&retained, proposal.digest(), &signed, expired)
+            .is_err()
+    );
+    let before = UsableTime(
+        now.0
+            .checked_sub(jiff::SignedDuration::from_secs(1))
+            .unwrap(),
+    );
+    assert!(authority.prepare_verification(selected(), before).is_err());
 }
 
 #[derive(Debug)]
@@ -652,7 +869,7 @@ async fn metadata_limits_expiry_and_version_exhaustion_are_enforced() {
     future.prepared_at = after(future.prepared_at, 1).unwrap();
     assert!(authority.prepare(future, support::time().unwrap()).is_err());
     assert!(Request::parse(&vec![b' '; MAX_REQUEST_BYTES + 1]).is_err());
-    assert!(next_version(NonZeroU64::new(u64::MAX)).is_err());
+    assert!(next_version(NonZeroU64::new(u64::MAX), None).is_err());
     assert!(
         authority
             .prepare(

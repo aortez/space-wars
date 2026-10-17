@@ -1610,7 +1610,8 @@ policy functions as the device verifier. The caller must supply the latest
 trusted policy and parent metadata from retained publisher state; accepting an
 arbitrary candidate's root or old signed parent would not establish freshness.
 
-The public request has `prepared_at` plus a tagged `change` object. Supported
+The public request has `prepared_at`, an optional reserved `version`, and a tagged
+`change` object. Supported
 operations are:
 
 - `channel`: select `release` or `nightly`, supply its signed `previous` role,
@@ -1632,9 +1633,12 @@ changing channel authority remain separate offline/management work. The publishe
 must still enforce historical generation allocation and deliberate retention;
 this helper appends/renews catalogs and does not remove targets.
 
-Proposals increment the selected parent metadata version, use 30-day
+Proposals advance the selected parent metadata version, use 30-day
 targets/snapshot and seven-day timestamp lifetimes, and bind the precise
 authority, parent, prepared time and unsigned role in canonical approval bytes.
+Without `version`, the next parent version is used. A supplied reservation must
+be strictly newer than the parent; gaps allow a durable journal to preserve
+numbers consumed by abandoned attempts. Zero, rollback and exhaustion reject.
 A proposal must not be future-dated or older than 24 hours when signed. Each job
 must independently admit that exact proposal digest before exposing credentials.
 The digest binds the proposed operation; it does not prove that source CI, Yocto
@@ -1661,6 +1665,10 @@ target/debug/examples/feed_sign trusted-root.json current-targets.json request.j
 # The isolated caller supplies the independently admitted proposal digest.
 target/debug/examples/feed_sign trusted-root.json current-targets.json request.json \
   "$APPROVED_PROPOSAL_SHA256" /private/selected-role-key.pkcs8 > signed-role.json
+
+# Retain a separately produced response only after checking the exact proposal.
+target/debug/examples/feed_sign trusted-root.json current-targets.json request.json \
+  verify "$APPROVED_PROPOSAL_SHA256" signed-role.json
 ```
 
 Preview receives no keys and emits the exact bytes whose digest it reports.
@@ -1669,6 +1677,13 @@ owned by the executing account, inaccessible to other accounts and singly
 linked; symlinks and oversized inputs are rejected. Credential errors are
 redacted. This helper does not generate, log or write private keys. The tests use
 ephemeral credentials, including a two-signature Release policy.
+
+The verification command receives no credentials. It verifies the exact approved
+body, current authority and signature threshold, then reports the proposal and
+signed-file digests. An already signed response can be verified after the
+24-hour signing window, until its original metadata expiry. Reconstructing that
+old proposal never reopens signing: the signer rejects its age before reading
+any key. No retry extends the original expiry.
 
 Before production use, the caller still needs pinned trusted tooling, GitHub
 run/artifact admission, same-source build qualification, separate protected
@@ -1694,6 +1709,75 @@ composition into a feed accepted by Release and Nightly consumers. Clippy,
 formatting, and Rust 1.89 checks for both publisher and default service builds
 pass. The [signing evidence](data/ota-signing-20261016.json) records the exact
 source, logs and remaining workflow/production prerequisites.
+
+## Durable publisher checkpoints
+
+[`ota_publisher_journal.py`](../.github/ci/ota_publisher_journal.py) retains public
+publisher state: the current signed roles, highest reserved role versions,
+image generations and complete immutable identities, successful channel
+publications, and a pending transaction's exact requests, proposals and signed
+responses. A reservation must be persisted before it is exposed to a signer.
+Preparation and signature collection are separate checkpoints. The helper uses
+the independently selected `feed_sign` binary without private keys to preview
+and verify responses; candidate paths cannot select the executable or root.
+
+An identical retry keeps its preparation time, versions, generation and saved
+signature bytes. A conflicting intent is rejected until the pending attempt is
+reconciled. Abandonment requires quiescent old signer/delivery jobs under the
+shared writer lock and a fresh public observation matching the old publication.
+It consumes every reserved version and retains the image's generation. If the
+public timestamp has advanced, that publication must be reconciled first.
+
+Nightly assigns a generation once per complete image identity. Reusing the
+payload with different immutable fields rejects. Release promotion uses an
+already successfully published Nightly payload and its original generation; it
+requires nonempty notes and a retained Pi qualification digest. Checking those
+notes, the actual Pi evidence, and maintainer approval remains the protected
+workflow's responsibility. A renewal updates all five online roles without
+allocating an image generation. Final confirmation requires the independently
+verified manifest and a matching fresh public readback after timestamp-last
+delivery.
+
+[`ota_publisher_checkpoint.py`](../.github/ci/ota_publisher_checkpoint.py) stores
+these bounded public checkpoints on a separate `ota-publisher-state` Git
+branch. Each commit binds the exact state's SHA-256 and has only the previously
+observed checkpoint as its parent. No working-tree checkout or hooks run.
+Non-forced reference updates reject competing sibling commits; successful
+updates with lost acknowledgements reconcile by exact parent and bytes.
+GitHub documents the [fast-forward reference update contract](https://docs.github.com/en/rest/git/refs#update-a-reference).
+The shared cross-channel workflow lock still applies to the whole publication.
+Previous commits preserve abandoned requests and signature bytes.
+
+Missing or corrupt state never initializes itself. Bootstrap must separately
+admit an empty genesis feed verified by `feed_inventory`, its independently
+selected root and exact initial checkpoint. Before activation, protect this
+branch against force-push and deletion, restrict its writers, and verify those
+protections in the workflow. No branch, protection, key, environment or public
+feed has been created by these local tests. Root rotation and retention still
+need explicit state transitions; this version rejects root replacement and
+preserves all generation history.
+
+The fixture command exercises the real signing and inventory tools, journal,
+checkpoint adapter and delivery adapter with disposable keys and mocked GitHub:
+
+```sh
+cargo build --locked -p engine-ota --features publisher \
+  --example feed_sign --example feed_inventory
+python3 .github/ci/ota_publisher_fixture.py \
+  --signer target/debug/examples/feed_sign \
+  --inventory target/debug/examples/feed_inventory
+```
+
+It abandons version 2, loses one successful checkpoint acknowledgement, publishes
+Nightly at version 3, promotes the same generation to Release at version 4, then
+renews at version 5. The actual 131,792,120-byte qualified host rootfs passed the
+same path. This verifies signed catalogs and exact payload delivery with fake
+GitHub responses; it does not prove live CI admission, device selection or a Pi
+boot. CI now requires the small disposable-key fixture. Local validation passed
+341 Rust cases (316 unit, 22 integration, three CLI; eight opt-in cases ignored),
+175 Python cases, Clippy, formatting, both workflow lint checks and Rust 1.89
+publisher/service checks. The [checkpoint evidence](data/ota-publisher-journal-20261016.json)
+records the exact files, logs and outstanding production integration.
 
 ## Feed delivery under development
 

@@ -322,7 +322,7 @@ class GitHub:
         self.token = token
         self.base = f'https://api.github.com/repos/{self.repo}'
 
-    def request(self, method, url, payload=None, *, length=None):
+    def request(self, method, url, payload=None, *, length=None, response_limit=MAX_MANIFEST_BYTES):
         raw = LimitedReader(payload, length) if length is not None else (
             json.dumps(payload).encode() if payload is not None else None)
         headers = {'Authorization': f'Bearer {self.token}',
@@ -336,11 +336,11 @@ class GitHub:
         # the next serialized invocation, which reads reservation and asset state.
         try:
             with urllib.request.build_opener(NoRedirect()).open(request, timeout=120) as response:
-                data = response.read(MAX_MANIFEST_BYTES + 1)
+                data = response.read(response_limit + 1)
         except urllib.error.HTTPError as error:
             error.close()
             raise
-        if len(data) > MAX_MANIFEST_BYTES:
+        if len(data) > response_limit:
             raise ValueError('GitHub JSON response exceeds limit')
         return strict_json(data) if data else None
 

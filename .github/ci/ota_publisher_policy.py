@@ -18,7 +18,8 @@ BUILD_JOBS = (('Build and qualify Pi rootfs candidate', (
     'Build image validator', 'Build selected source in isolated container',
     'Qualify and package exact image', 'Upload unsigned candidate')),)
 CI_JOBS = (
-    ('OTA updater and publisher', ('Test updater, metadata, image and publisher fixtures', 'Lint OTA publisher')),
+    ('OTA updater and publisher', ('Test updater, metadata, image and publisher fixtures',
+        'Build publisher fixture tools', 'Exercise resumable publication with disposable keys', 'Lint OTA publisher')),
     ('Pi hardware profiles and update safety', ('Verify unprivileged installer sandbox',
         'Test Pi deployment helpers', 'Lint Pi deployment scripts')),
     ('NES core, golden tests, and benchmark', ('Check Rust formatting', 'Test core and scenarios',
