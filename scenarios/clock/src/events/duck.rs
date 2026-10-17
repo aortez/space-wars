@@ -136,6 +136,7 @@ impl DuckEvent {
             return false;
         }
         self.clear_ledge_command();
+        self.stop_automatic_ledge();
         // Keep an open exit open. Otherwise give the player a short delay before
         // its normal opening animation, without changing the current phase.
         let exit_at_tick = (self.tick + PLAYER_EXIT_DELAY_TICKS).clamp(
@@ -552,7 +553,10 @@ impl DuckEvent {
                 .expect("duck hull and non-overlapping course water"),
             _ => BuoyancyReport::default(),
         };
-        if self.drive_ledge() {
+        self.decide_automatic_ledge();
+        let ledge_driven = self.drive_ledge();
+        self.observe_automatic_ledge();
+        if ledge_driven {
             self.paddling = false;
             if let Some(player) = &mut self.player {
                 player.jump_pending = false;
@@ -560,6 +564,7 @@ impl DuckEvent {
             }
             self.world.as_mut().unwrap().step(DT);
             self.finish_ledge_step();
+            self.observe_automatic_ledge();
             return;
         }
         let grounded = self.grounded();
@@ -911,6 +916,7 @@ impl DuckEvent {
             ledge: self.ledge.stats,
             outcome: self.outcome,
             navigation: self.player.is_none().then(|| ClockDuckNavigationState {
+                ledge: self.ledge.automatic.stats,
                 recovery: self.controller.recovery.stats,
                 water: self.controller.water.stats,
                 jump_profile: self.controller.profile,

@@ -32,6 +32,16 @@ fn ledge_fixtures_render_through_both_adapters() {
     );
 }
 
+#[test]
+#[ignore = "exports SPACEWARS_DUCK_AUTO_LEDGE_FRAMES to SPACEWARS_DUCK_AUTO_LEDGE_ARTIFACTS"]
+fn automatic_ledge_fixtures_render_through_both_adapters() {
+    render_fixtures(
+        "SPACEWARS_DUCK_AUTO_LEDGE_FRAMES",
+        "SPACEWARS_DUCK_AUTO_LEDGE_ARTIFACTS",
+        36,
+    );
+}
+
 fn render_fixtures(source_env: &str, output_env: &str, count: usize) {
     let source = std::env::var_os(source_env).expect("scenario fixture file");
     let output = std::path::PathBuf::from(std::env::var_os(output_env).expect("capture directory"));

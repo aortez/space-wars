@@ -15,6 +15,19 @@ pub(super) struct Edge {
 }
 
 impl Edge {
+    pub fn in_reach(self, duck: &DuckEvent) -> bool {
+        let world = duck.world.as_ref().unwrap();
+        let motion = world.motion(DUCK_BODY).unwrap();
+        let offset = motion.position - self.anchor(world).unwrap();
+        let relative = motion.linear_velocity - self.velocity(world).unwrap();
+        let r = duck.radius;
+        offset.length() <= r * REACH_RADII
+            && (0.3 * r..=2.0 * r).contains(&(offset.x * self.outward))
+            && (-2.0 * r..=-0.1 * r).contains(&offset.y)
+            && relative.x * self.outward <= r * 2.0
+            && relative.length() <= r * DISRUPTION_SPEED_RADII
+    }
+
     pub fn anchor(self, world: &PhysicsWorld) -> Option<Vec2> {
         let motion = world.motion(self.body)?;
         Some(motion.position + self.local_anchor.rotate_radians(motion.angle))

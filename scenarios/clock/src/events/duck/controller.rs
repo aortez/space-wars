@@ -344,6 +344,20 @@ impl Navigator {
 }
 
 impl Controller {
+    pub fn ledge_ready(&self) -> bool {
+        self.trial.is_none()
+            && self.heights.count >= 2
+            && self.speeds.count >= 9
+            && !self.water_active()
+            && self.capabilities().is_some()
+    }
+
+    pub fn interrupt_for_ledge(&mut self) {
+        self.interrupt_route();
+        self.recovery.clear();
+        self.behavior = ClockDuckBehavior::SeekingSupport;
+    }
+
     fn interrupt_route(&mut self) {
         self.trial = None;
         self.previous_speed = 0.0;
