@@ -542,14 +542,17 @@ impl NetworkPolicy {
             return Ok(());
         }
         // A live session or incomplete observer may prevent idle cleanup for
-        // hours. A new root SSH admission can replace expired SSH reservations
-        // because its fresh hold preserves uninterrupted network protection.
-        // Other reservation kinds retain their existing recovery grace.
+        // hours. A new SSH or setup admission can replace expired SSH
+        // reservations because its fresh hold preserves network protection.
+        // Releasing it still requires observed idle and the normal quiet grace
+        // before shutdown. Other hold kinds keep their existing recovery grace.
         let replaced: Vec<_> = self
             .temporary
             .iter()
             .filter_map(|(id, hold)| {
-                (kind == HoldKind::Ssh && hold.kind == HoldKind::Ssh && hold.expires_ms <= clock.ms)
+                (matches!(kind, HoldKind::Ssh | HoldKind::Setup)
+                    && hold.kind == HoldKind::Ssh
+                    && hold.expires_ms <= clock.ms)
                     .then_some(*id)
             })
             .collect();

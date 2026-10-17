@@ -845,7 +845,7 @@ fn new_ssh_admission_replaces_expired_ssh_holds_without_requiring_idle() {
         );
         assert!(
             policy
-                .reserve(&token(40), caller(2), HoldKind::Setup, &clock(SETUP_MS))
+                .reserve(&token(40), caller(2), HoldKind::TimeCheck, &clock(SETUP_MS))
                 .is_err()
         );
         assert!(
@@ -873,10 +873,76 @@ fn new_ssh_admission_replaces_expired_ssh_holds_without_requiring_idle() {
 }
 
 #[test]
-fn ssh_replacement_preserves_capacity_and_reservations_if_the_commit_fails() {
-    for point in ["written", "file-synced", "renamed", "directory-synced"] {
+fn setup_replaces_only_expired_ssh_holds_when_sessions_are_busy_or_unknown() {
+    for activity in [
+        Activity::default(),
+        Activity {
+            ssh_sessions: Some(true),
+            ..idle()
+        },
+    ] {
         let temp = tempfile::tempdir().unwrap();
         let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();
+        enable(&mut policy);
+        let root = Caller {
+            uid: 0,
+            ..caller(1)
+        };
+        for (n, kind) in [HoldKind::Setup, HoldKind::TimeCheck, HoldKind::Deployment]
+            .into_iter()
+            .enumerate()
+        {
+            policy
+                .reserve(&token(n as u8), caller(1), kind, &clock(0))
+                .unwrap();
+        }
+        for n in 3..MAX_HOLDS as u8 {
+            policy
+                .reserve(&token(n), root, HoldKind::Ssh, &clock(u64::from(n == 31)))
+                .unwrap();
+        }
+        observe_through(&mut policy, 1, SETUP_MS, activity);
+        assert!(
+            policy
+                .reserve(&token(40), caller(2), HoldKind::Setup, &clock(SETUP_MS - 1))
+                .is_err()
+        );
+        policy
+            .reserve(&token(40), caller(2), HoldKind::Setup, &clock(SETUP_MS))
+            .unwrap();
+        let status = policy.status(&clock(SETUP_MS)).unwrap();
+        assert_eq!(status.holds.len(), 5);
+        assert_eq!(status.intent, Intent::Available);
+        for n in [0, 1, 31, 40] {
+            assert!(policy.temporary.contains_key(&token(n).id()));
+        }
+        assert_eq!(policy.record.deployments.len(), 1);
+        // Setup cannot impersonate another reservation or extend its own cap
+        // by retrying an admission whose response was lost.
+        assert!(
+            policy
+                .reserve(&token(31), caller(2), HoldKind::Setup, &clock(SETUP_MS))
+                .is_err()
+        );
+        policy
+            .reserve(&token(40), caller(2), HoldKind::Setup, &clock(SETUP_MS + 1))
+            .unwrap();
+        assert_eq!(policy.temporary[&token(40).id()].expires_ms, SETUP_MS * 2);
+    }
+}
+
+#[test]
+fn releasing_replacement_setup_requires_observed_idle_before_radio_shutdown() {
+    for activity in [
+        Activity::default(),
+        Activity {
+            ssh_sessions: Some(true),
+            ..idle()
+        },
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();
+        enable(&mut policy);
         let root = Caller {
             uid: 0,
             ..caller(1)
@@ -886,20 +952,63 @@ fn ssh_replacement_preserves_capacity_and_reservations_if_the_commit_fails() {
                 .reserve(&token(n), root, HoldKind::Ssh, &clock(0))
                 .unwrap();
         }
-        assert!(
-            policy
-                .reserve(&token(40), root, HoldKind::Ssh, &clock(SETUP_MS - 1))
-                .is_err()
+        observe_through(&mut policy, 0, SETUP_MS, activity);
+        policy
+            .reserve(&token(40), caller(2), HoldKind::Setup, &clock(SETUP_MS))
+            .unwrap();
+        assert_eq!(policy.status(&clock(SETUP_MS)).unwrap().holds.len(), 1);
+        policy
+            .release(&token(40), caller(2), &clock(SETUP_MS + 1))
+            .unwrap();
+        observe_through(&mut policy, SETUP_MS + 1, SETUP_MS * 2 + 1, activity);
+        assert_ne!(
+            policy.status(&clock(SETUP_MS * 2 + 1)).unwrap().intent,
+            Intent::MayDisable
         );
-        policy.fail_save_at(point);
-        assert!(
-            policy
-                .reserve(&token(40), root, HoldKind::Ssh, &clock(SETUP_MS))
-                .is_err()
+        let quiet = SETUP_MS * 2 + 2;
+        observe_through(&mut policy, quiet, quiet + QUIET_MS - 1, idle());
+        assert_eq!(
+            policy.status(&clock(quiet + QUIET_MS - 1)).unwrap().intent,
+            Intent::QuietGrace
         );
-        assert_eq!(policy.temporary.len(), MAX_HOLDS);
-        assert!(!policy.temporary.contains_key(&token(40).id()));
-        assert!(policy.status(&clock(SETUP_MS)).is_err());
+        policy.observe(idle(), &clock(quiet + QUIET_MS)).unwrap();
+        assert_eq!(
+            policy.status(&clock(quiet + QUIET_MS)).unwrap().intent,
+            Intent::MayDisable
+        );
+    }
+}
+
+#[test]
+fn ssh_replacement_preserves_capacity_and_reservations_if_the_commit_fails() {
+    for kind in [HoldKind::Ssh, HoldKind::Setup] {
+        for point in ["written", "file-synced", "renamed", "directory-synced"] {
+            let temp = tempfile::tempdir().unwrap();
+            let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();
+            let root = Caller {
+                uid: 0,
+                ..caller(1)
+            };
+            for n in 0..MAX_HOLDS as u8 {
+                policy
+                    .reserve(&token(n), root, HoldKind::Ssh, &clock(0))
+                    .unwrap();
+            }
+            assert!(
+                policy
+                    .reserve(&token(40), root, kind, &clock(SETUP_MS - 1))
+                    .is_err()
+            );
+            policy.fail_save_at(point);
+            assert!(
+                policy
+                    .reserve(&token(40), root, kind, &clock(SETUP_MS))
+                    .is_err()
+            );
+            assert_eq!(policy.temporary.len(), MAX_HOLDS);
+            assert!(!policy.temporary.contains_key(&token(40).id()));
+            assert!(policy.status(&clock(SETUP_MS)).is_err());
+        }
     }
 }
 

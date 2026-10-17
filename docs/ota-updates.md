@@ -436,10 +436,11 @@ to continue; it does not claim Wi-Fi or Internet readiness. An independently off
 radio in mode Off stays off, preserving Ethernet logins. A policy-owned off state
 must be restored first, and an uncertain prior command cannot produce a successful
 admission. Expired holds remain protective while live sessions or unknown activity
-remain. A new root SSH admission can replace expired SSH holds with its fresh
-120-second hold, maintaining uninterrupted protection without needing to prove
-idle first. Otherwise an active session or an incomplete observer could keep all
-32 slots occupied indefinitely and prevent new logins before the SSH banner.
+remain. A new root SSH admission or Wi-Fi setup admission can replace expired
+SSH holds with its fresh 120-second hold, maintaining protection without needing
+to prove idle first. Otherwise an active session or an incomplete observer could
+keep all 32 slots occupied indefinitely and prevent new logins before the SSH
+banner or prevent the Wi-Fi setup screen from opening.
 Replacement happens only after the policy commit succeeds; unexpired holds and
 all other hold kinds retain their existing limits and recovery grace. Without a
 replacement admission, reaping still requires a quiet, complete observation.
@@ -458,6 +459,20 @@ The temporary service override was removed afterwards and the installed binary
 hash verified; the fix is not yet permanently installed. The stalled primary
 Picade's hold count could not be read.
 [SSH admission comparison and restoration evidence](data/ota-ssh-admission-20261017.json).
+
+The original SSH fix did not reclaim those slots for setup. A regression using
+the kiosk's shared `SetupHold` client and the real Unix-socket coordinator
+reproduced `network setup protection is unavailable` with 32 expired SSH holds.
+Setup can now replace those expired SSH holds; live SSH holds and other kinds
+remain protected. Releasing setup cannot permit shutdown until session activity
+is known idle and the full quiet grace passes. Tests cover busy and unknown
+observers, ownership, capacity, idempotent replies, and failed durable commits.
+The serial manager suite passes 160 tests, and both normally skipped root-peer
+client integrations pass in an isolated user namespace with a fake radio.
+The primary Picade's reported setup error is consistent with this failure, but
+its previous boot's journal was unavailable after the user's reboot; the exact
+historical cause remains unconfirmed.
+[Setup admission reproduction](data/ota-setup-admission-20261017.json).
 
 The helper has a 45-second socket/retry budget and reuses one capability. Its unit
 wants and follows the device service without requiring successful startup. If the

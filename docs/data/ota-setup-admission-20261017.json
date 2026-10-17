@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "source_before_fix": "b8fb994",
+  "case": "Wi-Fi setup admission with a full table of expired SSH reservations",
+  "controls": {
+    "root_coordinator": "real Unix-socket server with private temporary state",
+    "setup_client": "spacewars_control::network::SetupHold used by the kiosk",
+    "radio": "fake; no writes observed",
+    "ssh_sessions": "busy; policy fixtures also cover unknown activity",
+    "holds": 32,
+    "expiry_ms": 120000
+  },
+  "before": {
+    "policy_error": "network hold capacity reached",
+    "shared_client_error": "network setup protection is unavailable"
+  },
+  "after": {
+    "setup_admit_renew_release": "passed",
+    "preserves_unexpired_ssh_and_other_hold_kinds": true,
+    "release_requires_idle_observation_and_quiet_grace": true,
+    "durable_commit_faults": "all four write boundaries preserve original reservations"
+  },
+  "validation": {
+    "manager_serial": {
+      "passed": 160,
+      "failed": 0,
+      "ignored": 2
+    },
+    "root_peer_integrations": {
+      "passed": 2,
+      "failed": 0,
+      "execution": "unshare --user --map-root-user; private state and fake radio"
+    },
+    "clippy": "passed with -D warnings",
+    "first_parallel_suite": {
+      "passed": 158,
+      "failed": 2,
+      "ignored": 2,
+      "failures": [
+        "network_controller::tests::timeout_never_acknowledges_a_hold_or_disappears_on_service_restart: network policy already has an owner",
+        "time_query::tests::rejected_method_reply_cannot_replenish_the_provider_allowance: device schedule already has an owner"
+      ],
+      "followup": "complete suite passed serially without changing code; cause of parallel ownership failures not established"
+    }
+  },
+  "picade_report": {
+    "boot_id_after_user_reboot": "18c00abc-873b-4b79-9e07-5f3ba94a2c01",
+    "network_after_reboot": "wireless enabled and available; game and system service active",
+    "historical_cause": "unconfirmed; previous boot journal unavailable",
+    "archive": "target/ota-picade-reboot-20261017"
+  },
+  "limits": [
+    "Host regression uses a fake radio; it does not qualify physical automatic radio shutdown.",
+    "The installed Picade image still predates these fixes."
+  ],
+  "artifacts": {
+    "target/ota-setup-reclaim-before.log": {
+      "bytes": 1028,
+      "sha256": "ea76360dc365ddb96cbb853b2effee8b1c70996475779fa39af2bf5019b3ebf6"
+    },
+    "target/ota-setup-client-before.log": {
+      "bytes": 720,
+      "sha256": "816aeaa5193f2f499f0d1bd3093dcbdc5151548f1c6cf77ff809a7cc34b35f1f"
+    },
+    "target/ota-setup-reclaim-tests.log": {
+      "bytes": 18688,
+      "sha256": "c0159af658b18b6217e6f559ad50b4e4d9ef3554a830c490e841c58685ebd4f4"
+    },
+    "target/ota-setup-reclaim-tests-serial.log": {
+      "bytes": 17471,
+      "sha256": "940acd670595aab06f0faf27a74a869f62d223a7d3aa646315da6215fb273b09"
+    },
+    "target/ota-setup-client-after.log": {
+      "bytes": 313,
+      "sha256": "478a3fbca9e9a59af56f525c24e0984f4ae6c42077eb1e8e753798ebcd57db8b"
+    },
+    "target/ota-setup-reclaim-clippy.log": {
+      "bytes": 173,
+      "sha256": "e807ad7a43486ad494999dcd846c3584d3930e51763b1313a90521c6ebf0e84d"
+    }
+  }
+}

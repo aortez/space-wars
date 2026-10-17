@@ -9,6 +9,7 @@ use std::sync::Mutex;
 struct World {
     ms: u64,
     radio: Observation,
+    activity: Activity,
     writes: Vec<bool>,
     barrier: Option<(SyncSender<()>, Receiver<()>)>,
 }
@@ -33,6 +34,12 @@ impl Fake {
                 ethernet_available: false,
                 wireless_available: true,
             },
+            activity: Activity {
+                ssh_sessions: Some(false),
+                checkpoints: Some(false),
+                install_lock: Some(false),
+                operations: Some(false),
+            },
             writes: Vec::new(),
             barrier: None,
         })))
@@ -47,16 +54,13 @@ impl Backend for Fake {
         })
     }
     fn snapshot(&mut self) -> Result<Snapshot> {
+        let clock = self.clock()?;
+        let world = self.0.lock().unwrap();
         Ok(Snapshot {
             change: None,
-            clock: self.clock()?,
-            radio: self.0.lock().unwrap().radio.clone(),
-            activity: Activity {
-                ssh_sessions: Some(false),
-                checkpoints: Some(false),
-                install_lock: Some(false),
-                operations: Some(false),
-            },
+            clock,
+            radio: world.radio.clone(),
+            activity: world.activity,
         })
     }
     fn shutdown_guard(&mut self) -> Result<Option<()>> {
@@ -251,6 +255,59 @@ fn native_off_write_without_a_live_install_guard_is_never_submitted() {
         backend.set_wireless(&expected, false).unwrap(),
         WriteResult::NotSubmitted
     );
+}
+
+#[test]
+#[ignore = "run explicitly as root inside a user namespace; uses only private state and a fake radio"]
+fn shared_setup_client_recovers_capacity_from_expired_ssh_admissions() {
+    assert_eq!(uid(), 0);
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let fake = Fake::new();
+    fake.0.lock().unwrap().activity.ssh_sessions = Some(true);
+    let _server =
+        crate::network_runtime::start_with(&temp.path().join("state"), &path, uid(), fake.clone())
+            .unwrap();
+    for n in 0..32 {
+        let reply = request(
+            &path,
+            &Request::Admit {
+                schema: 1,
+                token: format!("{n:064x}"),
+                kind: HoldKind::Ssh,
+            },
+        )
+        .unwrap();
+        assert!(reply["error"].is_null());
+        assert_eq!(reply["availability"], "session-protected");
+    }
+    let hold = spacewars_control::network::SetupHold::at(&path).unwrap();
+    futures_lite::future::block_on(async {
+        // Live SSH admission slots cannot be evicted by the setup screen.
+        assert!(hold.admit().await.is_err());
+        fake.0.lock().unwrap().ms = 120_000;
+        assert_eq!(
+            status(&path)["status"]["policy"]["holds"]
+                .as_array()
+                .unwrap()
+                .len(),
+            32
+        );
+        hold.admit().await.unwrap();
+        let admitted = status(&path);
+        let holds = admitted["status"]["policy"]["holds"].as_array().unwrap();
+        assert_eq!(holds.len(), 1);
+        assert_eq!(holds[0]["kind"], "setup");
+        hold.renew().await.unwrap();
+        hold.release().await.unwrap();
+        assert!(
+            status(&path)["status"]["policy"]["holds"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+    });
+    assert!(fake.0.lock().unwrap().writes.is_empty());
 }
 
 #[test]
