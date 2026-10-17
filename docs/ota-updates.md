@@ -1393,6 +1393,16 @@ Production signer isolation, build provenance/qualification, durable generation
 history, retention, metadata refresh, real feed publication and device rollout
 remain separate work.
 
+Validation passed 297 OTA unit tests, 22 signed-feed integration tests, the final
+10 publication cases and all 87 CI Python helper tests, including Windows
+packaging/publication checks. Clippy, formatting and Rust 1.89 checks pass.
+The initial helper run lacked PowerShell; a checksum-verified copy was unpacked
+only under the ignored build directory before the successful complete rerun.
+The [publication evidence](data/ota-publication-20261016.json) records source and
+log hashes, exact validation scope and the read-only public asset probe. These
+checks authenticate and preserve selected bytes; a compromised authorized build
+or signer can still produce a validly signed malicious image.
+
 ## Persistent verification and installation evidence
 
 `TrustStore::initialize` is an explicit bootstrap operation and requires a new
