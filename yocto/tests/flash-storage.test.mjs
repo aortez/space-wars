@@ -4,7 +4,7 @@ import { chmodSync, chownSync, linkSync, lstatSync, mkdirSync, mkdtempSync, read
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { backupData, copyTree, legacyRootArgument, preserveLegacyHostKeys, provisionAccess, readPublicKey, restoreData } from '../scripts/flash-storage.mjs';
+import { assertCleanFilesystem, backupData, copyTree, legacyRootArgument, preserveLegacyHostKeys, provisionAccess, readPublicKey, restoreData } from '../scripts/flash-storage.mjs';
 
 function temporary(t) {
   const directory = mkdtempSync(join(tmpdir(), 'spacewars-flash-test-'));
@@ -24,6 +24,7 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
     assert.equal(program, 'sudo');
     if (sudoFailure) throw Object.assign(new Error('sudo denied'), { status: 1 });
     const [command, ...rest] = args;
+    if (command === 'dumpe2fs') return 'Filesystem features: has_journal extent\nFilesystem state: clean';
     if (command === 'mount') mounts.set(rest.at(-1), Number(rest.at(-2).at(-1)));
     if (command === 'umount') mounts.delete(rest[0]);
     if (command === 'rsync') return rest.includes('--dry-run') && mismatch ? '>fcs....... damaged\n' : '';
@@ -178,4 +179,21 @@ test('public key preflight rejects private files and mixed malformed public line
   assert.throws(() => readPublicKey(key), /public SSH key/);
   writeFileSync(key + '.pub', Buffer.concat([readFileSync(key + '.pub'), Buffer.from('invalid\n')]));
   assert.throws(() => readPublicKey(key + '.pub'), /rejected/);
+});
+
+test('read-only backups reject unreplayed journals before mounting or copying', t => {
+  const base = temporary(t);
+  const filesystem = join(base, 'fixture.ext4');
+  execFileSync('truncate', ['-s', '16M', filesystem]);
+  execFileSync('mkfs.ext4', ['-q', '-F', filesystem]);
+  const header = () => execFileSync('dumpe2fs', ['-h', filesystem], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.doesNotThrow(() => assertCleanFilesystem(header()));
+  execFileSync('debugfs', ['-w', '-R', 'feature needs_recovery', filesystem], { stdio: 'pipe' });
+  const dirty = header();
+  assert.throws(() => assertCleanFilesystem(dirty), /needs recovery/);
+  assert.throws(() => assertCleanFilesystem('Filesystem state: clean'), /needs recovery/);
+  const m = model();
+  const run = (program, args, options) => args[0] === 'dumpe2fs' ? dirty : m.run(program, args, options);
+  assert.throws(() => backupData('/dev/sdz', { run, base }), /needs recovery/);
+  assert.ok(!m.calls.some(call => ['mount', 'rsync'].includes(call.args[0])));
 });

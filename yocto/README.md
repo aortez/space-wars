@@ -166,7 +166,10 @@ can explicitly import `/home/swadmin/.ssh/authorized_keys` into an empty role
 with `sudo engine-os-manager maintenance import-admin-keys`.
 
 Full flashing recreates the partition table; it does not leave `/data` in place.
-The flash utility now backs up an existing data partition by default, preserving
+The flash utility first requires a clean source filesystem with no pending
+journal recovery, so a read-only backup cannot silently miss recent changes.
+If this check fails, shut down the Pi cleanly or repair the offline filesystem
+before retrying. It backs up an existing data partition by default, preserving
 numeric owners, modes, hardlinks, symlinks, ACLs and extended attributes. It
 verifies file contents and metadata before writing the image, then verifies the
 restored copy. A failure stops the operation. Backups remain under

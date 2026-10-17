@@ -33,6 +33,14 @@ function exists(run, path) {
   return result === 'present';
 }
 
+export function assertCleanFilesystem(report) {
+  const state = /^Filesystem state:\s*(.+)$/m.exec(report)?.[1].trim();
+  const features = /^Filesystem features:\s*(.+)$/m.exec(report)?.[1].split(/\s+/);
+  if (state !== 'clean' || !features || features.includes('needs_recovery') || features.includes('orphan_present')) {
+    throw new Error('The source filesystem needs recovery before backup. Shut the Pi down cleanly or repair the offline filesystem, then retry; nothing will be flashed.');
+  }
+}
+
 function mounted(device, number, writable, run, work) {
   const source = partition(device, number);
   const report = JSON.parse(run('lsblk', ['--json', '--output', 'TYPE,FSTYPE,LABEL,MOUNTPOINTS', source]));
@@ -43,6 +51,7 @@ function mounted(device, number, writable, run, work) {
       || !Array.isArray(entries[0].mountpoints) || entries[0].mountpoints.some(Boolean)) {
     throw new Error(`${source} must be an unmounted ${number === 4 ? 'data-labelled ' : ''}${filesystem} partition.`);
   }
+  if (!writable && filesystem === 'ext4') assertCleanFilesystem(sudo(run, 'dumpe2fs', '-h', source));
   const target = mkdtempSync(join(tmpdir(), 'spacewars-flash-mount-'));
   let attached = false;
   try {
