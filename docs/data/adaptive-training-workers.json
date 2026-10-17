@@ -1,0 +1,188 @@
+{
+  "hardware": "AMD Ryzen 7 9800X3D, 8 cores / 16 hardware threads",
+  "profile": "ci, Rust 1.89.0",
+  "runtime": "diagnostic_v1/linux/x86_64/f244b3f73c9ed029e3aba550202e91719600fc900222ea1b7c9776ec8c305bb8",
+  "source_freeze": "data/training-experiments/training-workers-20261017/source-freeze.json",
+  "raw": "data/training-experiments/training-workers-20261017/scaling/workers.json",
+  "candidate": "1cea67c1a3a7ef8f45b8358821115624217c135b1440194ecbc459aa36df28f7",
+  "episodes": 172,
+  "scored_ticks": 83262,
+  "previous_path": "4 static precision chunks and serial match cases",
+  "previous_path_seconds": [
+    1.241761185,
+    1.244246767
+  ],
+  "previous_path_median_seconds": 1.243003976,
+  "fixed": [
+    {
+      "workers": 1,
+      "samples": 3,
+      "median_seconds": 2.353243117,
+      "min_seconds": 2.3505446279999997,
+      "max_seconds": 2.379801269,
+      "precision_median_seconds": 1.482459749,
+      "match_median_seconds": 0.878779875,
+      "median_scored_ticks_per_second": 35381.809639008075,
+      "speedup_over_previous_path": 0.5282089075371977
+    },
+    {
+      "workers": 2,
+      "samples": 3,
+      "median_seconds": 1.215696696,
+      "min_seconds": 1.211044617,
+      "max_seconds": 1.228166965,
+      "precision_median_seconds": 0.744646699,
+      "match_median_seconds": 0.471049997,
+      "median_scored_ticks_per_second": 68489.12255331161,
+      "speedup_over_previous_path": 1.0224622474420215
+    },
+    {
+      "workers": 4,
+      "samples": 3,
+      "median_seconds": 0.6482208780000001,
+      "min_seconds": 0.6457230190000001,
+      "max_seconds": 0.661793227,
+      "precision_median_seconds": 0.377284913,
+      "match_median_seconds": 0.271495633,
+      "median_scored_ticks_per_second": 128446.9581678608,
+      "speedup_over_previous_path": 1.917562389898833
+    },
+    {
+      "workers": 8,
+      "samples": 3,
+      "median_seconds": 0.377360716,
+      "min_seconds": 0.376329147,
+      "max_seconds": 0.386788305,
+      "precision_median_seconds": 0.211015397,
+      "match_median_seconds": 0.169684547,
+      "median_scored_ticks_per_second": 220642.998779979,
+      "speedup_over_previous_path": 3.293941110711694
+    }
+  ],
+  "auto": {
+    "target_cpu_percent": 75,
+    "seconds": 56,
+    "competing_load": {
+      "end_seconds": 36,
+      "start_seconds": 20.161432477,
+      "threads": 8
+    },
+    "transitions": [
+      {
+        "seconds": 2.218033639,
+        "allowed": 2,
+        "machine_cpu_percent": 12.734082397003744
+      },
+      {
+        "seconds": 4.48060662,
+        "allowed": 3,
+        "machine_cpu_percent": 24.772656005017247
+      },
+      {
+        "seconds": 6.130745548,
+        "allowed": 4,
+        "machine_cpu_percent": 23.90826264530317
+      },
+      {
+        "seconds": 10.585088194,
+        "allowed": 5,
+        "machine_cpu_percent": 25.93524049041182
+      },
+      {
+        "seconds": 12.22958313,
+        "allowed": 6,
+        "machine_cpu_percent": 32.967032967032964
+      },
+      {
+        "seconds": 16.469374841,
+        "allowed": 7,
+        "machine_cpu_percent": 35.41209652146662
+      },
+      {
+        "seconds": 18.206297557,
+        "allowed": 8,
+        "machine_cpu_percent": 40.72229140722291
+      },
+      {
+        "seconds": 22.129485782,
+        "allowed": 7,
+        "machine_cpu_percent": 91.5286026883401
+      },
+      {
+        "seconds": 24.28257195,
+        "allowed": 6,
+        "machine_cpu_percent": 90.45694746658377
+      },
+      {
+        "seconds": 26.711717031,
+        "allowed": 5,
+        "machine_cpu_percent": 85.05639097744361
+      },
+      {
+        "seconds": 28.942886089,
+        "allowed": 4,
+        "machine_cpu_percent": 80.40752351097179
+      },
+      {
+        "seconds": 38.273162469,
+        "allowed": 5,
+        "machine_cpu_percent": 25.720551378446114
+      },
+      {
+        "seconds": 40.414490466,
+        "allowed": 6,
+        "machine_cpu_percent": 31.84673366834171
+      },
+      {
+        "seconds": 42.288634015,
+        "allowed": 7,
+        "machine_cpu_percent": 35.81670822942643
+      },
+      {
+        "seconds": 44.404635928,
+        "allowed": 8,
+        "machine_cpu_percent": 39.661123313460934
+      },
+      {
+        "seconds": 46.308028493,
+        "allowed": 9,
+        "machine_cpu_percent": 46.139418568302595
+      },
+      {
+        "seconds": 48.471691646,
+        "allowed": 10,
+        "machine_cpu_percent": 48.85328306628966
+      }
+    ],
+    "final_workers": 10
+  },
+  "historical_parity": {
+    "4": {
+      "episodes": 276,
+      "ticks": 20479,
+      "trace_byte_parity": true,
+      "episode_result_parity": true,
+      "complete": true,
+      "runtime": "diagnostic_v1/linux/x86_64/b72c0be839c9bf562218555e554dc77f76174899418584395a139b343168879a"
+    },
+    "auto": {
+      "episodes": 276,
+      "ticks": 20479,
+      "trace_byte_parity": true,
+      "episode_result_parity": true,
+      "complete": true,
+      "runtime": "diagnostic_v1/linux/x86_64/b72c0be839c9bf562218555e554dc77f76174899418584395a139b343168879a"
+    }
+  },
+  "complete": true,
+  "scope": "Bounded finalist replay, not a complete evolutionary run.",
+  "verification_source_freeze": "data/training-experiments/training-workers-20261017/final-source-freeze.json",
+  "verification_logs": {
+    "agent-final-2.log": "test result: ok. 97 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.97s",
+    "guidance-final.log": "test result: ok. 8 passed; 0 failed; 7 ignored; 0 measured; 710 filtered out; finished in 0.34s",
+    "training-ui-controls-final.log": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 720 filtered out; finished in 8.35s",
+    "training-ui-render-final.log": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 724 filtered out; finished in 0.10s",
+    "parity-final-4.log": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 724 filtered out; finished in 15.99s",
+    "parity-final-auto.log": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 724 filtered out; finished in 22.70s"
+  }
+}

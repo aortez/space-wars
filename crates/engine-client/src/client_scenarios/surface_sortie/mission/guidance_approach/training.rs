@@ -6,6 +6,7 @@ use engine_agent::{
     ship_arrival,
     ship_curriculum::{self, Partition},
     ship_training,
+    training_workers::{EpisodePool, WorkerConfig},
 };
 
 mod diagnostic;
@@ -25,7 +26,9 @@ const LEARNING_PLAN_V3: &[u8] = include_bytes!(concat!(
     "/../../docs/data/learned-guidance-match-training-v3-plan.json"
 ));
 
-type Source = (Case, MaterialMissionClientScenario);
+// A source contains interior-mutable query/render caches. Give each case
+// exclusive access rather than making the production world globally Sync.
+type Source = (Case, std::sync::Mutex<MaterialMissionClientScenario>);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -67,7 +70,7 @@ impl Fitness {
 struct TrainingTask<'a> {
     sources: &'a [Source],
     retained: Vec<ship_arrival::ArrivalCase>,
-    retention_workers: usize,
+    pool: EpisodePool,
     manifest: TaskManifest,
 }
 
@@ -80,16 +83,37 @@ impl EvaluationTask for TrainingTask<'_> {
 
     fn evaluate(&self, model: &DenseModel) -> Result<Fitness, EvolutionError> {
         let mut score = Fitness::default();
-        for result in full_retention::episodes(&self.retained, model, self.retention_workers)? {
+        for result in self.pool.map(&self.retained, |case| {
+            ship_arrival::run_episode(case.clone(), Policy::Model(model.clone()), false)
+        }) {
+            let result = result?;
             score.retained_completed += result.fitness.completed;
             score.retained_position_points += result.fitness.position_points;
             score.retained_velocity_points += result.fitness.velocity_points;
             score.spare_ticks += result.fitness.spare_ticks;
         }
-        for (case, source) in self.sources {
-            score.record_approach(&episode(source, case, "model", model, None));
+        for result in self.pool.map(self.sources, |(case, source)| {
+            episode(&source.lock().unwrap(), case, "model", model, None)
+        }) {
+            score.record_approach(&result);
         }
         Ok(score)
+    }
+}
+
+fn worker_config() -> WorkerConfig {
+    let mode = std::env::var("SPACEWARS_TRAINING_WORKERS").unwrap_or_else(|_| "auto".into());
+    if mode == "auto" {
+        WorkerConfig::Auto {
+            target_cpu_percent: std::env::var("SPACEWARS_TRAINING_CPU_PERCENT")
+                .map_or(75, |s| s.parse().expect("CPU target percentage")),
+            max_workers: std::env::var("SPACEWARS_TRAINING_MAX_WORKERS")
+                .map_or(0, |s| s.parse().expect("maximum workers")),
+        }
+    } else {
+        WorkerConfig::Fixed {
+            workers: mode.parse().expect("workers: auto or an integer"),
+        }
     }
 }
 
@@ -136,7 +160,7 @@ fn sources(cases: Vec<Case>) -> Vec<Source> {
         .into_iter()
         .map(|case| {
             let run = prepare(&case);
-            (case, run)
+            (case, std::sync::Mutex::new(run))
         })
         .collect()
 }
@@ -208,7 +232,7 @@ fn validation(plan: &Value) -> (Vec<Source>, Vec<Value>) {
                         continue;
                     }
                     assert_eq!(after.applied, [0.0; 3]);
-                    found.push((case, neutral));
+                    found.push((case, std::sync::Mutex::new(neutral)));
                     *selected = true;
                 }
                 if selected.iter().all(|s| *s) {
@@ -228,7 +252,10 @@ fn validation(plan: &Value) -> (Vec<Source>, Vec<Value>) {
 }
 
 fn records(sources: &[Source]) -> Vec<Value> {
-    sources.iter().map(|(c, s)| initial_record(s, c)).collect()
+    sources
+        .iter()
+        .map(|(c, s)| initial_record(&s.lock().unwrap(), c))
+        .collect()
 }
 
 fn configuration(plan: &Value) -> EvolutionConfig {
@@ -275,6 +302,7 @@ fn train(task: &TrainingTask<'_>, plan: &Value, parent: &DenseModel, out: &Path,
             break;
         }
         run.save(&checkpoint).unwrap();
+        save(out.join("workers.json"), &task.pool.control().snapshot());
         if step == 0
             || !run.history().is_empty()
                 && (run.complete() || run.fitness().iter().all(Option::is_none))
@@ -283,7 +311,8 @@ fn train(task: &TrainingTask<'_>, plan: &Value, parent: &DenseModel, out: &Path,
                 "{}",
                 json!({"completed_generations":run.history().len(),
                 "evaluated_in_generation":run.fitness().iter().filter(|s|s.is_some()).count(),
-                "complete":run.complete(),"best":run.history().last().map(|r|r.best_fitness)})
+                "complete":run.complete(),"best":run.history().last().map(|r|r.best_fitness),
+                "workers":task.pool.control().snapshot()})
             );
         }
     }
@@ -341,7 +370,7 @@ fn evaluate(
             fs::create_dir(&traces).unwrap();
             let episodes: Vec<_> = cases
                 .iter()
-                .map(|(c, s)| episode(s, c, driver, model, Some(&traces)))
+                .map(|(c, s)| episode(&s.lock().unwrap(), c, driver, model, Some(&traces)))
                 .collect();
             let arrived = episodes
                 .iter()
@@ -461,7 +490,7 @@ fn learned_guidance_match_training() {
     let task = TrainingTask {
         sources: &training,
         retained,
-        retention_workers: plan["retention_workers"].as_u64().unwrap_or(1) as usize,
+        pool: EpisodePool::new(worker_config()).unwrap(),
         manifest: TaskManifest {
             id: plan["experiment"].as_str().unwrap().into(),
             contract: spacewars_ai::guidance::contract(),

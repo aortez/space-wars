@@ -145,7 +145,15 @@ fn learned_guidance_failure_diagnostic() {
         }
         let match_episodes: Vec<_> = approaches
             .iter()
-            .map(|(case, source)| episode(source, case, driver, model, Some(&approach_out)))
+            .map(|(case, source)| {
+                episode(
+                    &source.lock().unwrap(),
+                    case,
+                    driver,
+                    model,
+                    Some(&approach_out),
+                )
+            })
             .collect();
         for episode in &match_episodes {
             score.record_approach(episode);

@@ -16,6 +16,7 @@ pub mod ship_training;
 pub mod training_history;
 pub mod training_job;
 pub mod training_validation;
+pub mod training_workers;
 
 use std::{
     collections::BTreeMap,

@@ -19,6 +19,8 @@ fn learned_guidance_clone_trace_parity() {
     let mut groups = Vec::new();
     let mut total_ticks = 0_u64;
     let mut total_episodes = 0;
+    let pool = std::env::var_os("SPACEWARS_TRAINING_WORKERS")
+        .map(|_| EpisodePool::new(worker_config()).unwrap());
     for partition in ["training", "development", "validation"] {
         let expected_starts = preflight[partition].as_array().unwrap();
         // Use the retained starts, including the resolved reserved starts, so
@@ -58,8 +60,14 @@ fn learned_guidance_clone_trace_parity() {
             let traces = out.join(&directory);
             fs::create_dir(&traces).unwrap();
             let mut receipts = Vec::new();
-            for ((case, source), expected) in starts.iter().zip(expected) {
-                let actual = episode(source, case, driver, model, Some(&traces));
+            let evaluate = |(case, source): &Source| {
+                episode(&source.lock().unwrap(), case, driver, model, Some(&traces))
+            };
+            let actual = match &pool {
+                Some(pool) => pool.map(&starts, evaluate),
+                None => starts.iter().map(evaluate).collect(),
+            };
+            for (((case, _), actual), expected) in starts.iter().zip(actual).zip(expected) {
                 // The original report first converted episodes to Value,
                 // promoting f32 fields to f64, then serialized them. Use the
                 // same path before parsing both sides once.
@@ -99,6 +107,7 @@ fn learned_guidance_clone_trace_parity() {
         out.join("parity.json"),
         &json!({"groups":groups,"episodes":total_episodes,
         "ticks":total_ticks,"complete":true,"runtime":engine_agent::evolution::runtime_id().unwrap(),
-        "original_runtime":evaluation["runtime"],"trace_byte_parity":true,"episode_result_parity":true}),
+        "original_runtime":evaluation["runtime"],"trace_byte_parity":true,"episode_result_parity":true,
+        "workers":pool.as_ref().map(|p|p.control().snapshot())}),
     );
 }

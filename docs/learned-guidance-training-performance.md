@@ -1,5 +1,10 @@
 # Headless guidance training performance
 
+Independent practice and match cases now also share an adaptive episode pool.
+See [adaptive training workers](adaptive-training-workers.md) for Auto/Fixed
+controls, current scaling measurements, and scheduling-parity verification.
+The measurements below retain the earlier cloning investigation.
+
 World copies now use Rapier's in-memory clone operations instead of a snapshot
 round trip. Immutable collision shapes are shared through Rapier's copy-on-write
 API; bodies, contacts, joints, stable IDs, and mutable simulation state are copied.
@@ -42,8 +47,8 @@ Other builds remained active: the repeat's candidate durations ranged from
 improvements, not a promised speedup for an entire future training run.
 
 In the repeat's stage profile, copies fell from 85.1% to 43.7% of match time.
-The host check and its extra physics step remain intact. Parallelizing independent
-match cases is still a separate opportunity. Precision arrivals do not perform
+The host check and its extra physics step remain intact. These copy measurements
+precede the separate parallel-worker change. Precision arrivals do not perform
 this per-tick copy, and their throughput is approximately unchanged.
 
 The [comparison data](data/learned-guidance-clone-performance.json), preserved
@@ -142,14 +147,11 @@ included in this training-source setup measurement.
    preserves the current host probe. Regression checks compare it against
    snapshot restoration, including contacts, sleeping bodies, joints, sensors,
    pending edits, shape copy-on-write, and compound CCD with reused handles.
-2. **Parallelize match cases.** They currently run serially, while only precision
-   cases use four workers. Keep case order, score aggregation and deterministic
-   outcomes stable. After the clone optimization, match cases take about 1.0 s
-   of a 1.5 s candidate evaluation. An ideal four-way match split would reduce
-   the combined duration to about 0.77 s, or almost 2× faster, before thread
-   overhead, load imbalance, and host contention. That is an estimate to test,
-   not a measured result. Increasing precision workers from four to eight saved
-   about 0.13 s in the original baseline samples.
+2. **Parallelize match cases — implemented.** Practice and match episodes share
+   one reusable pool, with Auto based on machine load and Fixed for benchmarking.
+   Case order and deterministic outcomes stay fixed. The prior copy-only result
+   spent about 1.0 s of a 1.5 s candidate on serial match cases; the subsequent
+   [worker measurements](adaptive-training-workers.md) test the actual gain.
 3. **Reuse deterministic fitness for unchanged genomes.** The completed run has
    384 evaluations but only 338 unique genomes: 46 repeats, or 12% of evaluations.
    A cache must include the exact runtime and task identity. Evaluation count
@@ -175,7 +177,7 @@ matches the original bytes. The optimization changes physics-world copying;
 candidate policy, physics integration, training selection, deployed bot, and
 defaults are unchanged. No new training run has started.
 
-All 1,332 regression tests pass: 163 physics, 619 Spacewars gameplay, 451 AI,
+At the clone-optimization checkpoint, all 1,332 regression tests passed: 163 physics, 619 Spacewars gameplay, 451 AI,
 91 training framework, and eight guidance fixture tests. The new
 [`historical replay check`](../crates/engine-client/src/client_scenarios/surface_sortie/mission/guidance_approach/training/performance/parity.rs)
 also reproduced all **276 saved match episodes** across mission, reference,

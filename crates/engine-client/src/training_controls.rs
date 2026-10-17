@@ -1,6 +1,7 @@
 //! Training views observe a worker; navigation never starts/stops evaluation.
 
 use engine_agent::training_job::{JobSnapshot, JobSpec, JobState, Recipe, TrainingManager};
+use engine_agent::training_workers::{WorkerConfig, available_workers};
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use spacewars_control::{UiAction, UiControl};
 use std::{path::PathBuf, time::Duration};
@@ -53,6 +54,14 @@ pub(crate) fn install(
             return;
         }
         let result = match id.as_str() {
+            "training.workers.previous" | "training.workers.next" => {
+                let options = worker_options();
+                let current = commands.snapshot().workers.unwrap().config;
+                let index = options.iter().position(|c| *c == current).unwrap_or(1) as i32;
+                let delta = if id.ends_with("previous") { -1 } else { 1 };
+                commands
+                    .set_workers(options[(index + delta).rem_euclid(options.len() as i32) as usize])
+            }
             id if id.starts_with("training.history.") => {
                 window.invoke_history_command(id.into());
                 return;
@@ -98,6 +107,7 @@ pub(crate) fn install(
             }
         };
         publish(&window, &commands.snapshot());
+        publish_setup(&window);
         if let Err(e) = result {
             window.set_training_error(e.to_string().into());
         }
@@ -115,6 +125,39 @@ pub(crate) fn install(
         _history: history,
         _manager: manager,
     })
+}
+
+fn worker_options() -> Vec<WorkerConfig> {
+    let mut options: Vec<_> = [50, 75, 90]
+        .into_iter()
+        .map(|target_cpu_percent| WorkerConfig::Auto {
+            target_cpu_percent,
+            max_workers: 0,
+        })
+        .collect();
+    let capacity = available_workers();
+    let mut counts: Vec<_> = [1, 2, 4, 8, 16, 32, 64]
+        .into_iter()
+        .filter(|n| *n <= capacity)
+        .collect();
+    if !counts.contains(&capacity) {
+        counts.push(capacity);
+    }
+    options.extend(
+        counts
+            .into_iter()
+            .map(|workers| WorkerConfig::Fixed { workers }),
+    );
+    options
+}
+
+fn worker_label(config: WorkerConfig) -> String {
+    match config {
+        WorkerConfig::Auto {
+            target_cpu_percent, ..
+        } => format!("Auto {target_cpu_percent}%"),
+        WorkerConfig::Fixed { workers } => format!("Fixed {workers}"),
+    }
 }
 
 fn setup_spec(window: &MainWindow) -> Result<JobSpec, engine_agent::evolution::EvolutionError> {
@@ -187,8 +230,9 @@ pub(crate) fn publish_setup(window: &MainWindow) {
         .set_training_setup_detail(format!("{cases} · Guidance evolves; ship stays fixed.").into());
     window.set_training_budget(
         format!(
-            "{} episode evaluations · This device · 1 worker",
-            spec.population * spec.generations * spec.recipe.cases()
+            "{} episode evaluations · Workers: {}",
+            spec.population * spec.generations * spec.recipe.cases(),
+            window.get_training_worker_label(),
         )
         .into(),
     );
@@ -246,6 +290,23 @@ fn state_label(state: JobState) -> &'static str {
 }
 
 pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
+    if let Some(workers) = &snapshot.workers {
+        window.set_training_worker_label(worker_label(workers.config).into());
+        let cpu = workers
+            .machine_cpu_percent
+            .map_or_else(|| "CPU —".into(), |p| format!("CPU {p:.0}%"));
+        window.set_training_worker_status(
+            format!(
+                "Workers {} / {} · {} · {} · {:.0} episodes/s",
+                workers.active,
+                workers.allowed,
+                worker_label(workers.config),
+                cpu,
+                workers.episodes_per_second,
+            )
+            .into(),
+        );
+    }
     if snapshot.run_id.is_some() && !window.get_training_has_job() {
         window.set_training_setup(false);
     }
@@ -308,7 +369,7 @@ pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
         .into(),
     );
     let Some(spec) = &snapshot.spec else {
-        window.set_training_run_label("Ship guidance · This device · 1 worker".into());
+        window.set_training_run_label("Ship guidance · This device".into());
         window.set_training_progress_label("Choose a curriculum to begin".into());
         window.set_training_progress(0.0);
         window.set_training_best("No completed generation yet".into());
@@ -322,9 +383,7 @@ pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
         Recipe::MixedArrival => "Mixed arrivals",
         Recipe::DiagnosticLine => "Diagnostic line mover",
     };
-    window.set_training_run_label(
-        format!("{recipe} · Seed {} · This device · 1 worker", spec.seed).into(),
-    );
+    window.set_training_run_label(format!("{recipe} · Seed {} · This device", spec.seed).into());
     window.set_training_progress(snapshot.evaluated_candidates as f32 / total as f32);
     window.set_training_progress_label(
         format!(
@@ -351,18 +410,10 @@ pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
             .into(),
     );
     let seconds = snapshot.evaluation_millis as f64 / 1000.0;
-    let rate = if seconds >= 1.0 {
-        format!(
-            " · {:.0} episodes/s",
-            snapshot.evaluated_episodes as f64 / seconds
-        )
-    } else {
-        String::new()
-    };
     window.set_training_saved(
         format!(
-            "Saved {} candidates · {} episodes · {:.0}s evaluation{}",
-            snapshot.saved_candidates, snapshot.evaluated_episodes, seconds, rate
+            "Saved {} candidates · {} episodes · {:.0}s evaluation",
+            snapshot.saved_candidates, snapshot.evaluated_episodes, seconds
         )
         .into(),
     );
@@ -393,6 +444,20 @@ pub(crate) fn inventory(window: &MainWindow) -> Vec<UiControl> {
         UiControl::new("training.snapshot", "Training job", false)
             .with_value(window.get_training_snapshot().to_string()),
     ];
+    for direction in ["previous", "next"] {
+        controls.push(
+            UiControl::new(
+                format!("training.workers.{direction}"),
+                "Training workers",
+                true,
+            )
+            .with_value(window.get_training_worker_label().to_string()),
+        );
+    }
+    controls.push(
+        UiControl::new("training.workers.status", "Worker usage", false)
+            .with_value(window.get_training_worker_status().to_string()),
+    );
     if window.get_training_setup() {
         for (field, label, value) in [
             (
@@ -513,6 +578,7 @@ pub(crate) fn selected_id(window: &MainWindow) -> &'static str {
             5 => "training.start",
             7 => "training.current",
             8 => "training.history.open",
+            9 => "training.workers.next",
             _ => "training.back",
         }
     } else {
@@ -527,6 +593,7 @@ pub(crate) fn selected_id(window: &MainWindow) -> &'static str {
             7 => "training.preview.speed",
             8 => "training.preview.follow",
             9 => "training.history.open",
+            10 => "training.workers.next",
             _ => "training.back",
         }
     }
@@ -539,7 +606,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     }
     let setup = window.get_training_setup();
     let current = window.get_training_focus();
-    let count = if setup { 9 } else { 10 };
+    let count = if setup { 10 } else { 11 };
     let move_focus = |delta| {
         let mut next = crate::ui_navigation::moved_selection(current, count, delta);
         if setup && !window.get_training_has_job() && next == 7 {
@@ -549,6 +616,13 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     };
     match action {
         UiAction::Up | UiAction::Down => move_focus(if action == UiAction::Up { -1 } else { 1 }),
+        UiAction::Left | UiAction::Right if current == (if setup { 9 } else { 10 }) => {
+            window.invoke_training_command(if action == UiAction::Left {
+                "training.workers.previous".into()
+            } else {
+                "training.workers.next".into()
+            });
+        }
         UiAction::Left | UiAction::Right if setup && current < 4 => {
             let field =
                 ["recipe", "population", "generations", "seed"][current.clamp(0, 3) as usize];

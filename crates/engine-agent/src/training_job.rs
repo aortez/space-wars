@@ -1,4 +1,4 @@
-//! One local training worker with bounded progress snapshots and atomic saves.
+//! One training coordinator, a shared episode pool, and atomic saves.
 //! UI navigation is independent of job commands. Recovery never starts work.
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
     ship_curriculum::{self, CurriculumFitness},
     ship_qualification, ship_training,
     training_validation::{self, ValidationResult},
+    training_workers::{EpisodePool, WorkerConfig, WorkerControl, WorkerSnapshot},
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -164,6 +165,7 @@ pub struct JobSnapshot {
     pub validation: Vec<ValidationResult>,
     pub can_resume: bool,
     pub error: Option<String>,
+    pub workers: Option<WorkerSnapshot>,
 }
 
 /// Small immutable inputs for an independent replay. They never contain a live
@@ -357,10 +359,16 @@ impl Run {
             Self::Line(r) => r.encode(),
         }
     }
-    fn advance(&mut self) -> Result<bool, EvolutionError> {
+    fn advance(&mut self, pool: Option<&EpisodePool>) -> Result<bool, EvolutionError> {
         match self {
-            Self::Stationary(r) => r.advance(&ship_training::TrainingTask),
-            Self::Mixed(r) => r.advance(&ship_curriculum::TrainingTask),
+            Self::Stationary(r) => match pool {
+                Some(pool) => r.advance(&ship_training::ParallelTask(pool)),
+                None => r.advance(&ship_training::TrainingTask),
+            },
+            Self::Mixed(r) => match pool {
+                Some(pool) => r.advance(&ship_curriculum::ParallelTask(pool)),
+                None => r.advance(&ship_curriculum::TrainingTask),
+            },
             Self::Line(r) => r.advance(&LineTask::default()),
         }
     }
@@ -589,9 +597,13 @@ impl Job {
         job.saved_candidates = job.snapshot(JobState::Paused).evaluated_candidates;
         Ok(Some(job))
     }
+    #[cfg(test)]
     fn advance(&mut self) -> Result<(), EvolutionError> {
+        self.advance_with_pool(None)
+    }
+    fn advance_with_pool(&mut self, pool: Option<&EpisodePool>) -> Result<(), EvolutionError> {
         let start = Instant::now();
-        let result = self.run.advance();
+        let result = self.run.advance(pool);
         self.evaluation_millis = self
             .evaluation_millis
             .saturating_add(start.elapsed().as_millis() as u64);
@@ -611,7 +623,7 @@ impl Job {
     fn finished(&self) -> bool {
         self.run.complete() && !self.validation_pending()
     }
-    fn validate_best(&mut self) -> Result<(), EvolutionError> {
+    fn validate_with_pool(&mut self, pool: Option<&EpisodePool>) -> Result<(), EvolutionError> {
         let mut progress = JobSnapshot::default();
         self.run.progress(&mut progress);
         let model = DenseModel::new(
@@ -621,7 +633,8 @@ impl Job {
                 .clone(),
         )
         .map_err(error)?;
-        let result = training_validation::evaluate(&model, progress.completed_generations)?;
+        let result =
+            training_validation::evaluate_with_pool(&model, progress.completed_generations, pool)?;
         self.validation.push(result);
         Ok(())
     }
@@ -642,6 +655,7 @@ struct Shared {
 struct Channel {
     shared: Mutex<Shared>,
     wake: Condvar,
+    workers: WorkerControl,
 }
 
 /// A lightweight clone for UI callbacks. It owns no world or worker handle.
@@ -652,7 +666,14 @@ pub struct JobControl {
 
 impl JobControl {
     pub fn snapshot(&self) -> JobSnapshot {
-        self.channel.shared.lock().unwrap().snapshot.clone()
+        let mut snapshot = self.channel.shared.lock().unwrap().snapshot.clone();
+        snapshot.workers = Some(self.channel.workers.snapshot());
+        snapshot
+    }
+    /// Execution policy is local to this manager, outside saved experiments.
+    /// An in-flight episode finishes even when the limit is reduced.
+    pub fn set_workers(&self, config: WorkerConfig) -> Result<(), EvolutionError> {
+        self.channel.workers.configure(config)
     }
     pub fn preview_candidates(&self) -> PreviewCandidates {
         self.channel.shared.lock().unwrap().previews.clone()
@@ -728,6 +749,7 @@ pub struct TrainingManager {
 
 impl TrainingManager {
     pub fn new(root: PathBuf) -> Result<Self, EvolutionError> {
+        let pool = EpisodePool::new(WorkerConfig::default())?;
         let channel = Arc::new(Channel {
             shared: Mutex::new(Shared {
                 snapshot: JobSnapshot::default(),
@@ -736,12 +758,13 @@ impl TrainingManager {
                 shutdown: false,
             }),
             wake: Condvar::new(),
+            workers: pool.control(),
         });
         let worker_channel = Arc::clone(&channel);
         let worker = thread::Builder::new()
             .name("training-job".into())
             .stack_size(16 * 1024 * 1024)
-            .spawn(move || worker(root, worker_channel))
+            .spawn(move || worker(root, worker_channel, pool))
             .map_err(error)?;
         Ok(Self {
             control: JobControl { channel },
@@ -798,7 +821,7 @@ fn storage_lock(root: &Path) -> Result<File, EvolutionError> {
     Ok(file)
 }
 
-fn worker(root: PathBuf, channel: Arc<Channel>) {
+fn worker(root: PathBuf, channel: Arc<Channel>, pool: EpisodePool) {
     let _lock = match storage_lock(&root) {
         Ok(lock) => lock,
         Err(e) => {
@@ -893,6 +916,7 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
                             next.save(&root)?;
                             atomic_write(&root.join("latest"), next.id.as_bytes())?;
                             job = Some(next);
+                            pool.reset_statistics();
                             publish_previews(&channel, job.as_ref().unwrap());
                             running = true;
                         }
@@ -923,9 +947,9 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
                     let job = job.as_mut().expect("running job");
                     if job.validation_pending() {
                         publish(&channel, job.snapshot(JobState::Validating));
-                        job.validate_best()?;
+                        job.validate_with_pool(Some(&pool))?;
                     } else {
-                        job.advance()?;
+                        job.advance_with_pool(Some(&pool))?;
                     }
                     publish(&channel, job.snapshot(JobState::Saving));
                     job.save(&root)?;

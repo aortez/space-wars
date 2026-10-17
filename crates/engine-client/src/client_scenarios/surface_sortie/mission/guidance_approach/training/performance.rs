@@ -4,6 +4,7 @@ use scenario_spacewars::{PlayerId, SpacewarsStepMetrics};
 use std::{cell::RefCell, collections::BTreeMap, time::Instant};
 
 mod parity;
+mod workers;
 
 #[derive(Default, Serialize)]
 struct Timing {
@@ -185,7 +186,7 @@ fn candidate(
     let started = Instant::now();
     let approaches: Vec<_> = sources
         .iter()
-        .map(|(case, source)| episode(source, case, "model", model, None))
+        .map(|(case, source)| episode(&source.lock().unwrap(), case, "model", model, None))
         .collect();
     let match_seconds = started.elapsed().as_secs_f64();
     let mut fitness = Fitness::default();
@@ -318,7 +319,7 @@ fn learned_guidance_training_profile() {
         timed("match_episodes", || {
             sources
                 .iter()
-                .map(|(c, s)| episode(s, c, "model", &finalist, None))
+                .map(|(c, s)| episode(&s.lock().unwrap(), c, "model", &finalist, None))
                 .collect::<Vec<_>>()
         })
     });

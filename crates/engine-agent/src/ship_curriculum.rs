@@ -190,6 +190,27 @@ pub fn config(seed: u64) -> Result<EvolutionConfig, EvolutionError> {
 #[derive(Debug, Clone, Default)]
 pub struct TrainingTask;
 
+pub struct ParallelTask<'a>(pub &'a crate::training_workers::EpisodePool);
+
+impl EvaluationTask for ParallelTask<'_> {
+    type Fitness = CurriculumFitness;
+
+    fn manifest(&self) -> TaskManifest {
+        TrainingTask.manifest()
+    }
+
+    fn evaluate(&self, model: &DenseModel) -> Result<CurriculumFitness, EvolutionError> {
+        let results = self.0.map(&cases(Partition::Training), |case| {
+            ship_arrival::run_episode(case.clone(), Policy::Model(model.clone()), false)
+        });
+        let mut fitness = CurriculumFitness::default();
+        for (index, result) in results.into_iter().enumerate() {
+            fitness.record(index, result?.fitness);
+        }
+        Ok(fitness)
+    }
+}
+
 impl EvaluationTask for TrainingTask {
     type Fitness = CurriculumFitness;
 

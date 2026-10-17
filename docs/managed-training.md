@@ -1,6 +1,7 @@
 # Local Training setup and progress
 
-The launcher now has a **Training** destination backed by one local worker.
+The launcher now has a **Training** destination backed by one local coordinator
+and a shared pool of episode workers.
 It runs the existing ship-guidance experiments, reports progress, and saves
 enough state to continue after leaving the screen or restarting the app.
 This is the first job/UI slice of the
@@ -38,6 +39,26 @@ successful controller. Changing curriculum restores its initial generation
 budget. The core API accepts populations 4–64, generations 1–64, and any `u64`
 seed. Its line-mover recipe remains an automated diagnostic, outside the menu.
 
+The header's **Auto 75%** control cycles through Auto CPU targets of 50%, 75%,
+and 90%, then Fixed worker counts up to this process's detected CPU capacity.
+Left/Right moves backward/forward through these choices. It works during a run
+as well as in setup. Auto starts with one worker and adjusts by one every two
+seconds, with a five-percentage-point deadband around its target. The Linux
+sampler measures total machine CPU use, including other applications. This is
+a soft sharing target: at least one episode can run, and active episodes finish
+before a reduced limit takes full effect. Missing CPU readings keep Auto at one
+worker; Fixed is available on platforms without the Linux sampler.
+
+The resource line shows active/allowed workers, the CPU target or fixed count,
+measured machine CPU, and episodes/second. Its throughput covers selection and
+monitoring episodes in this process since starting the current job (or reopening
+the app); it excludes idle time, setup, and checkpoint I/O. A dash means no
+current CPU sample. The structured snapshot also exposes capacity and queued
+work. Capacity is the process's available parallelism, capped at 64. These local
+resource preferences reset to Auto 75% on app restart and are outside the saved
+experiment identity. Changing them does not change seeds, case order, fitness,
+selection, or checkpoint compatibility requirements.
+
 Progress shows completed generations, evaluated and saved candidates, total
 episodes, evaluation time, and throughput. Gold bars show the selected winner's
 arrivals in each completed generation; blue bars show the lower median arrival
@@ -63,8 +84,9 @@ Starting a different run clears the previous replay, including stale worker repl
 One independent preview worker retains at most two 1,200-tick traces, with one
 evaluation in flight and at most one new replay per second. Rendering is capped
 at 15 updates per second and stops when the displayed frame is unchanged. No
-preview traces are written to disk. Training, preview, and genome practice can
-each have one worker; this can reduce evaluation throughput on a small device.
+preview traces are written to disk. Preview and genome practice retain their
+own bounded workers; Auto includes their CPU use when adjusting the shared
+training pool. Selection and scheduled monitoring share that pool.
 
 After generations 1, 4, 8, and so on, and at the final generation, the training
 worker checks the saved winner on **six fixed validation cases**. These cover
@@ -132,10 +154,14 @@ The implementation lives in
 [`engine-agent::training_job`](../crates/engine-agent/src/training_job.rs), with
 [`training_controls`](../crates/engine-client/src/training_controls.rs) connecting
 bounded snapshots and commands to Slint. There is one pending command slot,
-one evaluation worker, and at most 64 generation summaries. The UI polls every
+one episode pool, and at most 64 generation summaries. The UI polls every
 100 ms without waiting for evaluation or filesystem I/O.
 
 ## UI control interface
+
+`training.workers.{previous,next}` changes the local resource policy;
+`training.workers.status` exposes its displayed usage. `training.snapshot`
+includes the structured `workers` object even during an in-flight candidate.
 
 ### Saved history
 

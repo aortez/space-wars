@@ -68,9 +68,25 @@ impl ValidationResult {
     }
 }
 pub fn evaluate(model: &DenseModel, generation: usize) -> Result<ValidationResult, EvolutionError> {
+    evaluate_with_pool(model, generation, None)
+}
+
+pub(crate) fn evaluate_with_pool(
+    model: &DenseModel,
+    generation: usize,
+    pool: Option<&crate::training_workers::EpisodePool>,
+) -> Result<ValidationResult, EvolutionError> {
+    let evaluate = |case: &ArrivalCase| {
+        ship_arrival::run_episode(case.clone(), Policy::Model(model.clone()), false)
+    };
+    let cases = cases();
+    let episodes = match pool {
+        Some(pool) => pool.map(&cases, evaluate),
+        None => cases.iter().map(evaluate).collect(),
+    };
     let mut results = Vec::new();
-    for case in cases() {
-        let e = ship_arrival::run_episode(case, Policy::Model(model.clone()), false)?;
+    for episode in episodes {
+        let e = episode?;
         results.push(CaseResult {
             case: e.case,
             outcome: e.outcome,

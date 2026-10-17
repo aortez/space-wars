@@ -723,11 +723,13 @@ Closing the view or client detaches it from the runner. Reopening attaches to
 the same run. The app makes continued background work visible, and shutdown or
 restart recovery uses durable checkpoints rather than assuming process survival.
 
-The [first implemented slice](../managed-training.md) uses a single background
-thread in the client. Leaving the view keeps it running; exiting the client
-saves at a candidate boundary and stops it. This establishes observable job
-control and continuation before process separation, worker pools, and tick-level
-pause. Those planned lifecycle requirements remain open.
+The [implemented local runner](../managed-training.md) uses a background
+coordinator and a shared bounded episode pool in the client. Auto adjusts its
+dispatch limit to total machine CPU use; Fixed provides an explicit worker
+budget. Leaving the view keeps it running; exiting the client saves at a
+candidate boundary and stops it. Results reduce in input order, and resource
+settings remain outside the experiment identity. Process separation and
+tick-level pause remain open lifecycle requirements.
 
 This extends the managed-training activity anticipated in
 [auto-start activities](auto-start-activities.md). Idle launcher transitions
