@@ -1372,6 +1372,8 @@ jobs in main CI run `38964193098`, attempt 1, at
 its 246,622-byte timing artifact. This is API compatibility evidence, not an OTA
 candidate or validation of the unpushed OTA branch. The adapter follows GitHub's
 [artifact API](https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28).
+The [admission evidence](data/ota-admission-20261016.json) records exact source,
+test results, live run/artifact identities and remaining integration boundaries.
 
 ## Role-scoped publisher signing
 
