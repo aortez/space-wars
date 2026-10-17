@@ -10,7 +10,8 @@ or `/data/spacewars/config` (also mounted at `/var/lib/spacewars`) on the kiosks
 it on adds the labs and experiments after the six main scenarios. Restoring a
 valid saved or just-played extra enables and persists the preference. It controls
 picker visibility only; explicit scenario launches and scenario settings are
-unchanged. Runtime changes use the shared save status and Retry Save in App Settings.
+unchanged. A failed save shows a launcher warning directing users to the shared
+Retry Save action in App Settings; the warning clears once saving succeeds.
 
 ## Recovery contract
 

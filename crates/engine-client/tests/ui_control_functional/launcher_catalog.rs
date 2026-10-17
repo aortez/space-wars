@@ -201,7 +201,30 @@ fn filter_save_failure_uses_app_settings_retry_and_persists_off_on_restart() {
         let launcher = h.activate_guarded(TOGGLE, &launcher);
         assert_eq!(control_value(&launcher, TOGGLE), Some("On"));
         assert_eq!(launcher.active_scenario, None);
-        h.activate_guarded("launcher.sound", &launcher);
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        let failed_launcher = loop {
+            let state = h.state();
+            assert_eq!(state.screen, UiScreen::LauncherMain);
+            if state.error.is_some() {
+                break state;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "launcher did not report the save failure"
+            );
+            thread::sleep(POLL_INTERVAL);
+        };
+        assert!(
+            failed_launcher
+                .error
+                .as_deref()
+                .unwrap()
+                .contains("could not save settings")
+        );
+        assert_eq!(control_value(&failed_launcher, TOGGLE), Some("On"));
+        assert_eq!(selected_control(&failed_launcher), TOGGLE);
+        h.capture_screenshot("launcher-save-error.png");
+        h.activate_guarded("launcher.sound", &failed_launcher);
         let failed = h.wait_sound_save("error");
         assert!(failed.error.is_some());
         fs::remove_dir(&path).unwrap();
@@ -210,6 +233,8 @@ fn filter_save_failure_uses_app_settings_retry_and_persists_off_on_restart() {
         let saved = h.wait_sound_save("saved");
         assert!(stored(h).launcher.show_all);
         let launcher = h.activate_guarded("sound.back", &saved);
+        assert!(launcher.error.is_none());
+        assert_eq!(control_value(&launcher, TOGGLE), Some("On"));
         let launcher = h.activate_guarded(TOGGLE, &launcher);
         let launcher = restart(h, &launcher, &[]);
         assert_eq!(control_value(&launcher, TOGGLE), Some("Off"));

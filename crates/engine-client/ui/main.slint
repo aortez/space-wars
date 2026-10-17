@@ -1831,11 +1831,12 @@ export component MainWindow inherits Window {
 
             MenuPage {
                 available-width: parent.width; available-height: parent.height;
+                private property <bool> show-save-error: root.settings-save-error != "" && !root.launcher-controls-visible && !root.launcher-settings-visible;
                 // Scenario-specific forms retain their existing geometry in this pass.
                 height: Math.min(parent.height - 24px, root.launcher-controls-visible || root.launcher-settings-visible ? 440px : root.width < 600px ? 580px : 520px);
                 heading: root.launcher-settings-visible ? "Scenario Settings" : root.launcher-controls-visible ? "Controls" : "Space-Wars";
-                subtitle: root.launcher-error-text != "" ? root.launcher-error-text : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
-                error: root.launcher-error-text != "";
+                subtitle: root.launcher-error-text != "" ? root.launcher-error-text : self.show-save-error ? "Save failed. Retry Save in App Settings." : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
+                error: root.launcher-error-text != "" || self.show-save-error;
                 hint: root.launcher-controls-visible || root.launcher-settings-visible ? "" : root.launcher-focus-index == 0 ? (self.width < 600px ? "Left / Right browse · A confirm" : "Left / Right browse · A / Enter confirm · Start plays") : self.width < 600px ? "D-pad move · A select · Tap to choose" : "D-pad / arrows move · A / Enter selects · Tap to choose";
 
                 if !root.launcher-controls-visible && !root.launcher-settings-visible: launcher-body := Rectangle {

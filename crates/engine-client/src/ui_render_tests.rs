@@ -1223,6 +1223,17 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_scenario("planetary-tank-comparison-angular".into());
             crate::apply_scenario_metadata(ui, "planetary-tank-comparison-angular");
         }),
+        ("launcher-filter-save-error", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_launcher_show_all(true);
+            ui.set_launcher_focus_index(9);
+            ui.set_settings_save_error("Storage is not writable".into());
+        }),
+        ("launcher-filter-save-recovered", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_launcher_show_all(true);
+            ui.set_launcher_focus_index(9);
+        }),
         ("genome-browser", |ui| {
             ui.set_launcher_visible(true);
             ui.set_genomes_visible(true);

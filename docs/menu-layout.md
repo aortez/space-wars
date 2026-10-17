@@ -27,8 +27,9 @@ settings rows rather than scaling down text on smaller displays.
   a main selection or switches an extra to Space-Wars, without launching or
   changing the seed or scenario settings. Restoring a saved or just-played extra
   automatically enables and saves Show all. Direct CLI/API lookup is unfiltered;
-  returning from hidden `null` selects Space-Wars. Save failures use App Settings'
-  existing status and Retry Save.
+  returning from hidden `null` selects Space-Wars. Save failures show a warning
+  on the launcher directing users to App Settings → Retry Save. The warning
+  clears after a successful save and is also exposed through the UI inventory.
 - **Play** starts a fresh run using the current setup and seed; it is not Resume.
   **Play New World** starts a new Space-Wars match with a new seed. The current
   world seed is shown in Scenario Settings rather than on the main launcher.

@@ -446,7 +446,10 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             UiAction::Start,
             UiAction::Controls,
         ],
-        error: context.launcher_error.clone(),
+        error: context
+            .launcher_error
+            .clone()
+            .or_else(|| context.settings_save_error.clone()),
     };
     if material_match {
         inventory
@@ -1420,6 +1423,7 @@ mod tests {
         context.launcher_focus_index = 0;
         context.launch_available = false;
         context.launcher_error = Some("No cartridge selected".into());
+        context.settings_save_error = Some("Storage is not writable".into());
 
         let inventory = inventory_for_screen(UiScreen::LauncherMain, &context);
 
@@ -1445,6 +1449,20 @@ mod tests {
         assert!(!inventory.controls[3].enabled);
         assert_eq!(inventory.controls[0].value.as_deref(), Some("nes"));
         assert_eq!(inventory.error.as_deref(), Some("No cartridge selected"));
+
+        context.launcher_error = None;
+        assert_eq!(
+            inventory_for_screen(UiScreen::LauncherMain, &context)
+                .error
+                .as_deref(),
+            Some("Storage is not writable"),
+        );
+        context.settings_save_error = None;
+        assert!(
+            inventory_for_screen(UiScreen::LauncherMain, &context)
+                .error
+                .is_none()
+        );
     }
 
     #[test]
