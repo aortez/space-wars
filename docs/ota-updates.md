@@ -831,11 +831,12 @@ Duplicate invocation cannot refresh an existing arm record.
 The helper closes without the magic disable byte or a disable ioctl, including
 error paths. In the
 [pinned kernel implementation](https://github.com/raspberrypi/linux/blob/e442e5c1ab6bff5b5460b4fc949beb72aaf77970/drivers/watchdog/watchdog_dev.c),
-this leaves the watchdog active. The BCM2835 driver's shorter hardware timer is
-fed by the kernel only until the last userspace ping plus the requested virtual
-timeout. The unlimited first-open grace period does not apply to that active
-state. This source-level conclusion still needs measured expiry and reopen
-tests on each board; the syscall fixtures cannot establish physical reset.
+this leaves the watchdog active. The core is intended to feed the shorter
+hardware timer until the requested virtual deadline. However, the physical
+probe below found that the pinned BCM2835 driver programmed the wrong hardware
+timeout. The image now patches that calculation and tests the actual driver
+function during its build. Measured expiry and reopen tests on each board are
+still required; the syscall fixtures cannot establish physical reset.
 
 The coordinator enforces the existing 180-second boot-relative trial deadline,
 including across service restarts, without refreshing the allowance from its
@@ -862,6 +863,27 @@ boot file changed or data partition written during validation. The Picade was
 unavailable for this pass.
 [Archive, source and fixture evidence](data/ota-watchdog-20261015.json)
 records the exact scope.
+
+On October 17, a supervised same-root tryboot request on the freshly flashed
+Pi 5 returned to its normal image in roughly 30 seconds. No trial or early
+watchdog record was observed over SSH, so this is not a successful recovery
+qualification. A subsequent bounded hardware probe confirmed a kernel defect:
+`WDIOC_SETTIMEOUT` and `WDIOC_GETTIMEOUT` both reported 210 seconds, while
+`WDIOC_GETTIMELEFT` immediately reported only two. The probe disabled the timer
+successfully and the boot ID remained unchanged. The original trial selector
+was restored, and no qualification flags or production recovery state were
+created.
+
+The driver masked the virtual timeout into a 20-bit hardware counter, turning
+210 seconds into two seconds; the core's roughly eight-second ping interval
+could not keep that counter alive. The patch clamps the hardware timer to 15
+seconds and advertises the same 15,000 ms heartbeat while retaining the virtual
+deadline. A host test compiles the actual patched start function with register
+accesses intercepted, checks 19 timeout boundaries, and verifies that the
+counter agrees with the advertised heartbeat. The original driver fails this
+test; the patch passes. This does not yet prove the corrected kernel on hardware
+or establish the exact reset path of the first attempt.
+[Hardware probe and regression evidence](data/ota-watchdog-hardware-20261017.json).
 
 ### Immutable boot assets and root selection
 

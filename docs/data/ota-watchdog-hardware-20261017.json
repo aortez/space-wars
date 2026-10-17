@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "purpose": "Pi 5 same-root tryboot and early watchdog qualification",
+  "source_before_fix": "5a554cf1949dfbe521fa6786162330f54c0a7e63",
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 23470072,
+        "sha256": "43cf9c13f156b811bb10a1157ae537f7e5ef73d0444a028ac7f35dce6ce2c3ad"
+      },
+      "os_manager": {
+        "bytes": 11174656,
+        "sha256": "1cb6d2a5a3c1494ca04682a88139cb9a4ebc83fbc5d7340de8b66dda0dc574d2"
+      }
+    },
+    "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+    "build_id": "rootfs-1dda4d26ccab4f1a176a1bbe89158bdd16af13f9df2b535e89526157356d6295",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "1dda4d26ccab4f1a176a1bbe89158bdd16af13f9df2b535e89526157356d6295",
+    "schema": 1,
+    "source": {
+      "commit": "5f3eafc80e0b6589696b55e321b4493fdb5cdcb3",
+      "dirty": false,
+      "revision": "5f3eafc80e0b",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "trial_id": "b9a9a8278cee17116cc0b174694ac536d9b5fa4be3f52ddba3ba949b75ba48cf",
+  "initial_boot_id": "e4fe492b-0b29-40ef-9ab5-7e55b47216a6",
+  "returned_boot_id": "1860ffed-9cc9-4cfd-a658-fda5be42c98d",
+  "activation": {
+    "requested_at": "2026-10-17T07:02:09.755086+00:00",
+    "exit_code": 0,
+    "stdout": "o \"/org/freedesktop/systemd1/job/1759\"\n",
+    "stderr": "",
+    "reply_at": "2026-10-17T07:02:09.843970+00:00"
+  },
+  "observations": {
+    "samples": 51,
+    "trial_boot_observed": false,
+    "early_watchdog_record_observed": false,
+    "returned_to_normal": true,
+    "qualification": "not established"
+  },
+  "hardware_probe": {
+    "utc": "2026-10-17T07:08:27.338875+00:00",
+    "binary_sha256": "7f5b913f4fcff4bda7bf951478ee4e44ea220925f204a1a1616c8c1bc47028b0",
+    "exit_code": 0,
+    "stdout": "1860ffed-9cc9-4cfd-a658-fda5be42c98d\n{\"probe_errno\":0,\"initial_timeout\":15,\"set_timeout\":210,\"readback_timeout\":210,\"hardware_seconds_left\":2,\"disable_errno\":0,\"close_errno\":0}\n1860ffed-9cc9-4cfd-a658-fda5be42c98d\n",
+    "stderr": ""
+  },
+  "diagnosis": {
+    "requested_timeout_seconds": 210,
+    "reported_timeout_seconds": 210,
+    "hardware_seconds_left": 2,
+    "register_calculation": "(210 << 16) & 0x000fffff == 2 << 16",
+    "core_ping_interval_ms": 7999,
+    "fix": "Clamp hardware timeout to 15 seconds and advertise a 15000 ms hardware heartbeat without changing the virtual timeout"
+  },
+  "cleanup": {
+    "utc": "2026-10-17T07:08:15.013349+00:00",
+    "exit_code": 0,
+    "stdout": "Restored original trial selector; no qualification inferred.\n",
+    "stderr": ""
+  },
+  "checks": {
+    "before": {
+      "exit_code": 1,
+      "stdout": "",
+      "expected_result": "counter assertion fails"
+    },
+    "fixed": {
+      "exit_code": 0,
+      "stdout": "19 BCM2835 register/deadline cases passed\n",
+      "expected_result": "19 register/deadline cases pass"
+    }
+  },
+  "limits": [
+    "The failed trial was not directly observed; its precise reset path is not established.",
+    "The physical timer probe confirms the kernel counter defect, not firmware tryboot qualification.",
+    "The corrected kernel has not yet been tested on hardware.",
+    "No recovery qualification flags or OTA trust were created."
+  ],
+  "artifacts": {
+    "plan.json": {
+      "bytes": 3020,
+      "sha256": "df6b6a7fe3b0fec6f1d0eaa18408b8b5c49c3311bdccd9043011a1a90c57a4a8"
+    },
+    "activation.json": {
+      "bytes": 199,
+      "sha256": "80a29b56afc049314711a22ffadd87482f08518c37026dc317832c0889a1ae9f"
+    },
+    "observations.json": {
+      "bytes": 66037,
+      "sha256": "eeaf54070eb0018caead8bd5d2d7c31b8bf847d7ef32b6ba82e906af55983ef4"
+    },
+    "probe-timeout.c": {
+      "bytes": 2426,
+      "sha256": "8811839bb42ffe3b3dff8840ba033f279b3f71ae42898f03346b65faad851189"
+    },
+    "probe-timeout": {
+      "bytes": 70952,
+      "sha256": "7f5b913f4fcff4bda7bf951478ee4e44ea220925f204a1a1616c8c1bc47028b0"
+    },
+    "probe-timeout-result.json": {
+      "bytes": 416,
+      "sha256": "c95797449e28fe62d860cd0f8b727a4522ad0fcdce1d83daf55583335fec3b1a"
+    },
+    "restore.json": {
+      "bytes": 160,
+      "sha256": "ad01e465387597a2b7da55edaf9779931cb626e12bff1b3da166731d387c7aa1"
+    }
+  },
+  "local_archive": "target/ota-pi5-watchdog-trial-20261017"
+}

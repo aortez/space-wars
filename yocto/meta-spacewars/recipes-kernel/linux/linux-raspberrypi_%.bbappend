@@ -1,5 +1,17 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
-SRC_URI:append:raspberrypi-spacewars = " file://spacewars-pi45.cfg"
+SRC_URI:append:raspberrypi-spacewars = " \
+    file://spacewars-pi45.cfg \
+    file://0001-watchdog-bcm2835-clamp-hardware-timeout.patch \
+    file://test-bcm2835-watchdog.py \
+"
+
+# Exercise the actual patched driver, with MMIO intercepted on the build host.
+# Checking WDIOC_GETTIMEOUT alone cannot detect a wrapped hardware counter.
+do_compile:prepend:raspberrypi-spacewars() {
+    python3 ${WORKDIR}/test-bcm2835-watchdog.py \
+        --source ${S}/drivers/watchdog/bcm2835_wdt.c \
+        --cc "${BUILD_CC} ${BUILD_CFLAGS} ${BUILD_LDFLAGS}"
+}
 
 # Fail early if a BSP update silently selects a Pi 5-only page size.
 do_configure:append:raspberrypi-spacewars() {
