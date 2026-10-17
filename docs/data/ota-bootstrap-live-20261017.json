@@ -11,7 +11,7 @@
     "active_slot": "a",
     "target_slot": "b",
     "package_sha256": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
-    "status": "original disk migration stopped on medium errors; replacement restored and first boot verified; new bootstrap preparation pending",
+    "status": "replacement preservation, inactive-root installation and staging passed; first live trial hit service mount-check defect; unfed watchdog returned to original slot A; source fix and native sandbox checks pass; corrected-image trial pending",
     "raw_backup_failure": {
       "partition": "/dev/sda3",
       "copied_bytes": 3123773440,
@@ -82,7 +82,7 @@
       "device_written": true,
       "physical_restore_verified": true,
       "boot_verified": true,
-      "pending": "prepare a new bootstrap binding and preservation run on the verified replacement; qualify recovery before enabling OTA",
+      "pending": "clean corrected image and explicit failed-attempt reconciliation before a new bound trial; current Pi is running original slot A",
       "resume_dry_run_passed": true,
       "completed_before_profile_failure": {
         "evidence": "owner-provided terminal output; independently observed resulting partition layout",
@@ -242,7 +242,8 @@
         },
         "scope": "First boot and observed running-system health; no full-media surface test, bootstrap reservation, trial activation, baseline publication or automatic OTA installation.",
         "verification_sha256": "85bf6ecb20b862f99a1d0c1e4851a0b317fc1ffec5b07298f8596466c9ca21f7"
-      }
+      },
+      "bootstrap_evidence": "ota-pi5-replacement-bootstrap-20261017.json"
     },
     "boot_id_scope": "original failing disk preparation; replacement boot identity is recorded separately",
     "original_disk_workstation_diagnosis": {
@@ -282,7 +283,8 @@
       },
       "private_assessment_path": "target/original-pi5-disk-check-vf4cjtlj/assessment.json",
       "private_assessment_sha256": "9e58144f29ceffdc7153b20fdbe71792a654159ac87f3f1f5da9b13cc997a37e"
-    }
+    },
+    "original_disk_attempt_fields": "boot_id, original_source, raw_backup_failure, data_export and top-level mutation flags above describe the retired original-disk attempt"
   },
   "checks": {
     "archive_tests_passed": 4,

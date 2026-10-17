@@ -19,12 +19,11 @@ inactive-root installer, independent-export verifiers, restartable boot staging,
 consumed one-shot activation, a first-boot recovery coordinator, and restartable
 canonical asset preparation/activation with separate staged and canonical
 normal-boot health checks, and an explicit archive/cleanup/recovery handoff.
-**Remaining:** a new preparation and preservation run on the verified Pi 5
-replacement, effective legacy privilege/access/service qualification, live root
-installation and staging,
-live one-shot trial activation, supervised staged/canonical boot verification,
-live finalization and physical failure qualification. A package is not a signed
-OTA candidate or an enabled updater.
+**Remaining:** a clean runtime image containing the service-mount correction,
+explicit reconciliation of the consumed Pi 5 attempt, successful corrected
+Pi 5/Picade trials, supervised staged/canonical normal-boot verification,
+live finalization and the remaining physical failure qualification. A package
+is not a signed OTA candidate or an enabled updater.
 
 The [2026-10-17 hardware record](data/ota-bootstrap-live-20261017.json) tracks
 the current run. The Picade has completed raw, data/configuration and original-file
@@ -38,6 +37,14 @@ not started; the cause of that reboot has not been established.
 The Pi 5's raw
 inactive-root copy stopped on medium read errors before installation; its boot
 copy and a separate data/configuration export are retained off-device.
+
+The replacement Pi 5 has since completed preservation, independent exports,
+access checks, inactive-root installation and boot staging. Its first live
+trial reached slot B but stopped at a service mount check. An unfed 210-second
+early watchdog was followed by an automatic reset and return to original slot A.
+The source fix passes a native diagnostic under the service sandbox, but is
+not yet in an installed recovery runtime. The consumed trial and all recovery
+copies remain intact. See the [replacement trial record](data/ota-pi5-replacement-bootstrap-20261017.json).
 
 ### Replacement Pi 5 USB drive
 
@@ -132,6 +139,49 @@ The complete Yocto suite passes 70 Node tests and 87 Python tests, with one
 skipped in each. The focused hardware suite has 16 passing tests.
 A fresh flash still needs its own recovery-baseline qualification; these tests
 do not enable automatic OTA installation.
+
+### First replacement bootstrap trial
+
+The replacement's raw boot/inactive-root copies, 18,746-entry data archive and
+21 original files were independently exported and verified. Fallback-file
+replacement and independent administrator/runtime access checks passed. Slot B
+installation passed flush, readbacks and filesystem/image validation; the full
+trial tree reached `trial-ready` while retaining the original default.
+
+The requested trial boot reached slot B with the expected token. Recovery
+reported `bootstrap completion crossed mounts` at 5.862 seconds, before health
+observation or normal-default promotion. The immutable early record reports
+the watchdog armed at 0.714 seconds for 210 seconds. The last successful trial
+observation was at 204.4 seconds; the next reachable boot used slot A with
+firmware tryboot false. No further reboot request, watchdog open, keepalive or
+disable was issued. This supports the timeout/fallback path for this board and
+replacement medium; the exact reset-cause register was not captured, and the
+full power-loss/recovery matrix remains unqualified.
+
+The failure was the bootstrap coexistence check comparing mount IDs for
+`/data/spacewars-system` and `/data`. `ProtectSystem=strict` and the installed
+unit's `ReadWritePaths` intentionally give that exact subtree a separate bind
+mount. The check now uses the existing validator for its precise ext4 source,
+mount root and destination, as the trial-journal path already does.
+
+The new root-only `bootstrap_inspect_trial` example reads the existing journal
+under the installation lock without advancing it, opening a watchdog or
+requesting a reboot. Native before/after binaries ran under the installed
+recovery sandbox on the returned Pi 5: the old check reproduced the failure,
+the correction passed, and wrong-directory and foreign-filesystem binds were
+rejected. The journal hash and boot ID stayed unchanged. The foreign-filesystem
+case was rejected by the earlier directory opener; the diagnostic harness's
+initial expected error wording was corrected without repeating the tests.
+All 329 OTA unit tests and 160 manager unit tests passed, with 8 and 2
+environment-specific tests ignored respectively.
+
+The Pi is running its original slot A with kiosk, device service, Wi-Fi and
+administrator access working. Its installed recovery service still has the
+mount-check defect and the journal remains consumed at `trial-requested`.
+There is no health proof, canonical migration or production recovery baseline.
+Do not reset that journal or repeat its activation: retain the attempt and
+reconcile it explicitly before preparing a new binding with a clean corrected
+image. Automatic OTA installation remains disabled.
 
 ## Read the existing device
 
@@ -402,6 +452,28 @@ installed device-state service is stopped. It never stops services or changes
 network/radio state itself. The supervised window must keep other writers and
 operator edits quiescent too; this is a checked file capture, not an atomic
 filesystem snapshot. A changing source fails without publishing a completed copy.
+
+On the current images, a fresh socket-activated SSH connection wants the
+device-state service. Merely stopping that service allows an independent login
+test to start it again. Runtime-mask and stop both services before the capture
+window, retain the authenticated administrator connection, and verify a fresh
+administrator login with the services still masked. The SSH admission helper
+has a stopped-service fallback; it does not change persistent network state.
+Runtime masks live under `/run`, outside the captured configuration, and clear
+on reboot. Unmask and restart the services if preparation stops before installation.
+
+NetworkManager also writes lease and seen-network state independently of these
+services. On the replacement Pi 5, a Wi-Fi reauthentication changed this state
+after a verified capture while its independent export was in progress. The
+original-file guard correctly rejected the stale source. A subsequent supervised
+window freezes only the NetworkManager service cgroup, after checking that the
+existing lease outlasts the window and `wpa_supplicant` runs separately. An
+independent systemd timer thaws it after 20 minutes; normal and failure cleanup
+also thaw it explicitly. Verify a fresh SSH login while frozen, and keep that
+writer paused through original-file preservation and initial replacement.
+This is a device-specific quiet-window procedure, not a relaxation of the
+source-metadata check. Retain any earlier completed archive and its independently
+verified export during explicit reconciliation; never overwrite its receipt.
 
 The fixed selection includes all `/data` children except
 `/data/spacewars-bootstrap` (the package and backups), `/data/logs` and
@@ -784,6 +856,16 @@ complete boot inventory and the exclusively claimed inactive image. The shared
 installation lock, legacy-helper lock, private journal and inactive-root claim
 stay held until the reboot request returns. No raw target or selector is written.
 
+Run this command inside the separately authenticated root shell. On the current
+image, directly invoking `sudo engine-os-manager bootstrap-activate ...` leaves
+a waiting sudo process whose arguments contain `engine-os-manager`; the quiet
+runtime guard rejects that wrapper as a concurrent helper. A root shell that
+executes the command avoids this false positive without exempting another
+process from the guard. The Pi 5 direct-sudo invocation was rejected during
+prerequisite checks: the journal remained `trial-ready`, with no request boot ID,
+no reboot parameter and no pending reboot job. Inspect those facts before a
+corrected invocation; they do not permit repeating a consumed or uncertain request.
+
 Before any reboot mutation it requires an empty systemd reboot parameter and
 durably consumes the attempt as `trial-requested`, recording the current boot ID.
 The staged image must later run in a different boot from both staging and this
@@ -816,10 +898,10 @@ delete the record, rerun activation, issue another tryboot or clear another
 operator's reboot request to manufacture a retry. No automatic reconciliation
 or retry is implemented for this supervised handoff.
 
-Success reports only `reboot_job_accepted: true`; trial health, normal-boot
-confirmation and physical qualification remain unobserved. Automatic updates
-remain disabled. No live activation or new clean runtime image has been tested
-on either Pi yet.
+Success reports only `reboot_job_accepted: true`; it does not establish trial
+health, normal-boot confirmation or physical qualification. Automatic updates
+remain disabled. The replacement Pi 5's first accepted live activation and
+failed trial are recorded above; the Picade has not been activated.
 
 ## First-boot recovery runtime
 

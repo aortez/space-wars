@@ -275,7 +275,9 @@ impl TrialStore {
         // The active reservation still blocks ordinary maintenance/install.
         if let Some(system) = state::optional_directory(&self.data, "spacewars-system", self.owner)?
         {
-            super::finish_files::same_mount(&system, &self.data)?;
+            // ProtectSystem=strict gives the recovery service a writable bind
+            // of this exact subtree, just as it does for the trial journal.
+            crate::recovery_linux::check_data_subtree(&system, &self.data, "spacewars-system")?;
             super::handoff::check_coexistence(
                 &system,
                 self.owner,
