@@ -114,9 +114,7 @@ impl DuckEvent {
         (self.flaps.panels[0].open, self.flaps.panels[1].open)
     }
 
-    // The ledge controller will use this same validated seam in #281. Its
-    // attachment fixture is independent of that later movement feature.
-    #[allow(dead_code)]
+    // The shared ledge actuator registers one generation-checked local anchor.
     pub fn flap_handle(&self, side: usize) -> Option<FlapHandle> {
         self.flaps.panels.get(side)?.panel?;
         Some(FlapHandle {
@@ -125,7 +123,6 @@ impl DuckEvent {
         })
     }
 
-    #[allow(dead_code)]
     pub fn attach_to_flap(&mut self, handle: FlapHandle, local_point: Vec2) -> bool {
         let attachment = Attachment {
             handle,

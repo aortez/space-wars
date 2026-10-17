@@ -15,18 +15,30 @@ impl Platform for CapturePlatform {
 #[test]
 #[ignore = "exports the scenario's SPACEWARS_DUCK_FLAP_FRAMES to SPACEWARS_DUCK_FLAP_ARTIFACTS"]
 fn rigid_flap_fixtures_render_through_both_adapters() {
-    let source = std::env::var_os("SPACEWARS_DUCK_FLAP_FRAMES").expect("scenario fixture file");
-    let output = std::path::PathBuf::from(
-        std::env::var_os("SPACEWARS_DUCK_FLAP_ARTIFACTS").expect("capture directory"),
+    render_fixtures(
+        "SPACEWARS_DUCK_FLAP_FRAMES",
+        "SPACEWARS_DUCK_FLAP_ARTIFACTS",
+        48,
     );
+}
+
+#[test]
+#[ignore = "exports SPACEWARS_DUCK_LEDGE_FRAMES to SPACEWARS_DUCK_LEDGE_ARTIFACTS"]
+fn ledge_fixtures_render_through_both_adapters() {
+    render_fixtures(
+        "SPACEWARS_DUCK_LEDGE_FRAMES",
+        "SPACEWARS_DUCK_LEDGE_ARTIFACTS",
+        36,
+    );
+}
+
+fn render_fixtures(source_env: &str, output_env: &str, count: usize) {
+    let source = std::env::var_os(source_env).expect("scenario fixture file");
+    let output = std::path::PathBuf::from(std::env::var_os(output_env).expect("capture directory"));
     std::fs::create_dir_all(&output).unwrap();
     let mut fixtures: Vec<serde_json::Value> =
         serde_json::from_slice(&std::fs::read(source).unwrap()).unwrap();
-    assert_eq!(
-        fixtures.len(),
-        48,
-        "three viewports, both sides/floors, four stages"
-    );
+    assert_eq!(fixtures.len(), count);
     let windows = Rc::new(RefCell::new(Vec::new()));
     slint::platform::set_platform(Box::new(CapturePlatform(windows.clone()))).unwrap();
     let ui = MainWindow::new().unwrap();

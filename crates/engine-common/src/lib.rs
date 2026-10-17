@@ -1089,6 +1089,47 @@ pub struct ClockDuckFlapState {
     pub hold: Option<ClockDuckFlapHold>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckLedgePhase {
+    #[default]
+    Free,
+    Reaching,
+    Hanging,
+    Climbing,
+    Dropping,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckLedgeReason {
+    NoEligibleEdge,
+    Obstructed,
+    SupportLost,
+    Disrupted,
+    Released,
+    ClimbBlocked,
+    CaptureFailed,
+    ClimbTimeout,
+}
+
+/// One authoritative attachment, fixed-size counters, and per-tick query work.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckLedgeState {
+    pub phase: ClockDuckLedgePhase,
+    pub support_body: Option<u64>,
+    pub anchor_milli: Option<[i32; 2]>,
+    pub progress_milli: u32,
+    pub rearm_required: bool,
+    pub cooldown_ticks: u32,
+    pub candidates_checked: u32,
+    pub clearance_queries: u32,
+    pub catches: u32,
+    pub climbs: u32,
+    pub releases: u32,
+    pub reason: Option<ClockDuckLedgeReason>,
+}
+
 /// Temporary course/controller telemetry. Position is in thousandths of render
 /// world units. The character is absent during opening/resetting; its doors
 /// can still be moving in the shared physics world.
@@ -1107,6 +1148,8 @@ pub struct ClockDuckState {
     /// Entrance then exit, independent of screen-side mirroring.
     #[serde(default)]
     pub flaps: [ClockDuckFlapState; 2],
+    #[serde(default)]
+    pub ledge: ClockDuckLedgeState,
     pub outcome: Option<ClockDuckOutcome>,
     /// Additive diagnostics: old schema-8 payloads may omit this object.
     #[serde(default)]
