@@ -1,351 +1,67 @@
+# Qualification branch only: do not merge this replacement CI workflow.
+# No feed publication, repository writes, signing keys, or deploy steps.
 name: CI
+run-name: OTA hosted runner qualification - ${{ github.sha }}
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  CARGO_TERM_COLOR: always
+  group: ota-runner-qualification-254
+  cancel-in-progress: false
 
 jobs:
-  ota-publisher:
-    name: OTA updater and publisher
+  candidate:
+    name: Qualify standard runner capacity
+    if: >-
+      github.repository == 'aortez/space-wars' && github.ref == 'refs/heads/test/ota-runner-capacity-254' &&
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: '1.89.0'
-          components: clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Install image fixture tools
-        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends e2fsprogs python3-cryptography
-      - name: Test updater, metadata, image and publisher fixtures
-        # Reexec/crash-recovery tests share an executable: do not rebuild it
-        # concurrently, and run these fixtures serially in their own job.
-        run: cargo test --locked -p engine-ota --features publisher --all-targets -- --test-threads=1
-      - name: Build publisher fixture tools
-        run: cargo build --locked -p engine-ota --features publisher --example feed_sign --example feed_inventory
-      - name: Exercise resumable publication with disposable keys
-        run: |
-          /usr/bin/python3 .github/ci/ota_publisher_fixture.py \
-            --signer target/debug/examples/feed_sign \
-            --inventory target/debug/examples/feed_inventory
-      - name: Lint OTA publisher
-        run: cargo clippy --locked -p engine-ota --features publisher --all-targets -- -D warnings
-
-  yocto-tools:
-    name: Pi hardware profiles and update safety
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-      - name: Install device-tree and isolated updater test tools
-        run: sudo apt-get update && sudo apt-get install --yes device-tree-compiler bubblewrap apparmor
-      - name: Allow Bubblewrap user namespaces on the CI runner
-        run: sudo apparmor_parser --replace --skip-cache .github/ci/bwrap.apparmor
-      - name: Verify unprivileged installer sandbox
-        run: |
-          id
-          test "$(id -u)" -ne 0
-          bwrap --version
-          sysctl kernel.apparmor_restrict_unprivileged_userns
-          # Evaluate the IDs inside the sandbox, not on the host.
-          # shellcheck disable=SC2016
-          timeout 10 bwrap \
-            --ro-bind / / \
-            --unshare-user --uid 0 --gid 0 --unshare-pid --unshare-net \
-            --proc /proc --dev /dev --tmpfs /run --chdir / \
-            -- /bin/sh -ec 'test "$(id -u)" -eq 0; test "$(id -g)" -eq 0'
-      - name: Test Pi deployment helpers
-        run: npm --prefix yocto test
-        env:
-          SPACEWARS_REQUIRE_UPDATE_SANDBOX: 1
-      - name: Lint Pi deployment scripts
-        run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update-wrapper.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer-wrapper.sh yocto/meta-spacewars/recipes-support/ab-boot/files/spacewars-legacy-update-disabled yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh
-      - name: Report sandbox configuration and kernel denials
-        if: failure()
-        run: |
-          uname -a
-          id
-          bwrap --version || true
-          sysctl kernel.apparmor_restrict_unprivileged_userns \
-            kernel.apparmor_restrict_unprivileged_unconfined \
-            kernel.unprivileged_userns_clone user.max_user_namespaces || true
-          sudo aa-status || true
-          sudo journalctl --kernel --since '-5 minutes' --no-pager \
-            --grep='apparmor|bwrap|userns' || true
-
-  nes-core:
-    name: NES core, golden tests, and benchmark
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: '1.89.0'
-          components: clippy, rustfmt
-      - name: Check Rust formatting
-        run: cargo fmt --all -- --check
-      - name: Test core and scenarios
-        run: cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets
-      - name: Lint NES core and scenarios
-        run: cargo clippy --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets --no-deps -- -D warnings
-      - name: Exercise bundled-ROM release benchmark
-        run: cargo run --locked --release -p scenario-falling --bin falling-benchmark -- 120 10
-
-  linux-workspace:
-    name: Linux workspace
-    runs-on: ubuntu-latest
-    # Keep the cold-run ceiling while collecting optimized, cached timings.
-    # Only four long-running UI scenarios are deferred to ui-functional.yml.
-    timeout-minutes: 60
+    timeout-minutes: 360
     env:
-      # Material-world fixtures can exceed the default test-thread stack.
-      RUST_MIN_STACK: 16777216
+      SOURCE: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+      - name: Check out selected main source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Reclaim unused SDK space with a short deadline
+        run: python3 .github/ci/ota_runner_cleanup.py --qualification-branch test/ota-runner-capacity-254
+      - name: Install image inspection dependencies
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends e2fsprogs python3-yaml
+      - name: Install validator compiler
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: '1.89.0'
-      - name: Install pinned test runner
-        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
-        with:
-          tool: nextest@0.9.144
-      - name: Restore Rust dependencies
-        id: rust-cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-        with:
-          cache-on-failure: true
-          workspaces: |
-            . -> target
-            vendor/i-slint-backend-linuxkms -> target
-            vendor/lyon_tessellation -> target
-      - name: Install native client dependencies
-        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon e2fsprogs openssh-client libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
-      - name: Test CI reports, build identity, and input diagnostic safety
+      - name: Build image validator
+        run: cargo build --locked -p engine-ota --features publisher --example image_candidate
+      - name: Build selected source in isolated container
         run: |
-          python3 -m unittest discover -s .github/ci -p 'test_*.py'
-          python3 -m unittest discover -s tools -p 'test_picade_input.py'
-      - name: Test recorded bot-trip analysis
-        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
-      - name: Build optimized Linux test executables
-        id: build
+          python3 .github/ci/ota_container_build.py \
+            --source-checkout "$GITHUB_WORKSPACE" --source "$SOURCE" \
+            --output "$RUNNER_TEMP/ota-build" \
+            --cpus 4 --memory-gib 12 --timeout-minutes 330
+      - name: Qualify and package exact image
         run: |
-          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/build.seconds" \
-            cargo test --locked --workspace --all-targets --profile ci --no-run --timings
-      - name: Verify unchanged builds reuse compiled artifacts
-        run: |
-          set -o pipefail
-          CARGO_LOG=cargo::core::compiler::fingerprint=info \
-            cargo test --locked --workspace --all-targets --profile ci --no-run --message-format=json | \
-            python3 .github/ci/assert_fresh_build.py
-      - name: Run Linux workspace tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        env:
-          # Eight fast-headless mixed/recovery cases stay in normal CI. The broader
-          # ignored sweep runs only in clock-regression.yml or explicitly locally.
-          SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
-        run: |
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
-            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
-      - name: Verify PR UI selection
-        id: ui-selection
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          for profile in ui ui-pr; do
-            cargo nextest list --locked --workspace --all-targets --cargo-profile ci --profile "$profile" \
-              -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --message-format json \
-              > "$RUNNER_TEMP/spacewars-ci-timings/$profile-list.json"
-          done
-          python3 .github/ci/assert_ui_selection.py \
-            "$RUNNER_TEMP/spacewars-ci-timings/ui-list.json" \
-            "$RUNNER_TEMP/spacewars-ci-timings/ui-pr-list.json"
-      - name: Run PR UI functional tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.ui-selection.outcome == 'success' }}
-        run: |
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/ui.seconds" \
-            xvfb-run -a -s "-screen 0 1280x1024x24" \
-            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui-pr \
-              -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
-      - name: Test vendored LinuxKMS input and presentation renderers
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/kms.seconds" \
-            cargo test --locked --manifest-path vendor/i-slint-backend-linuxkms/Cargo.toml --features renderer-software,renderer-femtovg --lib
-      - name: Test exact round-join shortcut against vendored tessellator reference
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/lyon.seconds" \
-            cargo test --locked --release --manifest-path vendor/lyon_tessellation/Cargo.toml --lib
-      - name: Check default GPU kiosk client (no display required)
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/gpu-check.seconds" \
-            cargo check --locked --profile ci -p engine-client --no-default-features --features pi-kiosk-gpu
-      - name: Test GPU defaults, startup safety, text and rotation (no display required)
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/gpu-text.seconds" \
-            cargo test --locked --profile ci -p femtovg -p i-slint-renderer-femtovg -p engine-client \
-              --no-default-features --features engine-client/pi-kiosk-gpu --lib --bins --test backend_startup
-      - name: Test CCD cache and diagnostic lifecycle regressions
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          # Keep feature-gated work-count assertions in CI without enabling
-          # instrumentation in the normal workspace/client test builds.
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/physics-diagnostics.seconds" \
-            cargo nextest run --locked --cargo-profile ci --profile physics-diagnostics \
-              -p engine-rapier -p scenario-spacewars --lib \
-              --features engine-rapier/ccd-diagnostics,scenario-spacewars/ccd-diagnostics \
-              -E '(package(=engine-rapier) & test(world::tests::compound::ccd_)) | (package(=scenario-spacewars) & test(step_diagnostics::tests::))' \
-              --no-tests fail
-      - name: Summarize build and test timings
-        if: always()
-        run: |
-          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
-            --cache-hit '${{ steps.rust-cache.outputs.cache-hit }}' \
-            --phase build --phase workspace --phase ui --phase kms --phase lyon --phase gpu-check --phase gpu-text --phase physics-diagnostics \
-            target/nextest/ci/junit.xml target/nextest/ui-pr/junit.xml \
-            target/nextest/physics-diagnostics/junit.xml >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload build and per-test timings
-        if: always()
+          python3 .github/ci/ota_candidate.py \
+            --policy "$RUNNER_TEMP/ota-build/policy.json" \
+            --build-record "$RUNNER_TEMP/ota-build/build.json" \
+            --gzip-image "$RUNNER_TEMP/ota-build/rootfs.ext4.gz" \
+            --validator "$GITHUB_WORKSPACE/target/debug/examples/image_candidate" \
+            --output "$RUNNER_TEMP/ota-candidate"
+      - name: Upload unsigned candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: linux-test-timings
-          retention-days: 14
+          name: ota-runner-qualification-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/spacewars-ci-timings/
-            target/cargo-timings/
-            target/nextest/ci/junit.xml
-            target/nextest/ui-pr/junit.xml
-            target/nextest/physics-diagnostics/junit.xml
-            target/clock-regression/
-          if-no-files-found: ignore
-      - name: Upload functional-test failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ui-functional-test-artifacts
-          retention-days: 14
-          path: target/functional-test-artifacts
-          if-no-files-found: ignore
-
-  spacewars-recovery:
-    name: Spacewars experimental recovery
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      RUST_MIN_STACK: 16777216
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: '1.89.0'
-          components: clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      # The workspace tests the live terrain-recovery host without profiling.
-      # This job also covers historical profiles and diagnostic instrumentation.
-      # Retained full-match diagnostics remain ignored and require their packages.
-      - name: Test recovery profiles and native ground/boarding behavior
-        run: cargo test --locked --profile ci -p spacewars-ai --features sensor-profile --lib --test ground_navigation --test surface_recovery
-      - name: Test experimental supported-corridor observations
-        run: cargo test --locked --profile ci -p scenario-spacewars --features sensor-profile --lib surface_sortie::ground_posture::tests
-      - name: Lint recovery code and diagnostics
-        run: cargo clippy --locked -p spacewars-ai --features sensor-profile --lib --tests --no-deps -- -D warnings
-
-  spacewars-ai-regression:
-    name: Spacewars AI deterministic baselines
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: '1.89.0'
-      - name: Verify navigation-v1 baseline
-        run: cargo run --locked --release -p engine-agent -- --suite navigation-v1 --verify
-      - name: Verify strategy-v1 baseline
-        run: cargo run --locked --release -p engine-agent -- --suite strategy-v1 --verify
-
-  windows-client:
-    name: Windows client
-    runs-on: windows-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: '1.89.0'
-      - name: Test core and scenarios
-        run: cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets
-      - name: Check Windows client
-        run: cargo check --locked -p engine-client --all-targets
-
-  aarch64-core:
-    name: AArch64 core and scenario
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: '1.89.0'
-          targets: aarch64-unknown-linux-gnu
-      - name: Install AArch64 linker
-        run: sudo apt-get update && sudo apt-get install --yes gcc-aarch64-linux-gnu
-      - name: Check AArch64 core and scenarios
-        run: cargo check --locked -p engine-nes -p scenario-falling -p scenario-nes --target aarch64-unknown-linux-gnu
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-
-  windows-release:
-    name: Windows release validation
-    runs-on: windows-2025
-    timeout-minutes: 60
-    env:
-      RELEASE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - name: Verify selected head
-        shell: pwsh
-        run: |
-          $head = (git rev-parse HEAD).Trim()
-          if ($LASTEXITCODE -ne 0 -or $head -cne $env:RELEASE_SHA) { throw 'Wrong checkout' }
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: '1.89.0'
-          targets: x86_64-pc-windows-msvc
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      - name: Build and validate extracted release
-        shell: pwsh
-        run: .github/ci/windows-release.ps1 -SourceCommit $env:RELEASE_SHA -OutputDirectory "$env:RUNNER_TEMP/windows-release-evidence"
-      - name: Upload release and failure evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: windows-release-${{ env.RELEASE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/windows-release-evidence/
-          retention-days: 2
+            ${{ runner.temp }}/ota-candidate/image.ext4.zst
+            ${{ runner.temp }}/ota-candidate/candidate.json
+            ${{ runner.temp }}/ota-candidate/qualification.json
+            ${{ runner.temp }}/ota-candidate/build.json
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
