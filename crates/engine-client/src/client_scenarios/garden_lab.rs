@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting and fresh planting. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 4x, maximum 16x, run limit 300 ticks.",
+    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 4x, maximum 16x, run limit 300 ticks.",
     create,
 };
 
@@ -93,12 +93,16 @@ impl ClientScenario for GardenLabClientScenario {
         let tissues: Vec<_> = o.tissues.iter().map(|t|serde_json::json!({
             "id":t.id,"organism":t.organism,"role":format!("{:?}",t.role),
             "cell":t.cell,"health":t.health,"shade":t.shade_ticks,"shortage":t.shortage_ticks,
-            "stores":t.stores,
+            "stores":t.stores,"size":t.size,"policy":t.policy,"allocation":t.allocation,"support":format!("{:?}",t.support),
         })).collect();
         let selected = tissues.get(s.selected % tissues.len().max(1)).cloned();
         format!(
             "garden_lab={}",
             serde_json::json!({
+                "biological_state":format!("{:?}",o),"current_decisions":format!("{:?}",s.current_plan()),
+                "run_state":if o.tick >= scenario_garden_lab::MAX_TICKS { "complete" } else if s.paused { "lab_paused" } else { "running" },
+                "tissue_limit":s.grass.traits.max_tissues,"spread_radius":s.grass.traits.radius,
+                "pending_ns":s.pending_ns(),"growth_summary":s.growth_summary(),"admission_summary":s.admission_summary(),"admission_tick":o.ledger.tick,"admission":format!("{:?}",o.ledger.results),
                 "tick":o.tick,"seed":o.seed,"paused":s.paused,"speed":s.speed,
                 "intensity":s.intensity,"availability":s.availability,"shade":s.shade,
                 "shade_x":s.shade_x,"inspect":s.inspect,"control":s.control,
@@ -128,6 +132,60 @@ impl ClientScenario for GardenLabClientScenario {
 mod tests {
     use super::*;
     use crate::thruster_visual_tests::{raster, svg, write_png};
+    #[test]
+    fn garden_render_contract_keyboard_and_controller_limits_are_edge_triggered() {
+        use crate::input::{GamepadInput, GamepadSeatInput};
+        use std::{cell::RefCell, rc::Rc};
+        for controller in [false, true] {
+            let pads = Rc::new(RefCell::new(GamepadInput::default()));
+            let mut input = ClientInput::new(Rc::clone(&pads));
+            let mut client = GardenLabClientScenario {
+                state: GardenLabScenario::init((), 42),
+                held: std::cell::Cell::new([false; 5]),
+            };
+            client.state.paused = true;
+            // Up wraps through the new controls to the tissue-increase row.
+            for _ in 0..4 {
+                if controller {
+                    pads.borrow_mut().set_seat(
+                        0,
+                        GamepadSeatInput {
+                            connected: true,
+                            dpad_up: true,
+                            ..Default::default()
+                        },
+                    );
+                } else {
+                    input.press(GameKey::NesUp);
+                }
+                let a = client.map_input(&mut input, false);
+                client.step(&a, Duration::ZERO);
+                assert!(client.map_input(&mut input, false).is_empty());
+                pads.borrow_mut().set_seat(0, GamepadSeatInput::default());
+                input.release(GameKey::NesUp);
+                client.map_input(&mut input, false);
+            }
+            assert_eq!(client.state.control, 14);
+            let before = client.state.plants.clone();
+            if controller {
+                pads.borrow_mut().set_seat(
+                    0,
+                    GamepadSeatInput {
+                        connected: true,
+                        south: true,
+                        ..Default::default()
+                    },
+                );
+            } else {
+                input.press(GameKey::P1Laser);
+            }
+            let a = client.map_input(&mut input, false);
+            client.step(&a, Duration::ZERO);
+            assert_eq!(client.state.grass.traits.max_tissues, 33);
+            assert_eq!(client.state.plants, before);
+            assert!(client.map_input(&mut input, false).is_empty());
+        }
+    }
     #[test]
     fn garden_render_contract_selected_target_matches_diagnostics() {
         let mut client = GardenLabClientScenario {
