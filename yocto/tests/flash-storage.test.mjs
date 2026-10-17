@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, chownSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, chownSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { assertCleanFilesystem, backupData, copyTree, legacyRootArgument, preserveLegacyHostKeys, provisionAccess, readPublicKey, restoreData } from '../scripts/flash-storage.mjs';
+import { assertCleanFilesystem, backupData, copyTree, installKey, legacyRootArgument, preserveLegacyHostKeys, provisionAccess, readPublicKey, restoreData } from '../scripts/flash-storage.mjs';
 
 function temporary(t) {
   const directory = mkdtempSync(join(tmpdir(), 'spacewars-flash-test-'));
@@ -16,7 +16,8 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
   const calls = [];
   const mounts = new Map();
   const run = (program, args, options = {}) => {
-    calls.push({ program, args, options });
+    const call = { program, args, options };
+    calls.push(call);
     if (program === 'lsblk') {
       const number = Number(args.at(-1).at(-1));
       return JSON.stringify({ blockdevices: [{ type: 'part', fstype: number === 1 ? 'vfat' : 'ext4', label: number === 4 ? 'data' : 'rootfs_a', mountpoints: [mounted ? '/in-use' : null] }] });
@@ -24,6 +25,7 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
     assert.equal(program, 'sudo');
     if (sudoFailure) throw Object.assign(new Error('sudo denied'), { status: 1 });
     const [command, ...rest] = args;
+    if (command === 'install' && !rest.includes('-d')) call.key = readFileSync(rest.at(-2));
     if (command === 'dumpe2fs') return 'Filesystem features: has_journal extent\nFilesystem state: clean';
     if (command === 'mount') mounts.set(rest.at(-1), Number(rest.at(-2).at(-1)));
     if (command === 'umount') mounts.delete(rest[0]);
@@ -38,9 +40,14 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
     if (command === 'cat') {
       if (rest[0].endsWith('/etc/passwd')) return 'spacewars:x:1000:1000::/home/spacewars:/bin/bash\nswadmin:x:1001:1001::/home/swadmin:/bin/bash';
       if (rest[0].endsWith('/spacewars-admin')) return 'swadmin ALL=(root) NOPASSWD: ALL';
+      if (rest[0].endsWith('/etc/spacewars/boot-id')) return 'a'.repeat(64);
     }
     if (command === 'stat') {
       const path = rest.at(-1);
+      if (path.endsWith('/authorized_keys')) {
+        const uid = path.includes('/home/swadmin/') ? 1001 : 1000;
+        return `${uid}:${uid}:600:regular file:1`;
+      }
       if (path.endsWith('/spacewars-access')) return '0:0:755:directory';
       return `0:0:${path.endsWith('/spacewars-admin') ? '440' : path.endsWith('/root') ? '600' : '644'}:regular file:1`;
     }
@@ -82,19 +89,19 @@ test('new image receives explicit runtime and admin keys without writing a root 
   const runtime = Buffer.from('runtime public bytes');
   const admin = Buffer.from('owner public bytes');
   assert.equal(provisionAccess('/dev/sdz', runtime, admin, m), 'provisioned-on-first-boot');
-  const writes = m.calls.filter(call => call.options.input);
+  const writes = m.calls.filter(call => call.key);
   assert.equal(writes.length, 2);
   assert.match(writes[0].args.at(-1), /home\/spacewars\/\.ssh\/authorized_keys$/);
-  assert.equal(writes[0].options.input, runtime);
+  assert.deepEqual(writes[0].key, runtime);
   assert.match(writes[1].args.at(-1), /home\/swadmin\/\.ssh\/authorized_keys$/);
-  assert.equal(writes[1].options.input, admin);
+  assert.deepEqual(writes[1].key, admin);
   assert.ok(writes[1].args.includes('1001'));
 });
 
 test('restoring an old store provisions only the new owner role and preserves existing roles', () => {
   const m = model({ store: true });
   assert.equal(provisionAccess('/dev/sdz', Buffer.from('runtime'), Buffer.from('owner'), m), 'provisioned');
-  const writes = m.calls.filter(call => call.options.input);
+  const writes = m.calls.filter(call => call.key);
   assert.equal(writes.length, 3);
   assert.match(writes[2].args.at(-1), /spacewars-access\/swadmin$/);
   assert.ok(writes[2].args.includes('644'));
@@ -106,7 +113,7 @@ test('existing administrator keys and deliberate revocations survive unless expl
     const m = model({ store: true, admin: true });
     const result = provisionAccess('/dev/sdz', Buffer.from('runtime'), Buffer.from('owner'), { ...m, replaceAdmin });
     assert.equal(result, replaceAdmin ? 'replaced' : 'preserved');
-    assert.equal(m.calls.filter(call => call.options.input).length, replaceAdmin ? 3 : 2);
+    assert.equal(m.calls.filter(call => call.key).length, replaceAdmin ? 3 : 2);
   }
 });
 
@@ -114,8 +121,51 @@ test('unsafe admin key targets and unavailable sudo never become a first-boot fa
   const m = model({ store: true, admin: true });
   const run = (program, args, options) => args[0] === 'stat' && args.at(-1).endsWith('/swadmin')
     ? '0:0:777:symbolic link:1' : m.run(program, args, options);
-  assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), { run }), /Unsafe persistent/);
+  assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), { run }), /Unsafe SSH/);
   assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), model({ sudoFailure: true })), /sudo denied/);
+});
+
+test('real key installation preserves exact bytes and permissions when invoked through Node', t => {
+  const base = temporary(t);
+  const destination = join(base, 'authorized_keys');
+  const bytes = Buffer.from('# owner key\nssh-ed25519 fixture-public-bytes comment\n');
+  const owners = process.getuid() === 0 ? [0, 1000, 1001] : [process.getuid()];
+  const sources = [];
+  const run = (program, args, options = {}) => {
+    assert.equal(program, 'sudo');
+    if (args[0] === 'install') sources.push(args.at(-2));
+    return execFileSync(args[0], args.slice(1), {
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, LC_ALL: 'C' }, ...options,
+    }).trim();
+  };
+  for (const uid of owners) {
+    for (const mode of ['600', '644']) {
+      installKey(run, destination, bytes, uid, mode);
+      assert.deepEqual(readFileSync(destination), bytes);
+      const metadata = lstatSync(destination);
+      assert.deepEqual([metadata.uid, metadata.gid, metadata.mode & 0o777], [uid, uid, parseInt(mode, 8)]);
+    }
+  }
+  assert.ok(sources.every(path => !existsSync(path)));
+});
+
+test('key provisioning rejects the wrong boot image and unverified key copies', () => {
+  const m = model();
+  assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), {
+    ...m, bootIdentity: 'b'.repeat(64),
+  }), /boot identity/);
+  assert.ok(!m.calls.some(call => call.key));
+  let snapshot;
+  const run = (program, args, options) => {
+    if (args[0] === 'cmp') {
+      snapshot = args.at(-2);
+      throw new Error('key copy mismatch');
+    }
+    return m.run(program, args, options);
+  };
+  assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), { run }), /key copy mismatch/);
+  assert.ok(!existsSync(snapshot));
+  assert.equal(m.mounts.size, 0);
 });
 
 test('preserved host keys avoid reading an unrelated root slot', () => {

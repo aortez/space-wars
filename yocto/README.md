@@ -156,6 +156,12 @@ no shared login key. Flashing provisions the selected `--ssh-key` for both
 roles; use `--admin-ssh-key /path/to/owner.pub` to select a separate owner key.
 After boot, use `ssh swadmin@HOST.local` and `sudo -i` for administration.
 
+If image writing and data restoration succeeded but SSH provisioning failed,
+finish that step with `--access-only --device /dev/sdX --expected-serial SERIAL`,
+using the same `--image`, `--profile` and public-key options. This checks the
+drive serial and installed root's boot identity, installs and verifies the key
+files, and unmounts the filesystems. It does not reflash or repeat data restore.
+
 Login keys live in root-owned `/data/spacewars-access/{root,spacewars,swadmin}`.
 Updates and rollbacks retain those files, including deliberate empty-file
 revocations. Restoring an older data partition without an admin role provisions

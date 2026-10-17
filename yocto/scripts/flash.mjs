@@ -31,6 +31,8 @@ Options:
   --ssh-key <path>     Runtime public SSH key (also the default owner key)
   --admin-ssh-key <path> Separate owner key for swadmin, with passwordless sudo
   --replace-admin-key  Explicitly replace a restored swadmin key/revocation
+  --access-only        Finish SSH key provisioning on an already-flashed image
+  --expected-serial <serial> Require this drive identity (required with --access-only)
   --discard-data       Explicitly skip the existing /data backup and restore
   --interactive        Force interactive prompts instead of saved config
   --reconfigure        Re-select and save SSH key
@@ -261,6 +263,11 @@ async function main() {
   const specifiedHostname = argValue(args, '--hostname');
   const specifiedSshKey = argValue(args, '--ssh-key');
   const specifiedAdminKey = argValue(args, '--admin-ssh-key');
+  const accessOnly = args.includes('--access-only');
+  const expectedSerial = argValue(args, '--expected-serial');
+  if (accessOnly && (!specifiedDevice || !expectedSerial)) {
+    throw new Error('--access-only requires --device and --expected-serial.');
+  }
   const profile = listOnly ? null : validateProfile(argValue(args, '--profile'));
 
   const utils = await loadPiBase();
@@ -312,6 +319,23 @@ async function main() {
     specifiedDevice,
     interactive,
   );
+
+  if (expectedSerial && selectedDeviceInfo.serial !== expectedSerial) {
+    throw new Error('The selected drive serial does not match --expected-serial.');
+  }
+  if (accessOnly) {
+    if (dryRun) {
+      utils.info(`Would finish SSH key provisioning on ${targetDevice} after checking the installed root identity.`);
+    } else {
+      const access = provisionAccess(targetDevice, runtimeKey, adminKey, {
+        replaceAdmin: args.includes('--replace-admin-key'), bootIdentity,
+      });
+      utils.info(`Administrator SSH access: ${access}.`);
+      if (access === 'preserved') utils.info('Use the existing administrator key. Empty/revoked access stays revoked; --replace-admin-key explicitly provisions the selected key.');
+      utils.success('SSH access provisioning complete. Keys verified and filesystems unmounted.');
+    }
+    return;
+  }
 
   if (utils.isLargeDevice(selectedDeviceInfo)) {
     utils.log('');
@@ -377,7 +401,7 @@ async function main() {
     if (dryRun) {
       utils.info('Would restore and verify /data, provision the selected owner key, and preserve existing admin keys unless --replace-admin-key is selected.');
     } else {
-      const access = provisionAccess(targetDevice, runtimeKey, adminKey, { replaceAdmin: args.includes('--replace-admin-key') });
+      const access = provisionAccess(targetDevice, runtimeKey, adminKey, { replaceAdmin: args.includes('--replace-admin-key'), bootIdentity });
       utils.info(`Administrator SSH access: ${access}.`);
       if (access === 'preserved') utils.info('Use the existing administrator key. Empty/revoked access stays revoked; --replace-admin-key explicitly provisions the selected key.');
     }

@@ -204,20 +204,34 @@ export function readPublicKey(path, run = execute) {
   return bytes;
 }
 
-function installKey(run, path, bytes, uid, mode) {
-  // Public bytes go through stdin, never through a shell or command string.
-  run('sudo', ['install', '-o', String(uid), '-g', String(uid), '-m', mode, '/dev/stdin', path], { input: bytes });
-}
-
-function checkPath(run, path, mode, type) {
-  const format = `%u:%g:%a:%F${type === 'regular file' ? ':%h' : ''}`;
-  if (sudo(run, 'stat', '-c', format, '--', path) !== `0:0:${mode}:${type}${type === 'regular file' ? ':1' : ''}`) {
-    throw new Error(`Unsafe persistent SSH access path: ${path}`);
+export function installKey(run, path, bytes, uid, mode) {
+  // Node's child stdin can be a socket that install cannot reopen through
+  // /dev/stdin. Use a private regular file and verify the installed copy.
+  const directory = mkdtempSync(join(tmpdir(), 'spacewars-key-install-'));
+  const source = join(directory, 'key.pub');
+  try {
+    writeFileSync(source, bytes, { mode: 0o600 });
+    sudo(run, 'install', '-o', String(uid), '-g', String(uid), '-m', mode, source, path);
+    sudo(run, 'cmp', '--', source, path);
+    checkPath(run, path, mode, 'regular file', uid);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 }
 
-export function provisionAccess(device, runtimeKey, adminKey, { run = execute, replaceAdmin = false } = {}) {
+function checkPath(run, path, mode, type, uid = 0) {
+  const format = `%u:%g:%a:%F${type === 'regular file' ? ':%h' : ''}`;
+  if (sudo(run, 'stat', '-c', format, '--', path) !== `${uid}:${uid}:${mode}:${type}${type === 'regular file' ? ':1' : ''}`) {
+    throw new Error(`Unsafe SSH access path: ${path}`);
+  }
+}
+
+export function provisionAccess(device, runtimeKey, adminKey, { run = execute, replaceAdmin = false, bootIdentity } = {}) {
   mounted(device, 2, true, run, root => {
+    if (bootIdentity !== undefined
+        && (!/^[a-f0-9]{64}$/.test(bootIdentity) || sudo(run, 'cat', join(root, 'etc/spacewars/boot-id')) !== bootIdentity)) {
+      throw new Error('The flashed root does not match the selected image boot identity.');
+    }
     const passwd = sudo(run, 'cat', join(root, 'etc/passwd'));
     const accounts = passwd.split('\n').map(line => line.split(':'));
     for (const [user, uid] of [['spacewars', 1000], [ADMIN_USER, ADMIN_UID]]) {
