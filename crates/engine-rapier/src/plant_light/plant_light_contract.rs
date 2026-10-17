@@ -59,6 +59,8 @@ fn roots<'a>(
 }
 fn shoot(a: &TerrainAssembly, id: u64, cell: [i32; 2]) -> Tissue {
     Tissue {
+        development: [0; 3],
+        invested: [0; 3],
         id,
         organism: 1,
         policy: 1,

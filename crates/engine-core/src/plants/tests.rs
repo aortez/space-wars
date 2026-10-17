@@ -536,3 +536,107 @@ fn brain_observation_is_owned_and_host_queries_are_bounded() {
     assert_eq!(env.sites.get(), 1);
     assert_eq!(env.supports.get(), 1);
 }
+
+#[test]
+fn paid_development_conserves_resources_and_preserves_identity_at_cap() {
+    let mut p = pair();
+    p.config.max_tissues = 2;
+    // Isolate runtime accounting from the separately tuned grass profile.
+    p.config.root_intake_per_size = [10, 10, 0];
+    let id = 2;
+    let original = p.tissues[&id].clone();
+    let edges = p.edges.clone();
+    for n in 1..=8 {
+        let before = sum(&p);
+        step(&mut p, &Env::default(), &[Intent::Develop { tissue: id }]);
+        assert_eq!(p.ledger.results, vec![Ok(())]);
+        for i in 0..3 {
+            assert_eq!(
+                before[i] + p.ledger.intake[i],
+                sum(&p)[i] + p.ledger.maintenance[i] + p.ledger.growth[i] + p.ledger.loss[i]
+            );
+        }
+        let t = &p.tissues[&id];
+        assert_eq!(t.size, 1 + n / 4);
+        assert_eq!(t.development, [u64::from(n % 4); 3]);
+        assert_eq!(t.invested, [u64::from(n); 3]);
+        assert_eq!(
+            (t.id, t.organism, t.policy, t.cell, t.support),
+            (
+                original.id,
+                original.organism,
+                original.policy,
+                original.cell,
+                original.support
+            )
+        );
+        assert_eq!(p.edges, edges);
+        // This tick used the old size even when enlargement committed.
+        assert_eq!(
+            p.ledger.maintenance,
+            [
+                1 + u64::from(1 + (n - 1) / 4),
+                1 + 2 * u64::from(1 + (n - 1) / 4),
+                1 + 2 * u64::from(1 + (n - 1) / 4)
+            ]
+        );
+    }
+    let before = p.clone();
+    assert_eq!(
+        p.apply(&Intent::Develop { tissue: id }, &Env::default()),
+        Err(Rejection::Invalid)
+    );
+    assert_eq!(p, before);
+}
+
+#[test]
+fn development_refusals_are_atomic_and_shade_retains_paid_work() {
+    let mut p = pair();
+    let intent = Intent::Develop { tissue: 2 };
+    step(&mut p, &Env::default(), &[intent.clone()]);
+    let progress = p.tissues[&2].development;
+    for (env, expected) in [
+        (
+            Env {
+                support: false,
+                ..Env::default()
+            },
+            Rejection::Support,
+        ),
+        (
+            Env {
+                space: false,
+                ..Env::default()
+            },
+            Rejection::Space,
+        ),
+    ] {
+        let before = p.clone();
+        assert_eq!(p.apply(&intent, &env), Err(expected));
+        assert_eq!(p, before);
+    }
+    step(
+        &mut p,
+        &Env {
+            shade: Some([1, 0]),
+            ..Env::default()
+        },
+        &[intent.clone()],
+    );
+    assert_eq!(p.ledger.results, vec![Err(Rejection::Shade)]);
+    assert_eq!(p.tissues[&2].development, progress);
+    step(&mut p, &Env::default(), &[intent.clone()]);
+    assert_eq!(p.tissues[&2].development, [2; 3]);
+    p.sever(1, 2).unwrap();
+    p.tissues.get_mut(&2).unwrap().stores = [0; 3];
+    let before = p.clone();
+    assert_eq!(
+        p.apply(&intent, &Env::default()),
+        Err(Rejection::Unaffordable)
+    );
+    assert_eq!(p, before);
+    p.damage(2, 100).unwrap();
+    let before = p.clone();
+    assert_eq!(p.apply(&intent, &Env::default()), Err(Rejection::Dead));
+    assert_eq!(p, before);
+}

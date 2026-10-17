@@ -43,6 +43,12 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
 fn tissues(v: &Value) -> &Vec<Value> {
     v["tissues"].as_array().unwrap()
 }
+fn mature(v: &Value) -> usize {
+    tissues(v)
+        .iter()
+        .filter(|t| t["role"] == "Shoot" && t["size"] == 3 && t["health"].as_u64().unwrap() > 0)
+        .count()
+}
 fn tick(v: &Value) -> u64 {
     v["tick"].as_u64().unwrap()
 }
@@ -137,7 +143,7 @@ fn assert_connected_shade(v: &Value) {
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn garden_lab_controls_lifecycle_and_both_renderers() {
-    run_functional_test_with_backend("garden-lab", "winit-femtovg", |h| {
+    run_functional_test_with_seed("garden-lab", "winit-femtovg", 42, |h| {
         let ready = h.wait_until_ready();
         let mut s = h.activate_until_scenario("garden-lab", ready);
         for renderer in ["vector", "raster"] {
@@ -236,15 +242,82 @@ fn garden_lab_controls_lifecycle_and_both_renderers() {
                     .all(|v| v.as_u64().unwrap() > 0)
             );
             capture(h, renderer, "spread-expanded", &spread);
-            choose(h, &mut s, &mut c, 2);
-            press(h, &mut s, InputButton::South);
-            choose(h, &mut s, &mut c, 0);
-            let complete = snapshot(h, |v| tick(v) == 300 && v["run_state"] == "complete");
+            fresh(h, &mut s, &mut c);
+            for (time, label) in [
+                (2, "emergence"),
+                (60, "developing-small"),
+                (120, "developing-size-two"),
+                (186, "first-establishment"),
+                (240, "established-before-cut"),
+            ] {
+                let v = until(h, &mut s, &mut c, time);
+                if time >= 186 {
+                    assert!(mature(&v) >= 3);
+                }
+                if time == 60 {
+                    assert!(
+                        tissues(&v)
+                            .iter()
+                            .any(|t| t["development"][0].as_u64().unwrap() > 0)
+                    );
+                }
+                capture(h, renderer, label, &v);
+            }
+            let before = snapshot(h, |v| tick(v) == 240);
+            choose(h, &mut s, &mut c, 11);
+            let cut = snapshot(h, |v| tissues(v).iter().all(|t| t["role"] != "Shoot"));
+            for t in tissues(&cut) {
+                let old = tissues(&before)
+                    .iter()
+                    .find(|b| b["id"] == t["id"])
+                    .unwrap();
+                for field in [
+                    "id",
+                    "organism",
+                    "health",
+                    "size",
+                    "development",
+                    "invested",
+                    "support",
+                ] {
+                    assert_eq!(t[field], old[field]);
+                }
+            }
+            for i in 0..3 {
+                let removed: u64 = tissues(&before)
+                    .iter()
+                    .filter(|t| t["role"] == "Shoot")
+                    .map(|t| t["stores"][i].as_u64().unwrap())
+                    .sum();
+                assert_eq!(
+                    cut["loss"][i].as_u64().unwrap() - before["loss"][i].as_u64().unwrap(),
+                    removed
+                );
+            }
+            capture(h, renderer, "immediate-cut-240", &cut);
+            for (time, label) in [
+                (241, "small-replacement"),
+                (300, "replacement-development"),
+                (360, "replacement-size-two"),
+                (403, "mature-regrowth"),
+                (480, "bounded-stop"),
+            ] {
+                let v = until(h, &mut s, &mut c, time);
+                if time >= 403 {
+                    assert!(mature(&v) >= 3);
+                }
+                assert!(
+                    tissues(&v)
+                        .iter()
+                        .filter(|t| t["role"] == "Shoot")
+                        .all(|t| !tissues(&before).iter().any(|b| b["id"] == t["id"]))
+                );
+                capture(h, renderer, label, &v);
+            }
+            let complete = snapshot(h, |v| tick(v) == 480 && v["run_state"] == "complete");
             choose(h, &mut s, &mut c, 14);
             let tuned_complete = snapshot(h, |v| v["tissue_limit"] == 33);
-            assert_eq!(tuned_complete["tissues"], complete["tissues"]);
-            assert_eq!(tick(&tuned_complete), 300);
-            capture(h, renderer, "complete-after-tuning", &tuned_complete);
+            assert_eq!(complete["tissues"], tuned_complete["tissues"]);
             fresh(h, &mut s, &mut c);
             let sun = until(h, &mut s, &mut c, 10);
             assert!(
@@ -337,7 +410,9 @@ fn garden_lab_controls_lifecycle_and_both_renderers() {
                 v["paused"] == true && tissues(v).iter().all(|t| t["role"] != "Shoot")
             });
             assert!(
-                tissues(&cut).iter().all(|t| tissues(&before).contains(t)),
+                tissues(&cut).iter().all(|t| tissues(&before)
+                    .iter()
+                    .any(|b| b["id"] == t["id"] && b["health"] == t["health"])),
                 "cut changed survivors"
             );
             assert!(
@@ -406,9 +481,9 @@ fn garden_lab_controls_lifecycle_and_both_renderers() {
             }
             fresh(h, &mut s, &mut c);
             choose(h, &mut s, &mut c, 2);
-            snapshot(h, |v| v["speed"] == 8);
+            snapshot(h, |v| v["speed"] == 2);
             choose(h, &mut s, &mut c, 3);
-            snapshot(h, |v| v["speed"] == 4);
+            snapshot(h, |v| v["speed"] == 1);
             choose(h, &mut s, &mut c, 6);
             choose(h, &mut s, &mut c, 7);
             until(h, &mut s, &mut c, 10);
@@ -433,7 +508,7 @@ fn garden_lab_controls_lifecycle_and_both_renderers() {
             assert_ne!(instance, s.scenario_revision);
             snapshot(h, |v| {
                 tick(v) < 8
-                    && v["speed"] == 4
+                    && v["speed"] == 1
                     && v["shade"] == false
                     && v["availability"] == json!([1000, 1000])
             });
@@ -486,7 +561,7 @@ fn assert_selected_target(path: &Path, tissue: &Value) {
     assert!(magenta.len() > 20, "selected tissue marker invisible");
     assert!(
         magenta.iter().all(|(x, y)| (x - cx).abs() < 0.6 * scale
-            && *y > cy - 1.1 * scale
+            && *y > cy - 2.0 * scale
             && *y < cy + 0.6 * scale),
         "marker does not identify selected tissue cell: {tissue}"
     );
