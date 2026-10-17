@@ -26,6 +26,7 @@ mod fonts;
 #[cfg(test)]
 mod input_tests;
 mod layout;
+pub mod lighting_fixture;
 #[cfg(test)]
 mod live_tests;
 mod meridiem;

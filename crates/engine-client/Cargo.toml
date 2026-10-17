@@ -53,6 +53,7 @@ futures-lite = "2"
 lyon_tessellation = { version = "=1.0.20", optional = true }
 
 [dev-dependencies]
+engine-rapier = { workspace = true }
 lyon_tessellation = "=1.0.20"
 
 [build-dependencies]
