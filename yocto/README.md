@@ -149,6 +149,13 @@ The flash script follows the DirtSim flow: it uses `bmaptool` when a
 key, writes `/boot/hostname.txt`, grows the `/data` partition, and preserves an
 existing `/data` partition by default through a verified backup and restore.
 
+Flashing requires GNU `install` to assign numeric image owners even when those
+accounts do not exist on the workstation. The tool selects a verified GNU
+implementation from the standard system paths and uses its absolute path through
+sudo. On Ubuntu systems whose default `install` is uutils, install the
+`gnu-coreutils` package. A missing GNU implementation stops the command before
+any disk operations.
+
 Current images include an SSH-only owner account, `swadmin` (UID 1001), with
 passwordless sudo. The kiosk still runs as `spacewars` (UID 1000) with its
 limited permissions. Neither account has a usable password, and images contain

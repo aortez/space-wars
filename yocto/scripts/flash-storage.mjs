@@ -17,6 +17,17 @@ export function execute(program, args, options = {}) {
   }).trim();
 }
 
+export function requireGnuInstall(run = execute) {
+  // Some install implementations resolve numeric owners through the host's
+  // account database. Offline image UIDs need not exist on the workstation.
+  for (const path of ['/usr/bin/gnuinstall', '/bin/gnuinstall', '/usr/bin/install', '/bin/install']) {
+    try {
+      if (/^install \(GNU coreutils\) /m.test(run(path, ['--version']))) return path;
+    } catch { /* Try the next system location. */ }
+  }
+  throw new Error('GNU install is required to preserve offline image ownership. Install GNU coreutils (gnu-coreutils on Ubuntu systems using uutils) before flashing.');
+}
+
 function partition(device, number) {
   if (!/^\/dev\/(sd[a-z]+|mmcblk\d+|nvme\d+n\d+)$/.test(device)) {
     throw new Error('Expected a selected whole-disk device.');
@@ -114,6 +125,7 @@ export function restoreData(device, backup, { run = execute } = {}) {
 
 export function preserveLegacyHostKeys(device, backup, { run = execute } = {}) {
   if (!backup || backup.hasHostKeys) return backup;
+  const install = requireGnuInstall(run);
   const rootArgument = mounted(device, 1, false, run, boot => {
     if (exists(run, join(boot, 'tryboot.txt')) || exists(run, join(boot, 'autoboot.txt'))) {
       throw new Error('Cannot select legacy SSH host keys from this boot configuration. Review the boot selection before flashing.');
@@ -138,7 +150,7 @@ export function preserveLegacyHostKeys(device, backup, { run = execute } = {}) {
     }
     if (!names.some(name => !name.endsWith('.pub'))) return;
     const target = join(backup.tree, 'ssh');
-    sudo(run, 'install', '-d', '-o', '0', '-g', '0', '-m', '700', target);
+    sudo(run, install, '-d', '-o', '0', '-g', '0', '-m', '700', target);
     // Verify the copied files, including numeric owners and modes, before
     // allowing the old root to be overwritten. Key bytes never enter logs.
     sudo(run, 'rsync', '-aHAX', '--numeric-ids', ...names.map(name => join(source, name)), `${target}/`);
@@ -204,14 +216,14 @@ export function readPublicKey(path, run = execute) {
   return bytes;
 }
 
-export function installKey(run, path, bytes, uid, mode) {
+export function installKey(run, path, bytes, uid, mode, install = requireGnuInstall(run)) {
   // Node's child stdin can be a socket that install cannot reopen through
   // /dev/stdin. Use a private regular file and verify the installed copy.
   const directory = mkdtempSync(join(tmpdir(), 'spacewars-key-install-'));
   const source = join(directory, 'key.pub');
   try {
     writeFileSync(source, bytes, { mode: 0o600 });
-    sudo(run, 'install', '-o', String(uid), '-g', String(uid), '-m', mode, source, path);
+    sudo(run, install, '-o', String(uid), '-g', String(uid), '-m', mode, source, path);
     sudo(run, 'cmp', '--', source, path);
     checkPath(run, path, mode, 'regular file', uid);
   } finally {
@@ -227,6 +239,7 @@ function checkPath(run, path, mode, type, uid = 0) {
 }
 
 export function provisionAccess(device, runtimeKey, adminKey, { run = execute, replaceAdmin = false, bootIdentity } = {}) {
+  const install = requireGnuInstall(run);
   mounted(device, 2, true, run, root => {
     if (bootIdentity !== undefined
         && (!/^[a-f0-9]{64}$/.test(bootIdentity) || sudo(run, 'cat', join(root, 'etc/spacewars/boot-id')) !== bootIdentity)) {
@@ -248,8 +261,9 @@ export function provisionAccess(device, runtimeKey, adminKey, { run = execute, r
     }
     for (const [user, uid, bytes] of [['spacewars', 1000, runtimeKey], [ADMIN_USER, ADMIN_UID, adminKey]]) {
       const directory = join(root, 'home', user, '.ssh');
-      sudo(run, 'install', '-d', '-o', String(uid), '-g', String(uid), '-m', '700', directory);
-      installKey(run, join(directory, 'authorized_keys'), bytes, uid, '600');
+      sudo(run, install, '-d', '-o', String(uid), '-g', String(uid), '-m', '700', directory);
+      checkPath(run, directory, '700', 'directory', uid);
+      installKey(run, join(directory, 'authorized_keys'), bytes, uid, '600', install);
     }
   });
   return mounted(device, 4, true, run, data => {
@@ -266,7 +280,7 @@ export function provisionAccess(device, runtimeKey, adminKey, { run = execute, r
     }
     // An older restored store has no admin role. Physical flashing explicitly
     // provisions the selected owner key, without promoting runtime credentials.
-    installKey(run, path, adminKey, 0, '644');
+    installKey(run, path, adminKey, 0, '644', install);
     return replaceAdmin ? 'replaced' : 'provisioned';
   });
 }

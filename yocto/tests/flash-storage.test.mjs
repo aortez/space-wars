@@ -4,7 +4,10 @@ import { chmodSync, chownSync, existsSync, linkSync, lstatSync, mkdirSync, mkdte
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { assertCleanFilesystem, backupData, copyTree, installKey, legacyRootArgument, preserveLegacyHostKeys, provisionAccess, readPublicKey, restoreData } from '../scripts/flash-storage.mjs';
+import { assertCleanFilesystem, backupData, copyTree, execute, installKey, legacyRootArgument, preserveLegacyHostKeys, provisionAccess, readPublicKey, requireGnuInstall, restoreData } from '../scripts/flash-storage.mjs';
+
+const GNU_INSTALL = '/usr/bin/gnuinstall';
+const isInstall = command => /\/(gnuinstall|install)$/.test(command);
 
 function temporary(t) {
   const directory = mkdtempSync(join(tmpdir(), 'spacewars-flash-test-'));
@@ -18,6 +21,7 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
   const run = (program, args, options = {}) => {
     const call = { program, args, options };
     calls.push(call);
+    if (program === GNU_INSTALL && args[0] === '--version') return 'install (GNU coreutils) 9.7';
     if (program === 'lsblk') {
       const number = Number(args.at(-1).at(-1));
       return JSON.stringify({ blockdevices: [{ type: 'part', fstype: number === 1 ? 'vfat' : 'ext4', label: number === 4 ? 'data' : 'rootfs_a', mountpoints: [mounted ? '/in-use' : null] }] });
@@ -25,7 +29,7 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
     assert.equal(program, 'sudo');
     if (sudoFailure) throw Object.assign(new Error('sudo denied'), { status: 1 });
     const [command, ...rest] = args;
-    if (command === 'install' && !rest.includes('-d')) call.key = readFileSync(rest.at(-2));
+    if (isInstall(command) && !rest.includes('-d')) call.key = readFileSync(rest.at(-2));
     if (command === 'dumpe2fs') return 'Filesystem features: has_journal extent\nFilesystem state: clean';
     if (command === 'mount') mounts.set(rest.at(-1), Number(rest.at(-2).at(-1)));
     if (command === 'umount') mounts.delete(rest[0]);
@@ -44,6 +48,10 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
     }
     if (command === 'stat') {
       const path = rest.at(-1);
+      if (path.endsWith('/.ssh')) {
+        const uid = path.includes('/home/swadmin/') ? 1001 : 1000;
+        return `${uid}:${uid}:700:directory`;
+      }
       if (path.endsWith('/authorized_keys')) {
         const uid = path.includes('/home/swadmin/') ? 1001 : 1000;
         return `${uid}:${uid}:600:regular file:1`;
@@ -55,6 +63,28 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
   };
   return { calls, mounts, run };
 }
+
+test('GNU ownership tool selection accepts standard paths and rejects incompatible tools before mounting', () => {
+  for (const available of [GNU_INSTALL, '/bin/gnuinstall', '/usr/bin/install', '/bin/install']) {
+    const run = (program, args) => {
+      assert.deepEqual(args, ['--version']);
+      if (program === available) return 'install (GNU coreutils) 9.7\n';
+      if (program.endsWith('/gnuinstall')) throw Object.assign(new Error('not found'), { code: 'ENOENT' });
+      return 'install (uutils coreutils) 0.8.0';
+    };
+    assert.equal(requireGnuInstall(run), available);
+  }
+  for (const missing of [false, true]) {
+    const run = (program, args) => {
+      assert.ok(isInstall(program), 'must fail before sudo, mounting or disk inspection');
+      assert.deepEqual(args, ['--version']);
+      if (missing) throw Object.assign(new Error('not found'), { code: 'ENOENT' });
+      return 'install (uutils coreutils) 0.8.0';
+    };
+    assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), { run }), /GNU install is required/);
+    assert.throws(() => preserveLegacyHostKeys('/dev/sdz', { hasHostKeys: false }, { run }), /GNU install is required/);
+  }
+});
 
 test('backup and restore preserve real numeric owners and verify before success', t => {
   const m = model();
@@ -96,6 +126,7 @@ test('new image receives explicit runtime and admin keys without writing a root 
   assert.match(writes[1].args.at(-1), /home\/swadmin\/\.ssh\/authorized_keys$/);
   assert.deepEqual(writes[1].key, admin);
   assert.ok(writes[1].args.includes('1001'));
+  assert.ok(m.calls.filter(call => isInstall(call.args[0])).every(call => call.args[0] === GNU_INSTALL));
 });
 
 test('restoring an old store provisions only the new owner role and preserves existing roles', () => {
@@ -132,11 +163,9 @@ test('real key installation preserves exact bytes and permissions when invoked t
   const owners = process.getuid() === 0 ? [0, 1000, 1001] : [process.getuid()];
   const sources = [];
   const run = (program, args, options = {}) => {
-    assert.equal(program, 'sudo');
-    if (args[0] === 'install') sources.push(args.at(-2));
-    return execFileSync(args[0], args.slice(1), {
-      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, LC_ALL: 'C' }, ...options,
-    }).trim();
+    if (program !== 'sudo') return execute(program, args, options);
+    if (isInstall(args[0])) sources.push(args.at(-2));
+    return execute(args[0], args.slice(1), options);
   };
   for (const uid of owners) {
     for (const mode of ['600', '644']) {
@@ -147,6 +176,77 @@ test('real key installation preserves exact bytes and permissions when invoked t
     }
   }
   assert.ok(sources.every(path => !existsSync(path)));
+});
+
+test('real provisioning creates runtime and admin directories and keys with offline numeric owners', {
+  skip: process.getuid() !== 0 ? 'Run in a disposable root test container to check UIDs 1000 and 1001' : false,
+}, t => {
+  const roots = [];
+  const writes = [];
+  const results = [];
+  const runtime = Buffer.from('runtime fixture key\n');
+  const admin = Buffer.from('admin fixture key\n');
+  const bootIdentity = 'a'.repeat(64);
+  t.after(() => roots.forEach(root => rmSync(root, { recursive: true, force: true })));
+  const file = (root, path, bytes, mode) => {
+    const target = join(root, path);
+    mkdirSync(join(target, '..'), { recursive: true });
+    writeFileSync(target, bytes, { mode });
+  };
+  const metadata = path => {
+    const stat = lstatSync(path);
+    return [stat.uid, stat.gid, stat.mode & 0o777, stat.isDirectory() ? 'directory' : 'file'];
+  };
+  const run = (program, args, options) => {
+    if (program === 'lsblk') return model().run(program, args, options);
+    if (program !== 'sudo') return execute(program, args, options);
+    const [command, ...rest] = args;
+    if (command === 'mount') {
+      const root = rest.at(-1);
+      roots.push(root);
+      if (rest.at(-2).endsWith('2')) {
+        file(root, 'etc/passwd', 'spacewars:x:1000:1000::/home/spacewars:/bin/bash\nswadmin:x:1001:1001::/home/swadmin:/bin/bash\n', 0o644);
+        file(root, 'etc/spacewars/boot-id', bootIdentity + '\n', 0o644);
+        file(root, 'etc/sudoers.d/spacewars-admin', 'swadmin ALL=(root) NOPASSWD: ALL\n', 0o440);
+        for (const [user, uid] of [['spacewars', 1000], ['swadmin', 1001]]) {
+          const home = join(root, 'home', user);
+          mkdirSync(home, { recursive: true });
+          chownSync(home, uid, uid);
+        }
+      } else {
+        file(root, 'spacewars-access/root', 'retained root key\n', 0o600);
+        file(root, 'spacewars-access/spacewars', 'retained runtime key\n', 0o644);
+      }
+      return '';
+    }
+    if (command === 'umount') {
+      const root = rest[0];
+      assert.ok(roots.includes(root));
+      const entries = existsSync(join(root, 'home'))
+        ? ['home/spacewars/.ssh', 'home/spacewars/.ssh/authorized_keys', 'home/swadmin/.ssh', 'home/swadmin/.ssh/authorized_keys']
+        : ['spacewars-access/root', 'spacewars-access/spacewars', 'spacewars-access/swadmin'];
+      for (const path of entries) {
+        const target = join(root, path);
+        results.push({ path, metadata: metadata(target), bytes: lstatSync(target).isFile() ? readFileSync(target) : null });
+      }
+      for (const path of ['etc', 'home', 'spacewars-access']) rmSync(join(root, path), { recursive: true, force: true });
+      return '';
+    }
+    if (isInstall(command)) writes.push(command);
+    return execute(command, rest, options);
+  };
+  assert.equal(provisionAccess('/dev/sdz', runtime, admin, { run, bootIdentity }), 'provisioned');
+  assert.deepEqual(results, [
+    { path: 'home/spacewars/.ssh', metadata: [1000, 1000, 0o700, 'directory'], bytes: null },
+    { path: 'home/spacewars/.ssh/authorized_keys', metadata: [1000, 1000, 0o600, 'file'], bytes: runtime },
+    { path: 'home/swadmin/.ssh', metadata: [1001, 1001, 0o700, 'directory'], bytes: null },
+    { path: 'home/swadmin/.ssh/authorized_keys', metadata: [1001, 1001, 0o600, 'file'], bytes: admin },
+    { path: 'spacewars-access/root', metadata: [0, 0, 0o600, 'file'], bytes: Buffer.from('retained root key\n') },
+    { path: 'spacewars-access/spacewars', metadata: [0, 0, 0o644, 'file'], bytes: Buffer.from('retained runtime key\n') },
+    { path: 'spacewars-access/swadmin', metadata: [0, 0, 0o644, 'file'], bytes: admin },
+  ]);
+  assert.deepEqual(writes, Array(5).fill(requireGnuInstall()));
+  assert.ok(roots.every(root => !existsSync(root)));
 });
 
 test('key provisioning rejects the wrong boot image and unverified key copies', () => {

@@ -5,7 +5,7 @@ import { basename, isAbsolute, join, resolve } from 'path';
 import { pathToFileURL } from 'url';
 import { defaultImageDir, preferredImages, YOCTO_DIR } from './paths.mjs';
 import { readBootIdentity, setHardwareProfile, validateProfile } from './hardware.mjs';
-import { ADMIN_USER, backupData, restoreData, readPublicKey, provisionAccess, preserveLegacyHostKeys } from './flash-storage.mjs';
+import { ADMIN_USER, backupData, restoreData, readPublicKey, provisionAccess, preserveLegacyHostKeys, requireGnuInstall } from './flash-storage.mjs';
 
 const DEFAULT_IMAGE_DIR = defaultImageDir();
 const CONFIG_FILE = join(YOCTO_DIR, '.flash-config.json');
@@ -284,6 +284,7 @@ async function main() {
     return;
   }
 
+  utils.info(`SSH ownership tool: ${requireGnuInstall()}`);
   const config = await ensureSshKeyConfig(utils, specifiedSshKey, reconfigure, dryRun);
   const runtimeKey = readPublicKey(config.ssh_key_path);
   const adminKey = readPublicKey(resolvePath(specifiedAdminKey ?? config.ssh_key_path));
