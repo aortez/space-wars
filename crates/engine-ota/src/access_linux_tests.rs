@@ -209,6 +209,28 @@ fn interrupted_bootstrap_keeps_existing_roles_but_never_reimports_missing_roles(
 }
 
 #[test]
+fn bootstrap_accepts_preserved_administrator_without_enabling_root_login_or_reimporting_keys() {
+    let fixture = Fixture::new();
+    fixture.put("home/swadmin/.ssh/authorized_keys", key().as_bytes());
+    fixture.put("home/spacewars/.ssh/authorized_keys", key().as_bytes());
+    fixture.init().unwrap();
+    let access = preserved_under(&fixture.data, fixture.owners.root).unwrap();
+    assert_eq!(access.root_keys, 0);
+    assert_eq!(access.admin_keys, 1);
+    assert_eq!(access.runtime_keys, 1);
+    assert!(fixture.stored("root").is_empty());
+    fs::write(
+        fixture.temp.path().join("data/spacewars-access/swadmin"),
+        b"",
+    )
+    .unwrap();
+    assert!(preserved_under(&fixture.data, fixture.owners.root).is_err());
+    fixture.init().unwrap();
+    assert!(fixture.stored("swadmin").is_empty());
+    assert!(preserved_under(&fixture.data, fixture.owners.root).is_err());
+}
+
+#[test]
 fn first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys() {
     let fixture = Fixture::new();
     let runtime = format!(

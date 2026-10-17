@@ -87,7 +87,7 @@ impl Assets {
     }
 }
 
-fn manifest(contents: &BTreeMap<String, Vec<u8>>) -> BootManifest {
+pub(super) fn manifest(contents: &BTreeMap<String, Vec<u8>>) -> BootManifest {
     let files: BTreeMap<_, _> = contents
         .iter()
         .map(|(name, bytes)| {
@@ -587,8 +587,9 @@ pub(crate) mod linux {
             Some(r#"{"schema":1,"protocol":1}"#),
             Some(r#"{"schema":1,"protocol":2}"#),
             Some(r#"{"schema":1,"protocol":3}"#),
-            Some(r#"{"schema":2,"protocol":4}"#),
-            Some(r#"{"schema":1,"protocol":4,"bypass":true}"#),
+            Some(r#"{"schema":1,"protocol":4}"#),
+            Some(r#"{"schema":2,"protocol":5}"#),
+            Some(r#"{"schema":1,"protocol":5,"bypass":true}"#),
             Some("not a runtime record"),
         ] {
             let fixture = Fixture::new();

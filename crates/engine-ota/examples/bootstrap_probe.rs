@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!(
         "{}",
-        serde_json::to_string_pretty(&engine_ota::bootstrap::inspect_legacy_boot()?)?
+        serde_json::to_string_pretty(&engine_ota::bootstrap::inspect_bootstrap_boot()?)?
     );
     Ok(())
 }

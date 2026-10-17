@@ -27,6 +27,12 @@ fn setup(fixture: &Fixture) -> std::path::PathBuf {
 
 #[test]
 fn selector_interruptions_preserve_a_complete_old_or_new_config_and_all_other_assets() {
+    for fresh in [false, true] {
+        selector_interruptions(fresh);
+    }
+}
+
+fn selector_interruptions(fresh: bool) {
     for point in [
         "created",
         "written",
@@ -35,7 +41,11 @@ fn selector_interruptions_preserve_a_complete_old_or_new_config_and_all_other_as
         "directory-sync",
         "filesystem-sync",
     ] {
-        let fixture = Fixture::new();
+        let fixture = if fresh {
+            Fixture::fresh()
+        } else {
+            Fixture::new()
+        };
         let boot = setup(&fixture);
         let mut files = TrialBootFiles::open(
             File::open(&boot).unwrap(),

@@ -4,8 +4,8 @@
 //! Explicit activation consumes a one-shot reboot; after confirmed staged
 //! health, separate canonical commands publish and activate the permanent layout.
 use super::{
-    Board, BootPlan, BootstrapPackage, LegacyBootEvidence, PlanRequest, STAGE_DIRECTORY,
-    active_lines, inspect_legacy_boot, invalid,
+    Board, BootPlan, BootstrapBootEvidence, BootstrapPackage, PlanRequest, STAGE_DIRECTORY,
+    active_lines, inspect_bootstrap_boot, invalid,
 };
 use crate::boot::{
     BootCommandLine, BootManifest, MAX_BOOT_MANIFEST_BYTES, SlotRoots, UNPREPARED_TRIAL,
@@ -157,7 +157,7 @@ pub fn backup_installed_package(
     inspected.check(&lock)?;
     // Backups never relax the original-file binding. Detect a changed layout,
     // physical device or boot tree before reporting completion.
-    let after = inspect_legacy_boot()?;
+    let after = inspect_bootstrap_boot()?;
     let current =
         super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
     super::state::existing(&inspected.parent, 0, &current)?
@@ -198,7 +198,7 @@ pub fn backup_installed_data(
         &mut report,
     )?;
     inspected.check(&lock)?;
-    let after = inspect_legacy_boot()?;
+    let after = inspect_bootstrap_boot()?;
     let current =
         super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
     super::state::existing(&inspected.parent, 0, &current)?
@@ -270,7 +270,7 @@ pub fn prepare_installed_legacy(
         },
     )?;
     inspected.check(&lock)?;
-    let after = inspect_legacy_boot()?;
+    let after = inspect_bootstrap_boot()?;
     let current =
         super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
     super::state::existing(&inspected.parent, 0, &current)?
@@ -360,7 +360,7 @@ pub fn replace_installed_legacy(
             Ok(())
         },
     )?;
-    let after = inspect_legacy_boot()?;
+    let after = inspect_bootstrap_boot()?;
     let current =
         super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
     super::state::existing(&inspected.parent, 0, &current)?
@@ -425,6 +425,7 @@ pub fn check_installed_legacy_access(
         ssh_connection: connection,
         root_sshd_configuration_sha256: observed.root_sshd,
         runtime_sshd_configuration_sha256: observed.runtime_sshd,
+        administrator: observed.administrator,
         checked_services: observed.services,
         independent_logins_verified: false,
         equivalent_privilege_audit_complete: false,
@@ -540,7 +541,7 @@ struct Installed {
     data: File,
     parent: File,
     package: OperatorPackage,
-    legacy: LegacyBootEvidence,
+    legacy: BootstrapBootEvidence,
     report: PackageCheck,
     observed: super::BootstrapBinding,
     existing: Option<super::BootstrapBinding>,
@@ -559,7 +560,7 @@ impl Installed {
     ) -> Result<Self> {
         lock.check()?;
         let data = crate::recovery_linux::open_data_mount()?;
-        reject_provisioned(&data)?;
+        reject_provisioned(&data, 0)?;
         let parent = open_at(&data, DIRECTORY, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
         owned(&parent.metadata()?, true, 0, true)?;
         if parent.metadata()?.dev() != data.metadata()?.dev() {
@@ -630,7 +631,7 @@ impl Installed {
     }
 }
 
-fn reject_provisioned(data: &File) -> Result<()> {
+fn reject_provisioned(data: &File, owner: u32) -> Result<()> {
     let system = match open_at(
         data,
         "spacewars-system",
@@ -641,14 +642,29 @@ fn reject_provisioned(data: &File) -> Result<()> {
         Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error),
     };
-    owned(&system.metadata()?, true, 0, true)?;
-    // Existing time metadata is preserved. Recovery, trust, staged OTA bytes
-    // or unknown service state must not be silently treated as a fresh device.
+    owned(&system.metadata()?, true, owner, true)?;
+    if system.metadata()?.dev() != data.metadata()?.dev() {
+        return Err(invalid(
+            "device-service state is not on the data filesystem",
+        ));
+    }
+    // Fresh images run these services before OTA is provisioned. Preserve their
+    // stores and scheduling history; none grants recovery or signed-feed authority.
+    // Recovery, trust, staged OTA bytes and unknown state still require reconciliation.
     for entry in fs::read_dir(format!("/proc/self/fd/{}", system.as_raw_fd()))? {
-        if entry?.file_name() != "time" {
+        let name = entry?.file_name();
+        let name = name
+            .to_str()
+            .ok_or_else(|| invalid("invalid service store name"))?;
+        if !matches!(name, "time" | "time-check" | "network" | "update-check") {
             return Err(invalid(
                 "existing device-service state requires explicit reconciliation",
             ));
+        }
+        let directory = open_at(&system, name, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+        owned(&directory.metadata()?, true, owner, true)?;
+        if directory.metadata()?.dev() != data.metadata()?.dev() {
+            return Err(invalid("service store crossed data filesystems"));
         }
     }
     Ok(())
@@ -902,7 +918,7 @@ impl OperatorPackage {
     }
 
     #[cfg(test)]
-    fn check_device(&mut self, legacy: &LegacyBootEvidence) -> Result<PackageCheck> {
+    fn check_device(&mut self, legacy: &BootstrapBootEvidence) -> Result<PackageCheck> {
         let report = self.check_device_with_credit(legacy, 0)?;
         report.require_data_space()?;
         Ok(report)
@@ -911,7 +927,7 @@ impl OperatorPackage {
     #[cfg(test)]
     fn check_device_with_credit(
         &mut self,
-        legacy: &LegacyBootEvidence,
+        legacy: &BootstrapBootEvidence,
         backup_credit: u64,
     ) -> Result<PackageCheck> {
         self.check_device_with_credits(legacy, backup_credit, 0)
@@ -919,7 +935,7 @@ impl OperatorPackage {
 
     fn check_device_with_credits(
         &mut self,
-        legacy: &LegacyBootEvidence,
+        legacy: &BootstrapBootEvidence,
         backup_credit: u64,
         staged_credit: u64,
     ) -> Result<PackageCheck> {
@@ -1064,7 +1080,7 @@ fn normalized_profile(lines: &[String], profile: &str) -> Vec<String> {
 
 fn capacity_with_credit(
     files: &BTreeMap<String, Blob>,
-    legacy: &LegacyBootEvidence,
+    legacy: &BootstrapBootEvidence,
     credit: u64,
 ) -> Result<Capacity> {
     let cluster = legacy.boot_allocation_bytes;

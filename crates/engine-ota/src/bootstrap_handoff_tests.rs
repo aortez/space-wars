@@ -3,7 +3,7 @@ use crate::bootstrap::finish_files::tests::Retirement;
 use crate::recovery::SlotImage;
 use crate::{RecoveryStore, Sha256};
 use std::fs;
-use std::os::unix::fs::MetadataExt;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 fn plan(fixture: &Retirement, store: &mut TrialStore) -> RecoveryRecord {
     fixture.run(store, |_| Ok(())).unwrap();
@@ -42,6 +42,50 @@ fn run(
         },
         point,
     )
+}
+
+#[test]
+fn fresh_image_reaches_one_canonical_baseline_and_preserves_existing_service_stores() {
+    let fixture = Retirement::fresh();
+    let data = fixture.migration.fixture.temp.path().join("data");
+    let system = data.join("spacewars-system");
+    for name in ["network", "time", "time-check", "update-check"] {
+        let directory = system.join(name);
+        fs::create_dir_all(&directory).unwrap();
+        for path in [&system, &directory] {
+            fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        fs::write(directory.join("retained-state"), name).unwrap();
+    }
+    let mut store = fixture.open();
+    let baseline = plan(&fixture, &mut store);
+    assert!(
+        run(&fixture, &mut store, |point| {
+            if point == "handoff-recovery-published" {
+                Err(invalid("power loss"))
+            } else {
+                Ok(())
+            }
+        })
+        .is_err()
+    );
+    drop(store);
+    let mut store = fixture.open();
+    run(&fixture, &mut store, |_| Ok(())).unwrap();
+    fixture.verified(&store);
+    assert_eq!(
+        RecoveryStore::open(&system.join("recovery"))
+            .unwrap()
+            .record(),
+        &baseline
+    );
+    assert!(store.is_completed());
+    for name in ["network", "time", "time-check", "update-check"] {
+        assert_eq!(
+            fs::read(system.join(name).join("retained-state")).unwrap(),
+            name.as_bytes()
+        );
+    }
 }
 
 #[test]

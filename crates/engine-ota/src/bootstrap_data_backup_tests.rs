@@ -34,7 +34,8 @@ impl Fixture {
         let data = File::open(temp.path().join("data")).unwrap();
         let parent = File::open(temp.path().join("data/spacewars-bootstrap")).unwrap();
         let binding = BootstrapBinding {
-            schema: 1,
+            schema: 2,
+            origin: crate::bootstrap::BootstrapOrigin::Legacy,
             package_sha256: Sha256::digest(b"package"),
             device_id: Sha256::digest(b"device"),
             layout_id: Sha256::digest(b"layout"),

@@ -63,7 +63,8 @@ impl Fixture {
         let parent = File::open(data_path.join("spacewars-bootstrap")).unwrap();
         let owner = unsafe { libc::geteuid() };
         let binding = BootstrapBinding {
-            schema: 1,
+            schema: 2,
+            origin: crate::bootstrap::BootstrapOrigin::Legacy,
             package_sha256: Sha256::digest(b"package"),
             device_id: Sha256::digest(b"device"),
             layout_id: Sha256::digest(b"layout"),

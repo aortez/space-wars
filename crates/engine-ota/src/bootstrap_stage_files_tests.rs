@@ -23,7 +23,15 @@ struct Staging {
 
 impl Staging {
     fn new() -> Self {
-        let fixture = Fixture::new();
+        Self::with_fresh_origin(false)
+    }
+
+    fn with_fresh_origin(fresh: bool) -> Self {
+        let fixture = if fresh {
+            Fixture::fresh()
+        } else {
+            Fixture::new()
+        };
         let boot = fixture.temp.path().join("boot");
         let sources = fixture.temp.path().join("sources");
         for (path, bytes) in &fixture.boot_files {
@@ -36,6 +44,16 @@ impl Staging {
             };
             fs::create_dir_all(destination.parent().unwrap()).unwrap();
             fs::write(&destination, bytes).unwrap();
+        }
+        if fresh {
+            fs::write(
+                boot.join("tryboot.txt"),
+                format!(
+                    "{}\n[all]\ncmdline=spacewars-trial.txt\n",
+                    fixture.inputs.legacy_config.trim_end()
+                ),
+            )
+            .unwrap();
         }
         for base in [&boot, &sources] {
             modes(base);
@@ -56,7 +74,14 @@ impl Staging {
         )
     }
     fn retained(&self) {
-        for path in self.fixture.inputs.binding.original_boot_files.keys() {
+        for path in self
+            .fixture
+            .inputs
+            .binding
+            .original_boot_files
+            .keys()
+            .filter(|path| path.as_str() != "tryboot.txt")
+        {
             assert_eq!(
                 fs::read(self.boot.join(path)).unwrap(),
                 self.fixture.boot_files[path],
@@ -65,6 +90,11 @@ impl Staging {
         }
     }
     fn complete(&self) {
+        let files = inventory(&File::open(&self.boot).unwrap(), self.fixture.owner).unwrap();
+        assert_eq!(
+            retained(&files, &self.fixture.inputs, 512).unwrap().0,
+            self.fixture.inputs.binding.original_boot_files
+        );
         self.retained();
         for (path, bytes) in &self.fixture.boot_files {
             assert_eq!(&fs::read(self.boot.join(path)).unwrap(), bytes, "{path}");
@@ -76,7 +106,13 @@ impl Staging {
 
 #[test]
 fn staging_publication_faults_resume_without_changing_the_retained_normal_boot() {
-    let full = Staging::new();
+    for fresh in [false, true] {
+        staging_faults_resume(fresh);
+    }
+}
+
+fn staging_faults_resume(fresh: bool) {
+    let full = Staging::with_fresh_origin(fresh);
     let mut points = Vec::new();
     full.apply(|point| {
         points.push(point.to_owned());
@@ -96,7 +132,7 @@ fn staging_publication_faults_resume_without_changing_the_retained_normal_boot()
         offsets.insert(*matching.last().unwrap());
     }
     for failure in offsets {
-        let fixture = Staging::new();
+        let fixture = Staging::with_fresh_origin(fresh);
         let mut count = 0;
         let result = fixture.apply(|_| {
             let current = count;
@@ -118,6 +154,41 @@ fn staging_publication_faults_resume_without_changing_the_retained_normal_boot()
             })
             .unwrap();
     }
+}
+
+#[test]
+fn fresh_staging_never_overwrites_unknown_missing_or_concurrently_changed_trial_selectors() {
+    for missing in [true, false] {
+        let fixture = Staging::with_fresh_origin(true);
+        let path = fixture.boot.join("tryboot.txt");
+        if missing {
+            fs::remove_file(&path).unwrap();
+        } else {
+            fs::write(&path, b"another selector\n").unwrap();
+        }
+        assert!(
+            fixture
+                .apply(|_| panic!("must reject before staging"))
+                .is_err()
+        );
+        assert!(!fixture.boot.join(STAGE_DIRECTORY).exists());
+        assert!(!fixture.boot.join(PENDING).exists());
+    }
+    let fixture = Staging::with_fresh_origin(true);
+    assert!(
+        fixture
+            .apply(|point| {
+                if point == "trial-before-publish" {
+                    fs::write(fixture.boot.join("tryboot.txt"), b"concurrent change\n").unwrap();
+                }
+                Ok(())
+            })
+            .is_err()
+    );
+    assert_eq!(
+        fs::read(fixture.boot.join("tryboot.txt")).unwrap(),
+        b"concurrent change\n"
+    );
 }
 
 #[test]

@@ -52,7 +52,14 @@ pub(in crate::bootstrap) fn confirm_normal(
 
 impl Migration {
     pub fn new() -> Self {
-        let fixture = Fixture::new();
+        Self::from_fixture(Fixture::new())
+    }
+
+    pub fn fresh() -> Self {
+        Self::from_fixture(Fixture::fresh())
+    }
+
+    fn from_fixture(fixture: Fixture) -> Self {
         let (mut store, _) = fixture.promoted();
         let normal = CanonicalObservation {
             boot: confirm_normal(&mut store, &fixture),

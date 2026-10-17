@@ -93,7 +93,7 @@ pub fn install_bootstrap_root(
         quiet.check_with_target(target)?;
         crate::access_linux::preserved_for_bootstrap(&lock)?;
         crate::network_linux::preserved_for_bootstrap(&lock)?;
-        let actual = inspect_legacy_boot()?;
+        let actual = inspect_bootstrap_boot()?;
         if actual.layout != inspected.legacy.layout || actual.boot_id != inspected.legacy.boot_id {
             return Err(invalid(
                 "live boot or layout changed during root installation",

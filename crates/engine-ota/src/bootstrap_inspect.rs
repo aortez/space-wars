@@ -1,6 +1,6 @@
-//! Read-only inventory of the currently supported legacy installation. Passing
+//! Read-only inventory of supported legacy and unprepared fresh installations. Passing
 //! this preflight is not permission to install or proof of rollback capability.
-use super::{Board, active_lines, invalid};
+use super::{Board, BootstrapOrigin, active_lines, invalid};
 use crate::boot::{
     MAX_BOOT_ASSET_BYTES, MAX_BOOT_TOTAL_BYTES, asset_path, hardware_profile, hostname,
     kernel_build_id,
@@ -18,12 +18,13 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
-const LEGACY_CONFIG: &str = "disable_splash=1\n[pi4]\ndtoverlay=vc4-kms-v3d-pi4\n[pi5]\ndtoverlay=vc4-kms-v3d-pi5\n[all]\narm_64bit=1\ninclude spacewars-device.txt\n[all]\n";
+pub(super) const LEGACY_CONFIG: &str = "disable_splash=1\n[pi4]\ndtoverlay=vc4-kms-v3d-pi4\n[pi5]\ndtoverlay=vc4-kms-v3d-pi5\n[all]\narm_64bit=1\ninclude spacewars-device.txt\n[all]\n";
 
 #[derive(Debug, Serialize)]
-pub struct LegacyBootEvidence {
+pub struct BootstrapBootEvidence {
     pub schema: u32,
     pub purpose: &'static str,
+    pub origin: BootstrapOrigin,
     pub physical: PhysicalIdentity,
     pub boot_id: String,
     pub layout: DiskLayout,
@@ -42,15 +43,27 @@ pub struct LegacyBootEvidence {
 /// Inspect fixed installed paths without opening a block device or watchdog,
 /// obtaining an installation lock, changing state or requiring root. Reports
 /// the live inactive slot/UUIDs; package planning arguments cannot supply them.
-pub fn inspect_legacy_boot() -> Result<LegacyBootEvidence> {
+pub fn inspect_bootstrap_boot() -> Result<BootstrapBootEvidence> {
     inspect_staging(None).map(|(legacy, _)| legacy)
+}
+
+/// Retain the narrower legacy-only probe for callers that have not opted in to
+/// fresh images. A manifest alone must never make an old caller accept a trial.
+pub fn inspect_legacy_boot() -> Result<BootstrapBootEvidence> {
+    let evidence = inspect_bootstrap_boot()?;
+    if evidence.origin != BootstrapOrigin::Legacy {
+        return Err(invalid(
+            "legacy-only inspection does not accept fresh images",
+        ));
+    }
+    Ok(evidence)
 }
 
 /// Only the explicit staging path supplies an already validated durable intent.
 /// The public legacy probe continues to reject all existing staging/trial files.
 pub(super) fn inspect_staging(
     stage: Option<&super::trial::TrialInputs>,
-) -> Result<(LegacyBootEvidence, u64)> {
+) -> Result<(BootstrapBootEvidence, u64)> {
     let layout = inspect_layout()?;
     let physical = PhysicalIdentity::inspect(&layout)?;
     let board = Board::from_model(&physical.model)?;
@@ -86,10 +99,8 @@ pub(super) fn inspect_staging(
         0
     };
     if files.keys().any(|path| {
-        matches!(
-            path.as_str(),
-            "tryboot.txt" | "autoboot.txt" | "spacewars-boot-manifest.json"
-        ) || path.starts_with("sw-bootstrap/")
+        path == "autoboot.txt"
+            || path.starts_with("sw-bootstrap/")
             || path.starts_with(".sw-bootstrap-")
     }) {
         return Err(invalid(
@@ -116,14 +127,30 @@ pub(super) fn inspect_staging(
         }
         Ok(bytes)
     };
-    let config = contents("config.txt", 16 * 1024)?;
-    let cmdline = contents("cmdline.txt", 4096)?;
-    legacy_selection(
-        &String::from_utf8(config).map_err(|_| invalid("non-UTF8 boot configuration"))?,
-        &cmdline,
-        &text("/proc/cmdline", 16 * 1024)?,
-        &layout.active_partition().name,
-    )?;
+    let origin = if files.contains_key("spacewars-boot-manifest.json") {
+        super::fresh::inspect(
+            crate::ImageIdentity::read_installed()?,
+            &files,
+            &layout.active_partition().name,
+            &kernel,
+            &text("/proc/cmdline", 16 * 1024)?,
+            &contents,
+        )?
+    } else {
+        if files.contains_key("tryboot.txt") {
+            return Err(invalid(
+                "unidentified trial selector requires reconciliation",
+            ));
+        }
+        let config = contents("config.txt", 16 * 1024)?;
+        legacy_selection(
+            &String::from_utf8(config).map_err(|_| invalid("non-UTF8 boot configuration"))?,
+            &contents("cmdline.txt", 4096)?,
+            &text("/proc/cmdline", 16 * 1024)?,
+            &layout.active_partition().name,
+        )?;
+        BootstrapOrigin::Legacy
+    };
     let selection = contents("spacewars-device.txt", 4096)?;
     let profile = hardware_profile(
         std::str::from_utf8(&selection).map_err(|_| invalid("non-UTF8 hardware selection"))?,
@@ -163,13 +190,16 @@ pub(super) fn inspect_staging(
         || named.metadata()?.dev() != boot.metadata()?.dev()
         || named.metadata()?.ino() != boot.metadata()?.ino()
         || text("/proc/sys/kernel/random/boot_id", 64)?.trim() != boot_id
+        || matches!(&origin, BootstrapOrigin::FreshImage { image }
+            if **image != crate::ImageIdentity::read_installed()?)
     {
         return Err(invalid("boot context changed during legacy preflight"));
     }
     Ok((
-        LegacyBootEvidence {
-            schema: 1,
-            purpose: "read-only-legacy-bootstrap-inventory",
+        BootstrapBootEvidence {
+            schema: 2,
+            purpose: "read-only-bootstrap-inventory",
+            origin,
             physical,
             boot_id,
             layout,
@@ -199,9 +229,16 @@ fn legacy_selection(config: &str, default: &[u8], running: &str, active: &str) -
         "dwc_otg.lpm_enable=0 root=/dev/{active} rootfstype=ext4 rootwait net.ifnames=0 console=tty1 fbcon=map:01"
     );
     let tokens: Vec<_> = default.split_ascii_whitespace().collect();
+    if tokens.join(" ") != expected {
+        return Err(invalid("unsupported legacy default command line"));
+    }
+    running_selection(default, running)
+}
+
+pub(super) fn running_selection(default: &str, running: &str) -> Result<()> {
+    let tokens: Vec<_> = default.split_ascii_whitespace().collect();
     let actual: Vec<_> = running.split_ascii_whitespace().collect();
-    if tokens.join(" ") != expected
-        || !actual.ends_with(&tokens)
+    if !actual.ends_with(&tokens)
         || actual.iter().filter(|arg| arg.starts_with("root=")).count() != 1
         || actual.iter().any(|arg| {
             matches!(

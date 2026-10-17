@@ -32,6 +32,7 @@ const ROOT_PATHS: &[&str] = &[
     "etc",
     "root/.ssh",
     "home/spacewars/.ssh",
+    "home/swadmin/.ssh",
     "var/lib/NetworkManager",
     "usr/sbin/ab-update",
     "usr/sbin/ab-update-with-key",

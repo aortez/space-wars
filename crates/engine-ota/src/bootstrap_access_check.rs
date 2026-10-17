@@ -76,10 +76,18 @@ pub struct LegacyAccessCheck {
     pub ssh_connection: SshCheckConnection,
     pub root_sshd_configuration_sha256: Sha256,
     pub runtime_sshd_configuration_sha256: Sha256,
+    pub administrator: Option<AdministratorCheck>,
     pub checked_services: Vec<String>,
     pub independent_logins_verified: bool,
     pub equivalent_privilege_audit_complete: bool,
     pub ready_for_trial: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AdministratorCheck {
+    pub account_sha256: Sha256,
+    pub sudo_policy_sha256: Sha256,
+    pub sshd_configuration_sha256: Sha256,
 }
 
 pub(super) struct Observations {
@@ -87,6 +95,7 @@ pub(super) struct Observations {
     pub(super) commands: usize,
     pub(super) root_sshd: Sha256,
     pub(super) runtime_sshd: Sha256,
+    pub(super) administrator: Option<AdministratorCheck>,
     pub(super) services: Vec<String>,
 }
 
@@ -127,6 +136,30 @@ pub(super) fn check(
     run("/usr/sbin/visudo", &["-c", "-s"])?;
     let sudo = run("/usr/bin/sudo", &["-n", "-ll", "-U", "spacewars"])?;
     let commands = sudo_policy(text(&sudo)?)?;
+    let access = crate::access_linux::preserved_under(data, 0)?;
+    let administrator = if access.admin_keys > 0 {
+        let policy = fixed_file(root, "etc/sudoers.d/spacewars-admin", false)?
+            .expect("required admin policy");
+        if policy.identity.mode != 0o440 || policy.identity.gid != 0 {
+            return Err(invalid("unsafe administrator sudo policy permissions"));
+        }
+        let passwd = file_bytes(root, "etc/passwd", false)?.expect("required accounts");
+        let account = administrator_account(text(&passwd)?)?;
+        let sudo = run("/usr/bin/sudo", &["-n", "-ll", "-U", "swadmin"])?;
+        administrator_sudo_policy(text(&sudo)?)?;
+        let config = run(
+            "/usr/sbin/sshd",
+            &["-T", "-C", &connection.argument("swadmin")],
+        )?;
+        ssh_configuration(text(&config)?)?;
+        Some(AdministratorCheck {
+            account_sha256: Sha256::digest(account.as_bytes()),
+            sudo_policy_sha256: Sha256::digest(&sudo),
+            sshd_configuration_sha256: Sha256::digest(&config),
+        })
+    } else {
+        None
+    };
 
     let mut services = Vec::new();
     let mut ssh_modes = 0;
@@ -177,6 +210,7 @@ pub(super) fn check(
         commands,
         root_sshd: Sha256::digest(&root_config),
         runtime_sshd: Sha256::digest(&runtime_config),
+        administrator,
         services,
     })
 }
@@ -232,28 +266,8 @@ fn file_bytes(root: &File, path: &str, optional: bool) -> Result<Option<Vec<u8>>
 /// Accept only the supported effective listing, not general sudoers syntax.
 /// Unknown defaults, tags, runas identities, commands or formatting fail closed.
 fn sudo_policy(output: &str) -> Result<usize> {
-    let lines: Vec<_> = output
-        .lines()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .collect();
-    let header = lines
-        .iter()
-        .position(|s| {
-            s.starts_with("User spacewars may run the following commands on ") && s.ends_with(':')
-        })
-        .ok_or_else(|| invalid("unsupported effective sudo listing"))?;
-    for line in &lines[..header] {
-        if !(line.starts_with("Matching Defaults entries for spacewars on ") && line.ends_with(':'))
-            && *line != "Runas and Command-specific defaults for spacewars:"
-            && *line
-                != r"secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin"
-            && *line != "Defaults!/usr/sbin/visudo env_keep+=\"SUDO_EDITOR EDITOR VISUAL\""
-        {
-            return Err(invalid("unreviewed effective sudo defaults"));
-        }
-    }
-    let mut index = header + 1;
+    let lines = sudo_commands(output, "spacewars")?;
+    let mut index = 0;
     let mut commands = BTreeSet::new();
     while index < lines.len() {
         let source = lines[index];
@@ -295,6 +309,70 @@ fn sudo_policy(output: &str) -> Result<usize> {
         return Err(invalid("incomplete expected runtime sudo policy"));
     }
     Ok(commands.len())
+}
+
+fn sudo_commands<'a>(output: &'a str, user: &str) -> Result<Vec<&'a str>> {
+    let lines: Vec<_> = output
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    let header = lines
+        .iter()
+        .position(|s| {
+            s.starts_with(&format!("User {user} may run the following commands on "))
+                && s.ends_with(':')
+        })
+        .ok_or_else(|| invalid("unsupported effective sudo listing"))?;
+    for line in &lines[..header] {
+        if !(line.starts_with(&format!("Matching Defaults entries for {user} on "))
+            && line.ends_with(':'))
+            && *line != format!("Runas and Command-specific defaults for {user}:")
+            && *line
+                != r"secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin"
+            && *line != "Defaults!/usr/sbin/visudo env_keep+=\"SUDO_EDITOR EDITOR VISUAL\""
+        {
+            return Err(invalid("unreviewed effective sudo defaults"));
+        }
+    }
+    Ok(lines[header + 1..].to_vec())
+}
+
+fn administrator_sudo_policy(output: &str) -> Result<()> {
+    if sudo_commands(output, "swadmin")?
+        != [
+            "Sudoers entry: /etc/sudoers.d/spacewars-admin",
+            "RunAsUsers: root",
+            "Options: !authenticate",
+            "Commands:",
+            "ALL",
+        ]
+    {
+        return Err(invalid(
+            "administrator does not have the supported passwordless root policy",
+        ));
+    }
+    Ok(())
+}
+
+fn administrator_account(passwd: &str) -> Result<&str> {
+    let accounts: Vec<_> = passwd
+        .lines()
+        .filter(|line| line.starts_with("swadmin:"))
+        .collect();
+    let [account] = accounts.as_slice() else {
+        return Err(invalid("missing or duplicated administrator account"));
+    };
+    let fields: Vec<_> = account.split(':').collect();
+    if fields.len() != 7
+        || fields[1..4] != ["x", "1001", "1001"]
+        || fields[5..] != ["/home/swadmin", "/bin/bash"]
+    {
+        return Err(invalid(
+            "administrator account differs from the supported image",
+        ));
+    }
+    Ok(account)
 }
 
 fn ssh_configuration(output: &str) -> Result<()> {

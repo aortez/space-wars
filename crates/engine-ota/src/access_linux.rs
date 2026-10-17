@@ -67,7 +67,7 @@ pub fn import_admin_key(lock: &InstallLock) -> Result<AccessStatus> {
     import_under(&root, &data, OWNERS, Role::Admin)
 }
 
-/// Bootstrap must preserve both roles before reserving an attempt, because a
+/// Bootstrap must preserve operator and runtime roles before reserving an attempt, because a
 /// later root image must never import new/default keys if this store is lost.
 pub(crate) fn preserved_for_bootstrap(lock: &InstallLock) -> Result<AccessStatus> {
     lock.check()?;
@@ -75,15 +75,15 @@ pub(crate) fn preserved_for_bootstrap(lock: &InstallLock) -> Result<AccessStatus
     preserved_under(&data, OWNERS.root)
 }
 
-fn preserved_under(data: &File, owner: u32) -> Result<AccessStatus> {
+pub(crate) fn preserved_under(data: &File, owner: u32) -> Result<AccessStatus> {
     let directory = open_at(data, DIRECTORY, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
     if directory.metadata()?.dev() != data.metadata()?.dev() {
         return Err(invalid("persistent access is not on the data filesystem"));
     }
     let status = status(&directory, owner, false)?;
-    if status.root_keys == 0 || status.runtime_keys == 0 {
+    if (status.root_keys == 0 && status.admin_keys == 0) || status.runtime_keys == 0 {
         return Err(invalid(
-            "bootstrap requires separately preserved root and runtime login keys",
+            "bootstrap requires preserved root or administrator keys and separate runtime keys",
         ));
     }
     Ok(status)

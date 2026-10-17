@@ -75,7 +75,8 @@ fn actual_build_artifacts_roundtrip_into_private_raw_recovery_copies() {
 
 fn binding() -> BootstrapBinding {
     BootstrapBinding {
-        schema: 1,
+        schema: 2,
+        origin: crate::bootstrap::BootstrapOrigin::Legacy,
         package_sha256: Sha256::digest(b"package"),
         device_id: Sha256::digest(b"device"),
         layout_id: Sha256::digest(b"layout"),

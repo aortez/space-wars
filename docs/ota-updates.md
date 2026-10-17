@@ -967,9 +967,13 @@ reservation fix. All 6,768 Yocto tasks passed, with 6,738 reused, and the frozen
 rootfs passed unsigned candidate validation. Its shared boot identity remains
 the corrected kernel's identity. This image has not been installed on a Pi and
 predates the subsequent setup-admission fix at `a76ec32`.
-Freshly flashed devices still need a supported bootstrap into recovery state:
-the current legacy bootstrap intentionally rejects their existing recovery
-manifest and trial configuration. The
+Freshly flashed devices still need supervised bootstrap into recovery state.
+Protocol 5 now recognizes an exact unprepared flashed image, preserves its
+administrator and service stores, and supports its existing factory trial
+selector under the same backup and durable migration checks as legacy devices.
+Both the primary Picade and Pi 5 pass the new read-only inventory. The updated
+runtime must be built into a new image before using this path; the `ef44f5b`
+image still carries protocol 4. The
 [combined image evidence](data/ota-integrated-image-20261017.json) records the
 exact build, payload and outstanding device/runner qualification.
 

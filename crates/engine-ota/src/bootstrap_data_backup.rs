@@ -239,7 +239,7 @@ pub(super) fn create(
     verify_blob(&mut output, &image)?;
     let receipt = DataBackupReceipt {
         schema: 1,
-        selection_version: 1,
+        selection_version: 2,
         binding_sha256: Sha256::digest(&serde_json::to_vec(binding)?),
         source_sha256: observed.source_sha256,
         entries: observed.entries,
@@ -307,7 +307,7 @@ fn read_receipt(
     let envelope: Envelope = serde_json::from_slice(&read_file(file, owner, RECORD_LIMIT)?)?;
     let receipt = envelope.receipt;
     if receipt.schema != 1
-        || receipt.selection_version != 1
+        || receipt.selection_version != 2
         || receipt.entries == 0
         || receipt.entries > 100_000
         || receipt.archive.bytes < 1024

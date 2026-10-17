@@ -3,7 +3,8 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 
 fn binding() -> BootstrapBinding {
     BootstrapBinding {
-        schema: 1,
+        schema: 2,
+        origin: crate::bootstrap::BootstrapOrigin::Legacy,
         package_sha256: Sha256::digest(b"package"),
         device_id: Sha256::digest(b"device"),
         layout_id: Sha256::digest(b"layout"),
@@ -38,6 +39,32 @@ fn fixture() -> (tempfile::TempDir, File, File, u32) {
     (temp, data, File::open(path).unwrap(), unsafe {
         libc::geteuid()
     })
+}
+
+#[test]
+fn fresh_origin_cannot_resume_as_legacy_or_with_another_image_or_missing_factory_selector() {
+    let fixture = crate::bootstrap::TrialFixture::fresh();
+    let binding = fixture.inputs.binding.clone();
+    binding.validate().unwrap();
+    for case in 0..4 {
+        let mut changed = binding.clone();
+        match case {
+            0 => changed.origin = BootstrapOrigin::Legacy,
+            1 => {
+                changed.original_boot_files.remove("tryboot.txt");
+            }
+            2 => {
+                if let BootstrapOrigin::FreshImage { image } = &mut changed.origin {
+                    image.binaries.os_manager.sha256 = Sha256::digest(b"other original root");
+                }
+            }
+            _ => changed.schema = 1,
+        }
+        assert!(binding.matches(&changed).is_err(), "{case}");
+    }
+    let mut value = serde_json::to_value(&binding).unwrap();
+    value.as_object_mut().unwrap().remove("origin");
+    assert!(serde_json::from_value::<BootstrapBinding>(value).is_err());
 }
 
 #[test]

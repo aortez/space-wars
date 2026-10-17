@@ -1,5 +1,6 @@
 //! Restartable boot preparation under a previously durable staging intent.
-//! The retained normal boot is immutable; only the new tree and tryboot are added.
+//! The retained normal boot is immutable. Only a bound, unused factory tryboot
+//! may be replaced when publishing the staged selector.
 use super::trial::TrialInputs;
 use super::{STAGE_DIRECTORY, inspect, invalid};
 use crate::owned_fs::{io_result, name, open_at, owned, unchanged};
@@ -48,6 +49,7 @@ pub(super) fn retained(
     let mut original = BTreeMap::new();
     let mut published = BTreeMap::new();
     let mut pending = false;
+    let mut trial_published = false;
     let mut credit = 0u64;
     for (path, contents) in files {
         if let Some(relative) = path.strip_prefix(&format!("{STAGE_DIRECTORY}/")) {
@@ -64,8 +66,14 @@ pub(super) fn retained(
             }
             pending = true;
         } else if path == "tryboot.txt" {
-            if contents != &blob(inputs.plan.trial_config.as_bytes()) {
+            let retained = inputs.binding.original_boot_files.get(path);
+            if contents == &blob(inputs.plan.trial_config.as_bytes()) {
+                trial_published = true;
+            } else if retained != Some(contents) {
                 return Err(invalid("trial selector differs from staging intent"));
+            }
+            if let Some(retained) = retained {
+                original.insert(path.clone(), retained.clone());
             }
             continue;
         } else if path == SELECTOR_PENDING {
@@ -82,9 +90,9 @@ pub(super) fn retained(
             .ok_or_else(|| invalid("staging allocation overflow"))?;
     }
     if (!published.is_empty() && (published != expected || pending))
-        || (files.contains_key("tryboot.txt") && published != expected)
+        || (trial_published && published != expected)
         || (files.contains_key(SELECTOR_PENDING) && published != expected)
-        || (files.contains_key(SELECTOR_PENDING) && files.contains_key("tryboot.txt"))
+        || (files.contains_key(SELECTOR_PENDING) && trial_published)
         || original != inputs.binding.original_boot_files
     {
         return Err(invalid(
@@ -154,7 +162,7 @@ pub(super) fn apply(
         check(boot, owner, inputs)?;
         same_directory(boot, PENDING, &pending, owner)?;
         checkpoint("stage-before-publish")?;
-        rename(boot, PENDING, STAGE_DIRECTORY)?;
+        rename(boot, PENDING, STAGE_DIRECTORY, false)?;
         checkpoint("stage-published")?;
         boot.sync_all()?;
         flush(boot)?;
@@ -162,7 +170,7 @@ pub(super) fn apply(
     }
     check(boot, owner, inputs)?;
     let files = inventory(boot, owner)?;
-    if !files.contains_key("tryboot.txt") {
+    if files.get("tryboot.txt") != Some(&blob(inputs.plan.trial_config.as_bytes())) {
         let bytes = inputs.plan.trial_config.as_bytes();
         let mut selector = writable(boot, boot, SELECTOR_PENDING, owner, bytes.len() as u64)?;
         checkpoint("trial-file-opened")?;
@@ -173,7 +181,16 @@ pub(super) fn apply(
         checkpoint("trial-file-synced")?;
         check(boot, owner, inputs)?;
         checkpoint("trial-before-publish")?;
-        rename(boot, SELECTOR_PENDING, "tryboot.txt")?;
+        check(boot, owner, inputs)?;
+        rename(
+            boot,
+            SELECTOR_PENDING,
+            "tryboot.txt",
+            inputs
+                .binding
+                .original_boot_files
+                .contains_key("tryboot.txt"),
+        )?;
         checkpoint("trial-published")?;
     }
     boot.sync_all()?;
@@ -189,7 +206,7 @@ fn check(boot: &File, owner: u32, inputs: &TrialInputs) -> Result<()> {
     Ok(())
 }
 
-fn rename(parent: &File, from: &str, to: &str) -> Result<()> {
+fn rename(parent: &File, from: &str, to: &str, replace: bool) -> Result<()> {
     let from = name(from)?;
     let to = name(to)?;
     // SAFETY: validated single-component names and the held directory stay live.
@@ -199,7 +216,7 @@ fn rename(parent: &File, from: &str, to: &str) -> Result<()> {
             from.as_ptr(),
             parent.as_raw_fd(),
             to.as_ptr(),
-            libc::RENAME_NOREPLACE,
+            if replace { 0 } else { libc::RENAME_NOREPLACE },
         )
     })
 }

@@ -1,6 +1,6 @@
 //! A durable reservation for the supervised migration. This record is not a
 //! recovery journal or permission to write; backups and login checks are pending.
-use super::{LegacyBootEvidence, PackageCheck, invalid};
+use super::{BootstrapBootEvidence, PackageCheck, invalid};
 use crate::install_lock::InstallLock;
 use crate::owned_fs::{io_result, name, open_at, owned, read_file};
 use crate::recovery::Slot;
@@ -18,6 +18,13 @@ const RECORD: &str = "binding.json";
 const MAX_BYTES: u64 = 256 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum BootstrapOrigin {
+    Legacy,
+    FreshImage { image: Box<crate::ImageIdentity> },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BootstrapBinding {
     pub schema: u32,
@@ -26,6 +33,7 @@ pub struct BootstrapBinding {
     pub layout_id: Sha256,
     pub original_boot_id: String,
     pub original_slot: Slot,
+    pub origin: BootstrapOrigin,
     pub target: Slot,
     pub kernel_build_id: String,
     pub hardware_profile: String,
@@ -55,7 +63,7 @@ impl BootstrapBinding {
     pub(super) fn observed(
         package_sha256: Sha256,
         target: Slot,
-        legacy: &LegacyBootEvidence,
+        legacy: &BootstrapBootEvidence,
     ) -> Result<Self> {
         let bytes = |sectors: u64| {
             sectors
@@ -63,12 +71,13 @@ impl BootstrapBinding {
                 .ok_or_else(|| invalid("bootstrap partition size overflow"))
         };
         let binding = Self {
-            schema: 1,
+            schema: 2,
             package_sha256,
             device_id: legacy.physical.fingerprint(),
             layout_id: legacy.layout.layout_id,
             original_boot_id: legacy.boot_id.clone(),
             original_slot: legacy.layout.active,
+            origin: legacy.origin.clone(),
             target,
             kernel_build_id: legacy.kernel_build_id.clone(),
             hardware_profile: legacy.hardware_profile.clone(),
@@ -81,7 +90,7 @@ impl BootstrapBinding {
     }
 
     pub(super) fn validate(&self) -> Result<()> {
-        if self.schema != 1
+        if self.schema != 2
             || !crate::recovery::boot_id(&self.original_boot_id)
             || self.original_slot.other() != self.target
             || self.kernel_build_id.len() != 40
@@ -108,6 +117,27 @@ impl BootstrapBinding {
                 .all(|p| self.original_boot_files.contains_key(*p))
         {
             return Err(invalid("invalid bootstrap preparation binding"));
+        }
+        match &self.origin {
+            BootstrapOrigin::Legacy => {
+                if self.original_boot_files.contains_key("tryboot.txt")
+                    || self
+                        .original_boot_files
+                        .contains_key("spacewars-boot-manifest.json")
+                {
+                    return Err(invalid("legacy binding contains recovery boot assets"));
+                }
+            }
+            BootstrapOrigin::FreshImage { image } => {
+                super::fresh::check_image(image)?;
+                if !crate::boot::MUTABLE_BOOT_FILES
+                    .iter()
+                    .chain([&"tryboot.txt"])
+                    .all(|path| self.original_boot_files.contains_key(*path))
+                {
+                    return Err(invalid("fresh-image binding is missing boot assets"));
+                }
+            }
         }
         Ok(())
     }

@@ -10,6 +10,7 @@ fn fixture() -> (tempfile::TempDir, File, File) {
         "data/bluetooth",
         "etc/NetworkManager",
         "root/.ssh",
+        "home/swadmin/.ssh",
     ] {
         fs::create_dir_all(temp.path().join(path)).unwrap();
     }
@@ -31,6 +32,11 @@ fn fixture() -> (tempfile::TempDir, File, File) {
     )
     .unwrap();
     fs::write(temp.path().join("etc/hostname"), b"fixture\n").unwrap();
+    fs::write(
+        temp.path().join("home/swadmin/.ssh/authorized_keys"),
+        b"synthetic administrator fixture\n",
+    )
+    .unwrap();
     fs::write(
         temp.path().join("root/.ssh/authorized_keys"),
         b"synthetic public fixture\n",
@@ -102,6 +108,7 @@ fn fixed_selection_includes_unknown_data_and_preserves_links_without_following_t
         "data/new-user-state/file",
         "etc/hostname",
         "root/.ssh/authorized_keys",
+        "home/swadmin/.ssh/authorized_keys",
         "data/spacewars/config/settings.json",
     ] {
         assert!(entries.contains_key(&PathBuf::from(path)), "{path}");

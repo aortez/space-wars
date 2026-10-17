@@ -16,6 +16,14 @@ pub(crate) struct Fixture {
 
 impl Fixture {
     pub(crate) fn new() -> Self {
+        Self::with_fresh_origin(false)
+    }
+
+    pub(crate) fn fresh() -> Self {
+        Self::with_fresh_origin(true)
+    }
+
+    fn with_fresh_origin(fresh: bool) -> Self {
         let temp = tempfile::tempdir().unwrap();
         fs::set_permissions(temp.path(), fs::Permissions::from_mode(0o700)).unwrap();
         let assets = crate::bootstrap::tests::Assets::new();
@@ -44,9 +52,27 @@ impl Fixture {
         );
         original.insert("hostname.txt".into(), b"spacewars-fixture\n".to_vec());
         original.insert("boot_slot".into(), b"B\n".to_vec());
+        let (origin_kind, legacy_config, original) = if fresh {
+            let fresh = crate::bootstrap::fresh::tests::Fixture::new();
+            let config = String::from_utf8(fresh.contents["config.txt"].clone()).unwrap();
+            (
+                crate::bootstrap::BootstrapOrigin::FreshImage {
+                    image: Box::new(fresh.image),
+                },
+                config,
+                fresh.contents,
+            )
+        } else {
+            (
+                crate::bootstrap::BootstrapOrigin::Legacy,
+                legacy_config,
+                original,
+            )
+        };
         let origin = "de606400-dc75-446e-b26b-385592b0f562".to_string();
         let binding = BootstrapBinding {
-            schema: 1,
+            schema: 2,
+            origin: origin_kind,
             package_sha256: Sha256::digest(b"package"),
             device_id: Sha256::digest(b"device"),
             layout_id: Sha256::digest(b"layout"),

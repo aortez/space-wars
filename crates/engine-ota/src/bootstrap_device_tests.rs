@@ -46,6 +46,41 @@ use crate::recovery::Slot;
 use crate::recovery_linux::{DeviceNumber, DiskLayout, Partition};
 use std::os::unix::fs::{PermissionsExt, symlink};
 
+#[test]
+fn only_safe_pre_ota_service_stores_are_preserved_during_bootstrap() {
+    let temp = tempfile::tempdir().unwrap();
+    let owner = unsafe { libc::geteuid() };
+    let data = File::open(temp.path()).unwrap();
+    reject_provisioned(&data, owner).unwrap();
+    let system = temp.path().join("spacewars-system");
+    fs::create_dir(&system).unwrap();
+    fs::set_permissions(&system, fs::Permissions::from_mode(0o700)).unwrap();
+    for name in ["time", "network", "time-check", "update-check"] {
+        fs::create_dir(system.join(name)).unwrap();
+        fs::set_permissions(system.join(name), fs::Permissions::from_mode(0o700)).unwrap();
+        fs::write(system.join(name).join("state"), b"preserve me").unwrap();
+    }
+    reject_provisioned(&data, owner).unwrap();
+    for name in [
+        "recovery",
+        ".bootstrap-recovery",
+        "trust",
+        "updates",
+        "unknown",
+    ] {
+        fs::create_dir(system.join(name)).unwrap();
+        assert!(reject_provisioned(&data, owner).is_err(), "{name}");
+        fs::remove_dir(system.join(name)).unwrap();
+    }
+    fs::rename(system.join("network"), temp.path().join("network-original")).unwrap();
+    symlink(temp.path().join("network-original"), system.join("network")).unwrap();
+    assert!(reject_provisioned(&data, owner).is_err());
+    assert_eq!(
+        fs::read(temp.path().join("network-original/state")).unwrap(),
+        b"preserve me"
+    );
+}
+
 fn open(fixture: &Fixture) -> Result<OperatorPackage> {
     let bytes = fs::read(fixture.output().join("bundle.json"))?;
     OperatorPackage::under(
@@ -55,7 +90,7 @@ fn open(fixture: &Fixture) -> Result<OperatorPackage> {
     )
 }
 
-fn legacy(package: &BootstrapPackage) -> LegacyBootEvidence {
+fn legacy(package: &BootstrapPackage) -> BootstrapBootEvidence {
     let partition = |number, start, sectors| Partition {
         number,
         name: format!("sda{number}"),
@@ -82,8 +117,9 @@ fn legacy(package: &BootstrapPackage) -> LegacyBootEvidence {
     ] {
         boot_files.remove(name);
     }
-    LegacyBootEvidence {
-        schema: 1,
+    BootstrapBootEvidence {
+        schema: 2,
+        origin: super::super::BootstrapOrigin::Legacy,
         purpose: "test-only-observed-legacy-boot",
         physical: crate::boot_linux::PhysicalIdentity {
             model: "Raspberry Pi 5 Model B Rev 1.1".into(),

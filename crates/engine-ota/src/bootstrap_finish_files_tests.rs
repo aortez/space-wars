@@ -14,7 +14,14 @@ pub(in crate::bootstrap) struct Retirement {
 
 impl Retirement {
     pub fn new() -> Self {
-        let migration = Migration::new();
+        Self::from_migration(Migration::new())
+    }
+
+    pub fn fresh() -> Self {
+        Self::from_migration(Migration::fresh())
+    }
+
+    fn from_migration(migration: Migration) -> Self {
         let mut store = migration.fixture.open();
         let mut boot = migration.selected(&mut store);
         boot.boot.boot_id = "cc606400-dc75-446e-b26b-385592b0f562".into();

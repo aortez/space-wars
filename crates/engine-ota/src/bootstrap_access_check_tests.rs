@@ -21,6 +21,49 @@ Sudoers entry: /etc/sudoers.d/spacewars-renderer
 const SSH: &str = "authorizedkeysfile /data/spacewars-access/%u\nauthorizedkeyscommand none\nauthorizedprincipalsfile none\nauthorizedprincipalscommand none\ntrustedusercakeys none\npubkeyauthentication yes\nstrictmodes yes\nusedns no\nforcecommand none\nchrootdirectory none\nhostbasedauthentication no\npermitrootlogin without-password\nauthenticationmethods any\nhostkey /data/ssh/ssh_host_rsa_key\nhostkey /data/ssh/ssh_host_ecdsa_key\nhostkey /data/ssh/ssh_host_ed25519_key\n";
 
 #[test]
+fn administrator_requires_separate_image_account_and_exact_passwordless_root_grant() {
+    let policy = SUDO
+        .split("User spacewars may")
+        .next()
+        .unwrap()
+        .replace("spacewars", "swadmin")
+        + "User swadmin may run the following commands on fixture:\nSudoers entry: /etc/sudoers.d/spacewars-admin\nRunAsUsers: root\nOptions: !authenticate\nCommands:\nALL\n";
+    administrator_sudo_policy(&policy).unwrap();
+    assert!(sudo_policy(&policy.replace("swadmin", "spacewars")).is_err());
+    for (from, to) in [
+        ("RunAsUsers: root", "RunAsUsers: ALL"),
+        ("!authenticate", "authenticate"),
+        ("Commands:\nALL", "Commands:\n/usr/bin/id"),
+        ("spacewars-admin", "spacewars-logs"),
+        ("!authenticate", "!authenticate, setenv"),
+    ] {
+        assert!(
+            administrator_sudo_policy(&policy.replace(from, to)).is_err(),
+            "{to}"
+        );
+    }
+    assert!(administrator_sudo_policy(&format!("{policy}ALL\n")).is_err());
+    let account = "swadmin:x:1001:1001:Owner:/home/swadmin:/bin/bash";
+    assert_eq!(
+        administrator_account(&format!("root:x:0:0::/root:/bin/sh\n{account}\n")).unwrap(),
+        account
+    );
+    for (from, to) in [
+        ("1001", "1000"),
+        (":x:", ":!:"),
+        ("/bin/bash", "/bin/false"),
+        ("/home/swadmin", "/home/spacewars"),
+    ] {
+        assert!(
+            administrator_account(&account.replace(from, to)).is_err(),
+            "{to}"
+        );
+    }
+    assert!(administrator_account(&format!("{account}\n{account}\n")).is_err());
+    assert!(administrator_account("").is_err());
+}
+
+#[test]
 fn effective_sudo_listing_rejects_old_installers_broad_grants_environment_and_runas_changes() {
     assert_eq!(sudo_policy(SUDO).unwrap(), 3);
     let logs_only = SUDO

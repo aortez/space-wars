@@ -43,14 +43,19 @@ hostname and free space. It hashes the boot inventory twice and rereads the
 physical layout to detect changes during inspection. It does not open a block
 device or watchdog, take the install lock, write persistent state or reboot.
 
-This first-stage probe accepts the existing standard legacy configuration and
-requires its default root arguments to match the running root. An unfamiliar
-configuration, existing trial/partition-selection configuration, or interrupted
-bootstrap needs explicit review. The report always says
+This first-stage probe accepts the standard legacy configuration or an
+unprepared flashed recovery image, and requires its default root arguments to
+match the running root. Fresh-image inspection verifies the original image
+identity, complete boot manifest, loaded kernel, factory `/dev/...` default and
+`spacewars.trial=unprepared` selector. A canonical PARTUUID default, used trial
+selector, unknown boot file or mismatched image is not a fresh installation.
+An unfamiliar configuration or interrupted bootstrap needs explicit review.
+The report includes its `origin` and always says
 `root_preflight_complete: false`: unprivileged inspection does not establish
 the private key/journal state, successful backups or safe installation.
 
-The Pi 5 currently runs slot B with HyperPixel. Its hostname file is
+The earlier legacy Pi 5 inventory ran slot B with HyperPixel; fresh flashes
+start in slot A. Always use the newly observed layout. The hostname file is
 `hostname.txt`, which the new boot verifier now accepts as an optional, bounded
 DNS host label. It is excluded from the immutable boot identity and preserved
 through selector changes. The old `boot_slot` file is only a legacy breadcrumb;
@@ -117,15 +122,19 @@ applies the fixed destination modes. Nothing under `legacy-root/` is executed
 by the packager or interpreted as an arbitrary installation hook.
 
 The device package checker requires the complete fixed list and bootstrap
-protocol 4. The builder and inactive-root readback check require
+protocol 5. The builder and inactive-root readback check require
 `/etc/spacewars/bootstrap-runtime.json` in the actual ext4 image, with schema 1
-and protocol 4. This marker is installed by the image recipe and is part of the
+and protocol 5. This marker is installed by the image recipe and is part of the
 rootfs identity. It identifies first-image recovery with persistent-store health
 checks, an activation boot ID and durable canonical migration with a staged
 fallback followed by explicit retirement and initial recovery publication;
 the production recovery protocol alone cannot establish that capability.
-The trial journal is schema 4. Schema 1/2 packages, bootstrap protocol 1/2/3
-images and schema 1/2/3 trial journals are rejected;
+The trial journal is schema 4 with a schema 2 preparation binding. That binding
+distinguishes legacy and fresh-image origins and retains the original image
+identity and boot inventory. Protocol 5 also supports a separately provisioned
+`swadmin` operator and replacing an unused factory trial selector under durable
+staging intent. Schema 1/2 packages, bootstrap protocol 1/2/3/4 images, schema 1
+preparation bindings and schema 1/2/3 trial journals are rejected;
 previous local packages must be rebuilt,
 never relabeled. This packaging step does not close any live privileges. The
 migration needs the separately implemented durable per-file record of original
@@ -158,11 +167,14 @@ space for recovery copies. Data-content backup sizing remains an additional
 requirement. No root partition, boot selector or persistent journal is written
 by the check. Its report always says `ready_for_write: false`.
 
-`bootstrap_prepare` uses the same check and additionally requires both root and
-runtime login keys already preserved in `/data/spacewars-access`, plus an existing
+`bootstrap_prepare` uses the same check and additionally requires operator
+keys (`root` or the separately provisioned `swadmin`) and runtime login keys
+already preserved in `/data/spacewars-access`, plus an existing
 valid `/data/NetworkManager/system-connections` directory. Establish
 those separate roles with the root manager's `initialize-access` and, if needed,
-`import-root-keys` operations while the old home files remain available. A
+`import-root-keys` or `import-admin-keys` operations while the old home files
+remain available. Fresh images already preserve `swadmin`; bootstrap never
+copies its key to `root` or promotes the runtime account. A
 runtime key is never automatically promoted to root. Key presence is not proof
 that either SSH login works; both intended logins still need verification.
 
@@ -174,6 +186,9 @@ only the same inputs, retains the original record and reports `resumed: true`.
 An ordinary legacy reboot is allowed; its new boot ID does not overwrite the
 first observed ID. Missing, corrupt, partial or conflicting state requires
 explicit reconciliation, and is never deleted or silently reinitialized.
+The existing `time`, `network`, `time-check` and `update-check` service stores
+are preserved, including scheduling history. Recovery, trust, staged updates,
+unknown entries and unsafe directory ownership or links still stop preparation.
 
 An active reservation blocks mutations through the **new** maintenance tools.
 New-image SSH initialization retains an existing access store and refuses to
@@ -266,7 +281,7 @@ cargo build --locked -p engine-ota --example bootstrap_backup \
 ## Data and root configuration recovery copy
 
 `bootstrap_backup_data` takes the same separately selected bundle hash and uses
-the existing preparation. It requires preserved root/runtime login roles and
+the existing preparation. It requires preserved operator/runtime login roles and
 the persistent network-profile directory. Under the shared installation lock,
 it checks that the kiosk is stopped (or masked and stopped), and that any
 installed device-state service is stopped. It never stops services or changes
@@ -279,7 +294,7 @@ The fixed selection includes all `/data` children except
 `/data/spacewars/coredumps` (disposable diagnostics). This includes unknown new
 user-data directories, settings, ROMs, network profiles, Bluetooth pairing,
 SSH host/login keys and device-service state. It also captures `/etc`, the
-root/runtime `.ssh` directories, `/var/lib/NetworkManager`, and the fixed legacy
+root/runtime/administrator `.ssh` directories, `/var/lib/NetworkManager`, and the fixed legacy
 update helpers and units needed for migration recovery. An actual NetworkManager
 bind alias is captured once at its `/data` location; an unbound rootfs profile
 directory is retained separately. This selection is versioned in the receipt.
@@ -437,7 +452,7 @@ and exchanged old inodes are not deleted by this phase.
 
 The report always says `ready_for_trial: false`. This command does not reload
 services, alter boot selectors, open a watchdog, write partition images or reboot.
-Effective sudo/SSH/service validation and separate root/runtime login tests must
+Effective sudo/SSH/service validation and separate operator/runtime login tests must
 follow before any trial. Neither installed Pi root has been changed by this work.
 
 ## Check access after replacement
@@ -468,7 +483,10 @@ must verify those independently retained backups again.
 Each fixed command has a ten-second deadline and 64 KiB output bound. The checks
 cover strict sudoers syntax, an allowlist of effective runtime sudo commands,
 the exact reviewed log helper, SSH public-key and persistent host-key paths for
-both users, and selected loaded service commands/dependencies. Unsupported
+root/runtime and any preserved administrator, and selected loaded service
+commands/dependencies. A preserved administrator also requires the image's
+UID/GID 1001 account, login shell/home and exact passwordless root sudo grant;
+its account and effective configuration hashes are reported separately. Unsupported
 sudo defaults or privileges, SSH command/environment overrides, stale systemd
 configuration and missing persistence ordering fail the check. SSH inspection
 uses `sshd -T -C`; it checks configuration and host-key validity without starting
@@ -477,8 +495,9 @@ not echo input contents.
 
 The report always leaves `independent_logins_verified`,
 `equivalent_privilege_audit_complete` and `ready_for_trial` false. Before a trial,
-retain the existing root session while verifying new root and runtime logins
-independently, exercise the denial cases as the actual runtime UID, and review
+retain the existing operator session while verifying new operator and runtime
+logins independently. For `swadmin`, verify `sudo -n id -u` returns `0`.
+Exercise the denial cases as the actual runtime UID, and review
 equivalent D-Bus, Polkit and service-control permissions. Loaded dependencies
 alone do not establish that services have run successfully or that an existing
 SSH daemon has adopted new settings. Pi 4 and Pi 5 need their own results.
@@ -568,8 +587,21 @@ Assets and generated command lines are copied into `/boot/.sw-bootstrap-pending`
 The command bounds and verifies every file, flushes files/directories and the
 filesystem, then publishes `/boot/sw-bootstrap` without replacing an existing
 tree. It writes the checked `/boot/tryboot.txt` last, through the fixed
-`.sw-bootstrap-tryboot.pending` file and a no-replace rename. The original
+`.sw-bootstrap-tryboot.pending` file. Legacy installations use a no-replace rename.
+A fresh image replaces only its exact, manifest-bound factory `tryboot.txt`,
+after the complete staged tree and durable intent exist. Both sides of an
+interrupted replacement reconstruct the same original inventory for resume;
+a missing or unexpected selector is never repaired. The original
 `config.txt`, command line, firmware, kernel, profile and hostname stay unchanged.
+
+Fresh-image regression coverage includes interruptions before and after trial
+publication, unexpected/missing selectors, retained-image identity changes,
+normal-selector restoration, canonical migration and interrupted recovery
+publication with existing service stores. The 2026-10-17 serial suites passed
+328 OTA unit tests and 22 integration tests (8 environment-specific tests
+ignored), plus 160 manager unit tests and 25 integration tests (2 namespace
+tests ignored). Clippy and formatting passed. Read-only inventories passed on
+the Pi 4 Picade and Pi 5; these checks do not qualify a live migration.
 
 An explicit rerun can finish bounded partial files only in its recorded pending
 tree. A published tree must already be complete and match its plan; changed or

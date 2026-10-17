@@ -18,7 +18,9 @@ pub use package::{BootstrapPackage, build_package};
 
 #[path = "bootstrap_inspect.rs"]
 mod inspect;
-pub use inspect::{LegacyBootEvidence, inspect_legacy_boot};
+pub use inspect::{BootstrapBootEvidence, inspect_bootstrap_boot, inspect_legacy_boot};
+#[path = "bootstrap_fresh.rs"]
+mod fresh;
 
 #[path = "bootstrap_device.rs"]
 mod device;
@@ -35,7 +37,9 @@ pub use backup::{
     verify_backup_export,
 };
 pub use device::backup_installed_package;
-pub use state::{BootstrapBinding, PreparationReport, require_no_active_bootstrap};
+pub use state::{
+    BootstrapBinding, BootstrapOrigin, PreparationReport, require_no_active_bootstrap,
+};
 
 #[path = "bootstrap_access_check.rs"]
 mod access_check;
@@ -93,7 +97,7 @@ pub use trial_coordinator::{BootstrapBackend, BootstrapOutcome, recover_bootstra
 mod trial_files;
 #[path = "bootstrap_trial_linux.rs"]
 mod trial_linux;
-pub use access_check::{LegacyAccessCheck, SshCheckConnection};
+pub use access_check::{AdministratorCheck, LegacyAccessCheck, SshCheckConnection};
 pub use data_backup::{
     DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
     DataBackupStage, verify_data_backup_export,
@@ -121,7 +125,7 @@ pub use trial_linux::BootstrapBoot;
 
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
 /// Boot-bound activation, canonical health and explicit retirement/recovery handoff.
-pub const BOOTSTRAP_PROTOCOL: u32 = 4;
+pub const BOOTSTRAP_PROTOCOL: u32 = 5;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
