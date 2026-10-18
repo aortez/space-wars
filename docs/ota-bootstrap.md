@@ -19,11 +19,13 @@ inactive-root installer, independent-export verifiers, restartable boot staging,
 consumed one-shot activation, a first-boot recovery coordinator, and restartable
 canonical asset preparation/activation with separate staged and canonical
 normal-boot health checks, and an explicit archive/cleanup/recovery handoff.
-**Remaining:** a clean image containing the health-worker capability correction,
-explicit reconciliation of the second consumed Pi 5 attempt, successful corrected
-Pi 5/Picade trials, supervised staged/canonical normal-boot verification,
-live finalization and the remaining physical failure qualification. A package
-is not a signed OTA candidate or an enabled updater.
+**Verified on the replacement Pi 5:** the corrected image passed the trial,
+staged normal and canonical normal boots. Finalization archived the temporary
+assets and established an initial generation-zero recovery baseline, accepted
+by the production recovery service.
+**Remaining:** Picade bootstrap, the remaining Pi 4/5 physical failure
+qualification, and feed/trust/service/policy rollout. Automatic OTA installation
+is still disabled; a bootstrap package is not a signed OTA release.
 
 The [2026-10-17 hardware record](data/ota-bootstrap-live-20261017.json) tracks
 the initial run; follow-up records appear below. The Picade has completed raw, data/configuration and original-file
@@ -46,7 +48,9 @@ The corrected runtime passed that check in a second trial, which then failed
 its kiosk state-write check and returned to slot A. Both consumed attempts and
 their recovery copies are retained. See the
 [first replacement trial record](data/ota-pi5-replacement-bootstrap-20261017.json)
-and [second trial record](data/ota-pi5-corrected-bootstrap-20261017.json).
+and [second trial record](data/ota-pi5-corrected-bootstrap-20261017.json). The
+[third attempt](data/ota-pi5-bootstrap-success-20261017.json), using the clean
+`e986718` image, completed the migration and recovery handoff described below.
 
 ### Replacement Pi 5 USB drive
 
@@ -261,12 +265,76 @@ UI/display counters, and rejection of a read-only configuration directory.
 The six artifact-policy tests and nine kiosk-health tests also passed. This
 diagnostic does not run recovery policy or establish boot qualification.
 
-The Pi is operating on its original slot A with kiosk, device service and Wi-Fi
-active, administrator access working and no observed storage errors. The
-production unit has not been patched in place. The capability correction still
-needs a clean image and a fresh trial, after explicitly reconciling the consumed
-`f952a6f4` attempt. Do not reset or reactivate that journal. No normal-default
-promotion, production recovery baseline or automatic OTA installation exists.
+At the end of that diagnostic, the Pi was operating on its original slot A with
+kiosk, device service and Wi-Fi active, administrator access working and no
+observed storage errors. The production unit was not patched in place. The
+following attempt used a clean image containing the correction, after explicitly
+reconciling the consumed `f952a6f4` attempt. Neither failed journal may be reset
+or reactivated.
+
+### Successful Pi 5 bootstrap and recovery handoff
+
+The [success record](data/ota-pi5-bootstrap-success-20261017.json) binds the
+completed migration to clean source `e986718`. All 6,768 Yocto tasks succeeded,
+with 6,734 reused. Independent candidate inspection accepted the image, embedded
+build inputs and compiler policy. The recovery unit extracted from the actual
+root image matched the checkout, including `AmbientCapabilities=CAP_SETUID`.
+Pi 4 and Pi 5 packages were frozen; only the Pi 5 package was installed in this run.
+
+Before preparing a fresh attempt, the tested reconciliation procedure archived
+the whole second reservation and package at
+`/data/logs/spacewars-bootstrap-failed-f952a6f4/attempt`. The consumed journal
+remained byte-for-byte unchanged. The original 109-file boot inventory was
+verified after restoring the factory trial selector and removing only the 78
+independently preserved staged files. The first failed attempt also remains
+intact. Reconciliation did not write either root slot, restore user data, open
+the watchdog or reboot the device.
+
+The new attempt made fresh raw, data/configuration and original-file backups,
+with independent workstation exports. The data archive contains 18,755 entries;
+an unprivileged extraction verified contents, modes, links and nanosecond
+timestamps. Numeric owners are retained in the archive, but were not recreated
+by this extraction. A temporary hostname-resolution failure interrupted an
+independent access check after preservation. Runtime services were restored;
+separate access checks subsequently passed at the authenticated current address
+with the existing host key required. The final post-boot checks also passed
+through `spacewars.local`. No preservation or activation allowance was reset.
+
+Slot B installation, readback, filesystem validation and staging passed. The
+single trial activation returned an accepted reboot reply before SSH exited
+with status 255; the command was not repeated. All three boots then completed
+their own local health windows on the same installed image:
+
+| Boot | Boot ID | Healthy observation window |
+| --- | --- | --- |
+| One-shot trial | `9b0d6b67-d927-4387-b5a5-909dc58caf51` | 7.085–68.001 s (60.916 s) |
+| Staged normal | `2d56d776-17f5-489a-9754-32b81bba4969` | 6.892–67.660 s (60.768 s) |
+| Canonical normal | `ec997cb4-c669-4b14-b593-e3b50d1f31d6` | 7.692–68.733 s (61.041 s) |
+
+The early trial record reports the watchdog armed at 0.719 seconds for 210
+seconds. Its volatile completion receipt was not captured before the successful
+normal reboot. The persistent health proofs and subsequent normal boots were
+observed; the complete watchdog and deliberate-failure matrix remains separate.
+
+After independent canonical-boot verification, finalization archived and
+removed 78 temporary boot files, retained the completed reservation, and
+published the initial production recovery baseline on slot B at generation
+zero. The retired archive was independently exported and hash-verified. The
+native boot probe accepted the cleaned canonical tree. Restarting the ordinary
+recovery service reported `healthy` and left the baseline and completed journal
+unchanged. No legacy slot was claimed as a retained-good image.
+
+Fresh administrator login and sudo succeeded; runtime login worked while
+unrestricted sudo and recovery execution were denied. The Clock controls opened
+and returned to unpaused gameplay without restarting the kiosk. These were
+logical UI actions, not physical button/controller tests. A captured 800×480
+frame showed the Clock; kiosk and device services had zero restarts, and the
+current kernel log contained no observed storage errors.
+
+The completed reservation and both failed attempts remain available for
+recovery. Trust and staging are not provisioned, and automatic OTA is disabled.
+Next are the Picade bootstrap and the remaining physical failure qualification;
+neither Picade was changed during this run.
 
 ## Read the existing device
 
@@ -302,13 +370,16 @@ start in slot A. Always use the newly observed layout. The hostname file is
 DNS host label. It is excluded from the immutable boot identity and preserved
 through selector changes. The old `boot_slot` file is only a legacy breadcrumb;
 it must be archived and removed after canonical confirmation, never used to choose
-the writable partition. Reobserve both devices before preparing an attempt.
+the writable partition. Reobserve the selected device before preparing an
+attempt. A completed bootstrap with a production recovery baseline uses the
+ordinary OTA path; it must not be prepared again as a fresh device.
 
 ## Build the workstation package
 
 Use an expanded `.ext4` artifact and the boot directory extracted from that
-same clean Yocto build. The output directory must not exist. The current Pi 5
-inventory supplies the following planning inputs:
+same clean Yocto build. The output directory must not exist. This historical
+example uses the replacement Pi 5's pre-bootstrap slot A inventory; use the
+selected device's current inventory when planning a new migration:
 
 ```sh
 cargo run --locked -p engine-ota --example bootstrap_package -- \
@@ -1101,9 +1172,10 @@ Atomic replacements do not qualify shared-FAT behavior under physical power loss
 
 Success still reports `automatic_updates_enabled: false`. Canonical confirmation
 does not itself delete the staged tree or initialize production recovery. The
-separate finalization operation below performs that handoff. No live canonical
-migration has run on either Pi. The clean `cd66877` protocol-4 runtime and
-schema-3 kits below are available for supervised preparation.
+separate finalization operation below performs that handoff. The replacement
+Pi 5 completed canonical migration and its separate normal-boot check using
+`e986718`; Picade migration remains pending. The `cd66877` protocol-4 runtime
+and schema-3 kits described later are historical artifacts.
 
 ## Archive bootstrap assets and establish the initial recovery baseline
 
@@ -1159,9 +1231,10 @@ is lost state, not a fresh unprovisioned device.
 The command requests no reboot and leaves `automatic_updates_enabled: false`.
 The ordinary recovery service can now open the baseline, but actual tryboot and
 watchdog qualification, feed/trust setup and the update service/policy remain
-separate requirements. Finalization has not run against either Pi's installed
-state. Do not relabel older runtime images, kits or journals to bypass the new
-protocol checks.
+separate requirements. Finalization has completed on the replacement Pi 5,
+including an independent archive export and production recovery-service check;
+the Picade has not reached this step. Do not relabel older runtime images, kits
+or journals to bypass the new protocol checks.
 
 Once finalization has archived the active reservation, the root operator can
 run the separate [OTA state provisioning](ota-updates.md#supervised-ota-state-provisioning)
@@ -1234,10 +1307,12 @@ original normal configuration retained. A later reset should use the original
 default; that behavior and watchdog expiry must be measured on both installed
 boards. [Raspberry Pi tryboot documentation](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#fail-safe-os-updates-tryboot)
 
-## Remaining supervised migration
+## Supervised migration sequence
 
-The following sequence is the implementation contract, **not a completed apply
-tool or instructions to copy the whole boot tree onto a live Pi**:
+The following sequence summarizes the implemented commands and their evidence
+requirements. The replacement Pi 5 completed it through the initial baseline;
+the Picade migration and the final failure/rollout qualification remain pending.
+It is not a substitute for the command-specific preconditions above:
 
 1. Establish the selected root access, take the shared install lock, repeat
    the device and private-state preflight, and preserve verified recovery
@@ -1262,8 +1337,8 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    The shared kiosk health worker now checks persistent network/Bluetooth binds
    and SSH-store structure as well as settings writes. The separate bootstrap
    coordinator uses that worker and its own persisted health authorization for
-   watchdog completion. Boot staging and supervised activation are implemented;
-   all live migration/boot qualification remains pending.
+   watchdog completion. Pi 5 staging and trial health have passed; the Picade
+   trial and remaining physical failure qualification are still pending.
 5. After a successful supervised trial, select a normal boot using the staged
    assets and reboot normally. Keep the backed-up legacy configuration/assets
    available until the canonical migration is proven.
@@ -1274,7 +1349,7 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    `hostname.txt`, and verify a canonical normal boot before archiving/removing
    the legacy breadcrumb, obsolete assets and temporary stage. Canonical
    preparation, activation, health observation and explicit archive/cleanup are
-   implemented; all live verification remains pending.
+   implemented and verified on the replacement Pi 5; Picade verification remains.
 7. The root-only finalization command then explicitly establishes the initial
    good recovery baseline from the observed normal boot. Do not advertise the overwritten/legacy root as a qualified
    retained image. Complete Pi 4/5 failure qualification and the remaining feed,
