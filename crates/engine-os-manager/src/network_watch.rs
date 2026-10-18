@@ -20,9 +20,12 @@ pub struct Snapshot {
 }
 
 impl Watch {
-    pub fn read(&self, now: &Clock) -> Option<Snapshot> {
+    /// Sample the clock under the observation lock. A caller's earlier sample
+    /// can precede a concurrent publication without the clock having regressed.
+    pub fn read(&self, read_clock: impl FnOnce() -> Option<Clock>) -> Option<Snapshot> {
         let state = self.0.lock().ok()?;
         let status = state.status.as_ref()?;
+        let now = read_clock()?;
         if status.observed.boot_id != now.boot_id
             || now
                 .ms

@@ -6,6 +6,47 @@ use engine_ota::Sha256;
 use std::collections::BTreeMap;
 
 const BOOT: &str = "11111111-2222-3333-4444-555555555555";
+
+#[test]
+fn native_network_read_accepts_publication_after_the_callers_clock_sample() {
+    use crate::linux;
+    use crate::service::ObservedState;
+    use crate::time::{TimeReason, TimeRecord, TimeTracker};
+    let boot_id = linux::boot_id().unwrap();
+    let reading = linux::clock_reading().unwrap();
+    let observed = Clock {
+        boot_id: boot_id.clone(),
+        ms: reading.boottime_us / 1000,
+    };
+    let earlier = Clock {
+        boot_id: boot_id.clone(),
+        ms: observed.ms.checked_sub(1).unwrap(),
+    };
+    let watch = Watch::default();
+    let mut snapshot = Fake::new().network(&clock(1000)).unwrap().status;
+    snapshot.observed = observed.clone();
+    watch.publish(Some(snapshot));
+    let native = native::Native::new(
+        Arc::new(Mutex::new(ObservedState {
+            tracker: TimeTracker::new(
+                boot_id.clone(),
+                TimeRecord::default(),
+                TimeReason::WaitingForNetworkSync,
+                reading,
+                None,
+            ),
+            boot_id: boot_id.clone(),
+            provider_error: None,
+            persistence_error: None,
+            rtc_error: None,
+            observed_at: Instant::now(),
+        })),
+        watch,
+        boot_id,
+    );
+    assert_eq!(native.network(&earlier).unwrap().status.observed, observed);
+}
+
 fn clock(ms: u64) -> Clock {
     Clock {
         boot_id: BOOT.into(),

@@ -59,8 +59,8 @@ impl Inputs for Native {
             ms: linux::clock_reading()?.boottime_us / 1000,
         })
     }
-    fn network(&self, clock: &Clock) -> Option<Snapshot> {
-        self.network.read(clock)
+    fn network(&self, _clock: &Clock) -> Option<Snapshot> {
+        self.network.read(|| self.clock().ok())
     }
     fn time(&self) -> Option<UsableTime> {
         let shared = self.time.lock().ok()?;

@@ -2644,8 +2644,64 @@ selectors, update schedule and trust/recovery records stayed unchanged.
 [Source and test evidence](data/ota-startup-check-20261018.json) distinguishes
 these probes from live startup qualification. Historical startup errors omitted
 their cause; the controlled reproduction does not recover that missing evidence.
-A signed canary boot, live partial-offline transport and frame-time qualification
-remain before relying on unattended checks.
+The subsequent signed canary and its remaining failures are recorded below;
+these fixture results alone do not qualify unattended checks.
+
+### Signed startup canary and observation ordering (2026-10-18)
+
+Owner-supervised Nightly generation 3 packages clean source `f58d725` from
+#500. Its qualified image uses the existing boot assets. Publication retained
+the earlier Nightly targets and left Release empty; automatic publication and
+installation remain disabled. The Pi 5 installed the signed candidate into its
+inactive slot, booted the trial and committed generation 3. Its trial-boot
+automatic Release check completed with no candidate.
+
+The initial byte-for-byte data check stopped on an application settings rewrite.
+The retained recovery archive matched the exact pre-install settings digest.
+Comparing parsed preferences established that all previous values survived;
+only the new Aquarium, Cell Swap and launcher-filter defaults were added.
+Other durable stores, including saved networks, SSH identity, access and ROMs,
+were unchanged. BlueZ also regenerated its local GATT cache as on earlier boots.
+
+A subsequent ordinary boot ran generation 3 from the committed normal slot,
+but its automatic check failed with `network-unavailable`. Restarting only the
+device service preserved that failed check's daily allowance and the running
+kiosk. On the second Picade, service interruption retained a partial download
+and the daily due time. Explicit retry reached the complete compressed length
+but was cancelled before Ready. A later diagnostic transfer encountered a
+network-status call taking longer than its 30-second observation bound. The
+Picade was restored to Release with its image, boot, kiosk and durable stores
+unchanged. These are retained failures, not passing resume/startup qualification.
+
+The detached Pi 5 partial-offline test kept SSH disconnected for the full test
+and independent restoration window. SSH activity remained unknown even after
+the reservations expired, so the coordinator conservatively kept Wi-Fi on.
+The 220-second offline-entry bound expired before the due-check/NTP handoff
+stages could run. The normal exit cleanup restored the original network policy
+and Release channel without its emergency radio fallback; the same kiosk kept
+running and durable stores were unchanged. Live offline handoff remains
+unqualified until native SSH-idle observation is resolved. An owner probe after
+restoration found four unclassified TCP listeners, with the SSH admission hook,
+configuration and host namespace checks passing. That probe ran outside the
+service sandbox and does not resolve its remaining namespace qualification.
+
+Inspection found a separate reproducible observation-ordering defect shared by
+the OTA and time workers: a clock sampled before taking the network observation
+lock can precede a newly published observation. The freshness check then rejects
+that valid observation as being in the future. The native-adapter regression
+fails before the correction. Both workers now sample the clock under the
+observation lock. The five-second freshness bound, actual future/other-boot
+rejection and coordinator-epoch invalidation remain intact.
+
+This correction does not establish the cause of every physical failure above,
+particularly the Picade's long network-status delay. Generation 3 does not
+contain this newer correction. Rust 1.89 passed all 194 device-service tests,
+scoped Clippy, formatting and AArch64 compilation. On each of Pi 5 and Pi 4,
+20 runtime/native-adapter tests and one clock-guard test passed without changing
+the installed services. A signed deployment of it, successful normal
+startup and verified resumed-download checks, and frame-time qualification
+remain before unattended rollout. Exact identities, observed outcomes and
+validation are in the [canary and observation evidence](data/ota-network-observation-20261018.json).
 
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
