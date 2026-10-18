@@ -428,6 +428,13 @@ class GitHub:
             raise ValueError('Remote asset length/state differs from manifest')
         url = (f'https://github.com/{self.repo}/releases/download/{self.tag}/'
                + urllib.parse.quote(asset['name'], safe=''))
+        if asset['name'] == 'timestamp.json':
+            if not integer(asset.get('id')):
+                raise ValueError('Invalid mutable timestamp asset identity')
+            # GitHub can cache the name's old CDN redirect after replacement.
+            # Bind this read to the API-observed replacement, retaining the
+            # normal public download route and exact signed-byte verification.
+            url += '?asset_id=' + str(asset['id'])
         request = urllib.request.Request(url, headers={'Accept-Encoding': 'identity'})
         # Deliberately credential-free, including all CDN redirects.
         try:

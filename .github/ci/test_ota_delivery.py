@@ -394,6 +394,26 @@ class DeliveryTests(unittest.TestCase):
 
 
 class AdapterTests(unittest.TestCase):
+    def test_replaced_timestamp_does_not_reuse_the_previous_cdn_redirect(self):
+        api = helper.GitHub('private-token-for-test')
+        expected = dict(bytes=3, sha256=helper.digest(b'new'))
+        requests = []
+        class Opener:
+            def open(inner, request, timeout):
+                self.assertNotIn('Authorization', request.headers)
+                requests.append(request.full_url)
+                response = io.BytesIO(b'old' if request.full_url.endswith('timestamp.json') else b'new')
+                response.status, response.headers = 200, {}
+                return response
+        with patch.object(helper.urllib.request, 'build_opener', return_value=Opener()):
+            for identity in (30, 31):
+                api.verify(dict(id=identity, name='timestamp.json', size=3, state='uploaded'), expected)
+            with self.assertRaises(ValueError):
+                api.verify(dict(id='31?token=bad', name='timestamp.json', size=3, state='uploaded'), expected)
+        self.assertEqual(requests, [
+            'https://github.com/aortez/space-wars/releases/download/ota-feed/timestamp.json?asset_id=30',
+            'https://github.com/aortez/space-wars/releases/download/ota-feed/timestamp.json?asset_id=31'])
+
     def test_public_download_is_credential_free_and_streamed_with_exact_digest(self):
         api = helper.GitHub('private-token-for-test')
         payload = b'payload'
