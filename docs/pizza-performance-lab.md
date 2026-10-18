@@ -9,6 +9,54 @@ benchmark. The shared gravity system computes mutual gravity, while Rapier owns
 ball and wall motion, held-ball kinematics, contacts, and contact impulses.
 Classic remains available only as a collision benchmark reference.
 
+## Event runtime
+
+Normal Pizza now owns a small deterministic event scheduler (#356). The first
+kind is directional gravity. This increment supplies admission, timing and
+diagnostics; the actual force/visual cue is #357, and user controls plus the
+saved automatic-events preference are #358.
+
+`PizzaConfig::automatic_events` defaults to true for normal runs. The scheduler
+samples 3,600–7,200 ticks of ordinary play on initialization and after each
+event ends. Only positive fixed-timestep updates advance it, at 60 Hz before
+the physics `WORLD_TIME_SCALE`. After the quiet gap's last update, the next
+update admits an event. An event owns exactly 900 updates, including its
+admission update, then starts a fresh gap. There is no wall-clock catch-up.
+
+Headless callers and future host controls use the ordinary action boundary:
+
+```rust
+use engine_common::Scenario;
+use scenario_pizza::{PizzaAction, PizzaEventKind, PizzaScenario};
+
+let request = PizzaAction::TriggerEvent(PizzaEventKind::DirectionalGravity).encode();
+// Queue without advancing the scenario; the next positive step admits it.
+PizzaScenario::step(&mut state, &[request], std::time::Duration::ZERO);
+```
+
+A manual request bypasses the quiet gap, takes precedence over a due automatic
+event and works with automatic events disabled. Repeated pending requests and
+requests during an active event are ignored without extending the visit,
+queuing another visit or consuming random choices. Admission chooses one of
+left/right/top/bottom uniformly and retains that screen direction through
+resize. The scheduler uses its own seed-derived RNG; spawning and fragmentation
+continue using their existing stream.
+
+`PizzaState::event_state()` exposes Disabled, Idle or Active, including the
+pending request, automatic wait, selected direction, admission source and
+elapsed/remaining ticks as applicable. `PizzaScenario::observe()` returns a
+bounded JSON `PizzaObservation` with version 1, simulation tick and that state.
+Reading observations or rendering frames advances neither time nor RNG.
+Pause preserves event state; resize preserves both pending and admitted
+requests; restarting with the same seed/configuration recreates the initial
+schedule. Leaving the scenario drops the scheduler and any pending request.
+
+Sparse/dense/churn benchmark configurations always disable both automatic and
+manual events, regardless of the requested setting. Normal-path cascade labs
+can instead set `automatic_events: false` without selecting benchmark mode,
+then send a typed manual request with a recorded run seed when needed. No
+settings migration, UI test or CI workflow is added by this runtime slice.
+
 ## Visual verification
 
 Start the default 300-ball dense Rapier workload:

@@ -46,6 +46,7 @@ fn create(
             ball_spawn_rate: setup.ball_spawn_rate,
             bounds,
             gravity: Default::default(),
+            automatic_events: true,
             benchmark: None,
         },
         ScenarioStartMode::Benchmark(configuration) => {
