@@ -12,3 +12,5 @@ engine-core = { workspace = true }
 engine-gravity = { workspace = true }
 engine-rapier = { workspace = true }
 rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

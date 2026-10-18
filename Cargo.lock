@@ -5322,6 +5322,8 @@ dependencies = [
  "engine-gravity",
  "engine-rapier",
  "rand 0.9.4",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

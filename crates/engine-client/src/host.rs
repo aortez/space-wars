@@ -3367,6 +3367,13 @@ mod tests {
             ScenarioStartMode::Normal,
         )
         .unwrap();
+        scenario.step(
+            &[scenario_pizza::PizzaAction::TriggerEvent(
+                scenario_pizza::PizzaEventKind::DirectionalGravity,
+            )
+            .encode()],
+            Duration::ZERO,
+        );
         let frames = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
         let projections =
             render::frame_projections(&frames, TEST_VIEWPORT, scenario.frame_layout());
@@ -3385,6 +3392,19 @@ mod tests {
         let actions = scenario.actions(&mut input, false, &projections);
         scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
         input.press(input::GameKey::Pause);
+        let event_before_pause = scenario
+            .as_any()
+            .downcast_ref::<PizzaClientScenario>()
+            .unwrap()
+            .state
+            .event_state();
+        assert!(matches!(
+            event_before_pause,
+            scenario_pizza::PizzaEventState::Active {
+                elapsed_ticks: 2,
+                ..
+            }
+        ));
 
         let mut accumulator = Duration::ZERO;
         let mut controls = ScenarioControls::default();
@@ -3413,6 +3433,7 @@ mod tests {
             .downcast_ref::<PizzaClientScenario>()
             .expect("scenario should host Pizza");
         assert!(paused);
+        assert_eq!(pizza.state.event_state(), event_before_pause);
         assert!(pizza.state.held_ball_id.is_none());
         assert!(!pizza.state.balls[0].invincible);
         assert!(pizza.state.balls[0].moving);
