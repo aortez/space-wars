@@ -2146,12 +2146,59 @@ engine-os-manager maintenance provision-updates \
   --bundle-sha256 BUNDLE_SHA256 --data-version CONFIRMED_DATA_VERSION
 ```
 
-The command reads only `/etc/spacewars/ota-bootstrap.json`. The operator supplies
+By default the command reads only `/etc/spacewars/ota-bootstrap.json`. The operator supplies
 the independently selected SHA-256 of that public file and confirms the actual
 current persistent data version. The version must match the confirmed image's
 write schema; it is not inferred automatically from an image after rollback.
 The kiosk socket has no provisioning operation and cannot supply a root, URL,
 path or data version.
+
+For an already bootstrapped image without that embedded file, the owner can put
+the public bundle at `/data/spacewars-system/ota-bootstrap.json` and explicitly
+add `--operator-bundle`. This fixed path must be on the inspected data partition,
+root-owned, regular, singly linked and not group/other writable. There is no
+implicit fallback or arbitrary path argument. A conflicting embedded bundle is
+rejected. The selected bytes are rechecked during setup; the same receipt,
+generation-zero requirement and no-reinitialization rules apply. This provisions
+initial trust without modifying a known-good root filesystem or reflashing it.
+
+### Initial owner signing authority
+
+`.github/ci/ota_authority.py` creates a new private authority directory outside
+the checkout/build tree. It refuses existing outputs, including interrupted
+ones, and pins the native `feed_inventory` verifier by SHA-256. The output has
+separate `keys/` and `public/` directories. Only `public/` is distributable.
+
+The initial policy uses nine distinct Ed25519 keys: a two-of-three root, separate
+Targets/Snapshot/Timestamp keys, two required Release keys, and one Nightly key.
+The root expires in one year, channel/top-level metadata in 30 days, and timestamp
+metadata in seven days. The verified genesis feed contains no images and uses
+the repository's `ota-feed` GitHub release URL. The tool also writes the initial
+publisher journal and public bootstrap bundle; a completion marker appears only
+after the native verifier accepts every signature and metadata reference.
+
+This is owner-local signing for the supervised rollout. Co-located keys are not
+isolated signers. Generation, delivery and later publication still use the
+existing durable publisher journal; running this tool neither publishes the feed
+nor provisions a device. Preserve this directory as the signing authority rather
+than regenerating keys during a build or failed setup. No private keys belong in
+Git, build artifacts, release uploads or Pi images.
+
+```sh
+python3 .github/ci/ota_authority.py --output /private/new-ota-authority \
+  --inventory /trusted/feed_inventory --inventory-sha256 SELECTED_VERIFIER_SHA256
+```
+
+The separately built `engine-os-manager` example `stage_update release|nightly`
+performs an owner-run feed/download check. It holds the native installation lock,
+requires the confirmed boot and completed trust setup, and derives compatibility
+from the inspected image, disk and persistent schema. Current time comes from a
+native provider receipt validated by `TimeTracker`; an unexplained clock change
+stops the request. It uses the normal bounded HTTPS/TUF/staging pipeline, retains
+trust/time floors, and rechecks installed state before reporting success. It does
+not install, change selectors, reboot, qualify unattended recovery or replace the
+installed time service. Run it over the maintained owner SSH connection; it does
+not alter network policy. The ordinary kiosk API remains unchanged.
 
 The bundle has exactly three fields: `schema: 1`, `root` (the signed TUF root
 object), and `location` (credential-free HTTPS `metadata` and `targets` base URLs

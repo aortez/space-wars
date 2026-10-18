@@ -75,6 +75,82 @@ fn bundle_bytes(fixture: &Fixture) -> Vec<u8> {
 }
 
 #[tokio::test]
+async fn operator_bundle_requires_explicit_selection_and_cannot_override_image_authority() {
+    let case = Case::new().await;
+    let bytes = bundle_bytes(&case.fixture);
+    let image_path = case.path("image");
+    fs::create_dir(&image_path).unwrap();
+    fs::set_permissions(&image_path, fs::Permissions::from_mode(0o700)).unwrap();
+    let image = open_directory(&image_path, case.owner).unwrap();
+    let read = |source| read_bundle(&image, &case.system, case.owner, source);
+    assert!(read(BundleSource::Image).is_err());
+    assert!(read(BundleSource::Operator).is_err());
+    case.private_write("ota-bootstrap.json", &bytes);
+    assert!(read(BundleSource::Image).is_err()); // No implicit fallback.
+    assert_eq!(read(BundleSource::Operator).unwrap(), bytes);
+    fs::write(image_path.join("ota-bootstrap.json"), &bytes).unwrap();
+    fs::set_permissions(
+        image_path.join("ota-bootstrap.json"),
+        fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
+    assert_eq!(read(BundleSource::Image).unwrap(), bytes);
+    assert_eq!(read(BundleSource::Operator).unwrap(), bytes);
+    let other = bundle_bytes(&Fixture::new().await);
+    case.private_write("ota-bootstrap.json", &other);
+    assert!(read(BundleSource::Operator).is_err());
+    assert_eq!(read(BundleSource::Image).unwrap(), bytes);
+    assert!(!case.path(RECEIPT).exists());
+}
+
+#[tokio::test]
+async fn operator_bundle_rejects_unsafe_input_and_preserves_the_existing_setup() {
+    for fault in ["symlink", "hardlink", "writable", "oversized", "directory"] {
+        let case = Case::new().await;
+        case.run(|_| Ok(())).unwrap();
+        let receipt = fs::read(case.path(RECEIPT)).unwrap();
+        let trust = fs::read(case.path("updates/trust/state.json")).unwrap();
+        let image_path = case.path("image");
+        fs::create_dir(&image_path).unwrap();
+        fs::set_permissions(&image_path, fs::Permissions::from_mode(0o700)).unwrap();
+        let image = open_directory(&image_path, case.owner).unwrap();
+        let bytes = bundle_bytes(&case.fixture);
+        let path = case.path("ota-bootstrap.json");
+        match fault {
+            "symlink" => {
+                case.private_write("other", &bytes);
+                symlink(case.path("other"), &path).unwrap();
+            }
+            "directory" => fs::create_dir(&path).unwrap(),
+            _ => {
+                case.private_write("ota-bootstrap.json", &bytes);
+                match fault {
+                    "hardlink" => fs::hard_link(&path, case.path("other")).unwrap(),
+                    "writable" => {
+                        fs::set_permissions(&path, fs::Permissions::from_mode(0o620)).unwrap()
+                    }
+                    _ => File::options()
+                        .write(true)
+                        .open(&path)
+                        .unwrap()
+                        .set_len(MAX_BUNDLE_BYTES + 1)
+                        .unwrap(),
+                }
+            }
+        }
+        assert!(
+            read_bundle(&image, &case.system, case.owner, BundleSource::Operator).is_err(),
+            "{fault}"
+        );
+        assert_eq!(fs::read(case.path(RECEIPT)).unwrap(), receipt);
+        assert_eq!(
+            fs::read(case.path("updates/trust/state.json")).unwrap(),
+            trust
+        );
+    }
+}
+
+#[tokio::test]
 async fn explicit_setup_publishes_usable_trust_and_preserves_unrelated_data() {
     let case = Case::new().await;
     case.private_write("unrelated", b"settings remain");

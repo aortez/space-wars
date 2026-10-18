@@ -15,6 +15,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 pub const BUNDLE_PATH: &str = "/etc/spacewars/ota-bootstrap.json";
+pub const OPERATOR_BUNDLE_PATH: &str = "/data/spacewars-system/ota-bootstrap.json";
 pub const RECEIPT_PATH: &str = "/data/spacewars-system/update-provision.json";
 pub const TRUST_PATH: &str = "/data/spacewars-system/updates/trust";
 pub const STAGING_PATH: &str = "/data/spacewars-system/updates/staging";
@@ -206,6 +207,47 @@ pub struct Status {
 /// Requires an independently selected public bundle and explicitly confirmed
 /// current data version. This is a local operator command, never a socket action.
 pub fn provision_installed(expected_bundle: Sha256, data_version: u32) -> Result<Status> {
+    provision_selected(expected_bundle, data_version, BundleSource::Image)
+}
+
+/// Explicit owner import for a bootstrapped image that did not embed a bundle.
+/// Reads only OPERATOR_BUNDLE_PATH on the validated data partition. It cannot
+/// replace a conflicting embedded root or reset any retained provisioning state.
+pub fn provision_operator(expected_bundle: Sha256, data_version: u32) -> Result<Status> {
+    provision_selected(expected_bundle, data_version, BundleSource::Operator)
+}
+
+#[derive(Clone, Copy)]
+enum BundleSource {
+    Image,
+    Operator,
+}
+
+fn read_bundle(image: &File, system: &File, owner: u32, source: BundleSource) -> Result<Vec<u8>> {
+    let embedded = optional(image, "ota-bootstrap.json", libc::O_RDONLY)?
+        .map(|file| read_file(file, owner, MAX_BUNDLE_BYTES))
+        .transpose()?;
+    match source {
+        BundleSource::Image => embedded.ok_or_else(|| invalid("image has no OTA bootstrap bundle")),
+        BundleSource::Operator => {
+            let file = open_at(system, "ota-bootstrap.json", libc::O_RDONLY, 0)?;
+            same_device(system, &file)?;
+            let bytes = read_file(file, owner, MAX_BUNDLE_BYTES)?;
+            if embedded.is_some_and(|embedded| embedded != bytes) {
+                return Err(invalid(
+                    "operator bundle conflicts with the embedded authority",
+                ));
+            }
+            Ok(bytes)
+        }
+    }
+}
+
+fn provision_selected(
+    expected_bundle: Sha256,
+    data_version: u32,
+    source: BundleSource,
+) -> Result<Status> {
     let lock = InstallLock::acquire()?;
     crate::bootstrap::require_no_active_bootstrap(&lock)?;
     let recovery = RecoveryStore::open(Path::new("/data/spacewars-system/recovery"))?;
@@ -223,13 +265,9 @@ pub fn provision_installed(expected_bundle: Sha256, data_version: u32) -> Result
     let root = open_directory(Path::new("/"), 0)?;
     let etc = child(&root, "etc", 0, false)?;
     let image = child(&etc, "spacewars", 0, false)?;
-    let bytes = read_file(
-        open_at(&image, "ota-bootstrap.json", libc::O_RDONLY, 0)?,
-        0,
-        MAX_BUNDLE_BYTES,
-    )?;
-    let bundle = Bundle::parse(&bytes, expected_bundle)?;
     let system = system_directory(&boot.layout)?;
+    let bytes = read_bundle(&image, &system, 0, source)?;
+    let bundle = Bundle::parse(&bytes, expected_bundle)?;
     let plan = Plan {
         bundle: bundle.fingerprint,
         root: Sha256::digest(&bundle.root),
@@ -260,6 +298,11 @@ pub fn provision_installed(expected_bundle: Sha256, data_version: u32) -> Result
                 || system.metadata()?.ino() != named_system.metadata()?.ino()
             {
                 return Err(invalid("system data directory changed"));
+            }
+            if read_bundle(&image, &named_system, 0, source)? != bytes {
+                return Err(invalid(
+                    "selected bootstrap bundle changed during provisioning",
+                ));
             }
             let current = BootController::open(&lock)?;
             current.authorize_maintenance(&recovery)?;

@@ -96,12 +96,16 @@ enum Command {
 
 #[derive(Subcommand)]
 enum MaintenanceCommand {
-    /// Provision the bundled public OTA root/feed and an explicitly confirmed data version.
+    /// Provision public OTA root/feed trust and an explicitly confirmed data version.
     ProvisionUpdates {
         #[arg(long)]
         bundle_sha256: String,
         #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
         data_version: u32,
+        /// Read the owner-provided bundle from /data/spacewars-system/ota-bootstrap.json.
+        /// Without this flag, only the image's /etc/spacewars bundle is used.
+        #[arg(long)]
+        operator_bundle: bool,
     },
     /// Explicitly import /root/.ssh/authorized_keys into an empty persistent root key file.
     ImportRootKeys,
@@ -364,16 +368,16 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                 MaintenanceCommand::ProvisionUpdates {
                     bundle_sha256,
                     data_version,
+                    operator_bundle,
                 } => {
                     let digest = engine_ota::Sha256::try_from(bundle_sha256)
                         .map_err(|error| engine_os_manager::Error::Invalid(error.into()))?;
-                    println!(
-                        "{}",
-                        serde_json::to_string(&engine_ota::provision_linux::provision_installed(
-                            digest,
-                            data_version
-                        )?)?
-                    );
+                    let status = if operator_bundle {
+                        engine_ota::provision_linux::provision_operator(digest, data_version)?
+                    } else {
+                        engine_ota::provision_linux::provision_installed(digest, data_version)?
+                    };
+                    println!("{}", serde_json::to_string(&status)?);
                 }
                 MaintenanceCommand::ImportRootKeys => println!(
                     "{}",

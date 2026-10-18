@@ -253,20 +253,31 @@ fn real_ext4_install_retains_unused_tail_and_rechecks_completed_image_without_wr
 }
 
 #[test]
-fn every_reported_boundary_resumes_with_the_original_selection_and_backup_binding() {
+fn every_installation_boundary_resumes_with_the_original_selection_and_backup_binding() {
+    // Periodic Writing telemetry is emitted every 250 ms. Count stable stage
+    // boundaries and write completion, not a load-dependent number of updates.
+    let boundary = |event: RootInstallProgress| {
+        !matches!(event, RootInstallProgress::Image(WriteProgress {
+            stage: WriteStage::Writing, bytes, total,
+        }) if bytes != 0 && bytes != total)
+    };
     let initial = Fixture::new();
     let mut count = 0;
     initial
-        .run(&mut |_| {
-            count += 1;
+        .run(&mut |event| {
+            count += usize::from(boundary(event));
             Ok(())
         })
         .unwrap();
+    assert!(count >= 12);
     for cut in 0..count {
         let f = Fixture::new();
         let mut reached = 0;
         assert!(
-            f.run(&mut |_| {
+            f.run(&mut |event| {
+                if !boundary(event) {
+                    return Ok(());
+                }
                 let current = reached;
                 reached += 1;
                 if current == cut {

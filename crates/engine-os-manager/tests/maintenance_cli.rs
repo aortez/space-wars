@@ -20,6 +20,15 @@ fn runtime_identity_cannot_invoke_root_maintenance() {
             "1",
         ],
         vec!["maintenance", "fast", "--check"],
+        vec![
+            "maintenance",
+            "provision-updates",
+            "--operator-bundle",
+            "--bundle-sha256",
+            "invalid",
+            "--data-version",
+            "1",
+        ],
         vec!["maintenance", "renderer", "gpu"],
         vec![
             "bootstrap-canonical",
