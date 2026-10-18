@@ -1,0 +1,36 @@
+[Unit]
+Description=Space-Wars independent device service
+After=spacewars-data-init.service spacewars-rtc-capture.service dbus.service
+Requires=spacewars-data-init.service
+Wants=spacewars-rtc-capture.service systemd-timesyncd.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/engine-os-manager serve
+User=root
+Group=spacewars
+UMask=0077
+RuntimeDirectory=spacewars-system
+RuntimeDirectoryMode=0750
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/data/spacewars-system /run/spacewars-system -/run/spacewars-install
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=CAP_SYS_TIME
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

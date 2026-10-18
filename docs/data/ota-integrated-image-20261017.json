@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "source": "ef44f5b6794f22ff8b435c2dc8498a68d3e85553",
+  "scope": "Workstation Yocto build containing both watchdog and SSH admission fixes; frozen artifacts and unsigned image validation",
+  "build": {
+    "tasks": 6768,
+    "reused": 6738,
+    "result": "passed",
+    "log": "target/ota-integrated-image-build-ef44f5b.log"
+  },
+  "frozen": {
+    "schema": 1,
+    "source": "ef44f5b6794f22ff8b435c2dc8498a68d3e85553",
+    "utc": "2026-10-17T07:49:24.293427+00:00",
+    "files": {
+      "spacewars-integrated.ext4.gz": {
+        "bytes": 137677314,
+        "sha256": "64e351bf10a9982d578899dcd122432444051cc00006c10cea62b70599d0a238"
+      },
+      "spacewars-integrated.wic.gz": {
+        "bytes": 187151626,
+        "sha256": "67c95bcf0872e42403b081272886bef52b2aa014f75db6506d7187f3f167caf3"
+      },
+      "spacewars-integrated.wic.bmap": {
+        "bytes": 6517,
+        "sha256": "8f38d9d883beac172e2293d8a705a9145e2c42dbb1626e11e1a1d1f3a6a4124e"
+      }
+    }
+  },
+  "image": {
+    "schema": 1,
+    "build_id": "rootfs-115f0f7ca341ef14f584bd7b6a2bab91fdfce7beacf75c3f58eb9565e6d47208",
+    "rootfs_tree": "115f0f7ca341ef14f584bd7b6a2bab91fdfce7beacf75c3f58eb9565e6d47208",
+    "source": {
+      "schema": 1,
+      "commit": "ef44f5b6794f22ff8b435c2dc8498a68d3e85553",
+      "dirty": false,
+      "revision": "ef44f5b6794f"
+    },
+    "machine": "raspberrypi-spacewars",
+    "architecture": "aarch64",
+    "layout": "spacewars-ab-v1",
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "updater_protocol": 1,
+    "recovery_protocol": 2,
+    "data": {
+      "reads": {
+        "min": 1,
+        "max": 1
+      },
+      "writes": 1
+    },
+    "binaries": {
+      "client": {
+        "bytes": 23470072,
+        "sha256": "7449e8ec49897b1cc53b6de9dff28725e3196636e18f4a1c85c59c3597fec75f"
+      },
+      "os_manager": {
+        "bytes": 11175680,
+        "sha256": "bfda1b75a791e82a48e79441c8342be0adec411411e95ff33bbe09b3790b240b"
+      }
+    }
+  },
+  "candidate": {
+    "schema": 1,
+    "format": "rootfs-ext4-zstd",
+    "compressed": {
+      "bytes": 131838611,
+      "sha256": "604603418cf7936120850ac339beac3c3d701a48516446964caf671d15aaae18"
+    },
+    "expanded": {
+      "bytes": 528482304,
+      "sha256": "2f25be7a02e5d6da744b45a21db7d72385b3772f744b0a5ea1588b8081250ee5"
+    }
+  },
+  "memory_observation": {
+    "schema": 1,
+    "source": "ef44f5b6794f22ff8b435c2dc8498a68d3e85553",
+    "scope": "one workstation process sample during the real Yocto build; not peak or hosted qualification",
+    "observed_at": "2026-10-17T00:47:21-07:00",
+    "process": {
+      "pid": 3364423,
+      "command": "rustc --crate-name engine_client",
+      "elapsed": "04:34",
+      "rss_kib": 15945320,
+      "rss_bytes": 16328007680
+    },
+    "current_hosted_wrapper_memory_bytes": 12884901888,
+    "conclusion": "Observed compiler RSS alone exceeds the configured 12 GiB CI container limit. Standard-runner memory qualification needs a constrained build and likely linker/profile tuning before deployment."
+  },
+  "earlier_standard_profile_probe": {
+    "source": "cfd20a1ed2c47940e7a23394d0a38e994da87e1d",
+    "cpus": 4,
+    "memory_gib": 12,
+    "exit_status": 1,
+    "finished_utc": "2026-10-17T06:02:05Z",
+    "failure": "Recipe source-provenance validation rejected inputs before compiling spacewars; exact source mismatch not established from retained log",
+    "log": "target/ota-standard-cold-cfd20a1.log",
+    "capacity_qualified": false
+  },
+  "limits": [
+    "The Pi 5 physical tests used a temporary kernel selection and runtime service override, each restored afterwards. The combined full image has not been installed on any Pi.",
+    "Fresh images remain without a recovery baseline. The current legacy bootstrap rejects their existing recovery assets; a supported fresh-image bootstrap path is still needed.",
+    "Pi 4 recovery tests await SSH access after the user reboots the primary Picade.",
+    "No signed feed, qualification authority, production trust, unattended installation or hosted runner capacity is established by this artifact."
+  ],
+  "artifacts": {
+    "target/ota-integrated-image-build-ef44f5b.log": {
+      "bytes": 17632,
+      "sha256": "404566ddb3abd1e45440eb42930d2b46248241ba45b9ab468ba16c402555e952"
+    },
+    "target/ota-integrated-build-inputs-ef44f5b.json": {
+      "bytes": 3400,
+      "sha256": "312191a8a27749cd1b1adbe2befabc47d00663e91984de7e37c551093ccb7f29"
+    },
+    "target/ota-integrated-image-policy-ef44f5b.json": {
+      "bytes": 291,
+      "sha256": "85600221b8ee209af08e12c7812940b614e84794fce71639c06377eb3211a1bd"
+    },
+    "target/ota-integrated-candidate-validation-ef44f5b.log": {
+      "bytes": 304,
+      "sha256": "8cf84dc2f9af41fd92abcc8cea94a3dec88eefbf9b0d33912eccb94f43061b5f"
+    },
+    "target/ota-integrated-candidate-ef44f5b/qualification.json": {
+      "bytes": 4314,
+      "sha256": "7760310d132e7ca0a476081be072d768bb8091c1bba9f03ae3d0e670babf3524"
+    },
+    "target/ota-standard-cold-cfd20a1.log": {
+      "bytes": 2420720,
+      "sha256": "519db7d2ced0c9fa4fa04abf91ff5aed8b974ba785e912fc8e750c109f0dad00"
+    }
+  }
+}

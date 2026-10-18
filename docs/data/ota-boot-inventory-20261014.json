@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "date": "2026-10-14",
+  "scope": "Read-only SSH observations. No watchdog opened, selector changed, reboot requested, clock/RTC changed, EEPROM written or rootfs installed. Both Pis confirmed locally or independently recoverable by the owner.",
+  "qualified_for_unattended_updates": false,
+  "inventory": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "host": "sw-picade.local",
+        "chunk_id": "bfeb6b",
+        "wall_time_seconds": 0.436477379,
+        "exit_code": 0,
+        "original_token_count": 296,
+        "output": "/proc/device-tree/chosen/bootloader/version 507b2360eb46af23c05844b289dc5ae4ecfc3cca\n/proc/device-tree/chosen/bootloader/name bootloader\n/proc/device-tree/model Raspberry Pi 4 Model B Rev 1.4\n/proc/device-tree/chosen/bootloader/build-timestamp  62 67 c8 5c\n/proc/device-tree/chosen/bootloader/update-timestamp  62 6a a2 0c\n/proc/device-tree/chosen/bootloader/capabilities  00 00 00 7f\n/proc/device-tree/chosen/bootloader/tryboot  00 00 00 00\n/proc/device-tree/chosen/bootloader/partition  00 00 00 00\n/proc/device-tree/chosen/bootloader/rsts  00 00 10 00\n/sys/module/watchdog/parameters/open_timeout 0\n/sys/module/watchdog/parameters/handle_boot_enabled Y\n/sys/class/watchdog/watchdog0/dev 247:0\n/sys/class/block/sda/device/model USB 3.0 FD      \n/sys/class/block/sda/size 121691328\n/sys/class/block/sda1/dev 8:1\n/sys/class/block/sda2/dev 8:2\n/sys/class/block/sda3/dev 8:3\n/sys/class/block/sda4/dev 8:4\n# Space-Wars hardware selection; preserved by rootfs-only A/B updates.\n[all]\ninclude spacewars-profiles/picade.txt\n[all]\n/etc/spacewars:\ntotal 1\n-rw-r--r-- 1 root root 65 Mar  9  2018 boot-id\n\n/usr/share/spacewars:\ntotal 1\n-rw-r--r-- 1 root root 65 Mar  9  2018 fast-update-compat\n"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "host": "spacewars.local",
+        "chunk_id": "1b4c19",
+        "wall_time_seconds": 0.152102402,
+        "exit_code": 0,
+        "original_token_count": 297,
+        "output": "/proc/device-tree/chosen/bootloader/version 2bb2ae640058a2f3aa8dcbdc2da33302e509668d\n/proc/device-tree/chosen/bootloader/name bootloader\n/proc/device-tree/model Raspberry Pi 5 Model B Rev 1.1\n/proc/device-tree/chosen/bootloader/build-timestamp  67 cf 1d 0d\n/proc/device-tree/chosen/bootloader/update-timestamp  00 00 00 00\n/proc/device-tree/chosen/bootloader/capabilities  00 00 00 7f\n/proc/device-tree/chosen/bootloader/tryboot  00 00 00 00\n/proc/device-tree/chosen/bootloader/partition  00 00 00 01\n/proc/device-tree/chosen/bootloader/rsts  00 00 00 20\n/sys/module/watchdog/parameters/open_timeout 0\n/sys/module/watchdog/parameters/handle_boot_enabled Y\n/sys/class/watchdog/watchdog0/dev 247:0\n/sys/class/block/sda/device/model  SanDisk 3.2Gen1\n/sys/class/block/sda/size 240328704\n/sys/class/block/sda1/dev 8:1\n/sys/class/block/sda2/dev 8:2\n/sys/class/block/sda3/dev 8:3\n/sys/class/block/sda4/dev 8:4\n# Space-Wars hardware selection; preserved by rootfs-only A/B updates.\n[all]\ninclude spacewars-profiles/hyperpixel.txt\n[all]\n/etc/spacewars:\ntotal 1\n-rw-r--r-- 1 root root 65 Mar  9  2018 boot-id\n\n/usr/share/spacewars:\ntotal 1\n-rw-r--r-- 1 root root 65 Mar  9  2018 fast-update-compat\n"
+      }
+    }
+  ],
+  "hashes": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "host": "sw-picade.local",
+        "chunk_id": "61775b",
+        "wall_time_seconds": 1.321370791,
+        "exit_code": 0,
+        "original_token_count": 245,
+        "output": "2cc344f6171797317ae0b6197191803b45e2f3cda091f0da31c0a3f0bfc47593  /boot/start4.elf\n5a1037279fc79f1cdb2832e92e70786e917e20b8b7a05ed049bf3a6116cc4cdb  /boot/kernel8.img\n5a1037279fc79f1cdb2832e92e70786e917e20b8b7a05ed049bf3a6116cc4cdb  /boot/kernel_2712.img\nd3b18f9dee8b220255203ad1b1ac52e73d6cfec261f80bfab8eb1cf6ed4b74d3  /boot/bcm2711-rpi-4-b.dtb\ne6bd4a60d24ffeb26141a5150ca1687c1b1e1833429da1878027471eb9278aa3  /boot/bcm2712-rpi-5-b.dtb\n47461f7ded8dab54698a73e6530eb190a18f1fac33a14da9b7cd7581d604b77e\n47461f7ded8dab54698a73e6530eb190a18f1fac33a14da9b7cd7581d604b77e\ntotal 0\nlrwxrwxrwx 1 root root 10 May 29  2025 076c4a2a-01 -> ../../sda1\nlrwxrwxrwx 1 root root 10 May 29  2025 076c4a2a-02 -> ../../sda2\nlrwxrwxrwx 1 root root 10 May 29  2025 076c4a2a-03 -> ../../sda3\nlrwxrwxrwx 1 root root 10 May 29  2025 076c4a2a-04 -> ../../sda4\n/sys/class/block/sda1/size 307200\n/sys/class/block/sda2/size 6291456\n/sys/class/block/sda3/size 6291456\n/sys/class/block/sda4/size 96619765\n"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "host": "spacewars.local",
+        "chunk_id": "697e80",
+        "wall_time_seconds": 1.1596508700000001,
+        "exit_code": 0,
+        "original_token_count": 245,
+        "output": "2cc344f6171797317ae0b6197191803b45e2f3cda091f0da31c0a3f0bfc47593  /boot/start4.elf\n5a1037279fc79f1cdb2832e92e70786e917e20b8b7a05ed049bf3a6116cc4cdb  /boot/kernel8.img\n5a1037279fc79f1cdb2832e92e70786e917e20b8b7a05ed049bf3a6116cc4cdb  /boot/kernel_2712.img\nd3b18f9dee8b220255203ad1b1ac52e73d6cfec261f80bfab8eb1cf6ed4b74d3  /boot/bcm2711-rpi-4-b.dtb\ne6bd4a60d24ffeb26141a5150ca1687c1b1e1833429da1878027471eb9278aa3  /boot/bcm2712-rpi-5-b.dtb\n47461f7ded8dab54698a73e6530eb190a18f1fac33a14da9b7cd7581d604b77e\n47461f7ded8dab54698a73e6530eb190a18f1fac33a14da9b7cd7581d604b77e\ntotal 0\nlrwxrwxrwx 1 root root 10 Oct 10 20:32 076c4a2a-01 -> ../../sda1\nlrwxrwxrwx 1 root root 10 Oct 10 20:32 076c4a2a-02 -> ../../sda2\nlrwxrwxrwx 1 root root 10 Oct 10 20:32 076c4a2a-03 -> ../../sda3\nlrwxrwxrwx 1 root root 10 Oct 10 20:32 076c4a2a-04 -> ../../sda4\n/sys/class/block/sda1/size 307200\n/sys/class/block/sda2/size 6291456\n/sys/class/block/sda3/size 6291456\n/sys/class/block/sda4/size 203393401\n"
+      }
+    }
+  ],
+  "sources": [
+    "https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#fail-safe-os-updates-tryboot",
+    "https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel_watchdog_timeout",
+    "https://github.com/raspberrypi/firmware/commit/3885768a3aad70f42a9d9a85b550046b6b9d83fe",
+    "https://github.com/raspberrypi/rpi-eeprom/blob/master/firmware-2712/release-notes.md"
+  ]
+}

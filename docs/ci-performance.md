@@ -117,6 +117,11 @@ running every normal PR check plus:
 - all three extended duck sweeps: jumping profiles, authored patterns and platform seeds;
 - the extended normal Spacewars match versus deterministic arena parity test.
 
+Normal checks include the dedicated OTA updater/publisher fixtures merged in
+#494. The OTA admission policy requires all thirteen ordinary CI jobs to pass;
+only the two explicitly named full-only jobs may be skipped in that configuration.
+Full nightly enables them and still requires every result before publishing.
+
 Each extended job fails normally, uses `--no-tests fail`, retains diagnostics and
 has no automatic retries. Windows publication waits for the reusable workflow's
 **entire validation result**, rather than just the Windows build. It downloads the
@@ -131,8 +136,9 @@ external/frozen inputs or a fresh explicitly chosen output path remain manual.
 Examples include recovery qualification/replay tools, drain-splash profiling,
 retained packing/geometry inspection, visual fixture exports and durability
 measurement. Feature-gated diagnostic assertions continue in their normal jobs.
-Physical Pi hardware, a Yocto image build and hardware GPU acceptance are not
-provided by GitHub's virtual runners.
+This workflow does not perform physical Pi or hardware GPU acceptance. The
+separate scheduled `OTA image candidate` workflow builds and qualifies an unsigned
+Yocto image; it is not part of the Windows nightly publication gate.
 
 ```sh
 # Full validation of a pushed branch, without publishing a nightly release:

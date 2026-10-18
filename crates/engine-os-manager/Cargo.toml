@@ -6,10 +6,34 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Owner qualification helper only; ordinary images do not enable this feature.
+recovery-qualification = ["engine-ota/recovery-qualification"]
+
+[[example]]
+name = "install_signed_trial"
+required-features = ["recovery-qualification"]
+
 [[bin]]
 name = "engine-os-manager"
 path = "src/main.rs"
 
 [dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+spacewars-control.workspace = true
+tempfile.workspace = true
+thiserror = "2"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+async-io = "2"
+engine-ota = { path = "../engine-ota" }
+futures-lite = "2"
+libc = "0.2"
+tokio = { version = "1", features = ["rt", "time", "net"] }
+nix = { version = "0.30.1", default-features = false, features = ["ioctl"] }
+zbus = { version = "=5.13.2", default-features = false, features = ["async-io"] }

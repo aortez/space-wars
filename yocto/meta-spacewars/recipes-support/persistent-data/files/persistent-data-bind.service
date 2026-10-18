@@ -1,0 +1,19 @@
+[Unit]
+Description=Bind persistent NetworkManager profiles after validated initialization
+After=data.mount persistent-data-init.service systemd-tmpfiles-setup.service
+Before=NetworkManager.service spacewars-access.service spacewars-recovery.service
+Requires=data.mount persistent-data-init.service
+
+[Service]
+Type=oneshot
+UMask=0077
+# Failure must leave networking stopped, without falling back to image seeds.
+ExecStartPre=/usr/bin/engine-os-manager initialize-network
+ExecStart=/bin/mount --bind /data/NetworkManager/system-connections /etc/NetworkManager/system-connections
+ExecStop=/bin/umount /etc/NetworkManager/system-connections
+RemainAfterExit=yes
+TimeoutStartSec=30
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target

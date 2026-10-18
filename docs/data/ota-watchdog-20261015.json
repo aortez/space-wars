@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-15T17:17:38.883614+00:00",
+  "source_base": "d3ce98c90c519d19eafe6213e3c1959ecdca22f9",
+  "source_files_sha256": {
+    "docs/ota-updates.md": "4898403a2debcf87192e033e85fa61d0da505b5f5b8c7a7fb3d05d3631ace327",
+    "yocto/kas-spacewars.yml": "7279d63cb37f2c67d391a4d0b4987d1abd21b4ca213ec2836137fb8d80aa6c3b",
+    "yocto/meta-spacewars/conf/machine/raspberrypi-spacewars.conf": "2c827abc17e7b8e5a5f80bde5e279e602271a480c8d63437c85870a4ba05f797",
+    "yocto/meta-spacewars/lib/spacewars/recovery_rootfs.py": "27450c2ad6cea9b20ae3a4fdb46f1bf2139f266d2bf9c72c7b2a1f75b1a1af3d",
+    "yocto/meta-spacewars/recipes-core/images/spacewars-boot-identity.inc": "262e54f22b4866833b622309905f54ac928bbc9d75030e4bc9deae82839a46eb",
+    "yocto/meta-spacewars/recipes-core/images/spacewars-recovery-initramfs.bb": "7f8de5da6db7c51b6c60d6d7bf770502892207b2b6d23e4c90928169ed089378",
+    "yocto/meta-spacewars/recipes-support/spacewars-trial-watchdog/files/00-spacewarswatchdog": "a5f3fd27e52488a51dedf0bb873b44899240104a1abca4a12e02bfc5e9798952",
+    "yocto/meta-spacewars/recipes-support/spacewars-trial-watchdog/files/98-spacewarsrun": "a0ffd9ecbfada7e4f497eb1cf537181702643fb4a4b8c70b3a7605ead65d3201",
+    "yocto/meta-spacewars/recipes-support/spacewars-trial-watchdog/files/spacewars-trial-watchdog.c": "568025f674bca0641fc161daa3e08cdb1b0583c5d7a28481c0009838e803966c",
+    "yocto/meta-spacewars/recipes-support/spacewars-trial-watchdog/spacewars-trial-watchdog_1.0.bb": "b284897f47968d359ab3a6e865667045782f70e2b3ed08309ea6ca13a355ecd2",
+    "yocto/tests/boot_identity_test.py": "78c7ec1fa667a083bbbc26d104c254c5c5bd648e2ba55ce37f3240fb6fbb449a",
+    "yocto/tests/recovery_rootfs_test.py": "6f59e37d0c70bc6b1a0a5a273e4d0abbe7604a6fc774b656d94003fa34c18a37",
+    "yocto/tests/trial_watchdog_fixture.c": "14f3d852c939f7252af9fdf0f48d9076c9378c2a4cc60ab58e8cfe91beb356b3",
+    "yocto/tests/trial_watchdog_test.py": "82e8b7e5a5388394b8fa4e6322517c1d58d3399a4d30fd25b91d95fd757c1c3a"
+  },
+  "kernel": {
+    "revision": "e442e5c1ab6bff5b5460b4fc949beb72aaf77970",
+    "files_sha256": {
+      "drivers/watchdog/watchdog_dev.c": "6daf6df4658cd7f97567d1b277f9f5893514a6f77c4ab9ba022ff56bfcb5318b",
+      "drivers/watchdog/bcm2835_wdt.c": "831802f5df8c102acfaf9bd098669ec9015b2823da7b7f4953ef72340e893088"
+    }
+  },
+  "initramfs": {
+    "archive_name": "spacewars-recovery-initramfs-raspberrypi-spacewars-20261015171308.cpio.gz",
+    "compressed_sha256": "461ab4531c05f96c235610855951be26cb4b764e7d7ea2c9da075087b9485c4a",
+    "compressed_bytes": 7980209,
+    "expanded_cpio_bytes": 21392384,
+    "helper_sha256": "a14397ffb7bb6539fa3bffeacea71308d6b5bb09e9c67ac0c26d4e84e08a8d35",
+    "helper_bytes": 67576,
+    "modules": [
+      "00-spacewarswatchdog",
+      "01-udev",
+      "90-rootfs",
+      "98-spacewarsrun",
+      "99-finish"
+    ],
+    "verified_runtime_closure": [
+      "/init",
+      "/init.d/00-spacewarswatchdog",
+      "/init.d/01-udev",
+      "/init.d/90-rootfs",
+      "/init.d/98-spacewarsrun",
+      "/init.d/99-finish",
+      "/usr/bin/busybox.nosuid",
+      "/usr/bin/udevadm",
+      "/usr/lib/ld-linux-aarch64.so.1",
+      "/usr/lib/libacl.so.1.1.2302",
+      "/usr/lib/libattr.so.1.1.2501",
+      "/usr/lib/libblkid.so.1.1.0",
+      "/usr/lib/libc.so.6",
+      "/usr/lib/libcap.so.2.69",
+      "/usr/lib/libcrypt.so.2.0.0",
+      "/usr/lib/libcrypto.so.3",
+      "/usr/lib/libkmod.so.2.4.1",
+      "/usr/lib/liblzma.so.5.4.7",
+      "/usr/lib/libm.so.6",
+      "/usr/lib/libmount.so.1.1.0",
+      "/usr/lib/libpthread.so.0",
+      "/usr/lib/libseccomp.so.2.5.5",
+      "/usr/lib/libz.so.1.3.1",
+      "/usr/lib/libzstd.so.1.5.5",
+      "/usr/lib/systemd/libsystemd-shared-255.so",
+      "/usr/sbin/spacewars-trial-watchdog"
+    ],
+    "entry_count": 627,
+    "critical_runtime_root_ownership_verified": true,
+    "kiosk_and_updater_absent": true
+  },
+  "aarch64_fixture": {
+    "sha256": "947829ae600f524fbb398ef14cf4e695b60a2c297f316a606505419953eac257",
+    "bytes": 73472,
+    "remote_path": "/tmp/spacewars-ota-health-tests-20261015/watchdog-fixture"
+  },
+  "validation": {
+    "yocto_tests": {
+      "sha256": "f837eeb3d6581cbbbcd56a05a5f8a904a3f933c2e505281d356f329fd35185eb",
+      "output": "\n> spacewars-yocto@0.1.0 test\n> node --test tests/*.test.mjs && python3 -m unittest discover -s tests -p '*_test.py'\n\n\u2714 pressure and budget policy has explicit boundaries (0.651524ms)\n\u2714 healthy or missing profiles never invoke Cargo (0.963529ms)\n\u2714 default dry run selects workspace packages but preserves every file (0.877989ms)\n\u2714 apply delegates deletion to Cargo and writes one audit report (0.785395ms)\n\u2714 empty package selection can never become a whole-target clean (0.897655ms)\n\u2714 unexpected workspace, preview path, and Cargo failure prevent apply (0.858352ms)\n\u2714 pin opts out of automatic cleanup (0.297549ms)\n\u2714 pre-build report mode is non-destructive and auto applies the same policy (0.791195ms)\n\u2714 a different build filesystem never causes unrelated cache cleanup (0.315953ms)\n\u2714 help and update dry-run bypass even an invalid maintenance configuration (42.930751ms)\n\u2714 reject symlinks, including a relocated target and a pin introduced during preview (0.577083ms)\n\u2714 allocated-byte count deduplicates hard links and invalid limits fail closed (3.562178ms)\n\u2714 real Cargo preserves dependencies/evidence and honors the build lock (573.128544ms)\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nBuild --target spacewars, then use bundle: /home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/spacewars-fast\nCheck restricted helper/runtime compatibility; verify hashes; copy pair; restart and health-check; rollback on failure.\nDry run: no build, SSH connection, files transferred, or remote changes.\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nFast update: spacewars@picade.local (client + CLI, application restart, no reboot)\nengine-client: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nspacewars-cli: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nengine-client: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nspacewars-cli: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\n\u2714 fast arguments are explicit and reject full-image flags/remote shell syntax (0.765708ms)\n\u2714 bundle requires matching identities, complete binary pair, architecture and checksums (1.249706ms)\n\u2714 missing/mismatched remote helper requires a full update (0.107992ms)\n\u2714 dry run has no build, network or artifact reads (0.898657ms)\n\u2714 runtime mismatch aborts before copying or stopping the app (0.534804ms)\n\u2714 fast update builds only the recipe, transfers a pair, calls fixed helper, cleans staging (0.661432ms)\n\u2714 failed install still cleans only its own staged pair and reports failure (0.520157ms)\n\u2714 wrapper routes --fast and legacy yolo refuses it instead of flashing (43.975683ms)\n\u2714 normal builds and updates use the GPU bundle; software stays separate (0.397216ms)\n\u2714 build selection defaults to GPU and rejects conflicting switches (0.206729ms)\n\u2714 normal image includes GPU libraries and boots the build-selected renderer (0.66079ms)\n\u2714 shader-only edits invalidate the Pi application build (0.126127ms)\n\u2714 build and artifact paths isolate the unified machine from older checkouts (0.581472ms)\n\u2714 only explicit known hardware profiles can be flashed (0.337213ms)\n\u2714 HDMI selection uses the connected connector, not the first DRM card (8.858964ms)\n\u2714 missing HDMI detection leaves output selection to Slint (5.275485ms)\n\u2714 Picade routes audio to the HAT without touching backlight files (6.428411ms)\n\u2714 HyperPixel retains its existing rotation, USB audio and backlight workaround (5.117619ms)\n\u2714 Picade refuses unsupported boards instead of silently starting without its HAT (2.994593ms)\n\u2714 missing, invalid and ambiguous selections fail without executing boot-file content (9.62388ms)\n\u2714 Windows line endings are accepted in boot profile selection (6.334034ms)\n\u2714 rootfs-only updates require valid, identical boot identities (0.640222ms)\n\u2714 profile files keep HAT and HyperPixel GPIO overlays mutually exclusive (0.158859ms)\n\u2714 Picade udev identities separate the gamepad from utility and power keys (0.083477ms)\n\u2714 flash help documents explicit hardware selection without accessing disks or saved settings (13.365316ms)\n\u2139 tests 38\n\u2139 suites 0\n\u2139 pass 38\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 715.532905\n..................................................\n----------------------------------------------------------------------\nRan 50 tests in 21.837s\n\nOK\n"
+    },
+    "pi5_intercepted_syscalls": {
+      "sha256": "213d6c71414fb81d0a5a389615137bda9beb00e9e6994dfa399e80230934b895",
+      "output": "spacewars-trial-watchdog: early recovery setup failed: Invalid argument\nspacewars-trial-watchdog: early recovery setup failed: File too large\nspacewars-trial-watchdog: early recovery setup failed: Invalid argument\nspacewars-trial-watchdog: early recovery setup failed: Invalid argument\nspacewars-trial-watchdog: root initramfs --arm-trial operation required\nspacewars-trial-watchdog: early recovery setup failed: File exists\nspacewars-trial-watchdog: early recovery setup failed: Operation not supported\nspacewars-trial-watchdog: early recovery setup failed: Operation not supported\nspacewars-trial-watchdog: early recovery setup failed: Input/output error\nspacewars-trial-watchdog: early recovery setup failed: Input/output error\nspacewars-trial-watchdog: early recovery setup failed: Input/output error\nspacewars-trial-watchdog: early recovery setup failed: Input/output error\nspacewars-trial-watchdog: early recovery setup failed: Invalid argument\nspacewars-trial-watchdog: early recovery setup failed: Invalid argument\nspacewars-trial-watchdog: early recovery setup failed: Invalid argument\nspacewars-trial-watchdog: early recovery setup failed: File too large\nspacewars-trial-watchdog: early recovery setup failed: Operation not permitted\nwatchdog helper: 21 syscall-fixture cases passed; no real device accessed\nspacewars-trial-watchdog: early recovery setup failed: Input/output error\n"
+    }
+  },
+  "yocto_build": {
+    "log_sha256": "26420e8e68ff6da7a7cc2498e0aa379e881fcd7a3d2948efa3212b13175dfe0e",
+    "summary": "2026-10-15 10:14:02 - INFO     - NOTE: Running noexec task 3909 of 3910 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-recovery-initramfs.bb:do_rm_work_all)\n2026-10-15 10:14:02 - INFO     - NOTE: Running noexec task 3910 of 3910 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-recovery-initramfs.bb:do_build)\n2026-10-15 10:14:04 - INFO     - NOTE: Tasks Summary: Attempted 3910 tasks of which 3886 didn't need to be rerun and all succeeded.\n2026-10-15 10:14:04 - INFO     - \n2026-10-15 10:14:04 - INFO     - Summary: There was 1 WARNING message.",
+    "warning": "Build host Ubuntu 26.04 is not in the layer tested-distribution list."
+  },
+  "hardware_scope": {
+    "pi5": "21 syscall-fixture cases run as the kiosk account; all watchdog/device/file syscalls intercepted",
+    "pi4": "Unavailable during this pass",
+    "real_watchdog_opened": false,
+    "reboot_requested": false,
+    "boot_or_partition_writes": false,
+    "qualification_remaining": [
+      "Exact initramfs boot and marker handoff on each board",
+      "Physical watchdog expiry with the candidate root unusable or updater absent",
+      "Coordinator takeover and restart without extending the trial deadline",
+      "One-shot tryboot fallback and durable promotion on the actual USB media",
+      "Shared boot damage remains outside automatic recovery coverage"
+    ]
+  }
+}

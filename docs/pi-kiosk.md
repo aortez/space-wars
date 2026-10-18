@@ -441,8 +441,8 @@ injects the selected SSH public key, writes `/boot/hostname.txt`, grows the
 `/data` partition, can back up and restore existing `/data`, and can inject
 Wi-Fi credentials.
 
-After the first OTA-capable image is flashed, root filesystem updates can use
-the project-root A/B updater over SSH:
+Existing images without `engine-os-manager` can use the legacy project-root
+A/B updater over SSH:
 
 ```sh
 ./update.sh
@@ -453,11 +453,17 @@ Run these from the repository root. The OTA path builds unless `--skip-build`
 is passed, transfers the latest
 `spacewars-image-raspberrypi-spacewars.rootfs.ext4.gz` to the Pi, verifies its checksum,
 flashes it to the inactive slot with SSH key injection, switches boot slots,
-reboots, and verifies that `spacewars-kiosk.service` is active. The image
-includes a narrow sudoers entry for the `spacewars` user so the node script can
+reboots, and verifies that `spacewars-kiosk.service` is active. Those legacy
+images include a sudoers entry for the `spacewars` user so the node script can
 run `sudo /usr/sbin/ab-update-with-key ...` and `sudo systemctl reboot`, matching
 DirtSim's no-local-sudo update model. The lower-level command remains available
 as `cd yocto && npm run update`.
+
+Images containing `engine-os-manager` disable these unsigned rootfs helpers
+and their runtime sudo grants. The workstation script detects that boundary
+and stops before transfer. Their signed installation service and supervised
+bootstrap are being integrated; see [OTA status](ota-updates.md). Compatible
+development client/CLI updates use the root operator fast path below.
 
 The `.ext4.gz.boot-id` sidecar must match the device's `/boot/spacewars-boot-id`
 before transfer. The updater cannot replace boot files. An old Pi 5 image
@@ -466,7 +472,11 @@ changes also require a full flash. Profile selection and boot overrides persist
 across rootfs-only A/B updates. See [the compatibility boundary](picade.md#updates-and-the-boot-compatibility-boundary).
 
 SSH host keys live under `/data/ssh` so reflashes and A/B updates keep a stable
-device identity.
+device identity. New device-manager images also preserve login keys separately
+at `/data/spacewars-access/root` and `/data/spacewars-access/spacewars`. First
+boot imports each account's home key file once. Runtime keys do not grant root
+access; later key changes belong in these root-owned persistent files. See
+[operator provisioning and rollback behavior](ota-updates.md#persistent-ssh-login-keys).
 
 ### Read-only application logs
 
@@ -507,7 +517,7 @@ their own path. Desktop and CPU-only headless benchmarks are unchanged.
 
 ### Fast application updates
 
-After **one normal update** installs the fast-update helper and sudoers rule:
+After a current flash provisions `swadmin` and the v2 maintenance guard:
 
 ```sh
 ./update.sh --fast --target picade.local
@@ -515,7 +525,10 @@ After **one normal update** installs the fast-update helper and sudoers rule:
 ./update.sh --fast --target picade.local --dry-run
 ```
 
-The default host is still `spacewars.local`; always specify `picade.local` for
+The default SSH user is `swadmin`; noninteractive sudo supplies the operator
+privileges. `--user root` remains supported for an independently provisioned
+root login. See the [flash access and data-preservation flow](../yocto/README.md#flash)
+for owner-key provisioning. The default host is still `spacewars.local`; always specify `picade.local` for
 the cabinet. Fast mode builds the `spacewars` recipe only (no rootfs/image),
 exports the stripped `engine-client` and `spacewars-cli` together to
 `tmp/deploy/images/raspberrypi-spacewars/spacewars-fast/`, checks their AArch64
@@ -526,21 +539,25 @@ application restart. Games in progress end when the application restarts.
 
 The installed runtime identity must match the bundle. It fingerprints the
 build target, shared libraries in the recipe sysroot, installed service files,
-data initialization and installer helper. Missing helpers, changed libraries
-or service setup fail before installation: run a normal update without
-`--fast`. Hardware/kernel/firmware changes still require the full-flash checks
+device-service executable, data initialization and installer helper. Missing
+helpers, changed libraries or service setup fail before installation and need
+a compatible rootfs update or supervised bootstrap. Hardware/kernel/firmware changes still require the full-flash checks
 described above. Fast mode does **not** update OS packages, units, boot files,
 `engine-agent`, `engine-os-manager`, or `falling-benchmark`, and does not sync
-user data/ROMs. Use normal updates for those changes and `sync-data.sh` for ROMs.
+user data/ROMs. Use the rootfs update/bootstrap path for those changes and `sync-data.sh` for ROMs.
 The fingerprint is a conservative guard, not a general OS/package upgrade tool.
 
-The fast-update sudo permission is `/usr/sbin/spacewars-fast-update`; it accepts
-a fixed pair of binaries from a validated staging directory, reads them as the
-kiosk user, verifies hashes again, and serializes installs with a lock. It keeps
+The runtime kiosk UID has no fast-update sudo permission. The separately
+authenticated owner invokes `/usr/sbin/spacewars-fast-update` as root; its fixed
+device-manager entry point validates arguments, acquires the shared OTA/recovery
+lock, and rejects an unresolved trial or uncompleted trial watchdog. It then
+executes a fixed private worker with the lock inherited. The worker accepts a
+fixed pair of binaries from a private root-owned staging directory and verifies
+hashes again. It keeps
 backups before stopping the app and requires three control-API responses from
 the same new PID. A failed install/start/health check restores the previous pair
 and restarts it. No arbitrary copy command or generic service-control sudo is
-granted. The previous successful pair is retained, root-owned, under
+granted to the kiosk account. The previous successful pair is retained, root-owned, under
 `/usr/lib/spacewars-fast-update/` for manual recovery.
 
 Unlike A/B rootfs updates, this modifies the **current** root slot. File renames

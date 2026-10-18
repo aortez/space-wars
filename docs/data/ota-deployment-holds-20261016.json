@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T21:32:12.256011+00:00",
+  "implementation_commit": "204a747936ffce1fbdbf877e9731bbf36187ba26",
+  "scope": "Deployment capability CLI and workstation fast/A-B transport hold lifecycle. The managed-image guard still prohibits legacy unsigned A/B installation.",
+  "validation": {
+    "host_manager_network_cases": 58,
+    "host_incidental_time_cases": 2,
+    "host_cli_negative_case": 1,
+    "host_final_node_suite": 51,
+    "host_final_deployment_and_fast_node_cases": 21,
+    "host_yocto_python_suite": 71,
+    "pi_network_cases_each": 58,
+    "pi_malformed_cli_operations_each": 3,
+    "manager_subprocess_fixture_entrypoints_each": 1,
+    "unrelated_root_namespace_setup_case_ignored": true,
+    "rust_msrv": "1.89.0",
+    "clippy_all_targets_warnings_denied": true,
+    "aarch64_all_targets_compiled": true,
+    "format_checked": true,
+    "suite_note": "The full Python suite preceded final JS confirmation/reconnect refinements; the final full Node suite includes them. Rust production source was unchanged after the 58-case host and Pi checks. ARM binaries were stripped for transfer. No packaged image was rebuilt."
+  },
+  "contracts": {
+    "deployment_lease_seconds": 7200,
+    "new_boot_reconnect_grace_seconds": 900,
+    "workstation_renew_interval_seconds": 60,
+    "ssh_request_timeout_seconds": 60,
+    "ssh_kill_grace_seconds": 1,
+    "ssh_captured_output_bytes": 65536,
+    "cli_input_deadline_seconds": 5,
+    "capability_hex_characters": 64,
+    "capability_transport": "stdin only, one newline-terminated line; never command arguments or environment",
+    "reconnect_attempts": 3,
+    "reconnect_retry_delay_seconds": 5,
+    "heartbeat_kills_in_progress_installer": false,
+    "managed_service_failure_allows_new_transfer_or_install_step": false,
+    "legacy_fallback_requires_manager_executable_absent": true,
+    "release_follows_cleanup": true
+  },
+  "properties_exercised": [
+    "Capabilities are bounded/redacted on stdin, and the real CLI rejects malformed input before contacting the service on the host and both Pis.",
+    "Mode Off admits a persisted deployment reservation without enabling an independently off radio or claiming a working link. Turning the policy on later preserves that hold. Unresolved radio commands still block admission.",
+    "The existing real-process hold ownership, persisted deployment, reboot grace and interrupted-radio fixtures remain passing; deployment was added to the hold-during-shutdown/restoration comparison.",
+    "The workstation reuses one capability through command gaps, heartbeat renewal and reboot. A service that appears after a legacy-image reboot is admitted before validation continues.",
+    "Unavailable/malformed policy cannot select legacy fallback. Lost admission responses still attempt release. Admission failure prevents staging/transfer; failed renewal after transfer prevents installer launch while preserving cleanup/release order.",
+    "Renewal continues during long work. Failure does not interrupt an installer, but subsequent steps require fresh acknowledgement. Expected reboot outages are tolerated, and reconnect retries must obtain acknowledgement before success.",
+    "A/B confirmation occurs before final admission and no longer exits inside the legacy helper on cancellation. Cancellation, failed transfer/checksum/flash and missed reboot cannot print update completion and still leave the hold cleanup path.",
+    "Captured SSH output and process duration are bounded, remote stderr is not echoed with secret input, and release failure cannot replace the original install error.",
+    "The managed-image guard continues rejecting unsigned A/B installation. Tests use fake SSH/transfers/flash/reboot, and physical Pis run only private fixtures and malformed-input CLI checks."
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "temporary_directory": "/tmp/spacewars-deployment-hold.PtPOZT",
+      "temporary_free_bytes_before": 302379008,
+      "artifacts": {
+        "tests": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-deployment-tests",
+          "sha256": "543818b923536176deb9c44e6fb15e2275ba0c3d9c44a91b0bc48f02a408452d",
+          "bytes": 9314288
+        },
+        "manager": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-deployment-manager",
+          "sha256": "95317ea7b8e03e91f17fd5a2d7270ddf40260eb621465fd07e5e9d8ecc5fb5f5",
+          "bytes": 14427392
+        }
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 58 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 8.42s",
+      "malformed_stdin_rejected_before_service_contact": [
+        {
+          "operation": "admit",
+          "exit_code": 1,
+          "stderr": "expected one 64-character deployment capability line on stdin"
+        },
+        {
+          "operation": "renew",
+          "exit_code": 1,
+          "stderr": "expected one 64-character deployment capability line on stdin"
+        },
+        {
+          "operation": "release",
+          "exit_code": 1,
+          "stderr": "expected one 64-character deployment capability line on stdin"
+        }
+      ],
+      "real_radio_changes": false,
+      "installed_service_changes": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "temporary_directory": "/tmp/spacewars-deployment-hold.MdrqMY",
+      "temporary_free_bytes_before": 3771019264,
+      "artifacts": {
+        "tests": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-deployment-tests",
+          "sha256": "543818b923536176deb9c44e6fb15e2275ba0c3d9c44a91b0bc48f02a408452d",
+          "bytes": 9314288
+        },
+        "manager": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-deployment-manager",
+          "sha256": "95317ea7b8e03e91f17fd5a2d7270ddf40260eb621465fd07e5e9d8ecc5fb5f5",
+          "bytes": 14427392
+        }
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 58 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 12.10s",
+      "malformed_stdin_rejected_before_service_contact": [
+        {
+          "operation": "admit",
+          "exit_code": 1,
+          "stderr": "expected one 64-character deployment capability line on stdin"
+        },
+        {
+          "operation": "renew",
+          "exit_code": 1,
+          "stderr": "expected one 64-character deployment capability line on stdin"
+        },
+        {
+          "operation": "release",
+          "exit_code": 1,
+          "stderr": "expected one 64-character deployment capability line on stdin"
+        }
+      ],
+      "real_radio_changes": false,
+      "installed_service_changes": false
+    }
+  ],
+  "limits": [
+    "No physical update, installed service change, real lease admission, radio toggle, boot/root/data partition change or watchdog operation was performed. Boot IDs stayed unchanged during each Pi run.",
+    "Fast update hold integration has not yet been qualified against an installed native coordinator during an actual transfer/restart/rollback. Root operator access and matching image rollout remain pending.",
+    "The A/B wrapper is tested with injected transport/reboot fixtures. The public managed path remains deliberately blocked until the verified workstation installer is integrated; these tests do not prove a signed root installation or physical reboot recovery.",
+    "Heartbeat/reconnect command bounds rely on the SSH child exiting after termination; an uninterruptible OS process is outside this fixture qualification. The root service independently bounds its persisted lease and live-operation checks.",
+    "Workstation process termination can leave the persisted lease for bounded expiry. Kiosk restarts do not finish that transaction. No claim is made that a killed workstation can recover its in-memory capability.",
+    "Expected setup profile coordination, native SSH idle qualification, daily synchronization, production signing/feed, downloader/install policy and full hardware OTA qualification remain unfinished."
+  ],
+  "logs": {
+    "host_network": {
+      "path": "target/ota-deployment-network-tests.log",
+      "bytes": 7631,
+      "sha256": "4366318062630845bc7c5259a7fdeaf44594593da61f3a0f09aafefde9aa19d5",
+      "results": [
+        "test result: ok. 58 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 17.98s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s"
+      ]
+    },
+    "host_cli": {
+      "path": "target/ota-deployment-cli-tests.log",
+      "bytes": 485,
+      "sha256": "63e1e5c2ca3598db3dbb6b901b6e0a1f97b963e7c12fc5779d352fd87639ce17",
+      "results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "node_full_final": {
+      "path": "target/ota-deployment-node-full-final.log",
+      "bytes": 6620,
+      "sha256": "18370005e36e586e61011a148e5fcb5fcb86e33eca14ebb4334f208c6f796fbd",
+      "results": [
+        "\u2139 tests 51",
+        "\u2139 pass 51",
+        "\u2139 fail 0"
+      ]
+    },
+    "node_deployment_final": {
+      "path": "target/ota-deployment-node-final.log",
+      "bytes": 4108,
+      "sha256": "6cda357fa7a33ee797c779f5ea55b847c25e5572a972918cf15267669e589ff3",
+      "results": [
+        "\u2139 tests 21",
+        "\u2139 pass 21",
+        "\u2139 fail 0"
+      ]
+    },
+    "yocto_full_before_final_js_refinements": {
+      "path": "target/ota-deployment-yocto-tests.log",
+      "bytes": 6590,
+      "sha256": "3b935cdd9d555b667675837cbc11a05f675f7a83d3342ca1b43bb04a95770ba8",
+      "results": [
+        "\u2139 tests 48",
+        "\u2139 pass 48",
+        "\u2139 fail 0",
+        "Ran 71 tests in 28.750s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-deployment-clippy.log",
+      "bytes": 367,
+      "sha256": "f4d4cd0741dcd4022cd9ed0656f338f419c075cdbb1472cfb6f060c75e611ae1"
+    },
+    "msrv": {
+      "path": "target/ota-deployment-msrv.log",
+      "bytes": 173,
+      "sha256": "512dd412758ad5adf57d2b78f4cfa0509df7f4c717e073ad9bee0590f31f29b8"
+    },
+    "aarch64": {
+      "path": "target/ota-deployment-aarch64.log",
+      "bytes": 174,
+      "sha256": "de0692658544d0b056546676334851c2e7412054dd0fdbe6fc0408fd5d8dbc39"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-deployment-aarch64.jsonl",
+      "bytes": 209330,
+      "sha256": "df45830ab8de88d1d548e7aaa576037f9619c76719e3283126f3fceb5b5b35a6"
+    },
+    "format": {
+      "path": "target/ota-deployment-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "device_runner": {
+      "path": "target/ota-deployment-pis.py",
+      "bytes": 3670,
+      "sha256": "9f42e5c57e1c6af614179c5ce0aa0f276ea62ace8f1955302812899373a6963a"
+    },
+    "device_run": {
+      "path": "target/ota-deployment-pis.log",
+      "bytes": 2518,
+      "sha256": "341f354058c38dc1782a0405708b638c9a16310a4926484469f963270521fccf"
+    },
+    "pi5_tests": {
+      "path": "target/ota-deployment-pi5-tests.log",
+      "bytes": 6418,
+      "sha256": "d78e3643640e70c653b189aa45116c55221ff86ec3a8472cec18f6d3fe23da32",
+      "results": [
+        "test result: ok. 58 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 8.42s"
+      ]
+    },
+    "pi4_tests": {
+      "path": "target/ota-deployment-pi4-tests.log",
+      "bytes": 6419,
+      "sha256": "7b15f4cb3be7faed879e66ce5ccfa2ddad32810006bcbb7446334ec85ebc818c",
+      "results": [
+        "test result: ok. 58 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 12.10s"
+      ]
+    }
+  }
+}

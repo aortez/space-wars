@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T06:24:04.129477+00:00",
+  "implementation_commit": "00d4bcee427b3717941c03cf5029c55685b8556c",
+  "scope": "Supervised retirement of staged and obsolete boot files, initial production recovery-journal publication, and archival of the bootstrap reservation. Temporary-file tests only; no live privileged adapter, boot mutation or reboot ran.",
+  "contract": {
+    "package_schema": 3,
+    "bootstrap_protocol": 4,
+    "trial_journal_schema": 4,
+    "runtime_marker": {
+      "schema": 1,
+      "protocol": 4
+    },
+    "recovery_protocol": 2,
+    "recovery_journal_schema": 2,
+    "unpublished_baseline_generation": 0,
+    "first_signed_generation": 1,
+    "automatic_updates_enabled": false,
+    "canonical_confirmation_required_before_retirement": true,
+    "all_retired_files_archived_before_first_removal": true,
+    "staged_fallback_allowed_after_retirement_intent": false,
+    "missing_production_journal_reinitialized_after_completion": false,
+    "reservation_archive": "/data/spacewars-bootstrap/completed"
+  },
+  "validation": {
+    "host_full": {
+      "ota_passed": 256,
+      "manager_passed": 40,
+      "ignored": 8
+    },
+    "yocto": {
+      "passed": 71,
+      "required_sandbox": true
+    },
+    "final_ext4": {
+      "passed": 33,
+      "seconds": 197.17,
+      "temporary_files": true
+    },
+    "final_pi5": {
+      "passed": 33,
+      "seconds": 308.82,
+      "uid": 1000,
+      "temporary_files": true
+    },
+    "order": "The full Rust suite preceded the final 1024-entry map bounds and bounded temporary-file capacity credit. Clippy, Rust 1.89 checks, formatting, AArch64 compilation and both selected 33-test runs used the final source. Yocto checks include the protocol-2 image identity.",
+    "artifact_source": "Debug binaries were built from the working tree subsequently committed as implementation_commit; they are not a clean packaged runtime image.",
+    "clippy": "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+    "msrv": "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "format": "cargo fmt --all -- --check",
+    "selected_filters": [
+      "bootstrap::finish",
+      "bootstrap::handoff",
+      "recovery::tests"
+    ]
+  },
+  "properties_exercised": [
+    "Copy, publication, removal, directory-flush, recovery-handoff and reservation-archive interruptions reopen and resume from durable intent; canonical files and hostname retain bytes and inodes.",
+    "Missing, corrupt, linked or unexpected archive contents after archive completion stop progress without repair. Source and final guard changes cannot remove unarchived data.",
+    "Journal write, file-sync, rename and directory-sync failures preserve the active reservation until the exact initial production record is durable.",
+    "Retirement intent cannot be undone; later canonical failure requires the operator and cannot select the retired staged fallback. A new boot requires fresh health.",
+    "Completed bootstrap with missing or changed production state cannot be treated as fresh provisioning. Repeating completion preserves the initial recovery record inode.",
+    "Generation zero permits the first signed generation one without inventing release history. Unqualified hardware, generation-zero candidates, protocol-1 candidates and schema-1 recovery journals remain rejected.",
+    "The real AArch64 prepare, activate and finish commands reject UID 1000 before digest parsing or installed-path access."
+  ],
+  "pi5": {
+    "host": "spacewars.local",
+    "temporary_directory": "/tmp/spacewars-bootstrap-finish.mkL4yj",
+    "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+    "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+    "root_command_exit_codes": {
+      "prepare": 1,
+      "activate": 1,
+      "finish": 1
+    },
+    "denial": "device mutations require the root-owned service"
+  },
+  "artifacts": {
+    "ota_tests": {
+      "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f7c7f1697874a6b9",
+      "bytes": 93034632,
+      "sha256": "24093d6ae4f25525c4e1232be9b55ff296e5e4d472a0174f3b284c6e22dee80f"
+    },
+    "manager": {
+      "path": "target/aarch64-unknown-linux-gnu/debug/engine-os-manager",
+      "bytes": 126013336,
+      "sha256": "ef9a40878c7d1eed639390e96a73ff0787d98dc0c2fb85ad69ed3459e92115a3"
+    }
+  },
+  "limits": [
+    "Fixed-path root admission, FAT retirement, actual mount/service state and live production handoff have not run on either Pi.",
+    "Fixture interruptions and synthetic boot/health evidence do not qualify power loss, watchdog reset, firmware fallback or bad-root startup.",
+    "No installed Pi boot files, root partitions, production state, system bus or watchdog were changed; Pi 4 was not exercised in this validation.",
+    "A clean protocol-4 bootstrap / protocol-2 recovery image and new schema-3 kits are still required; older images and journals must not be relabeled.",
+    "Root connection details, independent backup/restore rehearsal, access closure, supervised trials and both-board physical qualification remain outstanding.",
+    "Feed publishing, download/service/radio/policy/UI integration and qualified rollout are still required before automatic updates work."
+  ],
+  "logs": {
+    "host_full": {
+      "path": "target/ota-bootstrap-finish-tests.log",
+      "bytes": 34031,
+      "sha256": "224d8027e5ba27b7a990b43ba7a171e0fe7a67ab595d5ffe47b3523eb5fbb24f",
+      "test_results": [
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.58s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.42s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 234 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 178.06s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "host_ext4_final": {
+      "path": "target/ota-bootstrap-finish-ext4.log",
+      "bytes": 3530,
+      "sha256": "8e1e893d0c7329855a82b63213c7cdfb5bbee32a2c88674caa3ce7751fa8cc81",
+      "test_results": [
+        "test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 209 filtered out; finished in 197.17s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-bootstrap-finish-clippy.log",
+      "bytes": 454,
+      "sha256": "b587fc93e078d0ed8b8beb09a9f1a3182d343bf64f8563b804de009133cff0b6"
+    },
+    "msrv": {
+      "path": "target/ota-bootstrap-finish-msrv.log",
+      "bytes": 260,
+      "sha256": "8aa140010fb4cc5b8a5495e19b51e2b7450fe4407b692b8559ff501ceefcbcb0"
+    },
+    "format": {
+      "path": "target/ota-bootstrap-finish-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "yocto": {
+      "path": "target/ota-bootstrap-finish-yocto.log",
+      "bytes": 171,
+      "sha256": "e2d0f656d430907446610c8f68c073866a0b5adf10e2401450816c2e9a2d42f7",
+      "test_results": [
+        "Ran 71 tests in 28.558s"
+      ]
+    },
+    "aarch64": {
+      "path": "target/ota-bootstrap-finish-aarch64.log",
+      "bytes": 261,
+      "sha256": "579783cfff0561426c8529b3dce81f6c8adf1e5292670c77f8b09dbd105e6341"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-bootstrap-finish-aarch64.jsonl",
+      "bytes": 224659,
+      "sha256": "1d7eb958fd6562ada421094b44f768437b3f635e2c08473ea13c142c5455293d"
+    },
+    "pi5": {
+      "path": "target/ota-bootstrap-finish-pi5.log",
+      "bytes": 4003,
+      "sha256": "4c6a06531d6dd68a7b7d5f4a2a81ec4cb3c5ffe423a5c85deda5b5da831b9bca",
+      "test_results": [
+        "test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 209 filtered out; finished in 308.82s"
+      ]
+    },
+    "pi5_script": {
+      "path": "target/ota-bootstrap-finish-pi5.sh",
+      "bytes": 1007,
+      "sha256": "bbbfd40732a7f294f10230bc34224f43b4d2ba1fcb6129e71c17d6e7a9257c0a"
+    }
+  }
+}

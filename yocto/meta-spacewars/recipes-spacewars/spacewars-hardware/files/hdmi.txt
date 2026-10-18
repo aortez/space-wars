@@ -1,2 +1,3 @@
 # Generic HDMI, on either Pi 4 or Pi 5. Use the monitor's advertised mode.
 [all]
+dtoverlay=spacewars-profile-hdmi

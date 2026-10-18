@@ -219,7 +219,7 @@ class WorkflowTests(unittest.TestCase):
         ci = self.load('ci.yml')
         jobs = ci['jobs']
         self.assertEqual(set(jobs), {
-            'yocto-tools', 'nes-core', 'linux-workspace', 'linux-headless', 'linux-ui',
+            'ota-publisher', 'yocto-tools', 'nes-core', 'linux-workspace', 'linux-headless', 'linux-ui',
             'linux-graphics', 'physics-diagnostics', 'clock-extended', 'spacewars-extended', 'spacewars-recovery',
             'spacewars-ai-regression', 'windows-client', 'aarch64-core', 'windows-release',
         })

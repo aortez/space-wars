@@ -1,0 +1,211 @@
+{
+  "date": "2026-10-15",
+  "scope": "Boot artifact construction and parser validation; no physical boot, watchdog open, root partition write or recovery qualification.",
+  "source_base": "836938a462405416379826f8cc90992a4266c6eb",
+  "source_dirty": true,
+  "source_files_sha256": {
+    "crates/engine-ota/examples/boot_artifact_probe.rs": "6cba711da1a01a5b19528b6fa228497098608338785c3f7dec189cf1ba7903cb",
+    "crates/engine-ota/src/boot.rs": "8e3d71d65ed68453576e0ace8464bca6dc4944dcf83a5fe3c1bc82525048bb11",
+    "crates/engine-ota/src/boot_tests.rs": "c7aeabdd97d42d335da76dcd128cfb3f9b724fb98a676cd235104c4bc922055b",
+    "crates/engine-ota/src/lib.rs": "58f8cf2b0e6cd693539836e9db249e220e46f87f358e3de58892eb937423d459",
+    "crates/engine-ota/tests/fixtures/boot-manifest-v2.json": "5d9e363ac5abd6beab0c9cc23f4ef6e953dfc5eb0bc6762bd1a2e8d5c1c867e4",
+    "crates/engine-ota/tests/fixtures/boot-manifest-v2.sha256": "c9a8700317a9342f9472a00f39b7ced9868a2c0ded94500f9c9bcd5232f610ca",
+    "crates/engine-ota/tests/fixtures/kernel-notes-pi5.bin": "4dd6f2e5d107dcfdc471af3b36b422960abb79a078ac36f06b73cb1ad689b8e2",
+    "docs/ota-updates.md": "4b110c0dde2f72004dda45193c1f8ea4b3d98b4b528a4989665972b857ee25d5",
+    "yocto/meta-spacewars/conf/machine/raspberrypi-spacewars.conf": "18da888bd9aa7cea9dfc5278d690e5b69a2df1dd9b4ccdd2b5b6fb30ee4a7d94",
+    "yocto/meta-spacewars/lib/spacewars/boot_identity.py": "a28b9b385c660f1fdc22149b5ca57c1f7875d60b1b8e450b5237a7afb1b0a9d0",
+    "yocto/meta-spacewars/recipes-core/images/spacewars-boot-identity.inc": "aaceae7469173c6ca8de04a400675f4b7228741fbb7ba41ce3a0b64a8472a6ac",
+    "yocto/meta-spacewars/recipes-kernel/linux/linux-raspberrypi_%.bbappend": "28073b77e594d6b5320cc939dc6540fd860a9bdb11976b5cac3e6a114e446e57",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/hdmi.txt": "db965b12de8ff4a966daace6da7a579029d966bf97a6bd415c74cb0ea4a3ca3b",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/hyperpixel.txt": "f4bceddebaf9ddd0127f9a990fbf74d9a61dff1e85bb9f7720ff66fa9e9fd5ec",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/picade.txt": "c5a2f74dca34af4951158eb7fa935e2917e89ab13ed04258797f6d85c2a0bd7c",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-profile.dts.in": "f6e3b2d3ab1014a665ca060312264bc2b0197b269daf95b84a7460dec091dbb3",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/spacewars-hardware.bb": "9823e14f2a58b2bb6258310b933ca4e653aadb528d13a8ce7e3ec695c1fe4e1f",
+    "yocto/tests/hardware.test.mjs": "3d644c4cd63df23cee02b1b1dfc0b295006bdb1c0b126705680200d5d89a2efa",
+    "yocto/tests/recovery_boot_assets_test.py": "a9edef363ab24b825643ac8a7a9d63f5b88cb4de086883d2de3743c41b6abc48"
+  },
+  "checks": {
+    "host_ota_tests": {
+      "log": "target/ota-boot-host-tests.log",
+      "output": "   Compiling engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s\n     Running unittests src/lib.rs (target/debug/deps/engine_ota-cf9c8005e15d83e0)\n\nrunning 39 tests\ntest boot::tests::hardware_selection_is_data_only_and_requires_one_known_profile ... ok\ntest boot::tests::real_pi_kernel_notes_decode_and_truncation_duplicates_are_rejected ... ok\ntest boot::tests::firmware_prefix_is_allowed_but_cannot_override_recovery_arguments ... ok\ntest boot::tests::root_selection_accepts_only_canonical_provisioned_normal_or_trial_files ... ok\ntest boot::tests::unsafe_or_ambiguous_templates_are_rejected_before_rendering ... ok\ntest image_identity::tests::python_generated_image_matches_descriptor_and_survives_channel_promotion ... ok\ntest image_identity::tests::signed_metadata_cannot_relabel_packaged_content_or_compatibility ... ok\ntest image_identity::linux::tests::installed_reader_rejects_symlinks_permissions_owner_size_and_missing_state ... ok\ntest boot::tests::malformed_asset_sets_cannot_hide_missing_mutable_or_ambiguous_files ... ok\ntest recovery::tests::failed_journal_replace_releases_no_action_and_requires_reopen ... ok\ntest boot::tests::python_manifest_identity_binds_files_and_excludes_only_defined_mutable_state ... ok\ntest recovery::tests::generation_floor_commits_before_writing_and_corrupt_write_never_arms_trial ... ok\ntest recovery::tests::health_proofs_cannot_be_reused_after_a_gap_or_from_a_different_trial ... ok\ntest image_identity::tests::malformed_or_incoherent_image_records_are_rejected ... ok\ntest recovery::tests::journal_rejects_world_readable_state_and_symlinked_files ... ok\ntest recovery::tests::journal_rejects_stale_plans_and_never_replaces_corruption_with_bootstrap ... ok\ntest recovery::tests::corrupted_or_cross_phase_records_fail_validation ... ok\ntest recovery::tests::duplicate_trial_request_and_stale_transaction_cannot_repeat_reboot ... ok\ntest recovery::tests::stale_controls_frames_missing_requests_gaps_and_process_restarts_break_health ... ok\ntest recovery::tests::explicit_retry_is_bounded_and_never_lowers_persisted_history ... ok\ntest recovery::tests::trial_requires_matching_firmware_token_new_boot_and_actual_candidate ... ok\ntest recovery::tests::default_changes_only_after_continuous_health_and_old_root_is_retained ... ok\ntest recovery::tests::service_restart_before_selector_commit_requires_fresh_health_window ... ok\ntest recovery::tests::journal_reopen_keeps_attempt_floor_and_lock_excludes_a_second_owner ... ok\ntest recovery::tests::promotion_interruption_reconciles_both_selector_choices ... ok\ntest recovery::tests::next_update_stops_advertising_retained_slot_before_overwriting_it ... ok\ntest recovery::tests::trial_timeout_uses_boot_uptime_and_cannot_be_extended_by_service_restart ... ok\ntest recovery_linux::tests::cloned_disk_uuid_cannot_hide_behind_the_single_udev_alias ... ok\ntest recovery_linux::tests::even_a_read_only_inactive_mount_prevents_installation ... ok\ntest recovery::tests::unknown_roots_wrong_devices_and_unqualified_recovery_never_grant_writes ... ok\ntest recovery_linux::tests::different_disk_data_bind_mounts_duplicates_and_unknown_root_fail_closed ... ok\ntest recovery_linux::tests::root_selectors_are_strict_and_duplicate_root_arguments_are_rejected ... ok\ntest recovery_linux::tests::overlapping_out_of_disk_duplicate_and_unequal_partitions_are_rejected ... ok\ntest recovery_linux::tests::layout_identity_survives_device_enumeration_but_changes_with_geometry_or_uuid ... ok\ntest recovery_linux::tests::mounted_device_numbers_choose_both_slots_without_parsing_name_suffixes ... ok\ntest recovery::tests::uncommitted_temporary_file_never_supersedes_the_last_complete_journal ... ok\ntest recovery::tests::wrong_executable_build_or_unwritable_state_cannot_produce_health_proof ... ok\ntest recovery::tests::reset_or_service_restart_before_trial_preserves_old_root_and_quarantines_attempt ... ok\ntest recovery_linux::tests::malformed_or_oversized_kernel_evidence_is_rejected ... ok\n\ntest result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n     Running tests/verification.rs (target/debug/deps/verification-6077219126989ccc)\n\nrunning 22 tests\ntest compatibility_and_downgrade_gates_return_specific_reasons ... ok\ntest corrupt_truncated_and_oversized_payloads_are_rejected ... ok\ntest feed_endpoints_require_https_without_credentials_or_path_ambiguity ... ok\ntest caller_readable_or_symlinked_trust_state_is_rejected ... ok\ntest metadata_size_is_bounded_before_parsing ... ok\ntest quarantined_newest_image_does_not_fall_back_to_an_older_download ... ok\ntest trust_store_is_exclusive_and_corruption_does_not_rebootstrap ... ok\ntest structurally_valid_storage_corruption_cannot_reset_trust_history ... ok\ntest compatible_generation_is_retained_when_a_new_boot_image_is_published ... ok\ntest signed_unsupported_schema_is_not_an_installable_candidate ... ok\ntest cancelled_metadata_check_still_retains_observed_time ... ok\ntest image_identity_survives_promotion_and_rejects_relabelled_generations ... ok\ntest replay_after_restart_is_rejected_without_discarding_the_current_cached_feed ... ok\ntest interrupted_new_publication_invalidates_old_evidence_but_preserves_the_new_version_floor ... ok\ntest signature_threshold_requires_distinct_authorized_signatures ... ok\ntest accepted_root_rotation_is_retained_across_restart_and_offline_validation ... ok\ntest signed_channels_and_offline_install_survive_reopening_the_store ... ok\ntest persisted_recovery_quarantine_allows_only_a_freshly_verified_bounded_retry ... ok\ntest unknown_expired_and_backwards_time_never_accept_metadata ... ok\ntest signed_feed_cannot_escape_the_channel_or_image_contract ... ok\ntest removing_a_candidate_from_a_new_feed_revokes_its_cached_approval ... ok\ntest signed_metadata_lengths_cannot_override_the_local_size_limit ... ok\n\ntest result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s\n\n   Doc-tests engine_ota\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+    },
+    "yocto_tool_tests": {
+      "log": "target/ota-boot-yocto-tests.log",
+      "output": "\n> spacewars-yocto@0.1.0 test\n> node --test tests/*.test.mjs && python3 -m unittest discover -s tests -p '*_test.py'\n\n\u2714 pressure and budget policy has explicit boundaries (0.662042ms)\n\u2714 healthy or missing profiles never invoke Cargo (0.89154ms)\n\u2714 default dry run selects workspace packages but preserves every file (0.868787ms)\n\u2714 apply delegates deletion to Cargo and writes one audit report (0.754027ms)\n\u2714 empty package selection can never become a whole-target clean (0.866001ms)\n\u2714 unexpected workspace, preview path, and Cargo failure prevent apply (0.838348ms)\n\u2714 pin opts out of automatic cleanup (0.302076ms)\n\u2714 pre-build report mode is non-destructive and auto applies the same policy (0.863446ms)\n\u2714 a different build filesystem never causes unrelated cache cleanup (0.353714ms)\n\u2714 help and update dry-run bypass even an invalid maintenance configuration (42.403011ms)\n\u2714 reject symlinks, including a relocated target and a pin introduced during preview (0.742947ms)\n\u2714 allocated-byte count deduplicates hard links and invalid limits fail closed (0.427075ms)\n\u2714 real Cargo preserves dependencies/evidence and honors the build lock (628.025215ms)\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nBuild --target spacewars, then use bundle: /home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/spacewars-fast\nCheck restricted helper/runtime compatibility; verify hashes; copy pair; restart and health-check; rollback on failure.\nDry run: no build, SSH connection, files transferred, or remote changes.\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nFast update: spacewars@picade.local (client + CLI, application restart, no reboot)\nengine-client: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nspacewars-cli: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nengine-client: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nspacewars-cli: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\n\u2714 fast arguments are explicit and reject full-image flags/remote shell syntax (0.838068ms)\n\u2714 bundle requires matching identities, complete binary pair, architecture and checksums (1.495441ms)\n\u2714 missing/mismatched remote helper requires a full update (0.117083ms)\n\u2714 dry run has no build, network or artifact reads (0.952155ms)\n\u2714 runtime mismatch aborts before copying or stopping the app (0.593422ms)\n\u2714 fast update builds only the recipe, transfers a pair, calls fixed helper, cleans staging (0.644078ms)\n\u2714 failed install still cleans only its own staged pair and reports failure (0.568083ms)\n\u2714 wrapper routes --fast and legacy yolo refuses it instead of flashing (44.000797ms)\n\u2714 normal builds and updates use the GPU bundle; software stays separate (0.430751ms)\n\u2714 build selection defaults to GPU and rejects conflicting switches (0.206314ms)\n\u2714 normal image includes GPU libraries and boots the build-selected renderer (0.603862ms)\n\u2714 shader-only edits invalidate the Pi application build (0.126621ms)\n\u2714 build and artifact paths isolate the unified machine from older checkouts (0.70302ms)\n\u2714 only explicit known hardware profiles can be flashed (0.297608ms)\n\u2714 HDMI selection uses the connected connector, not the first DRM card (9.300571ms)\n\u2714 missing HDMI detection leaves output selection to Slint (5.638891ms)\n\u2714 Picade routes audio to the HAT without touching backlight files (7.110737ms)\n\u2714 HyperPixel retains its existing rotation, USB audio and backlight workaround (5.337806ms)\n\u2714 Picade refuses unsupported boards instead of silently starting without its HAT (2.944263ms)\n\u2714 missing, invalid and ambiguous selections fail without executing boot-file content (6.903441ms)\n\u2714 Windows line endings are accepted in boot profile selection (6.313747ms)\n\u2714 rootfs-only updates require valid, identical boot identities (0.570869ms)\n\u2714 profile files keep HAT and HyperPixel GPIO overlays mutually exclusive (0.560468ms)\n\u2714 Picade udev identities separate the gamepad from utility and power keys (0.098829ms)\n\u2714 flash help documents explicit hardware selection without accessing disks or saved settings (15.118283ms)\n\u2139 tests 38\n\u2139 suites 0\n\u2139 pass 38\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 766.277331\n.............................................................\n----------------------------------------------------------------------\nRan 61 tests in 21.862s\n\nOK\n"
+    },
+    "clippy": {
+      "log": "target/ota-boot-clippy.log",
+      "output": "    Checking engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.43s\n"
+    },
+    "probe_clippy": {
+      "log": "target/ota-boot-probe-clippy.log",
+      "output": "    Checking engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.33s\n"
+    },
+    "rust_1_89": {
+      "log": "target/ota-boot-rust189.log",
+      "output": "    Checking engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.77s\n"
+    },
+    "aarch64_tests_compile": {
+      "log": "target/ota-boot-aarch64.log",
+      "output": "   Compiling engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.18s\n  Executable unittests src/lib.rs (target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-af8e6f7e01ee75e6)\n  Executable tests/verification.rs (target/aarch64-unknown-linux-gnu/debug/deps/verification-9fc1643a739345d5)\n"
+    },
+    "pi5_boot_parser_tests": {
+      "log": "target/ota-boot-pi5-tests.log",
+      "output": "\nrunning 7 tests\ntest boot::tests::hardware_selection_is_data_only_and_requires_one_known_profile ... ok\ntest boot::tests::firmware_prefix_is_allowed_but_cannot_override_recovery_arguments ... ok\ntest boot::tests::root_selection_accepts_only_canonical_provisioned_normal_or_trial_files ... ok\ntest boot::tests::real_pi_kernel_notes_decode_and_truncation_duplicates_are_rejected ... ok\ntest boot::tests::unsafe_or_ambiguous_templates_are_rejected_before_rendering ... ok\ntest boot::tests::malformed_asset_sets_cannot_hide_missing_mutable_or_ambiguous_files ... ok\ntest boot::tests::python_manifest_identity_binds_files_and_excludes_only_defined_mutable_state ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s\n\nde606400-dc75-446e-b26b-385592b0f562\n"
+    },
+    "pi4_contact": {
+      "log": "target/ota-boot-pi4-contact.txt",
+      "output": "ssh: Could not resolve hostname sw-picade.local: Temporary failure in name resolution\n"
+    }
+  },
+  "full_image_build": {
+    "log": "target/ota-boot-image-build.log",
+    "tail": "2026-10-15 11:05:22 - INFO     - NOTE: Running task 6764 of 6768 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-image.bb:do_image_complete)\n2026-10-15 11:05:23 - INFO     - NOTE: recipe spacewars-image-1.0-r0: task do_image_complete: Started\n2026-10-15 11:05:24 - INFO     - NOTE: recipe spacewars-image-1.0-r0: task do_image_complete: Succeeded\n2026-10-15 11:05:24 - INFO     - NOTE: Running task 6765 of 6768 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-image.bb:do_populate_lic_deploy)\n2026-10-15 11:05:24 - INFO     - NOTE: recipe spacewars-image-1.0-r0: task do_populate_lic_deploy: Started\n2026-10-15 11:05:24 - INFO     - NOTE: recipe spacewars-image-1.0-r0: task do_populate_lic_deploy: Succeeded\n2026-10-15 11:05:24 - INFO     - NOTE: Running task 6766 of 6768 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-image.bb:do_rm_work)\n2026-10-15 11:05:24 - INFO     - NOTE: recipe spacewars-image-1.0-r0: task do_rm_work: Started\n2026-10-15 11:05:24 - INFO     - NOTE: recipe spacewars-image-1.0-r0: task do_rm_work: Succeeded\n2026-10-15 11:05:24 - INFO     - NOTE: Running noexec task 6767 of 6768 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-image.bb:do_rm_work_all)\n2026-10-15 11:05:24 - INFO     - NOTE: Running noexec task 6768 of 6768 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-image.bb:do_build)\n2026-10-15 11:05:26 - INFO     - NOTE: Tasks Summary: Attempted 6768 tasks of which 6741 didn't need to be rerun and all succeeded.\n2026-10-15 11:05:26 - INFO     - \n2026-10-15 11:05:26 - INFO     - Summary: There was 1 WARNING message."
+  },
+  "artifact_audit": {
+    "rootfs": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015175907.ext4.gz",
+      "compressed_bytes": 133764406,
+      "compressed_sha256": "bdde4b98a30b15433e84700f12e8e65d94893bca4e3dd03f8934d5f0985a22ad",
+      "expanded_bytes": 520093696,
+      "expanded_sha256": "2f2e8c0a5e68ed35f9c00ad24edbfde40f36c2aa58f1dfdd27d04c57544f7452"
+    },
+    "disk": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015175907.wic.gz",
+      "compressed_bytes": 183245971,
+      "compressed_sha256": "fa9b1c221c762efd0bf8c82c26b76280478f41ce52f990a3c70c3b88462539df",
+      "expanded_bytes": 7679770624,
+      "expanded_sha256": "6166bc569e395394b50c28d35646cbaaca165d149b9551d0a2f991dd28935e77"
+    },
+    "partition_table": [
+      {
+        "number": 1,
+        "type": 12,
+        "start_sector": 8192,
+        "sectors": 307200
+      },
+      {
+        "number": 2,
+        "type": 131,
+        "start_sector": 319488,
+        "sectors": 6291456
+      },
+      {
+        "number": 3,
+        "type": 131,
+        "start_sector": 6610944,
+        "sectors": 6291456
+      },
+      {
+        "number": 4,
+        "type": 131,
+        "start_sector": 12902400,
+        "sectors": 2097152
+      }
+    ],
+    "root_partuuids": [
+      "076c4a2a-02",
+      "076c4a2a-03"
+    ],
+    "identity": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 23426808,
+          "sha256": "da32579d9cf4166b1d74b25de21b4cca7283344572835a57dc51852e88f0f379"
+        },
+        "os_manager": {
+          "bytes": 3155448,
+          "sha256": "230014cc475b2cee2e5d8f80d215ef187aaba716b603482160c7995c538584c9"
+        }
+      },
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-ab138a1ef94fd3fe1db3a7dd4e66d91ad86b71754e1011db39d511cde854d001",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 1,
+      "rootfs_tree": "ab138a1ef94fd3fe1db3a7dd4e66d91ad86b71754e1011db39d511cde854d001",
+      "schema": 1,
+      "source": {
+        "commit": "836938a462405416379826f8cc90992a4266c6eb",
+        "dirty": true,
+        "revision": "836938a46240-dirty",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "boot_probe": {
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "hardware_profile": "hdmi",
+      "immutable_bytes": 85396458,
+      "immutable_files": 103,
+      "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+      "provisioned_default": null,
+      "trial": null
+    },
+    "rootfs_record_matches_sidecar": true,
+    "rootfs_and_fat_manifest_match": true,
+    "default_cmdline_unchanged": true,
+    "trial_uses_full_config_copy": true,
+    "boot_contains_exact_initramfs_sha256": "461ab4531c05f96c235610855951be26cb4b764e7d7ea2c9da075087b9485c4a",
+    "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-xpt3yya4",
+    "probe_command": [
+      "cargo",
+      "run",
+      "--locked",
+      "-p",
+      "engine-ota",
+      "--example",
+      "boot_artifact_probe",
+      "--",
+      "/home/data/workspace/space-wars-ota/target/ota-boot-audit-xpt3yya4/boot",
+      "/home/data/workspace/space-wars-ota/target/ota-boot-audit-xpt3yya4/image.json",
+      "076c4a2a-02",
+      "076c4a2a-03"
+    ],
+    "kernel_notes_build_id_matches_export": "e2eba337d5d4e0116d805c09231c063468301bda"
+  },
+  "device_tree_overlay_application": [
+    {
+      "base": "bcm2711-rpi-4-b.dtb",
+      "profile": "hdmi",
+      "observed_property": "hdmi",
+      "overlay_sha256": "851f3231d2a77b2aa81f8439ad2dc2062b3e8c7c069d8fb8d80c6f20d8d3da20"
+    },
+    {
+      "base": "bcm2711-rpi-4-b.dtb",
+      "profile": "picade",
+      "observed_property": "picade",
+      "overlay_sha256": "d4a21c9cc50a5ebb5c13f88e994a17d3f897fe56aa9aea904fef3419bba539a8"
+    },
+    {
+      "base": "bcm2712-rpi-5-b.dtb",
+      "profile": "hdmi",
+      "observed_property": "hdmi",
+      "overlay_sha256": "851f3231d2a77b2aa81f8439ad2dc2062b3e8c7c069d8fb8d80c6f20d8d3da20"
+    },
+    {
+      "base": "bcm2712-rpi-5-b.dtb",
+      "profile": "hyperpixel",
+      "observed_property": "hyperpixel",
+      "overlay_sha256": "0ce4d817011fdd077fb9af3593731fd240b9d6d77fd38ffbb75de509009758ea"
+    }
+  ],
+  "pi5_fixture_binary": {
+    "bytes": 47923656,
+    "sha256": "c1190714fd881729645ce418a71bfaf2f8db83420f24f03a6886909b6b8e08ee"
+  },
+  "limitations": [
+    "Uninstalled dirty development image",
+    "Pi 4 unreachable for this pass",
+    "Filesystem adapter/coordinator and supervised bootstrap remain",
+    "No firmware, watchdog expiry, reboot or power-loss qualification"
+  ]
+}

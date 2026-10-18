@@ -30,7 +30,11 @@ DEPENDS:append = "${@' virtual/egl virtual/libgles2 virtual/libgbm' if d.getVar(
 RDEPENDS:${PN} += " \
     alsa-lib \
     bash \
+    ca-certificates \
     coreutils \
+    e2fsprogs \
+    e2fsprogs-e2fsck \
+    openssh-keygen \
     fontconfig \
     libdrm \
     libinput \
@@ -38,6 +42,7 @@ RDEPENDS:${PN} += " \
     seatd \
     libudev \
     sudo \
+    systemd \
     util-linux-flock \
     util-linux-setpriv \
     xkeyboard-config \
@@ -50,6 +55,107 @@ INSANE_SKIP:${PN}-dbg += "buildpaths"
 
 do_compile[network] = "1"
 
+# Resolve once at recipe parsing, then use the same identity for Cargo and the
+# package. externalsrc disables parse caching, including across Git commits.
+export SPACEWARS_BUILD_REVISION
+python () {
+    import json
+    from spacewars.image_identity import source_identity
+
+    identity = source_identity(d.getVar("SPACEWARS_SRCROOT"))
+    d.setVar("SPACEWARS_SOURCE_IDENTITY", json.dumps(identity, sort_keys=True))
+    d.setVar("SPACEWARS_BUILD_REVISION", identity["revision"])
+}
+do_compile[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/image_identity.py:True"
+do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/image_identity.py:True"
+
+# Public bootstrap material is supplied separately from signing keys. Empty
+# configuration builds an unprovisioned image; it never creates a fixture root.
+SPACEWARS_OTA_BOOTSTRAP_BUNDLE ?= ""
+SPACEWARS_OTA_BOOTSTRAP_SHA256 ?= ""
+python () {
+    from spacewars.ota_bundle import read_selected_bundle
+    source = d.getVar("SPACEWARS_OTA_BOOTSTRAP_BUNDLE")
+    expected = d.getVar("SPACEWARS_OTA_BOOTSTRAP_SHA256")
+    if source or expected:
+        read_selected_bundle(source, expected)
+        d.appendVarFlag("do_install", "file-checksums", " " + source + ":True")
+}
+python install_spacewars_ota_bundle() {
+    from spacewars.ota_bundle import install_selected_bundle
+    source = d.getVar("SPACEWARS_OTA_BOOTSTRAP_BUNDLE")
+    expected = d.getVar("SPACEWARS_OTA_BOOTSTRAP_SHA256")
+    if source or expected:
+        install_selected_bundle(d.getVar("D"), source, expected)
+}
+do_install[postfuncs] += "install_spacewars_ota_bundle"
+do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/ota_bundle.py:True"
+
+# The public, pre-build input record is inside the hashed image, so layer and
+# configuration provenance cannot be detached from a published payload.
+SPACEWARS_OTA_BUILD_INPUTS ?= ""
+SPACEWARS_OTA_BUILD_INPUTS_SHA256 ?= ""
+python () {
+    import json
+    from spacewars.build_provenance import selected_inputs
+    path = d.getVar("SPACEWARS_OTA_BUILD_INPUTS")
+    selected_inputs(path, d.getVar("SPACEWARS_OTA_BUILD_INPUTS_SHA256"),
+                    json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")))
+    if path:
+        d.appendVarFlag("do_install", "file-checksums", " " + path + ":True")
+}
+
+python verify_spacewars_source_identity() {
+    import json
+    from spacewars.image_identity import source_identity
+
+    if source_identity(d.getVar("SPACEWARS_SRCROOT")) != json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")):
+        bb.fatal("Space-Wars source identity changed during the build; rebuild from a stable checkout")
+}
+do_compile[prefuncs] += "verify_spacewars_source_identity"
+do_compile[postfuncs] += "verify_spacewars_source_identity"
+
+python capture_spacewars_toolchain() {
+    import json
+    import os
+    from pathlib import Path
+    from spacewars.build_provenance import capture, write
+
+    provenance = capture(
+        json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")),
+        {**os.environ, "PATH": d.getVar("PATH")}, d.getVar("CC"),
+        d.getVar("RUST_TARGET"), d.getVar("CARGO_BUILD_PROFILE"),
+        d.getVar("SPACEWARS_KIOSK_FEATURE"),
+    )
+    write(Path(d.getVar("WORKDIR")) / "spacewars-build.json", provenance)
+}
+do_compile[prefuncs] += "capture_spacewars_toolchain"
+do_compile[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/build_provenance.py:True"
+
+python write_spacewars_source_identity() {
+    import json
+    from pathlib import Path
+    from spacewars.build_provenance import INPUTS_PATH, PROVENANCE_PATH, selected_inputs, write
+
+    bb.build.exec_func("verify_spacewars_source_identity", d)
+    path = Path(d.getVar("D")) / "usr/share/spacewars/source.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(d.getVar("SPACEWARS_SOURCE_IDENTITY") + "\n")
+    path.chmod(0o644)
+    provenance = json.loads((Path(d.getVar("WORKDIR")) / "spacewars-build.json").read_text())
+    if provenance["source"] != json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")):
+        bb.fatal("Space-Wars toolchain record belongs to a different source")
+    write(Path(d.getVar("D")) / PROVENANCE_PATH, provenance)
+    inputs = selected_inputs(d.getVar("SPACEWARS_OTA_BUILD_INPUTS"),
+                             d.getVar("SPACEWARS_OTA_BUILD_INPUTS_SHA256"), provenance["source"])
+    if inputs is not None:
+        output = Path(d.getVar("D")) / INPUTS_PATH
+        output.write_bytes(inputs)
+        output.chmod(0o644)
+}
+do_install[postfuncs] += "write_spacewars_source_identity"
+do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/build_provenance.py:True"
+
 python () {
     srcroot = d.getVar("SPACEWARS_SRCROOT")
     tracked = [
@@ -58,12 +164,23 @@ python () {
         f"{srcroot}/crates/engine-client/ui/main.slint:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-data-init.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-data-init.service:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-access.service:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-sshd-access.conf:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/sshd-spacewars-access.conf:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/sshd-spacewars-network.conf:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-system.service:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-recovery.service:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/bootstrap-runtime.json:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-install.conf:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-rtc-capture.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-kiosk.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-seatd.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update-wrapper.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sudoers:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer-wrapper.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sudoers:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.conf:True",
     ]
@@ -91,18 +208,37 @@ do_install() {
     install -m 0755 ${WORKDIR}/spacewars-data-init.sh ${D}${bindir}/spacewars-data-init
 
     install -d ${D}${sbindir}
-    install -m 0755 ${WORKDIR}/spacewars-fast-update.sh ${D}${sbindir}/spacewars-fast-update
+    install -d -m 0700 ${D}${libexecdir}/spacewars
+    install -m 0700 ${WORKDIR}/spacewars-fast-update.sh ${D}${libexecdir}/spacewars/fast-update
+    install -m 0755 ${WORKDIR}/spacewars-fast-update-wrapper.sh ${D}${sbindir}/spacewars-fast-update
     install -m 0755 ${WORKDIR}/spacewars-logs.sh ${D}${sbindir}/spacewars-logs
     install -d -m 0750 ${D}${sysconfdir}/sudoers.d
     install -m 0440 ${WORKDIR}/spacewars-logs.sudoers ${D}${sysconfdir}/sudoers.d/spacewars-logs
 
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${WORKDIR}/spacewars-data-init.service ${D}${systemd_system_unitdir}/spacewars-data-init.service
+    install -m 0644 ${WORKDIR}/spacewars-access.service ${D}${systemd_system_unitdir}/spacewars-access.service
+    install -d ${D}${systemd_system_unitdir}/sshd.service.d
+    install -m 0644 ${WORKDIR}/sshd-spacewars-access.conf ${D}${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf
+    # The default image uses Accept=yes socket activation and sshd@.service.
+    install -d ${D}${systemd_system_unitdir}/sshd@.service.d
+    install -m 0644 ${WORKDIR}/sshd-spacewars-access.conf ${D}${systemd_system_unitdir}/sshd@.service.d/spacewars-access.conf
+    install -m 0644 ${WORKDIR}/sshd-spacewars-network.conf ${D}${systemd_system_unitdir}/sshd@.service.d/spacewars-network.conf
+    install -d ${D}${sysconfdir}/ssh/sshd_config.d
+    install -m 0644 ${WORKDIR}/spacewars-sshd-access.conf ${D}${sysconfdir}/ssh/sshd_config.d/10-spacewars-access.conf
+    install -m 0644 ${WORKDIR}/spacewars-system.service ${D}${systemd_system_unitdir}/spacewars-system.service
+    install -m 0644 ${WORKDIR}/spacewars-recovery.service ${D}${systemd_system_unitdir}/spacewars-recovery.service
+    install -d ${D}${sysconfdir}/spacewars
+    install -m 0644 ${WORKDIR}/bootstrap-runtime.json ${D}${sysconfdir}/spacewars/bootstrap-runtime.json
+    install -d ${D}${nonarch_libdir}/tmpfiles.d
+    install -m 0644 ${WORKDIR}/spacewars-install.conf ${D}${nonarch_libdir}/tmpfiles.d/spacewars-install.conf
+    install -m 0644 ${WORKDIR}/spacewars-rtc-capture.service ${D}${systemd_system_unitdir}/spacewars-rtc-capture.service
     install -m 0644 ${WORKDIR}/spacewars-kiosk.service ${D}${systemd_system_unitdir}/spacewars-kiosk.service
     install -m 0644 ${WORKDIR}/spacewars-seatd.service ${D}${systemd_system_unitdir}/spacewars-seatd.service
 
     if [ "${SPACEWARS_GPU}" = "1" ]; then
-        install -m 0755 ${WORKDIR}/spacewars-renderer.sh ${D}${sbindir}/spacewars-renderer
+        install -m 0700 ${WORKDIR}/spacewars-renderer.sh ${D}${libexecdir}/spacewars/renderer
+        install -m 0755 ${WORKDIR}/spacewars-renderer-wrapper.sh ${D}${sbindir}/spacewars-renderer
         install -m 0440 ${WORKDIR}/spacewars-renderer.sudoers ${D}${sysconfdir}/sudoers.d/spacewars-renderer
         install -d ${D}${systemd_system_unitdir}/spacewars-kiosk.service.d
         install -m 0644 ${WORKDIR}/spacewars-renderer.conf ${D}${systemd_system_unitdir}/spacewars-kiosk.service.d/renderer.conf
@@ -114,12 +250,23 @@ do_install() {
 SRC_URI += " \
     file://spacewars-data-init.sh \
     file://spacewars-data-init.service \
+    file://spacewars-access.service \
+    file://spacewars-sshd-access.conf \
+    file://sshd-spacewars-access.conf \
+    file://sshd-spacewars-network.conf \
+    file://spacewars-system.service \
+    file://spacewars-recovery.service \
+    file://bootstrap-runtime.json \
+    file://spacewars-install.conf \
+    file://spacewars-rtc-capture.service \
     file://spacewars-kiosk.service \
     file://spacewars-seatd.service \
     file://spacewars-fast-update.sh \
+    file://spacewars-fast-update-wrapper.sh \
     file://spacewars-logs.sh \
     file://spacewars-logs.sudoers \
     file://spacewars-renderer.sh \
+    file://spacewars-renderer-wrapper.sh \
     file://spacewars-renderer.sudoers \
     file://spacewars-renderer.conf \
 "
@@ -131,12 +278,20 @@ python write_spacewars_fast_compatibility() {
 
     assets = [Path(d.getVar("WORKDIR")) / name for name in (
         "spacewars-data-init.sh", "spacewars-data-init.service",
+        "spacewars-access.service", "spacewars-sshd-access.conf", "sshd-spacewars-access.conf",
+        "sshd-spacewars-network.conf",
+        "spacewars-system.service", "spacewars-rtc-capture.service",
+        "spacewars-recovery.service", "bootstrap-runtime.json", "spacewars-install.conf",
         "spacewars-kiosk.service", "spacewars-seatd.service", "spacewars-fast-update.sh",
+        "spacewars-fast-update-wrapper.sh",
         "spacewars-logs.sh", "spacewars-logs.sudoers",
     )]
+    # A fast client must not assume a newer maintenance/service contract than
+    # the installed root image. This binary is not replaced by the fast path.
+    assets.append(Path(d.getVar("D")) / "usr/bin/engine-os-manager")
     if d.getVar("SPACEWARS_GPU") == "1":
         assets.extend(Path(d.getVar("WORKDIR")) / name for name in (
-            "spacewars-renderer.sh", "spacewars-renderer.sudoers", "spacewars-renderer.conf",
+            "spacewars-renderer.sh", "spacewars-renderer-wrapper.sh", "spacewars-renderer.sudoers", "spacewars-renderer.conf",
         ))
     variables = {key: d.getVar(key) or "" for key in (
         "MACHINE", "TARGET_SYS", "TUNE_FEATURES", "DISTRO", "DISTRO_VERSION",
@@ -178,7 +333,7 @@ python do_deploy() {
 }
 addtask deploy after do_package before do_build
 
-SYSTEMD_SERVICE:${PN} = "spacewars-seatd.service spacewars-data-init.service spacewars-kiosk.service"
+SYSTEMD_SERVICE:${PN} = "spacewars-seatd.service spacewars-data-init.service spacewars-kiosk.service spacewars-system.service spacewars-rtc-capture.service spacewars-recovery.service spacewars-access.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
 FILES:${PN} = " \
@@ -188,6 +343,7 @@ FILES:${PN} = " \
     ${bindir}/engine-os-manager \
     ${bindir}/falling-benchmark \
     ${bindir}/spacewars-data-init \
+    ${libexecdir}/spacewars \
     ${sbindir}/spacewars-fast-update \
     ${sbindir}/spacewars-logs \
     ${sysconfdir}/sudoers.d/spacewars-logs \
@@ -195,7 +351,21 @@ FILES:${PN} = " \
     ${sysconfdir}/sudoers.d/spacewars-renderer \
     ${systemd_system_unitdir}/spacewars-kiosk.service.d/renderer.conf \
     ${datadir}/spacewars/fast-update-compat \
+    ${datadir}/spacewars/source.json \
+    ${datadir}/spacewars/build.json \
+    ${datadir}/spacewars/build-inputs.json \
     ${systemd_system_unitdir}/spacewars-data-init.service \
+    ${systemd_system_unitdir}/spacewars-access.service \
+    ${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf \
+    ${systemd_system_unitdir}/sshd@.service.d/spacewars-access.conf \
+    ${systemd_system_unitdir}/sshd@.service.d/spacewars-network.conf \
+    ${sysconfdir}/ssh/sshd_config.d/10-spacewars-access.conf \
+    ${systemd_system_unitdir}/spacewars-system.service \
+    ${systemd_system_unitdir}/spacewars-recovery.service \
+    ${sysconfdir}/spacewars/bootstrap-runtime.json \
+    ${sysconfdir}/spacewars/ota-bootstrap.json \
+    ${nonarch_libdir}/tmpfiles.d/spacewars-install.conf \
+    ${systemd_system_unitdir}/spacewars-rtc-capture.service \
     ${systemd_system_unitdir}/spacewars-kiosk.service \
     ${systemd_system_unitdir}/spacewars-seatd.service \
     /var/lib \
