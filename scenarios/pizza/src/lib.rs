@@ -30,7 +30,8 @@ use engine_common::{
 };
 use engine_core::{Color, Vec2};
 use engine_gravity::{
-    GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver, GravityStepMetrics,
+    GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver,
+    GravitySourceShape, GravityStepMetrics,
 };
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
@@ -870,11 +871,22 @@ fn pizza_gravity_config(model: PizzaGravityModel) -> GravityConfig {
     }
 }
 
-fn collect_gravity_participants(participants: &mut Vec<GravityParticipant>, balls: &[BallState]) {
+fn collect_gravity_participants(
+    participants: &mut Vec<GravityParticipant>,
+    balls: &[BallState],
+    bounded_interior: bool,
+) {
     participants.clear();
     participants.extend(balls.iter().map(|ball| {
         let mut participant =
             GravityParticipant::dynamic(GravityId::new(ball.id), ball.position, ball.mass());
+        // A ball center inside another ball would otherwise feel a nearly
+        // singular point-mass pull and gain an extreme single-update kick.
+        if bounded_interior {
+            participant.source_shape = GravitySourceShape::UniformSphere {
+                radius: ball.radius,
+            };
+        }
         if !ball.moving {
             participant.response_scale = 0.0;
         }
@@ -891,7 +903,8 @@ fn apply_gravity_to_physics(state: &mut PizzaState) -> GravityStepMetrics {
         gravity_participants,
         ..
     } = state;
-    collect_gravity_participants(gravity_participants, balls);
+    // Benchmarks keep their legacy point-mass workload.
+    collect_gravity_participants(gravity_participants, balls, config.benchmark.is_none());
     let outputs = gravity_solver
         .solve(gravity_participants, pizza_gravity_config(config.gravity))
         .expect("normalized Pizza bodies form valid gravity participants");
@@ -919,7 +932,7 @@ fn apply_gravity_to_classic(state: &mut PizzaState) -> GravityStepMetrics {
         gravity_participants,
         ..
     } = state;
-    collect_gravity_participants(gravity_participants, balls);
+    collect_gravity_participants(gravity_participants, balls, false);
     let outputs = gravity_solver
         .solve(gravity_participants, pizza_gravity_config(config.gravity))
         .expect("normalized Pizza balls form valid gravity participants");
@@ -1586,6 +1599,52 @@ mod tests {
                 .iter()
                 .all(|ball| ball.velocity.x.is_finite() && ball.velocity.y.is_finite())
         );
+    }
+
+    #[test]
+    fn normal_play_bounds_gravity_between_overlapping_centers() {
+        // Overlapping fragments can bring two centers this close together.
+        let positions = [Vec2::new(0.5, 0.25), Vec2::new(0.5 + 2.6e-6, 0.25)];
+        let mut normal = PizzaScenario::init(
+            PizzaConfig {
+                desired_ball_count: 0,
+                ..PizzaConfig::default()
+            },
+            7,
+        );
+        for position in positions {
+            let ball = normal.allocate_ball(position, 0.003, Color::WHITE);
+            normal.push_ball(ball);
+        }
+        apply_gravity_to_physics(&mut normal);
+        normal.sync_from_rapier();
+
+        // The legacy benchmark keeps its point-mass workload.
+        let mut benchmark = PizzaScenario::init(
+            PizzaConfig::benchmark(
+                PizzaBenchmarkConfig {
+                    backend: PizzaPhysicsBackend::Classic,
+                    gravity: PizzaGravityModel::Fast,
+                    workload: PizzaBenchmarkWorkload::Sparse,
+                    ball_count: 2,
+                },
+                PizzaBounds::default(),
+            ),
+            7,
+        );
+        for (ball, position) in benchmark.balls.iter_mut().zip(positions) {
+            ball.position = position;
+            ball.radius = 0.003;
+            ball.velocity = Vec2::ZERO;
+        }
+        apply_gravity_to_classic(&mut benchmark);
+
+        for ball in &normal.balls {
+            assert!(ball.velocity.length() < 1.0e-5, "{:?}", ball.velocity);
+        }
+        for ball in &benchmark.balls {
+            assert!(ball.velocity.length() > 100.0, "{:?}", ball.velocity);
+        }
     }
 
     #[test]
