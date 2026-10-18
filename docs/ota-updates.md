@@ -1743,7 +1743,7 @@ test results, live run/artifact identities and remaining integration boundaries.
 
 [`ota_publisher_policy.py`](../.github/ci/ota_publisher_policy.py) derives the
 expected workflow hashes from an independently selected, clean publisher
-checkout at a complete reviewed commit. It requires all thirteen source CI jobs,
+checkout at a complete reviewed commit. It requires all fourteen source CI jobs,
 including the dedicated OTA updater/publisher fixture suite, and explicit
 successful qualification steps. All build/source-CI action references are pinned
 to immutable commits; custom secrets, signing environments, job permission

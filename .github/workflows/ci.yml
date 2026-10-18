@@ -566,6 +566,26 @@ jobs:
             target/nextest/physics-diagnostics/junit.xml
           if-no-files-found: ignore
 
+  linux-validation:
+    # Preserve the repository's required check while its work runs in parallel.
+    name: Linux workspace
+    needs: [linux-workspace, linux-headless, linux-ui, linux-graphics, physics-diagnostics]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require all Linux checks
+        env:
+          LINUX_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          results = {name: job['result'] for name, job in json.loads(os.environ['LINUX_RESULTS']).items()}
+          print(json.dumps(results, sort_keys=True))
+          raise SystemExit(any(result != 'success' for result in results.values()))
+          PY
+
   clock-extended:
     name: Clock extended / ${{ matrix.suite }}
     if: inputs.full

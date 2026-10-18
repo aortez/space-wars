@@ -118,9 +118,11 @@ running every normal PR check plus:
 - the extended normal Spacewars match versus deterministic arena parity test.
 
 Normal checks include the dedicated OTA updater/publisher fixtures merged in
-#494. The OTA admission policy requires all thirteen ordinary CI jobs to pass;
+#494. The OTA admission policy requires all fourteen ordinary CI jobs to pass;
 only the two explicitly named full-only jobs may be skipped in that configuration.
 Full nightly enables them and still requires every result before publishing.
+The required `Linux workspace` check aggregates all five split Linux jobs; a
+failure, skip or cancellation in any of them prevents it from passing.
 
 Each extended job fails normally, uses `--no-tests fail`, retains diagnostics and
 has no automatic retries. Windows publication waits for the reusable workflow's

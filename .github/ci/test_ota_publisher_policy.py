@@ -19,7 +19,7 @@ class PublisherPolicyTests(unittest.TestCase):
             result = helper.workflow(raw, path, events, jobs)
             self.assertEqual(result.sha256, helper.digest(raw))
             self.assertEqual(result.jobs, jobs)
-        self.assertEqual(len(helper.CI_JOBS), 13)
+        self.assertEqual(len(helper.CI_JOBS), 14)
         self.assertEqual(result.skipped_jobs, tuple(dict(helper.CI_EXTENDED_JOBS)))
 
     def test_ci_opt_in_jobs_do_not_make_required_qualification_optional(self):

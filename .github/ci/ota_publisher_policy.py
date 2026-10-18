@@ -36,6 +36,7 @@ CI_JOBS = (
         'Check default GPU kiosk client (no display required)',
         'Test GPU defaults, startup safety, text and rotation (no display required)')),
     ('CCD physics diagnostics', ('Test CCD cache and diagnostic lifecycle regressions',)),
+    ('Linux workspace', ('Require all Linux checks',)),
     ('Spacewars experimental recovery', ('Test recovery profiles and native ground/boarding behavior',
         'Test experimental supported-corridor observations', 'Lint recovery code and diagnostics')),
     ('Spacewars AI deterministic baselines', ('Verify navigation-v1 baseline', 'Verify strategy-v1 baseline')),
@@ -73,7 +74,8 @@ def workflow(raw, path, events, jobs):
                 or job.get('continue-on-error', 'false') != 'false'
                 or name not in expected or name in actual):
             raise ValueError('Reviewed job authority or identity changed')
-        condition = 'inputs.full' if name in extended else None
+        condition = ('inputs.full' if name in extended else
+                     '${{ always() }}' if name == 'Linux workspace' else None)
         if is_ci and job.get('if') != condition:
             raise ValueError('Reviewed required/opt-in job condition changed')
         actual[name] = job

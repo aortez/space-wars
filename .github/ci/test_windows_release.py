@@ -163,6 +163,9 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(ci['on']['workflow_call']['outputs']['windows-artifact']['value'],
                          '${{ jobs.windows-release.outputs.artifact }}')
         for name, job in ci['jobs'].items():
+            if name == 'linux-validation':
+                self.assertFalse(any('uses' in step for step in job['steps']))
+                continue
             checkout = next(s for s in job['steps'] if s.get('uses', '').startswith('actions/checkout@'))
             expected = ('${{ inputs.source || github.event.pull_request.head.sha || github.sha }}'
                         if name == 'windows-release' else '${{ inputs.source || github.sha }}')
@@ -220,10 +223,12 @@ class WorkflowTests(unittest.TestCase):
         jobs = ci['jobs']
         self.assertEqual(set(jobs), {
             'ota-publisher', 'yocto-tools', 'nes-core', 'linux-workspace', 'linux-headless', 'linux-ui',
-            'linux-graphics', 'physics-diagnostics', 'clock-extended', 'spacewars-extended', 'spacewars-recovery',
+            'linux-graphics', 'physics-diagnostics', 'linux-validation', 'clock-extended', 'spacewars-extended', 'spacewars-recovery',
             'spacewars-ai-regression', 'windows-client', 'aarch64-core', 'windows-release',
         })
         for name, job in jobs.items():
+            if name == 'linux-validation':
+                continue
             if name not in ('clock-extended', 'spacewars-extended'):
                 self.assertNotIn('if', job, name)
             if name in ('linux-headless', 'linux-ui', 'clock-extended', 'spacewars-extended'):
@@ -259,6 +264,22 @@ class WorkflowTests(unittest.TestCase):
             'mixed_event_sweep', 'jumping_profile_stress', 'authored_pattern_stress', 'platform_seed_stress',
         })
         self.assertNotIn('schedule', self.load('ui-functional.yml')['on'])
+
+    def test_required_linux_check_rejects_failures_skips_and_cancellation(self):
+        job = self.load('ci.yml')['jobs']['linux-validation']
+        self.assertEqual(job['name'], 'Linux workspace')
+        self.assertEqual(set(job['needs']), {
+            'linux-workspace', 'linux-headless', 'linux-ui', 'linux-graphics', 'physics-diagnostics',
+        })
+        self.assertEqual(job['if'], '${{ always() }}')
+        step, = job['steps']
+        self.assertEqual(step['env'], {'LINUX_RESULTS': '${{ toJSON(needs) }}'})
+        for result in ('success', 'failure', 'skipped', 'cancelled'):
+            results = {name: {'result': 'success'} for name in job['needs']}
+            results['linux-ui']['result'] = result
+            process = subprocess.run(['bash', '-c', step['run']], capture_output=True,
+                                     env={**os.environ, 'LINUX_RESULTS': json.dumps(results)})
+            self.assertEqual(process.returncode, 0 if result == 'success' else 1, process.stderr)
 
     def test_ui_and_workspace_share_cache_paths_as_well_as_keys(self):
         jobs = self.load('ci.yml')['jobs']
