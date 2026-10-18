@@ -39,6 +39,8 @@ jobs:
           # Keep the same cache configuration as the normal Linux job.
           workspaces: |
             . -> target
+            vendor/i-slint-backend-linuxkms -> target
+            vendor/lyon_tessellation -> target
       - name: Install native client and virtual display dependencies
         run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - name: Build optimized Linux test executables

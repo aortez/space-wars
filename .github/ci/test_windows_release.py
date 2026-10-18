@@ -210,7 +210,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('github.run_attempt', upload['with']['name'])
         self.assertEqual(job['outputs']['artifact'], '${{ steps.evidence.outputs.artifact-id }}')
         diagnostics = [s for j in ci['jobs'].values() for s in j['steps']
-                       if s.get('with', {}).get('name') in ('linux-test-timings', 'ui-functional-test-artifacts')]
+                       if s.get('with', {}).get('name') == 'linux-test-timings'
+                       or 'ui-functional-test-artifacts' in s.get('with', {}).get('name', '')]
         self.assertEqual(len(diagnostics), 2)
         self.assertTrue(all(s['with']['retention-days'] == '14' for s in diagnostics))
 
@@ -244,6 +245,13 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('assert_fresh_build.py', str(jobs['linux-workspace']))
         self.assertIn('assert_ui_selection.py', str(jobs['linux-workspace']))
         self.assertIn("inputs.full && 'ui' || 'ui-pr'", str(jobs['linux-ui']))
+        ui = jobs['linux-ui']
+        self.assertEqual(ui['strategy']['fail-fast'], 'false')
+        self.assertEqual(ui['strategy']['matrix']['shard'],
+                         "${{ fromJSON(inputs.full && '[1,2,3,4]' || '[1]') }}")
+        run = next(s for s in ui['steps'] if s.get('name') == 'Run UI workflows without compiling')
+        self.assertEqual(run['env']['UI_PARTITION'], 'slice:${{ matrix.shard }}/${{ inputs.full && 4 || 1 }}')
+        self.assertIn('--partition "$UI_PARTITION"', run['run'])
         extended = jobs['clock-extended']
         self.assertEqual(extended['if'], 'inputs.full')
         self.assertEqual(extended['strategy']['fail-fast'], 'false')
@@ -251,6 +259,17 @@ class WorkflowTests(unittest.TestCase):
             'mixed_event_sweep', 'jumping_profile_stress', 'authored_pattern_stress', 'platform_seed_stress',
         })
         self.assertNotIn('schedule', self.load('ui-functional.yml')['on'])
+
+    def test_ui_and_workspace_share_cache_paths_as_well_as_keys(self):
+        jobs = self.load('ci.yml')['jobs']
+        workspace = next(s for s in jobs['linux-workspace']['steps'] if s.get('id') == 'rust-cache')
+        ui = next(s for s in self.load('ui-functional.yml')['jobs']['ui-functional']['steps']
+                  if s.get('id') == 'rust-cache')
+        self.assertEqual(ui['with']['shared-key'], 'linux-workspace')
+        self.assertEqual(ui['with']['workspaces'], workspace['with']['workspaces'])
+        self.assertEqual(workspace['with']['workspaces'].splitlines(), [
+            '. -> target', 'vendor/i-slint-backend-linuxkms -> target', 'vendor/lyon_tessellation -> target',
+        ])
 
     def test_cache_policy_limits_branch_duplication_and_allows_a_baseline(self):
         ci = self.load('ci.yml')

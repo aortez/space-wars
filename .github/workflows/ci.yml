@@ -125,6 +125,12 @@ jobs:
         with:
           cache-on-failure: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          # Cache versions include the path list, even with identical keys.
+          # Preserve the historical paths so main's warm cache remains usable.
+          workspaces: |
+            . -> target
+            vendor/i-slint-backend-linuxkms -> target
+            vendor/lyon_tessellation -> target
       - name: Install native client dependencies
         run: sudo apt-get update && sudo apt-get install --yes dbus-daemon libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - name: Test CI reports, build identity, and input diagnostic safety
@@ -331,8 +337,12 @@ jobs:
           if-no-files-found: ignore
 
   linux-ui:
-    name: ${{ inputs.full && 'Full UI workflows' || 'PR UI smoke' }}
+    name: ${{ inputs.full && format('Full UI workflows ({0}/4)', matrix.shard) || 'PR UI smoke' }}
     needs: linux-workspace
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.full && '[1,2,3,4]' || '[1]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -360,10 +370,11 @@ jobs:
       - name: Run UI workflows without compiling
         env:
           UI_PROFILE: ${{ inputs.full && 'ui' || 'ui-pr' }}
+          UI_PARTITION: slice:${{ matrix.shard }}/${{ inputs.full && 4 || 1 }}
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/ui.seconds" \
             xvfb-run -a -s "-screen 0 1280x1024x24" \
-            cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json --cargo-metadata target/nextest/cargo-metadata.json --profile "$UI_PROFILE" \
+            cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json --cargo-metadata target/nextest/cargo-metadata.json --profile "$UI_PROFILE" --partition "$UI_PARTITION" \
               -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
       - name: Summarize UI timings and PR budget
         if: always()
@@ -379,7 +390,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-test-timings
+          name: ${{ inputs.full && format('ui-test-timings-{0}', matrix.shard) || 'ui-test-timings' }}
           retention-days: 14
           path: |
             ${{ runner.temp }}/spacewars-ci-timings/
@@ -389,7 +400,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-functional-test-artifacts
+          name: ${{ inputs.full && format('ui-functional-test-artifacts-{0}', matrix.shard) || 'ui-functional-test-artifacts' }}
           retention-days: 14
           path: target/functional-test-artifacts
           if-no-files-found: ignore

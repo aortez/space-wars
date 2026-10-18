@@ -30,6 +30,8 @@ and requires every artifact to be `fresh` before archiving it.
 
 `Swatinem/rust-cache` restores compiled dependency artifacts and Cargo downloads.
 The GPU job also caches the independent LinuxKMS and Lyon vendor manifests.
+The workspace cache preserves its historical path list so GitHub can restore
+existing entries: the path list affects the cache version as well as the key.
 Only `main` saves these large caches, avoiding a new copy for every PR. An exact
 key miss can still restore a compatible cache; inspect the restore log before
 calling a run cold. The manual UI workflow shares the workspace dependency key.
@@ -62,8 +64,9 @@ non-ignored workspace tests, including display-free UI/HUD checks. The `ui-pr`
 profile runs a reviewed selection of ignored `ui_control_functional` cases under
 Xvfb. The `ui` profile runs every eligible UI case, including the smoke cases.
 Fail-fast and retries remain disabled. Headless cases can run in parallel;
-UI cases remain serial because they share a display. Xvfb does not accelerate
-application time.
+UI cases remain serial within each runner because they share a display. Full
+nightly uses four nextest slice partitions with separate runners/displays; PRs
+use one partition. Xvfb does not accelerate application time.
 
 The PR selection covers:
 
@@ -108,7 +111,8 @@ or disappear from the full suite.
 **08:23 UTC**. It calls `ci.yml` with one immutable source SHA and `full=true`,
 running every normal PR check plus:
 
-- all **65 UI workflows**, serially on their own display;
+- all **65 UI workflows**, partitioned across four isolated runners, with tests
+  serial within each runner/display;
 - Clock's **240-visit mixed-event sweep**;
 - all three extended duck sweeps: jumping profiles, authored patterns and platform seeds;
 - the extended normal Spacewars match versus deterministic arena parity test.
@@ -155,7 +159,8 @@ Open the Actions run's summary for:
 - the 20 slowest executed tests, with their binary, name, status, and duration.
 
 Download `linux-build-timings` for Cargo timelines and cache statistics,
-`linux-test-timings` / `ui-test-timings` for JUnit and execution timings, and the
+`linux-test-timings` / `ui-test-timings` (suffixed per full-UI shard) for JUnit
+and execution timings, and the
 renderer, physics and extended-job artifacts for their evidence. Diagnostics are
 retained for 14 days; binary archives for one day and Windows release evidence
 for two days, on success or failure where available.
@@ -244,6 +249,37 @@ Future work should follow these measurements: profile remaining computational
 hotspots, split large internal parameter loops into individually scheduled cases,
 and isolate UI displays or add explicit controlled-time support if faster full
 UI runs are needed. Separating the workflow does not change the application clock.
+
+## Parallel CI and compiler-cache measurements (2026-10-18)
+
+At commit `7fe058c`, on the development workstation with Rust 1.89.0, each build
+started after cleaning only workspace packages from the `ci` target directory;
+compiled third-party dependencies remained available. The identical command was
+`cargo test --locked --workspace --all-targets --profile ci --no-run --timings`.
+
+| Compilation measurement | Wall time |
+|---|---:|
+| Compiled dependencies restored; no sccache wrapper | 109.36 s |
+| Compiled dependencies restored; warm sccache | 87.45 s |
+
+This pair is about **20% faster** with sccache. It is a local illustration, not a
+hosted-run promise: other workstation workloads were active and remote cache
+latency is absent. The warm run reported 23 Rust cache hits, zero misses/errors,
+and 121 non-cacheable crate-type calls. Its local compiler cache occupied about
+47 MiB. Repeating the unchanged build found all 775 compiler artifacts fresh.
+
+The full archive contained 119 binaries (117 tests and two application binaries),
+was about 523 MiB and took 2.25 seconds to pack locally. The UI-only archive was
+59 MiB; Clock-only was 13 MiB. Extracted tests ran with `RUSTC_WRAPPER=/bin/false`,
+confirming they did not invoke compilation; UI smoke and extended normal-match/
+arena parity passed. Hosted transfer/setup times still belong in the final
+elapsed-time comparison.
+
+Enabling the previously unscheduled Clock sweeps exposed two existing failures,
+tracked in [#493](https://github.com/aortez/space-wars/issues/493): the platform
+seed sweep and mixed-event dry-control assertions. They are deliberately required
+nightly checks, not allowed failures. Until corrected, comprehensive nightly
+validation must fail and rolling Windows publication must remain blocked.
 
 ## Initial local measurements (2026-09-13)
 
