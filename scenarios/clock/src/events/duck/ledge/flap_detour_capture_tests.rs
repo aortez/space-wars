@@ -6,13 +6,14 @@ use engine_common::{
 };
 use std::time::Duration;
 
-fn scene(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> ClockState {
+fn scene(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, direct: bool) -> ClockState {
     for scenario_seed in 0..100 {
         let mut state = ClockScenario::init(
             ClockConfig {
                 aspect_ratio: aspect,
                 event_profile: ClockEventProfile::Off,
                 duck_jump_profile: Some(profile),
+                duck_direct_flap_landing: direct,
                 duck_course_pattern: Some(engine_common::ClockDuckCoursePattern::Platforms),
                 ..Default::default()
             },
@@ -44,15 +45,30 @@ fn scene(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> ClockSta
 
 #[test]
 fn flap_detour_scene_replays_pauses_and_captures_the_whole_visit() {
+    capture_visit(false);
+}
+
+#[test]
+fn direct_flap_scene_replays_pauses_and_captures_the_whole_visit() {
+    capture_visit(true);
+}
+
+fn capture_visit(direct: bool) {
+    let prefix = if direct {
+        "SPACEWARS_DUCK_DIRECT"
+    } else {
+        "SPACEWARS_DUCK_DETOUR"
+    };
+    let name = if direct { "direct-flap" } else { "flap-detour" };
     let mut captures = Vec::new();
     let mut clip = Vec::new();
-    let clip_path = std::env::var_os("SPACEWARS_DUCK_DETOUR_CLIP_FRAMES");
+    let clip_path = std::env::var_os(format!("{prefix}_CLIP_FRAMES"));
     for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
         for direction in [-1.0, 1.0] {
             for profile in [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing] {
                 let mut previous = None;
                 for replay in 0..2 {
-                    let mut state = scene(width as f32 / height as f32, direction, profile);
+                    let mut state = scene(width as f32 / height as f32, direction, profile, direct);
                     let mut frames = Vec::new();
                     let mut finished = false;
                     let mut last_tick = 0;
@@ -82,27 +98,59 @@ fn flap_detour_scene_replays_pauses_and_captures_the_whole_visit() {
                             }));
                         }
                         finished |= detour.outcome == Some(Outcome::Returned);
-                        let stage = match frames.len() {
-                            0 if tick == OPENING_TICKS => "spawn",
-                            1 if detour.phase == DetourPhase::Approaching => "approach",
-                            2 if duck.ledge.phase == Phase::Reaching => "catch",
-                            3 if duck.ledge.phase == Phase::Hanging => "hang",
-                            4 if duck.ledge.progress_milli == 600 => "pull-up",
-                            5 if detour.phase == DetourPhase::Perching
-                                && detour.perch_ticks >= 18 =>
-                            {
-                                "perch"
-                            }
-                            6 if detour.phase == DetourPhase::Returning && !duck.grounded => {
-                                "return"
-                            }
-                            7 if detour.outcome == Some(Outcome::Returned) => "resumed",
-                            8 if nav.exit_visible && duck.position_milli.is_some() => "departure",
-                            _ => {
-                                if let Some(outcome) = duck.outcome {
-                                    assert_eq!(outcome, ClockDuckOutcome::Exited);
+                        let stage = if direct {
+                            match frames.len() {
+                                0 if tick == OPENING_TICKS => "spawn",
+                                1 if detour.phase == DetourPhase::Approaching
+                                    && duck.jumps == 1
+                                    && !duck.grounded =>
+                                {
+                                    "launch"
                                 }
-                                continue;
+                                2 if detour.phase == DetourPhase::Approaching
+                                    && duck.visit.unwrap().phase_tick >= 30 =>
+                                {
+                                    "approach"
+                                }
+                                3 if detour.phase == DetourPhase::Perching
+                                    && detour.perch_ticks >= 18 =>
+                                {
+                                    "perch"
+                                }
+                                4 if detour.phase == DetourPhase::Returning && !duck.grounded => {
+                                    "return"
+                                }
+                                5 if detour.outcome == Some(Outcome::Returned) => "resumed",
+                                6 if nav.exit_visible && duck.position_milli.is_some() => {
+                                    "departure"
+                                }
+                                _ => continue,
+                            }
+                        } else {
+                            match frames.len() {
+                                0 if tick == OPENING_TICKS => "spawn",
+                                1 if detour.phase == DetourPhase::Approaching => "approach",
+                                2 if duck.ledge.phase == Phase::Reaching => "catch",
+                                3 if duck.ledge.phase == Phase::Hanging => "hang",
+                                4 if duck.ledge.progress_milli == 600 => "pull-up",
+                                5 if detour.phase == DetourPhase::Perching
+                                    && detour.perch_ticks >= 18 =>
+                                {
+                                    "perch"
+                                }
+                                6 if detour.phase == DetourPhase::Returning && !duck.grounded => {
+                                    "return"
+                                }
+                                7 if detour.outcome == Some(Outcome::Returned) => "resumed",
+                                8 if nav.exit_visible && duck.position_milli.is_some() => {
+                                    "departure"
+                                }
+                                _ => {
+                                    if let Some(outcome) = duck.outcome {
+                                        assert_eq!(outcome, ClockDuckOutcome::Exited);
+                                    }
+                                    continue;
+                                }
                             }
                         };
                         let frame = ClockScenario::render_frame(&state);
@@ -112,12 +160,12 @@ fn flap_detour_scene_replays_pauses_and_captures_the_whole_visit() {
                         assert_eq!(state.duck_scene().unwrap().diagnostics(), duck);
                         assert_eq!(ClockScenario::render_frame(&state), frame);
                         frames.push(serde_json::json!({
-                            "name":format!("flap-detour-{width}x{height}-{}-{profile:?}-{stage}", if direction > 0.0 {"left"} else {"right"}),
+                            "name":format!("{name}-{width}x{height}-{}-{profile:?}-{stage}", if direction > 0.0 {"left"} else {"right"}),
                             "width":width,"height":height,"stage":stage,"seed":nav.course_seed,
                             "duck":duck,"bodies":state.body_count(),"colliders":state.collider_count(),"frame":frame,
                         }));
                     }
-                    assert_eq!(frames.len(), 9);
+                    assert_eq!(frames.len(), if direct { 7 } else { 9 });
                     assert!(finished);
                     state.set_aspect_ratio(0.75);
                     assert_eq!((state.body_count(), state.collider_count()), (0, 0));
@@ -132,7 +180,7 @@ fn flap_detour_scene_replays_pauses_and_captures_the_whole_visit() {
             }
         }
     }
-    if let Some(path) = std::env::var_os("SPACEWARS_DUCK_DETOUR_FRAMES") {
+    if let Some(path) = std::env::var_os(format!("{prefix}_FRAMES")) {
         std::fs::write(path, serde_json::to_vec(&captures).unwrap()).unwrap();
     }
     if let Some(path) = clip_path {
@@ -148,7 +196,7 @@ fn detour_survives_shared_events_and_resize_retires_an_attached_visit() {
         ClockEventKind::Falling,
         ClockEventKind::Meltdown,
     ] {
-        let mut state = scene(800.0 / 480.0, 1.0, ClockDuckJumpProfile::Flowing);
+        let mut state = scene(800.0 / 480.0, 1.0, ClockDuckJumpProfile::Flowing, false);
         for _ in 0..200 {
             ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
             if state.duck_scene().unwrap().ledge_state().phase == Phase::Hanging {
@@ -182,7 +230,7 @@ fn detour_survives_shared_events_and_resize_retires_an_attached_visit() {
         assert!(state.duck_state().is_none());
         assert_eq!((state.body_count(), state.collider_count()), (0, 0));
     }
-    let mut state = scene(800.0 / 480.0, 1.0, ClockDuckJumpProfile::Careful);
+    let mut state = scene(800.0 / 480.0, 1.0, ClockDuckJumpProfile::Careful, false);
     for _ in 0..200 {
         ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
         if state.duck_scene().unwrap().ledge_attached() {

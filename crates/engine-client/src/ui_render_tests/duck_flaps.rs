@@ -62,6 +62,26 @@ fn flap_detour_clip_renders_through_both_adapters() {
     );
 }
 
+#[test]
+#[ignore = "exports SPACEWARS_DUCK_DIRECT_FRAMES to SPACEWARS_DUCK_DIRECT_ARTIFACTS"]
+fn direct_flap_fixtures_render_through_both_adapters() {
+    render_fixtures(
+        "SPACEWARS_DUCK_DIRECT_FRAMES",
+        "SPACEWARS_DUCK_DIRECT_ARTIFACTS",
+        Some(84),
+    );
+}
+
+#[test]
+#[ignore = "exports SPACEWARS_DUCK_DIRECT_CLIP_FRAMES to SPACEWARS_DUCK_DIRECT_CLIP_ARTIFACTS"]
+fn direct_flap_clip_renders_through_both_adapters() {
+    render_fixtures(
+        "SPACEWARS_DUCK_DIRECT_CLIP_FRAMES",
+        "SPACEWARS_DUCK_DIRECT_CLIP_ARTIFACTS",
+        None,
+    );
+}
+
 fn render_fixtures(source_env: &str, output_env: &str, count: Option<usize>) {
     let source = std::env::var_os(source_env).expect("scenario fixture file");
     let output = std::path::PathBuf::from(std::env::var_os(output_env).expect("capture directory"));

@@ -31,7 +31,12 @@ impl DoorPanel {
     /// Each midpoint box is expanded by a bound on every corner's motion in
     /// that interval. Follow the solver's linear center/angular interpolation,
     /// including the small difference from an ideal continuous hinge arc.
-    fn sweep_touches(self, next: Self, point: Vec2, radius: f32) -> bool {
+    pub(in crate::events::duck) fn sweep_touches(
+        self,
+        next: Self,
+        point: Vec2,
+        radius: f32,
+    ) -> bool {
         const INTERVALS: usize = 8;
         let center = self.center();
         let translation = next.center() - center;
@@ -89,7 +94,7 @@ fn collider(side: usize) -> ColliderId {
 }
 
 impl DuckEvent {
-    fn panel_at(&self, side: usize, open: f32) -> DoorPanel {
+    pub(in crate::events::duck) fn panel_at(&self, side: usize, open: f32) -> DoorPanel {
         let local_x = if side == 0 { 0.0 } else { self.width };
         let x = self.render_position(Vec2::new(local_x, 0.0)).x;
         let bottom = self.door_floor(local_x);

@@ -4,12 +4,12 @@ use engine_common::{
     ClockDuckJumpProfile,
 };
 
-const ASPECTS: [f32; 3] = [800.0 / 480.0, 1024.0 / 768.0, 480.0 / 800.0];
-const PROFILES: [ClockDuckJumpProfile; 2] =
+pub(super) const ASPECTS: [f32; 3] = [800.0 / 480.0, 1024.0 / 768.0, 480.0 / 800.0];
+pub(super) const PROFILES: [ClockDuckJumpProfile; 2] =
     [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing];
 const SEED: u64 = 3;
 
-fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> DuckEvent {
+pub(super) fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> DuckEvent {
     assert!(flap_detour::selected(SEED));
     let mut duck = DuckEvent::new_platforms(Layout::new(aspect), SEED);
     duck.direction = direction;
@@ -17,7 +17,7 @@ fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> DuckE
     duck
 }
 
-fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool) {
+pub(super) fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool) {
     for _ in 0..400 {
         if predicate(duck) {
             return;
@@ -27,7 +27,7 @@ fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool) {
     panic!("stage not reached: {:?}", duck.diagnostics());
 }
 
-fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) {
+pub(super) fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) {
     let entity = PhysicsId::new(9000);
     assert!(duck.world.as_mut().unwrap().insert_body(
         BodyId::new(entity, BodyRole::PRIMARY),
@@ -207,7 +207,7 @@ fn changed_flap_failed_catch_and_late_return_block_end_the_single_attempt() {
     }
 }
 
-fn flood(duck: &DuckEvent) -> WaterWorld {
+pub(super) fn flood(duck: &DuckEvent) -> WaterWorld {
     use engine_water::{Boundary, PoolSpec, WaterConfig};
     let mut water = WaterWorld::new(
         WaterConfig::default(),
