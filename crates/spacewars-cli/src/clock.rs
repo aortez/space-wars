@@ -372,6 +372,21 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 player.duck.outcome,
                 state.automatic_events_suspended,
             );
+            let ledge = &player.duck.ledge;
+            println!(
+                "Player ledge: {:?}, support={:?}, anchor={:?}, rearm={}, catches={}, climbs={}, releases={}, reason={:?}",
+                ledge.phase,
+                ledge.support_body,
+                world_vector(ledge.anchor_milli),
+                ledge.rearm_required,
+                ledge.catches,
+                ledge.climbs,
+                ledge.releases,
+                ledge.reason,
+            );
+            println!(
+                "Ledge controls: hold Jump to catch; release then press Jump to climb; Down drops. Release Jump before re-catching."
+            );
             println!(
                 "Player water: {:.1}% submerged, velocity={:?}, strokes={}, stroke cooldown={} ticks, dive remaining={} ticks, dive recharging={}",
                 player.submerged_milli as f32 / 10.0,

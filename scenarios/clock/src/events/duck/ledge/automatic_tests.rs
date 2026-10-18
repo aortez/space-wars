@@ -270,6 +270,16 @@ fn takeover_keeps_a_hang_or_committed_climb_and_stops_automatic_decisions() {
         } else {
             assert_eq!(duck.ledge_state().phase, Phase::Hanging);
             assert_eq!(duck.ledge_state().climbs, 0);
+            // Once the owner has supplied neutral input, a fresh player press
+            // uses the same retained attachment to complete the climb.
+            duck.set_player_input(0, false, false, false);
+            duck.step();
+            duck.set_player_input(0, true, false, false);
+            for _ in 0..150 {
+                duck.step();
+            }
+            assert_eq!(duck.ledge_state().climbs, 1);
+            assert!(duck.grounded());
         }
     }
 }

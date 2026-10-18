@@ -1298,6 +1298,14 @@ exiting, exact body/contact continuity, normal bounded braking, controller-neutr
 gating, event composition and cleanup. Raster captures compare the takeover frame
 pixel-for-pixel on Picade, HyperPixel and portrait layouts.
 
+**Ledges:** Hold Jump to catch a reachable course edge or door-flap tip. Release
+Jump to keep hanging, then press it again to pull up. Down drops and takes priority
+over Jump while attached; release Jump before trying another catch. There is no
+hang stamina timer or sideways shimmy. Real support loss or disruption still
+releases the duck. A held catch/climb input never becomes an automatic ground jump.
+Taking over a hanging duck retains its anchor; a committed safe climb can finish.
+Pause, disconnect and takeover retain the usual neutral-input gate.
+
 A fresh **grounded** press is required for a land jump: no held-button auto-hop, opening
 jump buffer, landing buffer or mid-air extra jump. Inputs carry the visit ID and
 controller seat, so old/other-player actions cannot drive a new visit. There is
@@ -1511,7 +1519,9 @@ bytes). Version 10 extends the player setpoint and rejects the old version-9
 payload instead of silently interpreting an incomplete command. Optional JSON
 diagnostics include `run_held`, `dive_held`, `swim_strokes`,
 `swim_cooldown_ticks`, `dive_ticks_left`, and `dive_recharging`;
-`spacewars-cli clock state` prints them alongside immersion and velocity.
+`spacewars-cli clock state` prints them alongside immersion and velocity. The
+existing `player_duck.duck.ledge` diagnostics expose phase, support, anchor, rearm
+state and catch/climb/release counts; text output includes the ledge controls.
 
 Deterministic movement fixtures use production physics for flat-ground speed
 and jump comparisons on Picade/HyperPixel/portrait layouts, a deep pool for

@@ -12,6 +12,7 @@ pub struct ClockDuckInput {
     pub move_milli: i16,
     pub jump: bool,
     pub run: bool,
+    /// Down intent: release a ledge, otherwise dive while swimming.
     pub dive: bool,
 }
 
