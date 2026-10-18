@@ -16,7 +16,8 @@ class AuthorityTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.parent = Path(self.temp.name)
         self.output = self.parent / 'authority'
-        self.verifier = authority.REPO / 'target/release/examples/feed_inventory'
+        self.verifier = Path(os.environ.get('SPACEWARS_OTA_INVENTORY',
+                             authority.REPO / 'target/release/examples/feed_inventory')).resolve()
         if not self.verifier.is_file():
             self.fail('Build the native feed_inventory example before these tests')
         self.digest = authority.delivery.digest(self.verifier.read_bytes())
