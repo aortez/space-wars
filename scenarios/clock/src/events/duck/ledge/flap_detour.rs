@@ -17,6 +17,8 @@ pub(super) const PERCH_TICKS: u32 = 36;
 #[derive(Default)]
 pub(in crate::events::duck) struct Detour {
     pub stats: ClockDuckFlapDetourState,
+    // Independent of visit phase changes when the exit opens.
+    pub(super) age: u64,
     edge: Option<Edge>,
     landing: Option<Return>,
     launched: bool,
@@ -80,6 +82,7 @@ impl DuckEvent {
         if self.player.is_some() || self.ledge.detour.stats.phase == DetourPhase::Finished {
             return None;
         }
+        self.ledge.detour.age += 1;
         if self.ledge.detour.stats.phase == DetourPhase::Pending && !selected(self.seed) {
             self.finish_flap_detour(Outcome::NotSelected);
             return None;
@@ -88,7 +91,13 @@ impl DuckEvent {
             self.finish_flap_detour(Outcome::Wet);
             return None;
         }
-        if self.exit_visible() || self.tick + u64::from(BUDGET_TICKS) >= DUCK_TICKS - RESET_TICKS {
+        let departing = self.exit_visible();
+        if self.tick + u64::from(BUDGET_TICKS) >= DUCK_TICKS - RESET_TICKS
+            || (departing
+                && (!self.ledge.detour.active()
+                    || (self.ledge.detour.stats.phase == DetourPhase::Approaching
+                        && !self.ledge.detour.launched)))
+        {
             self.finish_flap_detour(Outcome::Deadline);
             return None;
         }
@@ -121,7 +130,7 @@ impl DuckEvent {
             DetourPhase::Pending => {
                 // Let the ordinary spawn settle. Never start a calibration
                 // jump while the selected entrance opportunity is pending.
-                if self.phase_tick > 6 {
+                if self.ledge.detour.age > 6 {
                     self.finish_flap_detour(Outcome::Expired);
                     return None;
                 }
@@ -158,7 +167,7 @@ impl DuckEvent {
         match self.ledge.detour.stats.phase {
             DetourPhase::Approaching => {
                 let edge = self.ledge.detour.edge.unwrap();
-                if !edge.valid(self) || self.phase_tick > 20 {
+                if !edge.valid(self) || self.ledge.detour.age > 20 {
                     self.finish_flap_detour(Outcome::Expired);
                     return None;
                 }
@@ -179,7 +188,7 @@ impl DuckEvent {
                 }
                 let landing = self.ledge.detour.landing.unwrap();
                 self.ledge.detour.stats.perch_ticks += 1;
-                if self.ledge.detour.stats.perch_ticks < PERCH_TICKS {
+                if !departing && self.ledge.detour.stats.perch_ticks < PERCH_TICKS {
                     if let Some(plan) = self.ledge.detour.direct {
                         return Some(self.direct_position_command(plan.perch_x, false));
                     }

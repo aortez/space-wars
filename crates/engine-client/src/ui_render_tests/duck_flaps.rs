@@ -82,6 +82,26 @@ fn direct_flap_clip_renders_through_both_adapters() {
     );
 }
 
+#[test]
+#[ignore = "exports SPACEWARS_DUCK_EXIT_FRAMES to SPACEWARS_DUCK_EXIT_ARTIFACTS"]
+fn exit_priority_fixtures_render_through_both_adapters() {
+    render_fixtures(
+        "SPACEWARS_DUCK_EXIT_FRAMES",
+        "SPACEWARS_DUCK_EXIT_ARTIFACTS",
+        Some(72),
+    );
+}
+
+#[test]
+#[ignore = "exports SPACEWARS_DUCK_EXIT_CLIP_FRAMES to SPACEWARS_DUCK_EXIT_CLIP_ARTIFACTS"]
+fn exit_priority_clip_renders_through_both_adapters() {
+    render_fixtures(
+        "SPACEWARS_DUCK_EXIT_CLIP_FRAMES",
+        "SPACEWARS_DUCK_EXIT_CLIP_ARTIFACTS",
+        None,
+    );
+}
+
 fn render_fixtures(source_env: &str, output_env: &str, count: Option<usize>) {
     let source = std::env::var_os(source_env).expect("scenario fixture file");
     let output = std::path::PathBuf::from(std::env::var_os(output_env).expect("capture directory"));
