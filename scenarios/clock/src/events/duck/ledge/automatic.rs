@@ -37,9 +37,7 @@ impl DuckEvent {
             auto.attempt_ticks += 1;
             let stop = if self.water_report.submerged_fraction >= 0.15 {
                 Some(Outcome::Wet)
-            } else if self.tick >= DUCK_TICKS - RESET_TICKS - 1
-                || (self.exit_visible() && self.ledge_facing().is_some_and(|d| d < 0.0))
-            {
+            } else if self.tick >= DUCK_TICKS - RESET_TICKS - 1 {
                 Some(Outcome::Deadline)
             } else if self.ledge.automatic.stats.attempt_ticks >= ATTEMPT_TICKS {
                 Some(Outcome::TimedOut)
@@ -98,7 +96,11 @@ impl DuckEvent {
         let caps = self.controller.capabilities().unwrap();
         let gravity = 8.0 * caps.height / caps.flight.powi(2);
         let apex = motion.position.y + motion.linear_velocity.y.max(0.0).powi(2) / (2.0 * gravity);
-        let direction = if self.exit_visible() {
+        let direction = if self.controller.navigator.flight_tick.is_some() {
+            // A near miss belongs to the committed flight, even when the exit
+            // opens behind it. Finish reaching safe support before rerouting.
+            self.controller.direction
+        } else if self.exit_visible() {
             1.0
         } else {
             self.controller.facing()

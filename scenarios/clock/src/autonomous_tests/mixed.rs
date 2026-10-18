@@ -112,6 +112,21 @@ struct Row {
     course: Vec<[f32; 3]>,
 }
 
+impl Row {
+    fn departed_from_safe_bank(&self) -> bool {
+        let nav = self.terminal_duck.navigation.as_ref().unwrap();
+        self.metrics.outcome == Some(ClockDuckOutcome::Exited)
+            && self.terminal_duck.grounded
+            && self.metrics.behavior_at_outcome == Some(ClockDuckBehavior::Exiting)
+            && !self.metrics.wet_at_outcome
+            && !self.metrics.collision.active
+            && nav
+                .planning
+                .as_ref()
+                .is_some_and(|p| p.support == self.course.len().checked_sub(1))
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 struct Totals {
     visits: usize,
@@ -485,7 +500,9 @@ fn mixed_event_collision_recovery() {
             row.metrics
         );
         assert!(row.metrics.collision.recoveries > 0);
-        assert!(row.metrics.post_collision_landings > 0);
+        // Recovery on the exit bank now leads straight out instead of taking
+        // an unnecessary jump back across the course.
+        assert!(row.metrics.post_collision_landings > 0 || row.departed_from_safe_bank());
     }
 }
 
@@ -548,7 +565,10 @@ fn mixed_event_smoke() {
     for row in &rows {
         assert!(row.metrics.interruptions > 0, "{row:?}");
         assert!(row.metrics.recoveries > 0, "{row:?}");
-        assert!(row.metrics.post_recovery_landings > 0, "{row:?}");
+        assert!(
+            row.metrics.post_recovery_landings > 0 || row.departed_from_safe_bank(),
+            "{row:?}"
+        );
         // A deterministic behavioral guard, not an execution-time assertion.
         assert!(
             row.metrics.longest_dry_no_progress_ticks < 5 * 60,

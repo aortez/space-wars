@@ -172,7 +172,7 @@ fn direct_flap_late_or_disrupted_landing_ends_without_retry() {
         let mut duck = direct(ASPECTS[0], 1.0);
         until(&mut duck, |d| d.jumps == 1 && d.phase_tick >= 25);
         if late {
-            duck.phase_tick = 100;
+            duck.ledge.detour.age = 100;
         } else {
             duck.world.as_mut().unwrap().apply_velocity_delta(
                 DUCK_BODY,
@@ -189,7 +189,7 @@ fn direct_flap_late_or_disrupted_landing_ends_without_retry() {
 }
 
 #[test]
-fn direct_flap_handles_water_timeout_departure_and_lost_support() {
+fn direct_flap_handles_water_timeout_deadline_and_lost_support() {
     for case in 0..4 {
         let mut duck = direct(ASPECTS[0], 1.0);
         until(&mut duck, |d| {
@@ -199,7 +199,7 @@ fn direct_flap_handles_water_timeout_departure_and_lost_support() {
         match case {
             0 => water = Some(flood(&duck)),
             1 => duck.ledge.detour.stats.ticks = flap_detour::BUDGET_TICKS - 1,
-            2 => duck.tick = OPENING_TICKS + EXIT_DELAY_TICKS,
+            2 => duck.tick = DUCK_TICKS - RESET_TICKS - u64::from(flap_detour::BUDGET_TICKS),
             _ => {
                 duck.world
                     .as_mut()
