@@ -289,6 +289,36 @@ show the baseline:
 | Repeated marquee recipes UI case | 148.00s | 148.05s |
 
 The new policy adds four short workflows, selects 43 smoke cases and retains
-all 65 in the full suite. Hosted before/after measurements must establish the
-end-to-end improvement, including runner/cache variation; selection alone is
-not evidence that the overall target has been met.
+all 65 in the full suite.
+
+### Hosted smoke results (2026-10-18 UTC)
+
+Three successful runs of implementation commit `5cc7576` completed all eight
+normal CI jobs below 30 minutes. The exact base revision (`d59fa86`) provides a
+comparison with identical production code and the same 3,352 headless tests.
+Total CI time below spans the first job starting to the last job completing;
+phase times are the recorded command wall durations.
+
+| Run | All CI jobs | Initial build | Headless | PR UI |
+|---|---:|---:|---:|---:|
+| [Base main](https://github.com/aortez/space-wars/actions/runs/39083614462) | 44m45s | 400.35s | 399.24s | 1352.64s |
+| [PR #486](https://github.com/aortez/space-wars/actions/runs/39086549005) | 26m45s | 412.22s | 400.05s | 261.42s |
+| [Manual sample 2](https://github.com/aortez/space-wars/actions/runs/39086610425) | 26m24s | 409.03s | 397.93s | 258.05s |
+| [Manual sample 3](https://github.com/aortez/space-wars/actions/runs/39086613331) | 18m18s | 273.73s | 198.57s | 255.37s |
+
+Every sample passed 3,352 headless tests, 43 UI smoke workflows and eight focused
+physics diagnostics, plus the unchanged platform/rendering checks. UI execution
+fell from about 22½ minutes to 4¼ minutes. The faster third runner also reduced
+build and headless time; the whole-pipeline difference is not an isolated UI
+benchmark.
+
+The base and all three samples restored the same approximately 1.1 GB Rust
+dependency cache. These measurements establish the target for normal cached PR
+runs; empty-cache runtime was not measured. The safety timeout remains 60 minutes.
+Per-test JUnit, discovery lists, Cargo timings and phase durations are attached
+to each run as `linux-test-timings` (14-day retention).
+
+The complete 65-case UI regression is tracked separately in
+[the full-suite validation run](https://github.com/aortez/space-wars/actions/runs/39086548049).
+Local Xvfb execution also passed all 43 smoke workflows in 253.703 seconds, and
+the unchanged complete tank-fixture sequence passed after its helper extraction.
