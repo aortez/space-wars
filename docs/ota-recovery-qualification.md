@@ -1,5 +1,11 @@
 # Supervised recovery failure tests
 
+The [first primary-Picade run](data/ota-picade-missing-root-20261017.json) observed
+return to the same normal image in 258.576 seconds after one accepted request.
+Operator cleanup restored recovery admission; all durable settings, ROMs,
+pairing records and keys matched. One regenerated local Bluetooth database is
+reported separately. The consumed attempt refused a repeated activation.
+
 The first repeatable case selects a nonexistent root PARTUUID for one firmware
 tryboot, then observes return to the unchanged normal image. It is restricted to
 a completed generation-zero bootstrap with no update transaction, retained-good

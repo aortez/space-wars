@@ -29,9 +29,9 @@ feed/trust/service/policy rollout, and a separate rollout to `sw-picade-2.local`
 Automatic OTA installation is still disabled; a bootstrap package is not a signed
 OTA release.
 
-The next physical check uses the [supervised recovery failure runner](ota-recovery-qualification.md)
-against this completed baseline. Its first missing-root case preserves the
-production record and tests early boot fallback; signed-candidate quarantine
+The [supervised recovery failure runner](ota-recovery-qualification.md) has now
+observed missing-root fallback on the primary Picade against this completed
+baseline, with the production record unchanged. Signed-candidate quarantine
 and interrupted promotion remain separate qualification steps.
 
 The [2026-10-17 hardware record](data/ota-bootstrap-live-20261017.json) tracks

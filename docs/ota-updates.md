@@ -966,8 +966,21 @@ devices still ran the original flashed image; no production qualification flags
 or recovery baseline were created. Subsequent supervised bootstraps installed
 the corrected kernel on the replacement Pi 5 and primary Picade. The Picade's
 successful bootstrap also captured the early watchdog and completion receipts
-for the same trial. Pi 4 missing-root testing and the remaining ordinary OTA
-watchdog/promotion failure cases remain. The corrected kernel changes the shared
+for the same trial. A subsequent Pi 4 missing-root diagnostic returned to the
+unchanged normal image in 258.576 seconds after one accepted tryboot request.
+The runner observed a new normal boot without requesting another reboot;
+there was no serial trace of the missing-root trial, so the elapsed interval is
+consistent with watchdog fallback rather than an exact reset-time measurement.
+The deliberately invalid trial selector blocked ordinary recovery admission
+until operator cleanup restored it. The production baseline remained unchanged,
+the recovery service then became healthy, and the game resumed with advancing
+control/render counters. Settings, ROMs, pairing records, Wi-Fi and keys matched;
+BlueZ's generated local GATT database changed and is recorded separately. A
+repeat activation of the consumed diagnostic was refused. See the
+[runner and cleanup procedure](ota-recovery-qualification.md) and
+[physical observation record](data/ota-picade-missing-root-20261017.json).
+Signed-candidate quarantine and the remaining ordinary OTA watchdog/promotion
+failure cases remain. The corrected kernel changes the shared
 boot identity and therefore required boot-asset provisioning, not a rootfs-only
 OTA. See the [bootstrap results](ota-bootstrap.md#primary-picade-bootstrap).
 [Hardware probe and regression evidence](data/ota-watchdog-hardware-20261017.json).
