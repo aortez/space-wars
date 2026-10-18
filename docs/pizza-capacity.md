@@ -37,13 +37,15 @@ The live client's existing `status` response also includes `pizza.population`: b
 
 ## Local functional evidence
 
-At source `ff21581`, Rust 1.89 release, seed 7, 800×480, 120 updates, all four normal fixtures completed with coherent physical counts:
+At source `b7b2b43`, Rust 1.89 release, seed 7, 800×480, 120 updates, all four normal fixtures completed with coherent physical counts:
 
 | Initial / budget | Final live balls | Exploded | Fragments created | Updates with explosions |
 | --- | ---: | ---: | ---: | ---: |
 | 500 / 500 | 434 | 90 | 24 | 46 |
-| 1,000 / 1,000 | 805 | 242 | 47 | 82 |
-| 2,500 / 2,500 | 1,685 | 1,135 | 320 | 113 |
-| 5,000 / 5,000 | 3,263 | 3,196 | 1,459 | 119 |
+| 1,000 / 1,000 | 797 | 244 | 41 | 83 |
+| 2,500 / 2,500 | 1,728 | 1,229 | 457 | 113 |
+| 5,000 / 5,000 | 3,275 | 3,201 | 1,476 | 119 |
 
-These are actual bodies, not render-only particles. Desktop timing collected alongside compilation is not a controlled baseline and is not used as a Pi performance claim. The initial 5,000-body snapshots and subsequent cascade snapshots in `docs/screenshots/pizza-capacity` identify their precise population and tick in the accompanying manifest. The menu screenshot comes from the live local client at the target dimensions; the physical scene images are fixture exports through the production raster renderer. The refreshed captures include the viewport and continuous collision detection corrections. Temporary Pi 4 GPU runs and their limitations are recorded in the [device investigation](pizza-cascade-profile.md).
+[Bounded gravity](pizza-bounded-gravity.md) changed the three larger fixtures; point-mass builds from `ff21581` through `7839926` end them at 805, 1,685 and 3,263 live balls.
+
+These are actual bodies, not render-only particles. Desktop timing collected alongside compilation is not a controlled baseline and is not used as a Pi performance claim. The initial 5,000-body snapshots and subsequent cascade snapshots in `docs/screenshots/pizza-capacity` identify their precise population and tick in the accompanying manifest. The menu screenshot comes from the live local client at the target dimensions; the physical scene images are fixture exports through the production raster renderer. The refreshed captures include the viewport, continuous collision detection and bounded-gravity corrections; the tick-0 snapshot is unchanged. Temporary Pi 4 GPU runs and their limitations are recorded in the [device investigation](pizza-cascade-profile.md).

@@ -43,49 +43,50 @@
       "fixture_version": 1,
       "image": "pizza-capacity-800x480-060.png",
       "population": {
-        "ball_colliders": 3434,
-        "balls": 3434,
+        "ball_colliders": 3471,
+        "balls": 3471,
         "births": {
-          "exploded": 2360,
+          "exploded": 2345,
           "exploded_by_generation": [
-            2298,
-            57,
+            2289,
+            51,
             5,
             0
           ],
           "exploded_by_size": [
-            2208,
+            2193,
             120,
             32
           ],
           "fragment_capacity_stops": 1,
           "fragment_parents_skipped": 128,
-          "fragments_created": 794,
+          "fragments_created": 816,
           "pointer_created": 0,
           "pointer_replaced": 0,
           "spawned": 0
         },
         "limit": 5000,
-        "physics_balls": 3434
+        "physics_balls": 3471
       },
       "seed": 7,
       "tick": 60,
       "capture": "Production raster renderer export under CI profile, Rust 1.89. No device-performance claim.",
       "width": 800,
       "height": 480,
-      "sha256": "aaf0bd4a90e76e6c96a02a28f221be57eb93ea719d6cc2f1f7ecc9d5a53be190"
+      "sha256": "1772511d6aca7f8b256ebc247b11895b459801e758a7de54a4943c583b3d448a",
+      "source": "b7b2b43ed448a5dc8a877417e95ddbdf4d76a946"
     },
     {
       "fixture_version": 1,
       "image": "pizza-capacity-1024x768-060.png",
       "population": {
-        "ball_colliders": 3556,
-        "balls": 3556,
+        "ball_colliders": 3569,
+        "balls": 3569,
         "births": {
           "exploded": 1709,
           "exploded_by_generation": [
-            1698,
-            11,
+            1697,
+            12,
             0,
             0
           ],
@@ -96,20 +97,21 @@
           ],
           "fragment_capacity_stops": 1,
           "fragment_parents_skipped": 128,
-          "fragments_created": 265,
+          "fragments_created": 278,
           "pointer_created": 0,
           "pointer_replaced": 0,
           "spawned": 0
         },
         "limit": 5000,
-        "physics_balls": 3556
+        "physics_balls": 3569
       },
       "seed": 7,
       "tick": 60,
       "capture": "Production raster renderer export under CI profile, Rust 1.89. No device-performance claim.",
       "width": 1024,
       "height": 768,
-      "sha256": "8b1e1de17af3534b1e0d6993e24cee53296cfa79197250862fd1cd021e4a667c"
+      "sha256": "510926063033000cb4cfecd2f5fb2a80caeaaab8ae217a8a6576e92f21bf7da5",
+      "source": "b7b2b43ed448a5dc8a877417e95ddbdf4d76a946"
     },
     {
       "image": "800x480-settings-software.png",

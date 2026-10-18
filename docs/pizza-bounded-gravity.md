@@ -199,7 +199,10 @@ only about 3% on the Pi; desktop worst-update gains overstate the device gain.
 
 With the field On, the bounded runs keep the UI core busier (85% against 81%)
 and saturated for longer (14–15 s against 10.3–10.4 s). Their flip p95 and p99
-are worse, although their longest captured flip interval is shorter. With the
+are worse, although their longest captured flip interval is shorter. These
+intervals mostly reflect catch-up: during the event, the status reports up to
+3.1 updates per rendered frame with point mass and 3.5–3.6 with bounded gravity,
+all on the UI thread. With the
 field Off, the bounded cascade happens to be smaller (at most 357 live balls
 against 500), so that run is lighter; Off cascades are chaotic under both laws.
 
@@ -273,9 +276,10 @@ builds.
 
 This removes the CCD stall, not the Pi 4 frame-budget problem. With the field
 On, both laws keep the UI core above 80% busy, flip p95 is 83–100 ms, and
-contact-bound updates still take about 100 ms on the device. Narrow-phase and
-solver cost is the next target. The device comparison covers seed 7 only; a
-multi-seed device comparison needs a seed argument in the capture script. Pi 5
-remains offline. The existing capacity screenshots record the earlier physics
-(`ff21581`); the 800×480 mixed 5,000 fixture now has 3,471 bodies after 60
+contact-bound updates still take about 100 ms on the device. Frame scheduling
+and narrow-phase and solver cost are the next targets. The device comparison
+covers seed 7 only; a multi-seed device comparison needs a seed argument in the
+capture script. Pi 5 remains offline. The capacity fixture screenshots and
+[functional counts](pizza-capacity.md#local-functional-evidence) now record
+bounded gravity: the 800×480 mixed 5,000 fixture has 3,471 bodies after 60
 updates instead of 3,434. PR #505 stays draft.
