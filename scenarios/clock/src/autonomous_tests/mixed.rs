@@ -633,9 +633,41 @@ fn mixed_event_sweep() {
             Some(ClockDuckOutcome::Exited),
             "dry/clear-weather control: {row:?}"
         );
-        assert_eq!(
-            row.metrics.collision.ticks, 0,
-            "recovery must leave the dry personalities alone"
+        if matches!(row.case.sequence, Sequence::Dry) {
+            assert_eq!(
+                row.metrics.collision.ticks, 0,
+                "recovery must leave the dry personalities alone: {}",
+                row.case_id
+            );
+        } else {
+            // Rain changes arrival timing: an opening exit flap can briefly
+            // dislodge a dry duck. Require recovered, dry, physical footing at
+            // departure instead of forbidding the recovery that makes it safe.
+            assert!(row.departed_from_safe_bank(), "{row:?}");
+        }
+    }
+}
+
+#[test]
+fn opening_exit_flap_recovers_real_footing_after_rain_clears() {
+    for (layout, aspect) in LAYOUTS {
+        let row = run(Case {
+            layout,
+            aspect,
+            profile: ClockDuckJumpProfile::Flowing,
+            seed: 1,
+            amount: ClockRainAmount::Light,
+            sequence: Sequence::RainCleared,
+        });
+        assert!(
+            row.trace.iter().any(|sample| sample.touches_exit_flap()),
+            "{layout}: the ordinary route must encounter the moving exit panel"
         );
+        let recovery = row.metrics.collision;
+        assert_eq!(recovery.lost_support, 1, "{layout}: {recovery:?}");
+        assert_eq!(recovery.recoveries, 1, "{layout}: {recovery:?}");
+        assert!((1..=60).contains(&recovery.ticks), "{layout}: {recovery:?}");
+        assert_eq!(recovery.escape_jumps, 0, "no extra jump is needed");
+        assert!(row.departed_from_safe_bank(), "{layout}: {row:?}");
     }
 }
