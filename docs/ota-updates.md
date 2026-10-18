@@ -2781,7 +2781,8 @@ shape (owned-off witness, returned enable request and external-change suspension
 admit recovery only after reboot, and require explicit owner resume before clearing
 the fault. They also cover an ambiguous off command and unavailable observation,
 while retaining same-boot rejection, exclusive policy ownership and deployment
-records. The Pi 5 still runs its original image; the recovery fix is not yet deployed.
+records. At this stage the Pi 5 still ran its original image; deployment is recorded
+below.
 Both new controller regressions failed before the change. The fixed controller
 also admits SSH using a copy of the exact collected record, without changing its
 radio fault, policy or deployments or issuing a radio command. All 200 device
@@ -2820,6 +2821,55 @@ login. There were no live radio writes or device reboots. This qualifies the SSH
 executable paths with a radio fixture, not real NetworkManager notifications or
 the interrupted idle cycle. The fix must persist across reboot, or independent
 recovery must be available, before another disruptive live-radio test.
+
+### Installed SSH recovery and radio trace (2026-10-18)
+
+The image built from `d77ac20` passed hosted CI and all four isolated SSH
+executable controls using its actual extracted manager binary. The owner signed
+and published it as Nightly generation 4, metadata version 5, then installed it
+on Pi 5 through the signed-trial path. The trial committed healthy in 95.853
+seconds. A subsequent normal boot verified the installed image, service masks,
+SSH admission hook, kiosk and fresh SSH access. Selected durable stores survived;
+only the adapter-local BlueZ GATT database regenerated across boots. Automatic
+publication and installation remain disabled; this is a supervised branch image,
+not an admitted main-branch nightly. Exact identities and receipts are in the
+[radio recovery evidence](data/ota-radio-recovery-20261018.json).
+
+Normal boot did **not** pass automatic update qualification: its startup check
+ended with `network-unavailable`. A later explicit Release check completed
+`no-candidate`. The failed automatic attempt and its consumed daily allowance
+remain recorded. The exact failing admission condition is still unknown.
+
+A separate detached radio-only diagnostic then disabled partial-offline Wi-Fi
+after 121 seconds of idle. On restoration, NetworkManager 1.46.6 emitted
+`WirelessEnabled=false` again, followed 447 microseconds later by `true`. There
+was no observed manager replacement or networking/hardware-property signal.
+The old monitor treated the redundant `false` as an external radio change,
+leaving a returned enable request suspended even though Wi-Fi was on. An explicit
+owner resume cleared that fault. Reconnection subsequently changed the aggregate
+profile revision with the same profile count, causing a separate
+`profiles-changed` suspension and requiring a second owner resume. Individual
+profile changes were not traced, so their cause remains unresolved.
+
+The diagnostic restored a clean controller and connected Wi-Fi without its
+emergency fallback. Fresh SSH succeeded, the same kiosk kept rendering, and all
+selected persistent-store bytes, boot selectors and recovery journal stayed
+unchanged. These are successful recovery checks, **not** a passing automatic radio
+cycle. The first workstation summary parser rejected the retained pretty-printed
+JSON stream; correcting it allowed the already-collected evidence to be analyzed
+without repeating device actions.
+
+The follow-up monitor change tracks actual `WirelessEnabled` transitions from
+its initial baseline and retained signal stream. Identical notifications neither
+consume nor extend the single expected transition; subsequent reversals still
+latch a fault even when the next snapshot matches. Other radio properties,
+invalidations, daemon replacement and timeout checks remain enforced. The
+captured enable sequence fails before this change and passes afterward, with
+controls for both directions, duplicates after completion, reversals between
+snapshots, a missing target transition and other radio controls. This correction
+has not yet been installed on the Pi. Native requalification, profile-revision
+diagnosis and automatic-startup diagnosis remain prerequisites to completing the
+full time/OTA idle cycle and unattended rollout.
 
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
