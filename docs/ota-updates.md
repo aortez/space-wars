@@ -2703,6 +2703,48 @@ startup and verified resumed-download checks, and frame-time qualification
 remain before unattended rollout. Exact identities, observed outcomes and
 validation are in the [canary and observation evidence](data/ota-network-observation-20261018.json).
 
+### Network-idle sandbox qualification (2026-10-18)
+
+The idle investigation confirmed two independent blockers. Default standalone
+`dnsmasq` and `rpcbind` services expose four TCP listeners that the observer
+correctly treats as unclassified activity. Inside the production service's
+capability sandbox, inspecting `/proc/1/ns/net` also fails. An unrestricted
+owner probe alone therefore cannot qualify the daemon's idle observation.
+
+The image now masks `dnsmasq.service`, `rpcbind.service` and `rpcbind.socket`.
+NetworkManager, systemd-resolved and Bluetooth provisioning remain enabled;
+the packages remain available for private helpers. Unknown listeners still
+defer shutdown. The service uses systemd's
+[OpenFile handoff](https://www.freedesktop.org/software/systemd/man/257/systemd.service.html#OpenFile=)
+to obtain a read-only host-network-namespace descriptor before entering the
+sandbox. Startup validates its process, descriptor count/name and kernel
+namespace type, pins its identity and sets close-on-exec. Observation compares
+it with the current namespace. No capabilities are added.
+
+On both Pi 5 and Pi 4, restricted native probes accepted the host descriptor
+and rejected missing descriptors, a mount-namespace descriptor and a private
+network namespace. All 197 device-service tests pass under Rust 1.89 with
+serial libtest execution; the initial threaded run hit the documented inherited
+fixture-lock contention. The six session tests also pass natively on Pi 4.
+Clippy, formatting, AArch64 compilation and 95 Yocto Python cases (one skipped)
+pass. The complete image from clean source `22e49a2` built and passed independent
+candidate validation. Inspection of its actual ext4 contents confirmed the
+service handoff and three masks. This candidate is unsigned and unpublished.
+
+A temporary Pi 5 service override then retained the installed production
+sandbox while running the preview binary and runtime masks. The 30-second
+active-SSH control passed, including DNS/TLS access with the standalone servers
+stopped. A detached partial-offline/time/OTA cycle was launched with an
+independent restoration timer and durable logs. Collection failed at the SSH
+banner; two longer attempts were reset before authentication. The actual cycle
+result and restoration remain unverified until owner recovery permits reading
+`/data/spacewars-system/qualification/ota-idle-20261018-2`. No image installation
+was requested. This is not a passing idle-cycle qualification, nor proof that
+the earlier Picade delay has the same cause. The
+[idle qualification evidence](data/ota-network-idle-20261018.json) retains exact
+source, binary, image and probe identities. Recover access and collect that
+trace before any signed deployment or unattended rollout.
+
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
 `record: {schema: 1, version: <positive integer>}` and the SHA-256 of the compact
