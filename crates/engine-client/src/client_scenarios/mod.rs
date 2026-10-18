@@ -287,6 +287,10 @@ pub trait ClientScenario {
     }
     fn frame_layout(&self) -> FrameLayout;
 
+    fn pizza_status(&self) -> Option<crate::host::PizzaStatus> {
+        None
+    }
+
     fn clock_state(&self) -> Option<spacewars_control::ClockState> {
         None
     }

@@ -141,6 +141,10 @@ pub(crate) struct UiInventoryContext {
     pub(crate) spacewars_player_2: String,
     pub(crate) pizza_desired_balls: String,
     pub(crate) pizza_spawn_rate: String,
+    pub(crate) pizza_automatic_events: bool,
+    pub(crate) pizza_event_available: bool,
+    pub(crate) pizza_event_can_trigger: bool,
+    pub(crate) pizza_event_status: String,
     pub(crate) clock_time_format: String,
     pub(crate) clock_show_date: bool,
     pub(crate) clock_event_profile: String,
@@ -703,11 +707,21 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.pizza.spawn-rate",
                 &context.pizza_spawn_rate,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.pizza.automatic-events",
+                if context.pizza_automatic_events {
+                    "On"
+                } else {
+                    "Off"
+                },
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.pizza.desired-balls",
                 "launcher.settings.pizza.spawn-rate",
+                "launcher.settings.pizza.automatic-events",
                 "launcher.settings.back",
             ]
         }
@@ -946,6 +960,17 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
 
     ids.push("pause.sound");
     controls.push(UiControl::new("pause.sound", "App Settings", true));
+    if context.selected_scenario == "pizza" && context.pizza_event_available {
+        ids.push("pause.pizza.gravity");
+        controls.push(
+            UiControl::new(
+                "pause.pizza.gravity",
+                "Run gravity & resume",
+                context.pizza_event_can_trigger,
+            )
+            .with_value(&context.pizza_event_status),
+        );
+    }
 
     UiInventory {
         selected_control: selected_from_index(&ids, context.ingame_menu_focus_index),
@@ -1212,6 +1237,10 @@ mod tests {
             spacewars_player_2: "rule bot".into(),
             pizza_desired_balls: "75".into(),
             pizza_spawn_rate: "0.10".into(),
+            pizza_automatic_events: true,
+            pizza_event_available: false,
+            pizza_event_can_trigger: false,
+            pizza_event_status: String::new(),
             clock_time_format: "24-hour".into(),
             clock_show_date: false,
             clock_event_profile: "Calm".into(),
@@ -1491,7 +1520,7 @@ mod tests {
                 16,
                 "launcher.settings.spacewars.player-2",
             ),
-            ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
+            ("pizza", 12, "launcher.settings.pizza.spawn-rate"),
             ("clock", 37, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
