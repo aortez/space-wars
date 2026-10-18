@@ -87,8 +87,99 @@ fn each_source_uses_its_own_radius_even_when_it_requests_tree_aggregation() {
         let output = solver.solve(&[left, right], config(backend)).unwrap();
         assert!((output[0].velocity_delta.x - 0.1).abs() < 1.0e-7);
         assert!((output[1].velocity_delta.x + 0.05).abs() < 1.0e-7);
-        assert_eq!(solver.metrics().direct_source_count, 2);
-        assert_eq!(solver.metrics().hierarchical_source_count, 0);
+        assert_eq!(solver.metrics().direct_source_count, 0);
+        assert_eq!(solver.metrics().hierarchical_source_count, 2);
+    }
+}
+
+fn hierarchical_sphere(id: u64, position: Vec2, mass: f32, radius: f32) -> GravityParticipant {
+    GravityParticipant {
+        source_shape: GravitySourceShape::UniformSphere { radius },
+        ..GravityParticipant::dynamic(GravityId::new(id), position, mass)
+    }
+}
+
+#[test]
+fn tree_does_not_aggregate_a_node_whose_sphere_contains_the_target() {
+    // The root is small enough for this opening angle to aggregate it, but
+    // the target lies inside the heavy sphere, whose interior field is bounded.
+    let participants = [
+        hierarchical_sphere(1, Vec2::ZERO, 100.0, 10.0),
+        hierarchical_sphere(2, Vec2::new(100.0, 0.0), 0.001, 0.1),
+        hierarchical_sphere(3, Vec2::new(100.0, 1.0), 0.001, 0.1),
+        hierarchical_sphere(4, Vec2::new(101.0, 0.0), 0.001, 0.1),
+        GravityParticipant::target(GravityId::new(5), Vec2::new(5.0, 0.0), 1.0),
+    ];
+    let mut exact = GravitySolver::new();
+    let reference = exact
+        .solve(&participants, config(GravityBackend::Exact))
+        .unwrap()[4]
+        .velocity_delta;
+    let mut tree = GravitySolver::new();
+    let actual = tree
+        .solve(
+            &participants,
+            config(GravityBackend::BarnesHut { theta: 100.0 }),
+        )
+        .unwrap()[4]
+        .velocity_delta;
+
+    assert_eq!(tree.metrics().hierarchical_source_count, 4);
+    assert!(tree.metrics().node_count > 1);
+    assert!((reference.x + 0.5).abs() < 1.0e-5, "{reference:?}");
+    assert!(
+        (actual - reference).length() < 1.0e-9,
+        "{actual:?} {reference:?}"
+    );
+}
+
+#[test]
+fn overlapping_spheres_have_bounded_kicks_and_match_exact_in_the_tree() {
+    // Pizza-like overlapping bodies, including two nearly coincident centers
+    // whose point-mass interaction would be close to singular.
+    let mut random = 0x5EED_u64;
+    let mut next = || {
+        random = random
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        (random >> 40) as f32 / (1_u32 << 24) as f32
+    };
+    let mut participants = (1..=400)
+        .map(|id| {
+            let radius = 0.002 + next() * 0.018;
+            let position = Vec2::new(0.3 + next() * 0.2, 0.2 + next() * 0.1);
+            hierarchical_sphere(id, position, radius * radius, radius)
+        })
+        .collect::<Vec<_>>();
+    let anchor = participants[0].position;
+    participants[1].position = anchor + Vec2::new(2.6e-6, 0.0);
+    let settings = |backend| GravityConfig {
+        backend,
+        softening: 1.0e-6,
+        interaction_scale: 0.0005,
+    };
+    let mut exact = GravitySolver::new();
+    let reference = exact
+        .solve(&participants, settings(GravityBackend::Exact))
+        .unwrap()
+        .to_vec();
+    for theta in [0.5, 0.7] {
+        let mut tree = GravitySolver::new();
+        let candidate = tree
+            .solve(&participants, settings(GravityBackend::BarnesHut { theta }))
+            .unwrap();
+        let largest = candidate
+            .iter()
+            .map(|output| output.velocity_delta.length())
+            .fold(0.0, f32::max);
+        // A point-mass pair this close would receive large opposite kicks.
+        let pair_separation = (candidate[0].velocity_delta - candidate[1].velocity_delta).length();
+        let error = compare_outputs(&reference, candidate).unwrap();
+
+        assert!(largest < 0.05, "theta {theta}: largest kick {largest}");
+        assert!(pair_separation < 1.0e-4, "theta {theta}: {pair_separation}");
+        assert!(error.normalized_rms < 0.04, "theta {theta}: {error:?}");
+        assert!(tree.metrics().approximations > 0);
     }
 }
 
