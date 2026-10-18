@@ -77,6 +77,44 @@ impl Session {
 }
 
 #[test]
+fn pizza_capacity_host_pause_resize_restart_and_teardown() {
+    use crate::client_scenarios::PizzaClientScenario;
+    use scenario_pizza::{PizzaBounds, capacity_lab};
+    let mut s = Session::new();
+    s.settings.pizza.live_ball_limit = 5_000;
+    let pizza = s
+        .scenario
+        .inner
+        .as_any_mut()
+        .downcast_mut::<PizzaClientScenario>()
+        .unwrap();
+    pizza.state =
+        capacity_lab::mixed_size_fixture(5_000, 5_000, PizzaBounds::default(), 7).unwrap();
+    s.pause();
+    let before = s.status();
+    assert_eq!(before.population.balls, 5_000);
+    s.scenario.inner.set_viewport(Viewport::new(480.0, 800.0));
+    s.step(Duration::from_secs(2));
+    assert_eq!(s.status().observation, before.observation);
+    assert_eq!(s.status().population, before.population);
+    s.controls.request_resume();
+    s.tick();
+    s.tick();
+    let population = s.status().population;
+    assert_eq!(population.balls, population.physics_balls);
+    assert!(population.balls <= 5_000);
+    s.controls.request_restart();
+    assert!(s.step(Duration::ZERO).scenario_replaced);
+    assert_eq!(s.status().population.limit, 5_000);
+    assert_eq!(s.status().population.balls, 0);
+    assert_eq!(s.status().population.births, Default::default());
+    // The launcher drops HostedScenario and clears its published controls.
+    drop(s.scenario);
+    s.controls.clear();
+    assert!(s.controls.pizza_status().is_none());
+}
+
+#[test]
 fn pizza_menu_trigger_consumes_input_and_preserves_pause_resize_and_completion() {
     let mut s = Session::new();
     s.pause();

@@ -1575,6 +1575,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             spacewars_player_1: window.get_launcher_p1_controller().to_string(),
             spacewars_player_2: window.get_launcher_p2_controller().to_string(),
             pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
+            pizza_live_ball_limit: window.get_launcher_pizza_live_ball_limit_text().to_string(),
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
             pizza_automatic_events: window.get_launcher_pizza_automatic_events(),
             pizza_event_available: window.get_pizza_event_available(),

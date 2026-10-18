@@ -4,6 +4,10 @@
 //! solver supplies either exact O(n²) gravity or deterministic Barnes-Hut
 //! gravity, making this scenario both an interactive toy and a scale lab.
 
+mod capacity;
+pub mod capacity_lab;
+#[cfg(test)]
+mod capacity_tests;
 #[cfg(test)]
 mod event_tests;
 mod events;
@@ -33,7 +37,9 @@ use engine_rapier::world::{
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
-pub const MAX_BALLS: usize = 500;
+pub const MAX_BALLS: usize = engine_common::MAX_PIZZA_LIVE_BALLS as usize;
+pub const DEFAULT_LIVE_BALL_LIMIT: usize = engine_common::DEFAULT_PIZZA_LIVE_BALL_LIMIT as usize;
+pub use capacity::{PizzaBirthCounts, PizzaPopulation};
 pub const MAX_BENCHMARK_BALLS: usize = 10_000;
 pub const DEFAULT_BENCHMARK_BALLS: usize = 300;
 pub const MIN_SPAWN_RATE: f32 = 0.01;
@@ -223,6 +229,7 @@ impl Default for PizzaBounds {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PizzaConfig {
+    pub live_ball_limit: usize,
     pub desired_ball_count: usize,
     pub ball_spawn_rate: f32,
     pub bounds: PizzaBounds,
@@ -235,12 +242,14 @@ pub struct PizzaConfig {
 impl PizzaConfig {
     pub fn normalized(&self) -> Self {
         let benchmark = self.benchmark.map(PizzaBenchmarkConfig::normalized);
+        let live_ball_limit = self.live_ball_limit.clamp(1, MAX_BALLS);
         let maximum_balls = if benchmark.is_some() {
             MAX_BENCHMARK_BALLS
         } else {
-            MAX_BALLS
+            live_ball_limit
         };
         Self {
+            live_ball_limit,
             desired_ball_count: benchmark
                 .map(|benchmark| benchmark.ball_count)
                 .unwrap_or(self.desired_ball_count)
@@ -262,6 +271,7 @@ impl PizzaConfig {
     pub fn benchmark(benchmark: PizzaBenchmarkConfig, bounds: PizzaBounds) -> Self {
         let benchmark = benchmark.normalized();
         Self {
+            live_ball_limit: DEFAULT_LIVE_BALL_LIMIT,
             desired_ball_count: benchmark.ball_count,
             ball_spawn_rate: MAX_SPAWN_RATE,
             bounds,
@@ -275,6 +285,7 @@ impl PizzaConfig {
 impl Default for PizzaConfig {
     fn default() -> Self {
         Self {
+            live_ball_limit: DEFAULT_LIVE_BALL_LIMIT,
             desired_ball_count: 24,
             ball_spawn_rate: 0.10,
             bounds: PizzaBounds::default(),
@@ -324,6 +335,7 @@ pub struct PizzaState {
     pub pointer_position: Vec2,
     pub cursor_velocity: Vec2,
     pub last_step_metrics: PizzaStepMetrics,
+    birth_counts: PizzaBirthCounts,
     seed: u64,
     next_ball_id: u64,
     rng: StdRng,
@@ -557,13 +569,14 @@ impl PizzaState {
 
     fn advance_spawner(&mut self) {
         if self.balls.len() >= self.config.desired_ball_count
-            || self.balls.len() >= MAX_BALLS
+            || self.balls.len() >= self.config.live_ball_limit
             || self.rng.random::<f32>() >= self.config.ball_spawn_rate
         {
             return;
         }
         let ball = self.random_ball();
         self.push_ball(ball);
+        self.birth_counts.spawned += 1;
     }
 
     fn apply_pointer_action(&mut self, action: PointerAction) {
@@ -589,8 +602,9 @@ impl PizzaState {
         let id = if let Some(id) = selected {
             id
         } else {
-            if self.balls.len() >= MAX_BALLS {
+            if self.balls.len() >= self.config.live_ball_limit {
                 self.remove_replaceable_ball();
+                self.birth_counts.pointer_replaced += 1;
             }
             let max_radius = MAX_RANDOM_BALL_RADIUS
                 .min(self.config.bounds.width * 0.5)
@@ -601,6 +615,7 @@ impl PizzaState {
             let ball = self.allocate_ball(self.pointer_position, radius, color);
             let id = ball.id;
             self.push_ball(ball);
+            self.birth_counts.pointer_created += 1;
             id
         };
 
@@ -919,6 +934,7 @@ impl Scenario for PizzaScenario {
             pointer_position: Vec2::ZERO,
             cursor_velocity: Vec2::ZERO,
             last_step_metrics: PizzaStepMetrics::default(),
+            birth_counts: PizzaBirthCounts::default(),
             seed,
             next_ball_id: 1,
             rng: StdRng::seed_from_u64(seed),
@@ -1219,8 +1235,11 @@ fn explode_dead_balls(state: &mut PizzaState) {
     }
     dead.reverse();
 
-    for parent in dead {
-        if state.balls.len() >= MAX_BALLS {
+    state.birth_counts.exploded += dead.len() as u64;
+    let parent_count = dead.len();
+    for (parent_index, parent) in dead.into_iter().enumerate() {
+        if state.balls.len() >= state.config.live_ball_limit {
+            state.birth_counts.fragment_parents_skipped += (parent_count - parent_index) as u64;
             break;
         }
         let division_size = parent.radius / EXPLOSION_DIVISIONS as f32;
@@ -1246,7 +1265,11 @@ fn explode_dead_balls(state: &mut PizzaState) {
                 fragment.velocity = velocity;
                 contain_ball(&mut fragment, state.config.bounds);
                 state.push_ball(fragment);
-                if state.balls.len() >= MAX_BALLS {
+                state.birth_counts.fragments_created += 1;
+                if state.balls.len() >= state.config.live_ball_limit {
+                    state.birth_counts.fragment_capacity_stops += 1;
+                    state.birth_counts.fragment_parents_skipped +=
+                        (parent_count - parent_index - 1) as u64;
                     return;
                 }
             }

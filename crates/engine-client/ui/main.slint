@@ -696,6 +696,7 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-p1-zoom-text: "320";
     in-out property <string> launcher-p2-zoom-text: "320";
     in-out property <string> launcher-pizza-desired-balls-text: "24";
+    in-out property <string> launcher-pizza-live-ball-limit-text: "500";
     in-out property <string> launcher-pizza-spawn-rate-text: "0.10";
     in-out property <bool> launcher-pizza-automatic-events: true;
     in property <bool> pizza-event-available: false;
@@ -2547,6 +2548,17 @@ export component MainWindow inherits Window {
                     }
 
                     if root.launcher-scenario == "pizza": ChoiceRow {
+                        y: 260px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Live ball limit";
+                        value: root.launcher-pizza-live-ball-limit-text;
+                        selected: root.launcher-settings-focus-index == 5;
+                        previous => { root.launcher-settings-focus-index = 5; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 5; root.ui-action(3); }
+                    }
+
+                    if root.launcher-scenario == "pizza": ChoiceRow {
                         x: 0px;
                         y: 208px;
                         width: parent.width;
@@ -2595,11 +2607,11 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 270px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 322px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 18 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 5 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 18 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -2607,7 +2619,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 270px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 322px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: root.launcher-material-match ? "Play World" : "Start Game";

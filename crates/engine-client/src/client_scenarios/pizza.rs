@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling, even during gravity events. Pause and choose Run gravity & resume to start one manually. Automatic events can be turned off in Pizza settings.",
+    controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling, even during gravity events. Pause and choose Run gravity & resume to start one manually. Pizza settings include automatic events and a live ball limit (including fragments). Higher limits increase CPU use; 5,000 is experimental.",
     create,
 };
 
@@ -42,6 +42,7 @@ fn create(
     let bounds = PizzaBounds::from_aspect_ratio(viewport.aspect_ratio());
     let config = match mode {
         ScenarioStartMode::Normal => PizzaConfig {
+            live_ball_limit: setup.live_ball_limit as usize,
             desired_ball_count: setup.desired_balls as usize,
             ball_spawn_rate: setup.ball_spawn_rate,
             bounds,
@@ -73,6 +74,7 @@ impl ClientScenario for PizzaClientScenario {
                 event: self.state.event_state(),
             },
             ball_count: self.state.balls.len(),
+            population: self.state.population(),
             held_ball_id: self.state.held_ball_id,
         })
     }

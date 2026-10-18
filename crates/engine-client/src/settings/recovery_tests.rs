@@ -40,6 +40,7 @@ fn missing_fields_and_sections_use_declared_defaults_without_resetting_siblings(
     choices.audio.master_volume = 0.05;
     choices.video.height = 900;
     choices.pizza.automatic_events = false;
+    choices.pizza.live_ball_limit = 2_500;
     choices.clock.show_date = true;
     choices.spacewars.player_health_percent = 200;
     choices.controls.player_1_device = Some("gilrs-v1:linux:usb".into());

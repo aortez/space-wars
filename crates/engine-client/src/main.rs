@@ -814,6 +814,7 @@ fn show_launcher(
     )));
     let pizza = settings.pizza.normalized();
     window.set_launcher_pizza_automatic_events(pizza.automatic_events);
+    window.set_launcher_pizza_live_ball_limit_text(pizza.live_ball_limit.to_string().into());
     window
         .set_launcher_pizza_desired_balls_text(SharedString::from(pizza.desired_balls.to_string()));
     window.set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(
@@ -1530,7 +1531,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 11,
         "spacewars-classic" => 8,
-        "pizza" => 6,
+        "pizza" => 7,
         "spacewars-terrain-combat" | "spacewars-terrain-duel" => 9,
         "spacewars-terrain-travel"
         | "spacewars-terrain-travel-duel"
@@ -1794,8 +1795,38 @@ fn adjust_spacewars_launcher_setting(window: &MainWindow, focus: i32, delta: i32
     }
 }
 
+fn pizza_limit_from_window(window: &MainWindow) -> u32 {
+    window
+        .get_launcher_pizza_live_ball_limit_text()
+        .parse::<u32>()
+        .unwrap_or(engine_common::DEFAULT_PIZZA_LIVE_BALL_LIMIT)
+        .clamp(1, engine_common::MAX_PIZZA_LIVE_BALLS)
+}
+
 fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
     match focus {
+        5 => {
+            let current = pizza_limit_from_window(window);
+            let choices = [100, 250, 500, 1_000, 2_500, 5_000];
+            let next = if delta > 0 {
+                choices
+                    .into_iter()
+                    .find(|value| *value > current)
+                    .unwrap_or(current)
+            } else {
+                choices
+                    .into_iter()
+                    .rev()
+                    .find(|value| *value < current)
+                    .unwrap_or(current)
+            };
+            window.set_launcher_pizza_live_ball_limit_text(next.to_string().into());
+            let desired = window
+                .get_launcher_pizza_desired_balls_text()
+                .parse::<u32>()
+                .unwrap_or(24);
+            window.set_launcher_pizza_desired_balls_text(desired.min(next).to_string().into());
+        }
         4 => window
             .set_launcher_pizza_automatic_events(!window.get_launcher_pizza_automatic_events()),
         2 => {
@@ -1803,7 +1834,8 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
                 .get_launcher_pizza_desired_balls_text()
                 .parse::<i32>()
                 .unwrap_or(24);
-            let next = (current + delta.signum() * 25).clamp(1, MAX_PIZZA_DESIRED_BALLS as i32);
+            let next =
+                (current + delta.signum() * 25).clamp(0, pizza_limit_from_window(window) as i32);
             window.set_launcher_pizza_desired_balls_text(SharedString::from(next.to_string()));
         }
         3 => {
@@ -2455,6 +2487,7 @@ fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String>
         window.get_launcher_pizza_desired_balls_text().as_str(),
         window.get_launcher_pizza_spawn_rate_text().as_str(),
         window.get_launcher_pizza_automatic_events(),
+        window.get_launcher_pizza_live_ball_limit_text().as_str(),
     )
 }
 
@@ -2641,8 +2674,15 @@ fn pizza_setup_from_values(
     desired_balls: &str,
     ball_spawn_rate: &str,
     automatic_events: bool,
+    live_ball_limit: &str,
 ) -> Result<PizzaSettings, String> {
     Ok(PizzaSettings {
+        live_ball_limit: parse_u32_setting(
+            live_ball_limit,
+            "Live ball limit",
+            1,
+            engine_common::MAX_PIZZA_LIVE_BALLS,
+        )?,
         automatic_events,
         desired_balls: parse_u32_setting(
             desired_balls,
@@ -2656,7 +2696,8 @@ fn pizza_setup_from_values(
             MIN_PIZZA_BALL_SPAWN_RATE,
             MAX_PIZZA_BALL_SPAWN_RATE,
         )?,
-    })
+    }
+    .normalized())
 }
 
 fn parse_u32_setting(value: &str, label: &str, min: u32, max: u32) -> Result<u32, String> {
@@ -4280,6 +4321,7 @@ mod tests {
                 player_2_controller: SpacewarsController::RuleBot,
             },
             pizza: PizzaSettings {
+                live_ball_limit: 500,
                 automatic_events: true,
                 desired_balls: 321,
                 ball_spawn_rate: 0.42,
@@ -4429,6 +4471,7 @@ mod tests {
     #[test]
     fn pizza_settings_normalization_clamps_saved_values() {
         let mut settings = Settings::default();
+        settings.pizza.live_ball_limit = MAX_PIZZA_DESIRED_BALLS + 1;
         settings.pizza.desired_balls = MAX_PIZZA_DESIRED_BALLS + 1;
         settings.pizza.ball_spawn_rate = f32::NAN;
 
@@ -4444,23 +4487,35 @@ mod tests {
     #[test]
     fn pizza_setup_values_parse_and_validate_caps() {
         assert_eq!(
-            pizza_setup_from_values("321", "0.42", true).unwrap(),
+            pizza_setup_from_values("321", "0.42", true, "500").unwrap(),
             PizzaSettings {
+                live_ball_limit: 500,
                 automatic_events: true,
                 desired_balls: 321,
                 ball_spawn_rate: 0.42,
             }
         );
         assert_eq!(
-            pizza_setup_from_values("501", "1.0", true).unwrap(),
+            pizza_setup_from_values("5001", "1.0", true, "5001").unwrap(),
             PizzaSettings {
+                live_ball_limit: 5_000,
                 automatic_events: true,
                 desired_balls: MAX_PIZZA_DESIRED_BALLS,
                 ball_spawn_rate: MAX_PIZZA_BALL_SPAWN_RATE,
             }
         );
-        assert!(pizza_setup_from_values("many", "0.42", true).is_err());
-        assert!(pizza_setup_from_values("24", "often", true).is_err());
+        let limited = pizza_setup_from_values("5000", "0.1", false, "250").unwrap();
+        assert_eq!(limited.desired_balls, 250);
+        assert_eq!(limited.live_ball_limit, 250);
+        assert_eq!(
+            pizza_setup_from_values("0", "0.1", false, "0")
+                .unwrap()
+                .live_ball_limit,
+            1
+        );
+        assert!(pizza_setup_from_values("24", "0.1", true, "many").is_err());
+        assert!(pizza_setup_from_values("many", "0.42", true, "500").is_err());
+        assert!(pizza_setup_from_values("24", "often", true, "500").is_err());
     }
 
     #[test]

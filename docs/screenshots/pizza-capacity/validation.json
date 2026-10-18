@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "source": "codex/pizza-capacity-5000, based on 5e0b2a0; see containing commit",
+  "deployment": false,
+  "images": [
+    {
+      "fixture_version": 1,
+      "image": "pizza-capacity-800x480-000.png",
+      "population": {
+        "ball_colliders": 5000,
+        "balls": 5000,
+        "births": {
+          "exploded": 0,
+          "fragment_capacity_stops": 0,
+          "fragment_parents_skipped": 0,
+          "fragments_created": 0,
+          "pointer_created": 0,
+          "pointer_replaced": 0,
+          "spawned": 0
+        },
+        "limit": 5000,
+        "physics_balls": 5000
+      },
+      "seed": 7,
+      "tick": 0,
+      "capture": "Production raster renderer export of explicit normal-gameplay fixture; no live-client or device performance claim.",
+      "width": 800,
+      "height": 480,
+      "sha256": "6443f47e6a59b2f4d7f3c237cbf3a1ab721c6c13a370ebead48efb7eada4e10a"
+    },
+    {
+      "fixture_version": 1,
+      "image": "pizza-capacity-800x480-060.png",
+      "population": {
+        "ball_colliders": 4776,
+        "balls": 4776,
+        "births": {
+          "exploded": 6799,
+          "fragment_capacity_stops": 21,
+          "fragment_parents_skipped": 1763,
+          "fragments_created": 6575,
+          "pointer_created": 0,
+          "pointer_replaced": 0,
+          "spawned": 0
+        },
+        "limit": 5000,
+        "physics_balls": 4776
+      },
+      "seed": 7,
+      "tick": 60,
+      "capture": "Production raster renderer export of explicit normal-gameplay fixture; no live-client or device performance claim.",
+      "width": 800,
+      "height": 480,
+      "sha256": "32c0378af88da1604715f497567fb4bd4d857deaf0896a742bf8a5402dec4f47"
+    },
+    {
+      "fixture_version": 1,
+      "image": "pizza-capacity-1024x768-060.png",
+      "population": {
+        "ball_colliders": 4452,
+        "balls": 4452,
+        "births": {
+          "exploded": 6508,
+          "fragment_capacity_stops": 11,
+          "fragment_parents_skipped": 1195,
+          "fragments_created": 5960,
+          "pointer_created": 0,
+          "pointer_replaced": 0,
+          "spawned": 0
+        },
+        "limit": 5000,
+        "physics_balls": 4452
+      },
+      "seed": 7,
+      "tick": 60,
+      "capture": "Production raster renderer export of explicit normal-gameplay fixture; no live-client or device performance claim.",
+      "width": 1024,
+      "height": 768,
+      "sha256": "7fd50b26ce19c68c1b57025bb9f62f038dc02f3f52e13587b90a198f33c6b592"
+    },
+    {
+      "image": "800x480-settings-software.png",
+      "capture": "Live local client via public controls on Xvfb, winit-software, target-sized X11 window.",
+      "live_ball_limit": 5000,
+      "desired_balls": 0,
+      "width": 800,
+      "height": 480,
+      "sha256": "872ad085dd2aa9d160924ce8305215781824775d22edbadef635e4a208a32cb5"
+    },
+    {
+      "image": "1024x768-settings-software.png",
+      "capture": "Live local client via public controls on Xvfb, winit-software, target-sized X11 window.",
+      "live_ball_limit": 5000,
+      "desired_balls": 0,
+      "width": 1024,
+      "height": 768,
+      "sha256": "4ebeabaee9188f5bb4c1e35e5e7e7ebe217291849497a7dd3fdd92dcf4a127a1"
+    }
+  ]
+}

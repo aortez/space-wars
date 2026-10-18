@@ -9,6 +9,10 @@ benchmark. The shared gravity system computes mutual gravity, while Rapier owns
 ball and wall motion, held-ball kinematics, contacts, and contact impulses.
 Classic remains available only as a collision benchmark reference.
 
+Normal gameplay has a saved 500-ball budget by default, adjustable up to an
+experimental 5,000. See the [capacity lab](pizza-capacity.md) for the normal
+contact/damage/fragmentation fixture and CPU-headroom qualification boundary.
+
 ## Event runtime
 
 Normal Pizza now owns a small deterministic event scheduler (#356). The first
@@ -127,8 +131,9 @@ from 0.61 to 0.86 (0 is the opposite edge, 1 is the target edge), compared with
 0.42–0.58 before admission. All runs remained finite and continued producing
 contacts and new bodies. Captures show the gathering effect and readable cue;
 focused gesture tests also verify a fling can travel against full-strength pull.
-This calibrates behavior at the existing 500-ball cap, not 5,000-ball capacity
-or device performance; #364 and #359 retain those qualifications.
+This calibrates behavior at the default 500-ball budget. The [capacity lab](pizza-capacity.md)
+covers functional integrity up to 5,000; #354 and #359 retain device performance
+and CPU-headroom qualification.
 Representative [native captures and validation records](screenshots/pizza-gravity/validation.json)
 are checked in alongside this document, including paired software/GPU images.
 
