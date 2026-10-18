@@ -219,6 +219,7 @@ fn scheduled_meltdown_starts_without_an_extra_player_tick() {
         explosion: false,
         aquarium: false,
         cell_swap: false,
+        grass: false,
     };
     state.configure(settings);
     ticks(&mut state, crate::events::COOLDOWN_TICKS as usize);

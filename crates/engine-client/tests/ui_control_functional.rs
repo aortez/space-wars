@@ -702,6 +702,7 @@ impl FunctionalHarness {
             .map_err(|error| format!("could not clone engine log handle: {error}"))?;
 
         let arguments = [
+            "--ignore-physical-controllers".to_string(),
             "--config-dir".to_string(),
             config_directory.display().to_string(),
             "--seed".into(),
@@ -718,6 +719,26 @@ impl FunctionalHarness {
             .env("RUST_LOG", "info")
             .env("SLINT_BACKEND", backend)
             .env("SPACEWARS_CONTROL_SOCKET", &socket_path)
+            .env(
+                "SPACEWARS_CLOCK_GRASS_INSPECT",
+                if test_name.starts_with("clock-grass-progress")
+                    || test_name.starts_with("clock-grass-shortage")
+                {
+                    "1"
+                } else {
+                    "0"
+                },
+            )
+            .env(
+                "SPACEWARS_CLOCK_GRASS_FIXTURE",
+                if test_name.starts_with("clock-grass-progress") {
+                    "favorable-v1"
+                } else if test_name.starts_with("clock-grass-shortage") {
+                    "shortage-v1"
+                } else {
+                    ""
+                },
+            )
             // These UI workflows must not reach the host's NetworkManager or
             // BlueZ. Wire-protocol tests supply their own private D-Bus daemon.
             .env(
@@ -1204,8 +1225,9 @@ impl FunctionalHarness {
 impl Drop for FunctionalHarness {
     fn drop(&mut self) {
         let failed = self.failure.is_some() || thread::panicking();
-        let preserve =
-            failed || std::env::var("SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS").as_deref() == Ok("1");
+        let preserve = failed
+            || self.test_name.starts_with("clock-grass-smoke-")
+            || std::env::var("SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS").as_deref() == Ok("1");
         if failed {
             self.capture_live_failure_artifacts();
         }

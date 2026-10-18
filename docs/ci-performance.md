@@ -3,8 +3,8 @@
 The normal `CI` workflow runs on pull requests and pushes to `main`. Its Linux
 workspace job builds all test targets and retains the full non-ignored headless
 suite and all existing platform/rendering/diagnostic checks. PR UI execution uses
-**43 representative smoke workflows**, budgeted at **3–5 minutes**. The complete
-**65-workflow UI suite** runs in `UI functional tests` (`ui-functional.yml`),
+**45 representative smoke workflows**, budgeted at **3–5 minutes**. The complete
+**71-workflow UI suite** runs in `UI functional tests` (`ui-functional.yml`),
 nightly and on manual dispatch. All tests still compile on every PR.
 
 The overall target is successful required PR checks in **under 30 minutes**, from
@@ -57,10 +57,17 @@ The PR selection covers:
   settings persistence and recovery, automatic Clock launch/disable, and planetary
   tank driving/pause/rendering, alongside the existing shorter Clock event cases.
 
-The **22 full-only cases** retain all their original assertions. They cover the
+The **26 full-only cases** retain all their original assertions. They cover the
 long Garden Lab physiology sequence, repeated marquee recipes, complete tank
 fixture/player-choice matrices, autostart repetition/relaunch, complete rain/duck/
 Demo/match lifecycles, and additional variants of shared scenario lifecycle tests.
+The four Clock grass growth/shortage cases retain their full normal-speed
+sequences in both renderers. Two short grass smoke cases exercise actual
+admission, early shoots under default room light, disable/pause persistence
+and restart cleanup, retaining normal-view screenshots even on success.
+Functional clients ignore physical controllers per process while retaining
+intentional API input; this does not disable actor physics. These additions
+have not yet supplied a new measured CI runtime.
 See [the classification manifest](../.github/ci/ui-tests.json) for exact names and
 individual deferral reasons. Fast replacement checks add coverage; they do not
 shorten the exhaustive workflows or alter the application.

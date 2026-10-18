@@ -11,6 +11,8 @@
     "clock::digit_slide_controls_preview_cleanup_and_persistence",
     "clock::explosion_controls_pause_recovery_and_restart_preserve_settings",
     "clock::falling_digits_recover_and_survive_pause_restart_and_relaunch",
+    "clock::grass_raster_admission_controls_smoke",
+    "clock::grass_vector_admission_controls_smoke",
     "clock::live_clock_controls_preserve_events_preview_and_persist_across_restart_and_relaunch",
     "clock::marquee_message_guards_validation_and_save_failure_retry",
     "clock::marquee_preview_settings_and_recovery_smoke",
@@ -60,6 +62,22 @@
     {
       "test": "clock::duck_runs_jumps_exits_and_supports_live_controls_and_cleanup",
       "reason": "Full calibration, traversal, exit and repeated preview; Clock controls and headless duck regressions stay on PRs."
+    },
+    {
+      "test": "clock::grass_raster_normal_speed_progress_and_persistent_controls",
+      "reason": "Full five-minute 1x favorable establishment and root/runner history, plus support transitions and persistence; default-room admission/control smoke stays on PRs."
+    },
+    {
+      "test": "clock::grass_raster_shortage_and_retirement",
+      "reason": "Full normal-speed resource shortage, dieback and retirement sequence; default-room admission/pause/disable/restart smoke stays on PRs."
+    },
+    {
+      "test": "clock::grass_vector_normal_speed_progress_and_persistent_controls",
+      "reason": "Full five-minute 1x favorable establishment and root/runner history, plus support transitions and persistence; default-room admission/control smoke stays on PRs."
+    },
+    {
+      "test": "clock::grass_vector_shortage_and_retirement",
+      "reason": "Full normal-speed resource shortage, dieback and retirement sequence; default-room admission/pause/disable/restart smoke stays on PRs."
     },
     {
       "test": "clock::marquee_recipes_preview_pause_persist_and_restore_live_clock",

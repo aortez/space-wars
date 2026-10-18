@@ -46,24 +46,56 @@ impl VisitArena {
         Some(duck)
     }
 
+    #[cfg(test)]
     pub fn step<'a>(
         &'a mut self,
         player: Option<&'a mut DuckEvent>,
         water: Option<&WaterWorld>,
         panels_advanced: bool,
     ) -> &'a mut DuckEvent {
+        self.step_with_soil(player, water, panels_advanced, None)
+    }
+
+    pub fn step_with_soil<'a>(
+        &'a mut self,
+        player: Option<&'a mut DuckEvent>,
+        water: Option<&WaterWorld>,
+        panels_advanced: bool,
+        soil: Option<&mut crate::grass::SoilHabitat>,
+    ) -> &'a mut DuckEvent {
         let occupied = player.is_some();
         let duck = self.get_mut(player);
         if occupied {
-            duck.step_with_environment(water, panels_advanced);
+            duck.step_with_soil(water, panels_advanced, soil);
         } else {
-            duck.step_unoccupied_arena(panels_advanced);
+            duck.step_unoccupied_arena(panels_advanced, soil);
         }
         duck
     }
 }
 
 impl DuckEvent {
+    pub fn existing_world(&self) -> Option<&PhysicsWorld> {
+        self.world.as_ref()
+    }
+    pub fn existing_world_mut(&mut self) -> Option<&mut PhysicsWorld> {
+        self.world.as_mut()
+    }
+    pub(super) fn synchronize_soil(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) {
+        if let Some(soil) = soil {
+            let state = if self.responsive_floor().is_some() {
+                crate::grass::SoilSupportState::Responsive
+            } else if self.drain_floor.is_some() {
+                crate::grass::SoilSupportState::Drain
+            } else {
+                crate::grass::SoilSupportState::Course
+            };
+            soil.set_surfaces(crate::grass::surfaces::duck(self), state);
+            if let Some(world) = &mut self.world {
+                soil.bind_current(world);
+            }
+        }
+    }
     pub fn actor_body(&self) -> Option<BodyId> {
         self.buoyant.as_ref().map(BuoyantBody::body)
     }
@@ -153,9 +185,14 @@ impl DuckEvent {
         self.entry_arena_opacity = Some(opacity);
     }
 
-    fn step_unoccupied_arena(&mut self, panels_advanced: bool) {
+    fn step_unoccupied_arena(
+        &mut self,
+        panels_advanced: bool,
+        soil: Option<&mut crate::grass::SoilHabitat>,
+    ) {
         assert!(self.arena_claimed && self.player.is_none());
         self.advance_panels(panels_advanced);
+        self.synchronize_soil(soil);
         let world = self.arena_world_mut();
         world.clear_forces();
         world.step(DT);

@@ -665,6 +665,7 @@ fn mixed_spawns_replay_both_personalities_without_changing_courses_or_schedules(
                     explosion: false,
                     aquarium: false,
                     cell_swap: false,
+                    grass: false,
                 },
                 ..ClockConfig::default()
             },

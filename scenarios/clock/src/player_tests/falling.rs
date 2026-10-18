@@ -316,6 +316,7 @@ fn automatic_falling_is_available_and_its_first_frame_matches_shared_physics() {
         explosion: false,
         aquarium: false,
         cell_swap: false,
+        grass: false,
     };
     state.configure(settings);
     assert!(!state.automatic_events_suspended());

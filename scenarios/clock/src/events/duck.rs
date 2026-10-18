@@ -732,10 +732,20 @@ impl DuckEvent {
         self.step_with_environment(water, water.is_some())
     }
 
+    #[cfg(test)]
     pub fn step_with_environment(
         &mut self,
         water: Option<&WaterWorld>,
         panels_advanced: bool,
+    ) -> bool {
+        self.step_with_soil(water, panels_advanced, None)
+    }
+
+    pub fn step_with_soil(
+        &mut self,
+        water: Option<&WaterWorld>,
+        panels_advanced: bool,
+        soil: Option<&mut crate::grass::SoilHabitat>,
     ) -> bool {
         self.advance_panels(panels_advanced);
         self.tick += 1;
@@ -743,6 +753,7 @@ impl DuckEvent {
         if self.phase != EventPhase::Resetting {
             self.ensure_world();
         }
+        self.synchronize_soil(soil);
         if self.phase == EventPhase::Opening {
             self.advance_flaps();
             self.world.as_mut().unwrap().step(DT);

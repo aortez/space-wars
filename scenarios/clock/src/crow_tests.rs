@@ -209,6 +209,7 @@ fn crow_only_schedule_blocks_duplicates_then_obeys_departure_cooldown() {
         explosion: false,
         aquarium: false,
         cell_swap: false,
+        grass: false,
         falling: false,
         color_cycle: false,
         meltdown: false,

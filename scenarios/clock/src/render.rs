@@ -18,6 +18,7 @@ mod explosion;
 mod floor;
 mod frame;
 mod glow;
+pub(crate) mod grass_inspection;
 mod marquee;
 mod meltdown;
 mod meridiem;
@@ -159,6 +160,55 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     } else {
         render_floor(&mut frame, state.floor.geometry(layout), layout.pitch, 1.0);
     }
+    if let Some(soil) = &state.soil {
+        for quad in soil.quads() {
+            frame.push_primitive(
+                ARENA_LAYER,
+                RenderPrimitive::Polygon(RenderPolygon::filled(
+                    quad.map(|p| RenderPoint::new(p.x, p.y)).to_vec(),
+                    RenderColor::rgb(0.38, 0.23, 0.10),
+                )),
+            );
+        }
+        let observation = state.plants.plants.observe();
+        for tissue in observation
+            .tissues
+            .iter()
+            .filter(|t| t.role == engine_core::plants::Role::Shoot)
+        {
+            if let (Some(center), Some(surface)) = (
+                soil.world_point(tissue.cell),
+                soil.surface_at(tissue.cell[0]),
+            ) {
+                let progress = tissue.development[0] as f32
+                    / observation.config.development_per_size[0] as f32;
+                let height = (f32::from(tissue.size) + progress) * 2.0;
+                let points = [
+                    Vec2::new(-0.5, -1.0),
+                    Vec2::new(0.5, -1.0),
+                    Vec2::new(0.0, height),
+                ]
+                .map(|p| {
+                    let p = center + p.rotate_radians(surface.angle);
+                    RenderPoint::new(p.x, p.y)
+                });
+                frame.push_primitive(
+                    ARENA_LAYER,
+                    RenderPrimitive::Polygon(RenderPolygon::filled(
+                        points.to_vec(),
+                        if tissue.health == 0 {
+                            RenderColor::rgb(0.35, 0.28, 0.12)
+                        } else {
+                            RenderColor::rgb(0.22, 0.65, 0.16)
+                        },
+                    )),
+                );
+            }
+        }
+    }
+    if let Some(view) = crate::grass::inspection::snapshot(state) {
+        grass_inspection::render(&mut frame, &view, layout);
+    }
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
         let opacity = 1.0 - event.playback().strength;
         if opacity > 0.0 {
@@ -201,6 +251,57 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     }
     render_player_and_course(&mut frame, state, layout);
     frame
+}
+
+/// Filled visible cell geometry, excluding glow shells and UI labels. Shared
+/// renderers supply effect transforms, clipping, reformation and fade state.
+/// Any positive fill opacity is opaque in the first overhead-light model.
+pub(crate) fn plant_face_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
+    let layout = Layout::new(state.aspect_ratio());
+    let mut frame = RenderFrame::default();
+    if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
+        if event.playback().strength < 1.0 {
+            render_segments(&mut frame, state, layout);
+            render_colon(&mut frame, state, layout);
+            render_meridiem(&mut frame, state, layout);
+        }
+        marquee::render(&mut frame, event, layout);
+    } else {
+        render_segments(&mut frame, state, layout);
+        render_colon(&mut frame, state, layout);
+        render_meridiem(&mut frame, state, layout);
+    }
+    filled_polygons(frame, ACTIVE_CELL_LAYER)
+}
+
+pub(crate) fn plant_actor_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
+    let mut frame = RenderFrame::default();
+    if let Some(visit) = &state.crow_visit {
+        crow::render(&mut frame, visit, Layout::new(state.aspect_ratio()));
+    }
+    let mut polygons = filled_polygons(frame, 8);
+    if let Some(crate::events::ActiveEvent::Aquarium(event)) = &state.active_event {
+        let mut fish = RenderFrame::default();
+        aquarium::residents(&mut fish, event);
+        polygons.extend(filled_polygons(fish, 14));
+    }
+    polygons
+}
+
+fn filled_polygons(frame: RenderFrame, z: i32) -> Vec<Vec<Vec2>> {
+    frame
+        .layers
+        .into_iter()
+        .filter(|layer| layer.z == z)
+        .flat_map(|layer| layer.primitives)
+        .filter_map(|primitive| {
+            let RenderPrimitive::Polygon(p) = primitive else {
+                return None;
+            };
+            p.fill.filter(|f| f.color.a > 0.0)?;
+            Some(p.points.into_iter().map(|p| Vec2::new(p.x, p.y)).collect())
+        })
+        .collect()
 }
 
 fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {

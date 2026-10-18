@@ -176,6 +176,7 @@ fn changed_readings_reassemble_the_latest_face_before_the_final_handoff() {
                 };
                 assert!(event.step(
                     events::EventContext {
+                        soil: None,
                         segments: &mut state.segments,
                         display: state.display,
                         layout,

@@ -1,0 +1,123 @@
+//! Real floor geometry expressed as transforms from retained material coordinates.
+use super::*;
+use crate::{
+    events::duck::{DuckEvent, arena::CourseGeometry},
+    floor::{FloorGeometry, responsive::ResponsiveFloor},
+    layout::Layout,
+};
+
+pub const MAX_SOIL_SURFACES: usize = 8;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Surface {
+    pub left: f32,
+    pub right: f32,
+    pub reference: Vec2,
+    pub position: Vec2,
+    pub angle: f32,
+}
+impl Surface {
+    pub fn map(self, point: Vec2) -> Vec2 {
+        self.position + (point - self.reference).rotate_radians(self.angle)
+    }
+    pub fn covers(self, left: f32, right: f32) -> bool {
+        self.left <= left && right <= self.right
+    }
+}
+
+pub(crate) fn ordinary(floor: FloorGeometry) -> Vec<Surface> {
+    floor
+        .slabs()
+        .map(|(a, b)| Surface {
+            left: a.x,
+            right: b.x,
+            reference: Vec2::ZERO,
+            position: Vec2::ZERO,
+            angle: 0.0,
+        })
+        .collect()
+}
+pub(crate) fn responsive(layout: Layout, floor: &ResponsiveFloor) -> Vec<Surface> {
+    (0..2)
+        .map(|side| {
+            let (mut reference, _) = floor.shape.panel_pose(side, 0.0);
+            reference.y += layout.floor_y - floor.shape.floor_y as f32;
+            let (position, angle) = floor.shape.panel_pose(side, floor.opening);
+            Surface {
+                left: if side == 0 {
+                    -floor.shape.half_width as f32
+                } else {
+                    0.0
+                },
+                right: if side == 0 {
+                    0.0
+                } else {
+                    floor.shape.half_width as f32
+                },
+                reference,
+                position,
+                angle,
+            }
+        })
+        .collect()
+}
+pub(crate) fn course(course: &CourseGeometry) -> Vec<Surface> {
+    course
+        .course
+        .surfaces
+        .iter()
+        .map(|s| {
+            let a = course.screen_position(Vec2::new(s.start.max(0.0), 0.0)).x;
+            let b = course
+                .screen_position(Vec2::new(s.end.min(course.width), 0.0))
+                .x;
+            Surface {
+                left: a.min(b),
+                right: a.max(b),
+                reference: Vec2::ZERO,
+                position: Vec2::new(0.0, s.height),
+                angle: 0.0,
+            }
+        })
+        .collect()
+}
+pub(crate) fn duck(duck: &DuckEvent) -> Vec<Surface> {
+    if let Some(floor) = duck.responsive_floor() {
+        responsive(duck.layout, floor)
+    } else if let Some(floor) = duck.drain_floor {
+        ordinary(floor.geometry())
+    } else if duck.course.is_some() {
+        course(&CourseGeometry::from_duck(duck))
+    } else {
+        Vec::new()
+    }
+}
+
+pub(crate) fn world<'a>(
+    event: &'a Option<crate::events::ActiveEvent>,
+    duck: Option<&'a DuckEvent>,
+) -> Option<&'a engine_rapier::world::PhysicsWorld> {
+    use crate::events::ActiveEvent::*;
+    match event {
+        Some(Falling(e)) => e.canonical_world(duck),
+        Some(Explosion(e)) => e.canonical_world(duck),
+        Some(Meltdown(e)) => e.canonical_world(duck),
+        Some(Aquarium(e)) => e.canonical_world(duck),
+        Some(Rain(e)) if duck.is_none() => e.canonical_world(),
+        _ => duck.and_then(DuckEvent::existing_world),
+    }
+}
+pub(crate) fn world_mut<'a>(
+    event: &'a mut Option<crate::events::ActiveEvent>,
+    duck: Option<&'a mut DuckEvent>,
+) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
+    use crate::events::ActiveEvent::*;
+    match event {
+        Some(Falling(e)) => e.canonical_world_mut(duck),
+        Some(Explosion(e)) => e.canonical_world_mut(duck),
+        Some(Meltdown(e)) => e.canonical_world_mut(duck),
+        Some(Aquarium(e)) => e.canonical_world_mut(duck),
+        Some(Rain(e)) if duck.is_none() => e.canonical_world_mut(),
+        _ => duck.and_then(DuckEvent::existing_world_mut),
+    }
+}
