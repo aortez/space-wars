@@ -2926,6 +2926,52 @@ Pi 4 qualification and unattended rollout remain outstanding. Automatic
 publication and installation remain disabled; the installed image is a
 supervised branch candidate, not an admitted main-branch nightly.
 
+### Identical credential refresh qualification (2026-10-18)
+
+The bundled NetworkManager 1.46.6 now has a narrow provider patch for the
+reconnect conflict. Its existing full comparison includes credentials. When
+that comparison is equal, storage and flags are unchanged, and the operation
+is exactly an internal non-persisted agent-secret refresh, it retains
+`VersionId`. Cache updates and `Updated` notifications still occur. Changed
+credentials, explicit updates (including no-ops), clearing secrets, reloads,
+storage changes and other update reasons retain their normal revision behavior.
+The radio controller's profile-conflict check is unchanged. This avoids
+requesting or hashing real credentials in the controller, or overlooking a
+password-only edit because `GetSettings` excludes secrets.
+
+The patched provider built successfully with Yocto. An opt-in
+[native D-Bus test](../crates/engine-os-manager/tests/nm_profile_refresh.rs)
+then ran the original and candidate daemons in separate private network/mount
+namespaces and private buses on Pi 5. The original failed the unchanged-secret
+control, advancing revision 2 to 3. The patched daemon passed repeated unchanged
+refreshes, explicit no-op updates, stale-version rejection, password-only edits,
+ClearSecrets, UpdateUnsaved/Save, deletion and changed/identical credentials from
+an actual synthetic secret agent. The signal trace confirms all three initial
+unchanged refreshes still emitted `Updated` while retaining revision 2; the
+following explicit update advanced it to 3. The test uses uncached property
+reads, correcting a cache-related assertion in its first run. Both runs retained
+the same production NetworkManager, boot, image, kiosk and selected store bytes.
+The final candidate test completed in 0.06 seconds. Formatting, Clippy with
+warnings denied, shell syntax and AArch64 test compilation passed.
+[Provider evidence](data/ota-profile-refresh-20261018.json) records the source
+archive, patch, executable and retained native test identities.
+
+This test is ignored in ordinary CI. Its
+[launcher](../yocto/tests/nm-profile-refresh.sh) requires a fresh root-owned
+mode-0700 directory under `/data/spacewars-nm-qualification-*`, with `baseline`
+or `candidate` case directories and private binds for `/etc/NetworkManager`,
+`/run/NetworkManager` and `/var/lib/NetworkManager`. Launch through a bounded
+systemd unit with private network, mounts, devices and temporary files;
+read-only kernel settings; and a private replacement for `/run/dbus` and
+`/run/udev`. The launcher starts its own bus and daemon, verifies namespace/bind
+isolation, and uses only non-autoconnecting synthetic profiles. It never stops
+or replaces production NetworkManager. Preserve the pre/post production checks
+and collect the case logs even when a control fails.
+
+The provider correction is not yet installed in the production image. The next
+qualification is a complete signed image and supervised real-radio cycle,
+followed by the full time/OTA idle cycle and Pi 4 coverage.
+
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
 `record: {schema: 1, version: <positive integer>}` and the SHA-256 of the compact
