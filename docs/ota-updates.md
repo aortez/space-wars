@@ -518,8 +518,13 @@ SSH admission reserves a root-only 120-second hold through the same coordinator
 queue as radio transitions. `session-protected` permits the accepted connection
 to continue; it does not claim Wi-Fi or Internet readiness. An independently off
 radio in mode Off stays off, preserving Ethernet logins. A policy-owned off state
-must be restored first, and an uncertain prior command cannot produce a successful
-admission. Expired holds remain protective while live sessions or unknown activity
+or pending command from the current boot must be reconciled first. After a real
+reboot, the saved command cannot execute, so an accepted TCP connection can gain
+SSH protection and reach owner recovery. Admission retains the pending command,
+suspension and old ownership; it does not silently resume automatic radio control.
+The stopped-service fallback applies the same boot-identity rule under the
+exclusive policy lock without rewriting saved state. A service restart does not
+qualify as a reboot. Expired holds remain protective while live sessions or unknown activity
 remain. A new root SSH admission or Wi-Fi setup admission can replace expired
 SSH holds with its fresh 120-second hold, maintaining protection without needing
 to prove idle first. Otherwise an active session or an incomplete observer could
@@ -2736,14 +2741,53 @@ sandbox while running the preview binary and runtime masks. The 30-second
 active-SSH control passed, including DNS/TLS access with the standalone servers
 stopped. A detached partial-offline/time/OTA cycle was launched with an
 independent restoration timer and durable logs. Collection failed at the SSH
-banner; two longer attempts were reset before authentication. The actual cycle
-result and restoration remain unverified until owner recovery permits reading
-`/data/spacewars-system/qualification/ota-idle-20261018-2`. No image installation
-was requested. This is not a passing idle-cycle qualification, nor proof that
-the earlier Picade delay has the same cause. The
+banner; two longer attempts were reset before authentication, and an owner
+reboot did not recover access. Read-only collection from the removed Pi 5 drive
+then recovered 576 samples: Wi-Fi switched off at 121 seconds, and the due OTA
+check correctly remained idle while offline. The manual time request was
+skipped as `recent-success`, so it did not produce the wake the harness expected.
+The test timed out without an automatic OTA attempt.
+
+Cleanup turned Wi-Fi on and restored the original daemon, disabled partial
+offline and selected Release. However, the saved radio state retained
+`owned_off=true`, a returned enable transition, and `external-radio-change`
+suspension. SSH admission rejects that state even after reboot; replaying the
+collected state through the real controller reproduces the rejection. The
+monitor's reason for latching that suspension during cleanup still needs native
+signal tracing. The harness's restoration markers did not check pending radio
+state and therefore did not establish restored owner access.
+
+The owner applied the narrowly bound offline recovery: it preserved the
+original record, required its exact hash and unchanged OTA state, advanced
+generation 458 to 459, and cleared stale radio ownership while keeping partial
+offline disabled. Final readback passed after unmount and remount. On boot
+`8a3a1171-3b1f-4980-bcfe-d222bd7ba1f9`, SSH, the kiosk and original device service
+are working; the installed `f58d725` image remains healthy and committed. Radio
+state has no pending command, suspension or owned-off flag. The startup update
+check recorded `network-unavailable`; an explicit retry then completed with
+`no-candidate` on Release and no error. No image was installed or reboot requested. The application checksum/schema reader accepts the proposed
+record and the controller admits SSH without issuing a radio command. No image
+installation was requested. This is not a passing idle-cycle qualification,
+nor proof that the earlier Picade delay has the same cause. The
 [idle qualification evidence](data/ota-network-idle-20261018.json) retains exact
-source, binary, image and probe identities. Recover access and collect that
-trace before any signed deployment or unattended rollout.
+source, binary, image, probe, collected-trace and recovery identities. Diagnose
+native radio notifications and recovery admission, then correct the skipped-sync
+and restoration harness before repeating qualification or attempting unattended
+rollout. Successful recovery does not qualify the interrupted idle cycle.
+
+The follow-up SSH fix uses the saved transition's boot identity in both the live
+coordinator and stopped-service fallback. Regressions preserve the Pi 5 failure
+shape (owned-off witness, returned enable request and external-change suspension),
+admit recovery only after reboot, and require explicit owner resume before clearing
+the fault. They also cover an ambiguous off command and unavailable observation,
+while retaining same-boot rejection, exclusive policy ownership and deployment
+records. The Pi 5 still runs its original image; the recovery fix is not yet deployed.
+Both new controller regressions failed before the change. The fixed controller
+also admits SSH using a copy of the exact collected record, without changing its
+radio fault, policy or deployments or issuing a radio command. All 200 device
+service tests pass, with three opt-in tests skipped; formatting, Clippy with
+warnings denied and the AArch64 build pass. Native recovery qualification remains
+pending.
 
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains

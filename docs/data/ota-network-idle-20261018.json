@@ -5,22 +5,66 @@
       "stderr": "",
       "stdout": ""
     },
-    "evidence": "Activation harness completed with exit 0; raw trace remains on device.",
+    "evidence": "Activation harness completed with exit 0; saved trace collected read-only from the Pi 5 drive.",
     "samples": 6,
     "seconds": 30,
     "wireless_remained_enabled": true
   },
   "date": "2026-10-18",
   "detached_pi5": {
-    "full_radio_cycle_result": "unknown until retained device trace is collected",
+    "full_radio_cycle_result": "Failed: off observed at 121 seconds; manual time request was skipped as recent-success; automatic OTA check never started.",
     "independent_restore_seconds": 540,
-    "outcome": "Trace collection blocked: first SSH banner timeout, then two connections reset before authentication after longer admission waits.",
+    "offline_collection": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/pi5-offline-cav3543x",
+    "offline_recovery": {
+      "after_sha256": "e5f91b9f97cc4c7c51215fe91ac69077131d289e97ea59c839c1968bc75ddb49",
+      "applied": true,
+      "before_sha256": "ad1fec4ae2529e40890a1e7be598646d09ad0327b71feda1feb195b79bce0b4f",
+      "offline_readback_verified": true,
+      "post_boot_verification": "passed: SSH, original service, kiosk, committed image, clean radio state and successful Release check",
+      "report": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/pi5-network-recovery-b5ghh3h_/result.json",
+      "scope": "Exact-state radio ownership reset with partial-offline disabled; generation 458 to 459; OTA records, boot files and image preserved.",
+      "validation": "Real controller reproduces SSH rejection from collected state and admits SSH from recovered state without radio writes. Validator uses controller/store source identical to installed f58d725."
+    },
+    "outcome": "Read-only offline collection recovered 576 samples. Cleanup enabled Wi-Fi but retained owned_off=true, an enable transition in returned phase, and external-radio-change suspension. This state blocks SSH admission across reboot.",
     "owner_recovery_requested": true,
-    "physical_failure_cause": "not established",
+    "partial_restoration": {
+      "policy_partial_offline": false,
+      "runtime_restored_marker": true,
+      "ssh_recovered": true,
+      "update_channel": "release"
+    },
+    "physical_failure_cause": "Persisted radio reconciliation blocks SSH; why the monitor latched external-radio-change during cleanup still needs native signal tracing.",
+    "post_recovery": {
+      "boot_id": "8a3a1171-3b1f-4980-bcfe-d222bd7ba1f9",
+      "boot_phase": "committed",
+      "image_install_requested": false,
+      "image_source": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+      "kiosk_active": true,
+      "manual_check": "no-candidate",
+      "manual_check_error": null,
+      "original_service_restored": true,
+      "ota_channel": "release",
+      "owned_off": false,
+      "partial_offline": false,
+      "pending": null,
+      "runtime_drop_ins": [],
+      "service_healthy": true,
+      "startup_check": "failed: network-unavailable",
+      "suspended": null,
+      "wireless_available": true
+    },
     "qualification_passed": false,
+    "reboot_observed_in_saved_update_state": "9b2a51fb-8f34-4f91-809a-d6b2e237156d",
     "remote_evidence": "/data/spacewars-system/qualification/ota-idle-20261018-2",
-    "restoration_verified": false,
-    "test_limit_seconds": 420
+    "restoration_verified": true,
+    "retained_transition_boot_id": "27e98de1-0c2c-4356-ab26-e05d73307ba1",
+    "test_limit_seconds": 420,
+    "timeline_seconds": {
+      "due_offline_start": 123,
+      "first_offline": 121,
+      "handoff_start": 134,
+      "last_sample": 273
+    }
   },
   "files": {
     "activation-failure.log": {
@@ -51,6 +95,10 @@
       "bytes": 3060,
       "sha256": "316c8c63faa1f0964f354ed3a012bc137537f114372c17c68784fb734feaa67c"
     },
+    "offline-recovery-validation.log": {
+      "bytes": 150,
+      "sha256": "fbd70efca93d69dc02e4ac4edbb9fd9348706b7db2c58cb9a36bd86fc8604516"
+    },
     "partial-offline-2/activation.json": {
       "bytes": 54,
       "sha256": "6379c17d798191f995d43b0950ea7787779fe29c9af7354b25de37a514ff207d"
@@ -71,6 +119,34 @@
       "bytes": 755,
       "sha256": "817b40a9311d71225e0786977bb56b4e3be26f51579297420737e9969017f72e"
     },
+    "pi5-after-offline-recovery.log": {
+      "bytes": 3998,
+      "sha256": "c2a1493d3cf91de75479171428560d4eadf6f514767ec93ed03fbb87d2e0f35b"
+    },
+    "pi5-after-recovery-services.log": {
+      "bytes": 1503,
+      "sha256": "3cc7928e8c51908bb8774e727f629d5e5ae39f68b42e7e9966e1939cef52064c"
+    },
+    "pi5-after-recovery-update-check.jsonl": {
+      "bytes": 2287,
+      "sha256": "8015708bbadb88d01a595dd0536da7cd82e44639b3a8c8aa26ffca203979b8d9"
+    },
+    "pi5-network-recovery-b5ghh3h_/result.json": {
+      "bytes": 272,
+      "sha256": "8eb30b8f3eb0e0498b201c90980124ca8934bab52b0eb501d9ac584857d62158"
+    },
+    "pi5-offline-cav3543x/data/spacewars-system/qualification/ota-idle-20261018-2/observations.jsonl": {
+      "bytes": 1231395,
+      "sha256": "020fee7466c3e2a9f224c471a24fa1b0c413281db6eeae84688ef2885d30b336"
+    },
+    "pi5-offline-cav3543x/data/spacewars-system/qualification/ota-idle-20261018-2/restore.log": {
+      "bytes": 2353,
+      "sha256": "a7827a481851b6c07c0d0d4056f973d2ae87ba3de92c57f2313d58dfe6a2b90b"
+    },
+    "pi5-offline-cav3543x/manifest.json": {
+      "bytes": 14080,
+      "sha256": "040772f0a199dfb979b98ebcc98a1b17b5786b063f8301b181f6f739cdb75769"
+    },
     "pi5-reconnect-2.log": {
       "bytes": 104,
       "sha256": "fa3ddb1d1e4dfbefbddf9bd8cbbc4b774eb771c4353708669c6ebb89c73f7973"
@@ -78,6 +154,10 @@
     "pi5-reconnect.log": {
       "bytes": 104,
       "sha256": "fa3ddb1d1e4dfbefbddf9bd8cbbc4b774eb771c4353708669c6ebb89c73f7973"
+    },
+    "pi5-recovery-final-status.log": {
+      "bytes": 3601,
+      "sha256": "34168fee8661e259938f46b5ff0f68d9a253ecca8210125c543b83bae65eda22"
     },
     "policy.json": {
       "bytes": 291,
@@ -87,9 +167,41 @@
       "bytes": 304,
       "sha256": "ebd9e83a329113b18852ec5ffeaabdc7ebed5d19955892e82635cfac41d91f6b"
     },
+    "recover-pi5-network.py": {
+      "bytes": 9513,
+      "sha256": "ff11be03836258d643e45dc2df554d87638712143530b05f7068bcc4eecdadbc"
+    },
     "source.patch": {
       "bytes": 9215,
       "sha256": "2d6770b2b096e1c54aacc9535a36211728a2fed656450523608762e4a085eeb1"
+    },
+    "ssh-recovery-aarch64.log": {
+      "bytes": 280,
+      "sha256": "a6991cd1db0b042035a795be716c488a7de01f941bd9ae1b340239c9bad04c32"
+    },
+    "ssh-recovery-clippy.log": {
+      "bytes": 175,
+      "sha256": "97e4a9f24af9e120512129f6c6b3d900492e0a85eade0fa68b99fc8f5781c939"
+    },
+    "ssh-recovery-exact-state.log": {
+      "bytes": 210,
+      "sha256": "664fe7e79389a7b42e00ad0bf2fd941cf7b30d2bdd6703796a1522179d0a5338"
+    },
+    "ssh-recovery-full-tests.log": {
+      "bytes": 22723,
+      "sha256": "e5cb8e6de239be505e5dc8fe527294e26db1e687009e2d98d146642abf3527d9"
+    },
+    "ssh-recovery-regression-before.log": {
+      "bytes": 1825,
+      "sha256": "613752925d3065ada1e4a0bfd17839ac5cd29db4bf67e5304df5e8d82306e7b2"
+    },
+    "ssh-recovery-source.patch": {
+      "bytes": 14763,
+      "sha256": "a6865597a34d2766e232854378f6ff8eb0d07725e4f6c59eac4f8467af3e7bae"
+    },
+    "ssh-recovery-tests.log": {
+      "bytes": 1783,
+      "sha256": "66035bcb0530400cb2440e22375654010a14613a220bc6f4c9638e0c238cd216"
     },
     "yocto-tests.log": {
       "bytes": 207,
@@ -114,8 +226,8 @@
   "implementation_commit": "22e49a2fd72ae32505b543518212161cd629f95f",
   "issue": 265,
   "next_qualification": [
-    "Recover Pi 5 access, collect the trace and verify restoration",
-    "Diagnose the live radio/SSH failure and repeat detached qualification",
+    "Qualify the tested SSH reboot-recovery fix on hardware; trace native radio notifications and correct their reconciliation",
+    "Correct skipped-sync harness and restoration checks, then repeat detached off/time-wake/OTA/off qualification",
     "Signed-image normal boot and verified interrupted/resumed download",
     "Frame-time impact before unattended rollout"
   ],
@@ -267,6 +379,23 @@
     ]
   },
   "schema": 1,
+  "ssh_recovery_fix": {
+    "aarch64_build": "passed",
+    "base_commit": "0102814b44f90df32b467cafd0f1dac406b2cde8",
+    "behavior": "Permit protected SSH recovery when saved radio writes or suspended ownership belong to an earlier boot; retain the fault for explicit resume. Same-boot reconciliation and exclusive-store locking remain required.",
+    "clippy": "passed with warnings denied",
+    "deployed": false,
+    "exact_saved_state_replay": "passed: original collected radio fault, policy and deployment state preserved; no radio commands issued",
+    "format": "passed",
+    "manager_tests": {
+      "failed": 0,
+      "ignored": 3,
+      "passed": 200
+    },
+    "native_recovery_qualification": "pending",
+    "patch_sha256": "a6865597a34d2766e232854378f6ff8eb0d07725e4f6c59eac4f8467af3e7bae",
+    "regressions_before_fix": "Both new controller regressions fail with SSH protection awaits radio reconciliation"
+  },
   "unsigned_image": {
     "descriptor": {
       "compressed": {

@@ -18,6 +18,7 @@ pub fn admit() -> Result<()> {
         return Err(unavailable());
     }
     accepted_socket(libc::STDIN_FILENO, 22)?;
+    let boot_id = crate::linux::boot_id()?;
     // The state parent must have the same ownership as the daemon requires.
     // A missing parent is permitted on an image that has never run the service.
     match fs::symlink_metadata("/data/spacewars-system") {
@@ -45,7 +46,8 @@ pub fn admit() -> Result<()> {
         // A stopped/uninstalled service must not unnecessarily disable SSH.
         // Taking its exclusive policy lock excludes a live coordinator. This
         // never initializes state, writes radio settings or clears uncertainty.
-        if let Ok(_guard) = protect_ssh_without_service(Path::new(network_service::STATE_DIRECTORY))
+        if let Ok(_guard) =
+            protect_ssh_without_service(Path::new(network_service::STATE_DIRECTORY), &boot_id)
         {
             return Ok(());
         }
