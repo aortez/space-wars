@@ -1171,6 +1171,12 @@ occasional visits. It uses ordinary jumps to reach the narrow upper edge of a
 nearly closed flap, perches briefly, then returns to the course. Default visits
 retain the pull-up route; the experiment does not change saved settings.
 
+An open exit becomes the automatic duck's destination, even behind it. A
+committed jump or climb finishes first; a grounded duck within one body length
+of tagging the opposite wall gets at most 0.75 seconds to finish that tag before
+turning. Normal acceleration, recovery and visit deadlines still apply. See
+[exit-priority validation and captures](clock-duck-exit-validation.md).
+
 This close-up uses the production renderer at half speed, with the camera moved
 to the entrance of the 800×480 layout:
 

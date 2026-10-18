@@ -7,6 +7,8 @@ mod controller;
 mod debris_tests;
 mod drain;
 #[cfg(test)]
+mod exit_tests;
+#[cfg(test)]
 mod flap_tests;
 pub(crate) mod flaps;
 mod flow;
@@ -556,6 +558,22 @@ impl DuckEvent {
                 .expect("duck hull and non-overlapping course water"),
             _ => BuoyancyReport::default(),
         };
+        if self.player.is_none() && self.exit_visible() {
+            let motion = self.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+            let x = motion.position.x * self.direction + self.width * 0.5;
+            let wall = self.radius * 3.0;
+            // Only finish a tag already within one body length on the same
+            // bank. A fresh jump, wet recovery or flap perch gets no detour.
+            let near_wall = (wall - self.radius * 0.3..=wall + self.radius * 2.0).contains(&x)
+                && motion.linear_velocity.x * self.direction < 0.0
+                && self.grounded()
+                && self.water_report.submerged_fraction <= 0.05
+                && self
+                    .course
+                    .as_ref()
+                    .is_none_or(|_| self.supported_surface() == Some(0));
+            self.controller.notice_exit(self.tick, near_wall);
+        }
         self.decide_player_ledge();
         self.decide_automatic_ledge();
         let detour_command = self.decide_flap_detour(water);
@@ -574,7 +592,6 @@ impl DuckEvent {
         }
         let grounded = self.grounded();
         let support = self.supported_surface();
-        let exit_visible = self.exit_visible();
         let Some(world) = &mut self.world else { return };
         let motion = world.motion(DUCK_BODY).expect("live duck body");
         let screen = self.direction;
@@ -654,18 +671,10 @@ impl DuckEvent {
             };
             self.controller
                 .decide_water(observed, self.water_report.submerged_fraction, context)
-                .unwrap_or_else(|| {
-                    self.controller
-                        .decide_course(observed, context, exit_visible)
-                })
+                .unwrap_or_else(|| self.controller.decide_course(observed, context))
         } else {
-            self.controller.decide(
-                observed,
-                &self.obstacles,
-                self.width,
-                self.radius,
-                exit_visible,
-            )
+            self.controller
+                .decide(observed, &self.obstacles, self.width, self.radius)
         };
         let mut delta = self.movement.velocity_delta(observed, &command);
         self.paddling = false;

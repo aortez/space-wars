@@ -10,16 +10,26 @@ const PROFILES: [ClockDuckJumpProfile; 2] =
 /// disrupted flight beside its selected target. This is a near-miss fixture,
 /// not evidence that an unperturbed seeded run normally misses this jump.
 fn near_miss(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> (DuckEvent, Edge) {
+    near_miss_toward(aspect, direction, profile, 1.0)
+}
+
+fn near_miss_toward(
+    aspect: f32,
+    direction: f32,
+    profile: ClockDuckJumpProfile,
+    route: f32,
+) -> (DuckEvent, Edge) {
     let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
     duck.direction = direction;
     duck.controller.profile = profile;
-    for _ in 0..900 {
+    for _ in 0..EXIT_DELAY_TICKS {
         duck.step();
         if duck
             .controller
             .navigator
             .flight_tick
             .is_some_and(|t| t >= 5)
+            && duck.controller.direction == route
         {
             let target = duck.controller.navigator.plan.unwrap().target;
             let edge = edges(&duck)
@@ -27,7 +37,7 @@ fn near_miss(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> (Duc
                 .flatten()
                 .find(|edge| {
                     edge.body.entity.value() == 1000 + target as u64
-                        && edge.outward * direction < 0.0
+                        && edge.outward * direction * route < 0.0
                 })
                 .unwrap();
             stage_miss(&mut duck, edge);
@@ -531,5 +541,45 @@ fn automatic_ledge_scene_fixtures_replay_pause_and_render_at_target_sizes() {
     }
     if let Some(path) = std::env::var_os("SPACEWARS_DUCK_AUTO_LEDGE_FRAMES") {
         std::fs::write(path, serde_json::to_vec(&captures).unwrap()).unwrap();
+    }
+}
+
+#[test]
+fn exit_opening_behind_a_committed_catch_or_climb_waits_for_support() {
+    for aspect in ASPECTS {
+        for direction in [-1.0, 1.0] {
+            for profile in PROFILES {
+                for phase in [Phase::Reaching, Phase::Hanging, Phase::Climbing] {
+                    let (mut duck, _) = near_miss_toward(aspect, direction, profile, -1.0);
+                    for _ in 0..80 {
+                        duck.step();
+                        if duck.ledge_state().phase == phase {
+                            break;
+                        }
+                    }
+                    assert_eq!(duck.ledge_state().phase, phase);
+                    let jumps = duck.jumps;
+                    duck.tick = OPENING_TICKS + EXIT_DELAY_TICKS - 1;
+                    for _ in 0..ATTEMPT_TICKS {
+                        duck.step();
+                        assert_eq!(duck.jumps, jumps, "no rescue jump while climbing");
+                        if duck.ledge.automatic.stats.completed == 1 {
+                            break;
+                        }
+                        assert_eq!(duck.controller.direction, -1.0, "finish committed climb");
+                    }
+                    assert_eq!(duck.ledge.automatic.stats.outcome, Some(Outcome::Climbed));
+                    assert!(duck.grounded());
+                    duck.step();
+                    assert_eq!(duck.controller.direction, 1.0);
+                    assert!(
+                        duck.controller
+                            .navigator
+                            .plan
+                            .is_none_or(|p| p.target > p.source)
+                    );
+                }
+            }
+        }
     }
 }
