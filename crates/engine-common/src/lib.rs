@@ -1065,6 +1065,36 @@ pub struct ClockDuckNavigationState {
     pub water: ClockDuckWaterState,
     #[serde(default)]
     pub recovery: ClockDuckRecoveryState,
+    #[serde(default)]
+    pub ledge: ClockDuckAutoLedgeState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckAutoLedgeOutcome {
+    Climbed,
+    Missed,
+    Blocked,
+    Wet,
+    Deadline,
+    TimedOut,
+    Interrupted,
+    TakenOver,
+}
+
+/// Automatic decisions are separate from the shared physical ledge state.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckAutoLedgeState {
+    pub active: bool,
+    pub target_body: Option<u64>,
+    pub attempts: u32,
+    pub completed: u32,
+    pub failed: u32,
+    pub attempt_ticks: u32,
+    pub hang_ticks: u32,
+    pub cooldown_ticks: u32,
+    pub candidates_checked: u32,
+    pub outcome: Option<ClockDuckAutoLedgeOutcome>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

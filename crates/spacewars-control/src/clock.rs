@@ -982,6 +982,13 @@ mod tests {
             ledge: Default::default(),
             outcome: Some(engine_common::ClockDuckOutcome::Exited),
             navigation: Some(engine_common::ClockDuckNavigationState {
+                ledge: engine_common::ClockDuckAutoLedgeState {
+                    attempts: 2,
+                    completed: 1,
+                    failed: 1,
+                    outcome: Some(engine_common::ClockDuckAutoLedgeOutcome::Climbed),
+                    ..Default::default()
+                },
                 recovery: engine_common::ClockDuckRecoveryState {
                     active: true,
                     interrupted_jumps: 2,
@@ -1113,6 +1120,7 @@ mod tests {
             .unwrap();
         navigation.remove("jump_profile");
         navigation.remove("recovery");
+        navigation.remove("ledge");
         let planning = navigation["planning"].as_object_mut().unwrap();
         for field in [
             "running_jumps",
@@ -1128,6 +1136,10 @@ mod tests {
         plan.remove("next_target");
         let older = ClockState::from_json(&careful_payload.to_string()).unwrap();
         let navigation = older.duck.unwrap().navigation.unwrap();
+        assert_eq!(
+            navigation.ledge,
+            engine_common::ClockDuckAutoLedgeState::default()
+        );
         assert_eq!(
             navigation.recovery,
             engine_common::ClockDuckRecoveryState::default()

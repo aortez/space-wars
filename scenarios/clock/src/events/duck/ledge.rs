@@ -5,6 +5,9 @@ use engine_common::{
     ClockDuckLedgePhase as Phase, ClockDuckLedgeReason as Reason, ClockDuckLedgeState,
 };
 
+mod automatic;
+#[cfg(test)]
+mod automatic_tests;
 mod geometry;
 use geometry::{Edge, clear_path, edges};
 
@@ -47,21 +50,24 @@ struct Attachment {
 #[derive(Default)]
 pub(super) struct Ledge {
     command: LedgeCommand,
+    catch_target: Option<Edge>,
     attachment: Option<Attachment>,
     pub stats: ClockDuckLedgeState,
+    pub automatic: automatic::Automatic,
 }
 
 impl DuckEvent {
-    /// Shared seam for the upcoming player/automatic adapters and replay fixtures.
-    #[allow(dead_code)]
+    /// Shared seam for command adapters and replay fixtures.
     pub fn set_ledge_command(&mut self, command: LedgeCommand) {
         if matches!(self.phase, EventPhase::Running | EventPhase::Exiting) {
             self.ledge.command = command;
+            self.ledge.catch_target = None;
         }
     }
 
     pub(super) fn clear_ledge_command(&mut self) {
         self.ledge.command = LedgeCommand::Idle;
+        self.ledge.catch_target = None;
     }
 
     pub(super) fn ledge_attached(&self) -> bool {
@@ -106,6 +112,7 @@ impl DuckEvent {
     /// Buoyancy has already been applied; the caller performs the single solve.
     pub(super) fn drive_ledge(&mut self) -> bool {
         let command = std::mem::take(&mut self.ledge.command);
+        let catch_target = self.ledge.catch_target.take();
         let stats = &mut self.ledge.stats;
         stats.candidates_checked = 0;
         stats.clearance_queries = 0;
@@ -127,7 +134,7 @@ impl DuckEvent {
                 return false;
             }
             self.ledge.stats.phase = Phase::Reaching;
-            self.try_catch();
+            self.try_catch(catch_target);
         }
         let Some(mut attachment) = self.ledge.attachment else {
             return false;
@@ -248,22 +255,22 @@ impl DuckEvent {
         true
     }
 
-    fn try_catch(&mut self) {
+    fn try_catch(&mut self, target: Option<Edge>) {
         let world = self.world.as_ref().unwrap();
         let motion = world.motion(DUCK_BODY).unwrap();
         let r = self.radius;
         self.ledge.stats.reason = Some(Reason::NoEligibleEdge);
-        for edge in edges(self).into_iter().flatten() {
+        let candidates = if let Some(target) = target {
+            let mut candidates = [None; geometry::MAX_EDGES];
+            candidates[0] = Some(target);
+            candidates
+        } else {
+            edges(self)
+        };
+        for edge in candidates.into_iter().flatten() {
             self.ledge.stats.candidates_checked += 1;
             let anchor = edge.anchor(world).unwrap();
-            let offset = motion.position - anchor;
-            let relative = motion.linear_velocity - edge.velocity(world).unwrap();
-            if offset.length() > r * REACH_RADII
-                || !(0.3 * r..=2.0 * r).contains(&(offset.x * edge.outward))
-                || !(-2.0 * r..=-0.1 * r).contains(&offset.y)
-                || relative.x * edge.outward > r * 2.0
-                || relative.length() > r * DISRUPTION_SPEED_RADII
-            {
+            if !edge.in_reach(self) {
                 continue;
             }
             let hang = anchor + Vec2::new(edge.outward * 1.12 * r, -0.9 * r);
