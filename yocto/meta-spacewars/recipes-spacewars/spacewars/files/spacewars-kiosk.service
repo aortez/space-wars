@@ -9,6 +9,9 @@ Type=simple
 User=spacewars
 Group=spacewars
 SupplementaryGroups=input video audio
+RuntimeDirectory=spacewars-kiosk
+RuntimeDirectoryMode=0750
+Environment=SPACEWARS_CONTROL_SOCKET=/run/spacewars-kiosk/control.sock
 Environment=SPACEWARS_CONFIG_DIR=/var/lib/spacewars
 Environment=SLINT_BACKEND=linuxkms
 EnvironmentFile=/run/spacewars-hardware/hardware.env

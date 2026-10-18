@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T00:07:10.621285+00:00",
+  "implementation_commit": "16df0be2b9996db3803ef215b80091127b88095b",
+  "scope": "Data/configuration archive and independent export verification using temporary fixtures only. No installed Pi credentials were captured, no live backup was taken, and no bootstrap preparation or installation was performed.",
+  "host_validation": {
+    "ota_tests_passed": 151,
+    "manager_tests_passed": 38,
+    "optional_archive_tests_passed": 2,
+    "optional_test_scope": [
+      "GNU tar restore into a temporary directory: content, mode, current-user ownership, hard links, symlinks, nanosecond timestamps, binary xattr and POSIX ACL",
+      "NetworkManager bind alias and unexpected mount checks inside a private user/mount namespace"
+    ],
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "aarch64_all_targets": "built",
+    "initial_failure": "The independent-export fixture inherited a broad directory mode under umask 0002. Fixed the fixture to use mode 0700; production permission checks were retained. Final full test run passed."
+  },
+  "pi5_validation": {
+    "uid": 1000,
+    "fixture_tests_passed": 11,
+    "workstation_only_tests_ignored": 2,
+    "remote_directory": "/tmp/spacewars-data-backup.ziUqgw",
+    "test_binary": {
+      "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-bfa87321f5ceb7b8",
+      "sha256": "ba3b69ce859516afdd6d4d8b31acfffdea119cf5e3473c7e2c083989da82c956"
+    },
+    "backup_command": {
+      "path": "target/aarch64-unknown-linux-gnu/debug/examples/bootstrap_backup_data",
+      "sha256": "dd51e5cd6310550084625fca4fe86ef48228bc08672fbc0dc49dd025f5a5f64b"
+    },
+    "backup_rejected_without_root": true,
+    "boot_id_unchanged": "de606400-dc75-446e-b26b-385592b0f562",
+    "installed_credential_contents_read": false
+  },
+  "device_mutations": {
+    "temporary_uid_1000_fixture_binaries": true,
+    "installed_configuration": false,
+    "services_stopped": false,
+    "network_state": false,
+    "root_preparation": false,
+    "live_data_backup": false,
+    "boot_remount": false,
+    "raw_partition_write": false,
+    "watchdog_open": false,
+    "reboot": false
+  },
+  "image_scope": {
+    "new_image_built_for_archive_helpers": false,
+    "latest_validated_image_source": "c14c53f53012722e653c303834499906393fe2cb",
+    "bootstrap_archive_helpers_are_separately_built_examples": true
+  },
+  "remaining": [
+    "Authenticated root connections on both Pis",
+    "Supervised live raw/data backups, independent exports and restore rehearsal",
+    "Legacy fallback-root privilege and network-importer migration with durable recovery",
+    "Inactive-root apply, staged boot, local persistence health and watchdog handoff",
+    "Canonical normal boot confirmation, recovery baseline and physical failure qualification",
+    "End-to-end feed, updater, policy and UI integration"
+  ],
+  "logs": {
+    "host-final": {
+      "path": "target/ota-data-backup-host-final.log",
+      "sha256": "e48e770d7c8670ae4bf550b67f20fcf3f679c28671be69e89263a77fbb283b23",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.24s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.68s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 129 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 17.32s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "archive-tests-final": {
+      "path": "target/ota-data-backup-archive-tests-final.log",
+      "sha256": "65228c8fb09600b39378b70d265473f51ce2779b9ebec8b5994df3aebcf3814f",
+      "test_results": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out; finished in 0.01s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy-final": {
+      "path": "target/ota-data-backup-clippy-final.log",
+      "sha256": "e83b8f5afb42c1e387a1188a81baac15311b3242cf87a186e3f7dc4f243d7f98"
+    },
+    "msrv": {
+      "path": "target/ota-data-backup-msrv.log",
+      "sha256": "00ee641b7609784a726c515a906686c908f594591aee51595e3258e58634e646"
+    },
+    "aarch64-build": {
+      "path": "target/ota-data-backup-aarch64-build.log",
+      "sha256": "36f3d7392557d9705347963d4025755cd2ca0af1e0743639c2b5d07845762f75"
+    },
+    "pi5-tests": {
+      "path": "target/ota-data-backup-pi5-tests.log",
+      "sha256": "b7a4490cc72ea14d65a08df246582647388a50d0db603cc8714f77637b5de99e",
+      "test_results": [
+        "test result: ok. 11 passed; 0 failed; 2 ignored; 0 measured; 122 filtered out; finished in 0.11s"
+      ]
+    },
+    "pi5-denial": {
+      "path": "target/ota-data-backup-pi5-denial.log",
+      "sha256": "a2fe1c8b5f69df030c1d6dd5858052d8d438e27556269cf87252ee0fcbd79517"
+    },
+    "pi5-observation": {
+      "path": "target/ota-data-backup-pi5-observation.log",
+      "sha256": "9309f48340e98a1111a896d90187cc69e0ca791dd7265abc050bc24d3487ddeb"
+    },
+    "pi5-layout": {
+      "path": "target/ota-data-backup-pi5-layout.log",
+      "sha256": "579c2b964e8853519e9488b594607983f8e348550d961a69b169ea938cd51391"
+    },
+    "pi5-service": {
+      "path": "target/ota-data-backup-pi5-service.log",
+      "sha256": "449ec8ca36dfeaffcb0635eeebb6d721ea5a397bc9c8f285200f84bfaa5ad3d6"
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "cargo test --locked -p engine-ota bootstrap::archive::tests -- --include-ignored --test-threads=1",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "cargo build --locked -p engine-ota -p engine-os-manager --all-targets --target aarch64-unknown-linux-gnu",
+    "On Pi 5 as UID 1000: test binary with filters bootstrap::archive::tests, bootstrap::data_backup::tests, bootstrap::device::tests::preservation_requires_a_loaded_stopped_kiosk_and_no_running_state_writer and --test-threads=1"
+  ]
+}

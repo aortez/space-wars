@@ -1,0 +1,1682 @@
+# Preparing the existing Pis for OTA
+
+The initial fresh flashes provisioned the separate `swadmin` owner account on
+the Pis. The [flash utility](../yocto/README.md#flash) preserves and verifies
+`/data` during that operation. The supervised migration below now uses this
+separately authenticated privileged access; an ordinary kiosk login cannot
+grant that access to itself.
+
+This alternative migration uses separately authenticated root access on each Pi
+and preserves its existing `/data` partition. Normal rootfs OTA cannot perform
+this first migration: the new kernel and recovery initramfs differ from the
+installed boot assets.
+
+**Implemented:** read-only legacy inventory, workstation package creation,
+root-only package validation, a durable preparation reservation, raw boot/inactive
+root recovery copies, a data/configuration archive, original-file preservation,
+restartable fixed-file replacement, effective access checks, a restartable
+inactive-root installer, independent-export verifiers, restartable boot staging,
+consumed one-shot activation, a first-boot recovery coordinator, and restartable
+canonical asset preparation/activation with separate staged and canonical
+normal-boot health checks, and an explicit archive/cleanup/recovery handoff.
+**Verified on the replacement Pi 5 and primary Picade:** the corrected image
+passed the trial, staged normal and canonical normal boots on both devices.
+Finalization archived the temporary assets and established an initial
+generation-zero recovery baseline on each, accepted by the production recovery
+service.
+**Trusted feed:** an owner-local authority and empty signed feed are now
+provisioned on both primary Pis. Each verified Release and Nightly over HTTPS
+with the native owner helper, preserving the baseline and installed images;
+see the [live trust evidence](data/ota-owner-feed-20261017.json).
+**Remaining:** Pi 4/5 physical failure qualification, signed-image delivery,
+installed service/policy rollout, and a separate rollout to `sw-picade-2.local`.
+Automatic OTA installation is still disabled; a bootstrap package is not a signed
+OTA release.
+
+The [supervised recovery failure runner](ota-recovery-qualification.md) has now
+observed missing-root fallback on the primary Picade against this completed
+baseline, with the production record unchanged. Signed-candidate quarantine
+and interrupted promotion remain separate qualification steps.
+
+The [2026-10-17 hardware record](data/ota-bootstrap-live-20261017.json) tracks
+the initial run; follow-up records appear below. That Picade run completed raw,
+data/configuration and original-file backups with independently verified
+workstation exports, plus the fixed fallback file replacements and independent
+administrator/runtime access checks. SSH was lost before the inactive-root
+installation command began. A subsequent check found a new boot ID, the original
+slot A still selected, the replacement manager intact, and both kiosk and device
+services active. Installation and staging had not started; the cause of that
+reboot has not been established. The later Picade run below archived this
+unactivated preparation intact before using the corrected image.
+
+The Pi 5's raw
+inactive-root copy stopped on medium read errors before installation; its boot
+copy and a separate data/configuration export are retained off-device.
+
+The replacement Pi 5 has since completed preservation, independent exports,
+access checks, inactive-root installation and boot staging. Its first live
+trial reached slot B but stopped at a service mount check. An unfed 210-second
+early watchdog was followed by an automatic reset and return to original slot A.
+The corrected runtime passed that check in a second trial, which then failed
+its kiosk state-write check and returned to slot A. Both consumed attempts and
+their recovery copies are retained. See the
+[first replacement trial record](data/ota-pi5-replacement-bootstrap-20261017.json)
+and [second trial record](data/ota-pi5-corrected-bootstrap-20261017.json). The
+[third attempt](data/ota-pi5-bootstrap-success-20261017.json), using the clean
+`e986718` image, completed the migration and recovery handoff described below.
+
+### Replacement Pi 5 USB drive
+
+The owner selected the connected 128 GB SanDisk Extreme Pro as the replacement
+for `spacewars.local` and explicitly approved erasing its Ubuntu installer and
+writable partition. The prepared workstation command is
+`python3 target/flash-spacewars-replacement.py`, with `--dry-run` for inspection.
+The owner's execution completed the image write, verified all mapped image
+bytes, grew the data partition and wrote the hostname. Hardware-profile
+selection then stopped before data restoration because its unprivileged
+`existsSync` check could not enter the root-mounted FAT filesystem under the
+operator's private umask. The same error was reproduced in a regression test.
+Boot profile/identity reads now use sudo, and the written selection is read
+back before success.
+
+The subsequent `--finish` execution selected HyperPixel and restored and
+verified all 18,148 data entries. Access provisioning then rejected the
+intentionally empty root-key file: the workstation's `stat %F` reports
+`regular empty file`, while the checker required `regular file`. Its owner and
+0600 permissions match the archive. The checker now uses numeric type/mode
+bits and retains the exact owner/group and single-link requirements. A real
+empty-file test reproduced the failure before the fix. An isolated root
+fixture also passed the remaining provisioning operation against the actual
+archived access store and account files from the frozen image, preserving all
+role files unchanged and leaving root access empty.
+
+The owner's `--finish-access` execution has now completed. It verified the
+installed image and all 18,148 restored entries, preserved administrator access,
+and passed the final read-only data check before unmounting and printing
+`READY`. The workstation completion receipt was inspected, and all four USB
+partitions were independently observed unmounted. No image write, partition
+resize or data restoration was repeated during this final invocation.
+The owner moved the replacement to the Pi 5 and booted it. Independent SSH
+checks and the read-only native probe confirmed the same Pi 5 board, the
+128 GB Extreme Pro, slot A, HyperPixel, and the clean `04b6cb7` image. The
+running kernel build ID and both installed and running executable hashes match
+the frozen artifacts. Wi-Fi is connected, the clock is synchronized, separate
+administrator login and sudo work, and the runtime account cannot run
+unrestricted sudo. Both services are active with zero restarts; at the final
+check, uptime was 285 seconds, with no failed units, service warnings or storage
+errors in the current boot journal. Other driver startup warnings are retained
+in the private evidence; the touchscreen and DPI framebuffer registered
+successfully. This is a first-boot observation, not a complete media surface
+test or an OTA recovery qualification.
+
+The owner also connected the original SanDisk 3.2Gen1 to the workstation. Its
+capacity and full serial match the failing source disk, and all four partitions
+are unmounted. No writes or repairs were attempted. Keep that disk and the
+verified workstation archive for recovery. The replacement command's historical
+`/dev/sdb` path now refers to this original disk, not the replacement; its model,
+capacity and connection checks must not be weakened or rebound to run again.
+Private first-boot evidence is retained in
+`target/ota-pi5-replacement-first-boot-20261017/verification.json`.
+
+The owner then ran the serial- and connection-bound read-only diagnostic on
+the original disk. Direct 4 KiB reads at sectors 0 and 12,711,936 succeeded;
+sector 12,712,136 returned `Medium Error / Unrecovered read error`, matching
+the exact sector that failed on the Pi. The failure therefore follows the
+drive across hosts: retire it from service and retain it only as a recovery
+source for now. The diagnostic exited with status 3 because its read-error
+handler omitted `ENODATA` (errno 61); the saved kernel evidence establishes the
+read failure independently. That handler is corrected and its injected-error
+regression passes. The full scan never started, and no writes or repairs were
+performed. Flash-chip versus controller/firmware failure remains undiagnosed.
+Evidence and assessment are retained in
+`target/original-pi5-disk-check-vf4cjtlj/assessment.json`.
+
+The replacement flash command pins the reviewed image, data archive and helper hashes,
+plus the connected disk's model, capacity, USB path and connection sequence. Its
+serial is all zeroes, so that value alone is insufficient to select the disk.
+After exact-path confirmation, it removes the old partition signatures, writes
+the clean `04b6cb7` image, reads back all 637,599,744 mapped image bytes, grows
+`/data`, and selects hostname `spacewars` and the HyperPixel profile.
+
+The [archive restoration helper](../yocto/scripts/recovery_archive.py) restores
+only the archived `/data` tree into the separately mounted offline partition.
+It verifies 18,148 selected entries, including real numeric owners, contents,
+modes, links, nanosecond timestamps and extended attributes. Root configuration
+from the failing disk stays in the recovery archive; active bootstrap/recovery
+journals are rejected. Existing unrelated destination files or mismatched path
+types also stop restoration. Wi-Fi, SSH host identity and the separate access
+store are in the selected data. Access provisioning is followed by another
+read-only data verification before the command prints `READY`.
+
+Seven focused tests passed in an isolated root container, including foreign
+numeric owners, hard/symbolic links, xattrs, damaged archives, unsafe paths and
+destination conflicts. A further isolated root-container rehearsal restored
+the actual archive's entire selected tree and verified all 18,148 entries,
+including numeric ownership. Replacement-device restoration, access
+provisioning, final readback and the observed first boot have passed.
+The complete Yocto suite passes 70 Node tests and 87 Python tests, with one
+skipped in each. The focused hardware suite has 16 passing tests.
+A fresh flash still needs its own recovery-baseline qualification; these tests
+do not enable automatic OTA installation.
+
+### First replacement bootstrap trial
+
+The replacement's raw boot/inactive-root copies, 18,746-entry data archive and
+21 original files were independently exported and verified. Fallback-file
+replacement and independent administrator/runtime access checks passed. Slot B
+installation passed flush, readbacks and filesystem/image validation; the full
+trial tree reached `trial-ready` while retaining the original default.
+
+The requested trial boot reached slot B with the expected token. Recovery
+reported `bootstrap completion crossed mounts` at 5.862 seconds, before health
+observation or normal-default promotion. The immutable early record reports
+the watchdog armed at 0.714 seconds for 210 seconds. The last successful trial
+observation was at 204.4 seconds; the next reachable boot used slot A with
+firmware tryboot false. No further reboot request, watchdog open, keepalive or
+disable was issued. This supports the timeout/fallback path for this board and
+replacement medium; the exact reset-cause register was not captured, and the
+full power-loss/recovery matrix remains unqualified.
+
+The failure was the bootstrap coexistence check comparing mount IDs for
+`/data/spacewars-system` and `/data`. `ProtectSystem=strict` and the installed
+unit's `ReadWritePaths` intentionally give that exact subtree a separate bind
+mount. The check now uses the existing validator for its precise ext4 source,
+mount root and destination, as the trial-journal path already does.
+
+The new root-only `bootstrap_inspect_trial` example reads the existing journal
+under the installation lock without advancing it, opening a watchdog or
+requesting a reboot. Native before/after binaries ran under the installed
+recovery sandbox on the returned Pi 5: the old check reproduced the failure,
+the correction passed, and wrong-directory and foreign-filesystem binds were
+rejected. The journal hash and boot ID stayed unchanged. The foreign-filesystem
+case was rejected by the earlier directory opener; the diagnostic harness's
+initial expected error wording was corrected without repeating the tests.
+All 329 OTA unit tests and 160 manager unit tests passed, with 8 and 2
+environment-specific tests ignored respectively.
+
+After that trial the Pi was running its original slot A with kiosk, device
+service, Wi-Fi and administrator access working. Its journal remained consumed
+at `trial-requested`, without health proof, canonical migration or a production
+recovery baseline. That attempt must never be reset or activated again.
+
+### Explicit failed-attempt reconciliation and corrected image
+
+The [reconciliation record](data/ota-pi5-failed-trial-reconciliation-20261017.json)
+retains the exact consumed journal and all recovery copies. A device-specific
+operator procedure required the unchanged fallback boot, original board and
+mount identities, the shared installation lock, stopped runtime writers, and
+matching control-record and boot-file hashes. Its filesystem rehearsals passed
+27 scenarios across seven test groups, including interruption at ten checkpoints,
+corrupt inputs, foreign links, conflicting archives and a changed journal.
+These are not physical power-loss qualification.
+
+The full 187-file boot tree was independently captured before cleanup. After
+the same checks passed on the Pi, the procedure restored the original factory
+`tryboot.txt` from its verified raw recovery copy and removed only the 78 copied
+and verified staged files. The native inventory probe confirmed the exact
+original 109-file boot tree. It then renamed the whole reservation and package
+to `/data/logs/spacewars-bootstrap-failed-afef8ee0/attempt`, preserving the trial
+journal's bytes and all prior backups. Root slots, normal configuration, later
+user data and fallback replacement scratch files were untouched. Both runtime
+services restarted successfully without a reboot.
+
+The [corrected image record](data/ota-corrected-bootstrap-image-20261017.json)
+binds the clean `a05944b` source to frozen Pi 4/Picade and Pi 5/HyperPixel packages.
+All 6,768 Yocto tasks succeeded, with 6,738 reused. Independent candidate
+inspection verified the image, embedded build inputs and compiler policy. An
+initial stale workstation validator rejected bootstrap protocol 5; rebuilding
+the feature-gated `image_candidate` with `--features publisher` resolved that
+tool mismatch without changing the image or its validation policy.
+
+A new Pi 5 attempt used a distinct preparation binding and fresh preservation;
+it did not reuse the archived attempt's activation allowance.
+
+### Second trial and the health-worker capability correction
+
+The [second trial record](data/ota-pi5-corrected-bootstrap-20261017.json) binds the
+new attempt to the `a05944b` image and its fresh raw, data and original-file
+preservation receipts. The 18,751-entry data archive was independently exported
+and checked for contents, modes, links and timestamps. Numeric owners remain in
+the archive; this unprivileged workstation rehearsal did not recreate them.
+Separate administrator/runtime access checks, inactive-root write and readback,
+filesystem validation and boot staging passed before the single activation.
+
+Trial `f952a6f4` booted slot B and reached `observing-trial`, passing the corrected
+mount check. It repeatedly reported `kiosk required state write failed`. The
+last trial observation was at 173.07 seconds; the next reachable boot was the
+original slot A, with the consumed journal marked `failed / health-timeout`.
+The original normal configuration is unchanged. No manual reboot or watchdog
+operation followed activation. The early watchdog was armed for 210 seconds,
+but the exact reset cause was not captured; this observation alone does not
+establish watchdog expiry.
+
+The state probe worked outside the recovery sandbox. Inside it, `setpriv`
+failed to switch to UID 1000 because the effective capability set lacked
+`CAP_SETUID`, despite its presence in `CapabilityBoundingSet`. The pinned
+[systemd 255 implementation](https://github.com/systemd/systemd-stable/blob/356c54394add8c6a1d52773852c23656590dc33b/src/core/exec-invoke.c#L4917)
+drops this capability during seccomp setup unless it is also requested as an
+ambient capability. The unit now sets `AmbientCapabilities=CAP_SETUID`, keeping
+the existing bounding set and sandbox restrictions. The kiosk probe runs with
+UID/GID 1000, no privileged supplemental groups, zero permitted/effective/ambient
+capabilities and `NoNewPrivileges=1` after the transition.
+
+The [native diagnostic](../yocto/scripts/check-recovery-health.py) uses the
+checkout's recovery sandbox with the installed health worker on a normally
+booted Pi. It holds the installation lock during each transient service and
+checks that the boot, worker binary and bootstrap journal stay unchanged:
+
+```sh
+python3 yocto/scripts/check-recovery-health.py \
+  --host spacewars.local --output target/recovery-health-check \
+  --compare-without-setuid
+```
+
+The output directory must be new. The optional comparison requires reproduction
+of the old systemd 255 capability failure. All five live cases passed: that
+failure, the unprivileged state write, two healthy observations with advancing
+UI/display counters, and rejection of a read-only configuration directory.
+The six artifact-policy tests and nine kiosk-health tests also passed. This
+diagnostic does not run recovery policy or establish boot qualification.
+
+At the end of that diagnostic, the Pi was operating on its original slot A with
+kiosk, device service and Wi-Fi active, administrator access working and no
+observed storage errors. The production unit was not patched in place. The
+following attempt used a clean image containing the correction, after explicitly
+reconciling the consumed `f952a6f4` attempt. Neither failed journal may be reset
+or reactivated.
+
+### Successful Pi 5 bootstrap and recovery handoff
+
+The [success record](data/ota-pi5-bootstrap-success-20261017.json) binds the
+completed migration to clean source `e986718`. All 6,768 Yocto tasks succeeded,
+with 6,734 reused. Independent candidate inspection accepted the image, embedded
+build inputs and compiler policy. The recovery unit extracted from the actual
+root image matched the checkout, including `AmbientCapabilities=CAP_SETUID`.
+Pi 4 and Pi 5 packages were frozen; only the Pi 5 package was installed in this run.
+
+Before preparing a fresh attempt, the tested reconciliation procedure archived
+the whole second reservation and package at
+`/data/logs/spacewars-bootstrap-failed-f952a6f4/attempt`. The consumed journal
+remained byte-for-byte unchanged. The original 109-file boot inventory was
+verified after restoring the factory trial selector and removing only the 78
+independently preserved staged files. The first failed attempt also remains
+intact. Reconciliation did not write either root slot, restore user data, open
+the watchdog or reboot the device.
+
+The new attempt made fresh raw, data/configuration and original-file backups,
+with independent workstation exports. The data archive contains 18,755 entries;
+an unprivileged extraction verified contents, modes, links and nanosecond
+timestamps. Numeric owners are retained in the archive, but were not recreated
+by this extraction. A temporary hostname-resolution failure interrupted an
+independent access check after preservation. Runtime services were restored;
+separate access checks subsequently passed at the authenticated current address
+with the existing host key required. The final post-boot checks also passed
+through `spacewars.local`. No preservation or activation allowance was reset.
+
+Slot B installation, readback, filesystem validation and staging passed. The
+single trial activation returned an accepted reboot reply before SSH exited
+with status 255; the command was not repeated. All three boots then completed
+their own local health windows on the same installed image:
+
+| Boot | Boot ID | Healthy observation window |
+| --- | --- | --- |
+| One-shot trial | `9b0d6b67-d927-4387-b5a5-909dc58caf51` | 7.085–68.001 s (60.916 s) |
+| Staged normal | `2d56d776-17f5-489a-9754-32b81bba4969` | 6.892–67.660 s (60.768 s) |
+| Canonical normal | `ec997cb4-c669-4b14-b593-e3b50d1f31d6` | 7.692–68.733 s (61.041 s) |
+
+The early trial record reports the watchdog armed at 0.719 seconds for 210
+seconds. Its volatile completion receipt was not captured before the successful
+normal reboot. The persistent health proofs and subsequent normal boots were
+observed; the complete watchdog and deliberate-failure matrix remains separate.
+
+After independent canonical-boot verification, finalization archived and
+removed 78 temporary boot files, retained the completed reservation, and
+published the initial production recovery baseline on slot B at generation
+zero. The retired archive was independently exported and hash-verified. The
+native boot probe accepted the cleaned canonical tree. Restarting the ordinary
+recovery service reported `healthy` and left the baseline and completed journal
+unchanged. No legacy slot was claimed as a retained-good image.
+
+Fresh administrator login and sudo succeeded; runtime login worked while
+unrestricted sudo and recovery execution were denied. The Clock controls opened
+and returned to unpaused gameplay without restarting the kiosk. These were
+logical UI actions, not physical button/controller tests. A captured 800×480
+frame showed the Clock; kiosk and device services had zero restarts, and the
+current kernel log contained no observed storage errors.
+
+The completed reservation and both failed attempts remain available for
+recovery. Trust and staging are not provisioned, and automatic OTA is disabled.
+Neither Picade was changed during that Pi 5 run. The primary Picade follow-up
+appears below; physical failure qualification remains separate.
+
+### Primary Picade bootstrap
+
+The [Picade hardware record](data/ota-picade-bootstrap-success-20261017.json)
+captures the completed migration and recovery handoff on `sw-picade.local`. It
+used the same clean `e986718` image and frozen Pi 4 package as the successful
+Pi 5 run. No image was rebuilt. The board, PNY USB drive, layout, original slot A
+and Picade hardware profile were checked against the earlier preparation before
+any installation.
+
+The old `04b6cb7` preparation had no root-install or trial journal. Its raw,
+data/configuration and original-file exports were reverified. Under the shared
+installation lock, the complete preparation was archived at
+`/data/logs/spacewars-bootstrap-prepared-04b6cb7/attempt`. All seven control
+records and the original 109-file boot inventory remained unchanged. This
+reconciliation did not write either root slot, restore user data, open the
+watchdog or request a reboot.
+
+Fresh preservation and independent exports passed for the corrected package.
+The new data archive contains 1,210 entries; the workstation extraction verified
+contents, modes, links and nanosecond timestamps. Numeric owners remain in the
+archive but were not recreated by the unprivileged extraction. Independent
+administrator and runtime access checks used the authenticated current address
+and existing host key while NetworkManager was temporarily frozen. Administrator
+sudo worked; unrestricted runtime sudo, recovery execution and logind reboot
+permission were denied. NetworkManager was thawed before inactive-root installation.
+
+Slot B write/readback, filesystem validation and staged boot preparation passed.
+The one-shot activation was accepted once, and all three boots completed their
+own local health windows on the corrected image:
+
+| Boot | Boot ID | Healthy observation window |
+| --- | --- | --- |
+| One-shot trial | `69f0ae4c-d7ba-4d6f-a78b-5a23e1dcaee3` | 11.539–71.673 s (60.134 s) |
+| Staged normal | `0d363d8d-582a-41ed-bec7-9521a0bb78b8` | 12.668–72.986 s (60.318 s) |
+| Canonical normal | `7d1a472c-a5b2-406d-83f6-b4dd94f23166` | 12.622–73.412 s (60.790 s) |
+
+The early trial watchdog was armed at 1.444 seconds for 210 seconds. Both its
+arming record and the production recovery worker's completion receipt were
+captured for the same trial and boot ID. They are retained on the workstation
+and at `/data/logs/spacewars-bootstrap-watchdog-e986718-picade`. The diagnostic
+only copied receipt files; it did not open the watchdog or change its timeout.
+These receipts do not qualify the complete deliberate-failure matrix.
+
+Canonical preparation completed 107 files, and the normal boot was independently
+verified before starting finalization. Finalization archived and removed 78
+temporary boot files and published the initial generation-zero recovery baseline
+on slot B. The retired files were independently exported and hash-verified; the
+native boot probe accepted the cleaned canonical tree. Restarting the ordinary
+recovery service reported `healthy`, with the baseline and completed trial journal
+unchanged. No legacy root was claimed as a retained-good image.
+
+Fresh hostname-based administrator login and sudo succeeded. Runtime login
+worked, while unrestricted sudo and recovery execution were denied. Space Wars
+paused, opened its controls, and returned to unpaused gameplay with the same
+kiosk process and boot ID. This verifies logical UI routing, not physical
+buttons/controllers. The final 1024×768 screenshot showed the running game;
+kiosk and device services had zero restarts, and no storage errors were observed
+in the current kernel log.
+
+The completed reservation, earlier unactivated preparation and independently
+verified recovery exports are retained. Trust and staging remain unprovisioned,
+and automatic OTA is disabled. Neither the Pi 5 nor `sw-picade-2.local` was changed
+during this Picade run. Pi 4 missing-root fallback and the remaining Pi 4/5 update
+and recovery failure cases still need qualification.
+
+This run also exposed a one-time bootstrap performance cost: canonical
+preparation took 18 minutes 42 seconds and finalization took 15 minutes 54 seconds
+on this Pi 4. An offline comparison found 101 of 108 canonical assets already
+matched the original inventory, while the
+implementation repeatedly verifies the whole boot tree between operations,
+including unchanged-file paths. The process remained active and progressed.
+Reduce that repeated work in a separate change while retaining complete final
+verification and interruption/change detection. This is not a measurement of
+ordinary rootfs OTA performance.
+
+## Read the existing device
+
+Build `bootstrap_probe` for AArch64, copy it to an ordinary account's temporary
+directory, and run it without sudo:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_probe \
+  --target aarch64-unknown-linux-gnu
+```
+
+The example takes no arguments. It reads the mounted root/boot/data layout,
+partition UUIDs, actual board/USB/EEPROM identity, firmware tryboot state,
+running kernel build ID, original boot files, selected hardware profile,
+hostname and free space. It hashes the boot inventory twice and rereads the
+physical layout to detect changes during inspection. It does not open a block
+device or watchdog, take the install lock, write persistent state or reboot.
+
+This first-stage probe accepts the standard legacy configuration or an
+unprepared flashed recovery image, and requires its default root arguments to
+match the running root. Fresh-image inspection verifies the original image
+identity, complete boot manifest, loaded kernel, factory `/dev/...` default and
+`spacewars.trial=unprepared` selector. A canonical PARTUUID default, used trial
+selector, unknown boot file or mismatched image is not a fresh installation.
+An unfamiliar configuration or interrupted bootstrap needs explicit review.
+The report includes its `origin` and always says
+`root_preflight_complete: false`: unprivileged inspection does not establish
+the private key/journal state, successful backups or safe installation.
+
+The earlier legacy Pi 5 inventory ran slot B with HyperPixel; fresh flashes
+start in slot A. Always use the newly observed layout. The hostname file is
+`hostname.txt`, which the new boot verifier now accepts as an optional, bounded
+DNS host label. It is excluded from the immutable boot identity and preserved
+through selector changes. The old `boot_slot` file is only a legacy breadcrumb;
+it must be archived and removed after canonical confirmation, never used to choose
+the writable partition. Reobserve the selected device before preparing an
+attempt. A completed bootstrap with a production recovery baseline uses the
+ordinary OTA path; it must not be prepared again as a fresh device.
+
+## Build the workstation package
+
+Use an expanded `.ext4` artifact and the boot directory extracted from that
+same clean Yocto build. The output directory must not exist. This historical
+example uses the replacement Pi 5's pre-bootstrap slot A inventory; use the
+selected device's current inventory when planning a new migration:
+
+```sh
+cargo run --locked -p engine-ota --example bootstrap_package -- \
+  /path/to/rootfs.ext4 /path/to/extracted-boot /path/to/new-pi5-package \
+  pi5 hyperpixel 076c4a2a-02 076c4a2a-03 a
+```
+
+For the Picade, use `pi4 picade` and the inactive slot/UUIDs from a fresh probe.
+These command arguments are planning inputs; the eventual root apply command
+must derive them again from live evidence under the installation lock.
+
+The builder pins regular input files, rejects links in asset paths, checks a
+clean complete ext4 header, runs read-only `e2fsck`, and reads the actual image
+identity, supported bootstrap runtime marker and both executable hashes with
+bounded `debugfs` calls. It validates
+every copied boot asset against that image's immutable manifest. It hashes the
+expanded root before inspection and again while compressing it, with unchanged
+file metadata required throughout. The output is real, checksummed zstd with a
+bounded window; a Yocto `.ext4.gz` must first be expanded, never merely renamed.
+
+It publishes one new private directory only after writing and flushing its
+contents. Every nested directory is mode 0700, independent of the workstation
+umask; files are mode 0600. An existing directory or symlink is never replaced.
+Files include:
+
+| Path | Purpose |
+| --- | --- |
+| `bundle.json`, `image.json` | Clean image identity, plan and exact file hashes |
+| `SHA256SUMS` | Transfer-integrity checks, including `bundle.json`; not signatures |
+| `rootfs.ext4.zst` | Actual compressed root filesystem |
+| `engine-os-manager` | Exact manager extracted from that filesystem, not executed by the builder |
+| `legacy-root/` | Fixed fallback-root replacement files extracted from that same filesystem |
+| `boot/` | Complete canonical boot assets and generated normal selectors |
+| `sw-bootstrap/` | One common kernel, selected board DTB, initramfs, overlays and staged command lines |
+| `trial-config.txt`, `normal-config.txt` | Explicit staged boot paths for the supervised migration |
+
+No device hostname, login key, host key, Wi-Fi credential or production signing
+key is shipped in the package. The device's own state must remain authoritative.
+The canonical trial command line remains unprepared. The separate temporary
+trial receives a random attempt identity; that identity grants no production
+installation or watchdog-completion authority.
+
+Package schema 3 carries 20 fixed fallback-root files: disabled
+legacy A/B helpers, guarded maintenance wrappers/backends, the restricted OTA
+sudoers file, persistent access configuration, and network initialization/bind
+units, SSH host-key and Bluetooth preservation helpers, and the host-key
+generation dependency. The manager is a separate 21st replacement. The packager
+reads their bytes from the selected ext4 artifact, checks
+root ownership, exact destination modes, single regular-file links and safe
+directory ancestors, and includes every file in the package inventory and
+checksums. All transferred files remain private mode 0600; the migration
+applies the fixed destination modes. Nothing under `legacy-root/` is executed
+by the packager or interpreted as an arbitrary installation hook.
+
+The device package checker requires the complete fixed list and bootstrap
+protocol 5. The builder and inactive-root readback check require
+`/etc/spacewars/bootstrap-runtime.json` in the actual ext4 image, with schema 1
+and protocol 5. This marker is installed by the image recipe and is part of the
+rootfs identity. It identifies first-image recovery with persistent-store health
+checks, an activation boot ID and durable canonical migration with a staged
+fallback followed by explicit retirement and initial recovery publication;
+the production recovery protocol alone cannot establish that capability.
+The trial journal is schema 4 with a schema 2 preparation binding. That binding
+distinguishes legacy and fresh-image origins and retains the original image
+identity and boot inventory. Protocol 5 also supports a separately provisioned
+`swadmin` operator and replacing an unused factory trial selector under durable
+staging intent. Schema 1/2 packages, bootstrap protocol 1/2/3/4 images, schema 1
+preparation bindings and schema 1/2/3 trial journals are rejected;
+previous local packages must be rebuilt,
+never relabeled. This packaging step does not close any live privileges. The
+migration needs the separately implemented durable per-file record of original
+contents/absence, restartable replacements, a check for running legacy helpers,
+and validation of effective sudo/SSH/systemd configuration before a trial.
+The data archive is a recovery copy, not that per-file migration journal.
+
+The older schema 2 workstation kits are
+`target/ota-bootstrap-c14c53f-pi5-v2` (Pi 5/HyperPixel, target A) and
+`target/ota-bootstrap-c14c53f-pi4-v2` (Pi 4/Picade, target B). Both contain the
+clean `c14c53f` rootfs and its exact replacement assets. Their board, profile and
+slot choices still require a fresh live preflight on the intended device. They
+predate the bootstrap runtime and preservation checks and are rejected by the
+current package checker. Clean source `04b6cb7` now has a protocol-5 Yocto image
+and schema-3 kits for both freshly flashed devices, targeting slot B. Those
+artifacts include the corrected watchdog kernel and SSH admission fixes.
+The [live preservation record](data/ota-bootstrap-live-20261017.json) records
+their use and the hardware limitations; neither kit is a signed OTA release.
+
+## Root package check and preparation reservation
+
+The separate `bootstrap_check` example accepts only the SHA-256 of `bundle.json`,
+supplied over the authenticated operator connection. Its package path is fixed
+at `/data/spacewars-bootstrap/package`; the parent and every package directory
+must be private and root-owned on the actual data filesystem. Neither the
+package's own checksum list nor a kiosk request supplies installation authority.
+
+The checker takes the shared install lock, hashes every declared file, rejects
+unknown files and duplicate metadata keys, and reconstructs the complete boot
+plan from checked assets and newly observed board/profile/root UUIDs. Retained
+firmware and hardware configuration must match. Capacity includes FAT allocation,
+staged assets, canonical growth, the largest atomic replacement, reserves and
+space for recovery copies. Data-content backup sizing remains an additional
+requirement. No root partition, boot selector or persistent journal is written
+by the check. Its report always says `ready_for_write: false`.
+
+`bootstrap_prepare` uses the same check and additionally requires operator
+keys (`root` or the separately provisioned `swadmin`) and runtime login keys
+already preserved in `/data/spacewars-access`, plus an existing
+valid `/data/NetworkManager/system-connections` directory. Establish
+those separate roles with the root manager's `initialize-access` and, if needed,
+`import-root-keys` or `import-admin-keys` operations while the old home files
+remain available. Fresh images already preserve `swadmin`; bootstrap never
+copies its key to `root` or promotes the runtime account. A
+runtime key is never automatically promoted to root. Key presence is not proof
+that either SSH login works; both intended logins still need verification.
+
+Preparation writes only `/data/spacewars-bootstrap/active/binding.json`. It binds
+the operator-selected package to the physical device, layout, original and
+target slots, kernel, profile and complete original boot-file inventory. The
+record and directory are flushed before success. A repeat preparation accepts
+only the same inputs, retains the original record and reports `resumed: true`.
+An ordinary legacy reboot is allowed; its new boot ID does not overwrite the
+first observed ID. Missing, corrupt, partial or conflicting state requires
+explicit reconciliation, and is never deleted or silently reinitialized.
+The existing `time`, `network`, `time-check` and `update-check` service stores
+are preserved, including scheduling history. Recovery, trust, staged updates,
+unknown entries and unsafe directory ownership or links still stop preparation.
+
+An active reservation blocks mutations through the **new** maintenance tools.
+New-image SSH initialization retains an existing access store and refuses to
+reimport keys if that store has disappeared during bootstrap. These guards do
+not change the legacy tools already installed on the Pis; their unsigned write
+and reboot paths still must be closed before trial. Preparation and raw recovery
+copies can resume today. Root installation uses its separate operator example
+below; staging and one-shot activation use their separate manager commands.
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_check \
+  --example bootstrap_prepare --target aarch64-unknown-linux-gnu
+```
+
+Both examples reject non-root execution before accessing the package. Their
+only argument is the separately reviewed bundle hash; neither accepts a device,
+destination path, URL or arbitrary command. Do not reserve a live attempt until
+its remaining recovery and apply procedure is ready for supervised execution.
+
+The inactive-root writer now separates its checked byte-copy mechanism from
+signed OTA authorization. Both paths can use the same bounded zstd decode,
+compressed and expanded hashes, flush, readback, read-only filesystem check and
+second readback. OTA still requires its verified candidate, current boot evidence
+and durable writing transaction. The bootstrap path can compare the complete
+packaged image identity without constructing fictional release metadata. This
+shared mechanism does not itself grant write authority to a preparation record.
+The separate root-install operation adds the admission checks and durable state
+described below.
+
+## Raw recovery copies and independent export
+
+`bootstrap_backup` takes the same separately selected bundle hash. It requires
+an existing valid preparation, preserved login roles and a read-only boot
+filesystem, including its underlying FAT superblock. A read-only bind view of a
+writable filesystem is insufficient. The command does not remount anything or
+stop services; those actions belong to the supervised backup window.
+
+Under the shared install lock it reobserves the layout, then opens only the boot
+and inactive-root block devices **for reading**. It checks their actual device
+numbers, ownership and capacities; the inactive root is exclusively claimed to
+reject a mounted filesystem. Copies go to these private directories:
+
+```text
+/data/spacewars-bootstrap/active/
+  binding.json
+  recovery-copies/
+    boot/partition.img
+    boot/record.json
+    inactive-root/partition.img
+    inactive-root/record.json
+```
+
+Each copy is length-bounded and hashed while reading, flushed, read back and
+compared with a second complete read of its source. Its receipt binds the hash
+and partition role to the original preparation. The image and receipt are
+published together by a flushed directory rename. Existing completed copies are
+verified and retained; corruption or a conflicting record requires reconciliation.
+Only a validated, unpublished `.boot.pending` or `.inactive-root.pending` copy
+can be restarted. Pending scratch space is reclaimed before remeasuring free
+space. Completed verified copies count toward the requirement, so a resume does
+not demand space for duplicates. The data reserve and additional preservation
+allowance still apply.
+
+The report contains `copies_sha256`, covering both receipts. Keep that value
+from the authenticated device connection, then independently copy the complete
+`active` directory to a private workstation directory. Preserve mode 0700 for
+directories and 0600 for files. Verify it with:
+
+```sh
+cargo run --locked -p engine-ota --example bootstrap_verify_backup -- \
+  /path/to/exported-active DEVICE_REPORTED_COPIES_SHA256
+```
+
+This verifier reads regular files only and checks the separately supplied digest
+before hashing the large image files. An export's own checksum records cannot
+substitute for the device-reported digest. Partial exports, links, changed files,
+unknown contents and mismatched preparation records are rejected.
+
+Raw-copy completion still reports `ready_for_write: false`. These copies do not
+cover current `/data` contents or all configuration on the running root; that
+preservation, independent recovery availability, legacy privilege closure,
+installation checkpoints and physical restore testing remain required. No raw
+backup is installation authority. The Pi 5's first live inactive-root copy
+stopped on repeated medium read errors; its completed boot copy was exported,
+and no root image or selector was changed. Keep the incomplete copy and
+reservation as evidence, and resolve the storage fault before retrying migration.
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_backup \
+  --target aarch64-unknown-linux-gnu
+```
+
+## Data and root configuration recovery copy
+
+`bootstrap_backup_data` takes the same separately selected bundle hash and uses
+the existing preparation. It requires preserved operator/runtime login roles and
+the persistent network-profile directory. Under the shared installation lock,
+it checks that the kiosk is stopped (or masked and stopped), and that any
+installed device-state service is stopped. It never stops services or changes
+network/radio state itself. The supervised window must keep other writers and
+operator edits quiescent too; this is a checked file capture, not an atomic
+filesystem snapshot. A changing source fails without publishing a completed copy.
+
+On the current images, a fresh socket-activated SSH connection wants the
+device-state service. Merely stopping that service allows an independent login
+test to start it again. Runtime-mask and stop both services before the capture
+window, retain the authenticated administrator connection, and verify a fresh
+administrator login with the services still masked. The SSH admission helper
+has a stopped-service fallback; it does not change persistent network state.
+Runtime masks live under `/run`, outside the captured configuration, and clear
+on reboot. Unmask and restart the services if preparation stops before installation.
+
+NetworkManager also writes lease and seen-network state independently of these
+services. On the replacement Pi 5, a Wi-Fi reauthentication changed this state
+after a verified capture while its independent export was in progress. The
+original-file guard correctly rejected the stale source. A subsequent supervised
+window freezes only the NetworkManager service cgroup, after checking that the
+existing lease outlasts the window and `wpa_supplicant` runs separately. An
+independent systemd timer thaws it after 20 minutes; normal and failure cleanup
+also thaw it explicitly. Verify a fresh SSH login while frozen, and keep that
+writer paused through original-file preservation and initial replacement.
+This is a device-specific quiet-window procedure, not a relaxation of the
+source-metadata check. Retain any earlier completed archive and its independently
+verified export during explicit reconciliation; never overwrite its receipt.
+
+The fixed selection includes all `/data` children except
+`/data/spacewars-bootstrap` (the package and backups), `/data/logs` and
+`/data/spacewars/coredumps` (disposable diagnostics). This includes unknown new
+user-data directories, settings, ROMs, network profiles, Bluetooth pairing,
+SSH host/login keys and device-service state. It also captures `/etc`, the
+root/runtime/administrator `.ssh` directories, `/var/lib/NetworkManager`, and the fixed legacy
+update helpers and units needed for migration recovery. An actual NetworkManager
+bind alias is captured once at its `/data` location; an unbound rootfs profile
+directory is retained separately. This selection is versioned in the receipt.
+
+The result is a standard uncompressed tar archive, retaining numeric owners,
+modes, hard links, symlink targets, nanosecond modification times and extended
+attributes, including ACLs. Symlinks are stored without following them. File
+access is relative to pinned descriptors; unexpected other filesystems,
+unsupported special files, source replacement and unsafe scratch paths fail.
+Bounds are 100,000 entries, 64 levels, 4,096-byte UTF-8 paths, 64 KiB of attributes
+per entry and 128 GiB of archive data. Unsupported names/attributes fail rather
+than disappear silently. Capacity includes a conservative archive allowance and
+the remaining raw-copy/reserve requirement.
+
+The command compares two complete archive captures and their source metadata,
+checks metadata again, flushes the output and verifies its readback hash. It
+publishes the archive and its binding/receipt together with a no-replace rename
+and directory flush:
+
+```text
+/data/spacewars-bootstrap/active/data-copy/
+  archive.tar
+  record.json
+```
+
+Directories are root-private and files are mode 0600; the archive contains
+credentials. Only known private `.data-copy.pending` scratch files can be
+restarted. A completed archive is verified and retained, never overwritten.
+On reuse, `source_matches` says whether the current source metadata matches the
+original snapshot. `false` is not a refreshed backup or permission to discard
+later user data; the apply procedure must reconcile it before proceeding.
+Every report still says `ready_for_write: false`.
+
+Keep the `receipt_sha256` from the authenticated device report and independently
+export `binding.json` plus the complete `data-copy` directory into a private
+workstation directory (0700 directories, 0600 files). The verifier compares the
+separately supplied digest before hashing the archive. It does not extract files:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_backup_data \
+  --target aarch64-unknown-linux-gnu
+cargo run --locked -p engine-ota --example bootstrap_verify_data_backup -- \
+  /path/to/exported-active DEVICE_REPORTED_RECEIPT_SHA256
+```
+
+Restoration must first be rehearsed in a fresh private directory using a tool
+that preserves tar extended attributes. Neither this command nor its verifier
+restores an archive onto a live root/data filesystem. The current Picade archive
+has passed independent export verification and workstation extraction checks
+for contents, modes, links and nanosecond timestamps. Numeric owners remain in
+the archive; the unprivileged rehearsal did not recreate those owners or qualify
+physical restoration.
+
+## Direct off-device data recovery
+
+For recovery from a device with storage read errors, `bootstrap_export_data`
+streams the same fixed data/configuration selection directly to the operator's
+stdout. It requires the existing preparation, preserved access/network stores
+and stopped writers. It writes no on-device archive or data-copy receipt and
+does not replace either backup required for migration. A failed inactive-root
+backup still blocks installation.
+
+Run it over authenticated SSH without a terminal, redirecting stdout into a
+new mode-0600 `.tar.partial` file inside a mode-0700 workstation directory.
+Keep stderr separately: it contains progress and, only after the archive is
+flushed and source metadata is rechecked, a final JSON report. Require a zero
+exit status, the final report's selected package and binding hashes, and a full
+workstation length/SHA-256 comparison before treating the export as complete.
+Retain any failed output as incomplete evidence. This is one checked content
+capture, with metadata inspection before and after; it does not perform the
+normal on-device backup's second full content read or issue install authority.
+Rehearse extraction with extended attributes into a fresh private directory
+before relying on the archive for restoration.
+
+## Preserve original fallback-root files
+
+`bootstrap_prepare_legacy` accepts the separately selected bundle hash, raw-copy
+digest and data-archive receipt digest. The operator must first independently
+export and verify both backups. The command verifies the local copies against
+those digests, requires the existing preparation, preserved access/network stores
+and stopped kiosk/device-state writers, and holds the shared installation lock.
+Other operator edits must remain quiescent during this checked capture; it is
+not an atomic snapshot of the running filesystem.
+It writes only private preparation files on `/data`; it never replaces a live
+root file or changes a service, boot selector or radio state.
+
+The fixed selection is the manager executable plus the 20 package replacements.
+The record includes each destination path, intended mode and replacement hash;
+each original's contents, numeric ownership, mode, inode/device, modification
+and change timestamps, and extended attributes; and the identities or absence
+of its parent directories. Missing files and present empty files are distinct.
+Inode/change timestamps support conflict detection; restoration cannot recreate
+an original inode number or change timestamp.
+
+The command rejects symlinks, hard-linked originals, special files, writable
+parent directories, unexpected ownership and mount crossings, including bind
+mounts on the same filesystem. Sources are read relative to pinned descriptors.
+It compares complete source captures, checks the saved bytes, flushes the files
+and record, and publishes them together by a no-replace directory rename:
+
+```text
+/data/spacewars-bootstrap/active/legacy-root/
+  record.json
+  original-00.bin ... original-20.bin
+```
+
+The numbered files correspond to the explicitly recorded replacement list;
+an absent original has a checked empty placeholder. Directories are mode 0700
+and files are mode 0600. The record is bounded to 8 MiB, original helpers/configs
+to 64 KiB each, and the original manager to 256 MiB. Capacity retains the
+remaining recovery reserve. Before first publication, the full data archive's
+source metadata must still match, and the fixed original files are checked again.
+
+Only recognized private `.legacy-root.pending` files can be restarted. Every
+pending object is validated before any truncation. Published originals remain
+immutable; a repeat verifies them and reports `original_files_match: false` if
+the fixed live paths have changed. That flag does not describe all `/data`,
+refresh a backup, permit discarding later edits, or authorize replacement.
+Reports still say `ready_for_write: false`.
+
+Export `binding.json` and the complete `legacy-root` directory into a private
+workstation directory. Retain the device-reported digest separately and verify:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_prepare_legacy \
+  --target aarch64-unknown-linux-gnu
+cargo run --locked -p engine-ota --example bootstrap_verify_legacy -- \
+  /path/to/exported-active DEVICE_REPORTED_RECEIPT_SHA256
+```
+
+These original copies do not restore files onto a live device. The current
+Picade's 21 originals have been captured and independently exported and verified.
+
+## Replace fixed fallback-root files
+
+`bootstrap_replace_legacy` is a separate root-operator phase. It takes four
+independently selected digests: bundle, raw copies, data archive receipt and
+original-file receipt. It verifies all copies and exact package sources before
+replacing any root files. Initial execution requires the data archive's source
+metadata still to match; a resume instead checks each recorded replacement.
+The preserved archive is never restored over later user data by this operation.
+
+The operator must runtime-mask and stop the kiosk and any installed device-state
+service, close runtime-account sessions, and drain the old update helpers first.
+The command does none of those operations automatically. It checks all thread
+UIDs, known helper command arguments and open writable block-device descriptors,
+and holds both the shared installation lock and the old fast-update lock.
+Yocto's root-owned sticky `/run/lock` directory is supported; foreign lock files
+and non-sticky writable directories are rejected. These checks complement the
+supervised quiet window; they do not exclude another root operator deliberately
+changing files or launching commands concurrently.
+
+The fixed 21 destinations and their modes come from the checked preservation
+receipt. Missing parent directories are created in parent order. An additional
+root-filesystem capacity check allows space to retain old inodes. The journal is
+private `/data/spacewars-bootstrap/active/legacy-migration/record.json`, bound to
+the selected original-file receipt. Every action records intent and its prepared
+inode before publication, flushes the destination directory, and records completion.
+Journal replacement is atomic and flushed; incomplete unpublished records cannot
+supersede the previous published record.
+
+New file bytes are written to anonymous `O_TMPFILE` inodes, checked and flushed
+before receiving a name. Existing destinations are published with
+`RENAME_EXCHANGE`, retaining the exact old inode at a dot-prefixed `.pending`
+name in the same directory. New destinations use `RENAME_NOREPLACE`. Temporary
+names are excluded from sudoers snippets and SSH/systemd `*.conf` includes.
+The Linux [open](https://man7.org/linux/man-pages/man2/open.2.html) and
+[rename](https://man7.org/linux/man-pages/man2/rename.2.html) interfaces define
+those filesystem operations; physical power-loss qualification is still required.
+
+Retries distinguish unpublished candidates from already completed swaps using
+inode, mode, ownership, contents, attributes and modification time. They tolerate
+the ctime change caused by link/rename. A lost anonymous candidate can be rebuilt;
+an unfinished directory can be adopted only while empty and safely owned.
+Changed files, replaced parents, links, special files, corrupt journals and
+unknown temporary objects stop progress and retain the evidence. Original copies
+and exchanged old inodes are not deleted by this phase.
+
+The report always says `ready_for_trial: false`. This command does not reload
+services, alter boot selectors, open a watchdog, write partition images or reboot.
+Effective sudo/SSH/service validation and separate operator/runtime login tests must
+follow before any trial. The Picade has completed this phase and its independent
+administrator/runtime login and denial checks. The first native attempt exposed
+an EOF cursor retained by package validation; `6d350bd` rewinds each source before
+verification. Its regression reproduced the failure before the fix, and all 16
+replacement tests passed afterward. The failed attempt wrote no migration journal
+or root files; the corrected operator tool replaced all 21 checked files using
+the unchanged `04b6cb7` package.
+
+## Check access after replacement
+
+After the operator reloads systemd, `bootstrap_check_legacy_access` verifies the
+completed replacement transaction and selected effective access settings. It
+holds the shared installation lock and accepts the same four independently
+selected digests as replacement, plus one explicit SSH connection context:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_check_legacy_access \
+  --target aarch64-unknown-linux-gnu
+# Run on the Pi from the authenticated root operator session:
+./bootstrap_check_legacy_access BUNDLE_SHA256 RAW_COPIES_SHA256 \
+  DATA_RECEIPT_SHA256 ORIGINALS_RECEIPT_SHA256 "$SSH_CONNECTION"
+```
+
+The final argument contains client address, client port, server address and
+server port. It selects the context for SSH `Match` rules; it is not evidence of
+operator authentication. The process must itself run as root. The checker
+never initializes or resumes an incomplete replacement, repairs configuration,
+reloads a service or authorizes a trial. It rechecks package, preserved key roles,
+network stores, original files and completed replacements before and after the
+commands. Backup digests must match the preservation receipt, but this read-only
+follow-up does not reread the entire raw/data archives; the next writing phase
+must verify those independently retained backups again.
+
+Each fixed command has a ten-second deadline and 64 KiB output bound. The checks
+cover strict sudoers syntax, an allowlist of effective runtime sudo commands,
+the exact reviewed log helper, SSH public-key and persistent host-key paths for
+root/runtime and any preserved administrator, and selected loaded service
+commands/dependencies. A preserved administrator also requires the image's
+UID/GID 1001 account, login shell/home and exact passwordless root sudo grant;
+its account and effective configuration hashes are reported separately. Unsupported
+sudo defaults or privileges, SSH command/environment overrides, stale systemd
+configuration and missing persistence ordering fail the check. SSH inspection
+uses `sshd -T -C`; it checks configuration and host-key validity without starting
+a daemon. Only configuration hashes are reported, and command diagnostics do
+not echo input contents.
+
+The report always leaves `independent_logins_verified`,
+`equivalent_privilege_audit_complete` and `ready_for_trial` false. Before a trial,
+retain the existing operator session while verifying new operator and runtime
+logins independently. For `swadmin`, verify `sudo -n id -u` returns `0`.
+Exercise the denial cases as the actual runtime UID, and review
+equivalent D-Bus, Polkit and service-control permissions. Loaded dependencies
+alone do not establish that services have run successfully or that an existing
+SSH daemon has adopted new settings. Pi 4 and Pi 5 need their own results.
+
+## Install the inactive root
+
+`bootstrap_install_root` is a separate root-operator operation. It requires the
+completed fallback-root replacement, effective access checks, preserved key and
+network stores, stopped/masked runtime services and no runtime-account processes.
+Close the runtime test login after verifying it, retaining the independent root
+session. The command takes the shared installation and legacy fast-update locks.
+It verifies the selected package and rehashes the raw, data and original-file
+recovery copies on each explicit invocation. Independently exported and verified
+copies must already be available to the supervising operator.
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_install_root \
+  --target aarch64-unknown-linux-gnu
+# On the Pi, through the authenticated root operator connection:
+./bootstrap_install_root BUNDLE_SHA256 RAW_COPIES_SHA256 DATA_RECEIPT_SHA256 \
+  ORIGINALS_RECEIPT_SHA256 "$SSH_CONNECTION"
+```
+
+The command derives the inactive block device from the live mount/layout
+evidence, checks its owner/device number/capacity/writeability and holds an
+exclusive kernel claim through verification and journal commit. It accepts no
+device or payload path. Before the first write, the entire inactive partition
+must still match its preserved raw copy. An unrecorded operator change stops the
+operation rather than being overwritten.
+
+The private journal is `active/root-install/record.json`, bound to the preparation,
+package, backup digests, completed replacement journal and exact image identity.
+It durably records `writing` before changing any image bytes, then `written`
+only after bounded zstd decoding, both content hashes, device flush, readback,
+read-only filesystem/image checks and a second readback. Journal publication uses
+a flushed private temporary file, atomic rename and parent-directory flush.
+Corrupt/conflicting records, replaced paths and unsafe temporary files stop
+progress; an unpublished temporary record cannot override the published one.
+
+An explicit retry of `writing` verifies admission again and rewrites the same
+inactive image from its beginning. It does not restore an older data archive.
+A repeated `written` operation only flushes and rechecks that image; it never
+repairs or overwrites changed bytes. Bytes beyond the image extent are retained.
+Package, boot/layout, fallback replacements and runtime quiescence are checked
+again at IO-stage boundaries. The process check allows only the installer's
+own retained target descriptors; it still rejects other writers and runtime
+threads. This complements the supervised quiet window and shared lock, rather
+than excluding deliberate concurrent root intervention.
+
+The result always says `ready_for_trial: false`. This operation does not write
+boot assets/selectors, change services/radio state, open the watchdog, reboot,
+create a production recovery baseline or mark an automatic update successful.
+Independent logins, the full privilege audit, boot staging/handoff and physical
+qualification remain separate requirements. No installed Pi partition has been
+written during the fixture validation of this command.
+
+## Stage the temporary boot files
+
+`bootstrap_stage_boot` requires the completed inactive-root receipt as well as
+the selected package and recovery-copy digests. The operator must retain the
+independent recovery copies and authenticated root connection, with the runtime
+services masked/stopped and their account quiescent as in the preceding phase.
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_stage_boot \
+  --target aarch64-unknown-linux-gnu
+# On the Pi through the authenticated root operator connection:
+./bootstrap_stage_boot BUNDLE_SHA256 RAW_COPIES_SHA256 DATA_RECEIPT_SHA256 \
+  ORIGINALS_RECEIPT_SHA256 ROOT_INSTALL_SHA256 "$SSH_CONNECTION"
+```
+
+The command takes both installation/legacy-maintenance locks, checks the actual
+normal boot and package, rehashes the recovery copies, verifies fallback-root
+replacement and access configuration, and rejects a missing or incomplete
+root-install receipt. It exclusively holds the observed inactive partition while
+rehashing its image, checking the actual ext4 identity/bootstrap capability, and
+preparing boot files. It repeats those image checks before reporting completion.
+It has no root-image write or repair path.
+
+Before any boot-file change, it publishes a private `staging` record at
+`active/boot-trial/record.json`, binding the written image, retained default and
+the checked plan. An interrupted initialization uses only
+`active/.boot-trial.pending`; unpublished bytes are never runtime authority.
+The normal recovery service cannot start a trial from `staging` or `trial-ready`.
+
+Assets and generated command lines are copied into `/boot/.sw-bootstrap-pending`.
+The command bounds and verifies every file, flushes files/directories and the
+filesystem, then publishes `/boot/sw-bootstrap` without replacing an existing
+tree. It writes the checked `/boot/tryboot.txt` last, through the fixed
+`.sw-bootstrap-tryboot.pending` file. Legacy installations use a no-replace rename.
+A fresh image replaces only its exact, manifest-bound factory `tryboot.txt`,
+after the complete staged tree and durable intent exist. Both sides of an
+interrupted replacement reconstruct the same original inventory for resume;
+a missing or unexpected selector is never repaired. The original
+`config.txt`, command line, firmware, kernel, profile and hostname stay unchanged.
+
+Fresh-image regression coverage includes interruptions before and after trial
+publication, unexpected/missing selectors, retained-image identity changes,
+normal-selector restoration, canonical migration and interrupted recovery
+publication with existing service stores. The 2026-10-17 serial suites passed
+328 OTA unit tests and 22 integration tests (8 environment-specific tests
+ignored), plus 160 manager unit tests and 25 integration tests (2 namespace
+tests ignored). Clippy and formatting passed. Read-only inventories passed on
+the Pi 4 Picade and Pi 5; these checks do not qualify a live migration.
+
+An explicit rerun can finish bounded partial files only in its recorded pending
+tree. A published tree must already be complete and match its plan; changed or
+missing completed assets stop preparation. Unknown entries in the pending or
+staged trees, unsafe links,
+conflicting trees, replaced paths or changed receipts also stop it. Resume
+credits only the allocated bytes of recorded stage files, while retaining space
+for later canonical migration and its reserve. An ordinary legacy reboot can
+resume copying without changing the original staging boot ID or trial token.
+
+The journal advances to `trial-ready` only after the complete boot tree and
+installed image pass verification. A repeated ready operation verifies that
+state; an already requested, observed, failed or confirmed trial cannot be
+prepared again. The result always reports `reboot_requested: false` and
+`automatic_updates_enabled: false`. Use the separate activation operation below
+after the supervised prerequisites; do not bypass it with a manual tryboot.
+
+## Supervised one-shot activation
+
+The root-only manager command accepts the selected package, completed root
+receipt and ready trial identity, plus the original SSH connection context:
+
+```sh
+engine-os-manager bootstrap-activate \
+  --package BUNDLE_SHA256 \
+  --written-root ROOT_INSTALL_SHA256 \
+  --trial TRIAL_ID \
+  --ssh-connection 'CLIENT_IP CLIENT_PORT SERVER_IP SERVER_PORT'
+```
+
+This is an operator command, not a device-socket request. It requires an existing
+`trial-ready` journal and cannot initialize, finish or repair staging. It derives
+the backup selections from the digest-bound completed root receipt, then repeats
+the staging admission checks: package/device/layout, originals and recovery
+copies, effective SSH/sudo/service policy, persistent access/network stores,
+complete boot inventory and the exclusively claimed inactive image. The shared
+installation lock, legacy-helper lock, private journal and inactive-root claim
+stay held until the reboot request returns. No raw target or selector is written.
+
+Run this command inside the separately authenticated root shell. On the current
+image, directly invoking `sudo engine-os-manager bootstrap-activate ...` leaves
+a waiting sudo process whose arguments contain `engine-os-manager`; the quiet
+runtime guard rejects that wrapper as a concurrent helper. A root shell that
+executes the command avoids this false positive without exempting another
+process from the guard. The Pi 5 direct-sudo invocation was rejected during
+prerequisite checks: the journal remained `trial-ready`, with no request boot ID,
+no reboot parameter and no pending reboot job. Inspect those facts before a
+corrected invocation; they do not permit repeating a consumed or uncertain request.
+
+Before any reboot mutation it requires an empty systemd reboot parameter and
+durably consumes the attempt as `trial-requested`, recording the current boot ID.
+The staged image must later run in a different boot from both staging and this
+request. It rechecks the held context before setting the fixed `0 tryboot`
+argument through logind, reads that parameter back without a property cache,
+rechecks context and parameter, and asks PID 1 to start only `reboot.target` in
+`replace-irreversibly` mode. No arbitrary command, unit or reboot argument is
+accepted. The firmware argument follows the [Raspberry Pi tryboot contract](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#fail-safe-os-updates-tryboot).
+The systemd 255 [logind implementation](https://github.com/systemd/systemd/blob/v255/src/login/logind-dbus.c)
+writes the volatile reboot parameter; the [shutdown path](https://github.com/systemd/systemd/blob/v255/src/shutdown/shutdown.c)
+uses it after orderly shutdown. This source review does not establish the
+installed boards' physical reboot behavior.
+
+Each bus call and initial connection has a two-second deadline. Synchronous
+media/access validation is not covered by that deadline. On a request error,
+the manager first tries to persist `activation-request-failed`, then attempts
+bounded cleanup only when the reboot parameter still equals its exact trial
+argument. An empty value is left alone; a different value is not overwritten.
+Failure persistence and cleanup errors remain visible. A failed or requested
+attempt never becomes ready again through this command, even after restart.
+
+A bus timeout cannot cancel a request already delivered to systemd. A late
+reboot may still happen; a durable failed record tells the candidate runtime
+to return to the retained legacy default. Process death can prevent the failure
+record or cleanup, leaving a consumed request and a volatile tryboot argument.
+An accepted job reply also does not prove reboot occurred. In any uncertain
+case, use the independent root/recovery connection to inspect the journal,
+current boot and pending reboot state before deciding how to recover. Do not
+delete the record, rerun activation, issue another tryboot or clear another
+operator's reboot request to manufacture a retry. No automatic reconciliation
+or retry is implemented for this supervised handoff.
+
+Success reports only `reboot_job_accepted: true`; it does not establish trial
+health, normal-boot confirmation or physical qualification. Automatic updates
+remain disabled. The replacement Pi 5's failed and successful trials, and the
+primary Picade's successful trial, are recorded above.
+
+## First-boot recovery runtime
+
+`engine-os-manager recover` now dispatches an explicitly staged bootstrap through
+its own root-private journal at
+`/data/spacewars-bootstrap/active/boot-trial/record.json`. Opening this journal
+never creates a missing attempt, reuses unpublished temporary state or resets a
+failed attempt. Bootstrap and production recovery journals can coexist only
+during the exact initial handoff described below; the active reservation still
+blocks installations during that interval.
+The staging command creates the initial record; the separate root-operator
+activation command consumes it before requesting the one-shot reboot. These
+source implementations alone do not qualify a device for a supervised trial.
+
+The immutable record binds the preparation/package, completed root-install
+digest, image identity, original boot configuration, staged plan and originating
+boot. The Linux adapter checks the loaded root, actual kernel build ID, hardware
+profile, board/USB/layout identity, command line, firmware tryboot flag and trial
+token. The boot-file adapter checks the retained and staged inventory and only
+replaces `config.txt` with one of the two recorded configurations.
+
+The trial reuses the bounded kiosk health worker, including persistent network,
+Bluetooth, SSH-store and application-settings checks. It requires 60 seconds of
+continuous local health inside the original 180-second boot-relative deadline.
+A restarted observer starts a new continuous window without extending that
+deadline. Internet connectivity is not part of this decision.
+
+Health is persisted before selecting the staged normal configuration. The
+selector replacement uses file/directory/filesystem flushes and is reconciled
+against the journal after interruptions. Only persisted health plus the selected
+staged default authorizes the shared watchdog-completion operation; it retains
+the existing early-evidence, driver and timeout checks. The coordinator then
+requests the fixed normal reboot operation.
+
+The next normal boot must pass a separate health window and has the distinct
+`bootstrap-confirmed` status. Trial health cannot stand in for that observation.
+Before canonical migration begins, an unhealthy trial keeps the original
+default; an unhealthy staged normal boot restores it and requests a normal
+reboot. Neither path retries automatically or
+qualifies the legacy root as a previous-good OTA image. A corrupt journal or
+unexpected boot state stops the coordinator and requires operator recovery.
+
+The service may write only the bootstrap journal subtree, alongside its existing
+boot/status/settings paths. The store accepts systemd's exact writable bind of
+that subtree while rejecting a different mount source. These source and fixture
+checks do not establish physical watchdog, reboot, FAT power-loss or canonical
+migration behavior on either Pi.
+
+## Canonical boot preparation and activation
+
+Only a confirmed staged **normal** boot can start this migration. The trial
+boot's health proof is insufficient. The same selected package, completed root
+receipt and trial identity are required by two separate root commands:
+
+```sh
+engine-os-manager bootstrap-canonical \
+  --package BUNDLE_SHA256 --written-root ROOT_INSTALL_SHA256 --trial TRIAL_ID \
+  prepare
+
+engine-os-manager bootstrap-canonical \
+  --package BUNDLE_SHA256 --written-root ROOT_INSTALL_SHA256 --trial TRIAL_ID \
+  activate
+```
+
+`prepare` pins and checks the package, actual board/profile/root pair, root
+receipt, raw recovery copies, data archive, preserved originals and persistent
+access/network stores under the shared install lock. It reconstructs the plan
+from the package and actual device. Case-folded path or directory collisions
+with retained files are rejected before copying.
+
+Before the first canonical replacement, the journal durably transfers recovery
+to the complete, already-confirmed staged tree. **Legacy rollback is no longer
+permitted after that transition:** the original canonical kernel and other
+assets may now be replaced. The raw legacy recovery copies remain available for
+independent operator recovery.
+
+Each file has durable copy intent before an atomic replacement and a completion
+record after file, directory and filesystem flushes. Resume accepts only exact
+old or new contents for the pending destination; completed files cannot be
+repaired or rewritten. Unchanged firmware is verified and retained in place.
+The complete `sw-bootstrap` tree, staged normal `config.txt`, `hostname.txt`,
+legacy `boot_slot` and other original extras remain present. Capacity includes
+remaining growth, the largest temporary replacement and a reserve; a full
+second canonical tree is unnecessary. Preparation never selects the canonical
+configuration or requests a reboot.
+
+`activate` requires complete preparation and does not copy missing assets. It
+records selection intent, publishes the canonical `config.txt` last, flushes
+and verifies it, then durably consumes one normal reboot request. The manager
+requires an empty reboot parameter before and after final authorization and
+leaves parameters untouched. It requests only `reboot.target` in
+`replace-irreversibly` mode. Bus methods use two-second timeouts and the bus
+handoff has a five-second timer; synchronous disk validation has no overall
+deadline. A timeout cannot cancel a delivered request. Accepted jobs prove
+neither a reboot nor health. Failures or lost replies never restore the consumed
+allowance and require operator reconciliation.
+
+The next boot must have a different boot ID and complete its own 60-second local
+health window within 180 seconds of boot. The staged health proof cannot confirm
+canonical success, and changing `config.txt` in the running staged boot is not
+confirmation. Restarting the observer does not extend the boot deadline. A new
+staged boot during interrupted preparation also repeats health before allowing
+the copy to resume, without clearing its completed-file record.
+
+An unhealthy canonical boot that reaches the recovery service durably fails,
+restores the staged default and requests a normal reboot. The next staged boot
+stops for the operator; it never retries canonical activation. Damaged files,
+unknown inventory or an uncertain journal stop recovery for manual inspection.
+Normal boots do not arm the one-shot trial watchdog: a failure before the
+recovery service starts requires the independently supervised recovery path.
+Atomic replacements do not qualify shared-FAT behavior under physical power loss.
+
+Success still reports `automatic_updates_enabled: false`. Canonical confirmation
+does not itself delete the staged tree or initialize production recovery. The
+separate finalization operation below performs that handoff. The replacement
+Pi 5 and primary Picade completed canonical migration and their separate
+normal-boot checks using `e986718`. The `cd66877` protocol-4 runtime
+and schema-3 kits described later are historical artifacts.
+
+## Archive bootstrap assets and establish the initial recovery baseline
+
+From the independently confirmed canonical normal boot, use the same three
+reviewed identities:
+
+```sh
+engine-os-manager bootstrap-canonical \
+  --package BUNDLE_SHA256 --written-root ROOT_INSTALL_SHA256 --trial TRIAL_ID \
+  finish
+```
+
+The command repeats the package, device, retained-backup and persistent-store
+checks. It records the exact retirement inventory before creating the archive.
+That durable intent ends automatic staged rollback: the staged tree may now
+be dismantled, so any later unhealthy boot requires operator recovery instead
+of selecting partly removed assets.
+
+All retired files are copied, hashed, read back and flushed to the private
+`retired-boot` directory inside the active bootstrap reservation **before any
+boot file is removed**. Files are stored by SHA-256; the journal's
+`canonical.finish.files` map preserves each original path, length and hash.
+This includes `boot_slot`, the staged tree, obsolete original assets and retained
+bootstrap selector temporaries. Equal content shares one archive copy.
+Canonical assets and `hostname.txt` retain their bytes and files in place.
+Each removal has durable intent and a flushed completion record. Resume accepts
+an absent file only when its removal was already recorded or pending; missing,
+changed or linked archive copies stop further removal without repairs once
+archive completion is recorded. Empty
+retired directories are removed only after their files, and the ordinary boot
+verifier must accept the resulting canonical tree.
+
+The command then derives the production binding from the actual canonical
+boot, records one initial good image using the completed root receipt, and
+publishes the exact journal at `/data/spacewars-system/recovery`. The initial
+unpublished image uses generation **zero**; signed OTA releases still require
+positive generations. The legacy root is not recorded as a retained-good image.
+Production recovery protocol 2 and journal schema 2 support this distinction;
+older journals are rejected, and candidate metadata must declare recovery
+protocol 2. No signed generation or hardware qualification is invented by
+finalization.
+
+Publication uses a private `.bootstrap-recovery` directory and flushed atomic
+rename. Only the exact initial record named by the bootstrap handoff may coexist
+with the active reservation. While both exist, that reservation still blocks
+ordinary installs and maintenance. After durable publication, the entire
+reservation is renamed from `/data/spacewars-bootstrap/active` to `completed`,
+retaining original files, raw/data recovery copies, retired boot bytes and all
+journals. Repeating an interrupted handoff verifies the existing record; it
+does not replace it. A completed reservation with a missing production journal
+is lost state, not a fresh unprovisioned device.
+
+The command requests no reboot and leaves `automatic_updates_enabled: false`.
+The ordinary recovery service can now open the baseline, but actual tryboot and
+watchdog qualification, feed/trust setup and the update service/policy remain
+separate requirements. Finalization has completed on the replacement Pi 5 and
+primary Picade, including independent archive exports and production
+recovery-service checks. Do not relabel older runtime images, kits or journals
+to bypass the new protocol checks.
+
+Once finalization has archived the active reservation, the root operator can
+run the separate [OTA state provisioning](ota-updates.md#supervised-ota-state-provisioning)
+command using a reviewed public bundle embedded in the new image and an explicit
+current data version. That command establishes persistent download trust and
+staging; it does not qualify recovery or enable automatic installation. The old
+`cd66877` kits below predate this command and must be rebuilt from current source
+before the complete OTA rollout.
+
+## Persistent network profiles
+
+The Pi 5's `/etc/NetworkManager/system-connections` and `/var/lib/bluetooth`
+already bind to their corresponding `/data` directories. Read-only inode/device
+checks establish that placement without reading credentials. Current data
+backups must include these persistent copies, SSH state and application settings;
+the raw root/boot recovery copies alone are insufficient.
+
+New images run `engine-os-manager initialize-network` under the shared install
+lock before binding the persistent NetworkManager directory. On a fresh device
+it imports a bounded set of private, root-owned seed files from the root image,
+retains their bytes and publishes the complete parent/child directory together
+with fsync and a no-replace rename. Existing persistent directories are always
+authoritative, including an empty directory after all profiles were deleted.
+Missing children, unsafe paths or missing stores during bootstrap/after recovery
+provisioning fail without recreating directories or reimporting credentials.
+The command accepts no paths and does not change radio or connection state.
+
+The Space-Wars layer replaces the base layer's every-boot profile merge and
+automatic `mkdir`/`chmod` in the bind service. NetworkManager requires a successful
+validated bind; it cannot silently use the root image's profiles after a failure.
+The bind, SSH-key initialization and recovery services are ordered so their
+shared lock does not race during startup. SSH and recovery wait for the bind
+attempt, but do not require its success. Startup does not require Internet access.
+
+This source change does not modify either installed legacy root. Before the
+first trial, the supervised migration must also replace the legacy profile-merge
+behavior on the original root, so returning to it cannot resurrect deleted
+credentials. Live migration, execution of the private data/configuration backup
+and independent export remain pending.
+
+The clean `c14c53f` image contains this importer and exact service wiring. All
+140 OTA and 38 manager host tests, 101 Yocto tooling tests, Clippy and Rust 1.89
+checks pass. The six network-preservation cases also pass on the Pi 5 as UID
+1000 with synthetic temporary profiles. The packaged manager rejects that UID's
+privileged initialization request. Static image ownership/dependency checks and
+`systemd-analyze verify` pass; this does not establish live service sandbox or
+reboot behavior. The Pi 5's boot ID, all 101 boot files, physical layout, kernel
+and hardware profile remain unchanged.
+[Source, artifact and device evidence](data/ota-network-preservation-20261015.json)
+records this checkpoint. Existing bootstrap kits built from `514264c` contain
+the earlier manager; they do not acquire this behavior from the new source tree.
+
+## Why stage the OS boot assets separately
+
+The Pi 5's boot filesystem has 79,437,824 bytes available in the captured
+inventory. A second complete boot tree is too large; the staged OS assets use
+35,599,908 bytes before FAT allocation and generated selector files. The plan
+retains GPU firmware and EEPROM. All 18 retained firmware files matched the
+live Pi 5; apply must compare them again, not assume another board matches.
+
+The staged configuration explicitly selects the common kernel, selected DTB,
+initramfs, command line and overlay directory. It inlines the checked hardware
+profile. This avoids relying on `os_prefix`, which the firmware can ignore if
+its viability checks fail, and avoids an include for bootloader-handled
+settings. These are source/documentation conclusions, still awaiting physical
+boot verification. [Raspberry Pi configuration documentation](https://www.raspberrypi.com/documentation/computers/config_txt.html#os_prefix)
+
+The intended first trial uses the firmware's one-shot `tryboot.txt`, with the
+original normal configuration retained. A later reset should use the original
+default; that behavior and watchdog expiry must be measured on both installed
+boards. [Raspberry Pi tryboot documentation](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#fail-safe-os-updates-tryboot)
+
+## Supervised migration sequence
+
+The following sequence summarizes the implemented commands and their evidence
+requirements. The replacement Pi 5 and primary Picade completed it through the
+initial baseline; second Picade rollout and the final failure/rollout
+qualification remain pending. It is not a substitute for the command-specific
+preconditions above:
+
+1. Establish the selected root access, take the shared install lock, repeat
+   the device and private-state preflight, and preserve verified recovery
+   copies. Retain boot files, the overwritten inactive root, access/network
+   configuration and data state with appropriate private permissions and an
+   independently available recovery copy. Existing journals/trust records must
+   never be overwritten as if the device were fresh.
+2. Preserve root and kiosk login keys as separate roles while the old home
+   files still exist; retain SSH host keys. Verify both intended logins. Replace
+   the legacy every-boot network-profile merge with the one-time preservation
+   behavior, including on the fallback root. Disable
+   the old kiosk-accessible unsigned install/reboot paths before a trial; the
+   old default root must remain controlled if rollback returns to it.
+3. Recheck firmware, inactive-slot identity/capacity and free space for the
+   package, backups, staged assets and later atomic file replacements. Write
+   and read back only the inactive root, verify its filesystem/image identity,
+   and flush the staged boot assets. Publish the temporary trial selector last.
+4. Perform the supervised one-shot boot with nearby recovery available. Observe
+   actual root/kernel/profile, data/access and kiosk health within the existing
+   boot deadline. Local persistent-store or bind failures must prevent promotion;
+   Internet connectivity must remain independent of that health decision.
+   The shared kiosk health worker now checks persistent network/Bluetooth binds
+   and SSH-store structure as well as settings writes. The separate bootstrap
+   coordinator uses that worker and its own persisted health authorization for
+   watchdog completion. Pi 5 and primary Picade staging and trial health have
+   passed; remaining physical failure qualification is still pending.
+5. After a successful supervised trial, select a normal boot using the staged
+   assets and reboot normally. Keep the backed-up legacy configuration/assets
+   available until the canonical migration is proven.
+6. From the confirmed staged normal boot, migrate canonical assets using
+   flushed replacements and publish the canonical default last. A full second
+   tree is not needed: capacity must cover the staged set, growth of the
+   canonical set, its largest temporary replacement and a reserve. Preserve
+   `hostname.txt`, and verify a canonical normal boot before archiving/removing
+   the legacy breadcrumb, obsolete assets and temporary stage. Canonical
+   preparation, activation, health observation and explicit archive/cleanup are
+   implemented and verified on the replacement Pi 5 and primary Picade.
+7. The root-only finalization command then explicitly establishes the initial
+   good recovery baseline from the observed normal boot. Do not advertise the overwritten/legacy root as a qualified
+   retained image. Complete Pi 4/5 failure qualification and the remaining feed,
+   service and UI integration before enabling automatic installation.
+
+Power loss can damage the shared FAT boot filesystem. Staging and atomic
+replacements do not remove the need for independent recovery during bootstrap.
+No physical recovery qualification follows from passing the workstation tests.
+
+The earlier `c14c53f` runtime image and schema-2 packages predate the added
+persistence health checks, missing-store guards and bootstrap coordinator. The
+archived `cd66877` image and schema-3 kits contain protocol 4 and the expanded
+fallback-root inventory, but predate the current network/download and provisioning
+code. Rebuild from current source for a new OTA preparation. Existing packages
+and reservations must never be relabeled to bypass protocol checks.
+
+## Validation
+
+The fixture tests use actual small ext4 files and exercise supported board and
+display profiles, explicit root selection, dirty/mismatched images, unsafe
+directives, symlink/changed assets, executable mismatch, unchanged input bytes,
+zstd round-trip, file checksums, private output and refusal to replace a kit.
+The hostname regression covers normal/trial selection and invalid naming files.
+The unprivileged Pi probe and full clean-image package checks are recorded
+separately from later device migration evidence.
+
+The current clean runtime is built from `cd668771d523917d210f6c460c4bc0956b2bb54e`.
+All 6,768 Yocto tasks succeeded, with 6,703 reused. The actual ext4 image contains
+bootstrap protocol 4 and recovery protocol 2; its boot identity remains
+`fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238`.
+Image inspection checked executable identities, root-owned helpers, restricted
+sudo rules, persistent SSH/network service wiring and absence of shipped keys
+or profiles. A full temporary-file writer round trip passed, as did the actual
+schema-3 package checker with a synthetic device context.
+
+| Device | Local package directory | Planned inactive root |
+| --- | --- | --- |
+| Pi 5 / HyperPixel | `target/ota-bootstrap-cd66877-pi5` | A |
+| Pi 4 / Picade | `target/ota-bootstrap-cd66877-pi4` | B |
+
+Each kit passed 213 file checksums, complete zstd expansion/hash verification,
+canonical selector/profile checks and the 20-file fallback-root inventory check.
+Fresh ordinary-user inventories on both devices matched all 18 retained firmware
+files and the planned root UUIDs. Estimated peak additional boot usage, including
+the reserves, is 75,493,376 bytes on Pi 5 and 75,468,800 on Picade, against
+79,437,824 bytes available on each. These remain planning estimates until root
+admission rechecks the actual filesystems.
+
+The exact packaged manager loaded on both Pis and rejected `prepare`, `activate`
+and `finish` as UID 1000 before installed-path access. Both boot IDs stayed
+unchanged. No package was installed, and no live boot/data/credential changes,
+watchdog operation or reboot occurred. [Clean runtime and kit evidence](data/ota-bootstrap-image-20261015.json)
+records source/layer revisions, artifact and bundle hashes, device observations,
+audit commands and remaining live gates. Root connection details, independent
+backup/restore checks and supervised migration remain pending.
+
+The previously validated clean `514264c9723d` image built successfully. Its build ID is
+`rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3`;
+the immutable boot identity remains unchanged. Packages are available in the
+build workspace at `target/ota-bootstrap-514264c-pi5` and
+`target/ota-bootstrap-514264c-pi4`. Each passed all 193 listed checksum checks,
+rootfs decompression/hash verification and canonical boot-selection inspection.
+The file-backed writer also accepted the exact clean artifact, using only an
+anonymous temporary regular file as its target.
+
+All 111 OTA and 38 device-manager tests passed, along with 38 Node and 63 Python
+tooling tests, Clippy with warnings denied, Rust 1.89 checks and the AArch64 test
+build. The seven new bootstrap tests and hostname regression passed as UID 1000
+on the Pi 5. The actual packaged manager loads there and rejects both privileged
+key commands from that account. Its boot ID and all 101 boot files remained
+unchanged. The Picade was unreachable; its package still needs a fresh live
+preflight. Root SSH on the Pi 5 continued to reject the existing key.
+[Source identities, artifact hashes and validation evidence](data/ota-bootstrap-20261015.json)
+record these limits and the outstanding migration work.
+
+The newer device checker, preparation record and maintenance/access guards are
+tested separately from that image. The repackaged private Pi 5 kit at
+`target/ota-bootstrap-private-514264c-pi5` contains the same clean root image;
+its newer directory permissions pass the device package reader. A read-only
+workstation test checks that real package against an explicitly synthetic Pi 5
+context. It is not a privileged live-device preflight. A future clean image
+must include the new guards before the supervised migration is attempted.
+
+At `0ed6e5fe01a8`, all 122 OTA tests and 38 manager tests passed, along with
+Clippy, Rust 1.89 checks and AArch64 builds. All 19 bootstrap-related tests passed
+on the Pi 5 as UID 1000 using temporary fixtures. Both root-only examples rejected
+that account. A fresh inventory confirmed the same boot ID, physical device,
+layout and all 101 boot files. No device reservation, partition write or boot
+change was performed. The real private package passed all 193 checksums and
+expanded-root round-trip validation. Root SSH still rejected the current key,
+and the Picade did not resolve.
+[Preparation validation evidence](data/ota-bootstrap-preparation-20261015.json)
+records the source and image identities separately.
+
+The shared-writer refactoring at `ff78362` passed all 124 OTA tests, Clippy,
+Rust 1.89 checks and the AArch64 test build. Its eight file-backed writer tests
+also passed on the Pi 5 as UID 1000. The actual 520,093,696-byte clean image passed
+the complete writer, filesystem check and readback on the workstation using an
+anonymous temporary target file. This did not exercise any live root partition
+or authorize a bootstrap install.
+
+The raw-copy implementation at `3108cea` passed all 134 OTA tests and 38 manager
+tests, Clippy, Rust 1.89 checks and AArch64 builds. Its 29 bootstrap fixture tests
+passed on the Pi 5 as UID 1000; the actual backup entry point rejected that user.
+The 157,286,400-byte boot artifact and 520,093,696-byte clean root artifact also
+passed copy, readback, source comparison and export verification on the
+workstation, using temporary regular files and an explicitly synthetic device
+binding. The Pi 5 retained its boot ID, layout, hardware profile and all 101 boot
+files. [Raw recovery-copy validation evidence](data/ota-bootstrap-backup-20261015.json)
+keeps these fixture results separate from the still-unperformed live backups.
+
+The data/configuration archive at `16df0be` passed all 151 OTA tests and 38
+manager tests, Clippy, Rust 1.89 checks and AArch64 builds. Two additional
+workstation tests verified GNU tar restoration of metadata/links/attributes
+and actual bind-mount handling in a private namespace. All 11 new ordinary
+fixture tests passed on the Pi 5 as UID 1000; the installed-data command refused
+that account. Its boot ID remained unchanged. These tests used temporary data;
+no installed credentials were captured and no live recovery archive was made.
+[Data archive validation evidence](data/ota-data-backup-20261015.json) records
+the exact binaries and scopes. The latest clean runtime image remains
+`c14c53f`; these operator examples were built separately.
+
+Schema 2 packaging at `9833758` passed all 153 OTA and 38 manager tests,
+Clippy, Rust 1.89 checks and AArch64 builds. Both new kits passed all 210 listed
+checksums, private-mode checks, comparison of the 17 replacement assets with
+the original ext4 image, and their identical compressed-root round trip.
+The Pi 5 kit also passed the device reader with synthetic device inputs.
+All 43 bootstrap-related fixture tests passed as UID 1000 on the Pi 5 in
+60.11 seconds; its boot ID remained unchanged. The installed legacy helpers
+and sudo grants remain in place. Root SSH still rejected the current key and
+the Picade did not resolve. [Fallback-root asset evidence](data/ota-legacy-assets-20261015.json)
+records the package identities and separates these checks from live migration.
+
+Original-file preservation at `437369c` passed all 162 OTA and 38 manager tests,
+Clippy, Rust 1.89 checks and the AArch64 build. Ten selected workstation tests
+covered immutable originals, source conflicts, interrupted preservation,
+independent export verification and same-filesystem bind mounts. The latter
+used only temporary paths in a private namespace. All 19 selected preservation
+and mount/layout tests passed as UID 1000 on the Pi 5; the actual preparation
+command rejected that account. Its boot ID remained unchanged. These are
+fixture results, not live migration or physical power-loss qualification.
+[Original-file preservation evidence](data/ota-legacy-preservation-20261015.json)
+
+Restartable file replacement at `643930b` passed all 181 OTA and 38 manager
+host tests, Clippy with warnings denied, Rust 1.89 and AArch64 builds. The final
+source passed 22 selected original-file/replacement tests on ext4 and the
+optional same-filesystem bind rejection test. The complete checkpoint sweep
+ran on host tmpfs and on Pi 5; it includes errors before and after every reported
+publication step. Separate subprocess tests exit after link and exchange
+without running destructors. These are not physical power-loss tests.
+On Pi 5, 27 selected fixture tests passed as UID 1000, with one optional namespace
+test ignored, in 79.90 seconds. The actual replacement command refused that
+unprivileged account before installed paths were touched. Its boot ID remained
+unchanged. No live migration, service change, watchdog open, partition write
+or reboot occurred. [Replacement evidence](data/ota-legacy-replacement-20261015.json)
+records the exact scope and binaries. The runtime image and schema 2 kits have
+not been rebuilt or installed by this step.
+
+The access checker at `113033d` passed 191 OTA and 38 manager tests using the
+documented serial command, plus Clippy, Rust 1.89 and AArch64 builds. Fourteen
+selected tests passed on Pi 5 as UID 1000 in 0.50 seconds; the actual operator
+entry point rejected that UID before inspecting installed paths. The Pi's SSH
+parser accepted a temporary configuration pointing at the persistent key roles.
+Its original loaded services and sudo grants remain unchanged. This is parser
+and fixture evidence, not successful migration, host-key validation or login.
+[Access-check evidence](data/ota-legacy-access-check-20261015.json) records exact
+binaries, captures and the remaining live checks. It also records intermittent
+`Busy` failures from the multithreaded `cargo test` runner: unrelated test forks
+can temporarily retain flock descriptors. Local qualification uses serial tests;
+CI uses nextest's separate processes. No production locking behavior was changed.
+
+The inactive-root installer at `25aa0c4` passed 199 OTA and 38 manager tests,
+Clippy, Rust 1.89 and AArch64 compilation. Twenty selected writer, restart and
+quiescence tests passed on host ext4 and on Pi 5 as UID 1000; one optional Yocto
+artifact test was ignored in each selected run. The Pi run took 432.96 seconds,
+which measures the debug fixture suite, not an installation. Tests include
+actual process exits after writing intent, flushing the temporary target and
+publishing completion. They do not establish physical power-loss behavior.
+The real operator command rejected UID 1000 before opening installed paths, and
+the boot ID stayed unchanged. The privileged admission path, raw block-device
+operations and boot/hardware qualification remain unexecuted.
+[Root-install evidence](data/ota-bootstrap-root-install-20261015.json) records
+the exact artifacts, command outputs and remaining live gates.
+
+The first-boot runtime at `6b5a098` passed 219 OTA and 38 manager tests, 71 Yocto
+helper/tooling tests with required sandbox support, Clippy, Rust 1.89 and AArch64
+test compilation. Seven journal/selector fixtures also passed on host ext4.
+All 17 new fixtures passed on Pi 5 as UID 1000 in 11.62 seconds, using temporary
+files, synthetic health/boot evidence and a fake watchdog. Its boot ID stayed
+unchanged. The new mount-source test uses synthetic mountinfo; it does not prove
+the prepared device's systemd namespace. No new image or schema-3 kits were
+built, and no live boot staging, trial activation or recovery qualification
+occurred. [Runtime evidence](data/ota-bootstrap-runtime-20261015.json) records the
+exact artifact/log hashes and the remaining migration/integration work.
+
+Boot staging at `e02f182` passed 228 OTA and 38 manager tests, Clippy, Rust 1.89,
+formatting and AArch64 test/command builds. Nine new fixtures passed on host
+ext4 in 12.32 seconds and on Pi 5 as UID 1000 in 20.67 seconds. They cover
+interrupted preparation/publication, immutable completed trees, unchanged
+retained boot files, selected space credit and receipt admission. The actual
+staging command rejected the ordinary Pi account before installed-path admission;
+its boot ID stayed unchanged. No root staging operation, clean image build,
+one-shot activation or physical failure test occurred. [Staging evidence](data/ota-bootstrap-stage-20261015.json)
+records the exact artifacts, logs and remaining hardware/integration limits.
+
+One-shot activation at `1aed0da` passed 233 OTA and 39 manager tests, 71 Yocto
+helper/tooling tests, Clippy, Rust 1.89, formatting and AArch64 compilation.
+Eleven selected journal, process-gate, receipt and runtime-marker fixtures passed
+on host ext4 in 5.99 seconds and Pi 5 in 27.64 seconds. The private D-Bus request
+fixture also passed on Pi 5 in 0.80 seconds, covering the successful sequence and
+13 failure cases. The real activation command rejected UID 1000 before parsing
+digests or accessing installed paths; the boot ID stayed unchanged. This was
+temporary-file/private-bus testing, not live system-bus or reboot qualification.
+[Activation evidence](data/ota-bootstrap-activation-20261015.json) records exact
+artifacts/logs and the remaining root-access, migration and integration work.
+
+Canonical migration at `48acde7` was validated with 247 OTA and 40 manager tests,
+71 Yocto checks, Clippy, Rust 1.89, formatting and AArch64 compilation. The final
+14 migration fixtures passed on host ext4 in 84.17 seconds and Pi 5 in 107.10
+seconds; the private normal-reboot D-Bus test passed on Pi 5 in 0.10 seconds.
+Both real canonical commands rejected UID 1000 before digest parsing or installed
+paths, with an unchanged boot ID. [Canonical migration evidence](data/ota-bootstrap-canonical-20261015.json)
+records the validation order, exact binaries/logs, retained fallback guarantees
+and outstanding cleanup, production provisioning and physical qualification.
+These temporary fixtures exercised no live boot files, system bus or reboot.
+
+Finalization at `00d4bce` was validated with 256 OTA and 40 manager tests,
+71 Yocto checks, Clippy, Rust 1.89, formatting and AArch64 compilation. The final
+33 retirement, handoff and recovery fixtures passed on host ext4 in 197.17 seconds
+and on Pi 5 as UID 1000 in 308.82 seconds. All three real canonical commands
+rejected that account before digest parsing or installed-path access; the boot
+ID stayed unchanged. [Finalization evidence](data/ota-bootstrap-finish-20261015.json)
+records exact logs and artifacts, validation order, and the protocol-4 bootstrap /
+protocol-2 recovery contract. These checks used temporary files; live FAT cleanup,
+production provisioning and hardware qualification remain outstanding.
+
+```sh
+cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
+cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
+cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets
+```

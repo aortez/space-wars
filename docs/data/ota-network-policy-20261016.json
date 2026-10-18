@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T07:01:32.636470+00:00",
+  "implementation_commit": "7dde8caa5c6c4ffe0a5a06e7d323f56db86306eb",
+  "scope": "Persistent requested Wi-Fi policy and bounded lease library, plus an actual read-only NetworkManager CLI probe. The service does not yet load this policy or admit holds; no radio-writing or shutdown path is enabled.",
+  "contracts": {
+    "policy_defaults": {
+      "partial_offline": false,
+      "stay_connected": false
+    },
+    "temporary_process_owned_lease_seconds": 120,
+    "time_check_total_seconds": 120,
+    "download_total_seconds": 1800,
+    "deployment_renewal_seconds": 7200,
+    "reboot_reconnect_seconds": 900,
+    "reconnect_allowances_per_explicit_renewal": 1,
+    "startup_grace_seconds": 110,
+    "expired_setup_checkpoint_grace_seconds": 100,
+    "continuous_quiet_seconds": 10,
+    "maximum_observation_gap_seconds": 5,
+    "maximum_holds": 32,
+    "maximum_deployment_holds": 8,
+    "record_limit_bytes": 16384,
+    "only_deployment_holds_persisted": true,
+    "tokens_in_status_or_persistent_state": false,
+    "radio_probe_total_deadline_seconds": 5,
+    "radio_reply_limit_bytes": 131072,
+    "radio_property_limit": 128,
+    "checkpoint_count_limit": 32
+  },
+  "validation": {
+    "host_manager_tests": 53,
+    "host_temporary_filesystem": "ext4 under target/ota-bootstrap-finish-tmp",
+    "pi5_selected_tests": 13,
+    "pi5_selected_seconds": 0.14,
+    "rust_msrv": "1.89.0",
+    "clippy_warnings_denied": true,
+    "format_checked": true,
+    "aarch64_compiled": true,
+    "artifact_source": "Debug artifacts built from the final working tree subsequently committed as implementation_commit; not a clean packaged runtime image."
+  },
+  "properties_exercised": [
+    "Mode Off remains unmanaged despite holds or a saved Stay connected override; persistent controls use generation checks and remain separate from deployment lifetimes.",
+    "Lost-response retries do not allocate another lease. Repeated release of a missing token does not restart quiet grace. Temporary ownership includes UID/PID/process start time; deployment ownership requires the same UID and capability across command gaps.",
+    "Setup can renew, time-check and download leases retain absolute limits, and expiry cannot be revived by repeating reserve. Service restart keeps deployment deadlines; reboot grace is persisted and cannot be replenished by repeated restarts/reboots.",
+    "Unknown, active or stale SSH/checkpoint/install/operation observations prevent reaping/shutdown intent. Continuous idle evidence and checkpoint/startup grace are required.",
+    "Corrupt/missing/linked/public/changed state cannot reset policy or deployment protection. File-write, file-sync, rename and directory-sync faults yield no usable status until reopen; the accepted generation depends on the durable replacement.",
+    "A private D-Bus NetworkManager fixture checks coherent radio/checkpoint snapshots, wrong owner, changing properties, bounded total timeout and zero mutation calls. Missing, malformed, duplicate or unbounded properties are rejected.",
+    "The real CLI read both installed root-owned NetworkManager instances from UID 1000 without scanning, changing radio/profile state or rebooting."
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "temporary_directory": "/tmp/spacewars-network-policy.8AMOO3",
+      "binaries": {
+        "engine-os-manager": "1ed88dae431565f8746ecb823933d4d0f3216b5c5cfab9299406119e0c8d1cc5",
+        "engine_os_manager-27536c227643c67f": "43939512c2b2b1226e6421522cb700e61963dadad96e1726d6b8dd77ddf9211c"
+      },
+      "probe": {
+        "schema": 1,
+        "bus_owner": ":1.8",
+        "pid": 476,
+        "networking_enabled": true,
+        "wireless_enabled": true,
+        "wireless_hardware_enabled": true,
+        "startup": false,
+        "checkpoint_count": 0,
+        "state": 70
+      },
+      "fixture_tests": 13,
+      "live_radio_writes": false,
+      "installed_state_changes": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "7dd35872-fb71-4348-a318-35a7adf2fb7e",
+      "boot_after": "7dd35872-fb71-4348-a318-35a7adf2fb7e",
+      "temporary_directory": "/tmp/spacewars-network-policy.LTetEj",
+      "binaries": {
+        "engine-os-manager": "1ed88dae431565f8746ecb823933d4d0f3216b5c5cfab9299406119e0c8d1cc5"
+      },
+      "probe": {
+        "schema": 1,
+        "bus_owner": ":1.6",
+        "pid": 412,
+        "networking_enabled": true,
+        "wireless_enabled": true,
+        "wireless_hardware_enabled": true,
+        "startup": false,
+        "checkpoint_count": 0,
+        "state": 70
+      },
+      "fixture_tests": 0,
+      "live_radio_writes": false,
+      "installed_state_changes": false
+    }
+  ],
+  "limits": [
+    "No runtime service policy/hold socket API, serialized radio coordinator, radio ownership journal, external-change observer or complete SSH/session observer is integrated yet.",
+    "The public library accepts OS observations from its caller; fixture Activity values do not qualify physical session-admission races. Its policy intent is not a radio-write capability.",
+    "Setup panel lease renewal/cleanup, deployment script holds, partial-offline scheduling, downloader and install policy remain outstanding.",
+    "The source additions are not present in the earlier cd66877 bootstrap runtime/kits, which still contain the completed bootstrap path.",
+    "No installed device state, Wi-Fi settings, credentials, boot files, root partitions or watchdog were changed. Tests on Pi 5 used ordinary-user temporary files and a private D-Bus daemon.",
+    "The overall OTA goal remains incomplete; root connection details, supervised migration and both-board physical qualification remain pending."
+  ],
+  "logs": {
+    "host_full_ext4": {
+      "path": "target/ota-network-policy-tests.log",
+      "bytes": 6198,
+      "sha256": "e79cb855a4e236959783c99c547b93def8d42d3fa76e92042805fe7df966c250",
+      "test_results": [
+        "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.30s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.09s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.80s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-network-policy-clippy.log",
+      "bytes": 367,
+      "sha256": "24d4d7da7018a99d4b8783cc1c54d37a5b0414ce044129bf76817fa2498d6c76",
+      "test_results": []
+    },
+    "msrv": {
+      "path": "target/ota-network-policy-msrv.log",
+      "bytes": 173,
+      "sha256": "a7ab43edb763973ac456de61c04ff8f085027a09fc851ce728f467dea10080cd",
+      "test_results": []
+    },
+    "format": {
+      "path": "target/ota-network-policy-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_results": []
+    },
+    "aarch64": {
+      "path": "target/ota-network-policy-aarch64.log",
+      "bytes": 174,
+      "sha256": "f83f4d41128ab4b82fd862ae0e17861d931ff00f5df4d8c9e6918efc4702ef4d",
+      "test_results": []
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-network-policy-aarch64.jsonl",
+      "bytes": 208478,
+      "sha256": "f4c54fe8aa440ecef32bb2ea11bd76097757ef62899b0977e9b64c3cf9858113"
+    },
+    "pi_run": {
+      "path": "target/ota-network-policy-pis.log",
+      "bytes": 1335,
+      "sha256": "f0fe9532a973205cea8c14987e354cf6e33a91291202ff5f7e47795b3f7506e7",
+      "test_results": []
+    },
+    "pi5_tests": {
+      "path": "target/ota-network-policy-pi5-tests.log",
+      "bytes": 1520,
+      "sha256": "867a57712595b63972ad37e0a647205f55f74c58b9d7be5c0da813504653ed79",
+      "test_results": [
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.14s"
+      ]
+    },
+    "pi5_probe": {
+      "path": "target/ota-network-policy-pi5-probe.log",
+      "bytes": 210,
+      "sha256": "fc637dbb2c983d3df6bcb0a4f36d839ba5bb19748e32bac96376e0102c301f87",
+      "test_results": []
+    },
+    "pi4_probe": {
+      "path": "target/ota-network-policy-pi4-probe.log",
+      "bytes": 210,
+      "sha256": "1319776a0772f496163b433357e979ba5f2dcddf4b7b0a237c4ed091563f4973",
+      "test_results": []
+    },
+    "pi_script": {
+      "path": "target/ota-network-policy-pis.py",
+      "bytes": 3072,
+      "sha256": "31ffb12af87992be7f5c69197698fbfc66e79bc80fd538f96a7060222f426660"
+    }
+  }
+}

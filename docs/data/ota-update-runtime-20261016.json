@@ -1,0 +1,245 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-16T23:59:23.354932+00:00",
+  "source_commit": "3945897a97e4eec872366c8709fbae6bb25e2687",
+  "branch": "feat/ota-updates-254",
+  "issues": [
+    "https://github.com/aortez/space-wars/issues/258",
+    "https://github.com/aortez/space-wars/issues/260",
+    "https://github.com/aortez/space-wars/issues/265"
+  ],
+  "scope": "Dedicated scheduled download worker in engine-os-manager serve, bounded owned network admission and time-check handoff, native context/time/staging guards, authenticated local check/channel commands",
+  "source_files": {
+    "Cargo.lock": "1e37900a35db9e7834df96b8f6ed560bdfc8426994a57b8474716841b198f45a",
+    "crates/engine-os-manager/Cargo.toml": "7481d50c5a4f27eb076270bbd2904ed0a74937605f140d011f0a59c85dd1de96",
+    "crates/engine-os-manager/src/lib.rs": "634b7465b9212c51e28486684d1aee20934f996825c459f701b227d7966df12e",
+    "crates/engine-os-manager/src/main.rs": "5edf354e1fcdb1fb698e43bd27dac307d38807dfa3ae9c7d30d1002ac9b86016",
+    "crates/engine-os-manager/src/network_controller.rs": "8ed761ee6b793cf9e7e193806d8ce6dbe9fed02d2a737764e59b19f0970e0009",
+    "crates/engine-os-manager/src/network_controller_tests.rs": "42080972020638f41fe1b9cb70aab8f9b9be701b7b8f4eb7dd21fd6f70f0256e",
+    "crates/engine-os-manager/src/network_policy.rs": "c228b968b01c6233b19396b9bc42792aa5bb8a8deec532dd19bdf1103223840f",
+    "crates/engine-os-manager/src/network_policy_tests.rs": "18cd0c5388c1ad7b93bef2d2989edf9e72a0d9417494cccb2a8a98a7a4b4d173",
+    "crates/engine-os-manager/src/network_service.rs": "df5a31d9139cf1f230fa0e7ee71740d486d68528c33532bb1bc30ab56e083963",
+    "crates/engine-os-manager/src/service.rs": "d24e53f9031526da18d1673546dce8583a4dc092b5991b1eca03944f42eb46e5",
+    "crates/engine-os-manager/src/time_runtime.rs": "e8d028783b47c8d85edc76f2ab0be72ea66e78153d980ca7fd7596fa7f25375d",
+    "crates/engine-os-manager/src/time_runtime_tests.rs": "93db024db777eaa2580897caa179bbd2eeb84cd7e7b9ea36c449120727968282",
+    "crates/engine-os-manager/src/update_native.rs": "992c5196d1ae3f889f7ccccc0a0683285ce01c7a16387e48d9f7b9f859e8e062",
+    "crates/engine-os-manager/src/update_runtime.rs": "e0c5b5d34891198848de6903d172653a30b0e5ea06626c06df24e439f4b1f6ee",
+    "crates/engine-os-manager/src/update_runtime_tests.rs": "6e71a96892c61e41c17fe0c4ac517f6de5ec21990a2f82f36b2097b1e82e74f7",
+    "crates/engine-os-manager/tests/local_service.rs": "4efb3a1b96df049ffebaa6b0a42882b5b926eca58558b543fe9398e43a8f0a27",
+    "crates/engine-ota/src/download.rs": "bb369be08191462d262aca60c0ca2c272978c4b3edf2e91e764c82acc2931789",
+    "crates/engine-ota/src/download_tests.rs": "81a7fcedfb725707d9716ff9bb9d708fce168c981b41a3e95ab918f952a4dbf4",
+    "crates/engine-ota/src/repository.rs": "f83884dc976f2f7f54aee3a5392ce12ea058cd407bce1d1e440b0d00d13a315e",
+    "docs/ota-updates.md": "e783f8519780e51969db67e99ee075a765bcc3d4459637bd2fff253a0bb806f2",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-system.service": "853814316b8c6b4d1210759cafde319f48ae5e7a984ee99a944be2a67bf51e95"
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked -p engine-os-manager -- --test-threads=1",
+      "exit_code": 0,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-full-final3.log",
+      "sha256": "5214367e2f60fe55c3ae97d961d742151caaf3d973806b1c1cb7c88d1ccde0ce",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.44s",
+        "test result: ok. 157 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 31.45s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.05s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "command": "cargo test --locked -p engine-ota -- --test-threads=1",
+      "exit_code": 0,
+      "scope": "Before final native service time-floor ordering fix and public admit_time visibility; its implementation is unchanged. Final signed-feed and focused downloader cases rerun below.",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-ota.log",
+      "sha256": "b41e6b5e5f332ac5225070e9804d9cdec0b70212a47db6b6e4e944c12451461d",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.74s",
+        "test result: ok. 276 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 180.50s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "command": "cargo test --locked -p engine-ota --test verification -- --test-threads=1",
+      "exit_code": 0,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-verification-final3.log",
+      "sha256": "b3ce8255d57f5d3418a4a08bfe68e29d37797b16847893d47d6fe08407c842bf",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.47s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s"
+      ]
+    },
+    {
+      "command": "cargo test --locked -p engine-ota --lib -- --test-threads=1 service_request_receipt_is_included_in_preparation_and_session_deadlines network_failure_retains_later_usable_time_against_clock_rollback unknown_or_expired_time_makes_no_ready_candidate",
+      "exit_code": 0,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-downloader-final3.log",
+      "sha256": "d2415b95e88c52a0beaba19265ac154bab308591a08fbae1013545359299bc94",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.19s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 281 filtered out; finished in 0.68s"
+      ]
+    },
+    {
+      "command": "cargo clippy --locked -p engine-os-manager -p engine-ota --all-targets --no-deps -- -D warnings",
+      "exit_code": 0,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-clippy-final3.log",
+      "sha256": "7466b9ac704a9f534960703b86a63ffae0818926a1a96eda58e53745c805d4cd",
+      "results": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.10s"
+      ]
+    },
+    {
+      "command": "cargo +1.89.0 check --locked -p engine-os-manager -p engine-ota --all-targets",
+      "exit_code": 0,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-msrv-final3.log",
+      "sha256": "3886c4f4bb3b9ab135fe88984ed372e12ac460745ced3328752a6c36bfbef68f",
+      "results": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.83s"
+      ]
+    },
+    {
+      "command": "cargo test --locked -p engine-os-manager --lib --target aarch64-unknown-linux-gnu --no-run --message-format=json",
+      "exit_code": 0,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-arm-final.log",
+      "sha256": "3e945d157ebe3bfcb9f9b52fe96952689959bf66eb40097ae0e2a60c750f6012",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.50s"
+      ]
+    },
+    {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-fmt-final3.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "results": []
+    },
+    {
+      "command": "python3 -m unittest discover -s yocto/tests -p '*_test.py'",
+      "exit_code": 0,
+      "scope": "Final Yocto changes; before later Rust-only queue accounting and final-time refinements",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-yocto.log",
+      "sha256": "000db7425e8ec9a4db9d8c8f1a44beb8d999f6fdd63295579460181929c6c2d9",
+      "results": [
+        "Ran 71 tests in 28.762s",
+        "OK"
+      ]
+    }
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "fixture_directory": "/data/spacewars/ota-update-runtime-fixtures.ykj6ST",
+      "data_free_bytes_before": 94251552768,
+      "artifact": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-arm-tests",
+        "sha256": "f7f53ea0b83d53e934ad17f8079c30238a4495abc9498f8348f61298c78fe07d",
+        "bytes": 10756056
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 63 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 4.14s",
+      "network": "Injected network/provider/clock fixtures only; workstation SSH for the test run",
+      "production_schedule_opened": false,
+      "system_provider_restarted": false,
+      "radio_mutations": false,
+      "installed_service_changes": false,
+      "root_partition_writes": false,
+      "reboots": false,
+      "test_output": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-pi5-tests.log",
+        "sha256": "c1f8e57f8d61199fcd70eeeff664dcca531b5c1e48b7c39a551f0164c66602a8"
+      }
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "fixture_directory": "/data/spacewars/ota-update-runtime-fixtures.t8SY3x",
+      "data_free_bytes_before": 44299902976,
+      "artifact": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-arm-tests",
+        "sha256": "f7f53ea0b83d53e934ad17f8079c30238a4495abc9498f8348f61298c78fe07d",
+        "bytes": 10756056
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 63 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 5.36s",
+      "network": "Injected network/provider/clock fixtures only; workstation SSH for the test run",
+      "production_schedule_opened": false,
+      "system_provider_restarted": false,
+      "radio_mutations": false,
+      "installed_service_changes": false,
+      "root_partition_writes": false,
+      "reboots": false,
+      "test_output": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-update-runtime-pi4-tests.log",
+        "sha256": "9db8375e11d5ee074e989dd2d7dbaa29d12dbe5f41d1f8189d1813d766d0ed5f"
+      }
+    }
+  ],
+  "device_test_filters": [
+    "update_runtime::",
+    "update_schedule::tests::",
+    "time_runtime::tests::",
+    "time_schedule::tests::",
+    "download_reservation_requires",
+    "download_manual_admission",
+    "download_handoff_keeps",
+    "stale_connected_download"
+  ],
+  "coverage": [
+    "Passive status and offline due work do not start network work; explicit checks join the original receipt and active session",
+    "Daily OTA allowance remains independent of NTP retries and manual checks",
+    "Download admission uses original request admission and total deadlines, including queue delay and HTTP client preparation",
+    "Root-only automatic reservation requires the unchanged mode and a fresh connected opportunity or live same-owner time-check parent",
+    "Expired parent offers and stale connected observations cannot authorize an automatic radio wake",
+    "Time worker offers before its provider query/release; updater acknowledges only after owning its separate persisted admission",
+    "Accepted time and actual association may arrive after admission; no HTTP starts before both",
+    "Thirty-second renewal keeps a rolling 120-second lease inside the original thirty-minute total",
+    "Channel/mode/epoch changes, failed renewal, deadline and shutdown cancel and join IO before releasing only the updater hold",
+    "Queued channel round trips invalidate old manual requests; failed channel persistence clears pending accounting",
+    "Coordinator thread shutdown and same-boot restart preserve consumed scheduling allowances",
+    "Fixed native device identity, data schema and recovery history are checked under the shared installation lock",
+    "Private checksummed data schema rejects missing/corrupt/public/linked identity instead of inferring it from a rolled-back image",
+    "Ready metadata snapshots invalidate on file replacement, content/permission/link changes or deletion",
+    "Final accepted-time observations persist before ready snapshot capture; expiry rejects readiness and clock rollback cannot revive retained metadata",
+    "Check/channel socket requests authenticate the root peer and reject extra URL/path fields or unsupported schema"
+  ],
+  "fixture_scope": {
+    "durable_state": "Private temporary directories; UID-1000 /data/spacewars children on both Pis",
+    "runtime": "Injected network/provider/clock observations and fake download backend; native private-record and ready-snapshot helpers tested directly",
+    "http": "Real bounded downloader/TLS/TUF host tests remain separate from the service runtime fixtures; installed native context plus HTTP is not yet qualified",
+    "service": "No installed service launch, system provider restart, radio mutation, boot-file change, physical root write or reboot",
+    "native_final_time": "Final native wrapper ordering reviewed; retained-time/expiry signed-feed and downloader cases rerun. No claim of installed native end-to-end execution."
+  },
+  "remaining": [
+    "Provision persistent data-version identity, production trust root/feed and staging under supervised authority",
+    "Publish signed Release/Nightly feeds with operational key separation and timestamp refresh",
+    "Qualify installed network/provider, native HTTP handoff, SSH idle detection and frame-time impact",
+    "Present retained partial-download bytes safely after process restart",
+    "Resolve time-store repair versus schedule success-generation recovery",
+    "Integrate verified installer, update settings and Ask/Automatic overnight policy",
+    "Complete supervised bootstrap and physical recovery/data/RTC qualification on both Pis"
+  ],
+  "root_access": "Root shell selected by the user; read-only SSH probe still denied on both Pis at this stage",
+  "installed_service_changes": false,
+  "system_provider_restarted": false,
+  "radio_mutations": false,
+  "live_installation_performed": false,
+  "auto_update_enabled": false,
+  "pushed": false
+}

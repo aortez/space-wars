@@ -1,21 +1,24 @@
 # Rootfs-only OTA must not pair a new kernel's modules with an old boot kernel.
-# A different boot ID requires a full USB image flash, not an A/B rootfs update.
+# A different boot ID requires supervised boot preparation, not rootfs-only OTA.
 do_rootfs[depends] += "virtual/kernel:do_deploy rpi-config:do_deploy rpi-bootfiles:do_deploy picade-hat:do_deploy spacewars-hardware:do_deploy"
+do_rootfs[depends] += "spacewars-recovery-initramfs:do_image_complete"
 do_rootfs[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/boot_identity.py:True"
 
 python write_spacewars_boot_identity() {
     from pathlib import Path
-    from spacewars.boot_identity import boot_identity
+    from spacewars.boot_identity import prepare_recovery_boot
 
     deploy = Path(d.getVar("DEPLOY_DIR_IMAGE"))
     try:
-        identity = boot_identity(deploy, d.getVar("IMAGE_BOOT_FILES")) + "\n"
-    except ValueError as error:
+        manifest, identity = prepare_recovery_boot(deploy, d.getVar("IMAGE_BOOT_FILES"))
+        identity += "\n"
+    except (KeyError, OSError, ValueError) as error:
         bb.fatal(str(error))
     (deploy / "spacewars-boot-id").write_text(identity)
     config = Path(d.getVar("IMAGE_ROOTFS")) / "etc/spacewars"
     config.mkdir(parents=True, exist_ok=True)
     (config / "boot-id").write_text(identity)
+    (config / "boot-manifest.json").write_bytes((deploy / "spacewars-boot-manifest.json").read_bytes())
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " write_spacewars_boot_identity;"
 

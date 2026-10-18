@@ -15,6 +15,7 @@ members = [
     "crates/spacewars-cli",
     "crates/engine-agent",
     "crates/engine-os-manager",
+    "crates/engine-ota",
     "scenarios/clock",
     "scenarios/garden-lab",
     "scenarios/falling",
@@ -35,6 +36,7 @@ exclude = [
     "vendor/i-slint-renderer-femtovg",
     "vendor/lyon_tessellation",
     "vendor/rapier2d",
+    "vendor/tough",
 ]
 
 [workspace.package]
@@ -99,6 +101,9 @@ scenario-terrain-lab = { path = "scenarios/terrain-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
 
 [patch.crates-io]
+# Inject the device's usable time without disabling expiration enforcement.
+# See vendor/tough/SPACEWARS_PATCH.md; signature verification is unchanged.
+tough = { path = "vendor/tough" }
 # Exact round joins for the Pi GPU profile, with reference diagnostic controls.
 lyon_tessellation = { path = "vendor/lyon_tessellation" }
 # Pi-selected CPU glyph masks; the library retains its vector default/control.

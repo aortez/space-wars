@@ -1,0 +1,377 @@
+{
+  "date": "2026-10-15",
+  "source_commit": "71826f02a3f49c8c28da0cd24d4da90743d168c7",
+  "source_clean_during_entire_build": true,
+  "scope": "Clean image packaging, access startup ordering, ownership/privilege boundary, complete file-backed writer and ordinary-user packaged Pi execution. Nothing installed on either Pi.",
+  "artifact_inspection": {
+    "artifact": {
+      "rootfs": {
+        "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015205535.ext4.gz",
+        "compressed_bytes": 134030853,
+        "compressed_sha256": "647442f6a0494c6533c067a2fe4cfde6d93a2dc599ba16cb8a7072509211d53d",
+        "expanded_bytes": 520093696,
+        "expanded_sha256": "5d9fb098ca60dd4a59d4966c221ce1004a85b0023eb2d76807ef8003c973f4a9"
+      },
+      "disk": {
+        "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015205535.wic.gz",
+        "compressed_bytes": 183511151,
+        "compressed_sha256": "28f5f33b66979209fb83770a00eeca0ed19376f763d8666a9809da5777b44d03",
+        "expanded_bytes": 7679770624,
+        "expanded_sha256": "43ce3117239c64cfd3eaf0c2e303be5e0e1350c176c94b6fce23303f095169bd"
+      },
+      "partition_table": [
+        {
+          "number": 1,
+          "type": 12,
+          "start_sector": 8192,
+          "sectors": 307200
+        },
+        {
+          "number": 2,
+          "type": 131,
+          "start_sector": 319488,
+          "sectors": 6291456
+        },
+        {
+          "number": 3,
+          "type": 131,
+          "start_sector": 6610944,
+          "sectors": 6291456
+        },
+        {
+          "number": 4,
+          "type": 131,
+          "start_sector": 12902400,
+          "sectors": 2097152
+        }
+      ],
+      "root_partuuids": [
+        "076c4a2a-02",
+        "076c4a2a-03"
+      ],
+      "identity": {
+        "architecture": "aarch64",
+        "binaries": {
+          "client": {
+            "bytes": 23426808,
+            "sha256": "6879a30f15897f614d5705ff70bf1b643e393b171fcec5c8f193fdabf4f66155"
+          },
+          "os_manager": {
+            "bytes": 3682960,
+            "sha256": "53ba996beb389c121acffc04168859fd54135d7bedf7a0e377570355eff14173"
+          }
+        },
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "build_id": "rootfs-17a9877d8859f5c75dc5aeedfed7f411d62ee238c961ab4a4b871854105daf29",
+        "data": {
+          "reads": {
+            "max": 1,
+            "min": 1
+          },
+          "writes": 1
+        },
+        "layout": "spacewars-ab-v1",
+        "machine": "raspberrypi-spacewars",
+        "recovery_protocol": 1,
+        "rootfs_tree": "17a9877d8859f5c75dc5aeedfed7f411d62ee238c961ab4a4b871854105daf29",
+        "schema": 1,
+        "source": {
+          "commit": "71826f02a3f49c8c28da0cd24d4da90743d168c7",
+          "dirty": false,
+          "revision": "71826f02a3f4",
+          "schema": 1
+        },
+        "updater_protocol": 1
+      },
+      "boot_probe": {
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "hardware_profile": "hdmi",
+        "immutable_bytes": 85396458,
+        "immutable_files": 103,
+        "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+        "provisioned_default": null,
+        "trial": null
+      },
+      "rootfs_record_matches_sidecar": true,
+      "rootfs_and_fat_manifest_match": true,
+      "default_cmdline_unchanged": true,
+      "trial_uses_full_config_copy": true,
+      "boot_contains_exact_initramfs_sha256": "461ab4531c05f96c235610855951be26cb4b764e7d7ea2c9da075087b9485c4a",
+      "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-fp3ww6vy",
+      "probe_command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "engine-ota",
+        "--example",
+        "boot_artifact_probe",
+        "--",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-fp3ww6vy/boot",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-fp3ww6vy/image.json",
+        "076c4a2a-02",
+        "076c4a2a-03"
+      ]
+    },
+    "root": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-fp3ww6vy/rootfs-view",
+    "exact_helper_sources": {
+      "usr/lib/systemd/system/spacewars-access.service": "a4ad4f4daaae90113156583a7df66d70e3f51745d29de6f8734f46d6aaf27f5e",
+      "usr/lib/systemd/system/sshd@.service.d/spacewars-access.conf": "46622cb97aa42b258dc5fa27758d0af32b9dae1f83813582dcd27d47860b49eb",
+      "usr/lib/systemd/system/sshd.service.d/spacewars-access.conf": "46622cb97aa42b258dc5fa27758d0af32b9dae1f83813582dcd27d47860b49eb",
+      "etc/ssh/sshd_config.d/10-spacewars-access.conf": "d8b1276b04ff97ac9296b7c869aedf386a8cd6af6e6ff3d5595959f36a20ef9e",
+      "usr/sbin/spacewars-fast-update": "cf9fdf0ac8e92417665e6e9e39db57962f41b28b61df0e79e3fc2b13db2bf1a4",
+      "usr/sbin/spacewars-renderer": "022bfd940f30a66bd8f310a80cb4b1c2833e254d459e8781181fbbe13a6c89cb",
+      "usr/libexec/spacewars/fast-update": "161c7a40f879b4c2c8afd64b4c86b422fb2b5d0b8526e9b49b2ce02c0b19b5f0",
+      "usr/libexec/spacewars/renderer": "205de0c9922522e2b650f258fe8e74dda76485fc957deac13380518c64122954",
+      "usr/sbin/ab-update": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594",
+      "usr/sbin/ab-update-with-key": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594",
+      "usr/sbin/ab-boot-manager": "a3a4947edae8df0e552dd0ffa0e8c118bf7be0fa3daf6ca8cb4ad6f5e8944a12"
+    },
+    "image_permissions": {
+      "/usr/lib/systemd/system/spacewars-access.service": {
+        "type": "regular",
+        "mode": 420,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/lib/systemd/system/sshd@.service.d/spacewars-access.conf": {
+        "type": "regular",
+        "mode": 420,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/ssh/sshd_config.d/10-spacewars-access.conf": {
+        "type": "regular",
+        "mode": 420,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/bin/ssh-keygen": {
+        "type": "regular",
+        "mode": 493,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/libexec/spacewars": {
+        "type": "directory",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/libexec/spacewars/fast-update": {
+        "type": "regular",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/libexec/spacewars/renderer": {
+        "type": "regular",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/bin/engine-os-manager": {
+        "type": "regular",
+        "mode": 493,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-ota": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-logs": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-renderer": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      }
+    },
+    "runtime_sudo_rules": [
+      "spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-logs *",
+      "spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-renderer software, /usr/sbin/spacewars-renderer gpu"
+    ],
+    "runtime_groups": [
+      "input",
+      "audio",
+      "video",
+      "spacewars"
+    ],
+    "packaged_binary_identity": {
+      "engine-client": {
+        "bytes": 23426808,
+        "sha256": "6879a30f15897f614d5705ff70bf1b643e393b171fcec5c8f193fdabf4f66155"
+      },
+      "engine-os-manager": {
+        "bytes": 3682960,
+        "sha256": "53ba996beb389c121acffc04168859fd54135d7bedf7a0e377570355eff14173"
+      }
+    },
+    "ext4_block_bytes": 1024,
+    "access_service_enabled": true,
+    "socket_activated_ssh_waits_for_access_initialization": true,
+    "no_login_keys_shipped": true,
+    "scope": "Static artifact policy, service wiring and ownership inspection; not live SSH/sandbox/Pi qualification"
+  },
+  "checks": {
+    "build": {
+      "path": "target/ota-access-yocto-final-build.log",
+      "bytes": 16509,
+      "sha256": "51cc840297359c6bd8b998f27ba7e82bda70464e8b5b68bff83010fb2ba2f896",
+      "exit_code": 0,
+      "summary": [
+        "2026-10-15 13:55:33 - WARNING  - Using branch without commit for repository \"poky\" is unsafe. Either add a commit or use a lock file.",
+        "2026-10-15 13:55:33 - WARNING  - Using branch without commit for repository \"meta-raspberrypi\" is unsafe. Either add a commit or use a lock file.",
+        "2026-10-15 13:55:33 - WARNING  - Using branch without commit for repository \"meta-openembedded\" is unsafe. Either add a commit or use a lock file.",
+        "2026-10-15 13:55:33 - WARNING  - Using branch without commit for repository \"meta-rust-bin\" is unsafe. Either add a commit or use a lock file.",
+        "2026-10-15 13:55:33 - WARNING  - Using branch without commit for repository \"meta-pi-base\" is unsafe. Either add a commit or use a lock file.",
+        "2026-10-15 13:55:33 - INFO     - WARNING: Host distribution \"ubuntu-26.04\" has not been validated with this version of the build system; you may possibly experience unexpected failures. It is recommended that you use a tested distribution.",
+        "2026-10-15 14:01:45 - INFO     - NOTE: Tasks Summary: Attempted 6768 tasks of which 6741 didn't need to be rerun and all succeeded.",
+        "2026-10-15 14:01:45 - INFO     - Summary: There was 1 WARNING message."
+      ]
+    },
+    "boot_audit": {
+      "path": "target/ota-access-boot-audit.log",
+      "bytes": 654,
+      "sha256": "04c1bc8e4337d7cc4edc0004a95d899014be3143958f4127147efe7b81127df5",
+      "exit_code": 0,
+      "summary": [
+        "  \"boot_probe\": {",
+        "    \"boot_identity\": \"fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238\","
+      ]
+    },
+    "image_audit": {
+      "path": "target/ota-access-image-audit.log",
+      "bytes": 589,
+      "sha256": "12961a02c37720b9e57986028cea0e520bf802896f39cb82116289aff34b9fb0",
+      "exit_code": 0,
+      "summary": []
+    },
+    "artifact_writer": {
+      "path": "target/ota-access-clean-artifact-writer.log",
+      "bytes": 2029,
+      "sha256": "0057444167435e696da631599ba985c8d596dfbd04a5bf6df9988ef110bd2486",
+      "exit_code": 0,
+      "summary": [
+        "{\"descriptor\":{\"architecture\":\"aarch64\",\"boot_identity\":\"fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238\",\"build_id\":\"rootfs-17a9877d8859f5c75dc5aeedfed7f411d62ee238c961ab4a4b871854105daf29\",\"channel\":\"release\",\"compressed\":{\"bytes\":128618256,\"sha256\":\"dfaebb1406fdc7ed8101ebfd92fbba9df1fbd61c996f8c2b4141588ba5d74492\"},\"data\":{\"reads\":{\"max\":1,\"min\":1},\"writes\":1},\"expanded\":{\"bytes\":520093696,\"sha256\":\"5d9fb098ca60dd4a59d4966c221ce1004a85b0023eb2d76807ef8003c973f4a9\"},\"format\":\"rootfs-ext4-zstd\",\"generation\":2,\"layout\":\"spacewars-ab-v1\",\"machine\":\"raspberrypi-spacewars\",\"min_recovery_protocol\":1,\"min_updater_protocol\":1,\"schema\":1,\"source_commit\":\"71826f02a3f49c8c28da0cd24d4da90743d168c7\"},\"result\":null,\"source\":{\"commit\":\"71826f02a3f49c8c28da0cd24d4da90743d168c7\",\"dirty\":false,\"revision\":\"71826f02a3f4\",\"schema\":1},\"stages\":[\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"writing\",\"flushing\",\"reading-back\",\"reading-back\",\"checking-filesystem\",\"reading-back\",\"reading-back\"],\"target_is_temporary_regular_file\":true}",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 35.52s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+      ]
+    },
+    "packaged_systemd": {
+      "path": "target/ota-access-packaged-systemd.log",
+      "bytes": 533,
+      "sha256": "507c02f7b774937be3097e39f2f151eb17fdc1125fd340ff1091679f9276c387",
+      "exit_code": 0,
+      "summary": [
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-fp3ww6vy/rootfs-view/usr/lib/systemd/system/systemd-timesyncd.service:29: The !! modifier for ExecStart= lines is no longer supported and is now ignored. Please update your unit files and remove the modifier.",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-fp3ww6vy/rootfs-view/usr/lib/systemd/system/systemd-resolved.service:27: The !! modifier for ExecStart= lines is no longer supported and is now ignored. Please update your unit files and remove the modifier."
+      ]
+    },
+    "packaged_pi5": {
+      "path": "target/ota-access-packaged-pi5.log",
+      "bytes": 978,
+      "sha256": "645bd30c386d6d41b19f20a68790bf0ca2b5b78d6747dfde2a88480c1629a90a",
+      "exit_code": 0,
+      "summary": [
+        "boot_before=de606400-dc75-446e-b26b-385592b0f562",
+        "boot_after=de606400-dc75-446e-b26b-385592b0f562"
+      ]
+    },
+    "process_isolated_tests": {
+      "path": "target/ota-access-process-isolation.json",
+      "bytes": 3099,
+      "sha256": "a9077c8fc70523dfe251692c4fc57c6cdc98aad1c0651e006a7075699b32f26e",
+      "exit_code": 0,
+      "summary": [
+        "    \"test\": \"access_linux::tests::first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys\",",
+        "    \"stdout\": \"\\nrunning 1 test\\ntest access_linux::tests::first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys ... ok\\n\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.05s\\n\\n\",",
+        "    \"stdout\": \"\\nrunning 1 test\\ntest access_linux::tests::invalid_or_incomplete_persistent_store_never_falls_back_to_image_keys ... ok\\n\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.40s\\n\\n\",",
+        "    \"stdout\": \"\\nrunning 1 test\\ntest access_linux::tests::public_key_validation_rejects_skipped_lines_secrets_and_unbounded_input ... ok\\n\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.04s\\n\\n\",",
+        "    \"stdout\": \"\\nrunning 1 test\\ntest access_linux::tests::runtime_only_flash_never_creates_root_authority_and_operator_import_is_explicit ... ok\\n\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.11s\\n\\n\",",
+        "    \"stdout\": \"\\nrunning 1 test\\ntest access_linux::tests::snapshot_detects_named_replacement_and_in_place_changes ... ok\\n\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.00s\\n\\n\",",
+        "    \"stdout\": \"\\nrunning 1 test\\ntest access_linux::tests::unsafe_sources_and_destinations_reject_before_publication ... ok\\n\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.01s\\n\\n\",",
+        "    \"stdout\": \"\\nrunning 1 test\\ntest file_command::tests::checker_deadline_output_exit_status_and_inherited_file_are_enforced ... ok\\n\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.16s\\n\\n\",",
+        "    \"stdout\": \"\\nrunning 1 test\\ntest recovery::tests::uncommitted_temporary_file_never_supersedes_the_last_complete_journal ... ok\\n\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.00s\\n\\n\","
+      ]
+    }
+  },
+  "packaged_pi5_output": "uid=1000(spacewars) gid=1000(spacewars) groups=1000(spacewars),19(input),29(audio),44(video)\nboot_before=de606400-dc75-446e-b26b-385592b0f562\nSpace-Wars independent device service\n\nUsage: ota-access-packaged-manager-71826f0 <COMMAND>\n\nCommands:\n  serve        Run the root-owned device service (normally started by systemd)\n  recover      Reconcile an existing recovery journal and observe a trial boot. Normally invoked by the separate spacewars-recovery service\n  maintenance  Separately authenticated root operator tools; not available on the device socket\n  status       Read a bounded JSON status snapshot independently of the game client\n  probe        Inspect the current time provider without changing clocks or state\n  help         Print this message or the help of the given subcommand(s)\n\nOptions:\n  -h, --help  Print help\ndevice mutations require the root-owned service\ndevice mutations require the root-owned service\nboot_after=de606400-dc75-446e-b26b-385592b0f562\n",
+  "isolated_test_results": [
+    {
+      "test": "access_linux::tests::first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys",
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest access_linux::tests::first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.05s\n\n",
+      "stderr": ""
+    },
+    {
+      "test": "access_linux::tests::invalid_or_incomplete_persistent_store_never_falls_back_to_image_keys",
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest access_linux::tests::invalid_or_incomplete_persistent_store_never_falls_back_to_image_keys ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.40s\n\n",
+      "stderr": ""
+    },
+    {
+      "test": "access_linux::tests::public_key_validation_rejects_skipped_lines_secrets_and_unbounded_input",
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest access_linux::tests::public_key_validation_rejects_skipped_lines_secrets_and_unbounded_input ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.04s\n\n",
+      "stderr": ""
+    },
+    {
+      "test": "access_linux::tests::runtime_only_flash_never_creates_root_authority_and_operator_import_is_explicit",
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest access_linux::tests::runtime_only_flash_never_creates_root_authority_and_operator_import_is_explicit ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.11s\n\n",
+      "stderr": ""
+    },
+    {
+      "test": "access_linux::tests::snapshot_detects_named_replacement_and_in_place_changes",
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest access_linux::tests::snapshot_detects_named_replacement_and_in_place_changes ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.00s\n\n",
+      "stderr": ""
+    },
+    {
+      "test": "access_linux::tests::unsafe_sources_and_destinations_reject_before_publication",
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest access_linux::tests::unsafe_sources_and_destinations_reject_before_publication ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.01s\n\n",
+      "stderr": ""
+    },
+    {
+      "test": "file_command::tests::checker_deadline_output_exit_status_and_inherited_file_are_enforced",
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest file_command::tests::checker_deadline_output_exit_status_and_inherited_file_are_enforced ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.16s\n\n",
+      "stderr": ""
+    },
+    {
+      "test": "recovery::tests::uncommitted_temporary_file_never_supersedes_the_last_complete_journal",
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest recovery::tests::uncommitted_temporary_file_never_supersedes_the_last_complete_journal ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.00s\n\n",
+      "stderr": ""
+    }
+  ],
+  "root_access_readiness": {
+    "spacewars.local": "SSH root check using the existing workstation key rejected with Permission denied (publickey,password).",
+    "sw-picade.local": "Name did not resolve from this workstation; no root connection established.",
+    "user_choice": "Root shell bootstrap on both Pis, preserving data; do not repeat the preference question."
+  },
+  "limitations": [
+    "No installed root execution, block writes, SSH key/config replacement, boot-selector changes, physical watchdog opens or reboots.",
+    "Root initializer service sandbox, actual separate root/runtime logins across updates/rollback and media interruption behavior still need supervised physical qualification.",
+    "The rootfs writer artifact test constructs a local descriptor and temporary zstd stream; it does not verify production feed signatures or publish a release.",
+    "The Yocto build warns that Ubuntu 26.04 has not been validated with the pinned build system.",
+    "Host systemd offline verification succeeds with warnings about old !! ExecStart modifiers in pinned timesyncd/resolved units, not the access units.",
+    "Bootstrap kit, final installer API/handoff, network/maintenance holds, publisher/downloader, policy/UI and full Pi qualification remain incomplete."
+  ]
+}

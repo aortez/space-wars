@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T05:35:58.878118+00:00",
+  "implementation_commit": "48acde7dcf7e1b37ad4ab62d188efa433a6bbdde",
+  "scope": "Supervised permanent boot-layout preparation, consumed normal activation and separate canonical boot health. Durable migration ownership preserves the staged fallback and forbids legacy selector rollback once canonical assets can change. No live privileged adapter or reboot ran.",
+  "contract": {
+    "package_schema": 3,
+    "bootstrap_protocol": 3,
+    "trial_journal_schema": 3,
+    "runtime_marker": {
+      "schema": 1,
+      "protocol": 3
+    },
+    "canonical_prepare_reboots": false,
+    "canonical_activate_prepares_missing_files": false,
+    "reboot_parameter_mutated_by_activation": false,
+    "fixed_systemd_unit": "reboot.target",
+    "fixed_systemd_mode": "replace-irreversibly",
+    "bus_method_timeout_seconds": 2,
+    "bus_handoff_timer_seconds": 5,
+    "health_window_seconds": 60,
+    "boot_relative_health_deadline_seconds": 180,
+    "new_runtime_image_or_kits_built": false,
+    "automatic_updates_enabled": false
+  },
+  "host_validation": {
+    "ota_tests_passed": 247,
+    "manager_tests_passed": 40,
+    "ordinary_suite_ignored": 8,
+    "yocto_tests_passed": 71,
+    "yocto_sandbox_required": true,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "format": "passed",
+    "aarch64_ota_manager_tests_and_command_build": "passed",
+    "selected_tests_on_workspace_ext4": 14,
+    "selected_ext4_seconds": 84.17,
+    "validation_order": "Full OTA/manager suite passed; after refining canonical D-Bus behavior, the full manager suite passed again. After a Clippy-only nested-if simplification, all 14 changed OTA tests passed on workspace ext4. Clippy, MSRV, format and AArch64 checks cover the final source.",
+    "commands": [
+      "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+      "cargo test --locked -p engine-os-manager -- --test-threads=1",
+      "TMPDIR=/home/data/workspace/space-wars-ota/target/ota-bootstrap-canonical-tmp cargo test --locked -p engine-ota --lib bootstrap::canonical -- --test-threads=1",
+      "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+      "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+      "cargo fmt --all -- --check",
+      "SPACEWARS_REQUIRE_UPDATE_SANDBOX=1 python3 -m unittest discover -s yocto/tests -p '*_test.py'",
+      "cargo test --locked -p engine-ota -p engine-os-manager --target aarch64-unknown-linux-gnu --no-run --message-format=json"
+    ]
+  },
+  "pi5_validation": {
+    "remote_directory": "/tmp/spacewars-bootstrap-canonical.F5OxKx",
+    "uid": 1000,
+    "boot_id_before_and_after": "de606400-dc75-446e-b26b-385592b0f562",
+    "artifacts": {
+      "ota_tests": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f7c7f1697874a6b9",
+        "bytes": 87206144,
+        "sha256": "21f270d751b0a59a7806cb61581daa5116c30256317286c6e8607f2fcee21927"
+      },
+      "manager_tests": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_os_manager-27536c227643c67f",
+        "bytes": 103980792,
+        "sha256": "352078cf2b6f469f36da4f653706ecf6559e9636fe669ef468c58c972cb3ee34"
+      },
+      "manager_command": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/engine-os-manager",
+        "bytes": 123634664,
+        "sha256": "caaee42212531f7df4bcd20a5d62daa37cf527b6d2fb76d68b86148ffbf41cae"
+      }
+    },
+    "artifact_build_state": "Debug executables built from the source working tree subsequently committed as implementation_commit. They are not a clean Yocto runtime image.",
+    "ota_selected_tests_passed": 14,
+    "manager_selected_tests_passed": 1,
+    "ignored": 0,
+    "ota_elapsed_test_seconds": 107.1,
+    "manager_elapsed_test_seconds": 0.1,
+    "ota_filter": "bootstrap::canonical",
+    "manager_filter": "canonical_reboot",
+    "actual_commands": [
+      "./engine-os-manager bootstrap-canonical --package invalid --written-root invalid --trial invalid prepare",
+      "./engine-os-manager bootstrap-canonical --package invalid --written-root invalid --trial invalid activate"
+    ],
+    "actual_command_denial": "Both commands exited 1: device mutations require the root-owned service",
+    "scope": "Ordinary-user temporary journals, simulated boot observations, filesystem fixtures and a private D-Bus with fake logind/PID1. Real command UID checks run before digest parsing or installed paths. No live root, boot, watchdog, persistent store or reboot mutation."
+  },
+  "covered_cases": [
+    "Every distinct copy checkpoint plus first/middle/last repeated intent, rename and completion checkpoints can resume using exact pending contents. Staged assets, firmware, hostname and boot_slot retain their original bytes and inodes.",
+    "All selector publication checkpoints preserve an exact staged or canonical configuration; selection is forbidden before every asset has a completion record.",
+    "Journal write, file-sync, rename and directory-sync failures release no migration or reboot action. A file renamed before its completion record is flushed and accepted without rewriting its inode.",
+    "Changed or missing completed/staged assets, unknown files/directories, links, oversized temporaries, altered sources and failed final guards are rejected without repairs or selector publication.",
+    "FAT case and directory collisions are rejected before copying. Immutable plans, completed paths, consumed reboot authority and the first failure cannot be reset through journal transitions.",
+    "Canonical confirmation requires a different normal boot and independent health; a new staged boot during interrupted copying repeats health without clearing progress. Late/unhealthy observations and lost activation replies return to the staged default, then stop for the operator on the following boot.",
+    "Private D-Bus fixtures verify the exact normal job, reject existing tryboot/foreign arguments, preserve arguments introduced during authorization, and issue no job when final authority fails. Canonical activation never sets or clears RebootParameter.",
+    "The real AArch64 prepare and activate commands reject UID 1000 before digest parsing or fixed-path/system-bus access."
+  ],
+  "limits": [
+    "The fixed-path privileged canonical admission, real FAT assets, system-bus handoff and actual boot health adapter have not run on either Pi.",
+    "The staged fallback is the retained recovery target once canonical migration begins; the original legacy config cannot safely select partially replaced canonical assets. Raw independent recovery copies remain required.",
+    "A canonical normal boot does not arm the one-shot trial watchdog. If it fails before the recovery service runs, independent supervised recovery is required.",
+    "Fixture faults, synthetic boot IDs and private D-Bus replies do not qualify real watchdog behavior, power loss, shared-FAT rename durability, resets or bad-root startup.",
+    "A bus timeout cannot retract an accepted request. Process loss can leave a consumed attempt; reboot state and storage uncertainty require operator reconciliation. Synchronous validation has no overall command deadline.",
+    "Only temporary ordinary-user artifacts were written on Pi 5; Pi 4 was not exercised and no installed device state was changed.",
+    "Staged-tree cleanup, boot_slot archival/removal, obsolete-asset removal and explicit production recovery baseline provisioning remain unimplemented.",
+    "No clean protocol-3 runtime image or new kits have been built. Older c14c53f/schema-2 packages and protocol-1/2 images or schema-1/2 journals must not be relabeled.",
+    "Root connection details, independent live backup/restore rehearsal, privilege/access closure, supervised installation/trial and both-board failure qualification remain outstanding. Feed, service, radio, policy and UI integration are also required before automatic update rollout."
+  ],
+  "logs": {
+    "host_full": {
+      "path": "target/ota-bootstrap-canonical-tests.log",
+      "bytes": 32970,
+      "sha256": "1c4e10dba0d365fe887e36c0ca56f4c322d38b60e533faad335e0dd741d725e6",
+      "test_results": [
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.33s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.52s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 225 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 116.20s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "host_manager_final": {
+      "path": "target/ota-bootstrap-canonical-manager-final.log",
+      "bytes": 4881,
+      "sha256": "fe2ba90a3f1e6020d3888d2d44d68d85751d809753c85afe5b1736dddac9b6d2",
+      "test_results": [
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.39s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.72s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "host_ext4_final": {
+      "path": "target/ota-bootstrap-canonical-ext4.log",
+      "bytes": 2086,
+      "sha256": "16fd8eee7acb34c0b0ba8d2580c97d3c825dc33bb30ca1122140339168416031",
+      "test_results": [
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 84.17s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-bootstrap-canonical-clippy.log",
+      "bytes": 454,
+      "sha256": "f91ae463e1284bdaac1677bef5f50a6768caf0d8edd118a3d9a4be8fe6ab4347"
+    },
+    "msrv": {
+      "path": "target/ota-bootstrap-canonical-msrv.log",
+      "bytes": 260,
+      "sha256": "b8153f2b2a3e40839cf8d1b1bcc2c7572c7527e5335e5c04063eed068c02d5fb"
+    },
+    "format": {
+      "path": "target/ota-bootstrap-canonical-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "yocto": {
+      "path": "target/ota-bootstrap-canonical-yocto.log",
+      "bytes": 171,
+      "sha256": "0c46f05801be41c4f310db86ac4db7c018860e4cbb11792fa2db3505c86ff58b",
+      "test_results": [
+        "Ran 71 tests in 28.761s"
+      ]
+    },
+    "aarch64": {
+      "path": "target/ota-bootstrap-canonical-aarch64.log",
+      "bytes": 261,
+      "sha256": "07922336e95772cc29310e656db7d53f31e808adedeccaeb7640817fc71cae78"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-bootstrap-canonical-aarch64.jsonl",
+      "bytes": 224659,
+      "sha256": "1cbf4990ac3f26862e90f38c19d4dac913b78736d39405d4fc79924fa069a957"
+    },
+    "pi5": {
+      "path": "target/ota-bootstrap-canonical-pi5.log",
+      "bytes": 2593,
+      "sha256": "7fae28d185b563cc9ea69f96186bc3fcf2ad1cf1839400e128257b41b290745b",
+      "test_results": [
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 107.10s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.10s"
+      ]
+    },
+    "pi5_script": {
+      "path": "target/ota-bootstrap-canonical-pi5.sh",
+      "bytes": 1077,
+      "sha256": "78873625297a71b5ffbecf78aad649fff67d86c244f402794db4c0a6272d2416"
+    }
+  }
+}

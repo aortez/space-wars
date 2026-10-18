@@ -1,0 +1,33 @@
+[Unit]
+Description=Capture Space-Wars RTC boot evidence before network synchronization
+DefaultDependencies=no
+After=systemd-modules-load.service systemd-udev-trigger.service
+Before=sysinit.target systemd-timesyncd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/engine-os-manager capture-rtc
+RemainAfterExit=yes
+User=root
+UMask=0077
+RuntimeDirectory=spacewars-rtc
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+TimeoutStartSec=5
+TimeoutStopSec=1
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/spacewars-rtc
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=sysinit.target

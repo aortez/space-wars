@@ -50,6 +50,7 @@ struct ControlRequest {
 #[cfg(unix)]
 #[derive(Debug)]
 enum ControlCommand {
+    Health(spacewars_control::HealthRequest),
     InputPress(InputPressRequest),
     Screenshot { output: PathBuf },
     Status,
@@ -168,6 +169,28 @@ pub fn control_socket_path() -> PathBuf {
 }
 
 #[cfg(unix)]
+fn health_state(nonce: u64) -> spacewars_control::HealthState {
+    thread_local! { static RESPONSES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) }; }
+    let ui_responses = RESPONSES.with(|count| {
+        let next = count.get().saturating_add(1);
+        count.set(next);
+        next
+    });
+    #[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
+    let presented_frames = i_slint_backend_linuxkms::profiling::presented_frames();
+    #[cfg(not(all(target_os = "linux", feature = "pi-kiosk")))]
+    let presented_frames = None;
+    spacewars_control::HealthState {
+        schema_version: spacewars_control::HEALTH_SCHEMA_VERSION,
+        nonce,
+        process_id: std::process::id(),
+        build_revision: env!("SPACEWARS_BUILD_REVISION").into(),
+        ui_responses,
+        presented_frames,
+    }
+}
+
+#[cfg(unix)]
 pub fn start_control_server(
     window: &MainWindow,
     socket_path: PathBuf,
@@ -237,7 +260,14 @@ fn spawn_listener(
     }
 
     let listener = UnixListener::bind(&socket_path)?;
-    fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))?;
+    let mode = if socket_path == Path::new(spacewars_control::KIOSK_CONTROL_SOCKET) {
+        // The runtime directory is owned by the kiosk service. Its group also
+        // admits the independent root service with its restricted capabilities.
+        0o660
+    } else {
+        0o600
+    };
+    fs::set_permissions(&socket_path, fs::Permissions::from_mode(mode))?;
     tracing::info!(path = %socket_path.display(), "control socket listening.");
 
     thread::spawn(move || {
@@ -285,6 +315,19 @@ fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<C
 fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
     let mut lines = body.lines();
     match lines.next() {
+        Some(spacewars_control::HEALTH_COMMAND) => {
+            let payload = lines
+                .next()
+                .ok_or_else(|| invalid_mutation_request("health requires one JSON request line"))?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "health accepts exactly one JSON request line",
+                ));
+            }
+            spacewars_control::HealthRequest::from_json(payload)
+                .map(ControlCommand::Health)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
         Some(INPUT_PRESS_COMMAND) => {
             let payload = lines.next().ok_or_else(|| {
                 invalid_mutation_request("input press requires one JSON request line")
@@ -695,6 +738,16 @@ fn handle_request(
                 window.get_settings_save_pending()
             ));
             request.response.ok(diagnostics);
+        }
+        ControlCommand::Health(health) => {
+            // Exercise presentation while the launcher or a paused game is
+            // otherwise static. This is not user input and does not affect idle
+            // or postponement accounting. The next sample observes completion.
+            window.window().request_redraw();
+            match serde_json::to_string(&health_state(health.nonce)) {
+                Ok(json) => request.response.ok(json),
+                Err(error) => request.response.error(error.to_string()),
+            }
         }
         ControlCommand::UiState => {
             match ui_state(window, ui_state_tracker).and_then(|state| state.to_json()) {
@@ -1942,6 +1995,7 @@ mod tests {
                 assert_eq!(output, PathBuf::from("/tmp/shot.png"));
             }
             ControlCommand::Status
+            | ControlCommand::Health(_)
             | ControlCommand::InputPress(_)
             | ControlCommand::UiState
             | ControlCommand::UiPress(_)
@@ -2002,6 +2056,39 @@ mod tests {
             Ok(ControlCommand::Status)
         ));
         assert!(parse_command("status\nextra\n").is_err());
+    }
+
+    #[test]
+    fn health_requires_a_single_versioned_challenge() {
+        assert!(matches!(
+            parse_command("health\n{\"schema_version\":1,\"nonce\":42}\n"),
+            Ok(ControlCommand::Health(spacewars_control::HealthRequest {
+                nonce: 42,
+                ..
+            }))
+        ));
+        for body in [
+            "health\n",
+            "health\n{\"schema_version\":2,\"nonce\":42}\n",
+            "health\n{\"schema_version\":1,\"nonce\":42}\nextra\n",
+            "health\n{\"schema_version\":1,\"nonce\":42,\"healthy\":true}\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn health_responses_advance_and_keep_the_callers_challenge() {
+        let first = health_state(42);
+        let second = health_state(43);
+        assert_eq!(first.nonce, 42);
+        assert_eq!(second.nonce, 43);
+        assert_eq!(first.process_id, std::process::id());
+        assert_eq!(first.build_revision, env!("SPACEWARS_BUILD_REVISION"));
+        assert_eq!(second.ui_responses, first.ui_responses + 1);
+        // Unit tests have not activated a DRM output. UI responses alone are
+        // deliberately insufficient to confirm presentation health.
+        assert_eq!(first.presented_frames, None);
     }
 
     #[test]

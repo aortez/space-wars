@@ -1,0 +1,53 @@
+From: Allan Ortiz <aortez@gmail.com>
+Subject: [PATCH] watchdog: bcm2835_wdt: clamp the hardware timeout
+
+The watchdog core accepts virtual timeouts above the hardware range when
+max_hw_heartbeat_ms is provided. bcm2835_wdt_start still masks the virtual
+seconds into the 20-bit register, so 210 seconds programs only 2 seconds.
+The core's roughly 8-second ping interval then cannot prevent a reset.
+
+Clamp the register timeout to its largest whole-second value and advertise
+the same 15-second hardware heartbeat. Keep the requested virtual timeout
+unchanged so the core can provide the full userspace deadline.
+
+Confirmed on a Raspberry Pi 5 with the pinned 6.6.63 kernel: SETTIMEOUT and
+GETTIMEOUT report 210 while GETTIMELEFT immediately reports 2.
+
+Upstream-Status: Pending
+Signed-off-by: Allan Ortiz <aortez@gmail.com>
+---
+--- a/drivers/watchdog/bcm2835_wdt.c
++++ b/drivers/watchdog/bcm2835_wdt.c
+@@ -36,7 +36,6 @@
+ 
+ #define SECS_TO_WDOG_TICKS(x) ((x) << 16)
+ #define WDOG_TICKS_TO_SECS(x) ((x) >> 16)
+-#define WDOG_TICKS_TO_MSECS(x) ((x) * 1000 >> 16)
+ 
+ struct bcm2835_wdt {
+ 	void __iomem		*base;
+@@ -60,12 +59,14 @@
+ static int bcm2835_wdt_start(struct watchdog_device *wdog)
+ {
+ 	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
++	u32 timeout = min_t(u32, wdog->timeout,
++			    WDOG_TICKS_TO_SECS(PM_WDOG_TIME_SET));
+ 	uint32_t cur;
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&wdt->lock, flags);
+ 
+-	writel_relaxed(PM_PASSWORD | (SECS_TO_WDOG_TICKS(wdog->timeout) &
++	writel_relaxed(PM_PASSWORD | (SECS_TO_WDOG_TICKS(timeout) &
+ 				PM_WDOG_TIME_SET), wdt->base + PM_WDOG);
+ 	cur = readl_relaxed(wdt->base + PM_RSTC);
+ 	writel_relaxed(PM_PASSWORD | (cur & PM_RSTC_WRCFG_CLR) |
+@@ -158,7 +159,7 @@
+ 	.info =		&bcm2835_wdt_info,
+ 	.ops =		&bcm2835_wdt_ops,
+ 	.min_timeout =	1,
+-	.max_hw_heartbeat_ms =	WDOG_TICKS_TO_MSECS(PM_WDOG_TIME_SET),
++	.max_hw_heartbeat_ms =	WDOG_TICKS_TO_SECS(PM_WDOG_TIME_SET) * 1000,
+ 	.timeout =	WDOG_TICKS_TO_SECS(PM_WDOG_TIME_SET),
+ };
+ 

@@ -1,0 +1,707 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T06:36:16.296161+00:00",
+  "source_commit": "cd668771d523917d210f6c460c4bc0956b2bb54e",
+  "scope": "Clean runtime image containing the complete supervised bootstrap source path; static image/package audits, current ordinary-user inventories and packaged executable privilege denial on Pi 4 and Pi 5. No live root migration or physical recovery qualification.",
+  "contract": {
+    "bootstrap_protocol": 4,
+    "package_schema": 3,
+    "trial_journal_schema": 4,
+    "recovery_protocol": 2,
+    "recovery_journal_schema": 2,
+    "automatic_updates_enabled": false
+  },
+  "build": {
+    "command": "SPACEWARS_BUILD_CACHE=off npm run build",
+    "working_directory": "yocto",
+    "tasks": 6768,
+    "reused": 6703,
+    "layers": {
+      "poky": {
+        "commit": "4fb7016a07507683359ebd620f1951fd5ea44bfa",
+        "dirty": false
+      },
+      "meta-raspberrypi": {
+        "commit": "018d44467c4f09eb63f8ea5e86e85d755250cf89",
+        "dirty": false
+      },
+      "meta-openembedded": {
+        "commit": "0f00f8b9a21950640da8c5707343e5540133f86e",
+        "dirty": false
+      },
+      "meta-rust-bin": {
+        "commit": "eaea247f32f247ab525112d2fbc16e16a553d880",
+        "dirty": false
+      },
+      "meta-pi-base": {
+        "commit": "ce48602dfefd4ee7f3d3010086e685ede3fb17b9",
+        "dirty": false
+      }
+    },
+    "warnings": [
+      "Yocto reports that Ubuntu 26.04 is not a validated host distribution.",
+      "KAS configurations follow branches without pinned commits; actual clean layer revisions are recorded here."
+    ],
+    "clean_source_checked_before_and_after": true
+  },
+  "artifact": {
+    "rootfs": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261016062448.ext4.gz",
+      "compressed_bytes": 134509217,
+      "compressed_sha256": "f203e39fd90fbd4f2ea8f25b134b9358dfedb320f96589d9a439009bacf5d92f",
+      "expanded_bytes": 520093696,
+      "expanded_sha256": "d7edfc3bf0222fadc8a4415dc38d95375926a0d7ff9d81f160a271d03649c7cb"
+    },
+    "disk": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261016062448.wic.gz",
+      "compressed_bytes": 183989486,
+      "compressed_sha256": "22bd850bd13ed0572f31073757fd984e8ace1c3023d720d04710804b108357b6",
+      "expanded_bytes": 7679770624,
+      "expanded_sha256": "8ba69a077c30c37b0657b1ac82effd5546e009e554ec74f679ed0acd768954e4"
+    },
+    "partition_table": [
+      {
+        "number": 1,
+        "type": 12,
+        "start_sector": 8192,
+        "sectors": 307200
+      },
+      {
+        "number": 2,
+        "type": 131,
+        "start_sector": 319488,
+        "sectors": 6291456
+      },
+      {
+        "number": 3,
+        "type": 131,
+        "start_sector": 6610944,
+        "sectors": 6291456
+      },
+      {
+        "number": 4,
+        "type": 131,
+        "start_sector": 12902400,
+        "sectors": 2097152
+      }
+    ],
+    "root_partuuids": [
+      "076c4a2a-02",
+      "076c4a2a-03"
+    ],
+    "identity": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 23426808,
+          "sha256": "c663b16af7836c5e2cb789168aab20508bc7d0835d83c80dd7280fd6b7f4fd77"
+        },
+        "os_manager": {
+          "bytes": 4652224,
+          "sha256": "a6b84ef8bcf8c41c49d367b4d8a2597f1c055b01ad4b34d3e9ace443a6694ecc"
+        }
+      },
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-77dffab0f6cf323a72f1046c63cb610cb2222d2717e5795889a4d34cdd6696a9",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 2,
+      "rootfs_tree": "77dffab0f6cf323a72f1046c63cb610cb2222d2717e5795889a4d34cdd6696a9",
+      "schema": 1,
+      "source": {
+        "commit": "cd668771d523917d210f6c460c4bc0956b2bb54e",
+        "dirty": false,
+        "revision": "cd668771d523",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "boot_probe": {
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "hardware_profile": "hdmi",
+      "immutable_bytes": 85396458,
+      "immutable_files": 103,
+      "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+      "provisioned_default": null,
+      "trial": null
+    },
+    "rootfs_record_matches_sidecar": true,
+    "rootfs_and_fat_manifest_match": true,
+    "default_cmdline_unchanged": true,
+    "trial_uses_full_config_copy": true,
+    "boot_contains_exact_initramfs_sha256": "461ab4531c05f96c235610855951be26cb4b764e7d7ea2c9da075087b9485c4a",
+    "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde",
+    "probe_command": [
+      "cargo",
+      "run",
+      "--locked",
+      "-p",
+      "engine-ota",
+      "--example",
+      "boot_artifact_probe",
+      "--",
+      "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde/boot",
+      "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde/image.json",
+      "076c4a2a-02",
+      "076c4a2a-03"
+    ]
+  },
+  "image_checks": {
+    "root": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde/rootfs-view",
+    "bootstrap_runtime": {
+      "schema": 1,
+      "protocol": 4
+    },
+    "exact_helper_sources": {
+      "usr/lib/systemd/system/spacewars-access.service": "e617915f9413df0c16045996160eaca0b904cda7c435a200970368dc57aebc80",
+      "usr/lib/systemd/system/sshd@.service.d/spacewars-access.conf": "46622cb97aa42b258dc5fa27758d0af32b9dae1f83813582dcd27d47860b49eb",
+      "usr/lib/systemd/system/sshd.service.d/spacewars-access.conf": "46622cb97aa42b258dc5fa27758d0af32b9dae1f83813582dcd27d47860b49eb",
+      "etc/ssh/sshd_config.d/10-spacewars-access.conf": "d8b1276b04ff97ac9296b7c869aedf386a8cd6af6e6ff3d5595959f36a20ef9e",
+      "usr/sbin/spacewars-fast-update": "cf9fdf0ac8e92417665e6e9e39db57962f41b28b61df0e79e3fc2b13db2bf1a4",
+      "usr/sbin/spacewars-renderer": "022bfd940f30a66bd8f310a80cb4b1c2833e254d459e8781181fbbe13a6c89cb",
+      "usr/libexec/spacewars/fast-update": "161c7a40f879b4c2c8afd64b4c86b422fb2b5d0b8526e9b49b2ce02c0b19b5f0",
+      "usr/libexec/spacewars/renderer": "205de0c9922522e2b650f258fe8e74dda76485fc957deac13380518c64122954",
+      "usr/sbin/ab-update": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594",
+      "usr/sbin/ab-update-with-key": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594",
+      "usr/sbin/ab-boot-manager": "a3a4947edae8df0e552dd0ffa0e8c118bf7be0fa3daf6ca8cb4ad6f5e8944a12"
+    },
+    "image_permissions": {
+      "/usr/lib/systemd/system/spacewars-access.service": {
+        "type": "regular",
+        "mode": 420,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/lib/systemd/system/sshd@.service.d/spacewars-access.conf": {
+        "type": "regular",
+        "mode": 420,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/ssh/sshd_config.d/10-spacewars-access.conf": {
+        "type": "regular",
+        "mode": 420,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/bin/ssh-keygen": {
+        "type": "regular",
+        "mode": 493,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/libexec/spacewars": {
+        "type": "directory",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/libexec/spacewars/fast-update": {
+        "type": "regular",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/libexec/spacewars/renderer": {
+        "type": "regular",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/bin/engine-os-manager": {
+        "type": "regular",
+        "mode": 493,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-ota": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-logs": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-renderer": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      }
+    },
+    "runtime_sudo_rules": [
+      "spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-logs *",
+      "spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-renderer software, /usr/sbin/spacewars-renderer gpu"
+    ],
+    "runtime_groups": [
+      "input",
+      "audio",
+      "video",
+      "spacewars"
+    ],
+    "packaged_binary_identity": {
+      "engine-client": {
+        "bytes": 23426808,
+        "sha256": "c663b16af7836c5e2cb789168aab20508bc7d0835d83c80dd7280fd6b7f4fd77"
+      },
+      "engine-os-manager": {
+        "bytes": 4652224,
+        "sha256": "a6b84ef8bcf8c41c49d367b4d8a2597f1c055b01ad4b34d3e9ace443a6694ecc"
+      }
+    },
+    "ext4_block_bytes": 1024,
+    "access_service_enabled": true,
+    "socket_activated_ssh_waits_for_access_initialization": true,
+    "no_login_keys_shipped": true,
+    "scope": "Static artifact policy, service wiring and ownership inspection; not live SSH/sandbox/Pi qualification"
+  },
+  "network_checks": {
+    "source": {
+      "commit": "cd668771d523917d210f6c460c4bc0956b2bb54e",
+      "dirty": false,
+      "revision": "cd668771d523",
+      "schema": 1
+    },
+    "build_id": "rootfs-77dffab0f6cf323a72f1046c63cb610cb2222d2717e5795889a4d34cdd6696a9",
+    "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde",
+    "exact_sources_and_root_owned_units": {
+      "usr/lib/systemd/system/persistent-data-bind.service": "6d67bf00d6e6417b6f14e9069fc0507b830f543e2c5050b8f02fae34e84fd810",
+      "usr/lib/systemd/system/NetworkManager.service.d/spacewars-persistent-network.conf": "34599163e3d657ef2ba6ab13aee6950a177e218c6a3a7bd10b431742365c8028",
+      "usr/lib/systemd/system/spacewars-access.service": "e617915f9413df0c16045996160eaca0b904cda7c435a200970368dc57aebc80",
+      "usr/lib/systemd/system/spacewars-recovery.service": "66d37d2c4a34135edb8f7bc57beda39afee247236c62d5451838da6ce1dea1e6",
+      "usr/sbin/persistent-data-init": "05c5fa83114629af914f448d97f6009f720b65614d713e2658a1e813b982e2e5"
+    },
+    "empty_image_profile_directory": true,
+    "no_persistent_profile_store_shipped": true,
+    "bind_service_enabled": true,
+    "scope": "Packaged bytes, ownership and service dependencies; no installed Pi configuration changes"
+  },
+  "packages": [
+    {
+      "board": "pi5",
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-77dffab0f6cf323a72f1046c63cb610cb2222d2717e5795889a4d34cdd6696a9",
+      "compressed": {
+        "bytes": 128778500,
+        "sha256": "5fe61b1c9fa60ef41b83f09e6bb3efbd0fdbad20f260ecb9a7a2dd4ff88777d9"
+      },
+      "device_changes": false,
+      "expanded": {
+        "bytes": 520093696,
+        "sha256": "d7edfc3bf0222fadc8a4415dc38d95375926a0d7ff9d81f160a271d03649c7cb"
+      },
+      "output": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-cd66877-pi5",
+      "profile": "hyperpixel",
+      "purpose": "supervised-bootstrap",
+      "source": {
+        "commit": "cd668771d523917d210f6c460c4bc0956b2bb54e",
+        "dirty": false,
+        "revision": "cd668771d523",
+        "schema": 1
+      },
+      "staged_asset_bytes": 35599908,
+      "target": "a",
+      "canonical_boot_probe": {
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "hardware_profile": "hyperpixel",
+        "immutable_bytes": 85396458,
+        "immutable_files": 103,
+        "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+        "provisioned_default": "a",
+        "trial": null
+      },
+      "file_checksums_verified": 213,
+      "expanded_root_roundtrip_verified": true,
+      "frame_details": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-cd66877-pi5/rootfs.ext4.zst \n# Zstandard Frames: 1\nDictID: 0\nWindow Size: 64.0 MiB (67108864 B)\nCompressed Size: 123 MiB (128778500 B)\nDecompressed Size: 496 MiB (520093696 B)\nRatio: 4.0387\nCheck: XXH64 5628b28c\n\n*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***\n",
+      "bundle_sha256": "f34a7f87f8f3e019b677b42f55c3a8e4e44825f59dd3109f21234def36dbe71d",
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "engine-ota",
+        "--example",
+        "bootstrap_package",
+        "--",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde/rootfs.ext4",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde/boot",
+        "/home/data/workspace/space-wars-ota/target/ota-bootstrap-cd66877-pi5",
+        "pi5",
+        "hyperpixel",
+        "076c4a2a-02",
+        "076c4a2a-03",
+        "a"
+      ],
+      "pi5_comparison": {
+        "matching_retained_firmware_files": 18,
+        "boot_free_bytes": 79437824,
+        "stage_allocation_bytes": 35803136,
+        "canonical_growth_bytes": 8028160,
+        "largest_temporary_replacement_bytes": 27402240,
+        "directory_reserve_bytes": 65536,
+        "spare_reserve_bytes": 4194304,
+        "estimated_peak_additional_bytes": 75493376,
+        "capacity_estimate_only": true,
+        "root_preflight_complete": false
+      },
+      "package_schema": 3,
+      "bootstrap_protocol": 4,
+      "fixed_legacy_files": 20,
+      "trial_id": "12ad7cf1ad63c4e6803d87d8acf8cb88410554d35c1c0fc681a7da3583872f82",
+      "inventory_evidence": {
+        "path": "target/ota-bootstrap-complete-pi5-inventory.json",
+        "bytes": 16760,
+        "sha256": "fbf87c828b7ce79b39709874e0873e12b33296b329823644f731f15de112811c"
+      }
+    },
+    {
+      "board": "pi4",
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-77dffab0f6cf323a72f1046c63cb610cb2222d2717e5795889a4d34cdd6696a9",
+      "compressed": {
+        "bytes": 128778500,
+        "sha256": "5fe61b1c9fa60ef41b83f09e6bb3efbd0fdbad20f260ecb9a7a2dd4ff88777d9"
+      },
+      "device_changes": false,
+      "expanded": {
+        "bytes": 520093696,
+        "sha256": "d7edfc3bf0222fadc8a4415dc38d95375926a0d7ff9d81f160a271d03649c7cb"
+      },
+      "output": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-cd66877-pi4",
+      "profile": "picade",
+      "purpose": "supervised-bootstrap",
+      "source": {
+        "commit": "cd668771d523917d210f6c460c4bc0956b2bb54e",
+        "dirty": false,
+        "revision": "cd668771d523",
+        "schema": 1
+      },
+      "staged_asset_bytes": 35574861,
+      "target": "b",
+      "canonical_boot_probe": {
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "hardware_profile": "picade",
+        "immutable_bytes": 85396458,
+        "immutable_files": 103,
+        "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+        "provisioned_default": "b",
+        "trial": null
+      },
+      "file_checksums_verified": 213,
+      "expanded_root_roundtrip_verified": true,
+      "frame_details": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-cd66877-pi4/rootfs.ext4.zst \n# Zstandard Frames: 1\nDictID: 0\nWindow Size: 64.0 MiB (67108864 B)\nCompressed Size: 123 MiB (128778500 B)\nDecompressed Size: 496 MiB (520093696 B)\nRatio: 4.0387\nCheck: XXH64 5628b28c\n\n*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***\n",
+      "bundle_sha256": "907eb7fc77ea57540f047b1d57f3b2a40bba82885f73b4f506863837d028f4e5",
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "engine-ota",
+        "--example",
+        "bootstrap_package",
+        "--",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde/rootfs.ext4",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-wt7u7qde/boot",
+        "/home/data/workspace/space-wars-ota/target/ota-bootstrap-cd66877-pi4",
+        "pi4",
+        "picade",
+        "076c4a2a-02",
+        "076c4a2a-03",
+        "b"
+      ],
+      "pi4_comparison": {
+        "matching_retained_firmware_files": 18,
+        "boot_free_bytes": 79437824,
+        "stage_allocation_bytes": 35778560,
+        "canonical_growth_bytes": 8028160,
+        "largest_temporary_replacement_bytes": 27402240,
+        "directory_reserve_bytes": 65536,
+        "spare_reserve_bytes": 4194304,
+        "estimated_peak_additional_bytes": 75468800,
+        "capacity_estimate_only": true,
+        "root_preflight_complete": false
+      },
+      "package_schema": 3,
+      "bootstrap_protocol": 4,
+      "fixed_legacy_files": 20,
+      "trial_id": "a43ef37cba072d2656c8cc8ca4816c1f3cf972da97ccf13eec34f543e462c797",
+      "inventory_evidence": {
+        "path": "target/ota-bootstrap-complete-pi4-inventory.json",
+        "bytes": 16882,
+        "sha256": "bc955464244edc6a4c655ff9f9dbbe1835361e5fb7605276a6dccadaa409d3ef"
+      }
+    }
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "probe_sha256": "1c9b713f261b4bb4acd862099839b63b2aa4557f2e694d70ce745eb8ac93d9f5",
+      "uid": 1000,
+      "temporary_directory": "/tmp/spacewars-bootstrap-complete.E9FdLS",
+      "inventory": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-complete-pi5-inventory.json",
+      "boot_id": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_id_unchanged": true,
+      "active_slot": "b",
+      "hardware_profile": "hyperpixel",
+      "boot_files": 101
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "probe_sha256": "1c9b713f261b4bb4acd862099839b63b2aa4557f2e694d70ce745eb8ac93d9f5",
+      "uid": 1000,
+      "temporary_directory": "/tmp/spacewars-bootstrap-complete.FquFx3",
+      "inventory": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-complete-pi4-inventory.json",
+      "boot_id": "7dd35872-fb71-4348-a318-35a7adf2fb7e",
+      "boot_id_unchanged": true,
+      "active_slot": "a",
+      "hardware_profile": "picade",
+      "boot_files": 101
+    }
+  ],
+  "packaged_executable_checks": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_id_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_id_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "manager_sha256": "a6b84ef8bcf8c41c49d367b4d8a2597f1c055b01ad4b34d3e9ace443a6694ecc",
+      "commands": [
+        {
+          "operation": "prepare",
+          "exit_code": 1,
+          "stderr": "device mutations require the root-owned service"
+        },
+        {
+          "operation": "activate",
+          "exit_code": 1,
+          "stderr": "device mutations require the root-owned service"
+        },
+        {
+          "operation": "finish",
+          "exit_code": 1,
+          "stderr": "device mutations require the root-owned service"
+        }
+      ],
+      "scope": "Packaged executable loader/help and non-root rejection only; no installed-path or live root execution"
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_id_before": "7dd35872-fb71-4348-a318-35a7adf2fb7e",
+      "boot_id_after": "7dd35872-fb71-4348-a318-35a7adf2fb7e",
+      "manager_sha256": "a6b84ef8bcf8c41c49d367b4d8a2597f1c055b01ad4b34d3e9ace443a6694ecc",
+      "commands": [
+        {
+          "operation": "prepare",
+          "exit_code": 1,
+          "stderr": "device mutations require the root-owned service"
+        },
+        {
+          "operation": "activate",
+          "exit_code": 1,
+          "stderr": "device mutations require the root-owned service"
+        },
+        {
+          "operation": "finish",
+          "exit_code": 1,
+          "stderr": "device mutations require the root-owned service"
+        }
+      ],
+      "scope": "Packaged executable loader/help and non-root rejection only; no installed-path or live root execution"
+    }
+  ],
+  "writer_fixture": {
+    "descriptor": {
+      "architecture": "aarch64",
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-77dffab0f6cf323a72f1046c63cb610cb2222d2717e5795889a4d34cdd6696a9",
+      "channel": "release",
+      "compressed": {
+        "bytes": 129046115,
+        "sha256": "75b3ceb72bca90a52136c87ba21c53625b8438ccfb3daaadb642367aa98bb4c4"
+      },
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "expanded": {
+        "bytes": 520093696,
+        "sha256": "d7edfc3bf0222fadc8a4415dc38d95375926a0d7ff9d81f160a271d03649c7cb"
+      },
+      "format": "rootfs-ext4-zstd",
+      "generation": 2,
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "min_recovery_protocol": 2,
+      "min_updater_protocol": 1,
+      "schema": 1,
+      "source_commit": "cd668771d523917d210f6c460c4bc0956b2bb54e"
+    },
+    "result": null,
+    "source": {
+      "commit": "cd668771d523917d210f6c460c4bc0956b2bb54e",
+      "dirty": false,
+      "revision": "cd668771d523",
+      "schema": 1
+    },
+    "target_is_temporary_regular_file": true,
+    "stage_counts": {
+      "writing": 38,
+      "flushing": 1,
+      "reading-back": 4,
+      "checking-filesystem": 1
+    }
+  },
+  "writer_fixture_scope": "Locally derived descriptor and an anonymous temporary regular-file target; no authenticated feed, raw device, installed root or reboot.",
+  "package_fixture_scope": "Read-only full schema-3 package check with a synthetic Pi 5 context; not live privileged admission.",
+  "device_mutations": {
+    "ordinary_temporary_files": true,
+    "root_access": false,
+    "boot_files": false,
+    "root_partitions": false,
+    "data_or_credentials": false,
+    "watchdog": false,
+    "reboot": false
+  },
+  "remaining": [
+    "Obtain the pending root connection details for both devices. Reobserve under the root-only shared lock before preparing a live attempt.",
+    "Make and independently verify raw boot/inactive-root, persistent data and configuration exports; rehearse restore before the first live write.",
+    "Qualify legacy privilege closure, persistent login/network state and independent recovery; run the supervised root install, staging, one-shot boot, normal confirmations and finalization.",
+    "Qualify physical failure recovery on both exact board/firmware/media combinations before granting production installation authority.",
+    "Integrate trusted publishing, network holds, downloader, service admission and user installation policy; these packages are neither signed OTA releases nor enabled automatic updates."
+  ],
+  "checks": {
+    "yocto-build": {
+      "path": "target/ota-bootstrap-complete-yocto-build.log",
+      "bytes": 34356,
+      "sha256": "5d343bcdc900ce5a77611315ea6ee58fa2a422ca6d302eea35e15d320d302281",
+      "results": [
+        "2026-10-15 23:30:54 - INFO     - NOTE: Tasks Summary: Attempted 6768 tasks of which 6703 didn't need to be rerun and all succeeded."
+      ],
+      "exit_code": 0
+    },
+    "probes-build": {
+      "path": "target/ota-bootstrap-complete-probes-build.log",
+      "bytes": 159,
+      "sha256": "4ed03fbab45e23b6e8311e6c8d7ecfd231c00b4e187f125b16254b0bd1247447",
+      "results": [],
+      "exit_code": 0
+    },
+    "inventory": {
+      "path": "target/ota-bootstrap-complete-inventory.log",
+      "bytes": 916,
+      "sha256": "9bf851f1c44b161069015803c18791569c5b42a198956ca3d16e55f62ad4cc95",
+      "results": [],
+      "exit_code": 0
+    },
+    "artifact-audit": {
+      "path": "target/ota-bootstrap-complete-artifact-audit.log",
+      "bytes": 654,
+      "sha256": "fab5ea40d513892008490734a7ea30f038db3fbfd6066c13199912e8dd6bb30f",
+      "results": [],
+      "exit_code": 0
+    },
+    "image-audit": {
+      "path": "target/ota-bootstrap-complete-image-audit.log",
+      "bytes": 589,
+      "sha256": "79a37535564f493c3ea309b94475e87957073cdd94a04d27e6026f7197ba8f1b",
+      "results": [],
+      "exit_code": 0
+    },
+    "network-audit": {
+      "path": "target/ota-bootstrap-complete-network-audit.log",
+      "bytes": 1235,
+      "sha256": "063e067043c0087a7407bc4ebfec8beaff82d6582020f0163445aee2e5ff333e",
+      "results": [],
+      "exit_code": 0
+    },
+    "package-audit": {
+      "path": "target/ota-bootstrap-complete-package-audit.log",
+      "bytes": 506,
+      "sha256": "4a74d4df98e0f89317981d0aeff6f3b81ea5ac53c30dbf0e9c6b90d5ccf0ef10",
+      "results": [],
+      "exit_code": 0
+    },
+    "writer": {
+      "path": "target/ota-bootstrap-complete-writer.log",
+      "bytes": 1589,
+      "sha256": "75e0df5547dcfd7274c0fb70ff3f192324c3761893c2268be1b1a8ffbaee2353",
+      "results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 39.52s"
+      ],
+      "exit_code": 0
+    },
+    "packaged": {
+      "path": "target/ota-bootstrap-complete-packaged.log",
+      "bytes": 1390,
+      "sha256": "fa620dca9485a735f18e07a863eb8ca4526213e18b57762d198ccf7e5049e6a0",
+      "results": [],
+      "exit_code": 0
+    },
+    "package-check": {
+      "path": "target/ota-bootstrap-complete-package-check.log",
+      "bytes": 703,
+      "sha256": "8947bece699bb946b1ffcdbf59b5d14e550b07526235bb5f005587ed78ae7ae7",
+      "results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 3.54s"
+      ],
+      "exit_code": 0
+    }
+  },
+  "audit_scripts": {
+    "ota-bootstrap-complete-artifact-audit.py": {
+      "path": "target/ota-bootstrap-complete-artifact-audit.py",
+      "bytes": 4532,
+      "sha256": "cc9c1621839f35505e1129e6c8850a90f9ed165127492d041e32deb4b27278fc"
+    },
+    "ota-bootstrap-complete-image-audit.py": {
+      "path": "target/ota-bootstrap-complete-image-audit.py",
+      "bytes": 6187,
+      "sha256": "eed402b2180ec171d10c79a3bc7420dbc491bc1eb7d699d5c638260885ffdce3"
+    },
+    "ota-bootstrap-complete-inventory.py": {
+      "path": "target/ota-bootstrap-complete-inventory.py",
+      "bytes": 2327,
+      "sha256": "e3970793b9858bb3fb0aef5f8c9059b337ea7a28783e3d7bae1a3e7faed5311a"
+    },
+    "ota-bootstrap-complete-network-audit.py": {
+      "path": "target/ota-bootstrap-complete-network-audit.py",
+      "bytes": 2737,
+      "sha256": "a9415e9247a46687dc34fdebdb66c457d67d1d91a3a5b8cb17b6a06a6b78ad19"
+    },
+    "ota-bootstrap-complete-package-audit.py": {
+      "path": "target/ota-bootstrap-complete-package-audit.py",
+      "bytes": 4787,
+      "sha256": "d75d334bbbc1cd9b322c9c50904cefa215d4aed82fea234d1a4a294f954072c6"
+    },
+    "ota-bootstrap-complete-packaged-check.py": {
+      "path": "target/ota-bootstrap-complete-packaged-check.py",
+      "bytes": 2721,
+      "sha256": "efe4fefbc3061b5e336cf7ee2cdca6588cdf498cb532b64d96972160ca23b5f9"
+    }
+  }
+}
