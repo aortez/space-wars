@@ -67,6 +67,18 @@ Vector captures use Slint's SVG loader plus native text because the headless
 software fixture cannot draw native Path items. These are local captures, not
 device GPU or deployment evidence.
 
+## Selected captures
+
+[Capture source, telemetry and hashes](screenshots/clock/duck-auto-ledges-manifest.json).
+
+| Automatic hang, 800×480 raster | Automatic pull-up, 800×480 raster |
+| --- | --- |
+| ![Hanging](screenshots/clock/auto-ledge-800x480-left-Careful-hanging-raster.png) | ![Pull-up](screenshots/clock/auto-ledge-800x480-left-Careful-pull-up-raster.png) |
+
+| Confirmed landing, 1024×768 vector | Portrait hang, 480×800 vector |
+| --- | --- |
+| ![Landed](screenshots/clock/auto-ledge-1024x768-right-Flowing-landed-vector.png) | ![Portrait hang](screenshots/clock/auto-ledge-480x800-left-Flowing-hanging-vector.png) |
+
 ## Reproduction
 
 ```sh
