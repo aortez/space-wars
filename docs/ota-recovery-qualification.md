@@ -93,6 +93,14 @@ identity. Logs, boot diagnostics and live runtime counters are deliberately
 outside it. Retained manifests contain hashes and paths, not secret contents;
 keep the entire evidence directory private.
 
+The adapter-local `/data/bluetooth/<adapter-address>/attributes` content hash
+is reported separately. BlueZ regenerates this local GATT database as services
+register ([BlueZ 5.72 source](https://github.com/bluez/bluez/blob/5.72/src/gatt-database.c#L1461-L1483)).
+Its path, owner, mode and link state must still match; missing or added databases
+fail the check. All peer pairing records and every other content hash must
+match. A changed local database is recorded explicitly, never reported as
+byte-for-byte preservation of the entire Bluetooth tree.
+
 ## Interruption and recovery
 
 ```sh

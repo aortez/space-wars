@@ -143,6 +143,29 @@ class QualificationRunnerTest(unittest.TestCase):
             self.assertEqual(RUNNER.read(attempt / 'restore.json')['state']['phase'], 'restored')
             self.assertEqual(RUNNER.read(attempt / 'stores-after.json'), ['changed'])
 
+    def test_gatt_cache_changes_are_reported_without_exempting_pairings_or_metadata(self):
+        adapter = '/data/bluetooth/00:11:22:33:44:55'
+        cache = adapter + '/attributes'
+        peer = adapter + '/66:77:88:99:AA:BB'
+        before = sorted(['a' * 64 + '  ' + cache,
+                         'b' * 64 + '  ' + peer + '/info',
+                         'c' * 64 + '  ' + peer + '/attributes',
+                         'regular file:0:0:600:' + cache])
+        after = sorted(line.replace('a' * 64, 'd' * 64) for line in before)
+        comparison = RUNNER.compare_stores(before, after)
+        self.assertFalse(comparison['all_bytes_unchanged'])
+        self.assertTrue(comparison['durable_stores_unchanged'])
+        self.assertEqual(comparison['regenerated_local_gatt_databases'],
+                         [dict(path=cache, before='a' * 64, after='d' * 64)])
+        for changed in [
+            [line.replace('b' * 64, 'e' * 64) for line in after],
+            [line.replace('c' * 64, 'e' * 64) for line in after],
+            [line.replace('0:0:600:', '1000:0:600:') for line in after],
+            [line for line in after if not line.startswith('d' * 64)],
+            after + ['f' * 64 + '  /data/bluetooth/11:22:33:44:55:66/attributes'],
+        ]:
+            self.assertFalse(RUNNER.compare_stores(before, sorted(changed))['durable_stores_unchanged'])
+
 
 if __name__ == '__main__':
     unittest.main()

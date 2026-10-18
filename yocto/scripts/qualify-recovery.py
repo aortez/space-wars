@@ -53,6 +53,30 @@ def read(path):
     return json.loads(path.read_text())
 
 
+def compare_stores(before, after):
+    # BlueZ rewrites its adapter-local GATT database when services register.
+    # Peer pairing records, all other content, and every mode/owner/link still
+    # have to match. Retain cache digests and require the same cache paths.
+    def split(lines):
+        durable, caches = [], {}
+        for line in lines:
+            match = re.fullmatch(r'([0-9a-f]{64})  (/data/bluetooth/(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/attributes)', line)
+            if match:
+                digest, path = match.groups()
+                require(path not in caches, 'Duplicate local GATT database in store inventory')
+                caches[path] = digest
+            else:
+                durable.append(line)
+        return durable, caches
+
+    old, old_cache = split(before)
+    new, new_cache = split(after)
+    return dict(all_bytes_unchanged=before == after,
+                durable_stores_unchanged=old == new and old_cache.keys() == new_cache.keys(),
+                regenerated_local_gatt_databases=[dict(path=p, before=old_cache.get(p), after=new_cache.get(p))
+                    for p in sorted(old_cache.keys() | new_cache.keys()) if old_cache.get(p) != new_cache.get(p)])
+
+
 class Runner:
     def __init__(self, directory, host, helper):
         self.directory, self.host, self.helper = directory, host, helper
@@ -249,6 +273,9 @@ def restore(runner, metadata, plan):
     attempt = attempts / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-') + secrets.token_hex(4))
     attempt.mkdir(mode=0o700)
     runner = Runner(attempt, runner.host, runner.helper)
+    save(attempt / 'runner-source.json', dict(runner_sha256=sha(Path(__file__).read_bytes()),
+         source_head=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
+         source_status=subprocess.check_output(['git', 'status', '--porcelain'], cwd=REPO, text=True)))
     result = runner.operation('restore', metadata['id'])
     require(result.returncode == 0, 'Restoration stopped; inspect retained state before further action')
     restored = json.loads(result.stdout)
@@ -260,7 +287,9 @@ def restore(runner, metadata, plan):
     save(runner.directory / 'recovery-after.json', service)
     after = runner.stores()
     save(runner.directory / 'stores-after.json', after)
-    require(after == read(original_directory / 'stores-before.json'), 'Persistent store inventory changed; compare retained manifests')
+    comparison = compare_stores(read(original_directory / 'stores-before.json'), after)
+    save(runner.directory / 'stores-comparison.json', comparison)
+    require(comparison['durable_stores_unchanged'], 'Persistent store inventory changed; compare retained manifests')
     samples = [runner.health(plan['stamp']['image'])]
     time.sleep(2)
     samples.append(runner.health(plan['stamp']['image']))
@@ -292,10 +321,15 @@ def restore(runner, metadata, plan):
             'Unexpected pending reboot parameter')
     save(runner.directory / 'verification.json', dict(boot_id=final['current_boot_id'],
          diagnostic_id=metadata['id'], original_selector_restored=True, production_baseline_unchanged=True,
-         selected_persistent_stores_unchanged=True, recovery_service_healthy=True, kiosk_progress_verified=True,
+         selected_persistent_stores_unchanged=comparison['all_bytes_unchanged'],
+         settings_roms_pairings_wifi_and_keys_unchanged=True,
+         regenerated_local_gatt_databases=comparison['regenerated_local_gatt_databases'],
+         recovery_service_healthy=True, kiosk_progress_verified=True,
          repeated_activation_rejected=True, automatic_ota_enabled=False,
          candidate_quarantine_tested=False, physical_failure_matrix_qualified=False))
-    print('Original selector, baseline, persistent stores and kiosk progress verified; repeat activation refused. Evidence:', attempt, flush=True)
+    print('Original selector, baseline, settings/keys and kiosk progress verified; repeat activation refused.',
+          'Regenerated local GATT databases:', len(comparison['regenerated_local_gatt_databases']),
+          'Evidence:', attempt, flush=True)
 
 
 def main():
