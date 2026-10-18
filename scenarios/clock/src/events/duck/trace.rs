@@ -28,6 +28,14 @@ pub(crate) struct Sample {
     recovery: engine_common::ClockDuckRecoveryState,
 }
 
+impl Sample {
+    pub(crate) fn touches_exit_flap(&self) -> bool {
+        self.contacts
+            .iter()
+            .any(|contact| contact.entity == flaps::body(1).entity.value())
+    }
+}
+
 impl DuckEvent {
     pub(crate) fn trace_sample(&self) -> Option<Sample> {
         let world = self.world.as_ref()?;

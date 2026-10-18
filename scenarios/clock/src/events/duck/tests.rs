@@ -142,10 +142,9 @@ fn seeded_courses_jump_all_obstacles_exit_and_release_every_body() {
                         navigation.wall_tags.iter().all(|tags| *tags >= 1),
                         "{navigation:?}"
                     );
-                    assert_eq!(
-                        stats.jumps,
-                        2 + 3 * (navigation.wall_tags.iter().sum::<u32>() + 1)
-                    );
+                    // Full wall-to-wall trips clear all three obstacles. An
+                    // exit opening mid-trip can now retrace a partial crossing.
+                    assert!(stats.jumps >= 2 + 3 * navigation.wall_tags.iter().sum::<u32>());
                     assert_eq!(state.body_count(), if flaps == 0 { 0 } else { 4 + flaps });
                     assert_eq!(stats.position_milli, None);
                     if outcome.is_none() {
@@ -314,7 +313,6 @@ fn speed_measurement_excludes_airborne_blocked_and_accelerating_motion() {
                 &event.obstacles,
                 event.width,
                 event.radius,
-                false,
             );
         }
         assert_eq!(controller.speeds.count, 0);

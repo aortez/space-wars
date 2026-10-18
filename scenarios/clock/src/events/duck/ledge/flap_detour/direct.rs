@@ -40,11 +40,11 @@ impl DuckEvent {
             jump: false,
         };
         if self.ledge.detour.stats.phase == DetourPhase::Pending {
-            if self.phase_tick > SETTLE_TICKS {
+            if self.ledge.detour.age > SETTLE_TICKS {
                 self.finish_flap_detour(Outcome::Expired);
                 return None;
             }
-            if self.phase_tick < SETTLE_TICKS || !self.grounded() {
+            if self.ledge.detour.age < SETTLE_TICKS || !self.grounded() {
                 return Some(still());
             }
             let Some((plan, landing)) = self.plan_direct_flap(water) else {
@@ -60,7 +60,9 @@ impl DuckEvent {
             self.ledge.detour.stats.phase = DetourPhase::Approaching;
         }
         let mut plan = self.ledge.detour.direct.unwrap();
-        if self.phase_tick > plan.landing + LANDING_GRACE_TICKS || self.door_panels()[0].is_none() {
+        if self.ledge.detour.age > plan.landing + LANDING_GRACE_TICKS
+            || self.door_panels()[0].is_none()
+        {
             self.finish_flap_detour(Outcome::Expired);
             return None;
         }
@@ -79,7 +81,7 @@ impl DuckEvent {
             self.controller.direction = 1.0;
             return Some(self.direct_position_command(plan.perch_x, false));
         }
-        let jump = self.phase_tick == plan.launch;
+        let jump = self.ledge.detour.age == plan.launch;
         if jump {
             let landing = self.ledge.detour.landing.unwrap();
             if !self.grounded()
@@ -92,7 +94,7 @@ impl DuckEvent {
             }
             self.ledge.detour.launched = true;
         }
-        let command = if self.phase_tick < plan.approach {
+        let command = if self.ledge.detour.age < plan.approach {
             Command { jump, ..still() }
         } else {
             self.direct_position_command(plan.target_x, jump)
@@ -197,7 +199,7 @@ impl DuckEvent {
         let target_x = (panel.center() + local.rotate_radians(panel.angle)).x;
         for launch in SETTLE_TICKS + 1..=LAST_LAUNCH_TICK {
             for approach in 16..=30 {
-                if launch <= self.phase_tick {
+                if launch <= self.ledge.detour.age {
                     continue;
                 }
                 let plan = Plan {
@@ -227,8 +229,8 @@ impl DuckEvent {
         let mut points = [Vec2::ZERO; MAX_SAMPLES];
         points[0] = position;
         let mut len = 1;
-        for tick in self.phase_tick..=LAST_LANDING_TICK {
-            if tick > self.phase_tick {
+        for tick in self.ledge.detour.age..=LAST_LANDING_TICK {
+            if tick > self.ledge.detour.age {
                 let requested = (1.0 - tick.saturating_sub(20) as f32 / 24.0).max(0.0);
                 let next_open = open + (requested - open).clamp(-1.0 / 24.0, 1.0 / 24.0);
                 let next_open = if (next_open - requested).abs() < 1e-6 {
