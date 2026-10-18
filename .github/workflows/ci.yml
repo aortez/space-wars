@@ -26,6 +26,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 2
+      - name: Select OTA recovery coverage
+        run: python3 .github/ci/ota_test_selection.py select --output "$RUNNER_TEMP/ota-selection.json"
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: '1.89.0'
@@ -34,24 +37,33 @@ jobs:
       - name: Install image fixture tools
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends e2fsprogs python3-cryptography
       - name: Test updater, metadata, image and publisher fixtures
-        # Reexec/crash-recovery tests share an executable: do not rebuild it
-        # concurrently, and run these fixtures serially in their own job.
-        run: cargo test --locked -p engine-ota --features publisher --all-targets -- --test-threads=1
+        # Each fixture owns its paths. Reexec children share a read-only binary;
+        # finish compilation before running tests, without concurrent rebuilds.
+        run: python3 .github/ci/ota_test_selection.py run --selection "$RUNNER_TEMP/ota-selection.json"
       - name: Build publisher fixture tools
-        run: cargo build --locked -p engine-ota --features publisher --example feed_sign --example feed_inventory
+        run: cargo build --locked --profile ci -p engine-ota --features publisher --example feed_sign --example feed_inventory
       - name: Check separately enabled supervised installer
-        run: cargo check --locked -p engine-os-manager --features recovery-qualification --all-targets
+        run: cargo check --locked --profile ci -p engine-os-manager --features recovery-qualification --all-targets
       - name: Test initial owner authority with disposable keys
         run: /usr/bin/python3 .github/ci/ota_authority_tests.py -v
         env:
-          SPACEWARS_OTA_INVENTORY: target/debug/examples/feed_inventory
+          SPACEWARS_OTA_INVENTORY: target/ci/examples/feed_inventory
       - name: Exercise resumable publication with disposable keys
         run: |
           /usr/bin/python3 .github/ci/ota_publisher_fixture.py \
-            --signer target/debug/examples/feed_sign \
-            --inventory target/debug/examples/feed_inventory
+            --signer target/ci/examples/feed_sign \
+            --inventory target/ci/examples/feed_inventory
       - name: Lint OTA publisher
-        run: cargo clippy --locked -p engine-ota --features publisher --all-targets -- -D warnings
+        run: cargo clippy --locked --profile ci -p engine-ota --features publisher --all-targets -- -D warnings
+      - name: Upload OTA coverage and timings
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ota-test-timings
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/ota-selection.json
+            target/ota-test-report.json
 
   yocto-tools:
     name: Pi hardware profiles and update safety
@@ -173,7 +185,8 @@ jobs:
           SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
-            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
+            python3 .github/ci/ota_test_selection.py workspace -- \
+              cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
       - name: Verify PR UI selection
         id: ui-selection
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}

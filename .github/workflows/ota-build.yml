@@ -37,7 +37,11 @@ jobs:
         with:
           toolchain: '1.89.0'
       - name: Build image validator
-        run: cargo build --locked -p engine-ota --features publisher --example image_candidate
+        run: cargo build --locked --profile ci -p engine-ota --features publisher --example image_candidate
+      - name: Run complete OTA recovery suite
+        # Nightly and manual candidates require all sweeps at this exact source.
+        # A PR smoke selection is never accepted as publication evidence.
+        run: python3 .github/ci/ota_test_selection.py run --full
       - name: Build selected source in isolated container
         run: |
           python3 .github/ci/ota_container_build.py \
@@ -50,7 +54,7 @@ jobs:
             --policy "$RUNNER_TEMP/ota-build/policy.json" \
             --build-record "$RUNNER_TEMP/ota-build/build.json" \
             --gzip-image "$RUNNER_TEMP/ota-build/rootfs.ext4.gz" \
-            --validator "$GITHUB_WORKSPACE/target/debug/examples/image_candidate" \
+            --validator "$GITHUB_WORKSPACE/target/ci/examples/image_candidate" \
             --output "$RUNNER_TEMP/ota-candidate"
       - name: Upload unsigned candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
