@@ -38,6 +38,7 @@ pub enum Phase {
 pub enum Reason {
     StateUnavailable,
     PreparationUnavailable,
+    MaintenanceBusy,
     NetworkUnavailable,
     DownloadFailed,
     TimeUnavailable,
@@ -462,6 +463,59 @@ struct Finished<P> {
     proof: Option<P>,
     time: UsableTime,
 }
+// Only contention on the shared installation lock is retryable. A busy trust
+// store, invalid boot evidence or another preparation error still fails closed.
+#[derive(Debug)]
+enum PreparationError {
+    MaintenanceBusy,
+    Failed {
+        stage: &'static str,
+        category: &'static str,
+        os_error: Option<i32>,
+    },
+}
+impl PreparationError {
+    fn failed(stage: &'static str, error: impl Into<Error>) -> Self {
+        // Never format arbitrary error strings: parser/transport errors may
+        // contain feed URLs or private file contents. Keep diagnostics bounded.
+        let (category, os_error) = match error.into() {
+            Error::Io(error) | Error::Ota(engine_ota::Error::Io(error)) => {
+                ("io", error.raw_os_error())
+            }
+            Error::Json(_) | Error::Ota(engine_ota::Error::Json(_)) => ("json", None),
+            Error::Invalid(_) => ("invalid-state", None),
+            Error::Ota(error) => {
+                use engine_ota::Error::*;
+                let category = match error {
+                    Busy => "busy",
+                    Recovery(_) => "recovery",
+                    WaitingForTime | TimeMovedBackwards => "time",
+                    Timeout => "timeout",
+                    Descriptor(_) | ImageIdentity(_) | ImageMismatch => "image",
+                    Boot(_) => "boot",
+                    Access(_) => "access",
+                    Network(_) => "network",
+                    Persistence(_) => "persistence",
+                    Install(_) => "install",
+                    Feed(_) => "feed",
+                    Store(_) => "store",
+                    RefreshRequired | CandidateChanged => "candidate",
+                    Staging(_) | StagingSpace => "staging",
+                    DownloadResponse | Download(_) => "download",
+                    Tuf(_) => "verification",
+                    Io(_) | Json(_) => unreachable!("handled above"),
+                };
+                (category, None)
+            }
+        };
+        Self::Failed {
+            stage,
+            category,
+            os_error,
+        }
+    }
+}
+
 trait Backend: Inputs + Clone + Send + Sync + 'static {
     type Prepared: Send + 'static;
     type Ready: Send + 'static;
@@ -470,7 +524,7 @@ trait Backend: Inputs + Clone + Send + Sync + 'static {
         active: &Active,
         channel: Channel,
         control: Arc<Control>,
-    ) -> Result<Self::Prepared>;
+    ) -> std::result::Result<Self::Prepared, PreparationError>;
     fn run(
         prepared: Self::Prepared,
         control: Arc<Control>,
@@ -500,6 +554,12 @@ struct Ready<P> {
     proof: P,
     time: UsableTime,
 }
+struct PreparationRetry {
+    attempt_id: u64,
+    after_ms: u64,
+    epoch: u64,
+    mode: Option<u64>,
+}
 struct Runner<B: Backend> {
     schedule: Schedule,
     backend: B,
@@ -507,6 +567,7 @@ struct Runner<B: Backend> {
     ready: Option<Ready<B::Ready>>,
     reason: Option<Reason>,
     admitting: Option<HoldToken>,
+    preparation_retry: Option<PreparationRetry>,
 }
 impl<B: Backend> Drop for Runner<B> {
     fn drop(&mut self) {
@@ -529,6 +590,7 @@ impl<B: Backend> Runner<B> {
             ready: None,
             reason: None,
             admitting: None,
+            preparation_retry: None,
         })
     }
     fn step(&mut self, requests: &mpsc::Receiver<Command>, handle: &Handle) -> Result<()> {
@@ -559,6 +621,8 @@ impl<B: Backend> Runner<B> {
                         job.control.cancel();
                     }
                     self.ready = None;
+                    self.preparation_retry = None;
+                    self.reason = None;
                 }
                 Ok(Command::Offer(request)) => {
                     offer = Some(request);
@@ -612,16 +676,51 @@ impl<B: Backend> Runner<B> {
                 .as_ref()
                 .is_none_or(|n| n.status.policy.policy.partial_offline);
             let status = self.schedule.automatic(&now, partial, opportunity)?;
+            if self.preparation_retry.as_ref().is_some_and(|retry| {
+                status
+                    .active
+                    .as_ref()
+                    .is_none_or(|a| a.id != retry.attempt_id)
+            }) {
+                self.preparation_retry = None;
+            }
             if let Some(active) = status.active.clone() {
                 self.ready = None;
-                self.reason = None;
+                if self.preparation_retry.is_none() {
+                    self.reason = None;
+                }
                 if let Some(network) = network {
-                    self.start(active, &status, &network, offer.as_ref(), handle)?;
+                    let changed = self.preparation_retry.as_ref().is_some_and(|retry| {
+                        network.epoch != retry.epoch
+                            || retry
+                                .mode
+                                .is_some_and(|m| status_of(&network).mode_generation != m)
+                    });
+                    if changed {
+                        self.schedule
+                            .finish(&now, active.id, Completion::Cancelled)?;
+                        self.preparation_retry = None;
+                        self.reason = Some(Reason::Interrupted);
+                    } else if self
+                        .preparation_retry
+                        .as_ref()
+                        .is_none_or(|r| now.ms >= r.after_ms)
+                        && (active.trigger == schedule::Trigger::Manual
+                            || !partial
+                            || opportunity != Opportunity::None)
+                    {
+                        // A previous time offer is not authority for a later
+                        // partial-offline wake. Require a fresh opportunity.
+                        self.start(active, &status, &network, offer.as_ref(), handle)?;
+                    }
                 }
             }
         }
         now = self.backend.clock()?;
         let status = self.schedule.automatic(&now, true, Opportunity::None)?;
+        if status.active.is_none() {
+            self.preparation_retry = None;
+        }
         if let Some(job) = self.job.as_mut() {
             if status.active.as_ref().is_none_or(|a| a.id != job.active.id)
                 || job.control.route().is_err()
@@ -699,13 +798,53 @@ impl<B: Backend> Runner<B> {
             .prepare(&active, status.channel, control.clone())
         {
             Ok(prepared) => prepared,
-            Err(_) => {
+            Err(PreparationError::MaintenanceBusy) => {
+                if self.preparation_retry.is_none() {
+                    tracing::info!(
+                        attempt_id = active.id,
+                        stage = "install-lock",
+                        "update preparation waiting for maintenance"
+                    );
+                }
+                self.preparation_retry = Some(PreparationRetry {
+                    attempt_id: active.id,
+                    after_ms: self.backend.clock()?.ms.saturating_add(1000),
+                    epoch: network.epoch,
+                    mode: (active.trigger == schedule::Trigger::Automatic)
+                        .then_some(status_of(network).mode_generation),
+                });
+                self.reason = Some(Reason::MaintenanceBusy);
+                // Keep the persisted attempt and all original deadlines. No
+                // download hold or HTTP session exists while maintenance owns
+                // the lock; any offered NTP handoff can finish independently.
+                return Ok(());
+            }
+            Err(PreparationError::Failed {
+                stage,
+                category,
+                os_error,
+            }) => {
+                tracing::warn!(
+                    attempt_id = active.id,
+                    stage,
+                    category,
+                    os_error,
+                    "update preparation failed"
+                );
+                self.preparation_retry = None;
                 self.schedule
                     .finish(&self.backend.clock()?, active.id, Completion::Failed)?;
                 self.reason = Some(Reason::PreparationUnavailable);
                 return Ok(());
             }
         };
+        if self.preparation_retry.take().is_some() {
+            tracing::info!(
+                attempt_id = active.id,
+                "update preparation resumed after maintenance"
+            );
+        }
+        self.reason = None;
         let before = self.backend.clock()?;
         if !control.active() || offer.is_some_and(|o| !o.valid(&before)) {
             self.schedule
@@ -861,7 +1000,14 @@ impl<B: Backend> Runner<B> {
         } else if self.ready.is_some() {
             (Phase::Ready, None)
         } else if status.active.is_some() {
-            (Phase::WaitingForNetwork, None)
+            (
+                if self.preparation_retry.is_some() {
+                    Phase::Preparing
+                } else {
+                    Phase::WaitingForNetwork
+                },
+                None,
+            )
         } else {
             (Phase::Idle, None)
         };

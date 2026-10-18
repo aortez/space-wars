@@ -101,8 +101,7 @@ struct Context {
 }
 
 impl Context {
-    fn open() -> Result<Self> {
-        let lock = InstallLock::acquire()?;
+    fn open(lock: InstallLock) -> Result<Self> {
         engine_ota::bootstrap::require_no_active_bootstrap(&lock)?;
         let controller = BootController::open(&lock)?;
         let journal = RecoveryStore::open(crate::recovery_service::RECOVERY_DIRECTORY.as_ref())?;
@@ -237,23 +236,38 @@ impl Backend for Native {
         active: &Active,
         channel: Channel,
         control: Arc<Control>,
-    ) -> Result<Prepared> {
-        lower_priority()?;
+    ) -> std::result::Result<Prepared, PreparationError> {
+        lower_priority().map_err(|e| PreparationError::failed("priority", e))?;
         if !control.active() {
-            return Err(unavailable());
+            return Err(PreparationError::failed("cancelled", unavailable()));
         }
+        let lock = InstallLock::acquire().map_err(prepare_lock_error)?;
+        let context =
+            Context::open(lock).map_err(|e| PreparationError::failed("boot-context", e))?;
+        let trust =
+            TrustStore::open(TRUST.as_ref()).map_err(|e| PreparationError::failed("trust", e))?;
+        let staging = StagingStore::open(&context.boot.layout)
+            .map_err(|e| PreparationError::failed("staging", e))?;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .build()?;
+            .build()
+            .map_err(|e| PreparationError::failed("runtime", e))?;
         let session = {
             let _entered = runtime.enter();
-            download::DownloadSession::new_at(control.clone(), active.started_ms)?
+            download::DownloadSession::new_at(control.clone(), active.started_ms)
+                .map_err(|e| PreparationError::failed("http-session", e))?
         };
-        let context = Context::open()?;
-        let trust = TrustStore::open(TRUST.as_ref())?;
-        let staging = StagingStore::open(&context.boot.layout)?;
-        if !control.active() || self.clock()?.ms >= active.admission_deadline_ms {
-            return Err(unavailable());
+        if !control.active()
+            || self
+                .clock()
+                .map_err(|e| PreparationError::failed("clock", e))?
+                .ms
+                >= active.admission_deadline_ms
+        {
+            return Err(PreparationError::failed(
+                "admission-deadline",
+                unavailable(),
+            ));
         }
         Ok(Prepared {
             runtime,
@@ -381,6 +395,13 @@ impl Backend for Native {
     }
 }
 
+fn prepare_lock_error(error: engine_ota::Error) -> PreparationError {
+    match error {
+        engine_ota::Error::Busy => PreparationError::MaintenanceBusy,
+        error => PreparationError::failed("install-lock", error),
+    }
+}
+
 fn lower_priority() -> Result<()> {
     // Linux nice/IO priorities are per-thread. These only lower our own worker's
     // priority; radio/time observation and the separate client remain unaffected.
@@ -399,6 +420,100 @@ fn lower_priority() -> Result<()> {
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+
+    // Explicit owner diagnostic for an idle, already provisioned device. This
+    // opens existing stores but never runs HTTP, admits a hold, installs or
+    // reboots. Do not include it in unattended root/namespace test selections.
+    #[test]
+    #[ignore = "root owner qualification on an idle, provisioned OTA device"]
+    fn installed_preparation_recognizes_maintenance_and_reopens_after_release() {
+        use crate::service::ObservedState;
+        use crate::time::{TimeReason, TimeRecord, TimeTracker};
+        let boot_id = linux::boot_id().unwrap();
+        let reading = linux::clock_reading().unwrap();
+        let mut native = Native::new(
+            Arc::new(Mutex::new(ObservedState {
+                tracker: TimeTracker::new(
+                    boot_id.clone(),
+                    TimeRecord::default(),
+                    TimeReason::WaitingForNetworkSync,
+                    reading,
+                    None,
+                ),
+                boot_id: boot_id.clone(),
+                provider_error: None,
+                persistence_error: None,
+                rtc_error: None,
+                observed_at: Instant::now(),
+            })),
+            Watch::default(),
+            boot_id,
+        );
+        let now = native.clock().unwrap();
+        let active = Active {
+            id: 1,
+            trigger: schedule::Trigger::Manual,
+            started_ms: now.ms,
+            admission_deadline_ms: now.ms + schedule::ADMISSION_MS,
+            preparation_deadline_ms: now.ms + schedule::PREPARATION_MS,
+            deadline_ms: now.ms + schedule::SESSION_MS,
+            admitted: false,
+            payload_started: false,
+        };
+        let control = Arc::new(Control::new(
+            Arc::new(native.clone()),
+            now,
+            active.deadline_ms,
+            Arc::new(AtomicBool::new(false)),
+        ));
+        let held = InstallLock::acquire().expect("owner probe requires idle maintenance");
+        assert!(matches!(
+            native.prepare(&active, Channel::Release, control.clone()),
+            Err(PreparationError::MaintenanceBusy)
+        ));
+        drop(held);
+        let prepared = native
+            .prepare(&active, Channel::Release, control)
+            .expect("idle provisioned device must pass native preparation");
+        prepared.context.check().unwrap();
+    }
+
+    #[test]
+    fn only_install_lock_contention_is_retryable_and_diagnostics_are_redacted() {
+        assert!(matches!(
+            prepare_lock_error(engine_ota::Error::Busy),
+            PreparationError::MaintenanceBusy
+        ));
+        assert!(matches!(
+            PreparationError::failed("trust", engine_ota::Error::Busy),
+            PreparationError::Failed {
+                stage: "trust",
+                category: "busy",
+                ..
+            }
+        ));
+        assert!(matches!(
+            prepare_lock_error(std::io::Error::from_raw_os_error(libc::EACCES).into()),
+            PreparationError::Failed {
+                stage: "install-lock",
+                category: "io",
+                os_error: Some(libc::EACCES)
+            }
+        ));
+        let error = PreparationError::failed(
+            "boot-context",
+            engine_ota::Error::Store("private contents".into()),
+        );
+        assert!(matches!(
+            error,
+            PreparationError::Failed {
+                stage: "boot-context",
+                category: "store",
+                os_error: None
+            }
+        ));
+        assert!(!format!("{error:?}").contains("private contents"));
+    }
 
     #[test]
     fn ready_snapshot_detects_replacement_edits_permissions_and_links() {

@@ -27,6 +27,7 @@ struct World {
     time: bool,
     work: Work,
     fail_prepare: bool,
+    busy_prepare: bool,
     fail_admit: bool,
     fail_renew: bool,
     admit_delay: u64,
@@ -50,6 +51,7 @@ impl Fake {
             time: true,
             work: Work::Finish,
             fail_prepare: false,
+            busy_prepare: false,
             fail_admit: false,
             fail_renew: false,
             admit_delay: 0,
@@ -146,12 +148,14 @@ impl Backend for Fake {
         _active: &Active,
         _channel: Channel,
         _control: Arc<Control>,
-    ) -> Result<Self> {
+    ) -> std::result::Result<Self, PreparationError> {
         let mut w = self.0.lock().unwrap();
         w.prepares += 1;
         w.trace.push("prepared");
-        if w.fail_prepare {
-            Err(unavailable())
+        if w.busy_prepare {
+            Err(PreparationError::MaintenanceBusy)
+        } else if w.fail_prepare {
+            Err(PreparationError::failed("fixture", unavailable()))
         } else {
             Ok(self.clone())
         }
@@ -287,6 +291,213 @@ impl Fixture {
             thread::sleep(Duration::from_millis(2));
         }
     }
+}
+
+#[test]
+fn runtime_boot_maintenance_contention_preserves_the_original_attempt() {
+    let mut f = Fixture::new();
+    f.fake.edit(|w| w.busy_prepare = true);
+    f.step();
+    let waiting = f.handle.status().unwrap().schedule.unwrap();
+    let active = waiting
+        .active
+        .expect("busy boot recovery must not consume the startup check");
+    assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1);
+    assert_eq!(f.fake.0.lock().unwrap().sessions, 0);
+    assert_eq!(f.handle.status().unwrap().phase, Phase::Preparing);
+    assert_eq!(
+        f.handle.status().unwrap().reason,
+        Some(Reason::MaintenanceBusy)
+    );
+    assert!(f.handle.check_now().unwrap().coalesced);
+    for ms in [1100, 1200, 1999] {
+        f.fake.edit(|w| w.ms = ms);
+        f.step();
+    }
+    assert_eq!(f.fake.0.lock().unwrap().prepares, 1);
+    f.fake.edit(|w| {
+        w.ms = 2000;
+        w.busy_prepare = false;
+        w.work = Work::Wait;
+    });
+    f.step();
+    f.until(|f| f.fake.0.lock().unwrap().sessions == 1);
+    let resumed = &f.runner.job.as_ref().unwrap().active;
+    assert_eq!(resumed.id, active.id);
+    assert_eq!(resumed.started_ms, active.started_ms);
+    assert_eq!(resumed.admission_deadline_ms, active.admission_deadline_ms);
+    assert_eq!(
+        resumed.preparation_deadline_ms,
+        active.preparation_deadline_ms
+    );
+    assert_eq!(resumed.deadline_ms, active.deadline_ms);
+    assert_eq!(f.fake.0.lock().unwrap().prepares, 2);
+    assert_eq!(f.handle.status().unwrap().reason, None);
+}
+
+#[test]
+fn runtime_busy_maintenance_expires_without_renewing_manual_or_daily_allowances() {
+    for manual in [false, true] {
+        let mut f = Fixture::new();
+        f.fake.edit(|w| w.busy_prepare = true);
+        if manual {
+            f.handle.check_now().unwrap();
+        }
+        f.step();
+        let started = f.handle.status().unwrap().schedule.unwrap();
+        let active = started.active.unwrap();
+        for ms in [2000, active.admission_deadline_ms - 1] {
+            f.fake.edit(|w| w.ms = ms);
+            f.step();
+            assert!(f.handle.check_now().unwrap().coalesced);
+            assert_eq!(
+                f.handle
+                    .status()
+                    .unwrap()
+                    .schedule
+                    .unwrap()
+                    .active
+                    .unwrap()
+                    .id,
+                active.id
+            );
+        }
+        // Releasing the lock exactly at the original deadline is too late.
+        f.fake.edit(|w| {
+            w.ms = active.admission_deadline_ms;
+            w.busy_prepare = false;
+        });
+        f.step();
+        let expired = f.handle.status().unwrap().schedule.unwrap();
+        assert!(expired.active.is_none());
+        assert_eq!(expired.completion, Some(Completion::AdmissionTimeout));
+        let prepares = f.fake.0.lock().unwrap().prepares;
+        for ms in [900_000, 3_600_000, 21_600_000] {
+            f.fake.edit(|w| w.ms = ms);
+            f.step();
+        }
+        assert_eq!(f.fake.0.lock().unwrap().prepares, prepares);
+        assert_eq!(f.fake.0.lock().unwrap().sessions, 0);
+        assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1);
+        // An explicit new request can still start a separate bounded attempt.
+        assert!(!f.handle.check_now().unwrap().coalesced);
+        f.step();
+        f.until(|f| f.runner.job.is_none());
+        assert_eq!(f.fake.0.lock().unwrap().sessions, 1);
+    }
+}
+
+#[test]
+fn runtime_busy_time_handoff_never_becomes_an_independent_offline_wake() {
+    let mut f = Fixture::new();
+    let parent = HoldToken::parse("d".repeat(64)).unwrap();
+    f.fake.edit(|w| {
+        w.route = false;
+        w.busy_prepare = true;
+        w.holds.insert(parent.expose().into(), 121_000);
+    });
+    let (reply, answer) = mpsc::sync_channel(1);
+    f.handle
+        .requests
+        .try_send(Command::Offer(Offer {
+            parent: parent.clone(),
+            until: clock(6000),
+            cancelled: Arc::new(AtomicBool::new(false)),
+            reply,
+        }))
+        .unwrap();
+    f.step();
+    assert!(!answer.recv().unwrap());
+    let original = f.handle.status().unwrap().schedule.unwrap().active.unwrap();
+    f.fake.edit(|w| {
+        w.holds.remove(parent.expose());
+        w.busy_prepare = false;
+    });
+    for ms in [2000, 6000, 7000] {
+        f.fake.edit(|w| w.ms = ms);
+        f.step();
+    }
+    assert_eq!(f.fake.0.lock().unwrap().prepares, 1);
+    assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1);
+    assert_eq!(f.fake.0.lock().unwrap().sessions, 0);
+    // Fresh existing connectivity can finish the same attempt; the lost parent
+    // capability is neither retained nor supplied to admission.
+    f.fake.edit(|w| {
+        w.route = true;
+        w.work = Work::Wait;
+    });
+    f.step();
+    f.until(|f| f.fake.0.lock().unwrap().sessions == 1);
+    assert_eq!(f.runner.job.as_ref().unwrap().active.id, original.id);
+    assert_eq!(
+        f.runner.job.as_ref().unwrap().active.deadline_ms,
+        original.deadline_ms
+    );
+}
+
+#[test]
+fn runtime_pending_maintenance_cancels_on_channel_mode_or_coordinator_change() {
+    for change in ["channel", "mode", "coordinator"] {
+        let mut f = Fixture::new();
+        f.fake.edit(|w| w.busy_prepare = true);
+        f.step();
+        match change {
+            "channel" => {
+                f.handle.select_channel(Channel::Nightly).unwrap();
+            }
+            "mode" => f.fake.edit(|w| w.mode += 2),
+            _ => f.fake.edit(|w| w.epoch += 1),
+        }
+        f.fake.edit(|w| {
+            w.ms = 2000;
+            w.busy_prepare = false;
+            w.route = false;
+        });
+        f.step();
+        assert!(f.runner.preparation_retry.is_none(), "{change}");
+        assert!(
+            f.handle
+                .status()
+                .unwrap()
+                .schedule
+                .unwrap()
+                .active
+                .is_none(),
+            "{change}"
+        );
+        assert_eq!(f.fake.0.lock().unwrap().prepares, 1, "{change}");
+        assert_eq!(f.fake.0.lock().unwrap().sessions, 0, "{change}");
+        assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1, "{change}");
+    }
+}
+
+#[test]
+fn runtime_restart_while_waiting_for_maintenance_does_not_replay_the_attempt() {
+    let mut f = Fixture::new();
+    f.fake.edit(|w| w.busy_prepare = true);
+    f.step();
+    drop(f.runner);
+    f.fake.edit(|w| {
+        w.ms = 2000;
+        w.busy_prepare = false;
+    });
+    f.runner = Runner::open(
+        &f._temp.path().join("updates"),
+        f.fake.clone(),
+        &clock(2000),
+    )
+    .unwrap();
+    f.step();
+    let restarted = f.handle.status().unwrap().schedule.unwrap();
+    assert!(restarted.active.is_none());
+    assert_eq!(restarted.completion, Some(Completion::Interrupted));
+    for ms in [5000, 900_000, 3_600_000] {
+        f.fake.edit(|w| w.ms = ms);
+        f.step();
+    }
+    assert_eq!(f.fake.0.lock().unwrap().prepares, 1);
+    assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1);
+    assert_eq!(f.fake.0.lock().unwrap().sessions, 0);
 }
 
 #[test]

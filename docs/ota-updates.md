@@ -2559,6 +2559,39 @@ during the session. It is released when IO finishes, before any later installer
 obtains its own authority. Downloads never begin an installation or request a
 reboot.
 
+If boot recovery or maintenance owns that lock, preparation now reports
+`preparing` / `maintenance-busy` and tries the lock again at most once per second
+within the same persisted attempt. It retains the original two-minute automatic
+admission/preparation bounds (30-second admission for Check now), daily due time
+and total session deadline. It holds no download network reservation and starts
+no HTTP work while waiting. A time-check offer is declined promptly; a later
+partial-offline retry requires fresh existing connectivity or a fresh time-check
+handoff. Channel changes, network-coordinator replacement and automatic-mode
+changes cancel the pending work. Service restart terminates it as interrupted
+without granting another automatic allowance.
+
+Only contention on the installation lock receives this bounded wait. Missing or
+invalid provisioning, trust/staging lock failures and other preparation errors
+still fail the attempt. The journal records a fixed preparation stage, error
+category and optional OS error number, excluding error strings that could contain
+private content. Lock waiting and resumption are logged once per attempt.
+
+The contention regression failed before this change and passed afterward. The
+Rust 1.89 host run passed 217 cases: 193 service tests, 20 real HTTP/TLS downloader
+tests and four installation-lock tests. This includes interruption, exact-range
+resume, original deadlines, cancellation and restart without replenishing the
+daily allowance. Scoped Clippy, formatting and the AArch64 build passed. On Pi 5
+(`spacewars.local`) and Pi 4 (`sw-picade-2.local`), 19 isolated runtime cases and
+the explicit native preparation probe passed: the real held lock reported busy,
+and releasing it allowed the production preparation path to open the installed
+boot, recovery, trust and staging context. The installed images, services, boot
+selectors, update schedule and trust/recovery records stayed unchanged.
+[Source and test evidence](data/ota-startup-check-20261018.json) distinguishes
+these probes from live startup qualification. Historical startup errors omitted
+their cause; the controlled reproduction does not recover that missing evidence.
+A signed canary boot, live partial-offline transport and frame-time qualification
+remain before relying on unattended checks.
+
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
 `record: {schema: 1, version: <positive integer>}` and the SHA-256 of the compact
