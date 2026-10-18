@@ -65,9 +65,12 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install image fixture tools
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends e2fsprogs python3-cryptography
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
       - name: Test updater, metadata, image and publisher fixtures
-        # Each fixture owns its paths. Reexec children share a read-only binary;
-        # finish compilation before running tests, without concurrent rebuilds.
+        # Separate test processes isolate flock descriptors across crash fixtures.
         run: python3 .github/ci/ota_test_selection.py run --selection "$RUNNER_TEMP/ota-selection.json"
       - name: Build publisher fixture tools
         run: cargo build --locked --profile ci -p engine-ota --features publisher --example feed_sign --example feed_inventory
@@ -93,6 +96,7 @@ jobs:
           path: |
             ${{ runner.temp }}/ota-selection.json
             target/ota-test-report.json
+            target/nextest/ci/junit.xml
 
   yocto-tools:
     name: Pi hardware profiles and update safety

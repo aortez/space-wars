@@ -78,11 +78,10 @@ def validate_discovery(output, suites, ignored_output=''):
     discovered = [line[:-6] for line in output.splitlines() if line.endswith(': test')]
     ignored = {line[:-6] for line in ignored_output.splitlines() if line.endswith(': test')}
     for name in suites['exhaustive'] + suites['required_pr']:
-        # libtest --skip is a substring filter, so prove each exact catalog name
-        # matches exactly one discovered case before allowing any omission.
-        matches = [case for case in discovered if name in case]
+        # nextest filters exact names; new cases with similar names stay selected.
+        matches = [case for case in discovered if name == case]
         if matches != [name] or name in ignored:
-            raise ValueError(f'OTA coverage name missing, ignored, duplicated or ambiguous: {name}')
+            raise ValueError(f'OTA coverage name missing, ignored or duplicated: {name}')
     return len(discovered)
 
 
@@ -101,14 +100,20 @@ def run_tests(mode, report):
     discovered = validate_discovery(listing, suites, ignored)
     build_seconds = time.monotonic() - started
     skipped = suites['exhaustive'] if mode == 'pr' else []
-    args = command + ['--', '--test-threads=4']
-    for name in skipped:
-        args += ['--skip', name]
+    # Each test needs its own process: concurrent libtest threads can briefly
+    # inherit another fixture's flock descriptor while launching a crash child.
+    args = ['cargo', 'nextest', 'run', '--locked', '--cargo-profile', 'ci',
+            '--profile', 'ci', '-p', 'engine-ota', '--features', 'publisher',
+            '--all-targets', '--test-threads', '4', '--retries', '0',
+            '--no-fail-fast', '--no-tests', 'fail', '--ignore-default-filter']
+    if skipped:
+        args += ['-E', workspace_filter(suites)]
     print(f'OTA coverage: {mode}; {discovered} discovered; {len(skipped)} exhaustive sweeps deferred. '
           'Existing ignored tests remain ignored.', flush=True)
     started = time.monotonic()
     result = subprocess.run(args, cwd=ROOT)
-    value = dict(schema=1, mode=mode, discovered=discovered, omitted_sweeps=skipped,
+    value = dict(schema=1, mode=mode, runner='nextest', processes=4,
+                 discovered=discovered, omitted_sweeps=skipped,
                  build_and_discovery_seconds=round(build_seconds, 3),
                  execution_seconds=round(time.monotonic() - started, 3), returncode=result.returncode)
     report.parent.mkdir(parents=True, exist_ok=True)

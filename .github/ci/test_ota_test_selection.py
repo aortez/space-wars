@@ -86,7 +86,7 @@ class SelectionTests(unittest.TestCase):
             with patch.object(helper, 'git', side_effect=subprocess.CalledProcessError(128, ['git'])):
                 self.assertEqual(helper.selection(env)['mode'], 'full')
 
-    def test_discovery_rejects_missing_representatives_and_ambiguous_skips(self):
+    def test_discovery_rejects_missing_ignored_or_duplicate_cases(self):
         suites = helper.catalog()
         names = suites['exhaustive'] + suites['required_pr']
         listing = '\n'.join(name + ': test' for name in names)
@@ -97,9 +97,9 @@ class SelectionTests(unittest.TestCase):
                     helper.validate_discovery(listing.replace(name + ': test', ''), suites)
                 with self.assertRaises(ValueError):
                     helper.validate_discovery(listing, suites, name + ': test')
-        for extra in (names[0], names[0] + '_new_case'):
-            with self.assertRaises(ValueError):
-                helper.validate_discovery(listing + '\n' + extra + ': test', suites)
+        with self.assertRaises(ValueError):
+            helper.validate_discovery(listing + '\n' + names[0] + ': test', suites)
+        self.assertEqual(helper.validate_discovery(listing + '\n' + names[0] + '_new_case: test', suites), len(names) + 1)
         self.assertEqual(helper.validate_discovery(listing + '\nnew::regression: test', suites), len(names) + 1)
 
     def test_workspace_delegates_only_cataloged_sweeps_to_required_ota_job(self):
@@ -117,6 +117,7 @@ class SelectionTests(unittest.TestCase):
             self.assertNotIn('if', steps[name])
             self.assertNotIn('continue-on-error', steps[name])
         self.assertEqual(ota['steps'][0]['with']['fetch-depth'], '2')
+        self.assertEqual(steps['Install pinned test runner']['with']['tool'], 'nextest@0.9.144')
         headless = workflow['jobs']['linux-headless']
         step = next(step for step in headless['steps'] if step.get('name') == 'Run workspace tests without compiling')
         self.assertIn('ota_test_selection.py workspace --', step['run'])

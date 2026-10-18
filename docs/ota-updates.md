@@ -80,10 +80,14 @@ is checked again after downloading and validating it. Other source revisions
 do not substitute for the candidate's coverage.
 
 OTA tests use the existing optimized `ci` Cargo profile with debug assertions
-and overflow checks enabled, and four test workers. Fixture paths are private;
-crash children re-execute a read-only binary with child-specific environment
-variables. Builds finish before execution and no concurrent rebuild is started.
-The job summary and `ota-test-timings` artifact record selection and wall time.
+and overflow checks enabled, and four isolated nextest test processes. A hosted
+four-thread libtest experiment reproduced a lock-busy failure (344 passed,
+one failed); sharing a process is not a qualified concurrency mode. Separate
+processes isolate each fixture's descriptors from unrelated crash-child launches.
+Crash children still re-execute the same read-only binary with child-specific
+environment variables. Builds finish before execution and no concurrent rebuild
+is started. Retries are disabled. The job summary and `ota-test-timings` artifact
+record selection, wall time and JUnit results.
 On the previous serial GitHub run, the three selected sweeps accounted for about
 219 seconds of a 539-second library suite; this is a baseline, not a promised
 reduction in total PR duration.
@@ -2651,7 +2655,7 @@ cargo +1.89.0 check --locked -p engine-ota
 cargo check --locked -p engine-ota --target aarch64-unknown-linux-gnu
 ```
 
-Use the helper's bounded four-worker runner. Earlier validation on unchanged
+Use the helper's four isolated nextest processes. Earlier validation on unchanged
 revision `c779d0d` observed lock-busy and elapsed-progress assertion failures with
 the host's default parallelism; that observation does not establish a safe
 unrestricted worker count. Do not rebuild into the same target directory while
