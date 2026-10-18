@@ -8,6 +8,12 @@ rust-version.workspace = true
 
 [features]
 publisher = ["dep:aws-lc-rs"]
+# Separately built root-operator diagnostics; never enabled by the device image.
+recovery-qualification = []
+
+[[example]]
+name = "recovery_qualify"
+required-features = ["recovery-qualification"]
 
 [[example]]
 name = "feed_sign"

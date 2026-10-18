@@ -56,6 +56,8 @@ pub use watchdog_linux::{EarlyWatchdog, WatchdogCompletion};
 pub mod recovery;
 #[cfg(target_os = "linux")]
 pub mod recovery_linux;
+#[cfg(all(target_os = "linux", any(test, feature = "recovery-qualification")))]
+pub mod recovery_qualification;
 mod recovery_store;
 mod repository;
 #[cfg(target_os = "linux")]
