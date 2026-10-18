@@ -198,7 +198,18 @@ impl Session {
                 #[cfg(target_os = "linux")]
                 async_io::block_on(async {
                     match nm::NetworkManager::open().await {
-                        Ok(backend) => worker::run(&backend, receiver, Arc::clone(&shared)).await,
+                        Ok(backend) => {
+                            #[cfg(feature = "pi-kiosk")]
+                            match spacewars_control::network::SetupHold::new() {
+                                Ok(hold) => worker::run_protected(&backend, &hold, receiver, Arc::clone(&shared)).await,
+                                Err(_) => *shared.lock().unwrap() = View {
+                                    status: "Could not prepare Wi-Fi setup. Go Back and retry.".into(),
+                                    ..View::default()
+                                },
+                            }
+                            #[cfg(not(feature = "pi-kiosk"))]
+                            worker::run(&backend, receiver, Arc::clone(&shared)).await;
+                        },
                         Err(status) => *shared.lock().unwrap() = View { status, ..View::default() },
                     }
                 });

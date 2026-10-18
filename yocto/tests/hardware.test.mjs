@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { assertBootCompatibility, deviceProfileText, readBootIdentity, validateProfile } from '../scripts/hardware.mjs';
+import { assertBootCompatibility, deviceProfileText, readBootIdentity, setHardwareProfile, validateProfile } from '../scripts/hardware.mjs';
 import { defaultBuildDir, defaultImageDir, MACHINE, preferredImages, YOCTO_DIR } from '../scripts/paths.mjs';
 
 const hardwareFiles = join(YOCTO_DIR, 'meta-spacewars/recipes-spacewars/spacewars-hardware/files');
@@ -47,6 +47,72 @@ test('only explicit known hardware profiles can be flashed', () => {
   for (const name of [null, '', 'pi4', '../picade', 'picade\ninclude other.txt']) {
     assert.throws(() => validateProfile(name), /Select --profile/);
   }
+});
+
+function privateBootMount({ missingProfile = false, identity = 'a'.repeat(64), denyRead = false, corruptReadback = false } = {}) {
+  let mountPoint;
+  let selected;
+  let unmounted = false;
+  let ordinaryReaderDenied = false;
+  const run = (program, args, options = {}) => {
+    assert.equal(program, 'sudo');
+    const [command, ...rest] = args;
+    if (command === 'mount') {
+      mountPoint = rest.at(-1);
+      mkdirSync(join(mountPoint, 'spacewars-profiles'));
+      if (!missingProfile) writeFileSync(join(mountPoint, 'spacewars-profiles/hyperpixel.txt'), 'profile fixture\n');
+      writeFileSync(join(mountPoint, 'spacewars-boot-id'), identity + '\n');
+      // Model a root-owned FAT mount hidden by umask 077. Only the sudo runner
+      // can enter it; tests retain ownership solely to clean up the fixture.
+      chmodSync(mountPoint, 0);
+      ordinaryReaderDenied = !existsSync(join(mountPoint, 'spacewars-boot-id'));
+      return '';
+    }
+    if (command === 'umount') {
+      chmodSync(mountPoint, 0o700);
+      rmSync(join(mountPoint, 'spacewars-profiles'), { recursive: true });
+      rmSync(join(mountPoint, 'spacewars-boot-id'));
+      if (existsSync(join(mountPoint, 'spacewars-device.txt'))) rmSync(join(mountPoint, 'spacewars-device.txt'));
+      unmounted = true;
+      return '';
+    }
+    if (denyRead && (command === '/bin/sh' || command === 'cat')) throw new Error('sudo read denied');
+    chmodSync(mountPoint, 0o700);
+    try {
+      if (command === 'tee') selected = options.input;
+      if (corruptReadback && command === 'cat' && rest.at(-1).endsWith('/spacewars-device.txt')) return 'wrong profile\n';
+      return execFileSync(command, rest, options);
+    } finally {
+      chmodSync(mountPoint, 0);
+    }
+  };
+  return { run, result: () => ({ selected, unmounted, ordinaryReaderDenied, removed: !existsSync(mountPoint) }) };
+}
+
+const flashUtils = { getPartitionDevice: () => '/dev/fixture1', success() {}, info() {} };
+
+test('flash profile selection can inspect a private root-managed boot mount', { skip: process.getuid() === 0 }, () => {
+  const fixture = privateBootMount();
+  setHardwareProfile(flashUtils, '/dev/fixture', 'hyperpixel', 'a'.repeat(64), false, fixture);
+  assert.deepEqual(fixture.result(), {
+    selected: deviceProfileText('hyperpixel'), unmounted: true, ordinaryReaderDenied: true, removed: true,
+  });
+});
+
+test('profile failures preserve the selection and always unmount the boot filesystem', () => {
+  for (const options of [{ missingProfile: true }, { identity: 'b'.repeat(64) }, { denyRead: true }]) {
+    const fixture = privateBootMount(options);
+    assert.throws(() => setHardwareProfile(flashUtils, '/dev/fixture', 'hyperpixel', 'a'.repeat(64), false, fixture));
+    const result = fixture.result();
+    assert.equal(result.selected, undefined);
+    assert.ok(result.unmounted && result.removed);
+  }
+});
+
+test('profile selection verifies the bytes read back after writing', () => {
+  const fixture = privateBootMount({ corruptReadback: true });
+  assert.throws(() => setHardwareProfile(flashUtils, '/dev/fixture', 'hyperpixel', 'a'.repeat(64), false, fixture), /readback/);
+  assert.ok(fixture.result().unmounted && fixture.result().removed);
 });
 
 test('HDMI selection uses the connected connector, not the first DRM card', t => {
@@ -143,7 +209,7 @@ test('profile files keep HAT and HyperPixel GPIO overlays mutually exclusive', (
   assert.doesNotMatch(picade, /dtoverlay=vc4-kms-dpi/);
   assert.match(hyperpixel, /dtoverlay=vc4-kms-dpi-hyperpixel4/);
   assert.doesNotMatch(hyperpixel, /dtoverlay=picade/);
-  assert.doesNotMatch(hdmi, /dtoverlay=/);
+  assert.deepEqual(hdmi.match(/^dtoverlay=.*$/gm), ['dtoverlay=spacewars-profile-hdmi']);
   for (const [name, code] of Object.entries({ button1: 304, button2: 305, button3: 308, button4: 307, button5: 310, button6: 311, coin: 314, start: 315 })) {
     assert.ok(picade.includes(`dtparam=${name}=${code}\n`));
   }

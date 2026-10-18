@@ -6,6 +6,7 @@ import { pathToFileURL } from 'url';
 import { spawn } from 'child_process';
 import { defaultImageDir, preferredImages, YOCTO_DIR } from './paths.mjs';
 import { assertBootCompatibility, readBootIdentity } from './hardware.mjs';
+import { withDeploymentHold } from './deployment-network.mjs';
 
 const DEFAULT_IMAGE_DIR = defaultImageDir();
 const CONFIG_FILE = join(YOCTO_DIR, '.flash-config.json');
@@ -134,15 +135,17 @@ function findImage(utils, imageArg) {
   return utils.findLatestImage(DEFAULT_IMAGE_DIR, IMAGE_SUFFIX, PREFERRED_IMAGES);
 }
 
-function checkRemoteOtaPrivilege(utils, remoteTarget) {
+export function checkRemoteOtaPrivilege(utils, remoteTarget) {
   const probe = [
-    'rm -f /tmp/spacewars-ota-sudo-check',
-    'sudo -n /usr/sbin/ab-update-with-key --spacewars-sudo-probe >/tmp/spacewars-ota-sudo-check 2>&1',
-    "if grep -Eqi 'password|not allowed|may not run sudo' /tmp/spacewars-ota-sudo-check; then echo blocked; else echo ok; fi",
-    'rm -f /tmp/spacewars-ota-sudo-check',
+    'if test -x /usr/bin/engine-os-manager; then echo managed',
+    'elif sudo -n -l /usr/sbin/ab-update-with-key >/dev/null 2>&1; then echo legacy',
+    'else echo blocked; fi',
   ].join('; ');
-
-  return utils.ssh(remoteTarget, probe) === 'ok';
+  const state = utils.ssh(remoteTarget, probe);
+  if (state === 'managed') {
+    throw new Error('This image uses the verified device updater. Legacy unsigned A/B installation is disabled; use supervised root bootstrap while installer integration is in progress.');
+  }
+  return state === 'legacy';
 }
 
 async function main() {
@@ -216,11 +219,9 @@ async function main() {
   if (!dryRun && !checkRemoteOtaPrivilege(utils, remoteTarget)) {
     throw new Error(
       [
-        'Remote image is not OTA-ready for the spacewars user.',
-        'The current Pi image needs a sudoers rule allowing:',
-        '  sudo /usr/sbin/ab-update-with-key ...',
-        '  sudo /usr/bin/systemctl reboot',
-        'Flash one OTA-capable image first, then future updates can use npm run update.',
+        'The remote account does not have legacy update permission.',
+        'Do not add unsigned installer privileges to the runtime kiosk account.',
+        'Use separately authenticated root access for supervised bootstrap.',
       ].join('\n')
     );
   }
@@ -241,66 +242,90 @@ async function main() {
   const checksum = await utils.calculateChecksum(image.path);
   utils.success(`Checksum: ${checksum.substring(0, 16)}...`);
 
-  utils.banner('Transferring rootfs to Pi');
-  const { remoteImagePath, remoteChecksumPath } = await utils.transferImage(
-    image.path,
-    checksum,
-    remoteTarget,
-    remoteTmp,
-    dryRun,
-  );
-
-  if (!dryRun && !utils.verifyRemoteChecksum(remoteImagePath, remoteChecksumPath, remoteTarget)) {
-    throw new Error('Transfer checksum verification failed.');
-  }
-
-  let remoteKeyPath = null;
-  if (sshKeyPath) {
-    remoteKeyPath = `${remoteTmp}/spacewars-authorized_keys.pub`;
-    if (dryRun) {
-      utils.info(`Would transfer SSH key to ${remoteTarget}:${remoteKeyPath}`);
-    } else {
-      utils.info('Transferring SSH key...');
-      await utils.run('scp', [
-        '-o', 'ConnectTimeout=10',
-        '-o', 'BatchMode=yes',
-        sshKeyPath,
-        `${remoteTarget}:${remoteKeyPath}`,
-      ]);
-      utils.success('SSH key transferred');
-    }
-  }
-
-  const originalBootTime = utils.getRemoteBootTime(remoteTarget);
-
-  utils.banner('Flashing inactive slot on Pi');
-  await utils.remoteFlashWithKey(
-    remoteImagePath,
-    remoteKeyPath,
-    remoteUser,
-    remoteTarget,
-    dryRun,
-    skipConfirm,
-    'sudo /usr/sbin/ab-update-with-key',
-  );
-
-  if (dryRun) {
-    utils.success('Dry run complete.');
-    return;
-  }
-
-  utils.banner('Waiting for Pi to reboot');
-  const online = await utils.waitForReboot(remoteTarget, targetHost, originalBootTime, 180);
-  if (!online) {
-    utils.warn('The Pi did not come back online within the timeout.');
-    return;
-  }
-
-  utils.success('OTA update complete.');
-  utils.info(`Connect with: ssh ${remoteTarget}`);
+  await transferAndFlash({ utils, image, checksum, remoteTarget, remoteTmp, sshKeyPath, remoteUser, targetHost, dryRun, skipConfirm });
 }
 
-main().catch(err => {
-  console.error(err.message);
-  process.exit(1);
-});
+// The managed-image authority gate above remains in force. This wrapper also
+// protects a later verified A/B transport; it does not re-enable unsigned OTA.
+export async function transferAndFlash({ utils, image, checksum, remoteTarget, remoteTmp, sshKeyPath, remoteUser, targetHost, dryRun, skipConfirm }, { protect = withDeploymentHold } = {}) {
+  return protect({ target: remoteTarget, dryRun }, async hold => {
+    await hold.ensure();
+    utils.banner('Transferring rootfs to Pi');
+    const { remoteImagePath, remoteChecksumPath } = await utils.transferImage(
+      image.path,
+      checksum,
+      remoteTarget,
+      remoteTmp,
+      dryRun,
+    );
+
+    if (!dryRun && !utils.verifyRemoteChecksum(remoteImagePath, remoteChecksumPath, remoteTarget)) {
+      throw new Error('Transfer checksum verification failed.');
+    }
+
+    await hold.ensure();
+
+    let remoteKeyPath = null;
+    if (sshKeyPath) {
+      remoteKeyPath = `${remoteTmp}/spacewars-authorized_keys.pub`;
+      if (dryRun) {
+        utils.info(`Would transfer SSH key to ${remoteTarget}:${remoteKeyPath}`);
+      } else {
+        utils.info('Transferring SSH key...');
+        await utils.run('scp', [
+          '-o', 'ConnectTimeout=10',
+          '-o', 'BatchMode=yes',
+          sshKeyPath,
+          `${remoteTarget}:${remoteKeyPath}`,
+        ]);
+        utils.success('SSH key transferred');
+      }
+    }
+
+    // Keep renewal running while the operator decides. The legacy utility
+    // exits the process on cancellation, bypassing our cleanup; own the prompt
+    // here and recheck protection immediately before the actual flash instead.
+    if (!dryRun && !skipConfirm) {
+      utils.info(`Flash the inactive root on ${remoteTarget} and reboot; the previous slot remains available.`);
+      if ((await utils.prompt('Type "yolo" to proceed: ')).toLowerCase() !== 'yolo') {
+        throw new Error('Update cancelled.');
+      }
+    }
+    const originalBootTime = utils.getRemoteBootTime(remoteTarget);
+
+    utils.banner('Flashing inactive slot on Pi');
+    await hold.expectReboot();
+    await utils.remoteFlashWithKey(
+      remoteImagePath,
+      remoteKeyPath,
+      remoteUser,
+      remoteTarget,
+      dryRun,
+      true,
+      'sudo /usr/sbin/ab-update-with-key',
+    );
+
+    if (dryRun) {
+      utils.success('Dry run complete.');
+      return;
+    }
+
+    utils.banner('Waiting for Pi to reboot');
+    const online = await utils.waitForReboot(remoteTarget, targetHost, originalBootTime, 180);
+    if (!online) {
+      throw new Error('The Pi did not come back online within the timeout; update completion is unverified.');
+    }
+
+    await hold.reconnected();
+
+    utils.success('OTA update complete.');
+    utils.info(`Connect with: ssh ${remoteTarget}`);
+  });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(err => {
+    console.error(err.message);
+    process.exitCode = 1;
+  });
+}

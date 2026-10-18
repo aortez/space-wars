@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T02:48:27.425343+00:00",
+  "implementation_commit": "25aa0c4db06433358bdfabbad644dcc2e7c5669d",
+  "scope": "Supervised inactive-root image-copy journal and root-only device wrapper. Temporary regular-file fixtures exercise the shared ext4 writer and restart behavior. No installed Pi partition has been written and no boot trial is authorized.",
+  "host_validation": {
+    "ota_tests_passed": 199,
+    "manager_tests_passed": 38,
+    "ordinary_suite_ignored": 7,
+    "runner": "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "format": "passed",
+    "aarch64_tests_and_operator_example": "built",
+    "ext4": {
+      "binary": "target/debug/deps/engine_ota-6f09450237c0bb77",
+      "sha256": "e8b9cfd1b8c1df7aa2af661109f90d4e2ece98a3018807a9b0c62e6c43f98aa5",
+      "temporary_root": "/home/data/workspace/space-wars-ota/target/ota-root-ext4-15gm44qp",
+      "filesystem": "ext2/ext3",
+      "exit_code": 0,
+      "elapsed_seconds": 49.33,
+      "tests_passed": 20,
+      "optional_artifact_tests_ignored": 1,
+      "filesystem_scope": "Host /home/data ext4, reported as ext2/ext3 by statfs; private regular-file targets and journals."
+    }
+  },
+  "pi5_validation": {
+    "remote_directory": "/tmp/spacewars-root-install.eQTT0T",
+    "artifacts": {
+      "root-install-tests": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-bfa87321f5ceb7b8",
+        "sha256": "6b168373b516403c40fb24360d1af6a31cb4ed3e919d70e7c25412e9e35baab6",
+        "remote_sha256": "6b168373b516403c40fb24360d1af6a31cb4ed3e919d70e7c25412e9e35baab6"
+      },
+      "bootstrap_install_root": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/examples/bootstrap_install_root",
+        "sha256": "35162c2bfbe2b897215f274696aff21530825e341c1bdbae10a7bf6d240e079e",
+        "remote_sha256": "35162c2bfbe2b897215f274696aff21530825e341c1bdbae10a7bf6d240e079e"
+      }
+    },
+    "uid": 1000,
+    "boot_id_before": "de606400-dc75-446e-b26b-385592b0f562",
+    "tests_exit_status": 0,
+    "elapsed_seconds": 432.96,
+    "entry_point_denied_uid_1000": true,
+    "boot_id_after": "de606400-dc75-446e-b26b-385592b0f562",
+    "tests_passed": 20,
+    "optional_artifact_tests_ignored": 1,
+    "scope": "UID 1000, temporary regular-file targets under /tmp; actual command entry-point refusal before private installed paths are opened. Elapsed test duration is not an installation benchmark."
+  },
+  "covered_cases": [
+    "Initial inactive bytes must match the preserved original digest before writing intent is committed.",
+    "Exact compressed/expanded content, actual ext4 filesystem and embedded image identity; unused partition tail retained.",
+    "Errors at every reported progress boundary; explicit resume from writing and read-only revalidation from written.",
+    "Actual child _exit(86) without destructors after intent, device-flush simulation and written-journal publication.",
+    "Write/partial-write, flush, readback, filesystem-check, identity and checker-mutation failures do not publish written.",
+    "Altered originals or completed targets, changed backup binding, bad payloads and corrupt journals are refused.",
+    "Incomplete pending record never replaces published authority; unsafe links, concurrent transaction and revoked guard are rejected.",
+    "Quiescence still rejects runtime threads and legacy helpers when an installer target is specified.",
+    "Existing signed-OTA writer tests remain passing; bootstrap creates no VerifiedCandidate or production RecoveryRecord."
+  ],
+  "live_checks_not_performed": [
+    "Root-only bootstrap admission against an installed Pi, independent recovery exports and restore rehearsal.",
+    "Positive real-device test of the own-target /proc descriptor exception, exclusive block claim and device ioctls.",
+    "Physical interruption, power loss, firmware tryboot, watchdog expiry/handoff or successful normal/trial boot.",
+    "Independent fresh root/runtime SSH logins and complete effective privilege audit after actual migration."
+  ],
+  "device_mutations": {
+    "temporary_uid_1000_fixtures_and_binaries": true,
+    "installed_root_files": false,
+    "root_preparation": false,
+    "live_backup_capture": false,
+    "service_or_radio_changes": false,
+    "boot_remount": false,
+    "raw_partition_writes": false,
+    "watchdog_open": false,
+    "reboot": false,
+    "credential_contents_read": false
+  },
+  "artifact_scope": {
+    "new_runtime_image_built": false,
+    "latest_validated_runtime_image_source": "c14c53f53012722e653c303834499906393fe2cb",
+    "schema_2_kits_unchanged": true,
+    "operator_example_is_a_separate_build": true
+  },
+  "remaining": [
+    "Root connection details for both Pis and supervised live preservation, exports, access qualification and inactive-root installation.",
+    "Durable boot-asset staging and trial-selector publication, bootstrap health/persistent-store checks and watchdog handoff.",
+    "Staged normal and canonical normal boot confirmation followed by explicit recovery-baseline provisioning.",
+    "Physical Pi 4/5 failure qualification and end-to-end feed, updater, maintenance holds, scheduling and UI integration."
+  ],
+  "logs": {
+    "host": {
+      "path": "target/ota-bootstrap-root-host-final.log",
+      "sha256": "c5677f0fa51fe8d92279559ce2e3411d9d19ad3d831d22dad981ca7c028a5931",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.50s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.60s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 177 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 78.11s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "host-artifacts": {
+      "path": "target/ota-bootstrap-root-host-artifacts.jsonl",
+      "sha256": "be865ee5e6259794ffb301e60287dc91a2a77a3a8a2a005555d7cb37523514e2"
+    },
+    "ext4": {
+      "path": "target/ota-bootstrap-root-ext4.log",
+      "sha256": "023a253c565de71e33b064c581796f61d78e9e0847dc58fc10335aaeac45376c",
+      "test_results": [
+        "test result: ok. 20 passed; 0 failed; 1 ignored; 0 measured; 163 filtered out; finished in 49.27s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-bootstrap-root-clippy-final.log",
+      "sha256": "c177f2cdbea1c445d72dfbf5bc44b2811742acc9ee6aef6d87aae62fd056f100"
+    },
+    "msrv": {
+      "path": "target/ota-bootstrap-root-msrv.log",
+      "sha256": "8483e1f46d6435e7550b48dbd0babed848011b2f4943b138afe64edfd49fdf57"
+    },
+    "format": {
+      "path": "target/ota-bootstrap-root-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "aarch64": {
+      "path": "target/ota-bootstrap-root-aarch64.log",
+      "sha256": "317aaf536d049c5dfafd111a8149519987fde9e81d87c779558dd898714f1957"
+    },
+    "aarch64-artifacts": {
+      "path": "target/ota-bootstrap-root-aarch64-artifacts.jsonl",
+      "sha256": "3771890b2cac5c6b5044ee503372a98232d25389c888688255e46ba8c29f3158"
+    },
+    "pi5-tests": {
+      "path": "target/ota-bootstrap-root-pi5-tests.log",
+      "sha256": "2f907c02bfe4e9e4d66c0f3862a9a1b1c6fc5c80ef5ac9ef5532218f1f0a8ea7",
+      "test_results": [
+        "test result: ok. 20 passed; 0 failed; 1 ignored; 0 measured; 163 filtered out; finished in 432.73s"
+      ]
+    },
+    "pi5-denial": {
+      "path": "target/ota-bootstrap-root-pi5-denial.log",
+      "sha256": "a2fe1c8b5f69df030c1d6dd5858052d8d438e27556269cf87252ee0fcbd79517"
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "cargo build --locked -p engine-ota --tests --example bootstrap_install_root --target aarch64-unknown-linux-gnu --message-format=json",
+    "Select the exact Cargo test executable; with TMPDIR on ext4 run bootstrap::root_install bootstrap::quiesce install_linux::tests --test-threads=1 --nocapture.",
+    "Run those same filters on Pi 5 as UID 1000; invoke bootstrap_install_root with dummy valid digests and a documentation-only SSH context to confirm the root guard rejects before installed paths."
+  ]
+}

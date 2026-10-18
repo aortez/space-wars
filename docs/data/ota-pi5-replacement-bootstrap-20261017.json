@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "host": "spacewars.local",
+  "scope": "successful preservation and staging; failed first live bootstrap trial and automatic fallback; corrected journal-open diagnostic only, not a qualified OTA runtime",
+  "source_base": "8ee9b69",
+  "runtime_source": "04b6cb75f8639772e2de4bd86fe1ae795614be04",
+  "device": {
+    "board": "Raspberry Pi 5",
+    "board_serial": "ddde6ffbe45bcea8",
+    "disk": "SanDisk Extreme Pro",
+    "disk_bytes": 128043712512,
+    "profile": "hyperpixel"
+  },
+  "package_sha256": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
+  "preservation": {
+    "binding_sha256": "9825d662522ecf3060212289d868782ddd58250aa5b176c8222e9c5a43baefa5",
+    "raw_copies_sha256": "a10b91203ed4937499ffc2431c9be8d6bde1e4afc84c96f1aeced074106e0681",
+    "data_receipt_sha256": "2811c541651dfb3513fb69b3fbb7071c6abea5c7a74cbb2182926526aa93f7da",
+    "originals_receipt_sha256": "5a885c635eb965c1c258c4c7bb0f1f28dfeec458f99d8a225890c0a78a26d31f",
+    "data_entries": 18746,
+    "data_archive": {
+      "bytes": 1504895488,
+      "sha256": "592de5eec1828cef09e97307bc55f4b869b4b44e71df31632ad8b942fc6be3ba"
+    },
+    "all_three_independent_exports_verified": true,
+    "data_extraction_contents_modes_links_ns_timestamps_verified": true,
+    "numeric_owners_retained_not_recreated_by_host_extraction": true,
+    "fallback_replacement_and_independent_access_checks_passed": true
+  },
+  "quiet_window": {
+    "initial_data_copy_retained": true,
+    "initial_failure": "NetworkManager renewed lease/seen-network files while the verified archive was being exported; original preservation correctly rejected changed source",
+    "second_capture_guard": "a fresh SSH login restarted the stopped device-state service through its Wants dependency; capture rejected before publication",
+    "successful_capture": "runtime-mask both runtime services before fresh SSH; freeze NetworkManager with independent 20-minute thaw timer; keep it frozen through original preservation and replacement",
+    "independent_frozen_ssh_passed": true,
+    "network_manager_thawed_and_timer_stopped": true,
+    "prior_data_copy_path": "/data/logs/spacewars-bootstrap-data-reconciliation-9825d662"
+  },
+  "root_install": {
+    "schema": 1,
+    "scope": "verified inactive-root copy only; original boot selection retained; no login, complete privilege audit, watchdog or boot authority",
+    "package_sha256": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
+    "journal_sha256": "3ea0a680f0d11c11522b51ee9c979210217453f29ab7c1a1c867e1691a274d86",
+    "target": "b",
+    "expanded": {
+      "bytes": 528482304,
+      "sha256": "d25c321f2f25920142662bc08b868fd67d913518da257434c1d694ca3ceba021"
+    },
+    "reused_written": false,
+    "ready_for_trial": false
+  },
+  "boot_staging": {
+    "schema": 1,
+    "scope": "temporary boot tree and trial file prepared; normal default retained; one-shot reboot and physical qualification remain separate",
+    "package_sha256": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
+    "root_install_sha256": "3ea0a680f0d11c11522b51ee9c979210217453f29ab7c1a1c867e1691a274d86",
+    "trial_id": "afef8ee0a7016b1cb1e8516a328367c69576bf3638f929b319ab44333eeb9182",
+    "phase": "trial-ready",
+    "original_default_retained": true,
+    "reboot_requested": false,
+    "automatic_updates_enabled": false
+  },
+  "activation": {
+    "direct_sudo_preflight_rejected": true,
+    "cause": "waiting sudo wrapper contains engine-os-manager as a separate argument and is classified as another helper",
+    "verified_before_root_shell_invocation": {
+      "phase": "trial-ready",
+      "request_boot_id": null,
+      "reboot_parameter": "",
+      "pending_jobs": 0
+    },
+    "root_shell_activation": {
+      "schema": 1,
+      "scope": "one-shot reboot job accepted; trial boot, health and normal confirmation remain unobserved",
+      "package_sha256": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
+      "root_install_sha256": "3ea0a680f0d11c11522b51ee9c979210217453f29ab7c1a1c867e1691a274d86",
+      "trial_id": "afef8ee0a7016b1cb1e8516a328367c69576bf3638f929b319ab44333eeb9182",
+      "request_boot_id": "1dee0405-e541-414d-9711-44d237849481",
+      "reboot_job_accepted": true,
+      "automatic_updates_enabled": false
+    }
+  },
+  "trial": {
+    "boot_id": "497ac258-51e5-4273-a883-b777bdd3546a",
+    "slot": "b",
+    "trial_id": "afef8ee0a7016b1cb1e8516a328367c69576bf3638f929b319ab44333eeb9182",
+    "early_watchdog_armed_boottime_ms": 714,
+    "early_watchdog_timeout_seconds": 210,
+    "recovery_blocked_uptime_ms": 5862,
+    "error": "invalid boot evidence: bootstrap completion crossed mounts",
+    "health_window_started": false,
+    "normal_boot_promoted": false,
+    "watchdog_completion_record_present": false,
+    "last_observed_uptime_seconds": 204.4,
+    "additional_manual_reboot_or_watchdog_operation": false
+  },
+  "fallback": {
+    "boot_id": "340070d5-939e-4593-914a-e24ec9b52f12",
+    "slot": "a",
+    "device_number": "8:2",
+    "device_name": "sda2",
+    "firmware_tryboot": false,
+    "early_watchdog_record_present": false,
+    "kiosk_device_service_network_manager_active": true,
+    "administrator_login_and_sudo_passed": true,
+    "cause_assessment": "automatic reset and original-slot return after the unfed 210-second watchdog; exact reset-cause register not captured",
+    "journal_phase": "trial-requested",
+    "journal_still_consumed": true,
+    "installed_recovery_service_still_reports_mount_guard_error": true
+  },
+  "fix": {
+    "path": "crates/engine-ota/src/bootstrap_trial_store.rs",
+    "change": "validate the exact spacewars-system persistent subtree with the existing mount-source checker; retain checks for different directories and filesystems",
+    "new_diagnostic": "crates/engine-ota/examples/bootstrap_inspect_trial.rs",
+    "live_sandbox_checks": {
+      "boot_id": "340070d5-939e-4593-914a-e24ec9b52f12",
+      "binaries": {
+        "before": "a408aebc210f13fc12e2da772cdacef1881be6960f4af5a531534075887c751e",
+        "after": "351d98cf9c020ea65b39b1df861c39c1eee7ff590657205229a67365e23eeeba"
+      },
+      "journal_sha256_before": "f9f8ed32d30df3da790d9d33d9b189ced0bbd19ca91ef6c3435d163efa3698b9",
+      "journal_sha256_after": "f9f8ed32d30df3da790d9d33d9b189ced0bbd19ca91ef6c3435d163efa3698b9",
+      "journal_unchanged": true,
+      "original_failure_reproduced": true,
+      "fixed_exact_subtree_passed": true,
+      "wrong_same_filesystem_directory_rejected": true,
+      "foreign_filesystem_rejected": true,
+      "foreign_filesystem_rejected_by": "existing bootstrap directory opener, before exact-subtree validation",
+      "harness_initial_expected_error_corrected": true,
+      "recovery_policy_executed": false,
+      "watchdog_opened": false,
+      "reboot_requested": false
+    },
+    "production_runtime_replaced": false
+  },
+  "tests": {
+    "ota_unit_passed": 329,
+    "ota_unit_ignored": 8,
+    "manager_unit_passed": 160,
+    "manager_unit_ignored": 2,
+    "clippy_engine_ota_and_manager_all_targets_passed": true,
+    "cargo_fmt_passed": true,
+    "live_sandbox_cases_passed": 4
+  },
+  "automatic_updates_enabled": false,
+  "production_recovery_baseline": false,
+  "full_recovery_qualification": false,
+  "remaining": [
+    "build a clean image containing the mount-check correction",
+    "explicitly reconcile/archive the consumed failed attempt without resetting its allowance",
+    "prepare and observe a separately bound corrected trial",
+    "confirm staged and canonical normal boots and finalize recovery baseline",
+    "repeat on Picade and complete the supervised failure matrix"
+  ],
+  "private_evidence": "target/ota-pi5-replacement-bootstrap-04b6cb7",
+  "private_namespace_regression": "target/ota-trial-subtree-regression-20261017"
+}

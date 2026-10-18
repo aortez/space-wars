@@ -1,0 +1,236 @@
+{
+  "scope": "Actual local warm-cache Yocto build and reusable validator; not publication or device rollout",
+  "source_commit": "7673fa123403f11ecc0f9bed9eab6780fe553280",
+  "policy": {
+    "build_inputs_sha256": "d5f11f41686a96a908d3d5d987d24ccc52bab3e7cb136ced3e6eea90094798b3",
+    "cargo_version": "1.94.0",
+    "cc_version_line": "aarch64-poky-linux-gcc (GCC) 13.5.0",
+    "rust_version": "1.94.0",
+    "schema": 1,
+    "source_commit": "7673fa123403f11ecc0f9bed9eab6780fe553280"
+  },
+  "build_record": {
+    "bytes": 3400,
+    "sha256": "898ca8e06a9d85cc66e242e6ff3eb5291a5e556dcc362277f5fb21b5ed299651"
+  },
+  "gzip": {
+    "bytes": 137672061,
+    "sha256": "10e1462a2f570efcacf8c0b8f84164b26233bf2fbbe9ae1710b344c78109fe55"
+  },
+  "candidate": {
+    "schema": 1,
+    "format": "rootfs-ext4-zstd",
+    "compressed": {
+      "bytes": 131792120,
+      "sha256": "eecfe55d24f628cbd2ab08c6ad578f01b7c71335acb3b1a530c7faaa8b6b9395"
+    },
+    "expanded": {
+      "bytes": 528482304,
+      "sha256": "6c438f63aa823d8a6f0db2cc4f5e3996498e333df36f6e1d764799794be6ba75"
+    }
+  },
+  "qualification": {
+    "schema": 1,
+    "image": {
+      "schema": 1,
+      "build_id": "rootfs-49a49f207fff8d8e043b7873308fd1b841aa5ec36b8d17539d7911699968de6a",
+      "rootfs_tree": "49a49f207fff8d8e043b7873308fd1b841aa5ec36b8d17539d7911699968de6a",
+      "source": {
+        "schema": 1,
+        "commit": "7673fa123403f11ecc0f9bed9eab6780fe553280",
+        "dirty": false,
+        "revision": "7673fa123403"
+      },
+      "machine": "raspberrypi-spacewars",
+      "architecture": "aarch64",
+      "layout": "spacewars-ab-v1",
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "updater_protocol": 1,
+      "recovery_protocol": 2,
+      "data": {
+        "reads": {
+          "min": 1,
+          "max": 1
+        },
+        "writes": 1
+      },
+      "binaries": {
+        "client": {
+          "bytes": 23470072,
+          "sha256": "3e85ca40c3cba5ccca751fc9fbfc8b0e2b6980b00d9091851932b9fe45156182"
+        },
+        "os_manager": {
+          "bytes": 11171072,
+          "sha256": "3480e0f1ba070b3e6e491362737c4f88f12209b8737422c2051c75090037c5de"
+        }
+      }
+    },
+    "build_inputs_sha256": "d5f11f41686a96a908d3d5d987d24ccc52bab3e7cb136ced3e6eea90094798b3",
+    "build_inputs": {
+      "schema": 1,
+      "source_commit": "7673fa123403f11ecc0f9bed9eab6780fe553280",
+      "kas_version": "5.4",
+      "machine": "raspberrypi-spacewars",
+      "target": "spacewars-image",
+      "layers": {
+        "meta-openembedded": {
+          "url": "https://git.openembedded.org/meta-openembedded",
+          "commit": "0f00f8b9a21950640da8c5707343e5540133f86e"
+        },
+        "meta-pi-base": {
+          "url": "https://github.com/aortez/sparkle-duck-shared.git",
+          "commit": "ce48602dfefd4ee7f3d3010086e685ede3fb17b9"
+        },
+        "meta-raspberrypi": {
+          "url": "https://git.yoctoproject.org/meta-raspberrypi",
+          "commit": "018d44467c4f09eb63f8ea5e86e85d755250cf89"
+        },
+        "meta-rust-bin": {
+          "url": "https://github.com/rust-embedded/meta-rust-bin.git",
+          "commit": "eaea247f32f247ab525112d2fbc16e16a553d880"
+        },
+        "poky": {
+          "url": "https://git.yoctoproject.org/poky",
+          "commit": "4fb7016a07507683359ebd620f1951fd5ea44bfa"
+        }
+      },
+      "local_layer": {
+        "path": "yocto/meta-spacewars",
+        "source_commit": "7673fa123403f11ecc0f9bed9eab6780fe553280"
+      },
+      "configuration": {
+        "Cargo.lock": {
+          "bytes": 196778,
+          "sha256": "1e37900a35db9e7834df96b8f6ed560bdfc8426994a57b8474716841b198f45a"
+        },
+        "yocto/kas-spacewars.yml": {
+          "bytes": 4309,
+          "sha256": "13a9799516e99159551dddae7f5350c5eed62e93257ebc1972efccb416c53f39"
+        },
+        "yocto/meta-spacewars/conf/machine/raspberrypi-spacewars.conf": {
+          "bytes": 1765,
+          "sha256": "18da888bd9aa7cea9dfc5278d690e5b69a2df1dd9b4ccdd2b5b6fb30ee4a7d94"
+        }
+      },
+      "expanded_kas_sha256": "587d100f1e322bf3aba0fa51842010c80c063228d7c651e1ff7bd87db5f70409"
+    },
+    "compiler": {
+      "schema": 1,
+      "source": {
+        "schema": 1,
+        "commit": "7673fa123403f11ecc0f9bed9eab6780fe553280",
+        "dirty": false,
+        "revision": "7673fa123403"
+      },
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "profile": "release",
+      "kiosk_feature": "pi-kiosk-gpu",
+      "tools": {
+        "rustc": {
+          "version": "1.94.0",
+          "details": "rustc 1.94.0 (4a4ef493e 2026-03-02)\nbinary: rustc\ncommit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db\ncommit-date: 2026-03-02\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.0\nLLVM version: 21.1.8"
+        },
+        "cargo": {
+          "version": "1.94.0",
+          "details": "cargo 1.94.0 (85eff7c80 2026-01-15)\nrelease: 1.94.0\ncommit-hash: 85eff7c80277b57f78b11e28d14154ab12fcf643\ncommit-date: 2026-01-15\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.3 vendored)\nlibcurl: 8.17.0-DEV (sys:0.4.84+curl-8.17.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 [64-bit]"
+        },
+        "cc": {
+          "details": "aarch64-poky-linux-gcc (GCC) 13.5.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        }
+      }
+    },
+    "expanded": {
+      "bytes": 528482304,
+      "sha256": "6c438f63aa823d8a6f0db2cc4f5e3996498e333df36f6e1d764799794be6ba75"
+    }
+  },
+  "pack_seconds": 74.598,
+  "verify_seconds": 44.15,
+  "expanded_image": "/home/data/workspace/space-wars-ota/target/ota-embedded-image-5za1l6ef/rootfs.ext4",
+  "candidate_directory": "/home/data/workspace/space-wars-ota/target/ota-embedded-candidate",
+  "schema": 1,
+  "validation": {
+    "rust": {
+      "unit": 312,
+      "integration": 22,
+      "cli": 3,
+      "ignored_device_or_opt_in": 8,
+      "status": "pass"
+    },
+    "ci_python": 128,
+    "yocto_javascript": 51,
+    "yocto_python": 81,
+    "clippy": "pass, warnings denied",
+    "formatting": "pass",
+    "msrv": "Rust 1.89, default service and publisher/all targets pass"
+  },
+  "build": {
+    "source": "7673fa123403f11ecc0f9bed9eab6780fe553280",
+    "driver": "local Node/kas wrapper, existing caches",
+    "tasks": 6768,
+    "reused_tasks": 6738,
+    "warnings": [
+      "Ubuntu 26.04 is not a validated Yocto host distribution"
+    ],
+    "embedded_inputs": {
+      "bytes": 1367,
+      "sha256": "d5f11f41686a96a908d3d5d987d24ccc52bab3e7cb136ced3e6eea90094798b3"
+    }
+  },
+  "container_probe": {
+    "image": "ghcr.io/siemens/kas/kas@sha256:0911a72a5474d5287ecf546c9aa039aea0f04326531271996c2efb18a7e9569a",
+    "uid": 30000,
+    "gid": 30000,
+    "kas": "5.4",
+    "python": "3.13.5",
+    "default_seccomp_user_network_namespace": "denied",
+    "seccomp_unconfined_no_caps_no_new_privileges_user_network_namespace": "passed",
+    "mounts": [],
+    "full_build": "not qualified; cold attempt revealed build umask and cache-environment portability problems",
+    "cache_worker_datastore": {
+      "before": {
+        "SPACEWARS_CACHE_ROOT": "/home/data/linux1/yocto-cache",
+        "DL_DIR": "/home/data/linux1/yocto-cache/downloads",
+        "SSTATE_DIR": "/home/data/linux1/yocto-cache/sstate-cache",
+        "CCACHE_DIR": "/home/data/linux1/yocto-cache/.ccache/spacewars-yocto"
+      },
+      "after": {
+        "SPACEWARS_CACHE_ROOT": "/builder/selected-cache",
+        "DL_DIR": "/builder/selected-cache/downloads",
+        "SSTATE_DIR": "/builder/selected-cache/sstate-cache",
+        "CCACHE_DIR": "/builder/selected-cache/.ccache/spacewars-yocto"
+      }
+    }
+  },
+  "device_access": {
+    "spacewars.local": "root SSH denied publickey,password",
+    "sw-picade.local": "root SSH denied publickey,password",
+    "device_writes": false
+  },
+  "logs": [
+    "target/ota-image-candidate-full-tests.log",
+    "target/ota-image-candidate-python-tests.log",
+    "target/ota-image-candidate-yocto-tests.log",
+    "target/ota-image-candidate-clippy.log",
+    "target/ota-image-candidate-msrv.log",
+    "target/ota-image-candidate-default-msrv.log",
+    "target/ota-embedded-image-build.log",
+    "target/ota-embedded-image-audit.log",
+    "target/ota-container-cold-build-first.log",
+    "target/ota-container-cold-build-cache-path.log"
+  ],
+  "limitations": [
+    "Source selected locally; not GitHub/CI production admission.",
+    "No signing, publication, production credentials or device installation.",
+    "No boot-partition validation or Pi runtime result for this image.",
+    "Cold container build and GitHub workflow remain unqualified.",
+    "Compiler/source records and exact-byte verification do not establish that authorized software is harmless."
+  ],
+  "cache_fix_validation": {
+    "ci_build_and_policy_tests": 12,
+    "yocto_javascript": 51,
+    "yocto_python": 81,
+    "status": "pass",
+    "bitbake_datastore_override_after_environment_sanitization": "pass"
+  }
+}

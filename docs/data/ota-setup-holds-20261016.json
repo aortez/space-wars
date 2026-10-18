@@ -1,0 +1,248 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T21:14:41.269788+00:00",
+  "implementation_commit": "1100412ccf4bff1d83dcfac6ac351ff0cfe7f2cc",
+  "scope": "Kiosk setup hold lifecycle around the existing NetworkManager worker, authenticated shared lease client and setup admission without resuming a saved profile conflict.",
+  "validation": {
+    "host_wifi_worker_and_private_bus_tests": 26,
+    "host_manager_network_tests": 56,
+    "host_shared_client_tests": 3,
+    "host_incidental_time_tests": 2,
+    "explicit_root_namespace_interoperability_tests": 1,
+    "pi_manager_network_tests_each": 56,
+    "pi_shared_client_tests_each": 3,
+    "manager_fixture_entrypoints_each": 1,
+    "root_interoperability_ignored_on_ordinary_pi_runs": true,
+    "manager_and_control_msrv": "1.89.0",
+    "manager_and_control_clippy_warnings_denied": true,
+    "client_clippy_exit_code": 0,
+    "client_clippy_note": "Existing warnings in other client files remain; no diagnostic mentions the changed network files. This was not a warnings-denied client run.",
+    "kiosk_feature_check": "engine-client --no-default-features --features pi-kiosk-gpu --all-targets, host compilation only; existing extracted libseat/libinput development metadata under target/ota-host-tools supplied through PKG_CONFIG_PATH. No system packages installed.",
+    "kiosk_feature_check_exit_code": 0,
+    "kiosk_feature_check_note": "Existing unreachable-pattern warning in vendored Slint LinuxKMS backend. This is a type check, not a linked/deployed kiosk client or new image.",
+    "manager_and_control_aarch64_compiled": true,
+    "format_checked": true
+  },
+  "contracts": {
+    "setup_lease_seconds": 120,
+    "panel_or_cleanup_renew_interval_seconds": 30,
+    "mutations_recheck_admission": true,
+    "release_only_after_worker_cleanup": true,
+    "heartbeat_includes_device_sleep": true,
+    "request_budget_seconds": 42,
+    "release_budget_seconds": 5,
+    "response_bytes": 16384,
+    "root_peer_checked_before_capability": true,
+    "capability_reused_across_lifecycle": true,
+    "desktop_requires_device_service": false,
+    "kiosk_requires_device_service": true,
+    "setup_clears_profile_suspension": false
+  },
+  "properties_exercised": [
+    "Denied setup admission performs no automatic scan or connection mutation. A lost admission response still triggers a bounded release attempt with the same capability.",
+    "Closing the panel keeps protection while the existing worker rolls back. Renewal continues during delayed cleanup; release follows rollback completion.",
+    "Renewal failure closes the command channel, lets the existing transaction cancel and rollback, then releases. It does not drop the connection future mid-trial.",
+    "Mode Off leaves an independently disabled radio untouched while setup-protected allows ordinary saved-profile management. Wireless-ready remains a distinct actual radio result.",
+    "A profile conflict permits setup with a confirmed live radio but remains suspended after renewal/release. Rejected, uncertain or unmatched radio commands still refuse admission.",
+    "The shared client reuses its capability, requires a root peer before writing it, bounds framing/deadlines and rejects malformed, incomplete, unconfirmed and Ethernet-only setup replies.",
+    "The real shared client exchanges Admit/Renew/Release with the real coordinator and fake radio inside a root user namespace. It preserves profile suspension and detects lost temporary ownership after service restart.",
+    "Both Pis ran the manager and shared-client fixtures as UID 1000 using only private state, sockets and fake D-Bus/radio backends. Device boot identities stayed unchanged."
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "temporary_directory": "/tmp/spacewars-setup-hold.tBzgje",
+      "temporary_free_bytes_before": 315305984,
+      "artifacts": {
+        "manager": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-setup-hold-manager-tests",
+          "sha256": "587c8e21f5c49d2c254642bcbe49e6b26528206dcd846a1f7c9ed056e42d1bbd",
+          "bytes": 9314288,
+          "expected_passed": 56
+        },
+        "client": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-setup-hold-client-tests",
+          "sha256": "dbc1423b1babdca72de201df1af6952d2342faed6a11e8f9d6d265c62ddf99d1",
+          "bytes": 3610512,
+          "expected_passed": 3
+        }
+      },
+      "runs": {
+        "manager": {
+          "exit_code": 0,
+          "log": "target/ota-setup-hold-pi5-manager.log",
+          "result": "test result: ok. 56 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 8.28s"
+        },
+        "client": {
+          "exit_code": 0,
+          "log": "target/ota-setup-hold-pi5-client.log",
+          "result": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.05s"
+        }
+      },
+      "real_radio_changes": false,
+      "installed_service_changes": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "temporary_directory": "/tmp/spacewars-setup-hold.dVhKhj",
+      "temporary_free_bytes_before": 3783946240,
+      "artifacts": {
+        "manager": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-setup-hold-manager-tests",
+          "sha256": "587c8e21f5c49d2c254642bcbe49e6b26528206dcd846a1f7c9ed056e42d1bbd",
+          "bytes": 9314288,
+          "expected_passed": 56
+        },
+        "client": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-setup-hold-client-tests",
+          "sha256": "dbc1423b1babdca72de201df1af6952d2342faed6a11e8f9d6d265c62ddf99d1",
+          "bytes": 3610512,
+          "expected_passed": 3
+        }
+      },
+      "runs": {
+        "manager": {
+          "exit_code": 0,
+          "log": "target/ota-setup-hold-pi4-manager.log",
+          "result": "test result: ok. 56 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 11.92s"
+        },
+        "client": {
+          "exit_code": 0,
+          "log": "target/ota-setup-hold-pi4-client.log",
+          "result": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.06s"
+        }
+      },
+      "real_radio_changes": false,
+      "installed_service_changes": false
+    }
+  ],
+  "limits": [
+    "No kiosk client, image, service, live network setting, root/boot/data partition or watchdog changed. No reboot or deliberate live radio failure was performed.",
+    "Setup hold integration requires the matching device service image. It has not been physically exercised through the UI on either Pi, and existing prepared bootstrap kits predate this work.",
+    "Expected setup profile changes remain conservative conflicts; finishing setup does not silently accept their baseline. Automatic policy needs explicit resume until that coordination is implemented.",
+    "The root interoperability check uses a user namespace and fake radio, not root access or native radio control on either physical Pi.",
+    "Clock code uses CLOCK_BOOTTIME for renewal scheduling and response-age checks, but this checkpoint did not physically suspend a device to qualify that behavior.",
+    "Deployment holds, supported SSH idle classification, daily scheduling, signing/feed, downloader, install policy and end-to-end OTA qualification remain outstanding."
+  ],
+  "logs": {
+    "wifi_worker": {
+      "path": "target/ota-setup-hold-worker-tests.log",
+      "bytes": 8782,
+      "sha256": "c2862d17a646616b1bcb8d079c65ba99cf08c59815e2927afa2b3999e2333d0f",
+      "test_results": [
+        "test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 672 filtered out; finished in 0.20s"
+      ]
+    },
+    "service_and_shared_client": {
+      "path": "target/ota-setup-hold-service-tests.log",
+      "bytes": 7977,
+      "sha256": "98fa51d3e0588c6e1fc04cda50c102d0104fbf38fa7facb20b476330dff7db0a",
+      "test_results": [
+        "test result: ok. 56 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 18.65s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.05s"
+      ]
+    },
+    "root_interoperability": {
+      "path": "target/ota-setup-hold-root.log",
+      "bytes": 209,
+      "sha256": "89667d548dcc5c5d88f7b41524be8ffdfcdfd16e8a2afdb640d68e6c370bd421",
+      "test_results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 74 filtered out; finished in 0.31s"
+      ]
+    },
+    "manager_and_control_clippy": {
+      "path": "target/ota-setup-hold-clippy.log",
+      "bytes": 367,
+      "sha256": "7c487a2fcfec95aed828b71ffcd2cd83d77b6f5ba53055339297c9d60a8e921d"
+    },
+    "client_clippy": {
+      "path": "target/ota-setup-hold-client-clippy.log",
+      "bytes": 33489,
+      "sha256": "6066cb1f95864ba2147ce87b94185ae2d4f1d49eb64f208d825967df3b6da155"
+    },
+    "manager_and_control_msrv": {
+      "path": "target/ota-setup-hold-msrv.log",
+      "bytes": 274,
+      "sha256": "ce9c4411ed2c757123aa0e8344d93d135e02f50f075a8e6f865d4d1a1dc03ff7"
+    },
+    "kiosk_feature_check": {
+      "path": "target/ota-setup-hold-kiosk-check.log",
+      "bytes": 646,
+      "sha256": "4e7a44b9187446613a93120415da051f0043fa8f7bd926eb35e512097acf490b"
+    },
+    "aarch64": {
+      "path": "target/ota-setup-hold-aarch64.log",
+      "bytes": 275,
+      "sha256": "a6bb09d5042a5672ea3a21e2c128db780477746d677b101a7e94b4b79b0ed578"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-setup-hold-aarch64.jsonl",
+      "bytes": 209299,
+      "sha256": "2e015b7b51b3a8964f176779b77e239f69d9c24d3c9f4a73dc6882b2fa579372"
+    },
+    "format": {
+      "path": "target/ota-setup-hold-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "root_runner": {
+      "path": "target/ota-setup-hold-root.py",
+      "bytes": 972,
+      "sha256": "6229828378ae460501251aa31f270e17f8e25a1ee9c2e624395953c4a259ee62"
+    },
+    "device_runner": {
+      "path": "target/ota-setup-hold-pis.py",
+      "bytes": 3201,
+      "sha256": "5944416f216dcb3125efd9d2a88e5c7d65840fd3a52262056c86f1f59b9cf205"
+    },
+    "device_run": {
+      "path": "target/ota-setup-hold-pis.log",
+      "bytes": 739,
+      "sha256": "71820cc5f3649e4f2653f31cc37a35e23e1732b82cfcabadff0410de54978121"
+    },
+    "pi5_manager": {
+      "path": "target/ota-setup-hold-pi5-manager.log",
+      "bytes": 6197,
+      "sha256": "673a3097aee78fc15aebd446d85d6da009bb0341a0891232e9f2788299bdd5b8",
+      "test_results": [
+        "test result: ok. 56 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 8.28s"
+      ]
+    },
+    "pi5_shared_client": {
+      "path": "target/ota-setup-hold-pi5-client.log",
+      "bytes": 377,
+      "sha256": "5662a891a0164c8b84c5c08c11d3b77b4464029663c8159175351f488bb1d698",
+      "test_results": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.05s"
+      ]
+    },
+    "pi4_manager": {
+      "path": "target/ota-setup-hold-pi4-manager.log",
+      "bytes": 6198,
+      "sha256": "33014cc75c987ebc775d154813ab8ae52767228c988a3145ea2037f8c07e55ed",
+      "test_results": [
+        "test result: ok. 56 passed; 0 failed; 1 ignored; 0 measured; 18 filtered out; finished in 11.92s"
+      ]
+    },
+    "pi4_shared_client": {
+      "path": "target/ota-setup-hold-pi4-client.log",
+      "bytes": 377,
+      "sha256": "b884ab7e29a4f4497832bf6276a11932461bbbfc1b99c21c0666c359bc2fe9fa",
+      "test_results": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.06s"
+      ]
+    }
+  }
+}

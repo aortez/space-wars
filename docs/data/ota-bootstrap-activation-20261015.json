@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T04:51:44.992955+00:00",
+  "implementation_commit": "1aed0da42cae66064ed21acd257f92ed52a52a04",
+  "scope": "Supervised root-only one-shot activation of an existing ready bootstrap stage. Durable attempt consumption precedes a fixed systemd reboot request; failure and lost replies never grant an automatic retry. No live trial or production OTA authority was exercised.",
+  "host_validation": {
+    "ota_tests_passed": 233,
+    "manager_tests_passed": 39,
+    "ordinary_suite_ignored": 8,
+    "yocto_tests_passed": 71,
+    "yocto_sandbox_required": true,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "format": "passed",
+    "aarch64_ota_manager_tests_and_command_build": "passed",
+    "selected_tests_on_workspace_ext4": 11,
+    "selected_ext4_seconds": 5.99,
+    "commands": [
+      "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+      "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+      "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+      "cargo fmt --all -- --check",
+      "SPACEWARS_REQUIRE_UPDATE_SANDBOX=1 python3 -m unittest discover -s yocto/tests -p '*_test.py'",
+      "cargo test --locked -p engine-ota -p engine-os-manager --target aarch64-unknown-linux-gnu --no-run --message-format=json",
+      "TMPDIR=/home/data/workspace/space-wars-ota/target/ota-bootstrap-activation-tmp target/debug/deps/engine_ota-6f09450237c0bb77 bootstrap::activation bootstrap::quiesce bootstrap::root_install::tests::staging_requires bootstrap::tests::linux::bootstrap_requires --test-threads=1"
+    ]
+  },
+  "pi5_validation": {
+    "remote_directory": "/tmp/spacewars-bootstrap-activation.p8iZ8R",
+    "uid": 1000,
+    "boot_id_before_and_after": "de606400-dc75-446e-b26b-385592b0f562",
+    "artifacts": {
+      "ota_tests": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f7c7f1697874a6b9",
+        "bytes": 81591776,
+        "sha256": "28e8bed1c7fbd96ff0020acfaffecff9dcbcc96cd2c5115cd04b02aee56da27a"
+      },
+      "manager_tests": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_os_manager-27536c227643c67f",
+        "bytes": 103103944,
+        "sha256": "7aa7b486f617e9e6d22ac7b9a09333f013cc4465cb3d03fbddc783ec09ceb9ee"
+      },
+      "manager_command": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/engine-os-manager",
+        "bytes": 121239848,
+        "sha256": "933014a9cd2a26e394b620b77557b7c63389ca7d65114ecdb9c15ebf287e0a57"
+      }
+    },
+    "artifact_build_state": "Debug executables built from the source working tree subsequently committed as implementation_commit. They are not a clean Yocto runtime image.",
+    "ota_selected_tests_passed": 11,
+    "manager_selected_tests_passed": 1,
+    "ignored": 0,
+    "ota_elapsed_test_seconds": 27.64,
+    "manager_elapsed_test_seconds": 0.8,
+    "ota_filters": [
+      "bootstrap::activation",
+      "bootstrap::quiesce",
+      "bootstrap::root_install::tests::staging_requires",
+      "bootstrap::tests::linux::bootstrap_requires"
+    ],
+    "manager_filter": "bootstrap_activation",
+    "actual_command": "./engine-os-manager bootstrap-activate --package invalid --written-root invalid --trial invalid --ssh-connection invalid",
+    "actual_command_denial": "device mutations require the root-owned service\nactivation_command_exit=1",
+    "scope": "Ordinary-user temporary journals, synthetic process/boot evidence, small ext4 fixtures and a private session D-Bus with fake logind/PID1. The real CLI rejects UID 1000 before digest parsing, installed paths or system-bus access. No live reboot request or privileged adapter ran."
+  },
+  "contract": {
+    "package_schema": 3,
+    "bootstrap_protocol": 2,
+    "trial_journal_schema": 2,
+    "runtime_marker": {
+      "schema": 1,
+      "protocol": 2
+    },
+    "fixed_reboot_parameter": "0 tryboot",
+    "fixed_systemd_unit": "reboot.target",
+    "fixed_systemd_mode": "replace-irreversibly",
+    "bus_call_and_initial_connection_timeout_seconds": 2,
+    "new_runtime_image_or_kits_built": false
+  },
+  "covered_cases": [
+    "Request publication and flush precede reboot authority; interrupted publication cannot release an action. Reopened requested or failed attempts cannot be resent.",
+    "Staging and request boot IDs are distinct evidence. Trial or normal health cannot describe either originating boot; old/missing/malformed request evidence is rejected.",
+    "Failed guards, lost replies, omitted requests/jobs and simulated process loss preserve attempt consumption or leave an untouched ready stage when no request was persisted.",
+    "Private D-Bus fixtures cover the exact successful sequence, occupied/changed parameters, durable-begin failure, both authorization failures, rejected/retained parameters, denied/lost job replies, lost setter replies, failure-storage errors and rejected cleanup. Failure persistence precedes cleanup; foreign parameters are left unchanged.",
+    "The process gate permits only the current manager activation command, while still rejecting another manager, wrappers/other helper arguments, runtime-account threads and unclaimed writable block devices.",
+    "Completed-root receipt observation remains read-only. Actual small ext4 inspection rejects the old bootstrap runtime protocol. The existing staging and recovery suites continue to pass."
+  ],
+  "limits": [
+    "The full fixed-path privileged admission, actual raw target claim, effective live access checks, staged FAT tree and system-bus activation have not run on either Pi.",
+    "A bus deadline does not cancel a delivered request. An accepted reply does not prove reboot; abrupt process death can leave a consumed journal and volatile reboot parameter. No automatic retry or reconciliation is provided; uncertain outcomes require the independent operator recovery connection.",
+    "Only bus operations have the stated timeout. Synchronous media/access validation is not covered by an overall activation deadline.",
+    "No installed Pi root, boot file, service, persistent store, radio state, watchdog or reboot was changed. Only temporary ordinary-user test artifacts were written on Pi 5; Pi 4 was not exercised.",
+    "Fixture faults, private D-Bus replies and simulated process loss do not qualify FAT power loss, actual watchdog expiry/handoff, bad-root startup or physical reset recovery.",
+    "No clean protocol-2 runtime image or schema-3 kits have been built. Existing c14c53f/schema-2 artifacts predate this implementation and must not be relabeled.",
+    "Root connection details, independent live exports/restore rehearsal, effective privilege closure and actual root/runtime logins, live root installation/staging/trial, canonical migration and explicit production baseline remain outstanding.",
+    "Both-board hardware failure qualification and end-to-end feed, service, radio, scheduling and UI integration remain required before automatic update rollout."
+  ],
+  "logs": {
+    "host": {
+      "path": "target/ota-bootstrap-activation-tests.log",
+      "bytes": 30932,
+      "sha256": "2ff5365414c56d249ed5a9e35983b8ebcd83c1755408170976813fa034e78978",
+      "test_results": [
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.18s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.54s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 211 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 95.62s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-bootstrap-activation-clippy.log",
+      "bytes": 454,
+      "sha256": "b652bfd480cae5455f322e114f67bfeb87f2b282172fed6ae1ffc1e6529233cc"
+    },
+    "msrv": {
+      "path": "target/ota-bootstrap-activation-msrv.log",
+      "bytes": 260,
+      "sha256": "a659f230e1026670c819aac39fee29eac57bc921ddba009b223dd09456b13c5f"
+    },
+    "format": {
+      "path": "target/ota-bootstrap-activation-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "yocto": {
+      "path": "target/ota-bootstrap-activation-yocto.log",
+      "bytes": 171,
+      "sha256": "b4a32b53e6aeaf1ee9bf7f88b3692f446ec2b4dc6659e5c5f1afb27e2a972e88",
+      "test_results": [
+        "Ran 71 tests in 28.982s"
+      ]
+    },
+    "aarch64": {
+      "path": "target/ota-bootstrap-activation-aarch64.log",
+      "bytes": 261,
+      "sha256": "902656af1e95d18c9b47269eb304da30d8bab71ed70572581d3973df796ea3cd"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-bootstrap-activation-aarch64.jsonl",
+      "bytes": 224659,
+      "sha256": "96037ce8f34e367136e1a6244c7698d3e438a17e0d5aedd0825d3c8ae6247796"
+    },
+    "host_ext4": {
+      "path": "target/ota-bootstrap-activation-ext4.log",
+      "bytes": 1308,
+      "sha256": "092f73546f1cc27c1d01308a2ac9b546db7b2358c5ab4835223bc0c5b4a767f9",
+      "test_results": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 208 filtered out; finished in 5.99s"
+      ]
+    },
+    "pi5": {
+      "path": "target/ota-bootstrap-activation-pi5.log",
+      "bytes": 1981,
+      "sha256": "a5211f0a5c786f3be9274aa849cdb72dbb268f9c1a0650cd90c756f643a6aa44",
+      "test_results": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 208 filtered out; finished in 27.64s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.80s"
+      ]
+    }
+  }
+}

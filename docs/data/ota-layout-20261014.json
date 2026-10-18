@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "date": "2026-10-14",
+  "base_commit": "90150a3",
+  "scope": "Eight Linux layout fixtures and a read-only probe on both boards. Only proc/sysfs/udev/filesystem metadata read. No block device opened, partition written, watchdog opened, boot files changed or reboot requested. Not recovery qualification.",
+  "binaries": {
+    "recovery-probe": {
+      "bytes": 1502704,
+      "sha256": "1a24c5d5b914baee2c33e073ca8904f41c68e0e61ec8e4904a7bc0903f8f86ac"
+    },
+    "layout-tests": {
+      "bytes": 3051616,
+      "sha256": "d56040d07eb63b1e8ecf67c13570a2942dcd4ff9100e9322c91212b79c146eee"
+    }
+  },
+  "sources": {
+    "crates/engine-ota/src/lib.rs": "4b6edec5bd10a52b2c17f325aac40093c315df0e68c70db6026d9530f5e480f6",
+    "crates/engine-ota/src/recovery_linux.rs": "acb5181ed97cf41bcb06ac3d91d33eafd7a9be3636dd3d9d749d0dd1b985a3c2",
+    "crates/engine-ota/src/recovery_linux_tests.rs": "fe1e9fbcc96ad7c74589f3faaa1730bf1887f8e5005e4f70da87cc69a4035f1d",
+    "crates/engine-ota/examples/recovery_probe.rs": "3d2d72c814deea566d92e0c513dfe5ecf3f085d4af50e27417e218d815e61d8d"
+  },
+  "boards": {
+    "sw-picade.local": {
+      "exit_code": 0,
+      "output": "\nrunning 8 tests\ntest recovery_linux::tests::cloned_disk_uuid_cannot_hide_behind_the_single_udev_alias ... ok\ntest recovery_linux::tests::even_a_read_only_inactive_mount_prevents_installation ... ok\ntest recovery_linux::tests::different_disk_data_bind_mounts_duplicates_and_unknown_root_fail_closed ... ok\ntest recovery_linux::tests::layout_identity_survives_device_enumeration_but_changes_with_geometry_or_uuid ... ok\ntest recovery_linux::tests::mounted_device_numbers_choose_both_slots_without_parsing_name_suffixes ... ok\ntest recovery_linux::tests::overlapping_out_of_disk_duplicate_and_unequal_partitions_are_rejected ... ok\ntest recovery_linux::tests::root_selectors_are_strict_and_duplicate_root_arguments_are_rejected ... ok\ntest recovery_linux::tests::malformed_or_oversized_kernel_evidence_is_rejected ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.05s\n\n{\n  \"disk_name\": \"sda\",\n  \"disk_device\": {\n    \"major\": 8,\n    \"minor\": 0\n  },\n  \"disk_sectors\": 121691328,\n  \"active\": \"a\",\n  \"partitions\": [\n    {\n      \"number\": 1,\n      \"name\": \"sda1\",\n      \"device\": {\n        \"major\": 8,\n        \"minor\": 1\n      },\n      \"start_sector\": 8192,\n      \"sectors\": 307200,\n      \"partuuid\": \"076c4a2a-01\"\n    },\n    {\n      \"number\": 2,\n      \"name\": \"sda2\",\n      \"device\": {\n        \"major\": 8,\n        \"minor\": 2\n      },\n      \"start_sector\": 319488,\n      \"sectors\": 6291456,\n      \"partuuid\": \"076c4a2a-02\"\n    },\n    {\n      \"number\": 3,\n      \"name\": \"sda3\",\n      \"device\": {\n        \"major\": 8,\n        \"minor\": 3\n      },\n      \"start_sector\": 6610944,\n      \"sectors\": 6291456,\n      \"partuuid\": \"076c4a2a-03\"\n    },\n    {\n      \"number\": 4,\n      \"name\": \"sda4\",\n      \"device\": {\n        \"major\": 8,\n        \"minor\": 4\n      },\n      \"start_sector\": 12902400,\n      \"sectors\": 96619765,\n      \"partuuid\": \"076c4a2a-04\"\n    }\n  ],\n  \"layout_id\": \"1ef0a255d427187ef02f8f96b6ca13faa7972ad5d1ada82c774868454c3d4d6c\"\n}\n"
+    },
+    "spacewars.local": {
+      "exit_code": 0,
+      "output": "\nrunning 8 tests\ntest recovery_linux::tests::cloned_disk_uuid_cannot_hide_behind_the_single_udev_alias ... ok\ntest recovery_linux::tests::even_a_read_only_inactive_mount_prevents_installation ... ok\ntest recovery_linux::tests::different_disk_data_bind_mounts_duplicates_and_unknown_root_fail_closed ... ok\ntest recovery_linux::tests::layout_identity_survives_device_enumeration_but_changes_with_geometry_or_uuid ... ok\ntest recovery_linux::tests::root_selectors_are_strict_and_duplicate_root_arguments_are_rejected ... ok\ntest recovery_linux::tests::overlapping_out_of_disk_duplicate_and_unequal_partitions_are_rejected ... ok\ntest recovery_linux::tests::mounted_device_numbers_choose_both_slots_without_parsing_name_suffixes ... ok\ntest recovery_linux::tests::malformed_or_oversized_kernel_evidence_is_rejected ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.02s\n\n{\n  \"disk_name\": \"sda\",\n  \"disk_device\": {\n    \"major\": 8,\n    \"minor\": 0\n  },\n  \"disk_sectors\": 240328704,\n  \"active\": \"b\",\n  \"partitions\": [\n    {\n      \"number\": 1,\n      \"name\": \"sda1\",\n      \"device\": {\n        \"major\": 8,\n        \"minor\": 1\n      },\n      \"start_sector\": 8192,\n      \"sectors\": 307200,\n      \"partuuid\": \"076c4a2a-01\"\n    },\n    {\n      \"number\": 2,\n      \"name\": \"sda2\",\n      \"device\": {\n        \"major\": 8,\n        \"minor\": 2\n      },\n      \"start_sector\": 319488,\n      \"sectors\": 6291456,\n      \"partuuid\": \"076c4a2a-02\"\n    },\n    {\n      \"number\": 3,\n      \"name\": \"sda3\",\n      \"device\": {\n        \"major\": 8,\n        \"minor\": 3\n      },\n      \"start_sector\": 6610944,\n      \"sectors\": 6291456,\n      \"partuuid\": \"076c4a2a-03\"\n    },\n    {\n      \"number\": 4,\n      \"name\": \"sda4\",\n      \"device\": {\n        \"major\": 8,\n        \"minor\": 4\n      },\n      \"start_sector\": 12902400,\n      \"sectors\": 203393401,\n      \"partuuid\": \"076c4a2a-04\"\n    }\n  ],\n  \"layout_id\": \"7b0a4016a278673bfaf5c36314be8199016dea5c2ba6c1660b52b585f49081c5\"\n}\n"
+    }
+  }
+}

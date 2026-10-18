@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T00:48:26.209821+00:00",
+  "implementation_commit": "437369c1315ac5f3bb72d1fc0e1d87b80e51defc",
+  "scope": "Immutable original-file preparation and independent export verification for the fixed fallback-root migration paths. No live legacy-root replacement, privilege closure or installed-device preparation occurred.",
+  "host_validation": {
+    "ota_tests_passed": 162,
+    "manager_tests_passed": 38,
+    "selected_preservation_tests_passed_including_optional_bind_fixture": 10,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "aarch64_tests_and_examples": "built",
+    "fault_scope": "Injected failures at preservation checkpoints before and after publication, plus changing sources during copy and immediately before publication; not physical power-loss qualification",
+    "bind_fixture_scope": "Self-bind of a temporary source directory and file in a private user/mount namespace; verifies rejection even when device/inode are unchanged"
+  },
+  "pi5_validation": {
+    "uid": 1000,
+    "fixture_tests_passed": 19,
+    "optional_namespace_tests_ignored": 2,
+    "elapsed_seconds": 0.44,
+    "remote_directory": "/tmp/spacewars-legacy-prepare.GJ0bEB",
+    "test_binary": {
+      "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f7c7f1697874a6b9",
+      "sha256": "b3a187a9e38e5be12ba240ab2f381dc698a2afdb325eb0c6430aa4064d0c465f"
+    },
+    "command_binary": {
+      "path": "target/aarch64-unknown-linux-gnu/debug/examples/bootstrap_prepare_legacy",
+      "sha256": "5af4f4bcbdb44da2a0c33722ee79b19768acb3f5c66a486e8b535e7e91efe103"
+    },
+    "preparation_rejected_without_root": true,
+    "boot_id_unchanged": "de606400-dc75-446e-b26b-385592b0f562",
+    "scope": "Temporary regular-file and layout fixtures only, plus the actual non-root entry-point refusal",
+    "capacity_observation": [
+      "Filesystem      Size  Used Avail Use% Mounted on",
+      "tmpfs           3.9G  1.1G  2.9G  28% /tmp",
+      "/dev/sda4        94G  1.2G   88G   2% /data"
+    ]
+  },
+  "device_mutations": {
+    "temporary_uid_1000_fixture_binaries": true,
+    "installed_legacy_files": false,
+    "root_preparation": false,
+    "live_original_file_capture": false,
+    "service_or_radio_changes": false,
+    "boot_remount": false,
+    "raw_partition_write": false,
+    "watchdog_open": false,
+    "reboot": false,
+    "credential_contents_read": false
+  },
+  "artifact_scope": {
+    "new_runtime_image_built": false,
+    "latest_validated_runtime_image_source": "c14c53f53012722e653c303834499906393fe2cb",
+    "schema_2_packages_unchanged": [
+      "target/ota-bootstrap-c14c53f-pi5-v2",
+      "target/ota-bootstrap-c14c53f-pi4-v2"
+    ],
+    "new_commands_are_separately_built_operator_examples": true
+  },
+  "remaining": [
+    "Root connections and supervised live backup/original capture with independent exports",
+    "Durable replacement intent/progress and conflict-aware resume for the fallback root",
+    "Drain legacy helpers, close effective runtime privileges, validate sudo/SSH/systemd and both intended login roles",
+    "Inactive-root write, staged trial, local persistent-store health and watchdog handoff",
+    "Confirmed normal and canonical boot migration, explicit recovery baseline",
+    "Physical Pi 4/5 failure qualification and end-to-end feed/updater/policy/UI integration"
+  ],
+  "logs": {
+    "host": {
+      "path": "target/ota-legacy-prepare-host.log",
+      "sha256": "d78c0c41ed4ce249ff19c0f5549779b892a149191ae7873b6d5e1dba42d5b7e3",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.32s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.48s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 140 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 23.98s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "targeted-final": {
+      "path": "target/ota-legacy-prepare-targeted-final.log",
+      "sha256": "a6a5c3182a83206f1279573de7181a61aff845d941036c3baea51797c0485517",
+      "test_results": [
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 137 filtered out; finished in 0.11s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy-final": {
+      "path": "target/ota-legacy-prepare-clippy-final.log",
+      "sha256": "ff7d37a093a1c05bb574ecf13de61936d902ad50da9d699c375bec118710056c"
+    },
+    "msrv-final": {
+      "path": "target/ota-legacy-prepare-msrv-final.log",
+      "sha256": "6c51f0061509514221c656120258348ff1bf130b219d599e591da4f2658428bd"
+    },
+    "aarch64": {
+      "path": "target/ota-legacy-prepare-aarch64.log",
+      "sha256": "16af5e7e68ee8f016c00a592fffd4b75195cb9547eb8616f6786aefec986685d"
+    },
+    "pi5-tests": {
+      "path": "target/ota-legacy-prepare-pi5-tests.log",
+      "sha256": "500d59432521a8a2ecb98be458dccf325379ec9d34dc08fe84ae472e42371d13",
+      "test_results": [
+        "test result: ok. 19 passed; 0 failed; 2 ignored; 0 measured; 126 filtered out; finished in 0.44s"
+      ]
+    },
+    "pi5-denial": {
+      "path": "target/ota-legacy-prepare-pi5-denial.log",
+      "sha256": "a2fe1c8b5f69df030c1d6dd5858052d8d438e27556269cf87252ee0fcbd79517"
+    },
+    "pi5-observation": {
+      "path": "target/ota-legacy-prepare-pi5-observation.log",
+      "sha256": "9f7c6f14fd3edc65efe16572a9770134ca7968b4c54e679d80b93974d95b372d"
+    },
+    "pi5-capacity": {
+      "path": "target/ota-legacy-prepare-pi5-capacity.log",
+      "sha256": "c3ea816a126e128bfca950cd55e9e3841d39afc568bbf158d8d8a0e31661b492"
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "cargo test --locked -p engine-ota bootstrap::legacy -- --include-ignored --test-threads=1",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "cargo test --locked -p engine-ota -p engine-os-manager --target aarch64-unknown-linux-gnu --no-run",
+    "On Pi 5 as UID 1000: test binary bootstrap::legacy_state::tests recovery_linux::tests --test-threads=1"
+  ]
+}

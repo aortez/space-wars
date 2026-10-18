@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-15T23:30:04.545620+00:00",
+  "implementation_commit": "c14c53f53012722e653c303834499906393fe2cb",
+  "scope": "One-time seeded network-profile import and startup ordering, validated in fixtures and a clean rootfs artifact. No installed Pi network, boot, access, data or service configuration was changed.",
+  "host_validation": {
+    "ota_tests_passed": 140,
+    "manager_tests_passed": 38,
+    "yocto_node_tests_passed": 38,
+    "yocto_python_tests_passed": 63,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "aarch64_all_targets": "built"
+  },
+  "pi5_fixture_validation": {
+    "source_commit": "c14c53f53012722e653c303834499906393fe2cb",
+    "binary": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f3dd7bc01771d740",
+    "sha256": "ea180992f15fea4cb0d97ee72d289057e74bfb32342146047011f52096772e7a",
+    "remote_binary": "/tmp/ota-network-tests-aarch64",
+    "scope": "Synthetic profile fixtures as UID 1000; no installed network configuration access",
+    "tests_passed": 6,
+    "elapsed_seconds": 0.02
+  },
+  "packaged_pi5_validation": {
+    "source": {
+      "commit": "c14c53f53012722e653c303834499906393fe2cb",
+      "dirty": false,
+      "revision": "c14c53f53012",
+      "schema": 1
+    },
+    "build_id": "rootfs-6aaf7ad17c4d58851034ab15986b1fcd29f5efb49a8c22ae5ea0cc89cc1ba855",
+    "packaged_manager_sha256": "2e9124f58fb0ccc24557ef99e986fb2008752188df597d9fbf8e6c728560d87f",
+    "uid": 1000,
+    "privileged_command_rejected": true,
+    "boot_id_unchanged": "de606400-dc75-446e-b26b-385592b0f562",
+    "boot_inventory_unchanged_files": 101,
+    "physical_layout_kernel_profile_unchanged": true,
+    "scope": "Packaged binary loader/privilege denial and read-only inventory; no installed service or configuration changes"
+  },
+  "preservation_inventory": {
+    "read_only_metadata": [
+      "2052:8650754 700 0:0 directory /data/NetworkManager/system-connections",
+      "2052:8650754 700 0:0 directory /etc/NetworkManager/system-connections",
+      "2052:12058625 700 0:0 directory /data/bluetooth",
+      "2052:12058625 700 0:0 directory /var/lib/bluetooth",
+      "2052:7077889 700 0:0 directory /data/ssh",
+      "2051:186 755 0:0 directory /etc/ssh"
+    ],
+    "network_and_bluetooth_persistent_paths_match_runtime_device_and_inode": true,
+    "credential_contents_read": false
+  },
+  "artifact_validation": {
+    "image_build_id": "rootfs-6aaf7ad17c4d58851034ab15986b1fcd29f5efb49a8c22ae5ea0cc89cc1ba855",
+    "source": {
+      "commit": "c14c53f53012722e653c303834499906393fe2cb",
+      "dirty": false,
+      "revision": "c14c53f53012",
+      "schema": 1
+    },
+    "rootfs": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015232147.ext4.gz",
+      "compressed_bytes": 134038532,
+      "compressed_sha256": "cbee5c7807cdc854612103af40cc11b13ce0e24daf2e31a28f9c91ded832f538",
+      "expanded_bytes": 520093696,
+      "expanded_sha256": "cc3d206b235b11d3c7e234cd7901140176ff51d5c85738fef6485f1b2af83731"
+    },
+    "boot_probe": {
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "hardware_profile": "hdmi",
+      "immutable_bytes": 85396458,
+      "immutable_files": 103,
+      "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+      "provisioned_default": null,
+      "trial": null
+    },
+    "audit_directory": "target/ota-boot-audit-cr8p04bv",
+    "network_packaging": {
+      "source": {
+        "commit": "c14c53f53012722e653c303834499906393fe2cb",
+        "dirty": false,
+        "revision": "c14c53f53012",
+        "schema": 1
+      },
+      "build_id": "rootfs-6aaf7ad17c4d58851034ab15986b1fcd29f5efb49a8c22ae5ea0cc89cc1ba855",
+      "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-cr8p04bv",
+      "exact_sources_and_root_owned_units": {
+        "usr/lib/systemd/system/persistent-data-bind.service": "6d67bf00d6e6417b6f14e9069fc0507b830f543e2c5050b8f02fae34e84fd810",
+        "usr/lib/systemd/system/NetworkManager.service.d/spacewars-persistent-network.conf": "34599163e3d657ef2ba6ab13aee6950a177e218c6a3a7bd10b431742365c8028",
+        "usr/lib/systemd/system/spacewars-access.service": "e617915f9413df0c16045996160eaca0b904cda7c435a200970368dc57aebc80",
+        "usr/lib/systemd/system/spacewars-recovery.service": "12d357408f6fb6a0a1357b2322577a83feb3fa8b25577d3f93fa6a4ade774f3d",
+        "usr/sbin/persistent-data-init": "05c5fa83114629af914f448d97f6009f720b65614d713e2658a1e813b982e2e5"
+      },
+      "empty_image_profile_directory": true,
+      "no_persistent_profile_store_shipped": true,
+      "bind_service_enabled": true,
+      "scope": "Packaged bytes, ownership and service dependencies; no installed Pi configuration changes"
+    },
+    "all_build_tasks_succeeded": true,
+    "systemd_verify": "passed; host systemd 259 reports two pre-existing !! modifier notices for the pinned systemd 255 units",
+    "build_repository_commits": {
+      "poky": {
+        "commit": "4fb7016a07507683359ebd620f1951fd5ea44bfa",
+        "dirty": false
+      },
+      "meta-raspberrypi": {
+        "commit": "018d44467c4f09eb63f8ea5e86e85d755250cf89",
+        "dirty": false
+      },
+      "meta-openembedded": {
+        "commit": "0f00f8b9a21950640da8c5707343e5540133f86e",
+        "dirty": false
+      },
+      "meta-rust-bin": {
+        "commit": "eaea247f32f247ab525112d2fbc16e16a553d880",
+        "dirty": false
+      },
+      "meta-pi-base": {
+        "commit": "ce48602dfefd4ee7f3d3010086e685ede3fb17b9",
+        "dirty": false
+      }
+    },
+    "build_notices": "KAS warns about branch-only repository configuration; exact clean revisions are recorded here. Yocto also warns that Ubuntu 26.04 is not a validated build host."
+  },
+  "device_mutations": {
+    "installed_configuration": false,
+    "network_state": false,
+    "boot_remount": false,
+    "root_preparation": false,
+    "raw_partition_write": false,
+    "watchdog_open": false,
+    "reboot": false,
+    "temporary_uid_1000_fixture_binaries": true
+  },
+  "remaining": [
+    "Root connection and supervised preparation on both Pis",
+    "Independent data/configuration preservation copies",
+    "Legacy fallback-root profile importer replacement and unsigned-update/reboot privilege closure",
+    "Bootstrap installation, health/handoff, canonical boot migration and recovery baseline",
+    "Trial health checks for local persistent stores/binds; Internet availability must remain independent",
+    "Physical interruption and recovery qualification on both Pis"
+  ],
+  "logs": {
+    "ota-network-host.log": {
+      "path": "target/ota-network-host.log",
+      "sha256": "8035fd50f3db262a9e264077ce51f61af5947c8306078675eefe841e6e54f020",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.77s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.60s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 118 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 17.30s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "ota-network-clippy.log": {
+      "path": "target/ota-network-clippy.log",
+      "sha256": "74798ef7de8623aeed047e131845df0488db85ddbb90209a3f816d55b055a99b"
+    },
+    "ota-network-msrv.log": {
+      "path": "target/ota-network-msrv.log",
+      "sha256": "ccbb8c477b937d16f5fb7933118c6812cb88a17715dd06f7b1341f1ae068ff1f"
+    },
+    "ota-network-aarch64.log": {
+      "path": "target/ota-network-aarch64.log",
+      "sha256": "c678c3bdbd25495125013b53aa49e37090d5a35f8561d0abb8be24096e360d11"
+    },
+    "ota-network-yocto-tests.log": {
+      "path": "target/ota-network-yocto-tests.log",
+      "sha256": "98f1b3f6b133090b1c0197a6f4c155aec5fa8882072761d8241ae220fc527d4e"
+    },
+    "ota-network-pi5-tests.log": {
+      "path": "target/ota-network-pi5-tests.log",
+      "sha256": "1b4d60006098f746657b6c26fe8d514f029bbce87cc88687a5f88cff40e071ee",
+      "test_results": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 116 filtered out; finished in 0.02s"
+      ]
+    },
+    "ota-network-image-build.log": {
+      "path": "target/ota-network-image-build.log",
+      "sha256": "db4bb2cb073743d7dd4b90e5ae501df2b9fa0c5fa7f8ca14938f850052e01f25"
+    },
+    "ota-network-artifact-audit.log": {
+      "path": "target/ota-network-artifact-audit.log",
+      "sha256": "e4bb1b2525fc0c6d6858a6d02a9090489ced7ed3ce1d5643b5a8ab3b4a141eeb"
+    },
+    "ota-network-access-audit.log": {
+      "path": "target/ota-network-access-audit.log",
+      "sha256": "d390b1eeef9162f821ec6ccd87c22c4976fa4e6df6550560a1f3576a94e8485c"
+    },
+    "ota-network-image-audit.log": {
+      "path": "target/ota-network-image-audit.log",
+      "sha256": "05f2b3fb63702b5cfa19e7498fee70716ce9f600afe0c865e9c1df8b4adca828"
+    },
+    "ota-network-systemd.log": {
+      "path": "target/ota-network-systemd.log",
+      "sha256": "b6233b53e2f79bb6edc301096656364a25ac9e75f47056e83fb654bd43d62f9a"
+    },
+    "ota-network-packaged-pi5.log": {
+      "path": "target/ota-network-packaged-pi5.log",
+      "sha256": "cbb636dbe6bd411350aa2b979a5dcd1ae62a0b47d7c961c274988834016e147c"
+    },
+    "ota-network-pi5-inventory.json": {
+      "path": "target/ota-network-pi5-inventory.json",
+      "sha256": "fbf87c828b7ce79b39709874e0873e12b33296b329823644f731f15de112811c"
+    },
+    "ota-bootstrap-preservation-pi5-probe.log": {
+      "path": "target/ota-bootstrap-preservation-pi5-probe.log",
+      "sha256": "7f6776db73016d2c29b0b57bf56f773848125d7797ece5ad19c54e83457fe468"
+    }
+  }
+}

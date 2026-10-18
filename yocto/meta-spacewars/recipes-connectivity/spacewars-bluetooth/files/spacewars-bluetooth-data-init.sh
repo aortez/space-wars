@@ -10,9 +10,22 @@ if [ -L "$source" ] || [ -L "$destination" ]; then
     echo "Refusing symlinked Bluetooth state directories" >&2
     exit 1
 fi
-install -d -m 0700 "$source"
+
+for state in /data/spacewars-bootstrap /data/spacewars-system; do
+    if [ -L "$state" ] || { [ -e "$state" ] && [ ! -d "$state" ]; }; then
+        echo "Invalid persistent migration state" >&2
+        exit 1
+    fi
+done
 
 if [ ! -e "$destination" ]; then
+    for record in /data/spacewars-bootstrap/active /data/spacewars-system/recovery; do
+        if [ -e "$record" ] || [ -L "$record" ]; then
+            echo "Missing Bluetooth store during migration or after provisioning" >&2
+            exit 1
+        fi
+    done
+    install -d -m 0700 "$source"
     # Publish the complete migration atomically. A failed/interrupted copy must
     # not become the authoritative persistent state on the next boot.
     migration=$(mktemp -d /data/.spacewars-bluetooth.XXXXXXXX)
@@ -31,3 +44,4 @@ fi
 [ -d "$destination" ] || { echo "Invalid Bluetooth data directory" >&2; exit 1; }
 chmod 0700 "$destination"
 chown root:root "$destination"
+install -d -m 0700 "$source"

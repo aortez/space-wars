@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "date": "2026-10-14",
+  "base_commit": "8b1b8da22e0d376b06f93ec58ff0381a083a96df",
+  "scope": "Signed metadata and image-contract fixtures only; no installed rootfs changes or boot/recovery qualification.",
+  "compiler": "rustc 1.94.1 (e408947bf 2026-03-25)",
+  "build_command": "cargo test --locked -p engine-ota --test verification --target aarch64-unknown-linux-gnu --no-run",
+  "binary_sha256": "88f829ab9b732123e9648100242c7b0fb3d861e3574f18e1f25cafd40090acb2",
+  "source_sha256": {
+    "Cargo.toml": "a5dfd51d2285ac3519d4ef99bd633cdff96d0bb9a725adfc397fbacb8ff3c171",
+    "Cargo.lock": "673c5e7c729a4eb51a9a75741fade9540e4b7c070464717874119d051e7a0700",
+    "vendor/tough/src/lib.rs": "12b7f6a248355ae3af9f95f22eb428520ca7d92c6fe9c27bd9594183d9ca30a8",
+    "vendor/tough/src/datastore.rs": "6346a45e52ca3526749f47b6de2f92b372c6fec436af31f4569fd4ac63ae9c9b",
+    "vendor/tough/Cargo.toml": "be4af2eda713f17687e9361d1ae070a82b3c9aa53e12d8d5b39881ac87833f73",
+    "crates/engine-ota/Cargo.toml": "f9ee25816b95fcc692d94809b1ab9494078be7d66b199827ef4add61f9575e0d",
+    "crates/engine-ota/src/contract.rs": "e753572f2b27c3241654a1e14df2bbbecc0cba4d0f647b30ac555911e02365ab",
+    "crates/engine-ota/src/lib.rs": "412da7e34bce26c6c65c58183c7f3e6dec033a7dd061d30fb9285895cc311bc3",
+    "crates/engine-ota/src/repository.rs": "6538a25c5e3a2de539a0f83a77aa7157abd584513e1a4a204f11f255915f5f06",
+    "crates/engine-ota/src/store.rs": "b204863c675798e5211c4957f9cd1dd35847f642d2a844e15d770c8d3c14f4a4",
+    "crates/engine-ota/tests/support/mod.rs": "260c6ebeca80c371d2b7e98dc888df47747c8f8a83c78de80d46dbaf5ea05b6c",
+    "crates/engine-ota/tests/verification.rs": "112d1a34f6cdcd374ab9c3e5f45089db2d79b6956e0a2f0b930f624fe885b452"
+  },
+  "host_validation": [
+    "cargo test --locked -p engine-ota: 21 passed",
+    "cargo clippy --locked -p engine-ota --all-targets --no-deps -- -D warnings: passed",
+    "cargo +1.89.0 check --locked -p engine-ota: passed",
+    "cargo check --locked -p engine-ota --target aarch64-unknown-linux-gnu: passed"
+  ],
+  "devices": [
+    {
+      "host": "sw-picade.local",
+      "model": "Raspberry Pi 4 Model B Rev 1.4",
+      "kernel": "6.6.63-v8",
+      "os": "Poky 5.0.18 scarthgap",
+      "command": "/tmp/spacewars-ota-verification-254 --test-threads=2",
+      "exit_code": 0,
+      "output": "88f829ab9b732123e9648100242c7b0fb3d861e3574f18e1f25cafd40090acb2  /tmp/spacewars-ota-verification-254\n\nrunning 21 tests\ntest caller_readable_or_symlinked_trust_state_is_rejected ... ok\ntest cancelled_metadata_check_still_retains_observed_time ... ok\ntest compatibility_and_downgrade_gates_return_specific_reasons ... ok\ntest compatible_generation_is_retained_when_a_new_boot_image_is_published ... ok\ntest corrupt_truncated_and_oversized_payloads_are_rejected ... ok\ntest feed_endpoints_require_https_without_credentials_or_path_ambiguity ... ok\ntest accepted_root_rotation_is_retained_across_restart_and_offline_validation ... ok\ntest image_identity_survives_promotion_and_rejects_relabelled_generations ... ok\ntest metadata_size_is_bounded_before_parsing ... ok\ntest interrupted_new_publication_invalidates_old_evidence_but_preserves_the_new_version_floor ... ok\ntest quarantined_newest_image_does_not_fall_back_to_an_older_download ... ok\ntest replay_after_restart_is_rejected_without_discarding_the_current_cached_feed ... ok\ntest removing_a_candidate_from_a_new_feed_revokes_its_cached_approval ... ok\ntest signature_threshold_requires_distinct_authorized_signatures ... ok\ntest signed_channels_and_offline_install_survive_reopening_the_store ... ok\ntest signed_feed_cannot_escape_the_channel_or_image_contract ... ok\ntest signed_unsupported_schema_is_not_an_installable_candidate ... ok\ntest structurally_valid_storage_corruption_cannot_reset_trust_history ... ok\ntest trust_store_is_exclusive_and_corruption_does_not_rebootstrap ... ok\ntest unknown_expired_and_backwards_time_never_accept_metadata ... ok\ntest signed_metadata_lengths_cannot_override_the_local_size_limit ... ok\n\ntest result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.44s\n\n"
+    },
+    {
+      "host": "spacewars.local",
+      "model": "Raspberry Pi 5 Model B Rev 1.1",
+      "kernel": "6.6.63-v8",
+      "os": "Poky 5.0.18 scarthgap",
+      "command": "/tmp/spacewars-ota-verification-254 --test-threads=2",
+      "exit_code": 0,
+      "output": "88f829ab9b732123e9648100242c7b0fb3d861e3574f18e1f25cafd40090acb2  /tmp/spacewars-ota-verification-254\n\nrunning 21 tests\ntest caller_readable_or_symlinked_trust_state_is_rejected ... ok\ntest cancelled_metadata_check_still_retains_observed_time ... ok\ntest compatibility_and_downgrade_gates_return_specific_reasons ... ok\ntest compatible_generation_is_retained_when_a_new_boot_image_is_published ... ok\ntest corrupt_truncated_and_oversized_payloads_are_rejected ... ok\ntest feed_endpoints_require_https_without_credentials_or_path_ambiguity ... ok\ntest accepted_root_rotation_is_retained_across_restart_and_offline_validation ... ok\ntest image_identity_survives_promotion_and_rejects_relabelled_generations ... ok\ntest interrupted_new_publication_invalidates_old_evidence_but_preserves_the_new_version_floor ... ok\ntest metadata_size_is_bounded_before_parsing ... ok\ntest quarantined_newest_image_does_not_fall_back_to_an_older_download ... ok\ntest replay_after_restart_is_rejected_without_discarding_the_current_cached_feed ... ok\ntest removing_a_candidate_from_a_new_feed_revokes_its_cached_approval ... ok\ntest signature_threshold_requires_distinct_authorized_signatures ... ok\ntest signed_channels_and_offline_install_survive_reopening_the_store ... ok\ntest signed_feed_cannot_escape_the_channel_or_image_contract ... ok\ntest signed_unsupported_schema_is_not_an_installable_candidate ... ok\ntest structurally_valid_storage_corruption_cannot_reset_trust_history ... ok\ntest trust_store_is_exclusive_and_corruption_does_not_rebootstrap ... ok\ntest unknown_expired_and_backwards_time_never_accept_metadata ... ok\ntest signed_metadata_lengths_cannot_override_the_local_size_limit ... ok\n\ntest result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s\n\n"
+    }
+  ]
+}
