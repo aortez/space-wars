@@ -705,10 +705,18 @@ impl<B: Backend> Runner<B> {
                         .preparation_retry
                         .as_ref()
                         .is_none_or(|r| now.ms >= r.after_ms)
+                        && network
+                            .status
+                            .actual
+                            .as_ref()
+                            .is_some_and(|radio| !radio.startup)
                         && (active.trigger == schedule::Trigger::Manual
                             || !partial
                             || opportunity != Opportunity::None)
                     {
+                        // Policy can be known before NM supplies its first
+                        // usable radio observation. Wait within this attempt's
+                        // original deadline before preparing or requesting a hold.
                         // A previous time offer is not authority for a later
                         // partial-offline wake. Require a fresh opportunity.
                         self.start(active, &status, &network, offer.as_ref(), handle)?;
