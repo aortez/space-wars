@@ -1,0 +1,839 @@
+{
+  "source_commit": "919afba21a103ab81e87201f1db877c910e6dcbb",
+  "capture_method": "Normal manual Duck trigger, seeded selection, Platforms course and explicit profile; entrance direction varied before start. No test body placement, forced support or movement/ledge commands. Local raster and Slint SVG/native-text exports, not device GPU screenshots.",
+  "reading": "10:08",
+  "date": "2026-10-17",
+  "stills_source_frames": 108,
+  "local_still_pngs": 216,
+  "clip_source_frames": 69,
+  "local_clip_pngs": 138,
+  "clip_fps": 20,
+  "clip_first_tick": 36,
+  "clip_last_tick": 240,
+  "max_sampled_bodies": 6,
+  "max_sampled_colliders": 6,
+  "max_sampled_detour_queries": 35,
+  "completed_attempt_ticks": [
+    201,
+    202,
+    206
+  ],
+  "artifacts": [
+    {
+      "file": "flap-detour-800x480-left-Careful-hang-raster.png",
+      "width": 800,
+      "height": 480,
+      "adapter": "raster",
+      "stage": "hang",
+      "tick": 62,
+      "seed": 12884901889,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -400000,
+              -167600
+            ],
+            "hold": "attachment",
+            "open_milli": 1000,
+            "requested_open_milli": 750,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": false,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": [
+            -366000,
+            -157040
+          ],
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 2,
+          "climbs": 0,
+          "cooldown_ticks": 0,
+          "phase": "hanging",
+          "progress_milli": 0,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": 2100
+        },
+        "left_to_right": true,
+        "navigation": {
+          "behavior": "seeking-support",
+          "body_radius_milli": 8000,
+          "calibrated_jumps": 0,
+          "course_seed": 12884901889,
+          "exit_visible": false,
+          "facing_right": false,
+          "flap_detour": {
+            "attempts": 1,
+            "clearance_queries": 0,
+            "outcome": null,
+            "perch_ticks": 0,
+            "phase": "recovering",
+            "ticks": 22
+          },
+          "flight_ticks": null,
+          "jump_height_milli": null,
+          "jump_profile": "careful",
+          "ledge": {
+            "active": true,
+            "attempt_ticks": 13,
+            "attempts": 1,
+            "candidates_checked": 0,
+            "completed": 0,
+            "cooldown_ticks": 0,
+            "failed": 0,
+            "hang_ticks": 0,
+            "outcome": null,
+            "target_body": 2100
+          },
+          "planning": {
+            "acceleration_milli": null,
+            "confirmed_landings": 0,
+            "fallback_course": false,
+            "flowing_fallbacks": 0,
+            "generation_attempts": 2,
+            "moving_landings": 0,
+            "overshoots": 0,
+            "pattern": "platforms",
+            "plan": null,
+            "rejected_plans": 0,
+            "rejection": null,
+            "running_jumps": 0,
+            "skipped_platforms": 0,
+            "support": null,
+            "surface_count": 4,
+            "undershoots": 0,
+            "wrong_surface_landings": 0
+          },
+          "recovery": {
+            "active": false,
+            "escape_jumps": 0,
+            "interrupted_jumps": 0,
+            "lost_support": 0,
+            "no_target_ticks": 0,
+            "recoveries": 0,
+            "target_surface": null,
+            "ticks": 0,
+            "unstable_support": 0,
+            "wrong_landings": 0
+          },
+          "run_speed_milli": null,
+          "spawned_ticks": 26,
+          "speed_samples": 0,
+          "target_obstacle": null,
+          "wall_tags": [
+            0,
+            0
+          ],
+          "water": {
+            "interruptions": 0,
+            "paddling_ticks": 0,
+            "recoveries": 0,
+            "recovering_ticks": 0,
+            "target_surface": null
+          }
+        },
+        "obstacle_count": 3,
+        "outcome": null,
+        "position_milli": [
+          -357007,
+          -164349
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 26,
+          "submerged_milli": 0,
+          "tick": 62,
+          "velocity_milli": [
+            -722,
+            3287
+          ]
+        }
+      },
+      "sha256": "1201ed97389690c78a543e285fcad5ca8a77a31194aa50628749a596c0c6772a"
+    },
+    {
+      "file": "flap-detour-800x480-left-Careful-perch-raster.png",
+      "width": 800,
+      "height": 480,
+      "adapter": "raster",
+      "stage": "perch",
+      "tick": 158,
+      "seed": 12884901889,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -400000,
+              -167600
+            ],
+            "hold": "standing",
+            "open_milli": 1000,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": true,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 0,
+          "climbs": 1,
+          "cooldown_ticks": 0,
+          "phase": "free",
+          "progress_milli": 1000,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": true,
+        "navigation": {
+          "behavior": "landing",
+          "body_radius_milli": 8000,
+          "calibrated_jumps": 0,
+          "course_seed": 12884901889,
+          "exit_visible": false,
+          "facing_right": true,
+          "flap_detour": {
+            "attempts": 1,
+            "clearance_queries": 0,
+            "outcome": null,
+            "perch_ticks": 18,
+            "phase": "perching",
+            "ticks": 118
+          },
+          "flight_ticks": null,
+          "jump_height_milli": null,
+          "jump_profile": "careful",
+          "ledge": {
+            "active": false,
+            "attempt_ticks": 91,
+            "attempts": 1,
+            "candidates_checked": 0,
+            "completed": 1,
+            "cooldown_ticks": 42,
+            "failed": 0,
+            "hang_ticks": 18,
+            "outcome": "climbed",
+            "target_body": null
+          },
+          "planning": {
+            "acceleration_milli": null,
+            "confirmed_landings": 0,
+            "fallback_course": false,
+            "flowing_fallbacks": 0,
+            "generation_attempts": 2,
+            "moving_landings": 0,
+            "overshoots": 0,
+            "pattern": "platforms",
+            "plan": null,
+            "rejected_plans": 0,
+            "rejection": null,
+            "running_jumps": 0,
+            "skipped_platforms": 0,
+            "support": null,
+            "surface_count": 4,
+            "undershoots": 0,
+            "wrong_surface_landings": 0
+          },
+          "recovery": {
+            "active": false,
+            "escape_jumps": 0,
+            "interrupted_jumps": 0,
+            "lost_support": 0,
+            "no_target_ticks": 0,
+            "recoveries": 0,
+            "target_surface": null,
+            "ticks": 0,
+            "unstable_support": 0,
+            "wrong_landings": 0
+          },
+          "run_speed_milli": null,
+          "spawned_ticks": 122,
+          "speed_samples": 0,
+          "target_obstacle": null,
+          "wall_tags": [
+            0,
+            0
+          ],
+          "water": {
+            "interruptions": 0,
+            "paddling_ticks": 0,
+            "recoveries": 0,
+            "recovering_ticks": 0,
+            "target_surface": null
+          }
+        },
+        "obstacle_count": 3,
+        "outcome": null,
+        "position_milli": [
+          -377998,
+          -149059
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 122,
+          "submerged_milli": 0,
+          "tick": 158,
+          "velocity_milli": [
+            0,
+            0
+          ]
+        }
+      },
+      "sha256": "004095a8e0ae0a03e2c6f98ab7b6a9bc4300342b255d26c96eea2681f8e18a90"
+    },
+    {
+      "file": "flap-detour-1024x768-right-Flowing-perch-vector.png",
+      "width": 1024,
+      "height": 768,
+      "adapter": "vector",
+      "stage": "perch",
+      "tick": 159,
+      "seed": 12884901889,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": -1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              320000,
+              -174400
+            ],
+            "hold": "standing",
+            "open_milli": 1000,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              -320000,
+              -174400
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": true,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 0,
+          "climbs": 1,
+          "cooldown_ticks": 0,
+          "phase": "free",
+          "progress_milli": 1000,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": false,
+        "navigation": {
+          "behavior": "landing",
+          "body_radius_milli": 6400,
+          "calibrated_jumps": 0,
+          "course_seed": 12884901889,
+          "exit_visible": false,
+          "facing_right": false,
+          "flap_detour": {
+            "attempts": 1,
+            "clearance_queries": 0,
+            "outcome": null,
+            "perch_ticks": 18,
+            "phase": "perching",
+            "ticks": 119
+          },
+          "flight_ticks": null,
+          "jump_height_milli": null,
+          "jump_profile": "flowing",
+          "ledge": {
+            "active": false,
+            "attempt_ticks": 90,
+            "attempts": 1,
+            "candidates_checked": 0,
+            "completed": 1,
+            "cooldown_ticks": 42,
+            "failed": 0,
+            "hang_ticks": 18,
+            "outcome": "climbed",
+            "target_body": null
+          },
+          "planning": {
+            "acceleration_milli": null,
+            "confirmed_landings": 0,
+            "fallback_course": false,
+            "flowing_fallbacks": 0,
+            "generation_attempts": 2,
+            "moving_landings": 0,
+            "overshoots": 0,
+            "pattern": "platforms",
+            "plan": null,
+            "rejected_plans": 0,
+            "rejection": null,
+            "running_jumps": 0,
+            "skipped_platforms": 0,
+            "support": null,
+            "surface_count": 4,
+            "undershoots": 0,
+            "wrong_surface_landings": 0
+          },
+          "recovery": {
+            "active": false,
+            "escape_jumps": 0,
+            "interrupted_jumps": 0,
+            "lost_support": 0,
+            "no_target_ticks": 0,
+            "recoveries": 0,
+            "target_surface": null,
+            "ticks": 0,
+            "unstable_support": 0,
+            "wrong_landings": 0
+          },
+          "run_speed_milli": null,
+          "spawned_ticks": 123,
+          "speed_samples": 0,
+          "target_obstacle": null,
+          "wall_tags": [
+            0,
+            0
+          ],
+          "water": {
+            "interruptions": 0,
+            "paddling_ticks": 0,
+            "recoveries": 0,
+            "recovering_ticks": 0,
+            "target_surface": null
+          }
+        },
+        "obstacle_count": 3,
+        "outcome": null,
+        "position_milli": [
+          302398,
+          -157455
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 123,
+          "submerged_milli": 0,
+          "tick": 159,
+          "velocity_milli": [
+            0,
+            0
+          ]
+        }
+      },
+      "sha256": "0397b737ec04ce88db2956a436f48096b07ab2d52665d0678da4c6b81b4adc85"
+    },
+    {
+      "file": "flap-detour-480x800-left-Flowing-return-vector.png",
+      "width": 480,
+      "height": 800,
+      "adapter": "vector",
+      "stage": "return",
+      "tick": 181,
+      "seed": 12884901889,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -144000,
+              -189360
+            ],
+            "hold": "standing",
+            "open_milli": 1000,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              144000,
+              -189360
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": false,
+        "jumps": 2,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 0,
+          "climbs": 1,
+          "cooldown_ticks": 0,
+          "phase": "free",
+          "progress_milli": 1000,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": true,
+        "navigation": {
+          "behavior": "landing",
+          "body_radius_milli": 2880,
+          "calibrated_jumps": 0,
+          "course_seed": 12884901889,
+          "exit_visible": false,
+          "facing_right": true,
+          "flap_detour": {
+            "attempts": 1,
+            "clearance_queries": 0,
+            "outcome": null,
+            "perch_ticks": 36,
+            "phase": "returning",
+            "ticks": 141
+          },
+          "flight_ticks": null,
+          "jump_height_milli": null,
+          "jump_profile": "flowing",
+          "ledge": {
+            "active": false,
+            "attempt_ticks": 90,
+            "attempts": 1,
+            "candidates_checked": 0,
+            "completed": 1,
+            "cooldown_ticks": 23,
+            "failed": 0,
+            "hang_ticks": 18,
+            "outcome": "climbed",
+            "target_body": null
+          },
+          "planning": {
+            "acceleration_milli": null,
+            "confirmed_landings": 0,
+            "fallback_course": false,
+            "flowing_fallbacks": 0,
+            "generation_attempts": 2,
+            "moving_landings": 0,
+            "overshoots": 0,
+            "pattern": "platforms",
+            "plan": null,
+            "rejected_plans": 0,
+            "rejection": null,
+            "running_jumps": 0,
+            "skipped_platforms": 0,
+            "support": null,
+            "surface_count": 4,
+            "undershoots": 0,
+            "wrong_surface_landings": 0
+          },
+          "recovery": {
+            "active": false,
+            "escape_jumps": 0,
+            "interrupted_jumps": 0,
+            "lost_support": 0,
+            "no_target_ticks": 0,
+            "recoveries": 0,
+            "target_surface": null,
+            "ticks": 0,
+            "unstable_support": 0,
+            "wrong_landings": 0
+          },
+          "run_speed_milli": null,
+          "spawned_ticks": 145,
+          "speed_samples": 0,
+          "target_obstacle": null,
+          "wall_tags": [
+            0,
+            0
+          ],
+          "water": {
+            "interruptions": 0,
+            "paddling_ticks": 0,
+            "recoveries": 0,
+            "recovering_ticks": 0,
+            "target_surface": null
+          }
+        },
+        "obstacle_count": 3,
+        "outcome": null,
+        "position_milli": [
+          -135791,
+          -178204
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 145,
+          "submerged_milli": 0,
+          "tick": 181,
+          "velocity_milli": [
+            11520,
+            56294
+          ]
+        }
+      },
+      "sha256": "02dbe7c9925a69316c6b34628df5182cfac3c4211741ab87a8cc626e95e8ecfd"
+    },
+    {
+      "file": "flap-detour-800x480-return-mid-raster.png",
+      "width": 800,
+      "height": 480,
+      "adapter": "raster",
+      "stage": "return-midflight",
+      "tick": 201,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 0,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              -400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": false,
+        "jumps": 2,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 0,
+          "climbs": 1,
+          "cooldown_ticks": 0,
+          "phase": "free",
+          "progress_milli": 1000,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": true,
+        "navigation": {
+          "behavior": "landing",
+          "body_radius_milli": 8000,
+          "calibrated_jumps": 0,
+          "course_seed": 12884901889,
+          "exit_visible": false,
+          "facing_right": true,
+          "flap_detour": {
+            "attempts": 1,
+            "clearance_queries": 0,
+            "outcome": null,
+            "perch_ticks": 36,
+            "phase": "returning",
+            "ticks": 161
+          },
+          "flight_ticks": null,
+          "jump_height_milli": null,
+          "jump_profile": "careful",
+          "ledge": {
+            "active": false,
+            "attempt_ticks": 91,
+            "attempts": 1,
+            "candidates_checked": 0,
+            "completed": 1,
+            "cooldown_ticks": 0,
+            "failed": 0,
+            "hang_ticks": 18,
+            "outcome": "climbed",
+            "target_body": null
+          },
+          "planning": {
+            "acceleration_milli": null,
+            "confirmed_landings": 0,
+            "fallback_course": false,
+            "flowing_fallbacks": 0,
+            "generation_attempts": 2,
+            "moving_landings": 0,
+            "overshoots": 0,
+            "pattern": "platforms",
+            "plan": null,
+            "rejected_plans": 0,
+            "rejection": null,
+            "running_jumps": 0,
+            "skipped_platforms": 0,
+            "support": null,
+            "surface_count": 4,
+            "undershoots": 0,
+            "wrong_surface_landings": 0
+          },
+          "recovery": {
+            "active": false,
+            "escape_jumps": 0,
+            "interrupted_jumps": 0,
+            "lost_support": 0,
+            "no_target_ticks": 0,
+            "recoveries": 0,
+            "target_surface": null,
+            "ticks": 0,
+            "unstable_support": 0,
+            "wrong_landings": 0
+          },
+          "run_speed_milli": null,
+          "spawned_ticks": 165,
+          "speed_samples": 0,
+          "target_obstacle": null,
+          "wall_tags": [
+            0,
+            0
+          ],
+          "water": {
+            "interruptions": 0,
+            "paddling_ticks": 0,
+            "recoveries": 0,
+            "recovering_ticks": 0,
+            "target_surface": null
+          }
+        },
+        "obstacle_count": 3,
+        "outcome": null,
+        "position_milli": [
+          -351865,
+          -113437
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 165,
+          "submerged_milli": 0,
+          "tick": 201,
+          "velocity_milli": [
+            64000,
+            -3628
+          ]
+        }
+      },
+      "sha256": "36b2678e3dc9ced6fa7fe5f52b5b27a545dc86d9aefb36a6659147338a570638"
+    }
+  ],
+  "animation": {
+    "file": "flap-detour-800x480.gif",
+    "sha256": "e3f3ad770ff7906c827aa978ae0c4afba3f5f66da8a0ff0037f1a4fc3e285f6d",
+    "width": 800,
+    "height": 480,
+    "duration": "3.450000",
+    "nb_frames": "69",
+    "method": "ffmpeg image sequence at 20 fps, palettegen/paletteuse, no resizing or frame interpolation"
+  }
+}
