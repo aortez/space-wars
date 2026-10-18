@@ -9,6 +9,8 @@ StartLimitBurst=3
 [Service]
 Type=simple
 ExecStart=/usr/bin/engine-os-manager serve
+# Pin the host namespace before dropping process-inspection privileges.
+OpenFile=/proc/1/ns/net:spacewars-host-netns:read-only
 User=root
 Group=spacewars
 UMask=0077

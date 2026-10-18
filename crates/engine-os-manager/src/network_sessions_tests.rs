@@ -76,6 +76,61 @@ fn truncated_malformed_or_oversized_tcp_tables_cannot_report_idle() {
     }
 }
 
+#[test]
+fn namespace_handoff_requires_this_process_and_exact_named_descriptor() {
+    let pid = std::process::id().to_string();
+    assert!(namespace_descriptor(&pid, "1", HOST_NAMESPACE_NAME));
+    for (owner, count, names) in [
+        ("", "1", HOST_NAMESPACE_NAME),
+        ("0", "1", HOST_NAMESPACE_NAME),
+        ("1", "1", HOST_NAMESPACE_NAME),
+        (&pid, "0", HOST_NAMESPACE_NAME),
+        (&pid, "2", HOST_NAMESPACE_NAME),
+        (&pid, "999999999999", HOST_NAMESPACE_NAME),
+        (&pid, "1", "connection"),
+        (&pid, "1", ""),
+        (&pid, "1", "spacewars-host-netns:connection"),
+    ] {
+        assert!(!namespace_descriptor(owner, count, names));
+    }
+}
+
+#[test]
+fn namespace_handoff_pins_kernel_identity_and_closes_in_exec_children() {
+    let source = File::open("/proc/self/ns/net").unwrap();
+    // Simulate a descriptor handed to exec by systemd, without CLOEXEC.
+    let fd = unsafe { libc::fcntl(source.as_raw_fd(), libc::F_DUPFD, 3) };
+    assert!(fd >= 3);
+    // SAFETY: F_DUPFD returned a fresh descriptor owned by this test.
+    let inherited = unsafe { <File as std::os::fd::FromRawFd>::from_raw_fd(fd) };
+    let pinned = namespace_file(inherited.as_raw_fd()).unwrap();
+    for file in [&inherited, &pinned] {
+        assert_ne!(
+            unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFD) } & libc::FD_CLOEXEC,
+            0
+        );
+    }
+    drop(inherited);
+    assert!(same_namespace(&pinned, Path::new("/proc/self/ns/net")));
+    assert!(!same_namespace(&pinned, Path::new("/proc/self/ns/mnt")));
+    assert!(!same_namespace(&pinned, Path::new("/missing-namespace")));
+}
+
+#[test]
+fn namespace_handoff_rejects_regular_files_other_namespaces_and_sockets() {
+    let regular = tempfile::tempfile().unwrap();
+    let mount = File::open("/proc/self/ns/mnt").unwrap();
+    let (socket, _peer) = std::os::unix::net::UnixStream::pair().unwrap();
+    for fd in [
+        regular.as_raw_fd(),
+        mount.as_raw_fd(),
+        socket.as_raw_fd(),
+        -1,
+    ] {
+        assert!(namespace_file(fd).is_none());
+    }
+}
+
 struct PrivateBus(Child, String);
 impl PrivateBus {
     fn new() -> Self {

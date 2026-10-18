@@ -157,6 +157,8 @@ enum CanonicalCommand {
 }
 
 fn main() -> ExitCode {
+    #[cfg(target_os = "linux")]
+    engine_os_manager::network_sessions::initialize_host_namespace();
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())

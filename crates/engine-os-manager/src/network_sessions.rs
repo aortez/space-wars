@@ -3,11 +3,13 @@
 use crate::{Error, Result};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
+use std::sync::OnceLock;
 use std::time::Duration;
 use zbus::zvariant::{OwnedObjectPath, OwnedValue};
 
@@ -15,6 +17,8 @@ const NAME: &str = "org.freedesktop.systemd1";
 const ROOT: &str = "/org/freedesktop/systemd1";
 const TEMPLATE: &str = "sshd@spacewars-network-check.service";
 const DEADLINE: Duration = Duration::from_secs(5);
+const HOST_NAMESPACE_NAME: &str = "spacewars-host-netns";
+static HOST_NAMESPACE: OnceLock<Option<File>> = OnceLock::new();
 type Fields = HashMap<String, OwnedValue>;
 type UnitRow = (
     String,
@@ -51,6 +55,61 @@ struct Tcp {
     active: usize,
     ssh: usize,
     other_listeners: usize,
+}
+
+fn namespace_descriptor(pid: &str, count: &str, names: &str) -> bool {
+    pid.parse::<u32>().ok() == Some(std::process::id())
+        && count == "1"
+        && names == HOST_NAMESPACE_NAME
+}
+
+fn namespace_file(fd: i32) -> Option<File> {
+    // Reopen our own descriptor with CLOEXEC; keep the namespace pinned so its
+    // inode cannot be recycled. Do not take ownership of an unrelated caller FD.
+    let file = File::open(format!("/proc/self/fd/{fd}")).ok()?;
+    // SAFETY: NS_GET_NSTYPE takes no pointer and only inspects the open file.
+    if unsafe { libc::ioctl(file.as_raw_fd(), libc::NS_GET_NSTYPE) } != libc::CLONE_NEWNET {
+        return None;
+    }
+    // systemd passes the original without CLOEXEC. It must not reach helpers.
+    // SAFETY: fcntl operates on a descriptor number, with no pointer arguments.
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+    if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC) } < 0 {
+        return None;
+    }
+    Some(file)
+}
+
+/// Capture systemd's OpenFile before starting threads or spawning helpers.
+/// A socket-activated SSH admission command must leave its socket untouched.
+pub fn initialize_host_namespace() {
+    HOST_NAMESPACE.get_or_init(|| {
+        let pid = std::env::var("LISTEN_PID").ok()?;
+        let count = std::env::var("LISTEN_FDS").ok()?;
+        let names = std::env::var("LISTEN_FDNAMES").ok()?;
+        namespace_descriptor(&pid, &count, &names)
+            .then(|| namespace_file(3))
+            .flatten()
+    });
+}
+
+fn same_namespace(file: &File, current: &Path) -> bool {
+    file.metadata()
+        .ok()
+        .zip(fs::metadata(current).ok())
+        .is_some_and(|(host, current)| host.dev() == current.dev() && host.ino() == current.ino())
+}
+
+fn host_namespace_confirmed() -> bool {
+    if let Some(Some(file)) = HOST_NAMESPACE.get() {
+        return same_namespace(file, Path::new("/proc/self/ns/net"));
+    }
+    // Owner diagnostics can inspect PID 1 directly. The service sandbox cannot;
+    // missing or invalid inherited evidence therefore continues to defer idle.
+    fs::read_link("/proc/self/ns/net")
+        .ok()
+        .zip(fs::read_link("/proc/1/ns/net").ok())
+        .is_some_and(|(a, b)| a == b)
 }
 
 fn endpoint(value: &str, ipv6: bool) -> Result<(IpAddr, u16)> {
@@ -446,10 +505,7 @@ pub fn observe() -> Result<Observation> {
                 .map_err(|_| unavailable())?,
             true,
         )?;
-        let namespace = fs::read_link("/proc/self/ns/net")
-            .ok()
-            .zip(fs::read_link("/proc/1/ns/net").ok())
-            .is_some_and(|(a, b)| a == b);
+        let namespace = host_namespace_confirmed();
         let defaults_valid = defaults(Path::new("/etc/default/ssh"));
         let connection = zbus::connection::Builder::system()
             .map_err(|_| unavailable())?
