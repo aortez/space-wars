@@ -145,12 +145,14 @@ mod tests {
         use clap::Parser;
         let args = crate::Args::try_parse_from(["engine-client"]).unwrap();
         assert!(args.pizza_lab.config(None, false, false).unwrap().is_none());
+        let dir = tempfile::tempdir().unwrap();
+        let report = dir.path().join("scope-test.json");
         let args = crate::Args::try_parse_from([
             "engine-client",
             "--pizza-lab-balls",
             "500",
             "--pizza-lab-report",
-            "/tmp/pizza-lab-scope-test.json",
+            report.to_str().unwrap(),
         ])
         .unwrap();
         assert!(args.pizza_lab.config(None, false, true).is_err());
