@@ -150,58 +150,123 @@ class WorkflowTests(unittest.TestCase):
         # BaseLoader preserves "on" as a YAML string, rather than YAML 1.1 boolean.
         return yaml.load((ROOT / '.github/workflows' / name).read_text(), Loader=yaml.BaseLoader)
 
-    def test_nightly_selects_main_for_both_events_and_never_skips_upload(self):
-        workflow = self.load('windows-nightly.yml')
-        self.assertEqual(set(workflow['on']), {'schedule', 'workflow_dispatch'})
-        job = workflow['jobs']['windows-release']
-        self.assertNotIn('if', job)
-        checkout = job['steps'][0]
-        self.assertEqual(checkout['with']['ref'], 'main')
-        self.assertEqual(checkout['with']['persist-credentials'], 'false')
-        for step in job['steps']:
-            if 'run' in step:
-                self.assertNotIn('if', step)
-        upload = job['steps'][-1]
-        self.assertEqual(upload['if'], 'always()')
-        self.assertEqual(upload['with']['retention-days'], '2')
-        self.assertEqual(upload['with']['if-no-files-found'], 'error')
-        self.assertIn('github.run_id', upload['with']['name'])
-        self.assertIn('github.run_attempt', upload['with']['name'])
+    def test_nightly_reuses_every_ci_check_at_one_immutable_commit(self):
+        nightly = self.load('windows-nightly.yml')
+        self.assertEqual(set(nightly['on']), {'schedule', 'workflow_dispatch'})
+        self.assertEqual(nightly['on']['workflow_dispatch']['inputs']['publish']['default'], 'false')
+        validation = nightly['jobs']['validation']
+        self.assertEqual(validation['uses'], './.github/workflows/ci.yml')
+        self.assertEqual(validation['with'], {'source': '${{ github.sha }}', 'full': 'true'})
+        self.assertNotIn('if', validation)
+        ci = self.load('ci.yml')
+        self.assertEqual(ci['on']['workflow_call']['inputs']['source']['required'], 'true')
+        self.assertEqual(ci['on']['workflow_call']['outputs']['windows-artifact']['value'],
+                         '${{ jobs.windows-release.outputs.artifact }}')
+        for name, job in ci['jobs'].items():
+            checkout = next(s for s in job['steps'] if s.get('uses', '').startswith('actions/checkout@'))
+            expected = ('${{ inputs.source || github.event.pull_request.head.sha || github.sha }}'
+                        if name == 'windows-release' else '${{ inputs.source || github.sha }}')
+            self.assertEqual(checkout['with']['ref'], expected, name)
+            self.assertNotIn('continue-on-error', job, name)
 
-    def test_publication_permissions_and_success_gate(self):
+    def test_publication_permissions_and_full_validation_gate(self):
         workflow = self.load('windows-nightly.yml')
         self.assertEqual(workflow['permissions'], {'contents': 'read'})
-        build = workflow['jobs']['windows-release']
-        self.assertNotIn('permissions', build)
+        self.assertNotIn('permissions', workflow['jobs']['validation'])
         publish = workflow['jobs']['publish']
-        self.assertEqual(publish['needs'], 'windows-release')
-        self.assertEqual(publish['if'], "${{ needs.windows-release.result == 'success' }}")
+        self.assertEqual(publish['needs'], 'validation')
+        self.assertEqual(publish['if'],
+                         "${{ needs.validation.result == 'success' && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || inputs.publish) }}")
         self.assertEqual(publish['permissions'], {'contents': 'write'})
         self.assertEqual(publish['concurrency'], {'group': 'windows-nightly-publication', 'cancel-in-progress': 'false'})
         download = publish['steps'][1]
-        self.assertEqual(download['with']['artifact-ids'], '${{ needs.windows-release.outputs.artifact }}')
-        self.assertEqual(publish['steps'][0]['with']['ref'], '${{ needs.windows-release.outputs.source }}')
-        self.assertIn('steps.evidence.outputs.artifact-id', build['outputs']['artifact'])
+        self.assertEqual(download['with']['artifact-ids'], '${{ needs.validation.outputs.windows-artifact }}')
+        self.assertEqual(publish['steps'][0]['with']['ref'], '${{ github.sha }}')
+        publisher = publish['steps'][2]
+        self.assertEqual(publisher['env']['RELEASE_SHA'], '${{ github.sha }}')
+        self.assertEqual(publisher['env']['BUILD_RESULT'], '${{ needs.validation.result }}')
         ci = self.load('ci.yml')
         self.assertNotIn('publish', ci['jobs'])
         self.assertNotIn('publish_nightly', str(ci))
         self.assertNotIn('contents: write', (ROOT / '.github/workflows/ci.yml').read_text())
 
-    def test_candidate_head_and_shared_release_path(self):
+    def test_candidate_head_and_release_evidence_are_preserved(self):
         ci = self.load('ci.yml')
         job = ci['jobs']['windows-release']
         self.assertEqual(job['name'], 'Windows release validation')
         self.assertNotIn('if', job)  # Draft PRs must be included.
-        self.assertEqual(job['steps'][0]['with']['ref'], '${{ github.event.pull_request.head.sha || github.sha }}')
+        self.assertEqual(job['steps'][0]['with']['ref'],
+                         '${{ inputs.source || github.event.pull_request.head.sha || github.sha }}')
         self.assertEqual(job['steps'][0]['with']['persist-credentials'], 'false')
-        def release_command(workflow):
-            steps = workflow['jobs']['windows-release']['steps']
-            return next(s['run'] for s in steps if s.get('name') == 'Build and validate extracted release')
-        self.assertEqual(release_command(ci), release_command(self.load('windows-nightly.yml')))
+        for step in job['steps']:
+            if 'run' in step:
+                self.assertNotIn('if', step)
+        upload = job['steps'][-1]
+        self.assertEqual(upload['id'], 'evidence')
+        self.assertEqual(upload['if'], 'always()')
+        self.assertEqual(upload['with']['retention-days'], '2')
+        self.assertEqual(upload['with']['if-no-files-found'], 'error')
+        self.assertIn('github.run_id', upload['with']['name'])
+        self.assertIn('github.run_attempt', upload['with']['name'])
+        self.assertEqual(job['outputs']['artifact'], '${{ steps.evidence.outputs.artifact-id }}')
         diagnostics = [s for j in ci['jobs'].values() for s in j['steps']
                        if s.get('with', {}).get('name') in ('linux-test-timings', 'ui-functional-test-artifacts')]
         self.assertEqual(len(diagnostics), 2)
         self.assertTrue(all(s['with']['retention-days'] == '14' for s in diagnostics))
+
+    def test_parallel_jobs_retain_the_existing_checks(self):
+        ci = self.load('ci.yml')
+        jobs = ci['jobs']
+        self.assertEqual(set(jobs), {
+            'yocto-tools', 'nes-core', 'linux-workspace', 'linux-headless', 'linux-ui',
+            'linux-graphics', 'physics-diagnostics', 'clock-extended', 'spacewars-extended', 'spacewars-recovery',
+            'spacewars-ai-regression', 'windows-client', 'aarch64-core', 'windows-release',
+        })
+        for name, job in jobs.items():
+            if name not in ('clock-extended', 'spacewars-extended'):
+                self.assertNotIn('if', job, name)
+            if name in ('linux-headless', 'linux-ui', 'clock-extended', 'spacewars-extended'):
+                self.assertEqual(job['needs'], 'linux-workspace')
+                self.assertEqual(job['runs-on'], jobs['linux-workspace']['runs-on'])
+                runs = '\n'.join(s.get('run', '') for s in job['steps'])
+                self.assertIn('--extract-to "$GITHUB_WORKSPACE" --list-type binaries-only > /dev/null', runs)
+                self.assertIn('--binaries-metadata target/nextest/binaries-metadata.json', runs)
+                self.assertIn('--no-tests fail', runs)
+                self.assertNotIn('cargo test', runs)
+            else:
+                self.assertNotIn('needs', job, name)
+        graphics = str(jobs['linux-graphics'])
+        for command in ('vendor/i-slint-backend-linuxkms/Cargo.toml', 'vendor/lyon_tessellation/Cargo.toml',
+                        '--features pi-kiosk-gpu', '--test backend_startup'):
+            self.assertIn(command, graphics)
+        self.assertIn('--features engine-rapier/ccd-diagnostics,scenario-spacewars/ccd-diagnostics',
+                      str(jobs['physics-diagnostics']))
+        self.assertIn('assert_fresh_build.py', str(jobs['linux-workspace']))
+        self.assertIn('assert_ui_selection.py', str(jobs['linux-workspace']))
+        self.assertIn("inputs.full && 'ui' || 'ui-pr'", str(jobs['linux-ui']))
+        extended = jobs['clock-extended']
+        self.assertEqual(extended['if'], 'inputs.full')
+        self.assertEqual(extended['strategy']['fail-fast'], 'false')
+        self.assertEqual(set(extended['strategy']['matrix']['suite']), {
+            'mixed_event_sweep', 'jumping_profile_stress', 'authored_pattern_stress', 'platform_seed_stress',
+        })
+        self.assertNotIn('schedule', self.load('ui-functional.yml')['on'])
+
+    def test_cache_policy_limits_branch_duplication_and_allows_a_baseline(self):
+        ci = self.load('ci.yml')
+        self.assertEqual(ci['on']['workflow_dispatch']['inputs']['compiler-cache']['default'], 'true')
+        for name, job in ci['jobs'].items():
+            for step in job['steps']:
+                if step.get('uses', '').startswith('Swatinem/rust-cache@'):
+                    self.assertEqual(step['with']['save-if'], "${{ github.ref == 'refs/heads/main' }}", name)
+            if name in ('linux-workspace', 'linux-graphics'):
+                steps = job['steps']
+                cache = next(s for s in steps if s.get('name') == 'Enable compiler caching after dependency restore')
+                self.assertEqual(cache['if'], "github.event_name != 'workflow_dispatch' || inputs.compiler-cache")
+                self.assertEqual(cache['env']['CACHE_MODE'],
+                                 "${{ github.event_name == 'pull_request' && 'READ_ONLY' || 'READ_WRITE' }}")
+                self.assertLess(next(i for i, s in enumerate(steps) if s.get('id') == 'rust-cache'), steps.index(cache))
+                self.assertIn('SCCACHE_GHA_ENABLED=on', cache['run'])
 
 
 if __name__ == '__main__':

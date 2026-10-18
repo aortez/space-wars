@@ -1,56 +1,32 @@
-name: Windows nightly
+name: Comprehensive nightly
 
 on:
   schedule:
     - cron: '23 8 * * *'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish after every check passes (main only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-
-  windows-release:
-    name: Windows nightly release
-    runs-on: windows-2025
-    timeout-minutes: 60
-    outputs:
-      source: ${{ steps.source.outputs.sha }}
-      artifact: ${{ steps.evidence.outputs.artifact-id }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: main
-          persist-credentials: false
-      - name: Record resolved main head
-        id: source
-        shell: pwsh
-        run: |
-          $head = (git rev-parse HEAD).Trim()
-          if ($LASTEXITCODE -ne 0 -or $head -cnotmatch '^[0-9a-f]{40}$') { throw 'Cannot resolve main' }
-          "RELEASE_SHA=$head" >> $env:GITHUB_ENV
-          "sha=$head" >> $env:GITHUB_OUTPUT
-      - uses: dtolnay/rust-toolchain@1.89.0
-        with:
-          targets: x86_64-pc-windows-msvc
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      - name: Build and validate extracted release
-        shell: pwsh
-        run: .github/ci/windows-release.ps1 -SourceCommit $env:RELEASE_SHA -OutputDirectory "$env:RUNNER_TEMP/windows-release-evidence"
-      - name: Upload release and failure evidence
-        id: evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-release-${{ env.RELEASE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/windows-release-evidence/
-          retention-days: 2
-          if-no-files-found: error
+  # Reuse every PR check, expanding UI coverage and enabling the long sweeps.
+  # github.sha is immutable for this run; no job resolves a moving main branch.
+  validation:
+    name: Full validation
+    uses: ./.github/workflows/ci.yml
+    with:
+      source: ${{ github.sha }}
+      full: true
 
   publish:
     name: Publish rolling Windows nightly
-    needs: windows-release
-    if: ${{ needs.windows-release.result == 'success' }}
+    needs: validation
+    if: ${{ needs.validation.result == 'success' && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || inputs.publish) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -61,18 +37,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.windows-release.outputs.source }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
-          artifact-ids: ${{ needs.windows-release.outputs.artifact }}
+          artifact-ids: ${{ needs.validation.outputs.windows-artifact }}
           path: ${{ runner.temp }}/nightly-evidence
           merge-multiple: true
       - name: Publish validated ZIP
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_SHA: ${{ needs.windows-release.outputs.source }}
-          BUILD_RESULT: ${{ needs.windows-release.result }}
+          RELEASE_SHA: ${{ github.sha }}
+          BUILD_RESULT: ${{ needs.validation.result }}
         run: >-
           python3 .github/ci/publish_nightly.py
           --directory "$RUNNER_TEMP/nightly-evidence"

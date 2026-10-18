@@ -1,10 +1,8 @@
 name: UI functional tests
 
-# Full regression suite, including exhaustive workflows omitted on PRs.
-# Normal CI runs the representative ui-pr smoke selection.
+# UI-only manual investigation. Comprehensive nightly runs this full selection
+# through ci.yml, using the same build as the rest of its validation.
 on:
-  schedule:
-    - cron: '29 9 * * *'
   workflow_dispatch:
 
 permissions:
@@ -36,10 +34,11 @@ jobs:
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           cache-on-failure: true
+          shared-key: linux-workspace
+          save-if: ${{ github.ref == 'refs/heads/main' }}
           # Keep the same cache configuration as the normal Linux job.
           workspaces: |
             . -> target
-            vendor/i-slint-backend-linuxkms -> target
       - name: Install native client and virtual display dependencies
         run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - name: Build optimized Linux test executables

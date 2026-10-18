@@ -11,6 +11,10 @@ import xml.etree.ElementTree as ET
 
 PHASES = {
     "build": "Compile workspace (optimized CI profile)",
+    "archive": "Archive compiled tests",
+    "extract": "Extract compiled tests (no compilation)",
+    "match-extended": "Execute extended normal-match and arena parity",
+    "clock-extended": "Execute extended Clock sweep",
     "workspace": "Execute workspace tests",
     "ui": "Execute UI tests (serial, real-time application)",
     "kms": "Build and test vendored LinuxKMS",
