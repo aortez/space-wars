@@ -2,7 +2,7 @@
 
 The normal `CI` workflow runs on pull requests and pushes to `main`. It retains
 all non-ignored workspace tests, platform checks, rendering checks and physics
-diagnostics. PR UI execution uses **43 representative smoke workflows**, budgeted
+diagnostics. PR UI execution uses **44 representative smoke workflows**, budgeted
 at **3–5 minutes**. Every workspace test target still compiles on every PR.
 
 Linux compilation produces nextest archives once. Independent runners execute
@@ -71,7 +71,8 @@ use one partition. Xvfb does not accelerate application time.
 The PR selection covers:
 
 - launcher/navigation and catalog filtering, lifecycle transitions, saved settings,
-  save-failure recovery, Device Info, network/controller controls and attached APIs;
+  save-failure recovery, Device Info, network/controller controls, attached APIs
+  and live UI-thread kiosk health checks;
 - normal Spacewars and its scoreboard/rematches, Classic, Pizza, Clock and Scorched
   Earth, plus representative terrain, combat, travel and expedition workflows;
 - both rendering paths and HUD/performance integration;
@@ -111,7 +112,7 @@ or disappear from the full suite.
 **08:23 UTC**. It calls `ci.yml` with one immutable source SHA and `full=true`,
 running every normal PR check plus:
 
-- all **65 UI workflows**, partitioned across four isolated runners, with tests
+- all **66 UI workflows**, partitioned across four isolated runners, with tests
   serial within each runner/display;
 - Clock's **240-visit mixed-event sweep**;
 - all three extended duck sweeps: jumping profiles, authored patterns and platform seeds;

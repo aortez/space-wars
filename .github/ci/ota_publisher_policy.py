@@ -80,10 +80,19 @@ def workflow(raw, path, events, jobs):
             raise ValueError('Reviewed required/opt-in job condition changed')
         actual[name] = job
         names = set()
+        step_names = set()
         for step in job.get('steps', []):
             if 'uses' in step and not re.fullmatch(r'[A-Za-z0-9_/-]+@[0-9a-f]{40}', step['uses']):
                 raise ValueError('Every source CI/build action must use an immutable commit')
             step_name = step.get('name')
+            # Admission checks every reported step, including skipped ones.
+            # Unnamed actions share GitHub's generated name when used twice;
+            # require explicit names for scripts instead of predicting theirs.
+            if step_name is None and 'uses' in step:
+                step_name = f"Run {step['uses']}"
+            if not isinstance(step_name, str) or not step_name.strip() or step_name in step_names:
+                raise ValueError('Reviewed job step name is missing or duplicate')
+            step_names.add(step_name)
             if step_name in expected[name]:
                 if step_name in names or step.get('continue-on-error', 'false') != 'false':
                     raise ValueError('Required qualification step is duplicate or allowed to fail')

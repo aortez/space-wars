@@ -37,6 +37,40 @@ class PublisherPolicyTests(unittest.TestCase):
                 helper.workflow(yaml.safe_dump(value).encode(), path,
                                 ('push', 'workflow_dispatch'), helper.CI_JOBS)
 
+    def test_repeated_unnamed_archive_uploads_are_rejected_even_when_skipped(self):
+        path = '.github/workflows/ci.yml'
+        original = yaml.load((ROOT / path).read_bytes(), Loader=yaml.BaseLoader)
+        for second_archive in ('linux-ui-tests', 'linux-clock-tests'):
+            with self.subTest(second_archive=second_archive):
+                value = copy.deepcopy(original)
+                for step in value['jobs']['linux-workspace']['steps']:
+                    if step.get('with', {}).get('name') in ('linux-workspace-tests', second_archive):
+                        step.pop('name')
+                with self.assertRaisesRegex(ValueError, 'step name is missing or duplicate'):
+                    helper.workflow(yaml.safe_dump(value).encode(), path,
+                                    ('push', 'workflow_dispatch'), helper.CI_JOBS)
+
+    def test_nonqualification_step_names_cannot_collide_with_explicit_or_generated_names(self):
+        path = '.github/workflows/ci.yml'
+        original = yaml.load((ROOT / path).read_bytes(), Loader=yaml.BaseLoader)
+        checkout = original['jobs']['linux-workspace']['steps'][0]
+        for duplicate_name in ('Upload workspace test archive', f"Run {checkout['uses']}"):
+            with self.subTest(duplicate_name=duplicate_name):
+                value = copy.deepcopy(original)
+                value['jobs']['linux-workspace']['steps'].append(
+                    {'name': duplicate_name, 'if': 'false', 'run': 'true'})
+                with self.assertRaisesRegex(ValueError, 'step name is missing or duplicate'):
+                    helper.workflow(yaml.safe_dump(value).encode(), path,
+                                    ('push', 'workflow_dispatch'), helper.CI_JOBS)
+
+    def test_scripts_require_explicit_step_names(self):
+        path = '.github/workflows/ci.yml'
+        value = yaml.load((ROOT / path).read_bytes(), Loader=yaml.BaseLoader)
+        value['jobs']['linux-workspace']['steps'].append({'run': 'true'})
+        with self.assertRaisesRegex(ValueError, 'step name is missing or duplicate'):
+            helper.workflow(yaml.safe_dump(value).encode(), path,
+                            ('push', 'workflow_dispatch'), helper.CI_JOBS)
+
     def test_mutable_actions_missing_tests_or_additional_authority_require_review(self):
         path = '.github/workflows/ota-build.yml'
         original = yaml.load((ROOT / path).read_bytes(), Loader=yaml.BaseLoader)

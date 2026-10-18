@@ -229,14 +229,16 @@ jobs:
             -E 'package(=engine-client) & binary(=ui_control_functional)' \
             --archive-file "$RUNNER_TEMP/ui-tests.tar.zst"
           du -h "$RUNNER_TEMP/"*-tests.tar.zst >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Upload workspace test archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-workspace-tests
           path: ${{ runner.temp }}/workspace-tests.tar.zst
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Upload UI test archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-ui-tests
           path: ${{ runner.temp }}/ui-tests.tar.zst
@@ -249,7 +251,8 @@ jobs:
           cargo nextest archive --locked --workspace --all-targets --cargo-profile ci \
             -E 'package(=scenario-clock) & kind(lib)' \
             --archive-file "$RUNNER_TEMP/clock-tests.tar.zst"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Upload extended Clock test archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: inputs.full
         with:
           name: linux-clock-tests
@@ -474,7 +477,8 @@ jobs:
         run: |
           printf '%s\n' 'RUSTC_WRAPPER=sccache' 'SCCACHE_GHA_ENABLED=on' \
             "SCCACHE_GHA_RW_MODE=$CACHE_MODE" >> "$GITHUB_ENV"
-      - run: mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
+      - name: Prepare timing directory
+        run: mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
       - name: Test vendored LinuxKMS input and presentation renderers
         if: ${{ !cancelled() }}
         run: |
@@ -538,7 +542,8 @@ jobs:
         with:
           cache-on-failure: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
+      - name: Prepare timing directory
+        run: mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
       - name: Test CCD cache and diagnostic lifecycle regressions
         run: |
           # Keep feature-gated work-count assertions in CI without enabling
