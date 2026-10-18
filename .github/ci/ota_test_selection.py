@@ -47,6 +47,8 @@ def git(*args, repo=ROOT):
 
 def selection(env=os.environ, repo=ROOT):
     result = {'schema': 1, 'mode': 'full', 'reason': 'Non-PR or unverified change scope', 'paths': []}
+    if env.get('SPACEWARS_OTA_FULL', 'false') != 'false':
+        return dict(result, reason='Explicit full validation requested')
     if env.get('GITHUB_EVENT_NAME') != 'pull_request':
         return result
     try:
@@ -151,7 +153,8 @@ def main():
         raise SystemExit(run_tests(selected, args.report))
     else:
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
-        if command[:3] != ['cargo', 'nextest', 'run'] or '-E' in command or '--filter-expr' in command:
+        if (command[:3] != ['cargo', 'nextest', 'run']
+                or any(arg == '-E' or arg.startswith('--filter') for arg in command)):
             raise ValueError('Expected an unfiltered cargo nextest run')
         print('The required OTA job owns the three exhaustive sweeps; all other workspace cases remain selected.', flush=True)
         raise SystemExit(subprocess.run(command + ['-E', workspace_filter(catalog())], cwd=ROOT).returncode)

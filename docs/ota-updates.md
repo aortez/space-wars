@@ -1738,6 +1738,10 @@ events; CI accepts only push/manual events. PR/fork runs, reusable workflows,
 disabled/changed workflow registrations, changed workflow bytes, failed jobs,
 missing/skipped required steps, and old attempts are rejected. All expected jobs
 must be present and successful; a skipped optional failure-report step is fine.
+The two explicitly reviewed extended-test jobs must be present as skipped jobs
+with no executed steps in ordinary CI. Unknown, missing, failed or substituted
+jobs remain rejected. Full nightly runs are not substituted for ordinary source
+CI admission.
 Runs are bounded to at most seven days old, configurable downward by policy.
 Rerunning only failed jobs does not qualify older jobs as part of the new attempt.
 
@@ -1786,7 +1790,7 @@ test results, live run/artifact identities and remaining integration boundaries.
 
 [`ota_publisher_policy.py`](../.github/ci/ota_publisher_policy.py) derives the
 expected workflow hashes from an independently selected, clean publisher
-checkout at a complete reviewed commit. It requires all nine source CI jobs,
+checkout at a complete reviewed commit. It requires all fourteen source CI jobs,
 including the dedicated OTA updater/publisher fixture suite, and explicit
 successful qualification steps. All build/source-CI action references are pinned
 to immutable commits; custom secrets, signing environments, job permission
@@ -1794,6 +1798,10 @@ overrides and allowed failures on required steps are rejected. This is a policy
 for a previously reviewed publisher revision, not automatic approval of a
 candidate's checkout. Updating a reviewed workflow requires a corresponding
 publisher revision review.
+The workflow definition also permits a reusable invocation for comprehensive
+nightly validation; OTA admission still accepts only direct main push/manual
+runs, using `full=false` for a manual run. The reviewed skipped-job list is
+separate from the required successful jobs and is recorded in the receipt.
 
 [`ota_publisher_candidate.py`](../.github/ci/ota_publisher_candidate.py) joins that
 origin gate to the real image validator. It derives image policy from the

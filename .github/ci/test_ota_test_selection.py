@@ -50,6 +50,7 @@ class SelectionTests(unittest.TestCase):
             event.write_text(json.dumps({'pull_request': {'base': {'sha': base}, 'head': {'sha': head}}}))
             env = dict(GITHUB_EVENT_NAME='pull_request', GITHUB_EVENT_PATH=str(event), GITHUB_SHA=git('rev-parse', 'HEAD'))
             self.assertEqual(helper.selection(env, repo)['mode'], 'pr')
+            self.assertEqual(helper.selection(dict(env, SPACEWARS_OTA_FULL='true'), repo)['mode'], 'full')
             shallow = Path(temporary) / 'shallow'
             subprocess.run(['git', 'clone', '--depth=2', repo.as_uri(), str(shallow)],
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -116,6 +117,10 @@ class SelectionTests(unittest.TestCase):
             self.assertNotIn('if', steps[name])
             self.assertNotIn('continue-on-error', steps[name])
         self.assertEqual(ota['steps'][0]['with']['fetch-depth'], '2')
+        headless = workflow['jobs']['linux-headless']
+        step = next(step for step in headless['steps'] if step.get('name') == 'Run workspace tests without compiling')
+        self.assertIn('ota_test_selection.py workspace --', step['run'])
+        self.assertIn('--archive-file', step['run'])
 
 
 if __name__ == '__main__':

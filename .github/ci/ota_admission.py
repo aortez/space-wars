@@ -52,13 +52,16 @@ class Workflow:
     events: tuple
     # (job name, required successful step names), selected by workflow review.
     jobs: tuple
+    # Explicitly reviewed opt-in jobs that must be skipped in an admitted run.
+    skipped_jobs: tuple = ()
 
     def validate(self):
         if (not re.fullmatch(r'\.github/workflows/[a-z0-9-]+\.yml', self.path)
                 or not sha(self.sha256) or not self.events
                 or not set(self.events) <= {'push', 'schedule', 'workflow_dispatch'}
                 or len(set(self.events)) != len(self.events)
-                or not 1 <= len(self.jobs) <= MAX_JOBS):
+                or not 1 <= len(self.jobs) <= MAX_JOBS
+                or len(self.jobs) + len(self.skipped_jobs) > MAX_JOBS):
             raise ValueError('Invalid trusted workflow policy')
         names = set()
         for name, steps in self.jobs:
@@ -66,6 +69,10 @@ class Workflow:
                     or not steps or len(set(steps)) != len(steps)
                     or any(not isinstance(step, str) or not 1 <= len(step) <= 500 for step in steps)):
                 raise ValueError('Invalid required jobs/steps')
+            names.add(name)
+        for name in self.skipped_jobs:
+            if not isinstance(name, str) or not 1 <= len(name) <= 200 or name in names:
+                raise ValueError('Invalid reviewed skipped jobs')
             names.add(name)
 
 
@@ -83,6 +90,7 @@ class Policy:
         self.build.validate()
         self.ci.validate()
         if (self.build.path != '.github/workflows/ota-build.yml'
+                or self.build.skipped_jobs
                 or not set(self.build.events) <= {'schedule', 'workflow_dispatch'}
                 or self.ci.path != '.github/workflows/ci.yml'
                 or not set(self.ci.events) <= {'push', 'workflow_dispatch'}
@@ -155,13 +163,14 @@ def inspect_run(api, workflow, run_id, attempt, source, now, max_age_hours=168):
         raise ValueError('Run changed or selected attempt is no longer current')
     jobs = api.jobs(run_id, attempt)
     expected = dict(workflow.jobs)
-    if len(jobs) != len(expected):
+    skipped = set(workflow.skipped_jobs)
+    if len(jobs) != len(expected) + len(skipped):
         raise ValueError('Required workflow job set differs')
-    seen, ids, receipts = set(), set(), {}
+    seen, ids, receipts, skipped_receipts = set(), set(), {}, {}
     for job in jobs:
         name = job.get('name')
-        if (name not in expected or name in seen or not integer(job.get('id'))
-                or job['id'] in ids or not completed(job) or job.get('run_id') != run_id
+        if (name not in expected.keys() | skipped or name in seen or not integer(job.get('id'))
+                or job['id'] in ids or job.get('run_id') != run_id
                 or job.get('run_attempt') != attempt or job.get('head_sha') != source):
             raise ValueError('Missing, failed or foreign required job')
         seen.add(name)
@@ -170,6 +179,14 @@ def inspect_run(api, workflow, run_id, attempt, source, now, max_age_hours=168):
         if not timestamp(exact['started_at']) <= started <= finished <= timestamp(exact['completed_at']):
             raise ValueError('Job belongs outside the selected attempt')
         steps = job.get('steps')
+        if name in skipped:
+            if job.get('status') != 'completed' or job.get('conclusion') != 'skipped' or steps != []:
+                raise ValueError('Opt-in job was not skipped as reviewed')
+            skipped_receipts[name] = dict(id=job['id'], started_at=job['started_at'],
+                                         completed_at=job['completed_at'])
+            continue
+        if not completed(job):
+            raise ValueError('Required job did not succeed')
         if not isinstance(steps, list) or not 1 <= len(steps) <= 100:
             raise ValueError('Missing or excessive job steps')
         step_names, numbers, passed = set(), set(), set()
@@ -188,7 +205,8 @@ def inspect_run(api, workflow, run_id, attempt, source, now, max_age_hours=168):
             raise ValueError('Required qualification step did not succeed')
         receipts[name] = dict(id=job['id'], started_at=job['started_at'],
                               completed_at=job['completed_at'], steps=list(expected[name]))
-    return {**exact, 'workflow_sha256': workflow.sha256, 'jobs': receipts}
+    return {**exact, 'workflow_sha256': workflow.sha256, 'jobs': receipts,
+            **({'skipped_jobs': skipped_receipts} if skipped_receipts else {})}
 
 
 def inspect_artifact(api, selection, build, producer_job, now):
