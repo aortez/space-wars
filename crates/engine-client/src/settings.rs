@@ -607,6 +607,7 @@ enabled = true
                 explosion: false,
                 aquarium: false,
                 cell_swap: false,
+                grass: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -734,6 +735,7 @@ enabled = true
                         | engine_common::ClockEventKind::Explosion
                         | engine_common::ClockEventKind::Aquarium
                         | engine_common::ClockEventKind::CellSwap
+                        | engine_common::ClockEventKind::Grass
                 )
             );
         }
@@ -759,6 +761,7 @@ enabled = true
                     engine_common::ClockEventKind::Explosion
                         | engine_common::ClockEventKind::Aquarium
                         | engine_common::ClockEventKind::CellSwap
+                        | engine_common::ClockEventKind::Grass
                 )
             );
         }

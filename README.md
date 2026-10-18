@@ -11,6 +11,9 @@ clock contains an event system and various organisms. Currently we have nice thi
 like rain, a drain, exploding letters, melting letters, a parkour rubber ducky, a
 cautious crow... etc. Some events can overlap.
 
+Clock grass has an opt-in [root and runner cutaway](docs/clock-grass-inspection.md)
+for watching actual underground development without obscuring the digits.
+
 ## Why is it Called Space Wars?
 Being able to support my vision of the old 1985 Spacewar DOS game is a primary goal
 of this project. I can only hope to emulate the glory of this game's combat.

@@ -25,6 +25,7 @@ mod floor_tests;
 #[cfg(test)]
 mod font_tests;
 mod fonts;
+pub mod grass;
 #[cfg(test)]
 mod input_tests;
 mod layout;
@@ -68,7 +69,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 12;
+pub const CLOCK_ACTION_VERSION: u16 = 13;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -237,7 +238,7 @@ impl ClockAction {
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
             (CLOCK_ACTION_CONFIGURE, 14..=MAX_CONFIGURE_BYTES)
-                if payload[5] <= 7 && payload[8] <= 1 && payload[10] <= 1 =>
+                if payload[5] <= 15 && payload[8] <= 1 && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
                     fonts: ClockFontSettings {
@@ -268,6 +269,7 @@ impl ClockAction {
                         explosion: payload[5] & 1 != 0,
                         aquarium: payload[5] & 2 != 0,
                         cell_swap: payload[5] & 4 != 0,
+                        grass: payload[5] & 8 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
@@ -374,6 +376,10 @@ pub struct ClockConfig {
     pub duck_direct_flap_landing: bool,
     /// Development-only water fixtures using the Meltdown lifecycle.
     pub water_lab: ClockWaterLab,
+    /// Explicit reproducible full-sun fixture; ordinary Clock remains dim.
+    pub favorable_grass_fixture: bool,
+    /// Read-only material-coordinate cutaway below the Clock face.
+    pub grass_inspection: bool,
     /// None chooses a seeded personality once per Duck event.
     pub duck_jump_profile: Option<engine_common::ClockDuckJumpProfile>,
     /// None selects a seeded course pattern, independently of personality.
@@ -396,6 +402,8 @@ impl Default for ClockConfig {
             duck_debug_overlay: false,
             duck_direct_flap_landing: false,
             water_lab: ClockWaterLab::Off,
+            favorable_grass_fixture: false,
+            grass_inspection: false,
             duck_jump_profile: None,
             duck_course_pattern: None,
             time_format: ClockTimeFormat::TwentyFourHour,
@@ -418,6 +426,8 @@ impl ClockConfig {
             duck_debug_overlay: self.duck_debug_overlay,
             duck_direct_flap_landing: self.duck_direct_flap_landing,
             water_lab: self.water_lab,
+            favorable_grass_fixture: self.favorable_grass_fixture,
+            grass_inspection: self.grass_inspection,
             duck_jump_profile: self.duck_jump_profile,
             duck_course_pattern: self.duck_course_pattern,
             time_format: self.time_format,
@@ -441,6 +451,10 @@ pub struct ClockState {
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
     floor: floor::FloorManager,
+    soil: Option<grass::SoilHabitat>,
+    plants: grass::ClockPlants,
+    grass_refusal: Option<&'static str>,
+    grass_seeded: usize,
     last_started_event: Option<ClockEventKind>,
     event_notice: Option<(&'static str, u64)>,
     // One physical visit, independent of the event scheduler and command source.
@@ -455,6 +469,267 @@ pub struct ClockState {
 }
 
 impl ClockState {
+    pub fn grass_state(&self) -> engine_common::ClockGrassState {
+        let o = self.plants.plants.observe();
+        let soil = self
+            .soil
+            .as_ref()
+            .map(|s| s.accounting())
+            .unwrap_or_default();
+        engine_common::ClockGrassState {
+            biology_tick: o.tick,
+            soil_added: soil.added,
+            soil_retained: soil.retained,
+            soil_exported: soil.exported,
+            living_tissues: o.tissues.iter().filter(|t| t.health > 0).count(),
+            mature_blades: o
+                .tissues
+                .iter()
+                .filter(|t| {
+                    t.role == engine_core::plants::Role::Shoot && t.size >= 3 && t.health > 0
+                })
+                .count(),
+            shoots: o
+                .tissues
+                .iter()
+                .filter(|t| t.role == engine_core::plants::Role::Shoot && t.health > 0)
+                .count(),
+            organisms: o
+                .tissues
+                .iter()
+                .filter(|t| t.health > 0)
+                .map(|t| t.organism)
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+            reserves: std::array::from_fn(|i| o.tissues.iter().map(|t| t.stores[i]).sum()),
+            intake: o.ledger.intake,
+            maintenance: o.ledger.maintenance,
+            development: std::array::from_fn(|i| o.tissues.iter().map(|t| t.invested[i]).sum()),
+            seeded: self.grass_seeded,
+            refusal: self.grass_refusal.map(str::to_owned),
+            intensity: self.plants.intensity,
+            optical_refusals: self.plants.optical_refusals,
+            inspection: grass::inspection::snapshot(self),
+        }
+    }
+
+    fn introduce_grass(&mut self, seed: u64) {
+        self.grass_seeded = 0;
+        let refusal = if !self.config.events.grass {
+            Some("Future grass seeding is disabled")
+        } else if !self.plants.plants.observe().tissues.is_empty() {
+            Some("Grass resident capacity is occupied")
+        } else {
+            None
+        };
+        self.grass_refusal = refusal;
+        if refusal.is_none() {
+            self.admit_soil();
+            let soil = self.soil.as_ref().unwrap();
+            let width = soil.terrain().width() as i32;
+            let mut rng = StdRng::seed_from_u64(seed);
+            let start = if self.config.favorable_grass_fixture {
+                10
+            } else {
+                rng.random_range(0..width)
+            };
+            let offsets = [0, -grass::SEED_SPACING_CELLS, grass::SEED_SPACING_CELLS];
+            let center = (0..width).map(|i| (start + i) % width).find(|center| {
+                offsets.iter().all(|offset| {
+                    let x = center + offset;
+                    soil.terrain()
+                        .cell(engine_terrain::CellCoord::new(
+                            x,
+                            grass::SOIL_DEPTH_CELLS as i32 - 1,
+                        ))
+                        .is_some_and(|c| c.material == grass::CLOCK_DIRT)
+                        && soil
+                            .world_point([x, grass::SOIL_DEPTH_CELLS as i32 - 1])
+                            .is_some()
+                })
+            });
+            if let Some(center) = center {
+                for offset in offsets.into_iter().take(grass::SEED_BATCH) {
+                    if self.plant_grass(center + offset).is_ok() {
+                        self.grass_seeded += 1;
+                    }
+                }
+                if self.grass_seeded == 0 {
+                    self.grass_refusal = Some("No seed capacity or safe dirt contact");
+                }
+            } else {
+                self.grass_refusal = Some("No safe dirt habitat fits the seed spacing");
+            }
+        }
+        self.event_notice = Some((
+            self.grass_refusal.unwrap_or("Grass seeds planted"),
+            self.schedule.tick + grass::INTRODUCTION_TICKS,
+        ));
+    }
+    pub fn plants(&self) -> &grass::ClockPlants {
+        &self.plants
+    }
+    pub fn set_plant_playback(&mut self, playback: grass::PlantPlayback) {
+        self.plants.playback = playback;
+    }
+    pub fn set_plant_conditions(&mut self, intensity: u16, availability: [u16; 2]) -> bool {
+        if intensity > 1000 || availability.into_iter().any(|x| x > 1000) {
+            return false;
+        }
+        self.plants.intensity = intensity;
+        self.plants.availability = availability;
+        true
+    }
+    /// Explicit seed-admission seam; the periodic introduction will call this.
+    pub fn plant_grass(&mut self, column: i32) -> Result<u64, engine_core::plants::Rejection> {
+        self.synchronize_soil();
+        self.plants.plant(
+            self.soil
+                .as_ref()
+                .ok_or(engine_core::plants::Rejection::Space)?,
+            column,
+        )
+    }
+
+    fn advance_plants(&mut self, dt: Duration) {
+        if dt.is_zero() {
+            return;
+        }
+        let Some(soil) = self.soil.as_ref() else {
+            return;
+        };
+        let world = grass::surfaces::world(&self.active_event, self.duck_visit.as_deref());
+        if let Some(world) = world {
+            self.plants.crush(soil, world);
+        }
+        let transparent: Vec<_> = world
+            .into_iter()
+            .flat_map(|w| w.collider_ids())
+            .filter(|id| id.entity.value() == grass::SOIL_PHYSICS_ID)
+            .collect();
+        let geometry = world.map(|w| w.query_snapshot());
+        let crow = render::plant_actor_polygons(self);
+        let soil = self.soil.as_ref().unwrap();
+        self.plants.crush_polygons(soil, &crow);
+        if self.plants.biology_due(dt) {
+            self.plants.host_polygons = render::plant_face_polygons(self);
+            self.plants.host_polygons.extend(crow);
+        }
+        self.plants
+            .advance(dt, soil, geometry.as_ref(), &transparent, Vec::new());
+    }
+    pub fn soil(&self) -> Option<&grass::SoilHabitat> {
+        self.soil.as_ref()
+    }
+
+    /// Material commitment seam for the forthcoming seeding introduction.
+    /// Admission alone does not introduce seeds or modify the event schedule.
+    pub fn admit_soil(&mut self) -> grass::SoilAdmissionPlan {
+        use engine_rapier::world::{CollisionGroups, PhysicsId};
+        let layout = Layout::new(self.aspect_ratio());
+        self.synchronize_soil();
+        let (surfaces, _) = self.soil_surfaces();
+        let supports: Vec<_> = surfaces.iter().map(|s| (s.left, s.right)).collect();
+        let world = grass::surfaces::world(&self.active_event, self.duck_visit.as_deref());
+        let soil = self
+            .soil
+            .get_or_insert_with(|| grass::SoilHabitat::new(layout));
+        let plan = soil.admit(&supports, |site| {
+            let Some(surface) = surfaces.iter().find(|s| s.covers(site.min.x, site.max.x)) else {
+                return true;
+            };
+            world.is_some_and(|w| {
+                !w.current_cuboid_is_clear(
+                    surface.map((site.min + site.max) * 0.5),
+                    surface.angle,
+                    (site.max - site.min) * 0.5 - engine_core::Vec2::new(0.001, 0.001),
+                    CollisionGroups::ALL,
+                    &[PhysicsId::new(grass::SOIL_PHYSICS_ID)],
+                )
+            })
+        });
+        self.synchronize_soil();
+        plan
+    }
+
+    fn soil_surfaces(&self) -> (Vec<grass::surfaces::Surface>, grass::SoilSupportState) {
+        use grass::{SoilSupportState, surfaces};
+        let layout = Layout::new(self.aspect_ratio());
+        let visit = self.duck_visit.as_deref().or_else(|| {
+            self.active_event
+                .as_ref()
+                .and_then(ActiveEvent::vacant_arena)
+        });
+        if let Some(visit) = visit {
+            let authoritative = match &self.active_event {
+                Some(ActiveEvent::Rain(e)) => e.responsive_floor(),
+                Some(ActiveEvent::Meltdown(e)) => e.floor.as_ref(),
+                Some(ActiveEvent::Aquarium(e)) if visit.responsive_floor().is_some() => {
+                    Some(&e.floor)
+                }
+                _ => None,
+            };
+            if let Some(floor) = authoritative {
+                return (
+                    surfaces::responsive(layout, floor),
+                    SoilSupportState::Responsive,
+                );
+            }
+            return (
+                surfaces::duck(visit),
+                if visit.responsive_floor().is_some() {
+                    SoilSupportState::Responsive
+                } else if visit.drain_floor.is_some() {
+                    SoilSupportState::Drain
+                } else {
+                    SoilSupportState::Course
+                },
+            );
+        }
+        let floor = match &self.active_event {
+            Some(ActiveEvent::Rain(e)) => {
+                if let Some(course) = e.course() {
+                    return (surfaces::course(course), SoilSupportState::Course);
+                }
+                e.responsive_floor()
+            }
+            Some(ActiveEvent::Meltdown(e)) => e.floor.as_ref(),
+            Some(ActiveEvent::Aquarium(e)) => Some(&e.floor),
+            _ => None,
+        };
+        if let Some(floor) = floor {
+            (
+                surfaces::responsive(layout, floor),
+                SoilSupportState::Responsive,
+            )
+        } else {
+            (
+                surfaces::ordinary(self.floor.geometry(layout)),
+                if self.floor.mode() == engine_common::ClockFloorMode::DrainOpen {
+                    SoilSupportState::Drain
+                } else {
+                    SoilSupportState::Ordinary
+                },
+            )
+        }
+    }
+
+    fn synchronize_soil(&mut self) {
+        if self.soil.is_none() {
+            return;
+        }
+        let (surfaces, kind) = self.soil_surfaces();
+        let soil = self.soil.as_mut().unwrap();
+        soil.set_surfaces(surfaces, kind);
+        if let Some(world) =
+            grass::surfaces::world_mut(&mut self.active_event, self.duck_visit.as_deref_mut())
+        {
+            soil.bind_current(world);
+        }
+        self.plants.revalidate(soil);
+    }
+
     pub fn settings(&self) -> ClockSettings {
         ClockSettings {
             fonts: self.config.fonts,
@@ -564,6 +839,7 @@ impl ClockState {
         if self.active_event.is_some() {
             self.finish_event();
         }
+        self.synchronize_soil();
     }
 
     pub fn lifecycle(&self) -> EventLifecycle {
@@ -830,6 +1106,7 @@ impl ClockState {
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
+                soil: self.soil.as_mut(),
             };
             self.active_event = Some(match kind {
                 ClockEventKind::Aquarium => ActiveEvent::Aquarium(Box::new(
@@ -856,6 +1133,7 @@ impl ClockState {
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
+                soil: self.soil.as_mut(),
             },
             seed,
             self.config,
@@ -866,6 +1144,9 @@ impl ClockState {
     fn finish_event(&mut self) {
         if let Some(mut event) = self.active_event.take() {
             let kind = event.kind();
+            if kind == ClockEventKind::Grass {
+                self.event_notice = None;
+            }
             event.release_arena(self.duck_visit.as_deref_mut());
             if let ActiveEvent::Rain(rain) = &event
                 && let Some(floor) = rain.responsive_floor()
@@ -934,7 +1215,11 @@ impl ClockState {
             && if visit_advanced {
                 duck.visit_finished()
             } else {
-                duck.step_with_environment(water, panels_advanced || water.is_some())
+                duck.step_with_soil(
+                    water,
+                    panels_advanced || water.is_some(),
+                    self.soil.as_mut(),
+                )
             }
         {
             self.finish_duck_visit();
@@ -982,6 +1267,14 @@ impl ClockState {
     /// Reports whether the event already stepped the visit's mechanics world.
     /// This remains true on its final tick, after cleanup removes the event.
     fn step_active_event(&mut self, layout: Layout) -> bool {
+        let seed = match &mut self.active_event {
+            Some(ActiveEvent::Grass(event)) => event.take_seed(),
+            _ => None,
+        };
+        if let Some(seed) = seed {
+            self.introduce_grass(seed);
+        }
+        self.synchronize_soil();
         let event = self.active_event.as_mut().expect("active event");
         let visit_advanced = event.shares_visit_arena();
         let context = EventContext {
@@ -989,6 +1282,7 @@ impl ClockState {
             display: self.display,
             layout,
             floor: self.floor.geometry(layout),
+            soil: self.soil.as_mut(),
         };
         let finished = match event {
             ActiveEvent::Aquarium(event) => event.step(context, self.duck_visit.as_deref_mut()),
@@ -1103,6 +1397,10 @@ impl Scenario for ClockScenario {
     type Config = ClockConfig;
 
     fn init(config: Self::Config, seed: u64) -> Self::State {
+        let mut plants = grass::ClockPlants::new(seed);
+        if config.favorable_grass_fixture {
+            plants.intensity = 1000;
+        }
         ClockState {
             config: config.normalized(),
             reading: None,
@@ -1112,6 +1410,10 @@ impl Scenario for ClockScenario {
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
             floor: floor::FloorManager::default(),
+            soil: None,
+            plants,
+            grass_refusal: None,
+            grass_seeded: 0,
             last_started_event: None,
             event_notice: None,
             duck_visit: None,
@@ -1136,6 +1438,7 @@ impl Scenario for ClockScenario {
                 ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
         }
+        state.synchronize_soil();
         // The fixed-timestep host supplies one tick per call. Zero duration is
         // used to synchronize inputs/control actions without advancing physics.
         if dt.is_zero() {
@@ -1144,6 +1447,11 @@ impl Scenario for ClockScenario {
             // The visitor revalidates support after the timed event updates it.
             state.advance_tick();
         }
+        if let Some(soil) = state.soil.as_mut() {
+            soil.advance_loss(dt);
+        }
+        state.synchronize_soil();
+        state.advance_plants(dt);
         StepResult::default()
     }
 

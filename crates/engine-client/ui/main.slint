@@ -728,6 +728,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-marquee-enabled: true;
     in-out property <bool> launcher-clock-digit-slide-enabled: true;
     in-out property <bool> launcher-clock-cell-swap-enabled: true;
+    in-out property <bool> launcher-clock-grass-enabled: true;
     in-out property <bool> launcher-clock-rain-enabled: true;
     in-out property <string> launcher-clock-rain-amount: "Varied";
     in-out property <string> launcher-clock-marquee-preset: "Random";
@@ -1429,7 +1430,7 @@ export component MainWindow inherits Window {
                 MenuButton {
                     x: 0px;
                     y: 56px;
-                    width: (parent.width - 16px) / 3;
+                    width: (parent.width - 24px) / 4;
                     height: 48px;
                     text: "Rain\n" + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
                     selected: root.ingame-clock-focus-index == 12;
@@ -1437,9 +1438,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(12, 1); }
                 }
                 MenuButton {
-                    x: (parent.width + 8px) / 3;
+                    x: (parent.width + 8px) / 4;
                     y: 56px;
-                    width: (parent.width - 16px) / 3;
+                    width: (parent.width - 24px) / 4;
                     height: 48px;
                     text: "Date\n" + (root.launcher-clock-show-date ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 13;
@@ -1447,14 +1448,23 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(13, 1); }
                 }
                 MenuButton {
-                    x: 2 * (parent.width + 8px) / 3;
+                    x: 2 * (parent.width + 8px) / 4;
                     y: 56px;
-                    width: (parent.width - 16px) / 3;
+                    width: (parent.width - 24px) / 4;
                     height: 48px;
                     text: "Cell Swap\n" + (root.launcher-clock-cell-swap-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 18;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(18, 1); }
+                }
+                MenuButton {
+                    x: 3 * (parent.width + 8px) / 4;
+                    y: 56px;
+                    width: (parent.width - 24px) / 4;
+                    height: 48px;
+                    text: "Grass\n" + (root.launcher-clock-grass-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 19;
+                    activated => { root.ingame-clock-adjust(19, 1); }
                 }
                 MenuButton {
                     x: 0px;
@@ -2387,30 +2397,39 @@ export component MainWindow inherits Window {
                         MenuButton {
                             x: 0px;
                             y: 156px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Falling\n" + (root.launcher-clock-falling-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 5;
                             activated => { root.launcher-settings-focus-index = 5; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: (parent.width + 8px) / 3;
+                            x: (parent.width + 8px) / 4;
                             y: 156px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Color Cycle\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 6;
                             activated => { root.launcher-settings-focus-index = 6; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: 2 * (parent.width + 8px) / 3;
+                            x: 2 * (parent.width + 8px) / 4;
                             y: 156px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Cell Swap\n" + (root.launcher-clock-cell-swap-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 17;
                             activated => { root.launcher-settings-focus-index = 17; root.ui-action(3); }
                         }
+                MenuButton {
+                    x: 3 * (parent.width + 8px) / 4;
+                    y: 156px;
+                    width: (parent.width - 24px) / 4;
+                    height: 48px;
+                    text: "Grass\n" + (root.launcher-clock-grass-enabled ? "On" : "Off");
+                    selected: root.launcher-settings-focus-index == 18;
+                    activated => { root.launcher-settings-focus-index = 18; root.ui-action(3); }
+                }
 
                         MenuButton {
                             x: 0px;
@@ -2611,7 +2630,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 18 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 19 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }

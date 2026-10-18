@@ -3,6 +3,31 @@ use crate::{terrain::TerrainAssembly, world::PhysicsWorld};
 use engine_core::plants::{Environment, Exposure, Role, Support, Tissue};
 use engine_terrain::{CellCoord, MaterialId, Terrain, TerrainGeometry};
 
+mod material;
+pub use material::MaterialUptake;
+
+fn material_contact(
+    terrain: &Terrain,
+    geometry: &TerrainGeometry,
+    dirt: MaterialId,
+    cell: [i32; 2],
+) -> ContactReason {
+    let p = terrain.cell_center(CellCoord::new(cell[0], cell[1]));
+    let Some(cell) = geometry.source_cell(terrain, p) else {
+        return ContactReason::Air;
+    };
+    if dirt == MaterialId::VOID || terrain.cell(cell).map(|c| c.material) != Some(dirt) {
+        return ContactReason::Ineligible;
+    }
+    ContactReason::Eligible
+}
+
+fn supply_fractions(rates: [u16; 2], availability: [u16; 2], tick_ms: u16) -> [u16; 2] {
+    std::array::from_fn(|i| {
+        (u64::from(rates[i]) * u64::from(availability[i]) * u64::from(tick_ms) / 1_000_000) as u16
+    })
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ContactReason {
     Eligible,
@@ -51,18 +76,7 @@ impl RootUptake<'_> {
         }
         // Roots are lightweight point absorbers at local cell centers. No
         // proximity tolerance or world-position cache admits air samples.
-        let p = self
-            .terrain
-            .cell_center(CellCoord::new(t.cell[0], t.cell[1]));
-        let Some(cell) = self.geometry.source_cell(self.terrain, p) else {
-            return ContactReason::Air;
-        };
-        if self.dirt == MaterialId::VOID
-            || self.terrain.cell(cell).map(|c| c.material) != Some(self.dirt)
-        {
-            return ContactReason::Ineligible;
-        }
-        ContactReason::Eligible
+        material_contact(self.terrain, self.geometry, self.dirt, t.cell)
     }
     pub fn valid_controls(&self) -> bool {
         (1..=1000).contains(&self.tick_ms)
@@ -81,10 +95,7 @@ impl Environment for RootUptake<'_> {
                 ..Exposure::default()
             };
         }
-        let fractions: [u16; 2] = std::array::from_fn(|i| {
-            (u64::from(self.rates[i]) * u64::from(self.availability[i]) * u64::from(self.tick_ms)
-                / 1_000_000) as u16
-        });
+        let fractions = supply_fractions(self.rates, self.availability, self.tick_ms);
         Exposure {
             dirt_contact: self.contact(t) == ContactReason::Eligible,
             nutrients: fractions[0],

@@ -64,6 +64,8 @@ pub struct ClockState {
     #[serde(default)]
     pub cell_swap: Option<engine_common::ClockCellSwapState>,
     #[serde(default)]
+    pub grass: Option<engine_common::ClockGrassState>,
+    #[serde(default)]
     pub rain: Option<engine_common::ClockRainState>,
     #[serde(default)]
     pub aquarium: Option<engine_common::ClockAquariumState>,
@@ -422,6 +424,7 @@ mod tests {
             marquee: None,
             digit_slide: None,
             cell_swap: None,
+            grass: None,
             rain: None,
             aquarium: None,
             reading: Some([12, 34, 56]),

@@ -2802,6 +2802,7 @@ mod tests {
                     | ClockEventKind::Crow
                     | ClockEventKind::Explosion
                     | ClockEventKind::Aquarium
+                    | ClockEventKind::Grass
             );
             assert_eq!(controls.request_clock_event(event), expected, "{event:?}");
             if expected {

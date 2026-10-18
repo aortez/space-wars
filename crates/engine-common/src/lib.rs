@@ -632,10 +632,11 @@ pub enum ClockEventKind {
     Explosion = 8,
     Aquarium = 9,
     CellSwap = 10,
+    Grass = 11,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -647,6 +648,7 @@ impl ClockEventKind {
         Self::Explosion,
         Self::Aquarium,
         Self::CellSwap,
+        Self::Grass,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -662,6 +664,7 @@ impl ClockEventKind {
             Self::Explosion => "explosion",
             Self::Aquarium => "aquarium",
             Self::CellSwap => "cell-swap",
+            Self::Grass => "grass",
         }
     }
 
@@ -678,6 +681,7 @@ impl ClockEventKind {
             Self::Explosion => "Explosion",
             Self::Aquarium => "Aquarium",
             Self::CellSwap => "Cell Swap",
+            Self::Grass => "Grass",
         }
     }
 }
@@ -697,6 +701,7 @@ pub struct ClockEvents {
     pub explosion: bool,
     pub aquarium: bool,
     pub cell_swap: bool,
+    pub grass: bool,
 }
 
 impl Default for ClockEvents {
@@ -713,6 +718,7 @@ impl Default for ClockEvents {
             explosion: true,
             aquarium: true,
             cell_swap: true,
+            grass: true,
         }
     }
 }
@@ -731,8 +737,54 @@ impl ClockEvents {
             ClockEventKind::Explosion => self.explosion,
             ClockEventKind::Aquarium => self.aquarium,
             ClockEventKind::CellSwap => self.cell_swap,
+            ClockEventKind::Grass => self.grass,
         }
     }
+}
+
+/// Persistent Clock habitat and paid plant diagnostics, including between events.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockGrassState {
+    pub biology_tick: u64,
+    pub soil_added: u64,
+    pub soil_retained: usize,
+    pub soil_exported: u64,
+    pub living_tissues: usize,
+    pub mature_blades: usize,
+    pub shoots: usize,
+    pub organisms: Vec<u64>,
+    pub reserves: [u64; 3],
+    pub intake: [u64; 3],
+    pub maintenance: [u64; 3],
+    pub development: [u64; 3],
+    pub seeded: usize,
+    pub refusal: Option<String>,
+    pub intensity: u16,
+    pub optical_refusals: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection: Option<ClockGrassInspection>,
+}
+
+/// Bounded read-only view of one retained organism, in stable material cells.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockGrassInspection {
+    pub organism: Option<u64>,
+    pub tissues: Vec<ClockGrassTissue>,
+    pub connections: Vec<[u64; 2]>,
+    pub soil_cells: Vec<[i32; 2]>,
+    pub development_per_size: [u64; 3],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockGrassTissue {
+    pub id: u64,
+    pub cell: [i32; 2],
+    pub role: String,
+    pub size: u16,
+    pub health: u16,
+    pub development: [u64; 3],
+    pub invested: [u64; 3],
+    pub support: Option<[u64; 2]>,
 }
 
 /// Aquarium actors are steering agents, not native physics bodies. Water uses

@@ -215,6 +215,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: cell_swap::CELL_SWAP_MAX_TICKS,
         cooldown_ticks: 20 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::Grass,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::Arena,
+        duration_ticks: crate::grass::INTRODUCTION_TICKS,
+        cooldown_ticks: crate::grass::SEED_COOLDOWN_TICKS,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -222,6 +229,7 @@ pub(super) struct EventContext<'a> {
     pub display: DisplaySnapshot,
     pub layout: Layout,
     pub floor: crate::floor::FloorGeometry,
+    pub soil: Option<&'a mut crate::grass::SoilHabitat>,
 }
 
 /// An event owns its local phase and temporary resources. Dropping the variant
@@ -236,6 +244,7 @@ pub(super) enum ActiveEvent {
     Rain(Box<crate::rain::RainEvent>),
     Explosion(ExplosionEvent),
     Aquarium(Box<aquarium::AquariumEvent>),
+    Grass(crate::grass::Introduction),
 }
 
 // Use the admission seed locally so recipe selection cannot advance the scheduler RNG.
@@ -261,6 +270,7 @@ impl ActiveEvent {
         previous_display: Option<DisplaySnapshot>,
     ) -> Self {
         match kind {
+            ClockEventKind::Grass => Self::Grass(crate::grass::Introduction::new(seed)),
             ClockEventKind::Aquarium => {
                 Self::Aquarium(Box::new(aquarium::AquariumEvent::new(context, seed)))
             }
@@ -298,6 +308,7 @@ impl ActiveEvent {
     pub fn kind(&self) -> ClockEventKind {
         match self {
             Self::Aquarium(_) => ClockEventKind::Aquarium,
+            Self::Grass(_) => ClockEventKind::Grass,
             Self::Falling(_) => ClockEventKind::Falling,
             Self::Explosion(_) => ClockEventKind::Explosion,
             Self::ColorCycle(_) => ClockEventKind::ColorCycle,
@@ -385,6 +396,7 @@ impl ActiveEvent {
     /// Returns true when the event has finished.
     pub fn step(&mut self, context: EventContext<'_>) -> bool {
         match self {
+            Self::Grass(event) => event.step(),
             Self::Aquarium(event) => event.step(context, None),
             Self::Falling(event) => event.step(context, None),
             Self::Explosion(event) => event.step(context, None),
@@ -395,13 +407,14 @@ impl ActiveEvent {
             Self::CellSwap(event) => event.step(),
             Self::Rain(event) => {
                 event.synchronize(context.display, context.segments);
-                event.step()
+                event.step_with_soil(context.soil)
             }
         }
     }
 
     pub fn phase(&self) -> EventPhase {
         match self {
+            Self::Grass(_) => EventPhase::Presenting,
             Self::Aquarium(event) => event.phase(),
             Self::Falling(event) => event.phase(),
             Self::Explosion(event) => event.phase(),
@@ -422,6 +435,7 @@ impl ActiveEvent {
 
     pub fn phase_tick(&self) -> u64 {
         match self {
+            Self::Grass(event) => event.tick,
             Self::Aquarium(event) => event.phase_tick(),
             Self::Falling(event) => event.phase_tick(),
             Self::Explosion(event) => event.phase_tick(),
@@ -444,6 +458,7 @@ impl ActiveEvent {
 
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
+            Self::Grass(_) => (0, 0),
             Self::Aquarium(event) => event.physics_counts(),
             Self::Falling(event) => event.physics_counts(),
             Self::Explosion(event) => event.physics_counts(),

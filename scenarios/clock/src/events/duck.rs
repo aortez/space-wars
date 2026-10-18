@@ -86,6 +86,9 @@ pub(crate) struct DuckEvent {
     pub direction: f32,
     pub obstacles: [Obstacle; 3],
     pub course: Option<planner::Course>,
+    // Derived from current retained soil; never changes authored arena geometry.
+    soil_course: Option<planner::Course>,
+    soil_supports: Vec<(usize, Vec2, Vec2)>,
     // Rain/Meltdown advance the authoritative actuator while active. This small
     // snapshot drives contacts/rendering; after the wet event, it settles dry.
     responsive_floor: Option<ResponsiveFloor>,
@@ -315,6 +318,8 @@ impl DuckEvent {
             water_report: BuoyancyReport::default(),
             paddling: false,
             course: None,
+            soil_course: None,
+            soil_supports: Vec::new(),
             responsive_floor: None,
             drain_floor: None,
             spawn_motion: None,
@@ -541,6 +546,17 @@ impl DuckEvent {
         let course = self.course.as_ref()?;
         world.surface_contacts(DUCK_COLLIDER).find_map(|contact| {
             if contact.normal.y > 0.7 && contact.separation <= self.radius * 0.05 {
+                if contact.collider.entity.value() == crate::grass::SOIL_PHYSICS_ID {
+                    // Soil is a fixed compound at the world origin. Its local
+                    // surface point stays on the material even during penetration.
+                    return self.soil_supports.iter().find_map(|(index, min, max)| {
+                        (contact.local_surface.position.x >= min.x
+                            && contact.local_surface.position.x <= max.x
+                            && (contact.local_surface.position.y - max.y).abs()
+                                <= self.radius * 0.1)
+                            .then_some(*index)
+                    });
+                }
                 let index = contact.collider.entity.value().checked_sub(1000)? as usize;
                 (index < course.surfaces.len()).then_some(index)
             } else {
@@ -661,7 +677,7 @@ impl DuckEvent {
                 direction: axis.signum(),
                 jump: std::mem::take(&mut player.jump_pending),
             }
-        } else if let Some(course) = &self.course {
+        } else if let Some(course) = self.soil_course.as_ref().or(self.course.as_ref()) {
             let context = CourseContext {
                 course,
                 obstacles: &self.obstacles,
@@ -741,10 +757,20 @@ impl DuckEvent {
         self.step_with_environment(water, water.is_some())
     }
 
+    #[cfg(test)]
     pub fn step_with_environment(
         &mut self,
         water: Option<&WaterWorld>,
         panels_advanced: bool,
+    ) -> bool {
+        self.step_with_soil(water, panels_advanced, None)
+    }
+
+    pub fn step_with_soil(
+        &mut self,
+        water: Option<&WaterWorld>,
+        panels_advanced: bool,
+        soil: Option<&mut crate::grass::SoilHabitat>,
     ) -> bool {
         self.advance_panels(panels_advanced);
         self.tick += 1;
@@ -752,6 +778,7 @@ impl DuckEvent {
         if self.phase != EventPhase::Resetting {
             self.ensure_world();
         }
+        self.synchronize_soil(soil);
         if self.phase == EventPhase::Opening {
             self.advance_flaps();
             self.world.as_mut().unwrap().step(DT);

@@ -109,6 +109,10 @@ struct Args {
     #[command(flatten)]
     presentation: presentation_probe::Options,
 
+    /// Ignore physical controllers for isolated automation; public API input stays active.
+    #[arg(long)]
+    ignore_physical_controllers: bool,
+
     /// Scenario to load.
     #[arg(long)]
     scenario: Option<String>,
@@ -539,8 +543,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings_writer.clone(),
         Rc::clone(&gamepad_input),
     );
-    let _gamepad_timer =
-        gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input, controllers);
+    let _gamepad_timer = gamepad::start_gamepad_pump(
+        &window,
+        Rc::clone(&input),
+        gamepad_input,
+        controllers,
+        args.ignore_physical_controllers,
+    );
 
     if args.touch_test {
         show_launcher(
@@ -853,6 +862,7 @@ fn show_launcher(
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
     window.set_launcher_clock_cell_swap_enabled(settings.clock.events.cell_swap);
+    window.set_launcher_clock_grass_enabled(settings.clock.events.grass);
     window.set_launcher_clock_rain_enabled(settings.clock.events.rain);
     window.set_launcher_clock_rain_amount(settings.clock.rain_amount.label().into());
     window.set_launcher_clock_marquee_preset(settings.clock.marquee_preset.label().into());
@@ -1549,7 +1559,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 6,
-        "clock" => 19,
+        "clock" => 20,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1867,6 +1877,10 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
     if focus == 15 {
         window.invoke_clock_fonts_open();
+        return;
+    }
+    if focus == 18 {
+        window.set_launcher_clock_grass_enabled(!window.get_launcher_clock_grass_enabled());
         return;
     }
     if focus == 17 {
@@ -2522,6 +2536,7 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             explosion: window.get_launcher_clock_explosion_enabled(),
             aquarium: window.get_launcher_clock_aquarium_enabled(),
             cell_swap: window.get_launcher_clock_cell_swap_enabled(),
+            grass: window.get_launcher_clock_grass_enabled(),
             marquee: window.get_launcher_clock_marquee_enabled(),
             digit_slide: window.get_launcher_clock_digit_slide_enabled(),
             rain: window.get_launcher_clock_rain_enabled(),
@@ -3154,6 +3169,7 @@ mod tests {
     fn base_args() -> Args {
         Args {
             pizza_lab: pizza_lab::Options::default(),
+            ignore_physical_controllers: false,
             presentation: presentation_probe::Options::default(),
             scenario: None,
             rom: None,
@@ -4316,6 +4332,7 @@ mod tests {
                     explosion: false,
                     aquarium: false,
                     cell_swap: false,
+                    grass: false,
                 },
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),
