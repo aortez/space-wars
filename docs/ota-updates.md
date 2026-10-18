@@ -36,11 +36,11 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Corrected installed time service verified after signed update and normal boot on both primary Pis; broader provider and RTC retention qualification remain |
-| #258–#260 | Native coordinator, continuous monitoring, operation holds, durable time checks and OTA handoff implemented; expected setup profile changes and SSH idle qualification remain |
-| #262 | Owner-local authority published two signed Nightly generations with durable journal/readback; isolated automated Release/Nightly publishing, admission and signer operation remain |
+| #258–#260 | Native off/time-wake/automatic-OTA/off cycle and SSH recovery controls passed on Pi 5; expected setup profile changes and Pi 4 installed qualification remain |
+| #262 | Owner-local authority published six signed Nightly generations with durable journal/readback; isolated automated Release/Nightly publishing, admission and signer operation remain |
 | #263 | Signed install, stopped-app rollback/quarantine, bounded retry and normal-boot success verified on the replacement Pi 5 and primary Picade; interrupted promotion, power loss and second Picade rollout remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | Public trust and real signed-image delivery verified on both primary Pis with the native owner helper; installed worker/network/performance qualification remains |
+| #265 | Public trust and signed delivery verified on both primary Pis; corrected startup and time-wake feed checks passed on Pi 5; Pi 4 installed-worker and payload-performance qualification remain |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
 
@@ -2968,9 +2968,69 @@ isolation, and uses only non-autoconnecting synthetic profiles. It never stops
 or replaces production NetworkManager. Preserve the pre/post production checks
 and collect the case logs even when a control fails.
 
-The provider correction is not yet installed in the production image. The next
-qualification is a complete signed image and supervised real-radio cycle,
-followed by the full time/OTA idle cycle and Pi 4 coverage.
+The isolated result above did not establish installed radio behavior. The
+following image qualification supplies that evidence.
+
+### Installed profile-refresh correction (2026-10-18)
+
+Source `0a32db244ea2d692da9588b133ae4c5f92092804` passed hosted CI, including
+4,028 Linux workspace tests (112 skipped). Its complete Yocto image was built
+and independently verified. The exact stripped NetworkManager binary extracted
+from that image passed the isolated native comparison: the original daemon
+reproduced the revision fault; the packaged candidate passed every credential,
+explicit-update and conflict control. The packaged SSH helper is byte-identical
+to the previously qualified executable, so its four native controls were reused
+with a recorded hash comparison rather than rerun.
+
+The existing signing authority published this owner-supervised Nightly as
+generation 6 (metadata version 7). All earlier targets remain retained and
+Release remains empty. The signed trial committed healthy on Pi 5 in 96.989
+seconds. A subsequent normal boot completed its automatic Release check with
+`no-candidate` in 49.973 seconds, without a manual retry. The installed provider
+hash matches the independently verified image. These are branch-candidate
+results, not main-branch admission or unattended rollout.
+
+The real-radio diagnostic now passes. With SSH disconnected, Wi-Fi switched off
+after 121 seconds, then reconnected through the public policy API without a
+suspension, owner resume or emergency command. The native trace recorded the
+previously problematic secret-refresh callback, but the wireless profile stayed
+at revision 2 across baseline, offline and restored snapshots. Only
+`connection.timestamp` changed in the visible settings. The redundant false
+notification followed by true was also accepted. The diagnostic never called
+`GetSecrets` or exported real profile values. A fresh SSH login succeeded;
+boot, image, kiosk, selected saved-data bytes and original logging were preserved.
+
+[Installed image and radio evidence](data/ota-profile-image-20261018.json)
+records the source, image/provider identities, signed publication, boot checks,
+radio trace summary and hashes of the retained private evidence.
+
+The subsequent native off/time-wake/automatic-OTA/off cycle also passed. The
+Nightly check remained due while offline for 107 recorded samples.
+At an accepted-sync age of 305 seconds, a manual `sync-now` started one
+new time-check attempt. The accepted success generation advanced from
+84 to 85; completion was `synchronized`, not `recent-success`.
+The due OTA check ran automatically during that connection, with separate
+`time-check` and `download` holds observed, and finished `ineligible`.
+Both workers retained their original attempt identities and deadlines. Wi-Fi
+returned to owned-off idle at 259 seconds, with no holds remaining and
+the next OTA deadline unchanged through five final observations. Cleanup restored
+Release and partial-offline disabled. Fresh SSH, the same kiosk/boot/image and
+selected saved-data bytes were verified, with zero suspensions, owner resumes
+or emergency commands. This exercised the actual time worker through its manual
+request API; it did not advance the daily timer or install another payload.
+
+The packaged provider also passed its isolated comparison on the primary
+Pi 4 Picade: the original reproduced the revision fault and the candidate
+passed every native control. Its exact packaged SSH helper passed all four
+isolated old-boot/current-boot controls in 90.30 seconds. Both experiments kept
+the production image, network service, kiosk, boot and selected store bytes
+unchanged. These are isolated executable checks, not a Pi 4 image installation
+or real-radio qualification. Both Picades still run source `5b420c9` and report
+failed update preparation; the primary Picade's boot identity, data format and
+installed operator helpers are compatible with the selected candidate.
+
+Pi 4 installed-image/radio qualification and unattended rollout remain. Automatic
+publication and installation stay disabled, and PR #510 remains draft.
 
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
