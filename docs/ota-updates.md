@@ -19,10 +19,13 @@ coordinator and scheduled download worker, described below. Its local APIs expos
 bounded time/update checks, channel selection and network policy. Installation,
 reboot and arbitrary-command operations are not exposed. The freshly flashed
 kiosks run the device service; production trust and automatic installation
-remain unprovisioned. The [live bootstrap record](data/ota-bootstrap-live-20261017.json)
-tracks the current migration and preservation checks. Pi 5 migration is stopped
-before installation because its USB drive reported medium read errors; its
-data/configuration archive has been independently exported and checked.
+remain unprovisioned. The failed Pi 5 USB drive was replaced with verified data
+restoration. The [replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json)
+and [primary Picade](data/ota-picade-bootstrap-success-20261017.json) have completed
+supervised bootstrap through the initial recovery baseline. Both passed trial,
+staged normal and canonical normal boots, independent archive verification and
+production recovery-service checks. See the [bootstrap status](ota-bootstrap.md)
+for preservation, hardware evidence and the remaining rollout gates.
 
 Remaining work retains the full OTA scope:
 
@@ -31,7 +34,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Native coordinator, continuous monitoring, operation holds, durable time checks and OTA handoff implemented; expected setup profile changes and SSH idle qualification remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
+| #263 | Recovery service and health/watchdog handling implemented; bootstrap through baseline handoff verified on the replacement Pi 5 and primary Picade; second Picade rollout and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
 | #265 | Scheduled download worker, bounded connection ownership, time-check handoff, local API and supervised state provisioning implemented; production trust/artifacts and installed-device qualification remain |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -958,12 +961,15 @@ the original kernel and game. This firmware exposes no boot-count property;
 distinct trial/normal boot IDs and kernel build IDs were observed directly.
 
 Each test restored the original trial files, removed its extra kernel, and
-verified all original boot-asset hashes after returning. The devices still run
-the original flashed image; no production qualification flags or recovery
-baseline were created. Pi 4 missing-root testing, post-promotion watchdog
-completion and interrupted-promotion testing remain. The corrected kernel
-changes the shared boot identity and therefore needs boot-asset provisioning,
-not a rootfs-only OTA.
+verified all original boot-asset hashes after returning. At that checkpoint the
+devices still ran the original flashed image; no production qualification flags
+or recovery baseline were created. Subsequent supervised bootstraps installed
+the corrected kernel on the replacement Pi 5 and primary Picade. The Picade's
+successful bootstrap also captured the early watchdog and completion receipts
+for the same trial. Pi 4 missing-root testing and the remaining ordinary OTA
+watchdog/promotion failure cases remain. The corrected kernel changes the shared
+boot identity and therefore required boot-asset provisioning, not a rootfs-only
+OTA. See the [bootstrap results](ota-bootstrap.md#primary-picade-bootstrap).
 [Hardware probe and regression evidence](data/ota-watchdog-hardware-20261017.json).
 
 The combined image at `ef44f5b` includes this kernel correction and the SSH
@@ -1315,9 +1321,10 @@ the base layer's every-boot credential merge with a root-only, bounded one-time
 import before the bind mount. Existing stores, including deliberately empty
 ones, are authoritative across updates and rollback. NetworkManager requires the
 validated bind to succeed; SSH initialization and recovery follow its attempt
-without depending on network connectivity. The supervised bootstrap still needs
-to apply this behavior to the legacy fallback root and independently preserve
-data/configuration. See [network preservation](ota-bootstrap.md#persistent-network-profiles).
+without depending on network connectivity. The supervised bootstrap applied this
+behavior to the legacy fallback roots on the replacement Pi 5 and primary Picade,
+with independently verified data/configuration exports. See
+[network preservation](ota-bootstrap.md#persistent-network-profiles).
 
 ### Persistent SSH login keys
 
