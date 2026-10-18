@@ -346,6 +346,31 @@ impl<'a> BootController<'a> {
         Ok(())
     }
 
+    #[cfg(any(test, feature = "recovery-qualification"))]
+    pub(crate) fn authorize_supervised_reboot(
+        &self,
+        journal: &RecoveryStore,
+        id: Sha256,
+        consumed: bool,
+    ) -> Result<BootObservation> {
+        let boot = self.observe()?.observation;
+        let slot = journal
+            .durable_record()?
+            .supervised_reboot(id, &boot, consumed)?;
+        let selections = self.boot.files.selections(&self.boot.runtime.roots()?)?;
+        if selections.trial
+            != Some(crate::boot::TrialSelection {
+                slot,
+                transaction: id,
+            })
+        {
+            return Err(invalid(
+                "selected trial differs from the supervised transaction",
+            ));
+        }
+        Ok(boot)
+    }
+
     pub(crate) fn authorize_write(
         &self,
         journal: &RecoveryStore,

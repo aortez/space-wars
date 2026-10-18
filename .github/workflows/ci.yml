@@ -39,6 +39,8 @@ jobs:
         run: cargo test --locked -p engine-ota --features publisher --all-targets -- --test-threads=1
       - name: Build publisher fixture tools
         run: cargo build --locked -p engine-ota --features publisher --example feed_sign --example feed_inventory
+      - name: Check separately enabled supervised installer
+        run: cargo check --locked -p engine-os-manager --features recovery-qualification --all-targets
       - name: Test initial owner authority with disposable keys
         run: /usr/bin/python3 .github/ci/ota_authority_tests.py -v
         env:

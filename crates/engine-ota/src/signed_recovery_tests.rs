@@ -96,7 +96,7 @@ async fn signed_ext4_health_failure_survives_restart_and_a_new_feed() {
     // The control and failing case use identical image bytes. Only the app
     // health observation changes; a bad image cannot explain the failure.
     let image = Fixture::new();
-    for healthy in [true, false] {
+    for (healthy, supervised) in [(true, false), (false, false), (true, true), (false, true)] {
         let directory = tempfile::tempdir().unwrap();
         let trust_path = directory.path().join("trust");
         let recovery_path = directory.path().join("recovery");
@@ -214,8 +214,15 @@ async fn signed_ext4_health_failure_survives_restart_and_a_new_feed() {
             Err(Error::Recovery(RecoveryError::Unqualified))
         ));
         assert!(recovery.record().transaction().is_none());
+        let selected_record = recovery.record().fingerprint();
         let action = recovery
-            .advance(|r| r.begin(&candidate, &normal, &capability))
+            .advance(|r| {
+                if supervised {
+                    r.begin_supervised(&candidate, &normal, selected_record, false)
+                } else {
+                    r.begin(&candidate, &normal, &capability)
+                }
+            })
             .unwrap();
         let id = recovery.record().transaction().unwrap().id;
         assert_eq!(

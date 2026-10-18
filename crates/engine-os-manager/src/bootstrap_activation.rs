@@ -28,31 +28,33 @@ pub fn activate(
                 serde_json::to_string(&stage).expect("progress serializes")
             )
         },
-        |permit| {
-            futures_lite::future::block_on(async {
-                let connection = futures_lite::future::or(
-                    async {
-                        zbus::connection::Builder::system()
-                            .map_err(error)?
-                            .method_timeout(BUS_TIMEOUT)
-                            .build()
-                            .await
-                            .map_err(error)
-                    },
-                    async {
-                        async_io::Timer::after(BUS_TIMEOUT).await;
-                        Err(error("timed out connecting to the system bus"))
-                    },
-                )
-                .await?;
-                request_on(&connection, permit).await
-            })
-        },
+        |permit| request_trial(permit),
     )
 }
 
-// Kept private so test doubles cannot become production activation authority.
-trait RequestPermit {
+pub(crate) fn request_trial(permit: &mut impl RequestPermit) -> Result<()> {
+    futures_lite::future::block_on(async {
+        let connection = futures_lite::future::or(
+            async {
+                zbus::connection::Builder::system()
+                    .map_err(error)?
+                    .method_timeout(BUS_TIMEOUT)
+                    .build()
+                    .await
+                    .map_err(error)
+            },
+            async {
+                async_io::Timer::after(BUS_TIMEOUT).await;
+                Err(error("timed out connecting to the system bus"))
+            },
+        )
+        .await?;
+        request_on(&connection, permit).await
+    })
+}
+
+// Crate-private: only native permit adapters reach this handshake.
+pub(crate) trait RequestPermit {
     fn begin(&mut self) -> Result<()>;
     fn authorize(&mut self) -> Result<()>;
     fn queued(&mut self) -> Result<()>;

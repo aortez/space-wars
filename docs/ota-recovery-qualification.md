@@ -166,10 +166,87 @@ rollback. No test keys are installed on a Pi.
 
 Live preflight found a [time-validation defect](data/ota-time-marker-20261017.json)
 on both installed images. The fix passed read-only native probes, but is not yet
-installed. Production trust and staging also remain unprovisioned; the installed
-image has no `ota-bootstrap.json` bundle. Complete that setup and the supervised
-installation handoff before the live signed trial. A disposable test authority
-must not consume the production recovery generation floor and leave an otherwise
-unprovisioned device: first provisioning correctly rejects prior signed attempts.
+installed. [Owner trust and staging](data/ota-owner-feed-20261017.json) are now
+provisioned on both primary Pis, and both verified the empty Release/Nightly
+feed. A disposable test authority must not consume the production recovery
+generation floor: first provisioning correctly rejects prior signed attempts.
 The intended fault remains stopping only the kiosk service after verifying the
 exact candidate trial boot, allowing ordinary recovery to handle the timeout.
+
+## Owner-selected signed trial
+
+`install_signed_trial` joins the native fixed-device writer and recovery journal
+to the existing one-shot systemd reboot handshake. It is a separately enabled
+owner tool, excluded from ordinary image builds and the kiosk socket. It does
+not fabricate a qualified capability or enable unattended installation. This
+provides the supervised path needed to gather the physical qualification evidence.
+
+```sh
+cargo build --locked --release --target aarch64-unknown-linux-gnu \
+  -p engine-os-manager --features recovery-qualification \
+  --example install_signed_trial
+```
+
+Upload the exact helper under its content hash in a root-owned directory. Use a
+maintained owner SSH connection and the independently recoverable device selected
+for the trial. First stage a real image using the retained owner authority and
+normal signature/compatibility validation. The initial empty feed intentionally
+cannot produce an installation selection.
+
+`sudo /path/to/install_signed_trial inspect nightly` verifies the cached feed and
+opened staged payload, then returns `selection` and `selection_sha256`. Inspection
+can advance trusted-time floors, but leaves the recovery journal, roots and boot
+selectors unchanged. The selection binds the exact candidate descriptor, current
+image/boot/device, entire recovery history, public authority and persistent data
+version. It expires fifteen boot-relative minutes after inspection. Preserve the
+report in the private evidence directory and review those identities before the
+installation command.
+
+Extract only its `selection` object to `selection.json`. The independently
+selected digest authorizes one install-and-restart:
+
+```sh
+sudo /path/to/install_signed_trial install SELECTED_SELECTION_SHA256 < selection.json
+```
+
+The command obtains native installation/recovery/trust/staging locks, requires
+the same confirmed normal boot and completed provisioning, and reverifies the
+signed payload and expiry. It durably consumes an attempt before writing the
+actual inactive partition. Readback, filesystem and embedded-image checks must
+pass before preparing the trial selector. It rechecks signatures, data identity,
+time and expiry after writing; trusted-time floors also advance at final reboot
+admission. The selected prior-good default remains intact.
+
+The reboot adapter consumes the journal's one-shot allowance before setting the
+fixed `0 tryboot` argument. Each handoff checks the exact durable transaction and
+trial selector. Conflicting reboot arguments remain untouched. Lost replies or
+failed handoffs retain consumed history and quarantine; they cannot authorize a
+second request. An interrupted write or ambiguous reboot requires inspection and
+ordinary recovery reconciliation, not replaying `install` or deleting state.
+The helper never resumes a partially written root automatically.
+
+After an observed failure and completed return to the previous good image,
+`inspect nightly FAILED_PAYLOAD_SHA256` can select the existing explicit retry
+allowance. All metadata, payload, compatibility and time checks still apply.
+The persistent generation floor is never reduced; at most two attempts per
+payload remain permitted, including the first attempt. A new selection cannot
+clear quarantine or manufacture another retry.
+
+Fixtures cover changed selection/authority/boot/data, stale history, expiration
+at reboot and clock rollback, durable attempt/reboot consumption and bounded
+retry. The signed ext4 integration runs both healthy and failed-app controls
+through ordinary qualified admission and this supervised admission, using the
+same writer, health coordinator and quarantine. The existing private-bus suite
+exercises the shared reboot handshake, including lost responses. These are
+component/integration fixtures, not a native partition write or a physical trial.
+
+Validation for this installer passed 557 tests across the updater and system
+service (ten optional cases ignored), scoped Clippy with warnings denied,
+Rust 1.89 all-target checks, the AArch64 release helper build and formatting.
+The ordinary system-service build also remains feature-independent.
+
+The remaining live sequence is to publish and stage a verified candidate with
+the time fix, capture native inspection and preservation evidence, then exercise
+the selected trial and stopped-kiosk failure on both Pis. Do not enable the
+tag/Nightly automatic rollout until the resulting rollback, quarantine and
+interrupted-promotion evidence supports that admission.

@@ -2229,9 +2229,11 @@ subsequent run completed without a service restart or reboot.
 These native checks use the corrected in-memory time validator; the installed
 service was not replaced and still reports time unusable. This is an empty-feed
 trust/transport check, not signed-image installation or unattended recovery
-qualification. The next steps are a signed candidate containing the time fix,
-the explicitly supervised installer/qualification path, and physical rollback
-and quarantine checks. The [live trust record](data/ota-owner-feed-20261017.json)
+qualification. The [owner-selected signed installer](ota-recovery-qualification.md#owner-selected-signed-trial)
+now connects the verified inactive-root writer to one-shot reboot admission,
+without granting unattended recovery capability. A signed candidate containing
+the time fix and physical rollback/quarantine checks remain next. The
+[live trust record](data/ota-owner-feed-20261017.json)
 retains source, public pins, helper hashes, test results and device evidence.
 
 The bundle has exactly three fields: `schema: 1`, `root` (the signed TUF root

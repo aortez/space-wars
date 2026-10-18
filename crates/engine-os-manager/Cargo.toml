@@ -6,6 +6,14 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Owner qualification helper only; ordinary images do not enable this feature.
+recovery-qualification = ["engine-ota/recovery-qualification"]
+
+[[example]]
+name = "install_signed_trial"
+required-features = ["recovery-qualification"]
+
 [[bin]]
 name = "engine-os-manager"
 path = "src/main.rs"

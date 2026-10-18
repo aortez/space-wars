@@ -63,6 +63,8 @@ mod repository;
 #[cfg(target_os = "linux")]
 pub mod staging_linux;
 mod store;
+#[cfg(all(target_os = "linux", any(test, feature = "recovery-qualification")))]
+pub mod supervised_install;
 
 pub use contract::*;
 pub use image_identity::*;

@@ -102,7 +102,8 @@ impl BootObservation {
 
 /// Qualification is tied to exact boot assets, firmware, kernel and media by
 /// the service. Mere presence of /dev/watchdog or two root partitions is not
-/// evidence. An unqualified device cannot start a transaction.
+/// evidence. Ordinary admission requires qualification. A separately built
+/// root-operator tool can run a selected supervised qualification trial.
 #[derive(Clone, Debug)]
 pub struct RecoveryCapability {
     pub binding: BootBinding,
@@ -443,15 +444,41 @@ impl RecoveryRecord {
         capability: &RecoveryCapability,
         explicit_retry: bool,
     ) -> Result<Plan> {
-        self.check_boot(boot)?;
-        if !self.runs_good(boot) {
-            return Err(RecoveryError::BootMismatch);
-        }
         if capability.binding != self.binding
             || !capability.tryboot_qualified
             || !capability.watchdog_qualified
         {
             return Err(RecoveryError::Unqualified);
+        }
+        self.begin_admitted(image, boot, explicit_retry)
+    }
+
+    /// Only the opt-in native operator module calls this after checking its
+    /// selected plan, real boot, completed provisioning and reverified payload.
+    /// No qualification flag is constructed, stored or granted to the daemon.
+    #[cfg(all(target_os = "linux", any(test, feature = "recovery-qualification")))]
+    pub(crate) fn begin_supervised(
+        &self,
+        candidate: &VerifiedCandidate,
+        boot: &BootObservation,
+        selected_record: Sha256,
+        explicit_retry: bool,
+    ) -> Result<Plan> {
+        if self.fingerprint() != selected_record || boot.tryboot {
+            return Err(RecoveryError::StaleCommand);
+        }
+        self.begin_admitted(candidate.image(), boot, explicit_retry)
+    }
+
+    fn begin_admitted(
+        &self,
+        image: &ImageDescriptor,
+        boot: &BootObservation,
+        explicit_retry: bool,
+    ) -> Result<Plan> {
+        self.check_boot(boot)?;
+        if !self.runs_good(boot) {
+            return Err(RecoveryError::BootMismatch);
         }
         if self
             .transaction
@@ -573,6 +600,26 @@ impl RecoveryRecord {
         let mut next = self.clone();
         next.transaction.as_mut().unwrap().phase = Phase::TrialRequested;
         next.plan(self, Action::RebootTrial { transaction: id })
+    }
+
+    #[cfg(all(target_os = "linux", any(test, feature = "recovery-qualification")))]
+    pub(crate) fn supervised_reboot(
+        &self,
+        id: Sha256,
+        boot: &BootObservation,
+        consumed: bool,
+    ) -> Result<Slot> {
+        self.check_boot(boot)?;
+        let phase = if consumed {
+            Phase::TrialRequested
+        } else {
+            Phase::Prepared
+        };
+        let tx = self.command(id, phase)?;
+        if !boot.normal(&tx.previous_good) || boot.boot_id != tx.origin_boot_id {
+            return Err(RecoveryError::BootMismatch);
+        }
+        Ok(tx.candidate.slot)
     }
 
     /// Reconcile after every service start. A fresh observer must establish a
