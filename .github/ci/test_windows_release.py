@@ -230,8 +230,8 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(job['needs'], 'linux-workspace')
                 self.assertEqual(job['runs-on'], jobs['linux-workspace']['runs-on'])
                 runs = '\n'.join(s.get('run', '') for s in job['steps'])
-                self.assertIn('--extract-to "$GITHUB_WORKSPACE" --list-type binaries-only > /dev/null', runs)
-                self.assertIn('--binaries-metadata target/nextest/binaries-metadata.json', runs)
+                self.assertIn('--extract-to "$GITHUB_WORKSPACE"', runs)
+                self.assertIn('cargo nextest run --archive-file "$RUNNER_TEMP/', runs)
                 self.assertIn('--no-tests fail', runs)
                 self.assertNotIn('cargo test', runs)
             else:

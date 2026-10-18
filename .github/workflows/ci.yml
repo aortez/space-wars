@@ -252,23 +252,18 @@ jobs:
         with:
           name: linux-workspace-tests
           path: ${{ runner.temp }}
-      - name: Extract compiled tests at their original paths
-        run: |
-          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/extract.seconds" \
-            cargo nextest list --archive-file "$RUNNER_TEMP/workspace-tests.tar.zst" \
-              --extract-to "$GITHUB_WORKSPACE" --list-type binaries-only > /dev/null
       - name: Run every non-ignored workspace test without compiling
         env:
           SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
         run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
-            cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json --cargo-metadata target/nextest/cargo-metadata.json --profile ci --no-tests fail
+            cargo nextest run --archive-file "$RUNNER_TEMP/workspace-tests.tar.zst" --extract-to "$GITHUB_WORKSPACE" --profile ci --no-tests fail
       - name: Summarize build and test timings
         if: always()
         run: |
           python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
-            --phase extract --phase workspace \
+            --phase workspace \
             target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
       - name: Upload timing and diagnostic evidence
         if: always()
@@ -304,25 +299,20 @@ jobs:
         with:
           name: linux-workspace-tests
           path: ${{ runner.temp }}
-      - name: Extract compiled tests at their original paths
-        run: |
-          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/extract.seconds" \
-            cargo nextest list --archive-file "$RUNNER_TEMP/workspace-tests.tar.zst" \
-              --extract-to "$GITHUB_WORKSPACE" --list-type binaries-only > /dev/null
       - name: Compare normal matches against the deterministic arena
         env:
           SPACEWARS_MATCH_ARTIFACTS: ${{ github.workspace }}/target/match-regression
         run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/match-extended.seconds" \
-            cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json --cargo-metadata target/nextest/cargo-metadata.json --profile ci \
+            cargo nextest run --archive-file "$RUNNER_TEMP/workspace-tests.tar.zst" --extract-to "$GITHUB_WORKSPACE" --profile ci \
               -E 'package(=engine-client) & test(=client_scenarios::surface_sortie::mission::tests::normal_match_reproduces_the_arena_in_bounded_physical_rounds)' \
               --run-ignored only --no-tests fail
       - name: Summarize build and test timings
         if: always()
         run: |
           python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
-            --phase extract --phase match-extended \
+            --phase match-extended \
             target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
       - name: Upload timing and diagnostic evidence
         if: always()
@@ -361,20 +351,15 @@ jobs:
         with:
           name: linux-ui-tests
           path: ${{ runner.temp }}
-      - name: Extract compiled tests at their original paths
-        run: |
-          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/extract.seconds" \
-            cargo nextest list --archive-file "$RUNNER_TEMP/ui-tests.tar.zst" \
-              --extract-to "$GITHUB_WORKSPACE" --list-type binaries-only > /dev/null
       - name: Run UI workflows without compiling
         env:
           UI_PROFILE: ${{ inputs.full && 'ui' || 'ui-pr' }}
           UI_PARTITION: slice:${{ matrix.shard }}/${{ inputs.full && 4 || 1 }}
         run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/ui.seconds" \
             xvfb-run -a -s "-screen 0 1280x1024x24" \
-            cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json --cargo-metadata target/nextest/cargo-metadata.json --profile "$UI_PROFILE" --partition "$UI_PARTITION" \
+            cargo nextest run --archive-file "$RUNNER_TEMP/ui-tests.tar.zst" --extract-to "$GITHUB_WORKSPACE" --profile "$UI_PROFILE" --partition "$UI_PARTITION" \
               -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
       - name: Summarize UI timings and PR budget
         if: always()
@@ -384,7 +369,7 @@ jobs:
           budget=()
           if [[ "$UI_PROFILE" == ui-pr ]]; then budget=(--ui-budget-seconds 300); fi
           python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
-            --phase extract --phase ui "${budget[@]}" \
+            --phase ui "${budget[@]}" \
             "target/nextest/$UI_PROFILE/junit.xml" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload timing and diagnostic evidence
         if: always()
@@ -555,25 +540,20 @@ jobs:
         with:
           name: linux-clock-tests
           path: ${{ runner.temp }}
-      - name: Extract compiled tests at their original paths
-        run: |
-          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/extract.seconds" \
-            cargo nextest list --archive-file "$RUNNER_TEMP/clock-tests.tar.zst" \
-              --extract-to "$GITHUB_WORKSPACE" --list-type binaries-only > /dev/null
       - name: Run extended deterministic sweep
         env:
           SUITE: ${{ matrix.suite }}
           SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
         run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/clock-extended.seconds" \
-            cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json --cargo-metadata target/nextest/cargo-metadata.json --profile ci \
+            cargo nextest run --archive-file "$RUNNER_TEMP/clock-tests.tar.zst" --extract-to "$GITHUB_WORKSPACE" --profile ci \
               -E "package(=scenario-clock) & test(/::$SUITE$/)" --run-ignored only --no-tests fail
       - name: Summarize build and test timings
         if: always()
         run: |
           python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
-            --phase extract --phase clock-extended \
+            --phase clock-extended \
             target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
       - name: Upload timing and diagnostic evidence
         if: always()

@@ -154,7 +154,7 @@ when testing this change before merge.
 Open the Actions run's summary for:
 
 - wall durations for the phases belonging to that workflow: compilation plus
-  extraction, headless/UI execution and the independent renderer/physics jobs;
+  headless/UI execution (including archive extraction) and the independent renderer/physics jobs;
 - pass/failure counts for each nextest report; and
 - the 20 slowest executed tests, with their binary, name, status, and duration.
 
@@ -171,7 +171,7 @@ Both workflows retain failed-UI screenshots, app logs and protocol histories
 separately as `ui-functional-test-artifacts`.
 
 Per-test durations overlap under parallel execution; do not sum them as job wall
-time. Timed execution commands include cached build checks and discovery. Cache
+time. Timed execution commands include archive extraction and test discovery. Cache
 transfer and machine setup are separately visible as Actions steps. Compare both
 cold and warm runs on the same runner class before claiming an overall speedup.
 
