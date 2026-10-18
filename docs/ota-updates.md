@@ -93,6 +93,25 @@ wall timestamp. Accepted forward/backward corrections count once and do not
 alter elapsed-time accounting. An unexplained clock step revokes usable status;
 that revocation persists through service restart until new accepted evidence.
 
+The signed-recovery preflight on 2026-10-17 found that the installed service
+rejected genuine successful NTP receipts on both Pis. Linux creates inode
+timestamps with its [coarse realtime clock](https://github.com/torvalds/linux/blob/v6.6/fs/inode.c#L2373-L2379);
+the marker's mtime can therefore precede the provider's high-resolution receipt
+even though the provider touches it afterward. The validator now accepts the
+absolute difference within the existing two-second tolerance, retaining all
+provider, successful-correction, running-clock and replay checks. Regression
+tests cover negative offsets, both out-of-window directions and restart/dedup.
+
+A read-only native probe at `f87a5ac` accepted one real receipt on each Pi and
+rejected duplicates; the marker preceded the receipt by 3,213 microseconds on
+the Picade and 7,187 microseconds on the Pi 5. Both installed binaries, selectors,
+boot IDs and recovery records remained unchanged. The installed `e986718`
+services still contain the defect: this validates the code against live provider
+evidence, not deployment of the fix. The [retained evidence](data/ota-time-marker-20261017.json)
+records source/artifact identities and scope. The full service suite passed
+187 tests (two ignored), scoped Clippy, Rust 1.89 checks and the AArch64 probe
+build. Signed installation and recovery qualification remain separate work.
+
 ### RTC fallback and remaining qualification
 
 `spacewars-rtc-capture.service` reads the actual RTC before timesyncd starts and
