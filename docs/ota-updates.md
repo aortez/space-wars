@@ -50,6 +50,60 @@ after ten minutes idle in Clock or the launcher, with a sixty-second countdown.
 Input postpones until the next overnight window. Running and paused games stay
 protected.
 
+## PR and nightly recovery coverage
+
+The required **OTA updater and publisher** check always runs. A verified PR merge
+whose entire diff is confined to scenario code, documentation or UI render-test
+files runs every enabled OTA test except three exhaustive checkpoint sweeps:
+legacy file replacement, root installation and boot-file retirement. Dependency
+manifests and build scripts select the complete suite even under those paths.
+Changes to OTA code, device services, client controls, Yocto, dependencies,
+toolchains, CI configuration or unknown paths run the complete suite. Missing
+history, an unexpected merge identity, an empty diff or an unreadable event also
+selects complete coverage. Main pushes and manual CI runs always run it.
+
+The exact deferred names and required PR recovery representatives are in
+[the coverage catalog](../.github/ci/ota-test-suites.json). Discovery must find
+every cataloged name exactly once before any test is skipped. New tests run on
+PRs by default. Real process-exit/resume, rollback, validation, normal installation
+and flush-failure coverage remain on every PR; no assertions, filesystem flushes,
+checkpoint budgets or existing ignored-test rules are weakened. The Linux
+workspace job delegates only the same three exhaustive sweeps to the required
+OTA job, avoiding their duplicate execution in one CI run.
+
+The existing nightly/manual image workflow runs the **complete** OTA suite on
+its exact source before building and uploading a candidate. Publisher admission
+requires that successful step, successful main CI for the same source, and the
+latest image-workflow attempt for that source, ordered by `run_started_at`
+(which resets on rerun). A later attempt of an older run also supersedes an
+earlier attempt of a higher-numbered run. Missing, invalid or tied latest start
+times stop admission. A newer failed, cancelled or unfinished attempt blocks
+admission of an older successful artifact; this history
+is checked again after downloading and validating it. Other source revisions
+do not substitute for the candidate's coverage.
+
+OTA tests use the existing optimized `ci` Cargo profile with debug assertions
+and overflow checks enabled, and four isolated nextest test processes. A hosted
+four-thread libtest experiment reproduced a lock-busy failure (344 passed,
+one failed); sharing a process is not a qualified concurrency mode. Separate
+processes isolate each fixture's descriptors from unrelated crash-child launches.
+Crash children still re-execute the same read-only binary with child-specific
+environment variables. Builds finish before execution and no concurrent rebuild
+is started. Retries are disabled. The job summary and `ota-test-timings` artifact
+record selection, wall time and JUnit results.
+On the previous serial GitHub run, the three selected sweeps accounted for about
+219 seconds of a 539-second library suite; this is a baseline, not a promised
+reduction in total PR duration.
+
+To run complete coverage locally:
+
+```sh
+python3 .github/ci/ota_test_selection.py run --full
+```
+
+These host fixtures do not replace supervised hardware power-loss and
+bootloader qualification.
+
 ## Independent device service and usable time
 
 The kiosk recipe installs `spacewars-system.service`, running independently of
@@ -1793,9 +1847,10 @@ All 156 CI Python tests pass, including late origin/byte changes, bogus builder
 reports, failed source CI, expiry, time regression and clean-checkout/pinned
 workflow checks. HTTP failure paths now explicitly close their responses while
 keeping temporary CDN credentials out of error text. Both workflows pass
-Actionlint 1.7.12. Existing CI run commands and the Windows nightly workflow
-remain unchanged; the new serial publisher fixture job includes the previously
-validated Rust publisher tests that ordinary feature-disabled builds omit.
+Actionlint 1.7.12. At that revision the new publisher fixture job ran serially
+and included the previously validated Rust publisher tests that ordinary
+feature-disabled builds omit. Current selection and concurrency are described
+in [PR and nightly recovery coverage](#pr-and-nightly-recovery-coverage).
 
 A combined check on the real `7673fa1` image passed in 57.360 seconds, using
 the actual Rust validator and three origin inspections around download and
@@ -2597,22 +2652,21 @@ qualify the installed native HTTP/boot path or its effect on game frame time.
 ## Reproducible verification
 
 ```sh
-cargo test --locked -p engine-ota -- --test-threads=1
-cargo clippy --locked -p engine-ota --all-targets --no-deps -- -D warnings
+python3 .github/ci/ota_test_selection.py run --full
+cargo clippy --locked --profile ci -p engine-ota --features publisher --all-targets --no-deps -- -D warnings
 cargo +1.89.0 check --locked -p engine-ota
 cargo check --locked -p engine-ota --target aarch64-unknown-linux-gnu
 ```
 
-Run the OTA suite serially. The existing bootstrap fixtures reproduce lock-busy
-and elapsed-progress assertion failures under the default parallel test runner
-on this host, including on unchanged revision `c779d0d`. Do not rebuild into the
-same target directory while tests are running: crash/restart fixtures reexecute
-their own test binary. Use separate target directories for baseline worktrees;
-shared artifacts also reused the baseline executable in a subsequent run here.
-The staging validation therefore forced a rebuild, checked its complete test
-inventory and ran revision-named copies of the unit and integration executables.
-Those harness limitations remain separate from image staging and physical-device
-qualification.
+Use the helper's four isolated nextest processes. Earlier validation on unchanged
+revision `c779d0d` observed lock-busy and elapsed-progress assertion failures with
+the host's default parallelism; that observation does not establish a safe
+unrestricted worker count. Do not rebuild into the same target directory while
+tests are running: crash/restart fixtures reexecute their own test binary. Use
+separate target directories for baseline worktrees; shared artifacts previously
+reused a baseline executable in a subsequent run. Comparisons must check complete
+test inventories and use frozen revision-specific executables. These harness
+constraints remain separate from physical-device qualification.
 
 The fixture builder in `crates/engine-ota/tests/support` creates ephemeral
 Ed25519 keys and signed feeds using `tough`'s publisher API. Its transport is an

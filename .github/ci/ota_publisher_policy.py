@@ -15,10 +15,10 @@ from ota_delivery import digest
 BUILD_JOBS = (('Build and qualify Pi rootfs candidate', (
     'Check out selected main source', 'Reclaim unused SDK space with a short deadline',
     'Install image inspection dependencies', 'Install validator compiler',
-    'Build image validator', 'Build selected source in isolated container',
+    'Build image validator', 'Run complete OTA recovery suite', 'Build selected source in isolated container',
     'Qualify and package exact image', 'Upload unsigned candidate')),)
 CI_JOBS = (
-    ('OTA updater and publisher', ('Test updater, metadata, image and publisher fixtures',
+    ('OTA updater and publisher', ('Select OTA recovery coverage', 'Test updater, metadata, image and publisher fixtures',
         'Build publisher fixture tools', 'Exercise resumable publication with disposable keys', 'Lint OTA publisher')),
     ('Pi hardware profiles and update safety', ('Verify unprivileged installer sandbox',
         'Test Pi deployment helpers', 'Lint Pi deployment scripts')),
@@ -28,7 +28,7 @@ CI_JOBS = (
         'Test recorded bot-trip analysis', 'Build optimized Linux test executables',
         'Verify unchanged builds reuse compiled artifacts', 'Verify PR UI selection',
         'Archive tests for independent runners')),
-    ('Linux workspace tests', ('Run every non-ignored workspace test without compiling',)),
+    ('Linux workspace tests', ('Run workspace tests without compiling',)),
     ('PR UI smoke', ('Run UI workflows without compiling',)),
     ('GPU kiosk and vendored renderers', (
         'Test vendored LinuxKMS input and presentation renderers',

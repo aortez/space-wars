@@ -87,6 +87,21 @@ class PublisherPolicyTests(unittest.TestCase):
                     helper.workflow(yaml.safe_dump(value).encode(), path,
                                     ('push', 'workflow_dispatch'), helper.CI_JOBS)
 
+    def test_full_recovery_cannot_be_omitted_or_allowed_to_fail_before_candidate_creation(self):
+        path = '.github/workflows/ota-build.yml'
+        original = yaml.load((ROOT / path).read_bytes(), Loader=yaml.BaseLoader)
+        for remove in (True, False):
+            value = copy.deepcopy(original)
+            steps = value['jobs']['candidate']['steps']
+            step = next(s for s in steps if s.get('name') == 'Run complete OTA recovery suite')
+            if remove:
+                steps.remove(step)
+            else:
+                step['continue-on-error'] = 'true'
+            with self.assertRaises(ValueError):
+                helper.workflow(yaml.safe_dump(value).encode(), path,
+                                ('schedule', 'workflow_dispatch'), helper.BUILD_JOBS)
+
     def test_mutable_actions_missing_tests_or_additional_authority_require_review(self):
         path = '.github/workflows/ota-build.yml'
         original = yaml.load((ROOT / path).read_bytes(), Loader=yaml.BaseLoader)

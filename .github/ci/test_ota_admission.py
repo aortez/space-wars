@@ -49,7 +49,7 @@ class FakeGitHub:
             self.workflows[workflow.path] = dict(id=workflow_id, path=workflow.path, state='active')
             self.files[workflow.path] = contents
             self.runs[run] = dict(
-                id=run, run_attempt=attempt, workflow_id=workflow_id, path=workflow.path,
+                id=run, run_number=run, run_attempt=attempt, workflow_id=workflow_id, path=workflow.path,
                 head_sha=SOURCE, head_branch='main', event=workflow.events[0], status='completed',
                 conclusion='success', referenced_workflows=[], head_commit=dict(id=SOURCE),
                 repository=dict(id=helper.REPOSITORY_ID, full_name=helper.REPOSITORY),
@@ -89,6 +89,10 @@ class FakeGitHub:
 
     def jobs(self, run, attempt):
         return self.call('jobs', self.job_lists[run])
+
+    def workflow_runs(self, path, source):
+        return self.call('workflow_runs', [run for run in self.runs.values()
+                         if run['path'] == path and run['head_sha'] == source])
 
     def artifact(self, artifact):
         assert artifact == 12
@@ -171,6 +175,99 @@ class AdmissionTests(unittest.TestCase):
     def test_attempt_endpoint_and_current_run_must_agree(self):
         self.api.exact[10]['event'] = 'workflow_dispatch'
         self.rejects()
+
+    def test_newer_failed_pending_cancelled_or_successful_build_cannot_be_bypassed(self):
+        for status, conclusion in [('completed', 'failure'), ('completed', 'cancelled'),
+                                   ('queued', None), ('in_progress', None), ('completed', 'success')]:
+            with self.subTest(status=status, conclusion=conclusion):
+                self.api = FakeGitHub()
+                self.api.runs[20] = dict(self.api.runs[10], id=20, run_number=20,
+                                         run_started_at='2026-10-16T12:25:00Z',
+                                         updated_at='2026-10-16T12:26:00Z',
+                                         status=status, conclusion=conclusion)
+                self.rejects()
+                self.assertNotIn('download', self.api.calls)
+
+    def test_new_build_appearing_during_download_invalidates_admission(self):
+        self.api.hook = lambda api: api.runs.update({20: dict(api.runs[10], id=20, run_number=20,
+                                                           run_started_at='2026-10-16T12:25:00Z',
+                                                           updated_at='2026-10-16T12:26:00Z',
+                                                           status='in_progress', conclusion=None)})
+        self.rejects()
+        self.assertIn('download', self.api.calls)
+
+    def test_old_attempt_is_allowed_but_duplicate_or_foreign_history_rejects(self):
+        self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, conclusion='failure',
+                                run_started_at='2026-10-16T11:50:00Z')
+        with self.admit():
+            pass
+        for field, value in [('run_number', 10), ('id', 10), ('head_branch', 'topic'),
+                             ('run_attempt', None), ('run_attempt', True), ('run_attempt', 0)]:
+            self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, conclusion='failure',
+                                    run_started_at='2026-10-16T11:50:00Z')
+            self.api.runs[9][field] = value
+            self.rejects()
+
+    def test_later_attempt_of_older_run_cannot_be_bypassed_in_any_state(self):
+        # Run 10 succeeds at 12:20; run 9 is rerun at 12:25, keeping its number.
+        for status, conclusion in [('completed', 'failure'), ('completed', 'cancelled'),
+                                   ('queued', None), ('in_progress', None), ('completed', 'success')]:
+            for reverse in (False, True):
+                with self.subTest(status=status, conclusion=conclusion, reverse=reverse):
+                    self.api = FakeGitHub()
+                    self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, run_attempt=3,
+                                            run_started_at='2026-10-16T12:25:00Z',
+                                            updated_at='2026-10-16T12:26:00Z',
+                                            status=status, conclusion=conclusion)
+                    if reverse:
+                        self.api.runs = dict(reversed(self.api.runs.items()))
+                    self.rejects()
+                    self.assertNotIn('download', self.api.calls)
+
+    def test_attempt_start_not_run_number_or_completion_determines_latest(self):
+        # The selected run 10 attempt 2 started after run 20, even though run 20
+        # eventually completed later. Its old failure does not supersede run 10.
+        self.api.runs[20] = dict(self.api.runs[10], id=20, run_number=20, run_attempt=1,
+                                 run_started_at='2026-10-16T11:50:00Z',
+                                 updated_at='2026-10-16T12:25:00Z', conclusion='failure')
+        with self.admit():
+            pass
+
+    def test_missing_invalid_future_or_tied_attempt_chronology_rejects(self):
+        for field, value in [('run_started_at', None), ('run_started_at', 'invalid'),
+                             ('run_started_at', '2026-10-16T12:00:00Z'),
+                             ('run_started_at', '2026-10-16T10:59:59Z'),
+                             ('run_started_at', '2026-10-16T12:31:00Z'),
+                             ('created_at', None), ('updated_at', None),
+                             ('updated_at', '2026-10-16T11:49:59Z'),
+                             ('updated_at', '2026-10-16T12:31:00Z')]:
+            with self.subTest(field=field, value=value):
+                self.api = FakeGitHub()
+                self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, run_attempt=3,
+                                        run_started_at='2026-10-16T11:50:00Z', conclusion='failure')
+                self.api.runs[9][field] = value
+                self.rejects()
+                self.assertNotIn('download', self.api.calls)
+
+    def test_history_selected_attempt_times_must_match_independent_inspection(self):
+        for field, value in [('created_at', '2026-10-16T10:59:59Z'),
+                             ('run_started_at', '2026-10-16T11:59:59Z'),
+                             ('updated_at', '2026-10-16T12:20:01Z')]:
+            with self.subTest(field=field):
+                self.api = FakeGitHub()
+                history = [dict(self.api.runs[10], **{field: value})]
+                with patch.object(self.api, 'workflow_runs', return_value=history):
+                    self.rejects()
+                self.assertNotIn('download', self.api.calls)
+
+    def test_older_run_rerun_during_download_invalidates_admission(self):
+        self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, run_attempt=2,
+                                run_started_at='2026-10-16T11:50:00Z', conclusion='failure')
+        self.api.hook = lambda api: api.runs[9].update(run_attempt=3,
+            run_started_at='2026-10-16T12:25:00Z', updated_at='2026-10-16T12:26:00Z',
+            status='in_progress', conclusion=None)
+        self.rejects()
+        self.assertIn('download', self.api.calls)
 
     def test_workflow_file_and_registration_are_independently_checked(self):
         for path in (POLICY.build.path, POLICY.ci.path):
@@ -475,6 +572,20 @@ class TransportTests(unittest.TestCase):
             self.api.api_opener = Opener([Response(json.dumps(value).encode())])
             with self.assertRaises(ValueError):
                 self.api.jobs(10, 2)
+
+    def test_build_history_is_source_bound_and_incomplete_pagination_fails_closed(self):
+        for value in (dict(total_count=101, workflow_runs=[{}] * 100),
+                      dict(total_count=2, workflow_runs=[{}]),
+                      dict(total_count=True, workflow_runs=[{}]),
+                      dict(total_count=0, workflow_runs=[])):
+            self.api.api_opener = Opener([Response(json.dumps(value).encode())])
+            with self.assertRaises(ValueError):
+                self.api.workflow_runs(POLICY.build.path, SOURCE)
+        self.api.api_opener = Opener([Response(json.dumps(dict(total_count=1, workflow_runs=[{'id': 10}])).encode())])
+        self.assertEqual(self.api.workflow_runs(POLICY.build.path, SOURCE), [{'id': 10}])
+        url = self.api.api_opener.requests[0][0].full_url
+        self.assertIn(f'ota-build.yml/runs?head_sha={SOURCE}&branch=main&per_page=100', url)
+        self.assertNotIn('status=', url)  # Failed and unfinished runs must remain visible.
 
     def test_session_deadline_prevents_further_network(self):
         self.api.deadline = 0

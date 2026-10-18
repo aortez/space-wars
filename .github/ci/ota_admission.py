@@ -291,6 +291,36 @@ def inspect_candidate(api, policy, selection, now):
     selection.validate()
     build = inspect_run(api, policy.build, selection.build_run, selection.build_attempt,
                         selection.source, now, policy.max_age_hours)
+    # Compare attempts across runs: run_number survives reruns, whereas GitHub's
+    # run_started_at resets. A later retry of an older run also supersedes this
+    # artifact, regardless of that retry's outcome.
+    runs = api.workflow_runs(policy.build.path, selection.source)
+    if (not isinstance(runs, list) or not 1 <= len(runs) <= 100
+            or any(not isinstance(run, dict) or not integer(run.get('run_number'))
+                   or not integer(run.get('run_attempt'))
+                   or not integer(run.get('id')) or run.get('path') != policy.build.path
+                   or run.get('head_sha') != selection.source or run.get('head_branch') != 'main'
+                   for run in runs)
+            or len({run['id'] for run in runs}) != len(runs)
+            or len({run['run_number'] for run in runs}) != len(runs)):
+        raise ValueError('Missing, ambiguous or excessive candidate workflow history')
+    attempts = [(timestamp(run.get('run_started_at')), run) for run in runs]
+    for started, run in attempts:
+        if not timestamp(run.get('created_at')) <= started <= timestamp(run.get('updated_at')) <= now:
+            raise ValueError('Invalid candidate attempt chronology')
+    latest_start = max(started for started, _ in attempts)
+    latest = [run for started, run in attempts if started == latest_start]
+    # API timestamps have second precision. A tied start does not establish
+    # which attempt is newest; run numbers cannot resolve a rerun tie safely.
+    if len(latest) != 1:
+        raise ValueError('Ambiguous latest candidate attempt')
+    latest = latest[0]
+    if (latest['id'] != selection.build_run or latest.get('run_attempt') != selection.build_attempt
+            or not completed(latest)):
+        raise ValueError('A newer candidate build must pass before publication')
+    if (latest['created_at'] != build['created_at'] or latest['run_started_at'] != build['started_at']
+            or latest['updated_at'] != build['completed_at']):
+        raise ValueError('Candidate history differs from the inspected attempt')
     ci = inspect_run(api, policy.ci, selection.ci_run, selection.ci_attempt,
                      selection.source, now, policy.max_age_hours)
     artifact = inspect_artifact(api, selection, build, policy.producer_job, now)
@@ -437,6 +467,17 @@ class GitHub:
     def run(self, run_id, attempt=None):
         suffix = f'/actions/runs/{run_id}'
         return self.json(suffix if attempt is None else suffix + f'/attempts/{attempt}')
+
+    def workflow_runs(self, path, source):
+        if not COMMIT.fullmatch(source):
+            raise ValueError('Invalid workflow history source')
+        workflow = urllib.parse.quote(Path(path).name, safe='')
+        value = self.json(f'/actions/workflows/{workflow}/runs?head_sha={source}&branch=main&per_page=100')
+        runs = value.get('workflow_runs')
+        if (not isinstance(runs, list) or not integer(value.get('total_count'), upper=100)
+                or len(runs) != value['total_count']):
+            raise ValueError('Missing or excessive candidate workflow history')
+        return runs
 
     def jobs(self, run_id, attempt):
         value = self.json(f'/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100')

@@ -1,8 +1,9 @@
 # CI performance and test timings
 
 The normal `CI` workflow runs on pull requests and pushes to `main`. It retains
-all non-ignored workspace tests, platform checks, rendering checks and physics
-diagnostics. PR UI execution uses **44 representative smoke workflows**, budgeted
+platform checks, rendering checks, physics diagnostics and non-ignored workspace
+tests, with three exhaustive OTA sweeps deferred only for verified unrelated PRs
+as described below. PR UI execution uses **44 representative smoke workflows**, budgeted
 at **3–5 minutes**. Every workspace test target still compiles on every PR.
 
 Linux compilation produces nextest archives once. Independent runners execute
@@ -59,8 +60,9 @@ significant. No cache or test coverage settings change production builds.
 
 ## Coverage and execution
 
-Nextest 0.9.144 is pinned. The headless invocation still runs all existing
-non-ignored workspace tests, including display-free UI/HUD checks. The `ui-pr`
+Nextest 0.9.144 is pinned. The headless invocation runs existing non-ignored
+workspace tests, including display-free UI/HUD checks, while delegating three
+exhaustive OTA sweeps to the required OTA job. The `ui-pr`
 profile runs a reviewed selection of ignored `ui_control_functional` cases under
 Xvfb. The `ui` profile runs every eligible UI case, including the smoke cases.
 Fail-fast and retries remain disabled. Headless cases can run in parallel;
@@ -87,6 +89,15 @@ Demo/match lifecycles, and additional variants of shared scenario lifecycle test
 See [the classification manifest](../.github/ci/ui-tests.json) for exact names and
 individual deferral reasons. Fast replacement checks add coverage; they do not
 shorten the exhaustive workflows or alter the application.
+
+OTA selection is separate from UI selection. Verified scenario/documentation/
+render-test-only PRs defer three exact file-replacement, root-installation and
+cleanup checkpoint sweeps. Other enabled OTA tests still run. Relevant or unknown
+changes, main pushes, manual CI and explicit `full=true` runs execute all three
+in the dedicated OTA job, without repeating them in the headless job. The nightly
+image workflow also requires complete OTA coverage before producing a candidate.
+See [OTA coverage and publication gates](ota-updates.md#pr-and-nightly-recovery-coverage)
+and [the exact catalog](../.github/ci/ota-test-suites.json).
 
 ### Adding or changing a UI test
 
