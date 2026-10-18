@@ -1,81 +1,87 @@
 # CI performance and test timings
 
 The normal `CI` workflow runs on pull requests and pushes to `main`. Its Linux
-workspace job builds all test targets and runs the non-ignored headless tests,
-46 display-driven UI workflows, and vendored LinuxKMS tests. Only four explicitly
-named long-running UI scenarios are deferred from PR execution. The complete
-50-workflow suite runs in `UI functional tests` (`ui-functional.yml`), nightly
-and on manual dispatch. All tests still compile on every PR.
+workspace job builds all test targets and retains the full non-ignored headless
+suite and all existing platform/rendering/diagnostic checks. PR UI execution uses
+**43 representative smoke workflows**, budgeted at **3–5 minutes**. The complete
+**65-workflow UI suite** runs in `UI functional tests` (`ui-functional.yml`),
+nightly and on manual dispatch. All tests still compile on every PR.
 
-Both workflows use Cargo's `ci` profile:
-optimization level 2, line-table debug information, debug assertions and overflow
-checks enabled, no incremental compilation, no LTO, and 16 codegen units. Both
-headless and rendered UI tests use the same workspace/target selection. Each
-workflow builds on its own runner and reuses that build for execution; it does
-not transfer a complete test build between jobs. The production `release`
-profile is unchanged, including fat LTO for the NES scheduler. The separate
-NES release benchmark and AI baseline jobs remain.
+The overall target is successful required PR checks in **under 30 minutes**, from
+the first job starting through the last required job completing, including setup,
+builds, cache transfers and artifacts, but excluding GitHub queue delays.
+The five-minute UI budget covers its execution command, including cached build
+checks/discovery, separately from the initial compilation. It is not a timeout:
+tests finish and retain their diagnostics; an overrun appears in the summary and
+as an Actions warning. Review overruns instead of hiding failures or trimming
+production behavior. Both Linux jobs retain a 60-minute cold-run safety ceiling.
 
-After compilation, the normal Linux job repeats the same Cargo build and requires
-every reported compiler artifact to be `fresh`, including the client binary.
-This checks reuse directly rather than imposing a machine-dependent timing limit.
-If it fails, Cargo fingerprint diagnostics identify the invalidated inputs. Headless, UI and
-LinuxKMS tests still run when compilation succeeded, even if this guard fails.
+Both workflows use Cargo's `ci` profile: optimization level 2, line-table debug
+information, debug assertions and overflow checks enabled, no incremental
+compilation, no LTO, and 16 codegen units. Headless and rendered UI tests use the
+same workspace/target selection. Each workflow builds on its own runner and
+reuses that build for execution; it does not transfer a complete test build
+between jobs. Production `release` settings, the NES release benchmark and AI
+baseline jobs remain unchanged.
 
-`Swatinem/rust-cache` retains Cargo dependencies and compiled dependency artifacts
-for the Linux workspace and the excluded LinuxKMS vendor manifest. It saves even
-when a test fails. The action's keys include the toolchain and Cargo configuration;
-the first run with a new profile/toolchain may be cold. PR caches are scoped by
-GitHub; main's cache supplies future branches. The UI workflow uses the same
-Rust cache configuration. An exact cache-key miss is not proof of an empty
-cache: the restore step may reuse a compatible older dependency cache.
+After compilation, normal CI repeats the same build and requires every compiler
+artifact to be `fresh`, including the client binary. Cargo fingerprint diagnostics
+identify invalidated inputs. Execution still runs after a freshness/headless
+failure if compilation succeeded; any failed command still fails its job.
+
+`Swatinem/rust-cache` retains Cargo dependencies and compiled dependency artifacts,
+including the LinuxKMS vendor manifest (and Lyon in normal CI), even after test
+failures. Keys include the toolchain and Cargo configuration. PR caches are scoped
+by GitHub; main's cache supplies future branches. An exact cache-key miss can
+still restore a compatible dependency cache, so inspect the restore log before
+calling a run cold.
 
 ## Coverage and execution
 
-Nextest 0.9.144 is installed as a pinned prebuilt tool. The normal workflow runs
-all existing non-ignored workspace tests, including display-free UI/HUD checks.
-It also runs the `ui-pr` profile under Xvfb: all ignored `ui_control_functional`
-tests except the four listed below. The nightly/manual workflow uses the `ui`
-profile to run the complete suite, including those four. No test has been
-deleted, and no seed, scenario length, timeout, or assertion
-budget has been reduced. Fail-fast and retries are disabled so results include
-every selected case without concealing a failure behind a retry. Nextest schedules
-headless tests in separate processes; shared-display UI tests remain serial.
-LinuxKMS checks still run after a workspace-test failure if compilation succeeded.
-Any failed command still fails its job. Failures in the 46 retained UI workflows
-still fail normal PR CI; the four deferred cases are checked nightly/on demand.
+Nextest 0.9.144 is pinned. The headless invocation still runs all existing
+non-ignored workspace tests, including display-free UI/HUD checks. The `ui-pr`
+profile runs a reviewed selection of ignored `ui_control_functional` cases under
+Xvfb. The `ui` profile runs every eligible UI case, including the smoke cases.
+Fail-fast and retries remain disabled. Headless cases can run in parallel;
+UI cases remain serial because they share a display. Xvfb does not accelerate
+application time.
 
-### Deferred UI scenarios
+The PR selection covers:
 
-These are useful extended checks, not tests deemed worthless. Their long waits
-make them a more expensive PR gate than the shorter end-to-end coverage retained.
-The durations below come from [PR #97's hosted run](https://github.com/aortez/space-wars/actions/runs/34804048328).
+- launcher/navigation and catalog filtering, lifecycle transitions, saved settings,
+  save-failure recovery, Device Info, network/controller controls and attached APIs;
+- normal Spacewars and its scoreboard/rematches, Classic, Pizza, Clock and Scorched
+  Earth, plus representative terrain, combat, travel and expedition workflows;
+- both rendering paths and HUD/performance integration;
+- short Garden Lab pause/step/reset/rendering, one complete marquee preview with
+  settings persistence and recovery, automatic Clock launch/disable, and planetary
+  tank driving/pause/rendering, alongside the existing shorter Clock event cases.
 
-| Test (within `ui_control_functional`) | Time | Reason for deferral |
-|---|---:|---|
-| `spacewars_match::normal_spacewars_physical_round_reaches_result_and_play_again` | 121.464s | Plays two real one-minute matches before checking result/rematch transitions. |
-| `clock::demo_profile_automatically_runs_multiple_bounded_events` | 59.488s | Waits through multiple seeded automatic events and recovery intervals. |
-| `clock::rain_settings_preview_pause_cleanup_and_persistence` | 47.640s | Waits for the full rain/floating/drain lifecycle before cleanup checks. |
-| `clock::duck_runs_jumps_exits_and_supports_live_controls_and_cleanup` | 45.234s | Completes calibration, obstacle traversal, exit and repeated preview/restart. |
+The **22 full-only cases** retain all their original assertions. They cover the
+long Garden Lab physiology sequence, repeated marquee recipes, complete tank
+fixture/player-choice matrices, autostart repetition/relaunch, complete rain/duck/
+Demo/match lifecycles, and additional variants of shared scenario lifecycle tests.
+See [the classification manifest](../.github/ci/ui-tests.json) for exact names and
+individual deferral reasons. Fast replacement checks add coverage; they do not
+shorten the exhaustive workflows or alter the application.
 
-PRs retain launcher/scenario lifecycle, both rendering paths, HUD placement,
-Device Info, sound/save-failure recovery, player settings, both autostart workflows,
-and shorter Clock falling, color-cycle, meltdown, marquee and live-controls tests.
-Autostart remains despite its 33s/43s durations because it checks important kiosk
-scheduling, automatic results/repeat, pause and input-boundary behavior.
+### Adding or changing a UI test
 
-The `ui-pr` default filter in `.config/nextest.toml` excludes only exact names;
-new UI tests are included on PRs automatically. CI compares nextest's full and PR
-discovery reports using `assert_ui_selection.py`: stale exclusion names, missing
-new tests, or unexpected selected tests fail the selection guard. Changing this
-policy requires deliberately updating both the filter and its guard. A failing
-guard stops the UI execution step but still fails CI and retains the lists for
-inspection; it does not masquerade as successful UI coverage.
+1. Classify its exact name in `.github/ci/ui-tests.json`: `smoke`, or `full_only`
+   with a nonempty reason explaining the retained representative coverage.
+2. For smoke tests, also update the exact-name `ui-pr` filter in
+   `.config/nextest.toml`. Consider the aggregate runtime, not just the new case;
+   keep practical headroom within five minutes.
+3. Run both nextest discovery commands and the guard below. CI rejects
+   unclassified, stale, duplicate or overlapping entries, omitted smoke tests,
+   unexpected PR tests, non-UI selections, and full-suite omissions.
+4. Measure meaningful changes on the hosted runner and run the full UI workflow
+   when changing or deferring coverage.
 
-Physics/AI/water scenarios advance simulated ticks as fast as the CPU allows.
-The full-client UI scenarios use real-time scheduling, including the two one-minute
-match-result/rematch workflows. Xvfb supplies a display, not accelerated time.
-Both Linux jobs retain a 60-minute cold-run safety limit, not a performance goal.
+The manifest is deliberately independent of nextest's filter. A mismatch fails
+CI before smoke execution and retains both discovery lists; it cannot masquerade
+as a successful empty run. A new test cannot silently join the PR critical path
+or disappear from the full suite.
 
 ## Running the full UI suite on GitHub
 
@@ -137,17 +143,25 @@ cargo +1.89.0 test --locked --workspace --all-targets --profile ci --no-run --me
   python3 .github/ci/assert_fresh_build.py
 /usr/bin/time -f '%e' -o target/ci-timings/workspace.seconds \
   cargo +1.89.0 nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
-# PR UI coverage (all but four named long-running scenarios):
+# Validate actual discovery against the reviewed coverage manifest:
+for profile in ui ui-pr; do
+  cargo +1.89.0 nextest list --locked --workspace --all-targets --cargo-profile ci --profile "$profile" \
+    -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --message-format json \
+    > "target/ci-timings/$profile-list.json"
+done
+python3 .github/ci/assert_ui_selection.py \
+  target/ci-timings/ui-list.json target/ci-timings/ui-pr-list.json
+# PR UI smoke coverage:
 /usr/bin/time -f '%e' -o target/ci-timings/ui.seconds \
   xvfb-run -a -s "-screen 0 1280x1024x24" \
   cargo +1.89.0 nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui-pr \
     -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
-python3 .github/ci/test_report.py --timings-dir target/ci-timings \
+python3 .github/ci/test_report.py --timings-dir target/ci-timings --ui-budget-seconds 300 \
   target/nextest/ci/junit.xml target/nextest/ui-pr/junit.xml
 ```
 
 Use `--profile ui` in the display command for the full suite. To run only the
-four deferred cases, retain `--profile ui-pr` and the other arguments, but replace
+full-only cases, retain `--profile ui-pr` and the other arguments, but replace
 the filter with:
 
 ```sh
@@ -164,8 +178,9 @@ nextest command. A filtered run replaces that profile's JUnit report; only compa
 complete-suite reports when assessing coverage. Ordinary `cargo test --profile ci`
 still works without installing nextest.
 
-Validate the standard-library-only report/reuse checks and build-identity fixtures
-with Rust, Cargo, Git, and Python available:
+Validate the CI helpers with Rust, Cargo, Git, Python and PowerShell (`pwsh`)
+available. The report/selection helpers use only the Python standard library;
+the Windows packaging regressions also invoke PowerShell:
 
 ```sh
 python3 -m unittest discover -s .github/ci -p 'test_*.py'
@@ -249,7 +264,31 @@ All 732 compiler artifacts were fresh; Cargo's build checks before headless and
 UI execution took 0.36s and 0.37s. The improvement combines warm dependency caches
 and removal of redundant client builds, not an isolated measurement of either.
 
-The first proposal moved the entire 8m48s UI phase out of PRs. The revised policy
-defers only the four cases above (273.826s combined), retaining 38 cases (253.366s
-combined). Those sums describe the old run's test durations, not a measured new
-pipeline or a performance threshold. New PR durations still need hosted measurement.
+The first proposal moved the entire 8m48s UI phase out of PRs. The policy adopted
+then deferred four long match/Demo/rain/duck workflows (273.826s combined), keeping
+38 cases (253.366s combined). These historical counts and sums precede the current
+smoke policy and subsequent test growth.
+
+
+## PR smoke baseline (#483)
+
+The prior automatic-inclusion policy had grown to 57 PR cases out of 61 UI cases.
+Five recent successful workflows took about 36–46 minutes. The Linux workspace
+job was the critical path; other jobs finished sooner. Timing artifacts for
+[run 39081252422](https://github.com/aortez/space-wars/actions/runs/39081252422)
+and [run 39080712783](https://github.com/aortez/space-wars/actions/runs/39080712783)
+show the baseline:
+
+| Phase | Run 39081252422 | Run 39080712783 |
+|---|---:|---:|
+| Linux job, including setup/artifacts | 38m09s | 45m59s |
+| Initial build | 314.99s | 405.15s |
+| Full headless execution command | 218.90s | 404.00s |
+| Serial PR UI execution command | 1339.45s | 1349.06s |
+| Garden Lab exhaustive UI case | 779.80s | 774.92s |
+| Repeated marquee recipes UI case | 148.00s | 148.05s |
+
+The new policy adds four short workflows, selects 43 smoke cases and retains
+all 65 in the full suite. Hosted before/after measurements must establish the
+end-to-end improvement, including runner/cache variation; selection alone is
+not evidence that the overall target has been met.

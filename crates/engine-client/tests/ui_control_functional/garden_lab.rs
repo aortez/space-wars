@@ -142,6 +142,61 @@ fn assert_connected_shade(v: &Value) {
 }
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn garden_lab_pause_step_and_renderers_smoke() {
+    run_functional_test_with_seed("garden-smoke", "winit-femtovg", 42, |h| {
+        let ready = h.wait_until_ready();
+        let mut state = h.activate_until_scenario("garden-lab", ready);
+        for renderer in ["vector", "raster"] {
+            state = h.activate_guarded("launcher.settings", &state);
+            if control_value(&state, "launcher.settings.renderer.next") != Some(renderer) {
+                state = h.activate_guarded("launcher.settings.renderer.next", &state);
+            }
+            assert_eq!(
+                control_value(&state, "launcher.settings.renderer.next"),
+                Some(renderer)
+            );
+            h.activate_guarded("launcher.settings.start", &state);
+            state = h.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::Gameplay),
+                    scenario: Some("garden-lab".into()),
+                    ..Default::default()
+                },
+                TRANSITION_TIMEOUT,
+            );
+            let mut control = 0;
+            choose(h, &mut state, &mut control, 0);
+            let paused = snapshot(h, |v| v["paused"] == true);
+            let stepped = until(h, &mut state, &mut control, tick(&paused) + 1);
+            assert_eq!(tick(&stepped), tick(&paused) + 1);
+            assert!(!tissues(&stepped).is_empty());
+            let deadline = Instant::now() + TRANSITION_TIMEOUT;
+            loop {
+                if green(&capture(h, renderer, "smoke", &stepped)) > 0 {
+                    break;
+                }
+                assert!(Instant::now() < deadline, "garden shoots did not render");
+                thread::sleep(POLL_INTERVAL);
+            }
+            assert_eq!(stepped, snapshot(h, |v| v["paused"] == true));
+            let reset = fresh(h, &mut state, &mut control);
+            assert!(tick(&reset) <= 2);
+            h.pause_guarded(&state);
+            let pause = h.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::PauseMain),
+                    ..Default::default()
+                },
+                TRANSITION_TIMEOUT,
+            );
+            h.activate_guarded("pause.return-to-launcher", &pause);
+            state = h.wait_until_ready();
+        }
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn garden_lab_controls_lifecycle_and_both_renderers() {
     run_functional_test_with_seed("garden-lab", "winit-femtovg", 42, |h| {
         let ready = h.wait_until_ready();

@@ -80,7 +80,8 @@ jobs:
     name: Linux workspace
     runs-on: ubuntu-latest
     # Keep the cold-run ceiling while collecting optimized, cached timings.
-    # Only four long-running UI scenarios are deferred to ui-functional.yml.
+    # The PR UI smoke suite is budgeted at 3–5 minutes; ui-functional.yml retains
+    # the full suite. This timeout is a safety ceiling, not the performance target.
     timeout-minutes: 60
     env:
       # Material-world fixtures can exceed the default test-thread stack.
@@ -142,7 +143,7 @@ jobs:
           python3 .github/ci/assert_ui_selection.py \
             "$RUNNER_TEMP/spacewars-ci-timings/ui-list.json" \
             "$RUNNER_TEMP/spacewars-ci-timings/ui-pr-list.json"
-      - name: Run PR UI functional tests
+      - name: Run PR UI smoke tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.ui-selection.outcome == 'success' }}
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/ui.seconds" \
@@ -186,6 +187,7 @@ jobs:
         run: |
           python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
             --cache-hit '${{ steps.rust-cache.outputs.cache-hit }}' \
+            --ui-budget-seconds 300 \
             --phase build --phase workspace --phase ui --phase kms --phase lyon --phase gpu-check --phase gpu-text --phase physics-diagnostics \
             target/nextest/ci/junit.xml target/nextest/ui-pr/junit.xml \
             target/nextest/physics-diagnostics/junit.xml >> "$GITHUB_STEP_SUMMARY"

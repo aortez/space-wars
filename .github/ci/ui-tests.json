@@ -1,0 +1,137 @@
+{
+  "smoke": [
+    "attached::attached_workflows_preserve_automatic_clock_and_recover_failed_checks",
+    "attached::attached_workflows_preserve_launcher_running_and_paused_sessions",
+    "autostart::autostart_clock_launch_and_disable_smoke",
+    "clock::aquarium_preview_pause_enablement_and_restart_use_the_public_ui",
+    "clock::cell_swap_preview_and_saved_switch_use_the_public_controls",
+    "clock::clock_fonts_save_live_choices_and_survive_restart",
+    "clock::color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunch",
+    "clock::crow_trigger_pause_settings_and_restart_preserve_the_resident_contract",
+    "clock::digit_slide_controls_preview_cleanup_and_persistence",
+    "clock::explosion_controls_pause_recovery_and_restart_preserve_settings",
+    "clock::falling_digits_recover_and_survive_pause_restart_and_relaunch",
+    "clock::live_clock_controls_preserve_events_preview_and_persist_across_restart_and_relaunch",
+    "clock::marquee_message_guards_validation_and_save_failure_retry",
+    "clock::marquee_preview_settings_and_recovery_smoke",
+    "clock::meltdown_pools_drains_previews_and_cleans_up_through_the_real_client",
+    "compact_hud::compact_hud_renders_with_bottom_instruments_in_both_backends",
+    "controllers::controllers_are_reachable_from_launcher_and_pause_without_resuming",
+    "device_info::device_info_is_shared_read_only_scrollable_and_returns_to_its_parent",
+    "garden_lab::garden_lab_pause_step_and_renderers_smoke",
+    "launcher_can_run_the_classic_spacewars_menu_lifecycle",
+    "launcher_can_run_the_clock_menu_lifecycle",
+    "launcher_can_run_the_pizza_menu_lifecycle",
+    "launcher_catalog::direct_extra_and_hidden_launches_do_not_depend_on_the_picker_filter",
+    "launcher_catalog::filter_save_failure_uses_app_settings_retry_and_persists_off_on_restart",
+    "launcher_catalog::main_catalog_wraps_and_toggle_preserves_setup_and_extra_return",
+    "launcher_catalog::saved_extra_automatically_expands_and_persists_the_catalog",
+    "launcher_navigation_uses_the_public_control_api",
+    "network::network_settings_handle_missing_service_and_preserve_paused_session",
+    "performance::fps_counter_is_shared_by_scene_and_native_video_lifecycles",
+    "sound::sound_controls_persist_across_scenarios_restart_and_process_restart",
+    "spaceling_lab::material_expedition_two_players_settings_and_lifecycle",
+    "spaceling_lab::spaceling_lab_launch_pause_restart_and_both_renderers",
+    "spaceling_lab::surface_expedition_two_players_settings_and_lifecycle",
+    "spacewars_match::normal_spacewars_new_worlds_rematches_and_relaunch_preserve_settings",
+    "spacewars_match::scoreboard_keeps_rematches_and_new_worlds_and_resets_at_launcher",
+    "spacewars_terrain::material_combat_ai_launch_pause_restart_and_both_renderers",
+    "spacewars_terrain::material_jetpack_launch_pause_restart_and_both_renderers",
+    "spacewars_terrain::material_travel_launch_pause_restart_and_both_renderers",
+    "spacewars_terrain::planetary_tank_drive_and_pause_smoke",
+    "spacewars_terrain::spacewars_terrain_launch_pause_restart_and_both_renderers",
+    "terrain_lab::scorched_earth_launch_pause_restart_and_both_renderers",
+    "terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers",
+    "terrain_lab::terrain_lab_launch_pause_restart_and_both_renderers"
+  ],
+  "full_only": [
+    {
+      "test": "autostart::autostart_bot_matches_use_match_results_repeat_fresh_worlds_and_preserve_humans",
+      "reason": "Three automatic bot rounds; basic autostart and separate scoreboard/rematch smoke stay on PRs."
+    },
+    {
+      "test": "autostart::autostart_clock_is_sticky_and_preserves_preferences_on_explicit_exit",
+      "reason": "Repeated idle/pause/countdown/relaunch waits; automatic launch, disable and preference-preservation smoke stays on PRs."
+    },
+    {
+      "test": "clock::demo_profile_automatically_runs_multiple_bounded_events",
+      "reason": "Repeated automatic event visits; individual event controls and cleanup stay on PRs."
+    },
+    {
+      "test": "clock::duck_runs_jumps_exits_and_supports_live_controls_and_cleanup",
+      "reason": "Full calibration, traversal, exit and repeated preview; Clock controls and headless duck regressions stay on PRs."
+    },
+    {
+      "test": "clock::marquee_recipes_preview_pause_persist_and_restore_live_clock",
+      "reason": "Repeated random recipes and complete lifecycle matrix; one preview/settings/recovery smoke and validation/save-failure checks stay on PRs."
+    },
+    {
+      "test": "clock::rain_settings_preview_pause_cleanup_and_persistence",
+      "reason": "Complete rain/floating/drain lifecycle; shared Clock settings and other fluid-event controls stay on PRs."
+    },
+    {
+      "test": "garden_lab::garden_lab_controls_lifecycle_and_both_renderers",
+      "reason": "Exhaustive growth, shade, cutting and physiology transitions (about 13 minutes); pause/step/reset/rendering smoke stays on PRs."
+    },
+    {
+      "test": "spaceling_lab::surface_expedition_launch_pause_restart_and_both_renderers",
+      "reason": "Additional expedition/sortie variant of the shared lifecycle; Spaceling Lab and both two-player expedition settings workflows stay on PRs."
+    },
+    {
+      "test": "spaceling_lab::surface_sortie_generated_launch_pause_restart_and_both_renderers",
+      "reason": "Additional expedition/sortie variant of the shared lifecycle; Spaceling Lab and both two-player expedition settings workflows stay on PRs."
+    },
+    {
+      "test": "spaceling_lab::surface_sortie_launch_pause_restart_and_both_renderers",
+      "reason": "Additional expedition/sortie variant of the shared lifecycle; Spaceling Lab and both two-player expedition settings workflows stay on PRs."
+    },
+    {
+      "test": "spaceling_lab::surface_sortie_orbit_launch_pause_restart_and_both_renderers",
+      "reason": "Additional expedition/sortie variant of the shared lifecycle; Spaceling Lab and both two-player expedition settings workflows stay on PRs."
+    },
+    {
+      "test": "spaceling_lab::surface_sortie_world_launch_pause_restart_and_both_renderers",
+      "reason": "Additional expedition/sortie variant of the shared lifecycle; Spaceling Lab and both two-player expedition settings workflows stay on PRs."
+    },
+    {
+      "test": "spacewars_match::normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers",
+      "reason": "Full player-choice matrix; representative normal Spacewars settings/restart/rematch lifecycle stays on PRs."
+    },
+    {
+      "test": "spacewars_match::normal_spacewars_physical_round_reaches_result_and_play_again",
+      "reason": "Two complete real-time matches; short scoreboard/rematch and normal Spacewars lifecycles stay on PRs."
+    },
+    {
+      "test": "spacewars_terrain::material_arena_duel_launch_pause_restart_and_both_renderers",
+      "reason": "Additional material-world variant of the shared lifecycle; terrain, combat, jetpack and travel representatives stay on PRs."
+    },
+    {
+      "test": "spacewars_terrain::material_arena_launch_pause_restart_and_both_renderers",
+      "reason": "Additional material-world variant of the shared lifecycle; terrain, combat, jetpack and travel representatives stay on PRs."
+    },
+    {
+      "test": "spacewars_terrain::material_duel_launch_pause_restart_and_both_renderers",
+      "reason": "Additional material-world variant of the shared lifecycle; terrain, combat, jetpack and travel representatives stay on PRs."
+    },
+    {
+      "test": "spacewars_terrain::material_pilot_ai_launch_pause_restart_and_both_renderers",
+      "reason": "Additional material-world variant of the shared lifecycle; terrain, combat, jetpack and travel representatives stay on PRs."
+    },
+    {
+      "test": "spacewars_terrain::material_recovery_ai_launch_pause_restart_and_both_renderers",
+      "reason": "Additional material-world variant of the shared lifecycle; terrain, combat, jetpack and travel representatives stay on PRs."
+    },
+    {
+      "test": "spacewars_terrain::material_travel_duel_launch_pause_restart_and_both_renderers",
+      "reason": "Additional material-world variant of the shared lifecycle; terrain, combat, jetpack and travel representatives stay on PRs."
+    },
+    {
+      "test": "spacewars_terrain::planetary_tank_fixture_motion_support_and_lifecycle",
+      "reason": "Four fixtures through support loss, falling and cleanup in both renderers; one drive/pause fixture stays on PRs."
+    },
+    {
+      "test": "spacewars_terrain::surface_comparison_launch_pause_restart_and_both_renderers",
+      "reason": "Additional material-world variant of the shared lifecycle; terrain, combat, jetpack and travel representatives stay on PRs."
+    }
+  ]
+}

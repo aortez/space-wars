@@ -5,6 +5,7 @@ import argparse
 import html
 import math
 from pathlib import Path
+import sys
 import xml.etree.ElementTree as ET
 
 
@@ -36,7 +37,19 @@ def cell(value):
     )
 
 
-def summarize(timings_dir, reports, cache_hit="", limit=20, *, phases=tuple(PHASES)):
+def phase_seconds(timings_dir, phase):
+    path = timings_dir / f"{phase}.seconds"
+    if path.exists():
+        # GNU time prefixes failed commands with an exit-status line. An active
+        # or interrupted command can leave an empty output file.
+        recorded = path.read_text().strip().splitlines()
+        if recorded:
+            return seconds(recorded[-1])
+    return None
+
+
+def summarize(timings_dir, reports, cache_hit="", limit=20, *, phases=tuple(PHASES),
+              ui_budget_seconds=None):
     lines = ["## Linux build and test timings", ""]
     if cache_hit:
         lines += [
@@ -47,15 +60,15 @@ def summarize(timings_dir, reports, cache_hit="", limit=20, *, phases=tuple(PHAS
     lines += ["| Phase | Wall time |", "|---|---:|"]
     for phase in phases:
         label = PHASES[phase]
-        path = timings_dir / f"{phase}.seconds"
-        # On failure GNU time prefixes the duration with an exit-status line.
-        elapsed = "Not recorded"
-        if path.exists():
-            recorded = path.read_text().strip().splitlines()
-            # An active/interrupted command can leave an empty output file.
-            if recorded:
-                elapsed = f"{seconds(recorded[-1]):.2f}s"
+        duration = phase_seconds(timings_dir, phase)
+        elapsed = "Not recorded" if duration is None else f"{duration:.2f}s"
         lines.append(f"| {label} | {elapsed} |")
+    if ui_budget_seconds is not None:
+        duration = phase_seconds(timings_dir, "ui")
+        outcome = "Not recorded"
+        if duration is not None:
+            outcome = "within budget" if duration <= ui_budget_seconds else "OVER BUDGET"
+        lines += ["", f"PR UI smoke budget: **{ui_budget_seconds:.0f}s** — **{outcome}**."]
     lines += [
         "",
         "Setup/cache transfer time is shown in the Actions steps, not this table. "
@@ -112,16 +125,29 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timings-dir", type=Path, required=True)
     parser.add_argument("--cache-hit", default="")
+    parser.add_argument("--ui-budget-seconds", type=seconds,
+                        help="Report PR UI budget overruns without hiding test results.")
     parser.add_argument(
         "--phase", choices=PHASES, action="append",
         help="Phase expected in this workflow; repeat as needed (default: all).",
     )
     parser.add_argument("reports", type=Path, nargs="+")
     args = parser.parse_args()
+    if args.ui_budget_seconds is not None and args.ui_budget_seconds <= 0:
+        parser.error("--ui-budget-seconds must be positive")
     print(summarize(
         args.timings_dir, args.reports, args.cache_hit,
         phases=args.phase if args.phase is not None else tuple(PHASES),
+        ui_budget_seconds=args.ui_budget_seconds,
     ), end="")
+    if args.ui_budget_seconds is not None:
+        duration = phase_seconds(args.timings_dir, "ui")
+        if duration is not None and duration > args.ui_budget_seconds:
+            print(
+                f"::warning title=PR UI smoke over budget::UI execution took {duration:.2f}s "
+                f"(budget {args.ui_budget_seconds:.0f}s). Review slow cases and their coverage classification.",
+                file=sys.stderr,
+            )
 
 
 if __name__ == "__main__":

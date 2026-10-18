@@ -434,6 +434,49 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn marquee_preview_settings_and_recovery_smoke() {
+    use engine_common::ClockMarqueePreset;
+    run_functional_test("marquee-smoke", |h| {
+        let ready = h.wait_until_ready();
+        let launcher = h.activate_until_scenario("clock", ready);
+        h.activate_guarded("launcher.start", &launcher);
+        let game = h.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        h.activate_guarded("gameplay.clock-controls", &game);
+        let page = h.wait_clock_screen(UiScreen::PauseClock, game.revision);
+        let page = h.change_clock_setting("pause.clock.event-profile.previous", "Off", &page);
+        h.change_clock_setting("pause.clock.marquee-preset.previous", "Text spin", &page);
+        let paused = h.clock_state();
+        let configured = h.clock_message(&paused, "Smoke test");
+        assert_eq!(configured.settings.marquee_message.as_str(), "SMOKE TEST");
+        let mut page = h.state();
+        for _ in 0..ClockEventKind::Marquee as usize {
+            page = h.activate_guarded("pause.clock.preview-event.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "pause.clock.preview-event.next"),
+            Some("Marquee")
+        );
+        h.activate_guarded("pause.clock.preview", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let running = h.clock_wait(&configured, "presenting", configured.event_id + 1, 90);
+        let marquee = running.marquee.as_ref().unwrap();
+        assert_eq!(marquee.preset, ClockMarqueePreset::TextSpin);
+        assert_eq!(marquee.content, "SMOKE TEST");
+        h.capture_screenshot("marquee-smoke-preview.png");
+        let recovered = h.clock_wait(&running, "idle", running.event_id, 0);
+        assert!(recovered.marquee.is_none());
+        assert_eq!(recovered.next_event_tick, None);
+        assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
+        assert_eq!(recovered.settings, configured.settings);
+        let saved: engine_common::Settings =
+            toml::from_str(&fs::read_to_string(h.run_path().join("config/settings.toml")).unwrap())
+                .unwrap();
+        assert_eq!(saved.clock, configured.settings);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
     use engine_common::ClockMarqueePreset;
     run_functional_test("clock-marquee", |harness| {
