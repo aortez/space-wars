@@ -1,0 +1,1024 @@
+{
+  "issue": 357,
+  "local_offscreen": true,
+  "device_deployment": false,
+  "gl": [
+    "AMD",
+    "AMD Radeon RX 7800 XT (radeonsi, navi32, ACO, DRM 3.64, 7.0.0-38-generic)",
+    "OpenGL ES 3.2 Mesa 26.0.8-1ubuntu0.3"
+  ],
+  "field_acceleration_world_units_per_physics_second_squared": 0.3,
+  "fixed_hz": 60,
+  "world_time_scale": 0.9,
+  "ramp_hold_fade_ticks": [
+    120,
+    660,
+    120
+  ],
+  "normal_population_cap": 500,
+  "warmup_ticks": 300,
+  "spawn_rate": 0.99,
+  "capture_notes": "Normal spawning, mutual gravity, contacts, damage and fragmentation. Manual admission chooses each direction through the first matching seed; direction is never overwritten. Hold captures show event tick 360. Software transition captures show event ticks 0, 60, 840 and 960; the event finishes at 900. GPU images use the production triangle presenter on a local AMD GPU, without scanout. RGB edge differences are expected between native raster and antialiased GPU output. No device-performance claim.",
+  "images": [
+    {
+      "file": "1024x768-top-hold-gpu.png",
+      "width": 1024,
+      "height": 768,
+      "sha256": "65845b93efa1a8271d96e734c4e7430942a8214a8da8b49ce1547a194c3e58fe"
+    },
+    {
+      "file": "1024x768-top-hold-software.png",
+      "width": 1024,
+      "height": 768,
+      "sha256": "81820a469c57f5921bd4aef543d862f81ae2ff4c5329a08e2ee7b826152b84fc"
+    },
+    {
+      "file": "480x800-right-hold-gpu.png",
+      "width": 480,
+      "height": 800,
+      "sha256": "7a72a521173d68a99e0f9264c9b457e0358e615064d00b69fa3d519513a916cf"
+    },
+    {
+      "file": "480x800-right-hold-software.png",
+      "width": 480,
+      "height": 800,
+      "sha256": "dbd160e407ca842f830fbce8743809376c89d8e4cc94b574075accba6e2d4985"
+    },
+    {
+      "file": "800x480-left-after-software.png",
+      "width": 800,
+      "height": 480,
+      "sha256": "cb764a19a32c63f069db19e5f0dcc71af4c157a5c2c62eb100e787823c02bd33"
+    },
+    {
+      "file": "800x480-left-before-software.png",
+      "width": 800,
+      "height": 480,
+      "sha256": "e160895b4f3f3c0e06e01c97b7002497ca80d12dec8e18500eb4886eb7f05e3f"
+    },
+    {
+      "file": "800x480-left-fade-software.png",
+      "width": 800,
+      "height": 480,
+      "sha256": "895cddaa9d09b2c0b7e5491e8f15ad53111e7c7b22eb1788add2d1cee548a099"
+    },
+    {
+      "file": "800x480-left-hold-gpu.png",
+      "width": 800,
+      "height": 480,
+      "sha256": "f742e374889208198fa04c166668aed5877c4cb01c7f739129b1d42c00f31329"
+    },
+    {
+      "file": "800x480-left-hold-software.png",
+      "width": 800,
+      "height": 480,
+      "sha256": "24f1fab31894f17e5315ee77ceadac7663c442b6cea123097e9c9d44ea7d566d"
+    },
+    {
+      "file": "800x480-left-ramp-software.png",
+      "width": 800,
+      "height": 480,
+      "sha256": "acc7486af0ae8cb222b5e68791e92bb9f41c5a0c045a8ad17c207982e8174280"
+    }
+  ],
+  "renderer_checks": [
+    {
+      "fixture": "pizza-event-left",
+      "width": "800",
+      "height": "480",
+      "seed": "1",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "1.672992",
+      "different_pixel_fraction": "0.043997",
+      "reference_rgb_mae": "0.467596",
+      "reference_different_pixel_fraction": "0.013635"
+    },
+    {
+      "fixture": "pizza-event-right",
+      "width": "800",
+      "height": "480",
+      "seed": "0",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "2.105786",
+      "different_pixel_fraction": "0.051130",
+      "reference_rgb_mae": "0.581692",
+      "reference_different_pixel_fraction": "0.018302"
+    },
+    {
+      "fixture": "pizza-event-top",
+      "width": "800",
+      "height": "480",
+      "seed": "8",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "3.156102",
+      "different_pixel_fraction": "0.075359",
+      "reference_rgb_mae": "0.857556",
+      "reference_different_pixel_fraction": "0.026138"
+    },
+    {
+      "fixture": "pizza-event-bottom",
+      "width": "800",
+      "height": "480",
+      "seed": "2",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "2.760398",
+      "different_pixel_fraction": "0.061865",
+      "reference_rgb_mae": "0.745178",
+      "reference_different_pixel_fraction": "0.023734"
+    },
+    {
+      "fixture": "pizza-event-left",
+      "width": "1024",
+      "height": "768",
+      "seed": "1",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "1.900503",
+      "different_pixel_fraction": "0.046074",
+      "reference_rgb_mae": "0.514380",
+      "reference_different_pixel_fraction": "0.014464"
+    },
+    {
+      "fixture": "pizza-event-right",
+      "width": "1024",
+      "height": "768",
+      "seed": "0",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "1.238146",
+      "different_pixel_fraction": "0.028058",
+      "reference_rgb_mae": "0.335971",
+      "reference_different_pixel_fraction": "0.010709"
+    },
+    {
+      "fixture": "pizza-event-top",
+      "width": "1024",
+      "height": "768",
+      "seed": "8",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "1.735719",
+      "different_pixel_fraction": "0.037851",
+      "reference_rgb_mae": "0.471181",
+      "reference_different_pixel_fraction": "0.014203"
+    },
+    {
+      "fixture": "pizza-event-bottom",
+      "width": "1024",
+      "height": "768",
+      "seed": "2",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "2.237553",
+      "different_pixel_fraction": "0.049599",
+      "reference_rgb_mae": "0.605161",
+      "reference_different_pixel_fraction": "0.019344"
+    },
+    {
+      "fixture": "pizza-event-left",
+      "width": "480",
+      "height": "800",
+      "seed": "1",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "2.381123",
+      "different_pixel_fraction": "0.056508",
+      "reference_rgb_mae": "0.639792",
+      "reference_different_pixel_fraction": "0.019620"
+    },
+    {
+      "fixture": "pizza-event-right",
+      "width": "480",
+      "height": "800",
+      "seed": "0",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "2.933345",
+      "different_pixel_fraction": "0.069253",
+      "reference_rgb_mae": "0.792771",
+      "reference_different_pixel_fraction": "0.024620"
+    },
+    {
+      "fixture": "pizza-event-top",
+      "width": "480",
+      "height": "800",
+      "seed": "8",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "2.368497",
+      "different_pixel_fraction": "0.058909",
+      "reference_rgb_mae": "0.652466",
+      "reference_different_pixel_fraction": "0.020531"
+    },
+    {
+      "fixture": "pizza-event-bottom",
+      "width": "480",
+      "height": "800",
+      "seed": "2",
+      "tick": "660",
+      "objects": "500",
+      "rgb_mae": "2.693785",
+      "different_pixel_fraction": "0.061951",
+      "reference_rgb_mae": "0.724834",
+      "reference_different_pixel_fraction": "0.022852"
+    }
+  ],
+  "calibration_runs": [
+    {
+      "case": "pizza-800x480-left-24",
+      "seed": 1,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 72,
+          "mass_weighted_edge_progress": 0.4216741919517517,
+          "min_radius": 0.0020063912961632013,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8108609914779663,
+          "min_radius": 0.0020014557521790266,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 188592,
+          "new_bodies_since_admission": 16371
+        },
+        {
+          "elapsed": 900,
+          "balls": 287,
+          "mass_weighted_edge_progress": 0.9133291840553284,
+          "min_radius": 0.0020014322362840176,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 611519,
+          "new_bodies_since_admission": 49664
+        }
+      ]
+    },
+    {
+      "case": "pizza-800x480-left-120",
+      "seed": 1,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 429,
+          "mass_weighted_edge_progress": 0.48051005601882935,
+          "min_radius": 0.00200065434910357,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8143655061721802,
+          "min_radius": 0.0020014566835016012,
+          "max_radius": 0.07819712907075882,
+          "contact_samples": 235116,
+          "new_bodies_since_admission": 18824
+        },
+        {
+          "elapsed": 900,
+          "balls": 491,
+          "mass_weighted_edge_progress": 0.8644880652427673,
+          "min_radius": 0.0020018748473376036,
+          "max_radius": 0.0586216114461422,
+          "contact_samples": 631735,
+          "new_bodies_since_admission": 50859
+        }
+      ]
+    },
+    {
+      "case": "pizza-800x480-right-24",
+      "seed": 0,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 37,
+          "mass_weighted_edge_progress": 0.4461599588394165,
+          "min_radius": 0.002001585206016898,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8438792824745178,
+          "min_radius": 0.002001143991947174,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 258402,
+          "new_bodies_since_admission": 23920
+        },
+        {
+          "elapsed": 900,
+          "balls": 332,
+          "mass_weighted_edge_progress": 0.9089743494987488,
+          "min_radius": 0.0020028071012347937,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 660334,
+          "new_bodies_since_admission": 54738
+        }
+      ]
+    },
+    {
+      "case": "pizza-800x480-right-120",
+      "seed": 0,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.5113657712936401,
+          "min_radius": 0.0020058518275618553,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8226179480552673,
+          "min_radius": 0.002007504692301154,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 192418,
+          "new_bodies_since_admission": 14232
+        },
+        {
+          "elapsed": 900,
+          "balls": 120,
+          "mass_weighted_edge_progress": 0.7737060189247131,
+          "min_radius": 0.002003645757213235,
+          "max_radius": 0.05189507082104683,
+          "contact_samples": 568457,
+          "new_bodies_since_admission": 43753
+        }
+      ]
+    },
+    {
+      "case": "pizza-800x480-top-24",
+      "seed": 8,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 24,
+          "mass_weighted_edge_progress": 0.48847147822380066,
+          "min_radius": 0.018406424671411514,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7972907423973083,
+          "min_radius": 0.002001263666898012,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 186762,
+          "new_bodies_since_admission": 14011
+        },
+        {
+          "elapsed": 900,
+          "balls": 468,
+          "mass_weighted_edge_progress": 0.8460160493850708,
+          "min_radius": 0.002001772169023752,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 581423,
+          "new_bodies_since_admission": 39397
+        }
+      ]
+    },
+    {
+      "case": "pizza-800x480-top-120",
+      "seed": 8,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 478,
+          "mass_weighted_edge_progress": 0.4998760223388672,
+          "min_radius": 0.002001094166189432,
+          "max_radius": 0.0778217762708664,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.6805312037467957,
+          "min_radius": 0.002001534914597869,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 223168,
+          "new_bodies_since_admission": 16083
+        },
+        {
+          "elapsed": 900,
+          "balls": 483,
+          "mass_weighted_edge_progress": 0.8181760907173157,
+          "min_radius": 0.002000257605686784,
+          "max_radius": 0.07287799566984177,
+          "contact_samples": 590694,
+          "new_bodies_since_admission": 41214
+        }
+      ]
+    },
+    {
+      "case": "pizza-800x480-bottom-24",
+      "seed": 2,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 24,
+          "mass_weighted_edge_progress": 0.468017041683197,
+          "min_radius": 0.018565859645605087,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7850590944290161,
+          "min_radius": 0.0020017207134515047,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 180366,
+          "new_bodies_since_admission": 13755
+        },
+        {
+          "elapsed": 900,
+          "balls": 497,
+          "mass_weighted_edge_progress": 0.8625319004058838,
+          "min_radius": 0.002001448767259717,
+          "max_radius": 0.056950487196445465,
+          "contact_samples": 548431,
+          "new_bodies_since_admission": 40678
+        }
+      ]
+    },
+    {
+      "case": "pizza-800x480-bottom-120",
+      "seed": 2,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.4913715720176697,
+          "min_radius": 0.00200093281455338,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7490869760513306,
+          "min_radius": 0.0020001677330583334,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 215681,
+          "new_bodies_since_admission": 16176
+        },
+        {
+          "elapsed": 900,
+          "balls": 175,
+          "mass_weighted_edge_progress": 0.8957076072692871,
+          "min_radius": 0.0020021703094244003,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 582285,
+          "new_bodies_since_admission": 41636
+        }
+      ]
+    },
+    {
+      "case": "pizza-1024x768-left-24",
+      "seed": 1,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 89,
+          "mass_weighted_edge_progress": 0.46342870593070984,
+          "min_radius": 0.0020137561950832605,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 460,
+          "mass_weighted_edge_progress": 0.823624849319458,
+          "min_radius": 0.002002983121201396,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 278379,
+          "new_bodies_since_admission": 20772
+        },
+        {
+          "elapsed": 900,
+          "balls": 481,
+          "mass_weighted_edge_progress": 0.8609848618507385,
+          "min_radius": 0.0020007388666272163,
+          "max_radius": 0.06777714937925339,
+          "contact_samples": 725215,
+          "new_bodies_since_admission": 52679
+        }
+      ]
+    },
+    {
+      "case": "pizza-1024x768-left-120",
+      "seed": 1,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 439,
+          "mass_weighted_edge_progress": 0.45370715856552124,
+          "min_radius": 0.002000208478420973,
+          "max_radius": 0.07968542724847794,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.6378243565559387,
+          "min_radius": 0.0020017093047499657,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 246099,
+          "new_bodies_since_admission": 19374
+        },
+        {
+          "elapsed": 900,
+          "balls": 491,
+          "mass_weighted_edge_progress": 0.8987459540367126,
+          "min_radius": 0.0020004441030323505,
+          "max_radius": 0.05646619200706482,
+          "contact_samples": 615787,
+          "new_bodies_since_admission": 44395
+        }
+      ]
+    },
+    {
+      "case": "pizza-1024x768-right-24",
+      "seed": 0,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 25,
+          "mass_weighted_edge_progress": 0.5067623257637024,
+          "min_radius": 0.0020592031069099903,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8227344751358032,
+          "min_radius": 0.0020012264139950275,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 182790,
+          "new_bodies_since_admission": 13153
+        },
+        {
+          "elapsed": 900,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.6935693025588989,
+          "min_radius": 0.002000093227252364,
+          "max_radius": 0.07052424550056458,
+          "contact_samples": 642223,
+          "new_bodies_since_admission": 45661
+        }
+      ]
+    },
+    {
+      "case": "pizza-1024x768-right-120",
+      "seed": 0,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.5203362107276917,
+          "min_radius": 0.002000089269131422,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8591876029968262,
+          "min_radius": 0.0020002129022032022,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 233151,
+          "new_bodies_since_admission": 15701
+        },
+        {
+          "elapsed": 900,
+          "balls": 362,
+          "mass_weighted_edge_progress": 0.9075703620910645,
+          "min_radius": 0.0020066651050001383,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 695669,
+          "new_bodies_since_admission": 47435
+        }
+      ]
+    },
+    {
+      "case": "pizza-1024x768-top-24",
+      "seed": 8,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 24,
+          "mass_weighted_edge_progress": 0.4595579504966736,
+          "min_radius": 0.018406424671411514,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8535875082015991,
+          "min_radius": 0.0020002529490739107,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 234621,
+          "new_bodies_since_admission": 16113
+        },
+        {
+          "elapsed": 900,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7214322090148926,
+          "min_radius": 0.0020011926535516977,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 638298,
+          "new_bodies_since_admission": 42285
+        }
+      ]
+    },
+    {
+      "case": "pizza-1024x768-top-120",
+      "seed": 8,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 493,
+          "mass_weighted_edge_progress": 0.4868198037147522,
+          "min_radius": 0.0020003747195005417,
+          "max_radius": 0.07807345688343048,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7825119495391846,
+          "min_radius": 0.002001602668315172,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 218901,
+          "new_bodies_since_admission": 13681
+        },
+        {
+          "elapsed": 900,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.9012511372566223,
+          "min_radius": 0.0020006210543215275,
+          "max_radius": 0.07287799566984177,
+          "contact_samples": 605282,
+          "new_bodies_since_admission": 37026
+        }
+      ]
+    },
+    {
+      "case": "pizza-1024x768-bottom-24",
+      "seed": 2,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 24,
+          "mass_weighted_edge_progress": 0.4499659538269043,
+          "min_radius": 0.018565859645605087,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.777300238609314,
+          "min_radius": 0.002001808024942875,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 221705,
+          "new_bodies_since_admission": 15485
+        },
+        {
+          "elapsed": 900,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8818500638008118,
+          "min_radius": 0.0020033419132232666,
+          "max_radius": 0.07113491743803024,
+          "contact_samples": 624568,
+          "new_bodies_since_admission": 41566
+        }
+      ]
+    },
+    {
+      "case": "pizza-1024x768-bottom-120",
+      "seed": 2,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 470,
+          "mass_weighted_edge_progress": 0.5120977759361267,
+          "min_radius": 0.0020034024491906166,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7237868309020996,
+          "min_radius": 0.0020012108143419027,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 221225,
+          "new_bodies_since_admission": 12606
+        },
+        {
+          "elapsed": 900,
+          "balls": 471,
+          "mass_weighted_edge_progress": 0.8930305242538452,
+          "min_radius": 0.002003484172746539,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 622167,
+          "new_bodies_since_admission": 38721
+        }
+      ]
+    },
+    {
+      "case": "pizza-480x800-left-24",
+      "seed": 1,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 43,
+          "mass_weighted_edge_progress": 0.5184371471405029,
+          "min_radius": 0.0020018836949020624,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7923797965049744,
+          "min_radius": 0.002000827342271805,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 230642,
+          "new_bodies_since_admission": 18057
+        },
+        {
+          "elapsed": 900,
+          "balls": 493,
+          "mass_weighted_edge_progress": 0.8905628323554993,
+          "min_radius": 0.002004841109737754,
+          "max_radius": 0.0537034273147583,
+          "contact_samples": 591187,
+          "new_bodies_since_admission": 44115
+        }
+      ]
+    },
+    {
+      "case": "pizza-480x800-left-120",
+      "seed": 1,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.5753780603408813,
+          "min_radius": 0.002001307439059019,
+          "max_radius": 0.07861479371786118,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.8119626045227051,
+          "min_radius": 0.0020000580698251724,
+          "max_radius": 0.07819712907075882,
+          "contact_samples": 215994,
+          "new_bodies_since_admission": 16041
+        },
+        {
+          "elapsed": 900,
+          "balls": 424,
+          "mass_weighted_edge_progress": 0.908915638923645,
+          "min_radius": 0.002001178218051791,
+          "max_radius": 0.05302701145410538,
+          "contact_samples": 608634,
+          "new_bodies_since_admission": 41539
+        }
+      ]
+    },
+    {
+      "case": "pizza-480x800-right-24",
+      "seed": 0,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 54,
+          "mass_weighted_edge_progress": 0.523348867893219,
+          "min_radius": 0.002053538803011179,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 498,
+          "mass_weighted_edge_progress": 0.6092709898948669,
+          "min_radius": 0.0020003519020974636,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 207822,
+          "new_bodies_since_admission": 15199
+        },
+        {
+          "elapsed": 900,
+          "balls": 481,
+          "mass_weighted_edge_progress": 0.8742350935935974,
+          "min_radius": 0.002006916794925928,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 591894,
+          "new_bodies_since_admission": 40586
+        }
+      ]
+    },
+    {
+      "case": "pizza-480x800-right-120",
+      "seed": 0,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 469,
+          "mass_weighted_edge_progress": 0.5114476084709167,
+          "min_radius": 0.0020066534634679556,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.6161906719207764,
+          "min_radius": 0.0020021903328597546,
+          "max_radius": 0.07908234000205994,
+          "contact_samples": 212595,
+          "new_bodies_since_admission": 14387
+        },
+        {
+          "elapsed": 900,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7742184996604919,
+          "min_radius": 0.002001084852963686,
+          "max_radius": 0.0728517398238182,
+          "contact_samples": 568997,
+          "new_bodies_since_admission": 39866
+        }
+      ]
+    },
+    {
+      "case": "pizza-480x800-top-24",
+      "seed": 8,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 33,
+          "mass_weighted_edge_progress": 0.46988072991371155,
+          "min_radius": 0.002179962582886219,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 487,
+          "mass_weighted_edge_progress": 0.8369606733322144,
+          "min_radius": 0.0020002422388643026,
+          "max_radius": 0.0760769248008728,
+          "contact_samples": 222769,
+          "new_bodies_since_admission": 17907
+        },
+        {
+          "elapsed": 900,
+          "balls": 270,
+          "mass_weighted_edge_progress": 0.958247184753418,
+          "min_radius": 0.002006033668294549,
+          "max_radius": 0.04870414733886719,
+          "contact_samples": 622660,
+          "new_bodies_since_admission": 48443
+        }
+      ]
+    },
+    {
+      "case": "pizza-480x800-top-120",
+      "seed": 8,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 227,
+          "mass_weighted_edge_progress": 0.5727778077125549,
+          "min_radius": 0.0020006797276437283,
+          "max_radius": 0.07705710083246231,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7596625685691833,
+          "min_radius": 0.0020062760449945927,
+          "max_radius": 0.07287799566984177,
+          "contact_samples": 228084,
+          "new_bodies_since_admission": 18721
+        },
+        {
+          "elapsed": 900,
+          "balls": 469,
+          "mass_weighted_edge_progress": 0.9297447800636292,
+          "min_radius": 0.0020081154070794582,
+          "max_radius": 0.05033667013049126,
+          "contact_samples": 607653,
+          "new_bodies_since_admission": 48396
+        }
+      ]
+    },
+    {
+      "case": "pizza-480x800-bottom-24",
+      "seed": 2,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 24,
+          "mass_weighted_edge_progress": 0.560128927230835,
+          "min_radius": 0.018565859645605087,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.7465692758560181,
+          "min_radius": 0.0020015703048557043,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 218169,
+          "new_bodies_since_admission": 19440
+        },
+        {
+          "elapsed": 900,
+          "balls": 212,
+          "mass_weighted_edge_progress": 0.9050058722496033,
+          "min_radius": 0.002001805230975151,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 595399,
+          "new_bodies_since_admission": 48698
+        }
+      ]
+    },
+    {
+      "case": "pizza-480x800-bottom-120",
+      "seed": 2,
+      "snapshots": [
+        {
+          "elapsed": 0,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.5407910346984863,
+          "min_radius": 0.0020020511001348495,
+          "max_radius": 0.07745836675167084,
+          "contact_samples": 0,
+          "new_bodies_since_admission": 0
+        },
+        {
+          "elapsed": 360,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.750100314617157,
+          "min_radius": 0.0020011323504149914,
+          "max_radius": 0.07604891806840897,
+          "contact_samples": 209380,
+          "new_bodies_since_admission": 14812
+        },
+        {
+          "elapsed": 900,
+          "balls": 500,
+          "mass_weighted_edge_progress": 0.9156109690666199,
+          "min_radius": 0.002003308618441224,
+          "max_radius": 0.03974814713001251,
+          "contact_samples": 613000,
+          "new_bodies_since_admission": 44391
+        }
+      ]
+    }
+  ]
+}

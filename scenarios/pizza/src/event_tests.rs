@@ -123,7 +123,7 @@ fn resize_preserves_pending_active_and_idle_state_while_new_runs_reset_it() {
 }
 
 #[test]
-fn scheduling_alone_does_not_change_spawning_fragmentation_or_motion() {
+fn idle_scheduling_does_not_change_spawning_fragmentation_or_motion() {
     let config = PizzaConfig {
         desired_ball_count: 4,
         ..Default::default()
@@ -147,12 +147,9 @@ fn scheduling_alone_does_not_change_spawning_fragmentation_or_motion() {
             }
             fragmented = true;
         }
-        let actions = if tick == 1 || tick == 950 {
-            vec![trigger()]
-        } else {
-            vec![]
-        };
-        PizzaScenario::step(&mut enabled, &actions, DT);
+        // The initial automatic gap is at least 3,600 ticks. Check the ordinary
+        // path before any field is admitted; active fields intentionally move balls.
+        PizzaScenario::step(&mut enabled, &[], DT);
         PizzaScenario::step(&mut disabled, &[], DT);
         assert_eq!(enabled.balls, disabled.balls, "tick {tick}");
         assert_eq!(
