@@ -1,5 +1,16 @@
 # Preparing the existing Pis for OTA
 
+**Status reviewed 2026-10-18:** bootstrap is complete on the replacement Pi 5 and
+primary Picade. This document retains the migration runbook and historical
+recovery evidence. The [active OTA plan](ota-updates.md#current-implementation)
+owns current device status and next steps; a fresh flash or repeated bootstrap
+is not the next action for those units.
+
+Device-specific commands, disk paths and scripts under `target/` below belong
+to their recorded attempts. Their identity checks, reservations and one-shot
+allowances must not be reset or replayed as routine update instructions. Retain
+the independent data/recovery archives and failed-attempt evidence.
+
 The initial fresh flashes provisioned the separate `swadmin` owner account on
 the Pis. The [flash utility](../yocto/README.md#flash) preserves and verifies
 `/data` during that operation. The supervised migration below now uses this
@@ -24,19 +35,26 @@ passed the trial, staged normal and canonical normal boots on both devices.
 Finalization archived the temporary assets and established an initial
 generation-zero recovery baseline on each, accepted by the production recovery
 service.
-**Trusted feed:** an owner-local authority and empty signed feed are now
-provisioned on both primary Pis. Each verified Release and Nightly over HTTPS
-with the native owner helper, preserving the baseline and installed images;
-see the [live trust evidence](data/ota-owner-feed-20261017.json).
-**Remaining:** Pi 4/5 physical failure qualification, signed-image delivery,
-installed service/policy rollout, and a separate rollout to `sw-picade-2.local`.
+**Trusted feed and signed delivery:** initial empty-feed checks established trust
+on both primary Pis ([original evidence](data/ota-owner-feed-20261017.json)).
+Both subsequently passed real signed installation and application-health
+rollback/quarantine ([signed trials](ota-recovery-qualification.md#physical-signed-trials-2026-10-17)).
+The latest owner-supervised publication is Nightly generation 6 / metadata
+version 7; Release remains empty. The Pi 5 runs that corrected image, while both
+Picades were last observed on generation 2 / source `5b420c9`.
+**Remaining:** corrected-image installation/radio qualification on the Picades,
+the rest of the Pi 4/5 failure/performance matrix, normal install-service/policy
+integration and automated publishing. The second Picade needs its own evidence;
+its observed image does not inherit the primary Picade's qualification.
 Automatic OTA installation is still disabled; a bootstrap package is not a signed
 OTA release.
 
 The [supervised recovery failure runner](ota-recovery-qualification.md) has now
 observed missing-root fallback on the primary Picade against this completed
-baseline, with the production record unchanged. Signed-candidate quarantine
-and interrupted promotion remain separate qualification steps.
+baseline, with the production record unchanged. Later signed trials established
+candidate quarantine on both primary Pis. Interrupted promotion and physical
+power loss remain separate qualification steps. The early generation-zero test
+is not applicable to their current signed-update state.
 
 The [2026-10-17 hardware record](data/ota-bootstrap-live-20261017.json) tracks
 the initial run; follow-up records appear below. That Picade run completed raw,
@@ -409,10 +427,12 @@ kiosk and device services had zero restarts, and no storage errors were observed
 in the current kernel log.
 
 The completed reservation, earlier unactivated preparation and independently
-verified recovery exports are retained. Trust and staging remain unprovisioned,
-and automatic OTA is disabled. Neither the Pi 5 nor `sw-picade-2.local` was changed
-during this Picade run. Pi 4 missing-root fallback and the remaining Pi 4/5 update
-and recovery failure cases still need qualification.
+verified recovery exports are retained. At the end of this bootstrap run, trust
+and staging were still unprovisioned and automatic OTA was disabled. Neither
+the Pi 5 nor `sw-picade-2.local` was changed during this Picade run. Subsequent
+missing-root and signed-update trials are recorded in the
+[recovery qualification notes](ota-recovery-qualification.md); remaining cases
+belong to the active plan rather than this historical snapshot.
 
 This run also exposed a one-time bootstrap performance cost: canonical
 preparation took 18 minutes 42 seconds and finalization took 15 minutes 54 seconds
@@ -1509,10 +1529,11 @@ tooling tests, Clippy with warnings denied, Rust 1.89 checks and the AArch64 tes
 build. The seven new bootstrap tests and hostname regression passed as UID 1000
 on the Pi 5. The actual packaged manager loads there and rejects both privileged
 key commands from that account. Its boot ID and all 101 boot files remained
-unchanged. The Picade was unreachable; its package still needs a fresh live
-preflight. Root SSH on the Pi 5 continued to reject the existing key.
+unchanged. The Picade was unreachable during that run, so its package had no
+fresh live preflight. Root SSH on the Pi 5 continued to reject the existing key.
 [Source identities, artifact hashes and validation evidence](data/ota-bootstrap-20261015.json)
-record these limits and the outstanding migration work.
+record those historical limits; later bootstrap records above cover the completed
+migrations using the separately provisioned owner account.
 
 The newer device checker, preparation record and maintenance/access guards are
 tested separately from that image. The repackaged private Pi 5 kit at
