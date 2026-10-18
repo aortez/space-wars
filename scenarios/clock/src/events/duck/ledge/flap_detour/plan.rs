@@ -8,8 +8,8 @@ use engine_rapier::world::{BallCastOptions, BallCastStatus};
 pub(super) struct Return {
     pub center: Vec2,
     pub body: BodyId,
-    pose: Vec2,
-    angle: f32,
+    pub(super) pose: Vec2,
+    pub(super) angle: f32,
 }
 
 impl Return {
@@ -173,7 +173,12 @@ impl DuckEvent {
         false
     }
 
-    fn detour_flight_step(&self, position: Vec2, velocity: &mut Vec2, command: &Command) -> Vec2 {
+    pub(super) fn detour_flight_step(
+        &self,
+        position: Vec2,
+        velocity: &mut Vec2,
+        command: &Command,
+    ) -> Vec2 {
         let observation = Observation {
             position,
             velocity: Vec2::new(velocity.x * self.direction, velocity.y),

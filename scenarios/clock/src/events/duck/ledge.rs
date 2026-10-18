@@ -8,6 +8,8 @@ use engine_common::{
 mod automatic;
 #[cfg(test)]
 mod automatic_tests;
+#[cfg(test)]
+mod direct_flap_tests;
 mod flap_detour;
 #[cfg(test)]
 mod flap_detour_capture_tests;

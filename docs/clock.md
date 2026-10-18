@@ -1155,14 +1155,21 @@ the flap resumes from its held pose at the ordinary rate, without catching up to
 an expired deadline. An empty exit stays open until the visit ends. Ordinary
 jumps inherit the supporting point's current physical velocity. The flaps have
 no spring response or extra jump bonus; [#474](https://github.com/aortez/space-wars/issues/474)
-records that future experiment. The attachment seam is qualified with fixtures;
-the player ledge-grab controller follows in [#281](https://github.com/aortez/space-wars/issues/281).
+records that future experiment. Shared ledge mechanics support
+[player controls](clock-duck-player-ledges-validation.md) and an
+[occasional automatic pull-up detour](clock-duck-flap-detour-validation.md).
 
 The public duck diagnostics include `flaps` in entrance/exit order, reporting
 requested/actual opening, hinge, angle, body ID, motion and any standing,
 attachment or obstruction hold. Older payloads may omit this additive field.
 [Rigid-flap validation and target-size captures](clock-duck-flaps-validation.md)
 cover standing, jumping, delayed closure, shared ownership and cleanup.
+
+`SPACEWARS_CLOCK_DUCK_FLAP_DETOUR=direct-landing` selects the separate
+[direct-landing experiment](clock-duck-direct-flap-validation.md) on those
+occasional visits. It uses ordinary jumps to reach the narrow upper edge of a
+nearly closed flap, perches briefly, then returns to the course. Default visits
+retain the pull-up route; the experiment does not change saved settings.
 
 This close-up uses the production renderer at half speed, with the camera moved
 to the entrance of the 800×480 layout:

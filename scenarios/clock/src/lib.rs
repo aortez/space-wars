@@ -370,6 +370,8 @@ pub struct ClockConfig {
     pub fonts: ClockFontSettings,
     pub aspect_ratio: f32,
     pub duck_debug_overlay: bool,
+    /// Opt-in direct-landing experiment, independent of saved Clock settings.
+    pub duck_direct_flap_landing: bool,
     /// Development-only water fixtures using the Meltdown lifecycle.
     pub water_lab: ClockWaterLab,
     /// None chooses a seeded personality once per Duck event.
@@ -392,6 +394,7 @@ impl Default for ClockConfig {
             fonts: ClockFontSettings::default(),
             aspect_ratio: DEFAULT_ASPECT_RATIO,
             duck_debug_overlay: false,
+            duck_direct_flap_landing: false,
             water_lab: ClockWaterLab::Off,
             duck_jump_profile: None,
             duck_course_pattern: None,
@@ -413,6 +416,7 @@ impl ClockConfig {
             fonts: self.fonts,
             aspect_ratio: normalize_aspect_ratio(self.aspect_ratio),
             duck_debug_overlay: self.duck_debug_overlay,
+            duck_direct_flap_landing: self.duck_direct_flap_landing,
             water_lab: self.water_lab,
             duck_jump_profile: self.duck_jump_profile,
             duck_course_pattern: self.duck_course_pattern,
@@ -780,6 +784,7 @@ impl ClockState {
             let mut duck =
                 events::duck::DuckEvent::new_course(layout, seed, self.config.duck_course_pattern);
             duck.select_jump_profile(self.config.duck_jump_profile);
+            duck.select_direct_flap_landing(self.config.duck_direct_flap_landing);
             self.floor.acquire_visit();
             self.duck_visit = Some(Box::new(duck));
             // Admission uses the ordinary cadence/cooldown, but does not hold

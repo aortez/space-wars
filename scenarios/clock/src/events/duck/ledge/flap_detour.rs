@@ -6,6 +6,7 @@ use engine_common::{
     ClockDuckFlapDetourState,
 };
 
+mod direct;
 mod plan;
 use plan::Return;
 
@@ -20,6 +21,7 @@ pub(in crate::events::duck) struct Detour {
     landing: Option<Return>,
     launched: bool,
     return_airborne: bool,
+    direct: Option<direct::Plan>,
 }
 
 impl Detour {
@@ -37,6 +39,11 @@ pub(super) fn selected(seed: u64) -> bool {
 }
 
 impl DuckEvent {
+    pub(crate) fn select_direct_flap_landing(&mut self, enabled: bool) {
+        assert_eq!(self.tick, 0);
+        self.ledge.detour.stats.direct_landing = enabled;
+    }
+
     /// Older timed collision/calibration fixtures retain their original route.
     /// Detour fixtures separately exercise the new choice and interruptions.
     #[cfg(test)]
@@ -102,6 +109,14 @@ impl DuckEvent {
             direction: 1.0,
             jump: false,
         };
+        if self.ledge.detour.stats.direct_landing
+            && matches!(
+                self.ledge.detour.stats.phase,
+                DetourPhase::Pending | DetourPhase::Approaching
+            )
+        {
+            return self.decide_direct_flap_approach(water);
+        }
         match self.ledge.detour.stats.phase {
             DetourPhase::Pending => {
                 // Let the ordinary spawn settle. Never start a calibration
@@ -165,6 +180,9 @@ impl DuckEvent {
                 let landing = self.ledge.detour.landing.unwrap();
                 self.ledge.detour.stats.perch_ticks += 1;
                 if self.ledge.detour.stats.perch_ticks < PERCH_TICKS {
+                    if let Some(plan) = self.ledge.detour.direct {
+                        return Some(self.direct_position_command(plan.perch_x, false));
+                    }
                     return Some(still());
                 }
                 let motion = self.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
