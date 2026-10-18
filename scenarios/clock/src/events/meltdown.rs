@@ -48,6 +48,26 @@ pub(crate) struct MeltdownEvent {
 }
 
 impl MeltdownEvent {
+    pub fn canonical_world<'a>(
+        &'a self,
+        player: Option<&'a DuckEvent>,
+    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
+        if let Some(shared) = &self.shared {
+            Some(shared.arena.get(player).arena_world())
+        } else {
+            self.floats.as_ref().map(|f| &f.world)
+        }
+    }
+    pub fn canonical_world_mut<'a>(
+        &'a mut self,
+        player: Option<&'a mut DuckEvent>,
+    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
+        if let Some(shared) = &mut self.shared {
+            Some(shared.arena.get_mut(player).arena_world_mut())
+        } else {
+            self.floats.as_mut().map(|f| &mut f.world)
+        }
+    }
     pub fn new(context: EventContext<'_>, seed: u64, mode: ClockWaterLab) -> Self {
         Self::in_arena(context, seed, mode, None)
     }

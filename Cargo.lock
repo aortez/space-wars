@@ -5264,6 +5264,7 @@ dependencies = [
  "engine-common",
  "engine-core",
  "engine-rapier",
+ "engine-terrain",
  "engine-water",
  "fontdue",
  "rand 0.9.4",

@@ -92,6 +92,7 @@ fn no_enabled_events_is_a_bounded_noop_and_feedback_expires_only_while_running()
         explosion: false,
         aquarium: false,
         cell_swap: false,
+        grass: false,
     };
     next(&mut state);
     assert_eq!(state.event_id(), 0);
@@ -140,6 +141,7 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
             explosion: false,
             aquarium: false,
             cell_swap: false,
+            grass: false,
         };
         ClockScenario::step(
             &mut state,
@@ -201,6 +203,7 @@ fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
             explosion: true,
             aquarium: true,
             cell_swap: true,
+            grass: true,
         };
         ClockScenario::step(
             &mut state,

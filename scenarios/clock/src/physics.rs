@@ -47,6 +47,13 @@ impl FallingWorld {
         Self { world, bodies }
     }
 
+    pub fn world(&self) -> &PhysicsWorld {
+        &self.world
+    }
+    pub fn world_mut(&mut self) -> &mut PhysicsWorld {
+        &mut self.world
+    }
+
     pub fn into_parts(self) -> (PhysicsWorld, FallingBodies) {
         (self.world, self.bodies)
     }

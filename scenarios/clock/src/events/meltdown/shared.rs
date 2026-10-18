@@ -124,9 +124,10 @@ impl MeltdownEvent {
 
     pub(super) fn step_shared(
         &mut self,
-        context: EventContext<'_>,
+        mut context: EventContext<'_>,
         mut player: Option<&mut DuckEvent>,
     ) -> bool {
+        let soil = context.soil.take();
         // Move the small lease/batch handles temporarily, not the world or its
         // allocations. This lets both material paths share reformation code.
         let mut shared = self.shared.take().expect("shared Meltdown");
@@ -163,7 +164,9 @@ impl MeltdownEvent {
             }
             self.reform(context);
         }
-        let duck = shared.arena.step(player, Some(&self.water), true);
+        let duck = shared
+            .arena
+            .step_with_soil(player, Some(&self.water), true, soil);
         if material {
             self.exited_solid_area += shared.bodies.synchronize(
                 duck.arena_world_mut(),

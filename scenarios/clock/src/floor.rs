@@ -49,7 +49,8 @@ impl FloorManager {
             | ClockEventKind::Marquee
             | ClockEventKind::DigitSlide
             | ClockEventKind::CellSwap
-            | ClockEventKind::Crow => ClockFloorMode::Closed,
+            | ClockEventKind::Crow
+            | ClockEventKind::Grass => ClockFloorMode::Closed,
         };
     }
 

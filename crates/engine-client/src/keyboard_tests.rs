@@ -1051,8 +1051,10 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 649.0, 110.0);
     assert!(fonts_opened.get());
     click(&window, 649.0, 166.0);
+    assert_eq!(adjusted.get(), Some((19, 1)));
+    click(&window, 470.0, 166.0);
     assert_eq!(adjusted.get(), Some((18, 1)));
-    click(&window, 400.0, 166.0);
+    click(&window, 326.0, 166.0);
     assert_eq!(adjusted.get(), Some((13, 1)));
     click(&window, 175.0, 166.0);
     assert_eq!(adjusted.get(), Some((12, 1)));
@@ -1074,9 +1076,13 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     key(&window, Key::DownArrow);
     assert_eq!(window.get_launcher_settings_focus_index(), 4);
     assert!(window.get_launcher_clock_cell_swap_enabled());
-    click(&window, 649.0, 272.0);
+    click(&window, 470.0, 272.0);
     assert!(!window.get_launcher_clock_cell_swap_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 17);
+    assert!(window.get_launcher_clock_grass_enabled());
+    click(&window, 649.0, 272.0);
+    assert!(!window.get_launcher_clock_grass_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 18);
     assert!(window.get_launcher_clock_meltdown_enabled());
     click(&window, 175.0, 324.0);
     assert!(!window.get_launcher_clock_meltdown_enabled());

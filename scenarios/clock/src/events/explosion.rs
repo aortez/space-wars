@@ -58,6 +58,32 @@ fn body_id(index: usize) -> BodyId {
 }
 
 impl ExplosionEvent {
+    pub fn canonical_world<'a>(
+        &'a self,
+        player: Option<&'a DuckEvent>,
+    ) -> Option<&'a PhysicsWorld> {
+        match &self.mechanics {
+            Mechanics::Standalone(world) => world.as_deref(),
+            Mechanics::Shared(arena) => Some(arena.get(player).arena_world()),
+        }
+    }
+    pub fn canonical_world_mut<'a>(
+        &'a mut self,
+        player: Option<&'a mut DuckEvent>,
+    ) -> Option<&'a mut PhysicsWorld> {
+        match &mut self.mechanics {
+            Mechanics::Standalone(world) => world.as_deref_mut(),
+            Mechanics::Shared(arena) => Some(arena.get_mut(player).arena_world_mut()),
+        }
+    }
+    #[cfg(test)]
+    pub fn soil_world(&self) -> Option<&PhysicsWorld> {
+        match &self.mechanics {
+            Mechanics::Standalone(world) => world.as_deref(),
+            _ => None,
+        }
+    }
+
     pub fn new(context: EventContext<'_>, seed: u64) -> Self {
         let drain = context.floor.drain().expect("Explosion owns the drain");
         Self::build(
@@ -284,7 +310,12 @@ impl ExplosionEvent {
         self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS
     }
 
-    pub fn step(&mut self, context: EventContext<'_>, mut duck: Option<&mut DuckEvent>) -> bool {
+    pub fn step(
+        &mut self,
+        mut context: EventContext<'_>,
+        mut duck: Option<&mut DuckEvent>,
+    ) -> bool {
+        let soil = context.soil.take();
         // Reading/control updates do not move paused debris. On the next tick,
         // redirect only changed destinations from their current visible poses.
         if let Some(reassembly) = &mut self.reassembly {
@@ -298,7 +329,9 @@ impl ExplosionEvent {
                 world.step(1.0 / 60.0);
                 &*world
             }),
-            Mechanics::Shared(arena) => Some(arena.step(duck, None, false).arena_world()),
+            Mechanics::Shared(arena) => {
+                Some(arena.step_with_soil(duck, None, false, soil).arena_world())
+            }
         };
         if self.live_bodies
             && let Some(world) = world

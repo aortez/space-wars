@@ -129,19 +129,19 @@ pub(crate) fn moved_clock_selection(current: i32, action: UiAction) -> i32 {
     // followed by preview/Crow/Explosion [4, 14, 15], Marquee/recipe [9, 10], actions [5, 6].
     // Rain (12), Date (13) and Cell Swap (18) share a row. Up/Down visit
     // each; Left/Right on Rain continues to adjust its amount.
-    let current = current.clamp(0, 18) as usize;
+    let current = current.clamp(0, 19) as usize;
     match action {
         UiAction::Up => [
-            5, 0, 12, 12, 2, 9, 10, 12, 12, 17, 17, 18, 18, 16, 4, 14, 1, 15, 13,
+            5, 0, 12, 12, 2, 9, 10, 12, 12, 17, 17, 18, 18, 16, 4, 14, 1, 15, 13, 18,
         ][current],
         UiAction::Down => [
-            1, 16, 4, 4, 14, 0, 0, 4, 4, 5, 6, 4, 2, 18, 15, 17, 13, 9, 12,
+            1, 16, 4, 4, 14, 0, 0, 4, 4, 5, 6, 4, 2, 18, 15, 17, 13, 9, 12, 2,
         ][current],
         UiAction::Left => [
-            0, 1, 11, 2, 4, 6, 5, 3, 7, 10, 17, 8, 12, 13, 4, 14, 1, 9, 13,
+            0, 1, 11, 2, 4, 6, 5, 3, 7, 10, 17, 8, 12, 13, 4, 14, 1, 9, 13, 18,
         ][current],
         UiAction::Right => [
-            0, 1, 3, 7, 4, 6, 5, 8, 11, 17, 10, 2, 12, 13, 15, 4, 0, 10, 12,
+            0, 1, 3, 7, 4, 6, 5, 8, 11, 17, 10, 2, 12, 13, 15, 4, 0, 10, 19, 12,
         ][current],
         _ => current as i32,
     }

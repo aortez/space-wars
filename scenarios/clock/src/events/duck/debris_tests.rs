@@ -143,3 +143,16 @@ fn removed_debris_does_not_leave_the_duck_stuck_on_a_phantom_support() {
     assert_eq!(duck.controller.recovery.stats.recoveries, 1);
     assert_eq!(duck.supported_surface(), Some(0));
 }
+
+#[test]
+fn clock_grass_contract_foreign_debris_stays_foreign_with_retained_soil() {
+    let (mut duck, debris, _) = perched(ClockDuckJumpProfile::Careful, 1.0, 3.0);
+    let mut soil = crate::grass::SoilHabitat::new(duck.layout);
+    let plan = soil.admit(&[(-duck.width * 0.5, duck.width * 0.5)], |_| false);
+    assert!(!plan.sites.is_empty());
+    duck.synchronize_soil(Some(&mut soil));
+    // Existing physical contacts are with the foreign body, not the dirt below.
+    assert!(duck.grounded());
+    assert_eq!(duck.supported_surface(), None);
+    assert!(duck.world.as_ref().unwrap().motion(debris).is_some());
+}

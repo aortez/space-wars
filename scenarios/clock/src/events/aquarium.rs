@@ -63,6 +63,22 @@ pub(crate) fn fish_radius(layout: Layout) -> f32 {
 }
 
 impl AquariumEvent {
+    pub fn canonical_world<'a>(
+        &'a self,
+        player: Option<&'a DuckEvent>,
+    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
+        self.shared
+            .as_ref()
+            .map(|s| s.arena.get(player).arena_world())
+    }
+    pub fn canonical_world_mut<'a>(
+        &'a mut self,
+        player: Option<&'a mut DuckEvent>,
+    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
+        self.shared
+            .as_mut()
+            .map(|s| s.arena.get_mut(player).arena_world_mut())
+    }
     pub fn new(context: EventContext<'_>, seed: u64) -> Self {
         Self::build(context, seed, false)
     }
@@ -195,7 +211,12 @@ impl AquariumEvent {
         self.school.set_obstacles(obstacles, &self.water, self.port);
     }
 
-    pub fn step(&mut self, context: EventContext<'_>, mut player: Option<&mut DuckEvent>) -> bool {
+    pub fn step(
+        &mut self,
+        mut context: EventContext<'_>,
+        mut player: Option<&mut DuckEvent>,
+    ) -> bool {
+        let soil = context.soil.take();
         self.synchronize(context.display, context.segments);
         self.tick += 1;
         const INLET_TICKS: u64 = FILL_TICKS - 30;
@@ -249,7 +270,9 @@ impl AquariumEvent {
             } else {
                 duck.sync_responsive_floor(&self.floor);
             }
-            let duck = shared.arena.step(player, Some(&self.water), true);
+            let duck = shared
+                .arena
+                .step_with_soil(player, Some(&self.water), true, soil);
             self.native_steps += 1;
             if self.tick < DRAIN_AT {
                 self.school.step(

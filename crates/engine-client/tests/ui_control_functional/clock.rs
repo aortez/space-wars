@@ -4,6 +4,385 @@ use spacewars_control::{
 };
 
 #[test]
+#[ignore = "requires an explicit display and real client"]
+fn grass_vector_admission_controls_smoke() {
+    grass_admission_smoke("clock-grass-smoke-vector", "vector");
+}
+
+#[test]
+#[ignore = "requires an explicit display and real client"]
+fn grass_raster_admission_controls_smoke() {
+    grass_admission_smoke("clock-grass-smoke-raster", "raster");
+}
+
+fn grass_admission_smoke(name: &'static str, renderer: &'static str) {
+    run_functional_test_with_backend(name, "winit-femtovg", |h| {
+        let ready = h.wait_until_ready();
+        let state = h.activate_until_scenario("clock", ready);
+        let mut page = h.activate_guarded("launcher.settings", &state);
+        if control_value(&page, "launcher.settings.renderer.next") != Some(renderer) {
+            page = h.activate_guarded("launcher.settings.renderer.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "launcher.settings.renderer.next"),
+            Some(renderer)
+        );
+        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        h.activate_guarded("launcher.settings.start", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let initial = h.clock_state();
+        assert_eq!(initial.profile, "off");
+        assert_eq!(initial.grass.as_ref().unwrap().soil_retained, 0);
+        h.clock_trigger_event(&initial, ClockEventKind::Grass);
+        let deadline = Instant::now() + Duration::from_secs(15);
+        let early = loop {
+            let current = h.clock_state();
+            assert!(current.player_duck.is_none());
+            if current.grass.as_ref().unwrap().shoots > 0 {
+                break current;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "default-light early shoot missing"
+            );
+            thread::sleep(Duration::from_millis(50));
+        };
+        let grass = early.grass.as_ref().unwrap();
+        assert!(grass.soil_retained > 0 && grass.soil_retained <= 2880);
+        assert_eq!(grass.soil_added, grass.soil_retained as u64);
+        assert_eq!(grass.seeded, 3);
+        assert!(grass.biology_tick <= 10);
+        assert_eq!(grass.intensity, engine_rapier::plant_light::DIM_ROOM as u16);
+        assert!(
+            grass.inspection.is_none(),
+            "smoke uses the ordinary presentation"
+        );
+        h.capture_screenshot(&format!("grass-{renderer}-normal-early.png"));
+        write_json(&h.run_path().join("normal-early.json"), &early);
+        let gameplay = h.state();
+        h.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = h.change_clock_setting("pause.clock.grass", "Off", &page);
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        let paused = loop {
+            let current = h.clock_state();
+            assert_eq!(current.settings_error, None);
+            if !current.settings_pending {
+                break current;
+            }
+            assert!(Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(10));
+        };
+        assert!(!paused.settings.events.grass);
+        assert_eq!(paused.grass.as_ref().unwrap().soil_added, grass.soil_added);
+        assert_eq!(paused.grass.as_ref().unwrap().organisms, grass.organisms);
+        h.assert_clock_stays_paused(&paused);
+        write_json(&h.run_path().join("disabled-paused.json"), &paused);
+        let page = h.activate_guarded("pause.clock.back", &page);
+        h.activate_guarded("pause.restart", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let restarted = h.clock_state();
+        let clean = restarted.grass.as_ref().unwrap();
+        assert_eq!(clean.soil_retained, 0);
+        assert_eq!(clean.soil_added, 0);
+        assert_eq!(clean.living_tissues, 0);
+        assert!(clean.organisms.is_empty());
+        assert!(!restarted.settings.events.grass);
+        h.capture_screenshot(&format!("grass-{renderer}-normal-restarted.png"));
+        write_json(&h.run_path().join("restarted.json"), &restarted);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display and a real five-minute normal-speed sequence"]
+fn grass_vector_normal_speed_progress_and_persistent_controls() {
+    grass_progress("clock-grass-progress-vector", "vector");
+}
+#[test]
+#[ignore = "requires an explicit display and a real five-minute normal-speed sequence"]
+fn grass_raster_normal_speed_progress_and_persistent_controls() {
+    grass_progress("clock-grass-progress-raster", "raster");
+}
+fn grass_progress(name: &'static str, renderer: &'static str) {
+    run_functional_test_with_backend(name, "winit-femtovg", |h| {
+        let ready = h.wait_until_ready();
+        let state = h.activate_until_scenario("clock", ready);
+        let mut page = h.activate_guarded("launcher.settings", &state);
+        if control_value(&page, "launcher.settings.renderer.next") != Some(renderer) {
+            page = h.activate_guarded("launcher.settings.renderer.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "launcher.settings.renderer.next"),
+            Some(renderer)
+        );
+        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        h.activate_guarded("launcher.settings.start", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let initial = h.clock_state();
+        assert_eq!(initial.profile, "off");
+        h.clock_trigger_event(&initial, ClockEventKind::Grass);
+        let start = Instant::now();
+        let mut sequence = Vec::new();
+        let mut checkpoints = [0, 1, 5, 30, 60, 120, 180, 240, 300].into_iter().peekable();
+        let mut first_shoot = None;
+        let mut established = None;
+        let mut first_underground = None;
+        let mut underground_history = Vec::new();
+        loop {
+            let current = h.clock_state();
+            let grass = current.grass.as_ref().unwrap();
+            let inspection = grass
+                .inspection
+                .as_ref()
+                .expect("read-only cutaway enabled");
+            assert!(inspection.tissues.len() <= 64 && inspection.soil_cells.len() <= 2880);
+            let underground: Vec<_> = inspection
+                .tissues
+                .iter()
+                .filter(|t| t.role == "root" || t.role == "runner")
+                .map(|t| t.cell)
+                .collect();
+            if first_underground.is_none() && !underground.is_empty() {
+                first_underground = Some(underground.clone());
+            }
+            assert!(grass.living_tissues <= 64);
+            assert!(grass.soil_retained <= 2880);
+            assert_eq!(
+                grass.soil_added,
+                grass.soil_retained as u64 + grass.soil_exported
+            );
+            assert_eq!(grass.optical_refusals, 0);
+            assert_eq!(
+                grass.intensity, 1000,
+                "favorable-v1 fixture must be explicit"
+            );
+            if first_shoot.is_none() && grass.shoots > 0 {
+                first_shoot = Some(grass.biology_tick);
+            }
+            if established.is_none() && grass.mature_blades >= 3 {
+                established = Some(grass.biology_tick);
+            }
+            if checkpoints
+                .peek()
+                .is_some_and(|at| grass.biology_tick >= *at)
+            {
+                let at = checkpoints.next().unwrap();
+                underground_history.push(
+                    serde_json::json!({"biology_tick":grass.biology_tick,"inspection":inspection}),
+                );
+                h.capture_screenshot(&format!("grass-{renderer}-{at:03}.png"));
+                write_json(
+                    &h.run_path().join(format!("grass-{renderer}-{at:03}.json")),
+                    &current,
+                );
+                sequence.push(serde_json::json!({"biological_seconds":grass.biology_tick,"wall_seconds":start.elapsed().as_secs_f64(),"capture":at}));
+            }
+            if checkpoints.peek().is_none() {
+                break;
+            }
+            assert!(
+                start.elapsed() < Duration::from_secs(450),
+                "normal-speed fixture did not advance in time"
+            );
+            thread::sleep(Duration::from_millis(200));
+        }
+        write_json(
+            &h.run_path().join("grass-timing.json"),
+            &serde_json::json!({"fixture":"favorable-v1","seed":4242,"renderer":renderer,"playback":1,"first_visible":first_shoot,"three_mature":established,"sequence":sequence}),
+        );
+        assert!(first_shoot.is_some_and(|s| s <= 5));
+        assert!(established.is_some_and(|s| (180..=300).contains(&s)));
+        let final_state = h.clock_state();
+        let view = final_state
+            .grass
+            .as_ref()
+            .unwrap()
+            .inspection
+            .as_ref()
+            .unwrap();
+        assert!(view.tissues.iter().any(|t| t.role == "root"));
+        assert!(view.tissues.iter().any(|t| t.role == "runner"));
+        let first = first_underground.unwrap();
+        assert!(
+            view.tissues
+                .iter()
+                .any(|t| (t.role == "root" || t.role == "runner") && !first.contains(&t.cell)),
+            "actual underground network must spread beyond initial cells"
+        );
+        h.capture_screenshot(&format!("grass-{renderer}-underground-300.png"));
+        write_json(
+            &h.run_path()
+                .join(format!("grass-{renderer}-underground-history.json")),
+            &underground_history,
+        );
+        let before = h.clock_state();
+        let identity = before.grass.as_ref().unwrap().organisms.clone();
+        let added = before.grass.as_ref().unwrap().soil_added;
+        h.clock_trigger_event(&before, ClockEventKind::Grass);
+        let repeated = h.clock_state();
+        assert_eq!(repeated.grass.as_ref().unwrap().soil_added, added);
+        assert_eq!(repeated.grass.as_ref().unwrap().organisms, identity);
+        for kind in [ClockEventKind::Falling, ClockEventKind::Rain] {
+            let deadline = Instant::now() + Duration::from_secs(90);
+            let before = loop {
+                let current = h.clock_state();
+                if current.can_trigger {
+                    break current;
+                }
+                assert!(Instant::now() < deadline);
+                thread::sleep(Duration::from_millis(100));
+            };
+            h.clock_trigger_event(&before, kind);
+            let deadline = Instant::now() + Duration::from_secs(20);
+            loop {
+                let current = h.clock_state();
+                let grass = current.grass.as_ref().unwrap();
+                assert_eq!(grass.soil_added, added);
+                assert_eq!(
+                    grass.soil_added,
+                    grass.soil_retained as u64 + grass.soil_exported
+                );
+                assert!(grass.living_tissues <= 64 && grass.soil_retained <= 2880);
+                if grass.biology_tick >= before.grass.as_ref().unwrap().biology_tick + 3 {
+                    h.capture_screenshot(&format!("grass-{renderer}-{kind:?}-transition.png"));
+                    write_json(
+                        &h.run_path()
+                            .join(format!("grass-{renderer}-{kind:?}-transition.json")),
+                        &current,
+                    );
+                    break;
+                }
+                assert!(Instant::now() < deadline);
+                thread::sleep(Duration::from_millis(200));
+            }
+        }
+        let deadline = Instant::now() + Duration::from_secs(90);
+        let before = loop {
+            let current = h.clock_state();
+            if current.can_trigger {
+                break current;
+            }
+            assert!(Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(100));
+        };
+        let retained = before.grass.as_ref().unwrap().soil_retained;
+        h.clock_trigger_event(&before, ClockEventKind::ColorCycle);
+        let gameplay = h.state();
+        h.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = h.change_clock_setting("pause.clock.grass", "Off", &page);
+        // UI enablement acknowledges the simulation setting, while its disk
+        // write may still be pending. Establish a fully persisted baseline
+        // before the complete paused-state comparison below.
+        let pending = h.clock_state();
+        let mut expected = pending.clone();
+        expected.settings_pending = false;
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        let paused = loop {
+            let current = h.clock_state();
+            assert_eq!(current.settings_error, None);
+            if !current.settings_pending {
+                // Persistence completion is the only allowed transition here;
+                // animation, biology and every other field must stay frozen.
+                assert_eq!(current, expected);
+                break current;
+            }
+            assert_eq!(current, pending);
+            assert!(
+                Instant::now() < deadline,
+                "paused settings were not persisted"
+            );
+            thread::sleep(Duration::from_millis(10));
+        };
+        assert!(!paused.settings_pending);
+        assert!(!paused.settings.events.grass);
+        assert_eq!(paused.grass.as_ref().unwrap().soil_retained, retained);
+        h.assert_clock_stays_paused(&paused);
+        let page = h.activate_guarded("pause.clock.back", &page);
+        h.activate_guarded("pause.restart", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let restarted = h.clock_state();
+        assert_eq!(restarted.grass.as_ref().unwrap().soil_retained, 0);
+        assert_eq!(restarted.grass.as_ref().unwrap().living_tissues, 0);
+        assert!(!restarted.settings.events.grass);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display and a normal-speed shortage sequence"]
+fn grass_vector_shortage_and_retirement() {
+    grass_shortage("clock-grass-shortage-vector", "vector");
+}
+#[test]
+#[ignore = "requires an explicit display and a normal-speed shortage sequence"]
+fn grass_raster_shortage_and_retirement() {
+    grass_shortage("clock-grass-shortage-raster", "raster");
+}
+fn grass_shortage(name: &'static str, renderer: &'static str) {
+    run_functional_test_with_backend(name, "winit-femtovg", |h| {
+        let ready = h.wait_until_ready();
+        let state = h.activate_until_scenario("clock", ready);
+        let mut page = h.activate_guarded("launcher.settings", &state);
+        if control_value(&page, "launcher.settings.renderer.next") != Some(renderer) {
+            page = h.activate_guarded("launcher.settings.renderer.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "launcher.settings.renderer.next"),
+            Some(renderer)
+        );
+        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        h.activate_guarded("launcher.settings.start", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let initial = h.clock_state();
+        h.clock_trigger_event(&initial, ClockEventKind::Grass);
+        let start = Instant::now();
+        let mut checkpoints = [1, 5, 30, 60, 90].into_iter().peekable();
+        let mut admitted = false;
+        loop {
+            let current = h.clock_state();
+            let grass = current.grass.as_ref().unwrap();
+            assert_eq!(grass.intensity, 0, "explicit shortage-v1 fixture");
+            assert!(grass.intake.iter().all(|v| *v == 0));
+            assert!(grass.living_tissues <= 64 && grass.soil_retained <= 2880);
+            assert_eq!(
+                grass.soil_added,
+                grass.soil_retained as u64 + grass.soil_exported
+            );
+            admitted |= grass.seeded > 0;
+            if checkpoints
+                .peek()
+                .is_some_and(|at| grass.biology_tick >= *at)
+            {
+                let at = checkpoints.next().unwrap();
+                h.capture_screenshot(&format!("grass-shortage-{renderer}-{at:03}.png"));
+                write_json(
+                    &h.run_path()
+                        .join(format!("grass-shortage-{renderer}-{at:03}.json")),
+                    &serde_json::json!({"state": current, "wall_seconds":start.elapsed().as_secs_f64(), "fixture":"shortage-v1", "playback":1}),
+                );
+            }
+            if checkpoints.peek().is_none() {
+                assert!(admitted);
+                assert_eq!(grass.living_tissues, 0);
+                let cutaway = grass
+                    .inspection
+                    .as_ref()
+                    .expect("read-only cutaway enabled");
+                assert!(cutaway.tissues.is_empty() && cutaway.organism.is_none());
+                assert!(grass.organisms.is_empty());
+                assert!(
+                    grass.soil_retained > 0,
+                    "plant retirement must not erase soil"
+                );
+                break;
+            }
+            assert!(start.elapsed() < Duration::from_secs(180));
+            thread::sleep(Duration::from_millis(200));
+        }
+    });
+}
+
+#[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn cell_swap_preview_and_saved_switch_use_the_public_controls() {
     run_functional_test("clock-cell-swap", |h| {
@@ -883,6 +1262,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.explosion", "Off", &page);
         page = harness.change_clock_setting("pause.clock.aquarium", "Off", &page);
         page = harness.change_clock_setting("pause.clock.cell-swap", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.grass", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -897,6 +1277,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         assert_eq!(configured.collider_count, paused.collider_count);
         assert_eq!(configured.profile, "off");
         assert!(configured.events.iter().all(|event| !event.enabled));
+        assert!(!configured.settings.events.grass);
         assert_eq!(
             configured.settings.time_format,
             engine_common::ClockTimeFormat::TwelveHour
@@ -987,6 +1368,10 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             control_value(&page, "launcher.settings.clock.show-date.next"),
             Some("On")
         );
+        assert_eq!(
+            control_value(&page, "launcher.settings.clock.grass.next"),
+            Some("Off")
+        );
         harness.activate_guarded("launcher.settings.start", &page);
         harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let relaunched = harness.clock_state();
@@ -997,6 +1382,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         )
         .unwrap();
         assert_eq!(saved.clock, configured.settings);
+        assert!(!saved.clock.events.grass);
     });
 }
 
@@ -1172,6 +1558,13 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
         // This real-time UI smoke checks timed-event cadence. Resident-actor
         // scheduling/composition is covered at exact ticks in headless tests.
         let state = harness.activate_guarded("launcher.settings.clock.duck.next", &state);
+        // Resident admissions consume a global ID but never occupy the active
+        // timed slot. Keep exact-ID waits scoped to the timed catalog.
+        let state = harness.activate_guarded("launcher.settings.clock.crow.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.crow.next"),
+            Some("Off")
+        );
         assert_eq!(
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Demo")
@@ -1190,30 +1583,61 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
         );
         assert!(initial.events.iter().all(|event| event.enabled
             == (event.trigger == engine_common::ClockEventTrigger::Periodic
-                && event.kind != ClockEventKind::Duck)));
+                && !matches!(event.kind, ClockEventKind::Duck | ClockEventKind::Crow))));
         assert!((360..=600).contains(&initial.next_event_tick.unwrap()));
         let mut previous = None;
         for event_id in 1..=2 {
             let active = harness.clock_wait(&initial, "active", event_id, 30);
             assert_ne!(active.event_kind, previous);
             previous = active.event_kind;
-            if active.event_kind == Some(ClockEventKind::Falling) {
-                assert!((5..=32).contains(&active.body_count));
-                assert!(active.collider_count <= 100);
-            } else if active.event_kind == Some(ClockEventKind::Rain) {
-                assert!(active.body_count <= 2 && active.collider_count <= 5);
-                assert!(active.rain.is_some());
-            } else {
-                assert!(matches!(
-                    active.event_kind,
-                    Some(
-                        ClockEventKind::ColorCycle
-                            | ClockEventKind::Meltdown
-                            | ClockEventKind::Marquee
-                    )
-                ));
-                assert_eq!((active.body_count, active.collider_count), (0, 0));
+            assert_eq!(active.event_id, event_id);
+            assert!(active.duck.is_none() && active.crow.is_none());
+            let kind = active.event_kind.expect("automatic timed event");
+            let definition = active.events.iter().find(|e| e.kind == kind).unwrap();
+            assert!(definition.enabled);
+            assert_eq!(
+                definition.trigger,
+                engine_common::ClockEventTrigger::Periodic
+            );
+            assert!(active.phase_tick <= definition.duration_ticks);
+            match kind {
+                ClockEventKind::Falling => {
+                    assert!((5..=33).contains(&active.body_count));
+                    assert!(active.collider_count <= 130);
+                }
+                ClockEventKind::Explosion => {
+                    let explosion = active.explosion.as_ref().unwrap();
+                    assert!(explosion.live_cells <= explosion.max_cells);
+                    assert!(active.body_count <= explosion.max_cells as usize + 5);
+                    assert!(active.collider_count <= explosion.max_cells as usize + 34);
+                }
+                ClockEventKind::Rain | ClockEventKind::Meltdown | ClockEventKind::Aquarium => {
+                    // Two panels plus the one bounded retained-soil body;
+                    // its derived geometry uses at most 30 compound colliders.
+                    assert!(active.body_count <= 3 && active.collider_count <= 35);
+                    match kind {
+                        ClockEventKind::Rain => assert!(active.rain.is_some()),
+                        ClockEventKind::Meltdown => assert!(active.meltdown.is_some()),
+                        ClockEventKind::Aquarium => assert!(active.aquarium.is_some()),
+                        _ => unreachable!(),
+                    }
+                }
+                ClockEventKind::Grass
+                | ClockEventKind::ColorCycle
+                | ClockEventKind::Marquee
+                | ClockEventKind::CellSwap => {
+                    assert_eq!((active.body_count, active.collider_count), (0, 0));
+                }
+                ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::DigitSlide => {
+                    panic!("resident/time-change kind admitted to timed cadence smoke: {kind:?}");
+                }
             }
+            let soil = active.grass.as_ref().unwrap();
+            assert!(soil.living_tissues <= 64 && soil.soil_retained <= 2880);
+            assert_eq!(
+                soil.soil_added,
+                soil.soil_retained as u64 + soil.soil_exported
+            );
             let recovered = harness.clock_wait(&initial, "idle", event_id, 0);
             assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
             let next_wait = recovered.next_event_tick.unwrap() - recovered.simulation_tick;
@@ -1239,6 +1663,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.explosion.next",
             "launcher.settings.clock.aquarium.next",
             "launcher.settings.clock.cell-swap.next",
+            "launcher.settings.clock.grass.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
         ] {
@@ -1266,6 +1691,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
         let initial = harness.clock_state();
         assert_eq!(initial.profile, "demo");
         assert!(initial.events.iter().all(|event| !event.enabled));
+        assert!(!initial.settings.events.grass);
         assert_eq!(initial.next_event_tick, None);
         harness.clock_trigger_event(&initial, ClockEventKind::ColorCycle);
         let cycling = harness.clock_wait(&initial, "cycling", 1, 72);
@@ -1333,6 +1759,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.crow.next",
             "launcher.settings.clock.explosion.next",
             "launcher.settings.clock.marquee.next",
+            "launcher.settings.clock.grass.next",
         ] {
             assert_eq!(control_value(&settings, id), Some("Off"));
         }
@@ -1344,6 +1771,13 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
         assert_eq!(relaunched.palette_rgb, initial.palette_rgb);
         assert!(relaunched.events.iter().all(|event| !event.enabled));
         assert_eq!(relaunched.next_event_tick, None);
+        assert!(!relaunched.settings.events.grass);
+        let saved: engine_common::Settings = toml::from_str(
+            &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved.clock, relaunched.settings);
+        assert!(!saved.clock.events.grass);
     });
 }
 

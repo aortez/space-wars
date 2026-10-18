@@ -65,7 +65,14 @@ pub(crate) fn start_gamepad_pump(
     input: SharedInput,
     gamepads: SharedGamepadInput,
     controllers: SharedControllers,
+    ignore_physical_controllers: bool,
 ) -> Option<Timer> {
+    // Do not enumerate, sample, or route hardware input in isolated clients.
+    // The IPC-owned SimulatedInput driver is independent of this pump.
+    if ignore_physical_controllers {
+        tracing::info!("physical controllers ignored for this client run");
+        return None;
+    }
     let gilrs = match Gilrs::new() {
         Ok(gilrs) => gilrs,
         Err(err) => {

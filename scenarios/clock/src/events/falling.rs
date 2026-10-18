@@ -30,6 +30,32 @@ pub(crate) struct FallingEvent {
 }
 
 impl FallingEvent {
+    pub fn canonical_world<'a>(
+        &'a self,
+        player: Option<&'a DuckEvent>,
+    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
+        match &self.mechanics {
+            Mechanics::Standalone(world) => world.as_ref().map(|w| w.world()),
+            Mechanics::Shared { arena, .. } => Some(arena.get(player).arena_world()),
+        }
+    }
+    pub fn canonical_world_mut<'a>(
+        &'a mut self,
+        player: Option<&'a mut DuckEvent>,
+    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
+        match &mut self.mechanics {
+            Mechanics::Standalone(world) => world.as_mut().map(|w| w.world_mut()),
+            Mechanics::Shared { arena, .. } => Some(arena.get_mut(player).arena_world_mut()),
+        }
+    }
+    #[cfg(test)]
+    pub fn soil_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
+        match &self.mechanics {
+            Mechanics::Standalone(world) => world.as_ref().map(|w| w.world()),
+            _ => None,
+        }
+    }
+
     pub fn new(context: EventContext<'_>, seed: u64) -> Self {
         let letters = Self::letters_for(&context);
         let world = FallingWorld::new(
@@ -135,7 +161,8 @@ impl FallingEvent {
         arena.rejoin(session, seat)
     }
 
-    pub fn step(&mut self, context: EventContext<'_>, player: Option<&mut DuckEvent>) -> bool {
+    pub fn step(&mut self, mut context: EventContext<'_>, player: Option<&mut DuckEvent>) -> bool {
+        let soil = context.soil.take();
         let letters = self
             .letters
             .as_mut()
@@ -152,7 +179,7 @@ impl FallingEvent {
                 }
             }
             Mechanics::Shared { bodies, arena } => {
-                let duck = arena.step(player, None, false);
+                let duck = arena.step_with_soil(player, None, false, soil);
                 if let Some(bodies) = bodies {
                     bodies.synchronize(duck.arena_world(), context.segments, letters);
                 }

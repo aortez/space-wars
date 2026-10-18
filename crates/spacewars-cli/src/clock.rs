@@ -33,7 +33,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium or cell-swap.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap or grass.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
