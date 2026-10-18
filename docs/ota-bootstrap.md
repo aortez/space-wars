@@ -24,8 +24,12 @@ passed the trial, staged normal and canonical normal boots on both devices.
 Finalization archived the temporary assets and established an initial
 generation-zero recovery baseline on each, accepted by the production recovery
 service.
-**Remaining:** Pi 4/5 physical failure qualification,
-feed/trust/service/policy rollout, and a separate rollout to `sw-picade-2.local`.
+**Trusted feed:** an owner-local authority and empty signed feed are now
+provisioned on both primary Pis. Each verified Release and Nightly over HTTPS
+with the native owner helper, preserving the baseline and installed images;
+see the [live trust evidence](data/ota-owner-feed-20261017.json).
+**Remaining:** Pi 4/5 physical failure qualification, signed-image delivery,
+installed service/policy rollout, and a separate rollout to `sw-picade-2.local`.
 Automatic OTA installation is still disabled; a bootstrap package is not a signed
 OTA release.
 

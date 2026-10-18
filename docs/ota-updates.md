@@ -10,16 +10,18 @@ outside this update path; incompatible boot assets require a supervised upgrade.
 `crates/engine-ota` implements the shared verification and image eligibility
 contract for [#261](https://github.com/aortez/space-wars/issues/261), plus the
 recovery journal, Linux boot adapters and verified inactive-root writer. It is
-not an enabled end-to-end updater. Production feed/signing, installation-service
-integration and Pi failure qualification remain outstanding.
+not an enabled end-to-end updater. An owner-local signing authority and empty
+signed feed now work on both primary Pis. Automated publishing,
+installation-service integration and Pi failure qualification remain outstanding.
 
 `engine-os-manager` contains the independent time/status service for
 [#256](https://github.com/aortez/space-wars/issues/256), plus a separate network
 coordinator and scheduled download worker, described below. Its local APIs expose
 bounded time/update checks, channel selection and network policy. Installation,
 reboot and arbitrary-command operations are not exposed. The freshly flashed
-kiosks run the device service; production trust and automatic installation
-remain unprovisioned. The failed Pi 5 USB drive was replaced with verified data
+kiosks run the device service; public OTA trust is provisioned on the replacement
+Pi 5 and primary Picade, while automatic installation remains disabled. The failed
+Pi 5 USB drive was replaced with verified data
 restoration. The [replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json)
 and [primary Picade](data/ota-picade-bootstrap-success-20261017.json) have completed
 supervised bootstrap through the initial recovery baseline. Both passed trial,
@@ -33,10 +35,10 @@ Remaining work retains the full OTA scope:
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Native coordinator, continuous monitoring, operation holds, durable time checks and OTA handoff implemented; expected setup profile changes and SSH idle qualification remain |
-| #262 | Isolated Release/Nightly publishing and operational signing setup |
+| #262 | Owner-local authority and empty signed feed published; isolated automated Release/Nightly publishing and signer operation remain |
 | #263 | Recovery service and health/watchdog handling implemented; bootstrap through baseline handoff verified on the replacement Pi 5 and primary Picade; second Picade rollout and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | Scheduled download worker, bounded connection ownership, time-check handoff, local API and supervised state provisioning implemented; production trust/artifacts and installed-device qualification remain |
+| #265 | Download worker and public trust provisioned; both primary Pis verified the empty Release/Nightly feed with a native owner helper; installed worker/time-provider qualification and real-image delivery remain |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
 
@@ -2200,6 +2202,38 @@ not install, change selectors, reboot, qualify unattended recovery or replace th
 installed time service. Run it over the maintained owner SSH connection; it does
 not alter network policy. The ordinary kiosk API remains unchanged.
 
+On 2026-10-17, the owner selected dedicated private local keys for the supervised
+rollout. The authority is retained outside Git and build outputs at
+`/home/oldman/.spacewars-ota-signing/initial-supervised-20261017`, with private
+directories mode 0700 and key files mode 0600. Its public root digest is
+`825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9`.
+The [initial feed](https://github.com/aortez/space-wars/releases/tag/ota-feed)
+contains the six verified version-one metadata files and archived timestamp,
+with no images. Delivery used the existing timestamp-last publisher and public
+download verification, under one local publication lock. No automated publisher
+or remote journal branch was enabled. The initial timestamp expires at
+2026-10-25 03:28:30 UTC; later refreshes must retain this authority and advance
+the existing publisher journal, not regenerate or reset it.
+
+The root-only operator import established trust, staging and data schema 1 on
+`spacewars.local` and `sw-picade.local`. Both then verified Release and Nightly
+over real public HTTPS with `stage_update`, returning `no-candidate`. Repeating
+provisioning preserved the completed receipt, trusted metadata/time floors and
+data schema bytes. Their boot IDs, installed binaries/selectors, recovery
+baseline and selected settings/ROM/access/network/Bluetooth/SSH stores stayed
+unchanged. No root image was written and neither device rebooted. The rollout
+script now reuses one SSH connection: its initial burst of separate Pi 5
+connections encountered a banner timeout before trust provisioning, and the
+subsequent run completed without a service restart or reboot.
+
+These native checks use the corrected in-memory time validator; the installed
+service was not replaced and still reports time unusable. This is an empty-feed
+trust/transport check, not signed-image installation or unattended recovery
+qualification. The next steps are a signed candidate containing the time fix,
+the explicitly supervised installer/qualification path, and physical rollback
+and quarantine checks. The [live trust record](data/ota-owner-feed-20261017.json)
+retains source, public pins, helper hashes, test results and device evidence.
+
 The bundle has exactly three fields: `schema: 1`, `root` (the signed TUF root
 object), and `location` (credential-free HTTPS `metadata` and `targets` base URLs
 ending in `/`). Only public TUF fields are accepted. Provisioning verifies the
@@ -2235,10 +2269,10 @@ floors and the last trusted time. Data schema migrations must preserve the initi
 floor and update the current record under the same installation authority.
 
 The earlier development paths directly under `spacewars-system` are rejected if
-present without a receipt; this command does not adopt or overwrite them. This
-pass has not provisioned either Pi. Production public roots/feed publication,
-a newly built bundle-bearing image, supervised
-execution and physical qualification remain outstanding.
+present without a receipt; this command does not adopt or overwrite them. The
+initial fixture pass below did not provision either Pi. The later owner import
+and native empty-feed checks are recorded above; a bundle-bearing image and
+physical installation qualification remain outstanding.
 
 All 11 provisioning cases passed on both Pi 5 and Pi 4, alongside 62
 runtime/schedule cases on each. The host passed 287 OTA
@@ -2401,10 +2435,11 @@ AArch64 test compilation and formatting also passed. Exact source/artifact
 identities and outputs are recorded in the
 [download validation evidence](data/ota-download-20261016.json).
 
-The production service integration is described below. Production trust and
-staging provisioning, installed-device qualification and installation-policy
-handoff remain. No production release feed or enabled auto updater has yet been
-qualified on either kiosk.
+The production service integration is described below. Public trust and staging
+are now provisioned, and an owner helper has verified the empty signed feed on
+both primary Pis. Installed-worker qualification and installation-policy handoff
+remain; neither signed-image installation nor an enabled auto updater has been
+qualified by these checks.
 
 ### Durable update-check schedule
 
@@ -2513,11 +2548,11 @@ evidence only: installation still needs its own full revalidation. After process
 restart, retained bytes are not advertised as Ready without another verification
 session. Partial bytes remain available for a later eligible or explicit retry.
 
-The operator provisioning path is implemented above. Production bundle setup
-and execution remain, as do installed network/provider qualification, startup
-presentation of retained partial-byte status, installer/policy/UI integration and
-physical failure/performance qualification. The service has not been installed or
-enabled on either Pi by these fixture runs.
+The operator provisioning path and live empty-feed checks are described above.
+Installed network/provider qualification, startup presentation of retained
+partial-byte status, installer/policy/UI integration and physical
+failure/performance qualification remain. These earlier fixture runs did not
+install or enable the service on either Pi.
 
 The final service suite passed 182 tests, and 63 runtime/schedule/handoff cases
 passed on each Pi (4.14 seconds on Pi 5; 5.36 seconds on Pi 4). The OTA suite passed
