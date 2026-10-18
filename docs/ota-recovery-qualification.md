@@ -5,7 +5,11 @@ installation, application-health rollback/quarantine and subsequent normal boot
 ([physical trials](#physical-signed-trials-2026-10-17)). Interrupted promotion,
 physical power loss and the broader failure matrix remain outstanding. See the
 [active OTA plan](ota-updates.md#current-implementation) for current images,
-device-specific coverage and rollout order.
+device-specific coverage and rollout order. The
+[second-Picade follow-up](data/ota-picade2-profile-image-20261018.json) adds its
+successful signed trial/normal boot and installed radio/time/OTA qualification;
+it includes an explicitly reviewed additive settings migration, not a new
+deliberate-failure or power-loss trial.
 
 The missing-root commands immediately below are an **earlier generation-zero
 diagnostic**, not the next test for today's signed-update devices. Their

@@ -40,12 +40,14 @@ on both primary Pis ([original evidence](data/ota-owner-feed-20261017.json)).
 Both subsequently passed real signed installation and application-health
 rollback/quarantine ([signed trials](ota-recovery-qualification.md#physical-signed-trials-2026-10-17)).
 The latest owner-supervised publication is Nightly generation 6 / metadata
-version 7; Release remains empty. The Pi 5 runs that corrected image, while both
-Picades were last observed on generation 2 / source `5b420c9`.
-**Remaining:** corrected-image installation/radio qualification on the Picades,
-the rest of the Pi 4/5 failure/performance matrix, normal install-service/policy
-integration and automated publishing. The second Picade needs its own evidence;
-its observed image does not inherit the primary Picade's qualification.
+version 7; Release remains empty. The Pi 5 and owner-selected second Picade now
+run that corrected image; the primary Picade remains on generation 2 / source
+`5b420c9`. The [second-Picade evidence](data/ota-picade2-profile-image-20261018.json)
+records its own signed trial, normal boot and installed radio/time/OTA checks.
+**Remaining:** primary-Picade corrected-image rollout, the rest of the Pi 4/5
+failure/performance matrix, normal install-service/policy integration and
+automated publishing. A successful second-Picade update does not establish its
+full deliberate-failure qualification.
 Automatic OTA installation is still disabled; a bootstrap package is not a signed
 OTA release.
 

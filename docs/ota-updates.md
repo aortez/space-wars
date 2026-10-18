@@ -27,10 +27,10 @@ outstanding. See the [physical signed trials](ota-recovery-qualification.md#phys
 coordinator and scheduled download worker, described below. Its local APIs expose
 bounded time/update checks, channel selection and network policy. Installation,
 reboot and arbitrary-command operations are not exposed. The freshly flashed
-kiosks run the device service; public OTA trust is provisioned on the replacement
-Pi 5 and primary Picade, while automatic installation remains disabled. The failed
-Pi 5 USB drive was replaced with verified data
-restoration. The [replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json)
+kiosks run the device service; public OTA trust and signed staging have been
+verified on all three units, while automatic installation remains disabled. The
+failed Pi 5 USB drive was replaced with verified data restoration. The
+[replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json)
 and [primary Picade](data/ota-picade-bootstrap-success-20261017.json) have completed
 supervised bootstrap through the initial recovery baseline. Both passed trial,
 staged normal and canonical normal boots, independent archive verification and
@@ -39,23 +39,25 @@ for preservation, hardware evidence and the remaining rollout gates.
 
 ### Latest qualified state
 
-The latest image source is `0a32db244ea2d692da9588b133ae4c5f92092804` in draft
+The latest image source is `0a32db244ea2d692da9588b133ae4c5f92092804` in
 [PR #510](https://github.com/aortez/space-wars/pull/510). These are supervised
 branch-candidate results, not a claim that the changes are merged or enabled
 for unattended rollout. [The retained record](data/ota-profile-image-20261018.json)
-binds the image, publication, installed checks and isolated controls.
+binds the image, publication, installed checks and isolated controls. The
+[second-Picade record](data/ota-picade2-profile-image-20261018.json) adds its own
+signed trial, normal boot, service restart and installed radio/time/OTA cycles.
 
 | Device or feed | Latest recorded state | Next qualification |
 | --- | --- | --- |
 | `spacewars.local`, Pi 5 / HyperPixel | Signed Nightly generation 6 installed; healthy trial and normal boot; real radio off/reconnect and off/time-wake/automatic-feed-check/off passed | Actual daily timer, a new payload download under gameplay, and the integrated install policy |
 | `sw-picade.local`, primary Pi 4 / Picade | Source `5b420c9`, good generation 2; healthy game/recovery, update preparation failing; candidate NetworkManager and SSH helper passed isolated controls | Install the corrected image, then normal startup and real radio/time/OTA checks |
-| `sw-picade-2.local`, second Pi 4 / Picade | Source `5b420c9`, good generation 2; healthy game/recovery, update preparation failing | Corrected-image rollout and its own recorded qualification; do not inherit the primary Picade's results |
+| `sw-picade-2.local`, second Pi 4 / Picade | Signed Nightly generation 6 installed; healthy trial/default boot; service restart and real radio/time/automatic-feed-check cycles passed | Actual daily timer, payload/SSH/gameplay performance and the integrated install policy; remaining failure matrix |
 | Owner feed | Six supervised Nightly generations, metadata version 7; Release empty | Protected automated publishing, renewal and explicit Release promotion |
 
-The Pi 5 time-wake experiment used the real `sync-now` API and the OTA check
-joined automatically. It did not accelerate or observe the daily timer; the
-already-current candidate was ineligible, so that cycle did not download or
-install another image. Both installation automation and publication automation
+The Pi 5 and second-Picade time-wake experiments used the real `sync-now` API
+and the OTA check joined automatically. Neither observed the daily timer; the
+already-current candidate was ineligible, so neither cycle downloaded or
+installed another image. Both installation automation and publication automation
 remain disabled. Devices were left on Release with partial offline disabled.
 
 ### Remaining work and ownership
@@ -67,19 +69,20 @@ New image changes and previously untested failure cases still need qualification
 | Issue | Integration required |
 | --- | --- |
 | #256 | Corrected installed time service verified after signed update and normal boot on both primary Pis; broader provider and RTC retention qualification remain |
-| #258–#260 | Native off/time-wake/automatic-OTA/off cycle and SSH recovery controls passed on Pi 5; expected setup profile changes and Pi 4 installed qualification remain |
+| #258–#260 | Native off/time-wake/automatic-OTA/off cycle and SSH controls passed on Pi 5 and the selected second Picade; expected setup profile changes and remaining per-device rollout remain |
 | #261 | Shared metadata/image contract and verification fixtures implemented and used by the supervised path; retain those checks through normal service integration |
 | #262 | Owner-local publication, admission checks and durable journal/readback implemented; daily CI builds unsigned candidates; protected automatic signing/publication, renewal and Release promotion remain |
 | #263 | Signed install, stopped-app rollback/quarantine, bounded retry and normal-boot success verified on the replacement Pi 5 and primary Picade; remaining startup/service failures, interrupted promotion and physical power loss need qualification |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; fixed install-service operations, candidate-bound app handoff and remaining physical maintenance/data checks remain |
-| #265 | Public trust and signed delivery verified on both primary Pis; corrected startup and time-wake feed checks passed on Pi 5; Pi 4 installed-worker and payload-performance qualification remain |
+| #265 | Signed delivery verified; corrected startup/time-wake feed checks passed on Pi 5 and the second Picade; actual daily opportunity, new/resumed payload performance and fresh-SSH latency remain |
 | #266 | Updates UI/CLI, saved Ask/Automatic policy, manual consent, overnight admission, countdown and serialized cancellable app handoff |
-| #267 | Complete the Pi 4/5 matrix, second-Picade qualification, recovery/performance evidence and rollout/operator documentation |
+| #267 | Complete the Pi 4/5 failure/channel/mode/performance matrix, primary-Picade corrected-image rollout and operator documentation; retain exact pre-update settings for migration comparisons |
 
 ### Next implementation sequence
 
-1. Complete the primary Picade's corrected-image startup/radio/time/OTA checks,
-   roll out and verify the second Picade, then finish review and merge #510.
+1. Finish review and merge #510 with the Pi 5 and selected second-Picade
+   qualification. The owner selected `sw-picade-2.local` for this Pi 4 run; the
+   primary Picade's corrected-image rollout remains separately tracked in #267.
 2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
    consent, app save/acknowledgement, fixed privileged install operation, progress,
    trial and confirmed outcome. Define their shared handoff together; the
@@ -3088,12 +3091,67 @@ passed every native control. Its exact packaged SSH helper passed all four
 isolated old-boot/current-boot controls in 90.30 seconds. Both experiments kept
 the production image, network service, kiosk, boot and selected store bytes
 unchanged. These are isolated executable checks, not a Pi 4 image installation
-or real-radio qualification. Both Picades still run source `5b420c9` and report
-failed update preparation; the primary Picade's boot identity, data format and
-installed operator helpers are compatible with the selected candidate.
+or real-radio qualification. At that checkpoint both Picades ran source
+`5b420c9` and reported failed update preparation; the primary Picade's boot
+identity, data format and installed operator helpers are compatible with the
+selected candidate.
 
-Pi 4 installed-image/radio qualification and unattended rollout remain. Automatic
-publication and installation stay disabled, and PR #510 remains draft.
+That checkpoint left Pi 4 installed-image/radio qualification outstanding.
+The following second-Picade run supplies it; unattended rollout remains separate.
+
+### Second Picade installed qualification (2026-10-18)
+
+The owner selected `sw-picade-2.local`, a Pi 4 Model B Rev 1.2, for this run.
+Its isolated baseline reproduced the profile-revision fault, and the exact
+packaged provider passed every native control. All four isolated SSH helper
+controls passed in 90.35 seconds. These experiments preserved its
+production image, services, kiosk and selected store bytes before installation.
+
+The existing signed generation-6 payload staged successfully and its first
+trial was observed committed at 215.082 seconds. A normal reboot then completed
+the automatic Release check with `no-candidate` in 56.185 seconds. The image became
+the default without resetting prior failure or generation history.
+
+The original trial observer stopped on its byte-inventory assertion. An archived
+settings file exactly matched the pre-install hash. Parsed comparison established
+that every old value was preserved; startup added only `clock.events.aquarium`,
+`clock.events.cell_swap` and `launcher.show_all` at their new defaults. The new
+empty `training/worker.lock` and its directory are created by app startup.
+All other durable bytes and existing metadata matched; the adapter-local BlueZ
+GATT database regenerated separately. A read-only review retained the original
+failed comparison and accepted only these exact additive changes. No install
+was replayed, and no byte-for-byte settings preservation is claimed for this trial.
+
+The restart observer also encountered a brief missing status socket immediately
+after its requested service restart. Read-only follow-up verified the original
+daily deadline and completed check, healthy service, same kiosk/boot and unchanged
+stores; it did not request a second restart. Future qualification should capture
+exact pre-update settings privately and tolerate a bounded startup socket gap
+without resetting or repeating operations.
+
+The real radio off/reconnect diagnostic passed with profile revisions preserved,
+zero suspensions or owner resumes, restored logging and fresh SSH. The subsequent
+off/time-wake/automatic-OTA/off cycle passed: `sync-now` at accepted-sync age
+305 seconds established a new success, the due OTA check joined automatically,
+and the result was `ineligible` because the installed image was already current.
+The two workers retained their original attempt IDs/deadlines and separate holds.
+Wi-Fi returned to idle at 226 seconds; five final observations retained the same
+next OTA deadline. Cleanup restored Release and disabled partial offline, with
+the same boot/image/kiosk, selected store bytes and zero emergency intervention.
+This tests the real time worker through its manual API, not the daily timer or
+a new payload download. It does not qualify automatic installation.
+
+During staging on the old `5b420c9` image, a fresh SSH connection exceeded its
+five-second banner deadline while the existing control channel and service
+remained responsive. Fresh access succeeded after staging. Its cause is not
+established; retain fresh-login latency in the payload/gameplay performance
+matrix rather than claiming this corrected image fixed that observation.
+
+[Second-Picade evidence](data/ota-picade2-profile-image-20261018.json) retains the
+source, image, trial/review results, normal boot, both cycles and private-artifact
+hashes. This run did not access or update the primary Picade. Automatic publishing
+and installation remain disabled; PR review and the remaining #267 gates still
+precede unattended rollout.
 
 ### Download readiness contract
 
