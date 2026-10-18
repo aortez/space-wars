@@ -66,6 +66,7 @@ pub enum ScenarioAsset {
     #[default]
     None,
     NesRom(crate::nes_roms::NesRomAsset),
+    PizzaLab(crate::pizza_lab::Config),
 }
 
 impl ScenarioStartMode {

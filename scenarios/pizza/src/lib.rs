@@ -12,6 +12,7 @@ mod capacity_tests;
 mod event_tests;
 mod events;
 mod field;
+pub mod profile;
 
 pub use events::{
     DIRECTIONAL_GRAVITY_TICKS, FIXED_HZ, MAX_EVENT_GAP_TICKS, MIN_EVENT_GAP_TICKS,
@@ -164,6 +165,9 @@ impl Default for PizzaBenchmarkConfig {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct PizzaStepMetrics {
+    pub total_time: Duration,
+    pub spawning_time: Duration,
+    pub damage_time: Duration,
     pub workload_time: Duration,
     pub lifecycle_time: Duration,
     pub gravity_time: Duration,
@@ -298,6 +302,8 @@ impl Default for PizzaConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BallState {
+    /// Diagnostic ancestry only; never consulted by physics or damage.
+    pub fragment_generation: u8,
     pub id: u64,
     pub position: Vec2,
     pub velocity: Vec2,
@@ -311,6 +317,7 @@ pub struct BallState {
 impl BallState {
     fn new(id: u64, position: Vec2, radius: f32, color: Color) -> Self {
         Self {
+            fragment_generation: 0,
             id,
             position,
             velocity: Vec2::ZERO,
@@ -1010,10 +1017,13 @@ impl Scenario for PizzaScenario {
             return StepResult::default();
         }
 
+        let total_started = Instant::now();
         state.events.begin_tick();
         let mut metrics = PizzaStepMetrics::default();
+        let spawning_started = Instant::now();
         state.advance_held_ball(dt);
         state.advance_spawner();
+        metrics.spawning_time = spawning_started.elapsed();
 
         let gravity_started = Instant::now();
         metrics.gravity = apply_gravity_to_physics(state);
@@ -1036,15 +1046,18 @@ impl Scenario for PizzaScenario {
         let snapshot_started = Instant::now();
         state.sync_from_rapier();
         metrics.snapshot_time = snapshot_started.elapsed();
+        let damage_started = Instant::now();
         apply_contact_damage(state);
+        metrics.damage_time = damage_started.elapsed();
 
         let lifecycle_started = Instant::now();
-        let balls_before_explosions = state.balls.len();
+        let births_before = state.birth_counts;
         explode_dead_balls(state);
-        let balls_after_explosions = state.balls.len();
         metrics.lifecycle_time = lifecycle_started.elapsed();
-        metrics.added = balls_after_explosions.saturating_sub(balls_before_explosions);
-        metrics.removed = balls_before_explosions.saturating_sub(balls_after_explosions);
+        metrics.added =
+            (state.birth_counts.fragments_created - births_before.fragments_created) as usize;
+        metrics.removed = (state.birth_counts.exploded - births_before.exploded) as usize;
+        metrics.total_time = total_started.elapsed();
         state.last_step_metrics = metrics;
         state.events.finish_tick();
         state.tick += 1;
@@ -1236,6 +1249,11 @@ fn explode_dead_balls(state: &mut PizzaState) {
     dead.reverse();
 
     state.birth_counts.exploded += dead.len() as u64;
+    for parent in &dead {
+        state.birth_counts.exploded_by_generation
+            [usize::from(parent.fragment_generation).min(3)] += 1;
+        state.birth_counts.exploded_by_size[profile::size_band(parent.radius)] += 1;
+    }
     let parent_count = dead.len();
     for (parent_index, parent) in dead.into_iter().enumerate() {
         if state.balls.len() >= state.config.live_ball_limit {
@@ -1262,6 +1280,7 @@ fn explode_dead_balls(state: &mut PizzaState) {
                     (offset + parent.velocity * EXPLOSION_PARENT_VELOCITY_FACTOR) * velocity_scale;
                 let color = parent.color.random_variation(100.0 / 255.0, &mut state.rng);
                 let mut fragment = state.allocate_ball(parent.position + offset, radius, color);
+                fragment.fragment_generation = parent.fragment_generation.saturating_add(1);
                 fragment.velocity = velocity;
                 contain_ball(&mut fragment, state.config.bounds);
                 state.push_ball(fragment);

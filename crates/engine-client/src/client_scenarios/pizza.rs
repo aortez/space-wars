@@ -29,6 +29,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
 
 pub(crate) struct PizzaClientScenario {
     pub(crate) state: PizzaState,
+    lab: Option<crate::pizza_lab::Recorder>,
 }
 
 fn create(
@@ -36,7 +37,7 @@ fn create(
     settings: &Settings,
     viewport: Viewport,
     mode: ScenarioStartMode,
-    _asset: &ScenarioAsset,
+    asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     let setup = settings.pizza.normalized();
     let bounds = PizzaBounds::from_aspect_ratio(viewport.aspect_ratio());
@@ -54,9 +55,39 @@ fn create(
             PizzaConfig::benchmark(configuration.pizza, bounds)
         }
     };
-    Ok(Box::new(PizzaClientScenario {
-        state: PizzaScenario::init(config, seed),
-    }))
+    let mut state = PizzaScenario::init(config, seed);
+    let lab = if let ScenarioAsset::PizzaLab(config) = asset {
+        if !mode.is_benchmark() {
+            state = if config.ordinary {
+                PizzaScenario::init(
+                    PizzaConfig {
+                        live_ball_limit: config.limit,
+                        automatic_events: false,
+                        bounds,
+                        ..Default::default()
+                    },
+                    seed,
+                )
+            } else {
+                scenario_pizza::capacity_lab::mixed_size_fixture(
+                    config.balls,
+                    config.limit,
+                    bounds,
+                    seed,
+                )
+                .map_err(|detail| ScenarioCreateError::RuntimeInitialization {
+                    name: "pizza",
+                    detail: detail.into(),
+                })?
+            };
+            Some(crate::pizza_lab::Recorder::new(config.clone()))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    Ok(Box::new(PizzaClientScenario { state, lab }))
 }
 
 impl ClientScenario for PizzaClientScenario {
@@ -84,7 +115,14 @@ impl ClientScenario for PizzaClientScenario {
     }
 
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
-        PizzaScenario::step(&mut self.state, actions, dt)
+        if let Some(lab) = &self.lab {
+            lab.before_step(&mut self.state, dt);
+        }
+        let result = PizzaScenario::step(&mut self.state, actions, dt);
+        if let Some(lab) = &mut self.lab {
+            lab.after_step(&self.state, dt);
+        }
+        result
     }
 
     fn map_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {

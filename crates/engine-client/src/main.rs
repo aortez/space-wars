@@ -39,6 +39,7 @@ mod nes_realtime;
 mod nes_roms;
 mod network;
 mod network_controls;
+mod pizza_lab;
 mod presentation_probe;
 mod raster;
 mod render;
@@ -103,6 +104,8 @@ type SharedNesRomCatalog = Rc<RefCell<nes_roms::NesRomCatalog>>;
 #[derive(Parser, Debug)]
 #[command(name = "engine-client", about = "Spacewars scenario host")]
 struct Args {
+    #[command(flatten)]
+    pizza_lab: pizza_lab::Options,
     #[command(flatten)]
     presentation: presentation_probe::Options,
 
@@ -341,6 +344,11 @@ struct EffectiveLaunch {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+    let pizza_lab = args.pizza_lab.config(
+        args.scenario.as_deref(),
+        args.uses_benchmark(),
+        args.config_dir.is_some(),
+    )?;
 
     // This experiment must not load/write settings, open a control socket,
     // initialize audio/input, or create a desktop/KMS display connection. The
@@ -558,6 +566,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &rom_catalog.borrow(),
         )
         .and_then(|asset| {
+            let asset = pizza_lab
+                .clone()
+                .map(client_scenarios::ScenarioAsset::PizzaLab)
+                .unwrap_or(asset);
             start_scenario_from_launch(
                 &window,
                 &effective_launch,
@@ -3141,6 +3153,7 @@ mod tests {
 
     fn base_args() -> Args {
         Args {
+            pizza_lab: pizza_lab::Options::default(),
             presentation: presentation_probe::Options::default(),
             scenario: None,
             rom: None,

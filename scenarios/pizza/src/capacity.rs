@@ -8,6 +8,10 @@ pub struct PizzaBirthCounts {
     pub pointer_created: u64,
     pub pointer_replaced: u64,
     pub exploded: u64,
+    /// Generation 0, 1, 2, 3+. Diagnostic ancestry does not affect damage.
+    pub exploded_by_generation: [u64; 4],
+    /// Radii <0.005, <0.01, >=0.01 world units.
+    pub exploded_by_size: [u64; 3],
     pub fragments_created: u64,
     /// Stops immediately after a fragment fills the budget. Remaining random
     /// candidates are not sampled, preserving the existing RNG/lifecycle order.

@@ -1,14 +1,17 @@
 //! Headless normal-gameplay stress run. See docs/pizza-capacity.md.
 use engine_common::Scenario;
-use scenario_pizza::{PizzaBounds, PizzaScenario, capacity_lab};
+use scenario_pizza::{
+    PizzaAction, PizzaBounds, PizzaConfig, PizzaEventKind, PizzaScenario, capacity_lab,
+    profile::Sample,
+};
 use serde_json::json;
 use std::time::{Duration, Instant};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() < 2 || args.len() > 6 {
+    if args.len() < 2 || args.len() > 8 {
         return Err(
-            "usage: capacity_lab POPULATION LIMIT [STEPS=120] [SEED=7] [WIDTH=800] [HEIGHT=480]"
+            "usage: capacity_lab POPULATION LIMIT [STEPS=120] [SEED=7] [WIDTH=800] [HEIGHT=480] [FIELD=off] [KIND=mixed]"
                 .into(),
         );
     }
@@ -33,12 +36,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         return Err("steps must be 1..=3600, dimensions 1..=8192, populations <=5000".into());
     }
+    let field = match args.get(6).map(String::as_str).unwrap_or("off") {
+        "off" => false,
+        "on" => true,
+        _ => return Err("FIELD must be on or off".into()),
+    };
+    let ordinary = match args.get(7).map(String::as_str).unwrap_or("mixed") {
+        "mixed" => false,
+        "ordinary" => true,
+        _ => return Err("KIND must be mixed or ordinary".into()),
+    };
     let mut state = capacity_lab::mixed_size_fixture(
         population as usize,
         limit as usize,
         PizzaBounds::from_aspect_ratio(width as f32 / height as f32),
         seed,
     )?;
+    if ordinary {
+        state = PizzaScenario::init(
+            PizzaConfig {
+                live_ball_limit: limit as usize,
+                bounds: PizzaBounds::from_aspect_ratio(width as f32 / height as f32),
+                automatic_events: false,
+                ..Default::default()
+            },
+            seed,
+        );
+    }
     let initial = state.population();
     let mut timings = Vec::with_capacity(steps as usize);
     let mut samples = Vec::with_capacity(steps as usize);
@@ -47,6 +71,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut explosion_steps = 0;
     let mut last_exploded = 0;
     for _ in 0..steps {
+        if field && state.tick == 120 {
+            PizzaScenario::step(
+                &mut state,
+                &[PizzaAction::TriggerEvent(PizzaEventKind::DirectionalGravity).encode()],
+                Duration::ZERO,
+            );
+        }
         let started = Instant::now();
         PizzaScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
         let micros = started.elapsed().as_secs_f64() * 1e6;
@@ -60,15 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         last_exploded = counts.births.exploded;
         let metrics = state.last_step_metrics;
         contact_samples += metrics.rapier.contacts;
-        // Bounded in-memory trace, serialized only after the timed simulation.
-        samples.push(
-            json!({"tick":state.tick, "step_us":micros, "population":counts,
-            "contacts":metrics.rapier.contacts, "contact_pairs":metrics.rapier.contact_pairs,
-            "gravity_us":metrics.gravity_time.as_secs_f64()*1e6,
-            "physics_us":metrics.physics_time.as_secs_f64()*1e6,
-            "snapshot_us":metrics.snapshot_time.as_secs_f64()*1e6,
-            "lifecycle_us":metrics.lifecycle_time.as_secs_f64()*1e6}),
-        );
+        samples.push(Sample::capture(&state));
     }
     timings.sort_by(f64::total_cmp);
     let percentile =
@@ -76,7 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
-            "fixture_version":capacity_lab::FIXTURE_VERSION, "seed":seed,
+            "fixture_version":capacity_lab::FIXTURE_VERSION, "seed":seed, "field":field, "ordinary":ordinary,
             "width":width,"height":height,"steps":steps,"fixed_dt_ns":16_666_667,
             "initial":initial,"final":state.population(),"peak_balls":peak,
             "contact_samples":contact_samples,"explosion_steps":explosion_steps,
