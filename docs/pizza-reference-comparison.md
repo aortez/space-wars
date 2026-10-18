@@ -3,6 +3,8 @@
 This continues PR #505 / #354; the measured optimization is #509 under #59.
 It does not qualify the 5,000-ball ceiling or
 resolve the earlier production GPU failures in #359. The saved default is 500.
+The [planned performance work](#planned-performance-work) records the next
+experiments and the decisions still needed before changing physics behavior.
 
 ## What the desktop screenshot establishes
 
@@ -228,3 +230,130 @@ capacity, field force or fragmentation distribution to make the test easier.
 Production rendered Pi 4 qualification was repeated on `9170d99` and still
 exposes the stalls above. Pi 5 remains offline. PR #505 stays draft and
 #354/#359 remain open.
+
+## Planned performance work
+
+Planning update: 2026-10-18. First make ordinary 500-budget cascades smooth with
+CPU headroom on the Pi, then pursue larger populations. Keep 500 as the saved
+default and 5,000 as an opt-in aspiration. Preserve the detailed chain reactions
+in which large balls fragment and their descendants collide and explode.
+
+The current Pi 4 production gravity event averages 11.12–11.13 ms per update,
+with p95 around 20.6 ms and individual updates near 100 ms. The separate headless
+experiment starting at 5,000 averages 97.34 ms while the population falls; it
+does not establish sustained 5,000-ball throughput. Both CPU headroom and frame
+stalls need improvement before PR #505 is ready.
+
+### Experiment priorities
+
+1. **Reduce collision bookkeeping.** Start with the worst recorded cascade
+   updates. In the production gravity event, narrow-phase contact processing
+   averages about 3.1 ms/update. The difference between total physics time and
+   the raw engine step is about 1.1 ms; finer measurements must establish how
+   much comes from event collection, metadata access and other adapter work.
+   Look for repeated contact scans, duplicate event construction, unnecessary
+   lookups and reusable scratch storage. Preserve contact ordering, transient
+   CCD hits, resting contacts, damage and fragmentation. Use matching replay
+   fingerprints to verify changes that should preserve results.
+
+2. **Optimize the gravity tree.** Gravity averages about 1.9 ms/update in the
+   production event and 24.6 ms in the separate large-population headless case.
+   The engine already uses Barnes–Hut and reuses flat tree/work buffers. Measure
+   construction and force traversal separately, then investigate memory layout,
+   repeated calculations and traversal overhead. Changing approximation
+   tolerance, precision or gravity update frequency would change trajectories;
+   treat those as separate behavior experiments.
+
+3. **Benchmark physics build options.** The pinned Rapier 0.34 build enables
+   `enhanced-determinism` and excludes explicit SIMD. That version rejects
+   enabling both together. Measure a separate SIMD build on the target hardware
+   before considering a production change. Adoption depends on deciding whether
+   Pizza needs identical results across platforms and understanding the impact
+   on other scenarios sharing the dependency. Keep compiler versions and build
+   settings matched within each comparison.
+
+4. **Improve frame scheduling.** The host permits up to five fixed updates in
+   one callback, then clears accumulated time if it reaches that limit. Join
+   update timings to actual presentation intervals to determine how catch-up
+   contributes to stalls. Evaluate scheduling changes and, if justified, a
+   simulation worker with interpolated rendering. Track input latency, simulation
+   progress and total process CPU use: smoother presentation alone does not
+   establish cheaper physics. Any change to overload behavior or simulation
+   timing needs an explicit design decision.
+
+5. **Prototype a specialized Pizza physics backend.** If the preceding gains
+   leave a large gap, compare a compact circle-and-wall engine inspired by
+   allan.pizza with the canonical Rapier path. Rapier already specializes circle
+   contact geometry; the hypothesis is that a smaller surrounding collision and
+   response pipeline could save work. Retain gravity, damage and fragmentation
+   rules for the experiment, and compare containment, collision stability,
+   cascade behavior and CPU cost. Different solver trajectories are expected,
+   so this requires behavioral validation rather than identical fingerprints.
+   Keep it experimental until its benefits and integration costs are measured.
+
+Start with collision bookkeeping, then gravity. Use the scheduling and build
+experiments to assess their respective benefits before committing to a new
+backend. Renderer and allocation rewrites have lower priority unless finer
+profiling identifies a substantial cost there. No speedup is assumed for these
+unmeasured experiments.
+
+### Worst update: gravity between overlapping fragments
+
+The slowest update in all 15 retained ordinary gravity-On runs is tick 285:
+96.6–102.0 ms in the Pi headless runs, 99.3–108.4 ms in the production GPU runs
+and 14.0–14.3 ms on the desktop. CCD takes 72–73% of it on the Pi and 82–83% on
+the desktop; the deferred lookup leaves it essentially unchanged. The
+instrumented run counts 14,356 ball/ball shape casts and 20,869 resweep
+candidates in that update, against 216 and 2,490 one update earlier.
+
+The cause is gravity rather than collision bookkeeping. At the start of the
+update two overlapping fragments have centers 2.6×10⁻⁶ apart. Pizza's
+point-mass law (mass r², G 0.0005, softening 10⁻⁶; allan.pizza uses the same G
+and softening) gives them single-update velocity changes of about 607 and
+385 units/s, while no other ball moves faster than 0.67. CCD sweeps both across
+most of the playfield, both explode, and their fragments inherit up to
+3 units/s. In this 1,200-update fixture, 33 updates have a largest kick above
+1 unit/s, and all 8 updates with the most CCD shape casts coincide with or
+immediately follow one. A ball center lies inside another ball in 965 of the
+1,200 updates (66 pairs on average). Collision bookkeeping remains the larger
+mean cost; this explains the largest single stall.
+
+Normal play now bounds gravity inside overlapping balls; see
+[bounded gravity](pizza-bounded-gravity.md). Over 20 desktop seeds of the
+ordinary gravity-On fixture, the per-run maximum of shape casts in one update
+averages 715 instead of 7,452 (worst seed 2,279 instead of 39,667). Cascades
+show no consistent shift, and the mean update cost is unchanged. The change
+alters trajectories. Paired production Pi 4 captures of seed 7 confirm that the
+CCD stall is gone (at most 11.5 ms of CCD in one update instead of 74–80 ms).
+That seed's bounded cascade is heavier, however, and its new slowest update, a
+contact-bound one, still takes 102–104 ms.
+
+### Validation and open decisions
+
+- Retain repeatable ordinary On/Off scenes and mixed fixtures starting at 500,
+  1,000, 2,500 and 5,000 balls. Report actual population over time, contacts,
+  births, deaths and fragment generations so shrinking workloads cannot masquerade
+  as higher throughput. Include sustained cascades and recovery.
+- Compare interleaved baseline and candidate runs with the same build settings.
+  For behavior-preserving changes, require matching state/work fingerprints.
+  For alternative solvers or numerical settings, define behavioral checks before
+  judging their performance.
+- Validate with production rendering active on the Pi 4 at 1024×768/60 Hz.
+  Track update and displayed-frame p50/p95/p99/max, duration-weighted process CPU,
+  time near one fully occupied core, temperature and throttling. Measure any
+  worker threads as part of total CPU consumption. Repeat on Pi 5 when available.
+- Agree on numerical frame-stall and sustained-CPU acceptance limits before
+  declaring qualification. The 16.7 ms display interval is a total frame budget;
+  physics needs room for rendering and input. Exact headroom limits remain open.
+- Keep changes to reproducibility, solver behavior, approximation quality or
+  overload timing explicit. Do not reduce fragment populations or weaken the
+  cascade workload to pass the performance check.
+- Bounded gravity inside overlapping balls is implemented with spherical
+  sources in the Barnes–Hut tree, with retained multi-seed desktop evidence and
+  paired seed-7 production Pi 4 captures. It removes the CCD stall but does not
+  qualify the Pi 4 frame budget; contact-bound updates remain the largest
+  stalls there.
+
+These experiments continue the performance investigation under #59/#354 and
+event qualification in #359. They are planning notes; individual follow-up
+tickets have not yet been created for the five proposals.

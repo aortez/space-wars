@@ -81,15 +81,26 @@ def cpu_intervals(intervals):
         throttle_bits |= x['throttled']
     return dict(intervals=intervals, process_pct=utilization('process_pct'), main_thread_pct=utilization('main_thread_pct'), longest_main_thread_ge95_seconds=max_streak, temperature_c=summary([x['temp_c'] for x in intervals]), throttle_bits=throttle_bits)
 
+def trace_rows(path):
+    """Marked loop rows of one KMS trace, or None when it holds no table."""
+    text = path.read_text()
+    start = text.find('loop,marker,')
+    if start < 0:
+        return None
+    rows = list(csv.DictReader(io.StringIO(text[start:])))
+    return [r for r in rows if r.get('loop', '').isdigit() and r.get('marker') == '1']
+
+def flip_intervals(rows):
+    """Physical flip intervals in milliseconds; DRM flip times are microseconds."""
+    xs = [float(r['flip_kernel_us']) for r in rows if r.get('flip_kernel_us')]
+    return [(b - a) / 1000 for a, b in zip(xs, xs[1:]) if b > a]
+
 def render(paths):
     traces = []
     for path in paths:
-        text = path.read_text()
-        start = text.find('loop,marker,')
-        if start < 0:
+        rows = trace_rows(path)
+        if rows is None:
             continue
-        rows = list(csv.DictReader(io.StringIO(text[start:])))
-        rows = [r for r in rows if r.get('loop', '').isdigit() and r.get('marker') == '1']
 
         def numbers(key):
             return [float(r[key]) for r in rows if r.get(key)]
@@ -97,7 +108,7 @@ def render(paths):
         def intervals(key):
             xs = numbers(key)
             return [b - a for a, b in zip(xs, xs[1:]) if b > a]
-        flips = [x / 1000 for x in intervals('flip_kernel_us')]
+        flips = flip_intervals(rows)
         stages = {k: summary(numbers(k)) for k in rows[0] if k.endswith(('_wall_ms', '_cpu_ms'))} if rows else {}
         traces.append(dict(file=path.name, loops=len(rows), flip_intervals_ms=summary(flips), flip_intervals_over_25ms=sum((x > 25 for x in flips)), flip_interval_samples=len(flips), submit_intervals_ms=summary(intervals('submit_at_ms')), stages=stages))
     return traces
@@ -124,25 +135,27 @@ def before_export(result, last_tick):
             'last_simulation_tick': last_tick,
             'scope': 'Conservative status brackets before JSON export; not an exact update/frame join.'}
 
+def capture(p):
+    """Summary of one capture directory, or of a lone simulation report."""
+    if p.is_file():
+        return simulation(p)
+    result = {'simulation': simulation(p / 'simulation.json') if (p / 'simulation.json').exists() else None, 'cpu': cpu(p / 'cpu.txt'), 'render': render(sorted(p.glob('trace-*.txt')))}
+    statuses = []
+    for f in sorted(p.glob('status-*.txt'), key=lambda x: int(x.stem.split('-')[1])):
+        fields = dict((line.split('=', 1) for line in f.read_text().splitlines() if '=' in line))
+        values = {k: fields.get(k) for k in ['fps', 'ups', 'frames_total', 'updates_total', 'performance_target', 'renderer', 'pizza', 'scene_adapter', 'presentation_path']}
+        values['sample'] = int(f.stem.split('-')[1])
+        statuses.append(values)
+    result['statuses'] = statuses
+    if result['simulation']:
+        last_tick = result['simulation']['windows'][-1]['last_tick']
+        result['before_export'] = before_export(result, last_tick)
+    return result
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('path', type=Path)
     args = parser.parse_args()
-    p = args.path
-    if p.is_file():
-        result = simulation(p)
-    else:
-        result = {'simulation': simulation(p / 'simulation.json') if (p / 'simulation.json').exists() else None, 'cpu': cpu(p / 'cpu.txt'), 'render': render(sorted(p.glob('trace-*.txt')))}
-        statuses = []
-        for f in sorted(p.glob('status-*.txt'), key=lambda x: int(x.stem.split('-')[1])):
-            fields = dict((line.split('=', 1) for line in f.read_text().splitlines() if '=' in line))
-            values = {k: fields.get(k) for k in ['fps', 'ups', 'frames_total', 'updates_total', 'performance_target', 'renderer', 'pizza', 'scene_adapter', 'presentation_path']}
-            values['sample'] = int(f.stem.split('-')[1])
-            statuses.append(values)
-        result['statuses'] = statuses
-        if result['simulation']:
-            last_tick = result['simulation']['windows'][-1]['last_tick']
-            result['before_export'] = before_export(result, last_tick)
-    print(json.dumps(result, indent=2))
+    print(json.dumps(capture(args.path), indent=2))
 if __name__ == '__main__':
     main()
