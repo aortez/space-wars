@@ -441,8 +441,9 @@ activity evidence used by the decision.
 
 The native monitor retains authenticated D-Bus subscriptions for NetworkManager
 owner and radio-property changes. An external change reversed between snapshots
-still suspends automatic toggles. One matching notification can be attributed to
-a prepared write; extra notifications, invalidated properties, lost observation
+still suspends automatic toggles. One matching transition can be attributed to
+a prepared write. Identical `WirelessEnabled` notifications do not consume or
+extend that allowance; later reversals, invalidated properties, lost observation
 or owner replacement cannot erase a conflict. The saved suspension survives
 restart. Explicit resume establishes a new monitor baseline only after checking
 that there is no unresolved command from the current boot. Profile revisions
@@ -2867,9 +2868,63 @@ invalidations, daemon replacement and timeout checks remain enforced. The
 captured enable sequence fails before this change and passes afterward, with
 controls for both directions, duplicates after completion, reversals between
 snapshots, a missing target transition and other radio controls. This correction
-has not yet been installed on the Pi. Native requalification, profile-revision
-diagnosis and automatic-startup diagnosis remain prerequisites to completing the
-full time/OTA idle cycle and unattended rollout.
+was initially qualified only locally. Its subsequent installation and native
+results follow below; the earlier evidence record describes that earlier state.
+
+### Startup readiness and native radio correction (2026-10-18)
+
+The startup investigation found an automatic attempt beginning at 5.561 seconds,
+before NetworkManager completed startup at 10.866 seconds. This exposed an
+ordering hazard: policy can be available while its radio observation is still
+missing. A regression test reproduced the premature `network-unavailable`
+failure. The updater now waits for its first usable radio observation within the same persisted
+attempt. Its admission/preparation/session deadlines, coalescing and daily
+allowance remain unchanged; readiness at the admission deadline cannot revive
+an expired attempt. The original device failure did not log the precise
+admission subcondition, so the timing evidence and reproduced missing-observation
+path are recorded separately.
+
+The combined corrections in `1d5c671` passed 205 device-service tests (four
+opt-in tests ignored), formatting, Clippy with warnings denied, AArch64 test
+compilation and hosted CI. Its complete image passed the four native isolated
+SSH executable controls before supervised signing and publication as Nightly
+generation 5, metadata version 6. The Pi 5 signed trial committed healthy in
+97.049 seconds. A normal reboot then completed its automatic Release check with
+`no-candidate`, without a manual retry: the attempt began at 5.731 seconds,
+before NetworkManager startup completed at 11.034 seconds. Restarting the device
+service preserved the completed check, next daily deadline and running kiosk.
+Selected durable stores survived both boots; only the adapter-local BlueZ GATT
+database regenerated. Exact identities, receipts and artifact hashes are in the
+[startup and radio evidence](data/ota-startup-radio-20261018.json).
+
+A detached radio-only diagnostic then left SSH disconnected for 430 seconds,
+with independent bounded restoration. Wi-Fi turned off after 121 seconds. On
+restoration, NetworkManager again emitted redundant `false` followed by `true`,
+this time 279 microseconds apart. The corrected monitor accepted that transition
+without an `external-radio-change` suspension. A separate `profiles-changed`
+suspension still occurred; one explicit public owner resume cleared it. No
+emergency radio command or stored-state edit was needed. Fresh SSH, the same
+rendering kiosk, all selected persistent-store bytes, boot selectors and recovery
+journal passed verification. Original NetworkManager logging was also restored.
+
+The bounded SETTINGS debug trace identifies NetworkManager's secrets-processing
+callback immediately before the saved Wi-Fi profile's `VersionId` changes from
+3 to 4. `GetSettings` was identical across that transition. NetworkManager
+1.46.6's `get_secrets_cb` calls the settings update path, which increments
+`VersionId` even when its exact content comparison finds no change. This
+identifies the update path; it does **not** prove unchanged in-memory secrets,
+which the diagnostic never requested. `connection.timestamp` changed separately,
+before and after the revision bump. Raw profile values and journals remain in
+the private local evidence; the public summary contains changed field names and
+fixed source-code message markers only.
+
+This qualifies the startup and redundant-notification corrections on Pi 5, but
+the complete radio cycle still fails its no-suspension criterion. Reconnection
+needs to distinguish routine settings refresh from a real profile edit without
+simply accepting every revision change. The full off/time-wake/OTA/off cycle,
+Pi 4 qualification and unattended rollout remain outstanding. Automatic
+publication and installation remain disabled; the installed image is a
+supervised branch candidate, not an admitted main-branch nightly.
 
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
