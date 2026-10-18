@@ -174,10 +174,12 @@ cabinet's table instead on `sw-picade`.
 Use the logical inputs in the tables: North starts/dismisses a player duck,
 the joystick moves it, East jumps/swims, and South runs/paddles faster. On the
 default Picade 2 layout, hold bottom-left pink to Run and tap bottom-middle
-yellow to Jump. In water, holding Jump repeats strokes and holding Down dives
+yellow to Jump. Hold Jump to catch a reachable ledge; release it and press again
+to climb, or use Down to drop. Held Jump cannot immediately re-catch after a drop;
+release it first. A valid hang has no stamina timer. In water, holding Jump repeats strokes and holding Down dives
 for up to four seconds; releasing Down restores floating. The allowance
 recharges at the surface over two seconds, shown by the small meter. Jump takes
-priority over Down. Ground jumps still need a fresh press. If the
+priority over Down when swimming; Down takes priority while hanging. Ground jumps still need a fresh press. If the
 automatic obstacle-course duck is already on screen, North takes control of it
 in place, even mid-jump: no new course, teleport or velocity reset. Release the
 joystick/Run/Jump controls before steering; press North again to dismiss, not return

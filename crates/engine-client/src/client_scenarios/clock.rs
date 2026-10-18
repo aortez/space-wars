@@ -39,7 +39,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck join/dismiss: D / North / Picade bottom-right blue.\nMove/paddle: arrows / joystick. Run: Shift / South (bottom).\nJump/swim: Space/Z / East (right). Down: dive up to 4s; release at surface to recover.\nPicade 2: bottom-left pink runs; middle yellow jumps/swims.\nJoining pad owns duck; keys=P1. Neutral floats/drifts.\nHold Jump to swim; fresh press to jump on land.\nOff stops automatic events only. Pause freezes motion.",
+    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck join/dismiss: D / North / Picade bottom-right blue.\nMove/paddle: arrows / joystick. Run: Shift / South (bottom).\nJump/swim: Space/Z / East (right). Down: dive up to 4s; release at surface to recover.\nPicade 2: bottom-left pink runs; middle yellow jumps/swims.\nJoining pad owns duck; keys=P1. Neutral floats/drifts.\nHold Jump to swim/catch ledges; fresh press to jump on land.\nHanging: release Jump, press again to climb; Down drops.\nOff stops automatic events only. Pause freezes motion.",
     create,
 };
 

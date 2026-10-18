@@ -5,6 +5,7 @@ use engine_common::ClockEventProfile;
 mod autonomous;
 mod falling;
 mod join;
+mod ledges;
 mod meltdown;
 mod movement;
 mod takeover;

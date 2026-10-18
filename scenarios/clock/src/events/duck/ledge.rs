@@ -76,6 +76,30 @@ impl DuckEvent {
         self.ledge.catch_target = None;
     }
 
+    pub(super) fn decide_player_ledge(&mut self) {
+        let Some(player) = &self.player else { return };
+        // An explicit actuator command already owns this tick.
+        if self.ledge.command != LedgeCommand::Idle {
+            return;
+        }
+        let command = if self.ledge_attached() {
+            if player.dive_held {
+                LedgeCommand::Release
+            } else if player.jump_pending {
+                LedgeCommand::Climb
+            } else {
+                LedgeCommand::Idle
+            }
+        } else if player.jump_held {
+            // Keep requesting Catch after a drop so the shared rearm gate stays
+            // closed until Jump is actually released. Idle alone rearms it.
+            LedgeCommand::Catch
+        } else {
+            LedgeCommand::Idle
+        };
+        self.set_ledge_command(command);
+    }
+
     pub(super) fn ledge_attached(&self) -> bool {
         self.ledge.attachment.is_some()
     }

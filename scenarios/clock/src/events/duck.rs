@@ -19,6 +19,8 @@ pub(crate) mod planner;
 #[cfg(test)]
 mod platform_tests;
 mod player_control;
+#[cfg(test)]
+mod player_ledge_tests;
 mod responsive;
 #[cfg(test)]
 mod responsive_tests;
@@ -554,6 +556,7 @@ impl DuckEvent {
                 .expect("duck hull and non-overlapping course water"),
             _ => BuoyancyReport::default(),
         };
+        self.decide_player_ledge();
         self.decide_automatic_ledge();
         let detour_command = self.decide_flap_detour(water);
         let ledge_driven = self.drive_ledge();

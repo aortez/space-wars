@@ -119,6 +119,7 @@ fn deliberate_drop_keeps_momentum_and_requires_rearming() {
         assert_eq!(duck.diagnostics().ledge.catches, 1);
         assert!(duck.diagnostics().ledge.rearm_required);
     }
+    duck.set_player_input(0, false, false, false);
     duck.step();
     assert!(!duck.diagnostics().ledge.rearm_required);
 }
@@ -297,14 +298,15 @@ fn water_does_not_erase_a_valid_hang_or_apply_a_swim_stroke() {
             .unwrap();
     }
     for _ in 0..120 {
-        duck.set_player_input(0, true, false, true);
+        duck.set_player_input(0, false, false, false);
         duck.step_with_water(Some(&water));
         assert_eq!(duck.ledge_state().phase, Phase::Hanging);
         assert_eq!(duck.player.as_ref().unwrap().swim_strokes, 0);
         assert_eq!(duck.jumps, 1);
     }
     assert!(duck.water_report.submerged_fraction > 0.9);
-    duck.set_ledge_command(LedgeCommand::Release);
+    // Down wins over a fresh Jump while attached, even in deep water.
+    duck.set_player_input(0, true, false, true);
     duck.step_with_water(Some(&water));
     assert_eq!(
         duck.player.as_ref().unwrap().swim_strokes,
