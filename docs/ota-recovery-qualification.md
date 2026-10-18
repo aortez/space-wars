@@ -137,3 +137,39 @@ Keep the completed diagnostic record on-device and the private evidence on the
 workstation. Summaries should distinguish observed return, timing consistency,
 operator cleanup and ordinary recovery-service health from the outstanding
 signed-candidate failure/quarantine and interrupted-promotion cases in #263.
+
+## Signed application-health failure: integration fixture
+
+The joined fixture now exercises real signed metadata, staging and reverification,
+an ext4 write/readback/fsck/embedded-identity check, the durable recovery journal
+and the startup recovery coordinator. The same image bytes run through a healthy
+control and a stopped-app case. The control promotes after its continuous health
+window. The failure reaches the boot-relative deadline, retains the previous good
+image, persists quarantine before requesting normal reboot, and reconciles the
+simulated return without another reboot. Reopening both stores and publishing a
+newer signed catalog cannot make the failed payload automatically eligible.
+An unqualified capability and a duplicate trial request are also refused.
+
+```sh
+cargo test --locked -p engine-ota signed_ext4_health_failure -- --test-threads=1
+```
+
+Validation on 2026-10-17 passed all 340 OTA unit tests (eight optional cases
+ignored), 22 signed-feed integration tests, scoped Clippy with warnings denied,
+Rust 1.89 all-target checks and formatting. The unit run includes the joined
+healthy/failure case above and the missing-root diagnostic fixtures.
+
+This uses disposable signing keys, regular temporary files and simulated boot,
+watchdog and app observations. It does not exercise native partition admission,
+boot selector writes, firmware, production feed provisioning or a physical
+rollback. No test keys are installed on a Pi.
+
+Live preflight found a [time-validation defect](data/ota-time-marker-20261017.json)
+on both installed images. The fix passed read-only native probes, but is not yet
+installed. Production trust and staging also remain unprovisioned; the installed
+image has no `ota-bootstrap.json` bundle. Complete that setup and the supervised
+installation handoff before the live signed trial. A disposable test authority
+must not consume the production recovery generation floor and leave an otherwise
+unprovisioned device: first provisioning correctly rejects prior signed attempts.
+The intended fault remains stopping only the kiosk service after verifying the
+exact candidate trial boot, allowing ordinary recovery to handle the timeout.

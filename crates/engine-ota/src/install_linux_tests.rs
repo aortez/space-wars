@@ -5,6 +5,9 @@ use std::io::Cursor;
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::process::Command;
 
+#[path = "signed_recovery_tests.rs"]
+mod signed_recovery;
+
 struct Fixture {
     _directory: tempfile::TempDir,
     bytes: Vec<u8>,
