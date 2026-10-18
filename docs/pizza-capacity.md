@@ -37,13 +37,13 @@ The live client's existing `status` response also includes `pizza.population`: b
 
 ## Local functional evidence
 
-At seed 7, 800×480, 120 updates, all four normal fixtures completed with coherent physical counts:
+At source `ff21581`, Rust 1.89 release, seed 7, 800×480, 120 updates, all four normal fixtures completed with coherent physical counts:
 
 | Initial / budget | Final live balls | Exploded | Fragments created | Updates with explosions |
 | --- | ---: | ---: | ---: | ---: |
-| 500 / 500 | 452 | 103 | 55 | 53 |
-| 1,000 / 1,000 | 796 | 242 | 38 | 80 |
-| 2,500 / 2,500 | 2,269 | 3,378 | 3,147 | 117 |
-| 5,000 / 5,000 | 4,426 | 8,434 | 7,860 | 119 |
+| 500 / 500 | 434 | 90 | 24 | 46 |
+| 1,000 / 1,000 | 805 | 242 | 47 | 82 |
+| 2,500 / 2,500 | 1,685 | 1,135 | 320 | 113 |
+| 5,000 / 5,000 | 3,263 | 3,196 | 1,459 | 119 |
 
-These are actual bodies, not render-only particles. Desktop timing collected alongside compilation is not a controlled baseline and is not used as a Pi performance claim. The initial 5,000-body snapshots and subsequent cascade snapshots in `docs/screenshots/pizza-capacity` identify their precise population and tick in the accompanying manifest. The menu screenshot comes from the live local client at the target dimensions; the physical scene images are fixture exports through the production raster renderer. These initial captures were local. Subsequent temporary Pi 4 GPU runs and their limitations are recorded in the [device investigation](pizza-cascade-profile.md).
+These are actual bodies, not render-only particles. Desktop timing collected alongside compilation is not a controlled baseline and is not used as a Pi performance claim. The initial 5,000-body snapshots and subsequent cascade snapshots in `docs/screenshots/pizza-capacity` identify their precise population and tick in the accompanying manifest. The menu screenshot comes from the live local client at the target dimensions; the physical scene images are fixture exports through the production raster renderer. The refreshed captures include the viewport and continuous collision detection corrections. Temporary Pi 4 GPU runs and their limitations are recorded in the [device investigation](pizza-cascade-profile.md).

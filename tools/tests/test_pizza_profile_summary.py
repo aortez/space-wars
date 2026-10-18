@@ -1,5 +1,6 @@
 """Known CPU/DRM units, independent of any simulation implementation."""
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -30,6 +31,20 @@ def sample(index, uptime, total, process, main):
 
 
 class ProfileUnits(unittest.TestCase):
+    def test_export_boundary_and_gaps_are_excluded(self):
+        intervals = [dict(index=i, start_uptime=i - 1, end_uptime=i,
+                          weight_ticks=100, process_pct=100, main_thread_pct=100,
+                          temp_c=70, throttled=0) for i in range(1, 5)]
+        data = dict(cpu=dict(intervals=intervals), statuses=[
+            dict(sample=i, pizza=json.dumps(dict(tick=t)))
+            for i, t in enumerate([100, 200, 300, 1200, 1300])
+        ], render=[dict(file=f'trace-{i}.txt') for i in [1, 3, 'final']])
+        result = REPORT.before_export(data, 1200)
+        self.assertEqual([i['index'] for i in result['cpu']['intervals']], [1, 2])
+        self.assertEqual(result['render'], [dict(file='trace-1.txt')])
+        gaps = REPORT.cpu_intervals([intervals[0], intervals[2]])
+        self.assertEqual(gaps['longest_main_thread_ge95_seconds'], 1)
+
     def test_one_core_scale_and_duration_weighted_usage(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "cpu.txt"

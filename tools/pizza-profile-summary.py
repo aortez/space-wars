@@ -58,10 +58,18 @@ def cpu(path):
             continue
         core = {k: 100 * (1 - (b['cores'][k][1] - a['cores'][k][1]) / (b['cores'][k][0] - a['cores'][k][0])) for k in b['cores'] if k != 'cpu' and b['cores'][k][0] > a['cores'][k][0]}
         intervals.append(dict(weight_ticks=ticks, index=b['index'], start_uptime=a['uptime'], end_uptime=b['uptime'], process_pct=100 * (b['process'] - a['process']) / ticks, main_thread_pct=100 * (b['threads'][b['pid']] - a['threads'].get(a['pid'], 0)) / ticks, cores_pct=core, temp_c=b['temp'] / 1000, freq_khz=b['freq'], throttled=b['throttled']))
+    return cpu_intervals(intervals)
+
+def cpu_intervals(intervals):
+    """Aggregate selected intervals without joining streaks across capture gaps."""
     streak = max_streak = 0
+    previous_end = None
     for x in intervals:
+        if previous_end != x['start_uptime']:
+            streak = 0
         streak = streak + (x['end_uptime'] - x['start_uptime']) if x['main_thread_pct'] >= 95 else 0
         max_streak = max(max_streak, streak)
+        previous_end = x['end_uptime']
 
     def utilization(key):
         result = summary([x[key] for x in intervals])
@@ -94,6 +102,28 @@ def render(paths):
         traces.append(dict(file=path.name, loops=len(rows), flip_intervals_ms=summary(flips), flip_intervals_over_25ms=sum((x > 25 for x in flips)), flip_interval_samples=len(flips), submit_intervals_ms=summary(intervals('submit_at_ms')), stages=stages))
     return traces
 
+def before_export(result, last_tick):
+    """Only keep windows whose ending status precedes the final recorded update.
+
+    CPU samples precede their status request. Completed KMS traces are read after
+    that request, but their captured loops have already finished. Boundary and
+    final partial traces cannot prove that export has not started, so omit them.
+    """
+    ticks = {s['sample']: json.loads(s['pizza'])['tick']
+             for s in result['statuses'] if s.get('pizza')}
+    intervals = [x for x in result['cpu']['intervals']
+                 if x['index'] in ticks and x['index'] - 1 in ticks
+                 and ticks[x['index']] < last_tick
+                 and ticks[x['index'] - 1] < last_tick]
+    traces = []
+    for trace in result['render']:
+        suffix = Path(trace['file']).stem.removeprefix('trace-')
+        if suffix.isdigit() and int(suffix) in ticks and ticks[int(suffix)] < last_tick:
+            traces.append(trace)
+    return {'cpu': cpu_intervals(intervals), 'render': traces,
+            'last_simulation_tick': last_tick,
+            'scope': 'Conservative status brackets before JSON export; not an exact update/frame join.'}
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('path', type=Path)
@@ -110,6 +140,9 @@ def main():
             values['sample'] = int(f.stem.split('-')[1])
             statuses.append(values)
         result['statuses'] = statuses
+        if result['simulation']:
+            last_tick = result['simulation']['windows'][-1]['last_tick']
+            result['before_export'] = before_export(result, last_tick)
     print(json.dumps(result, indent=2))
 if __name__ == '__main__':
     main()

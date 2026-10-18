@@ -121,7 +121,7 @@ shared circle/polygon primitives and has no input handler or physical collider.
 
 ### Calibration and captures
 
-The October 18, 2026 local sweep used all four directions, 800×480, 1024×768
+The initial October 18, 2026 local sweep used all four directions, 800×480, 1024×768
 and 480×800 viewports, and target populations of 24 and 120 with normal
 spawning, damage and fragmentation. Each run warmed up for 300 ticks, admitted
 one typed manual event, and continued through 60 ticks after completion.
@@ -136,6 +136,8 @@ covers functional integrity up to 5,000; #354 and #359 retain device performance
 and CPU-headroom qualification.
 Representative [native captures and validation records](screenshots/pizza-gravity/validation.json)
 are checked in alongside this document, including paired software/GPU images.
+
+The sweep was rerun at `ff21581` after the viewport/CCD corrections. Updated ranges and raw calibration data are linked from the [cascade investigation](pizza-cascade-profile.md); the captures above retain their original source identity.
 
 Reproduce the normal-path sweep and export native software captures:
 

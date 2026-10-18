@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
-  "source": "codex/pizza-capacity-5000, based on 5e0b2a0; see containing commit",
-  "deployment": false,
+  "schema_version": 2,
+  "source": "ff2158126d0c8b2ebe96eb8d0eb9e69e3a877c33",
+  "installed_deployment": false,
   "images": [
     {
       "fixture_version": 1,
@@ -11,6 +11,17 @@
         "balls": 5000,
         "births": {
           "exploded": 0,
+          "exploded_by_generation": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "exploded_by_size": [
+            0,
+            0,
+            0
+          ],
           "fragment_capacity_stops": 0,
           "fragment_parents_skipped": 0,
           "fragments_created": 0,
@@ -23,7 +34,7 @@
       },
       "seed": 7,
       "tick": 0,
-      "capture": "Production raster renderer export of explicit normal-gameplay fixture; no live-client or device performance claim.",
+      "capture": "Production raster renderer export under CI profile, Rust 1.89. No device-performance claim.",
       "width": 800,
       "height": 480,
       "sha256": "6443f47e6a59b2f4d7f3c237cbf3a1ab721c6c13a370ebead48efb7eada4e10a"
@@ -32,55 +43,77 @@
       "fixture_version": 1,
       "image": "pizza-capacity-800x480-060.png",
       "population": {
-        "ball_colliders": 4776,
-        "balls": 4776,
+        "ball_colliders": 3434,
+        "balls": 3434,
         "births": {
-          "exploded": 6799,
-          "fragment_capacity_stops": 21,
-          "fragment_parents_skipped": 1763,
-          "fragments_created": 6575,
+          "exploded": 2360,
+          "exploded_by_generation": [
+            2298,
+            57,
+            5,
+            0
+          ],
+          "exploded_by_size": [
+            2208,
+            120,
+            32
+          ],
+          "fragment_capacity_stops": 1,
+          "fragment_parents_skipped": 128,
+          "fragments_created": 794,
           "pointer_created": 0,
           "pointer_replaced": 0,
           "spawned": 0
         },
         "limit": 5000,
-        "physics_balls": 4776
+        "physics_balls": 3434
       },
       "seed": 7,
       "tick": 60,
-      "capture": "Production raster renderer export of explicit normal-gameplay fixture; no live-client or device performance claim.",
+      "capture": "Production raster renderer export under CI profile, Rust 1.89. No device-performance claim.",
       "width": 800,
       "height": 480,
-      "sha256": "32c0378af88da1604715f497567fb4bd4d857deaf0896a742bf8a5402dec4f47"
+      "sha256": "aaf0bd4a90e76e6c96a02a28f221be57eb93ea719d6cc2f1f7ecc9d5a53be190"
     },
     {
       "fixture_version": 1,
       "image": "pizza-capacity-1024x768-060.png",
       "population": {
-        "ball_colliders": 4452,
-        "balls": 4452,
+        "ball_colliders": 3556,
+        "balls": 3556,
         "births": {
-          "exploded": 6508,
-          "fragment_capacity_stops": 11,
-          "fragment_parents_skipped": 1195,
-          "fragments_created": 5960,
+          "exploded": 1709,
+          "exploded_by_generation": [
+            1698,
+            11,
+            0,
+            0
+          ],
+          "exploded_by_size": [
+            1558,
+            119,
+            32
+          ],
+          "fragment_capacity_stops": 1,
+          "fragment_parents_skipped": 128,
+          "fragments_created": 265,
           "pointer_created": 0,
           "pointer_replaced": 0,
           "spawned": 0
         },
         "limit": 5000,
-        "physics_balls": 4452
+        "physics_balls": 3556
       },
       "seed": 7,
       "tick": 60,
-      "capture": "Production raster renderer export of explicit normal-gameplay fixture; no live-client or device performance claim.",
+      "capture": "Production raster renderer export under CI profile, Rust 1.89. No device-performance claim.",
       "width": 1024,
       "height": 768,
-      "sha256": "7fd50b26ce19c68c1b57025bb9f62f038dc02f3f52e13587b90a198f33c6b592"
+      "sha256": "8b1e1de17af3534b1e0d6993e24cee53296cfa79197250862fd1cd021e4a667c"
     },
     {
       "image": "800x480-settings-software.png",
-      "capture": "Live local client via public controls on Xvfb, winit-software, target-sized X11 window.",
+      "capture": "Live local client via public controls, target-sized Xvfb window, winit-software, CI profile/Rust 1.89.",
       "live_ball_limit": 5000,
       "desired_balls": 0,
       "width": 800,
@@ -89,12 +122,21 @@
     },
     {
       "image": "1024x768-settings-software.png",
-      "capture": "Live local client via public controls on Xvfb, winit-software, target-sized X11 window.",
+      "capture": "Live local client via public controls, target-sized Xvfb window, winit-software, CI profile/Rust 1.89.",
       "live_ball_limit": 5000,
       "desired_balls": 0,
       "width": 1024,
       "height": 768,
       "sha256": "4ebeabaee9188f5bb4c1e35e5e7e7ebe217291849497a7dd3fdd92dcf4a127a1"
+    },
+    {
+      "image": "1024x768-pi4-gpu-after-gravity.png",
+      "capture": "Actual Pi 4/Picade production KMS GPU capture, after timing ordinary field-On run 1. Post-event scene; population/tick not synchronized with screenshot.",
+      "width": 1024,
+      "height": 768,
+      "sha256": "d8a33cbec92e9ab3b2f01b227d4a20eccb830444e4296770f44d42d0ce633e2d",
+      "source": "ff2158126d0c8b2ebe96eb8d0eb9e69e3a877c33",
+      "client_sha256": "fbddc7ab7c2a174a5b6d2de199e0f4504c87d7a30cc410db1df79445a31c835a"
     }
   ]
 }
