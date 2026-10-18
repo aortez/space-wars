@@ -21,6 +21,22 @@ class PublisherPolicyTests(unittest.TestCase):
             self.assertEqual(result.jobs, jobs)
         self.assertEqual(len(helper.CI_JOBS), 9)
 
+    def test_ui_smoke_check_cannot_be_omitted_or_allowed_to_fail(self):
+        path = '.github/workflows/ci.yml'
+        original = yaml.load((ROOT / path).read_bytes(), Loader=yaml.BaseLoader)
+        for remove in (True, False):
+            with self.subTest(remove=remove):
+                value = copy.deepcopy(original)
+                steps = value['jobs']['linux-workspace']['steps']
+                step = next(s for s in steps if s.get('name') == 'Run PR UI smoke tests')
+                if remove:
+                    steps.remove(step)
+                else:
+                    step['continue-on-error'] = 'true'
+                with self.assertRaises(ValueError):
+                    helper.workflow(yaml.safe_dump(value).encode(), path,
+                                    ('push', 'workflow_dispatch'), helper.CI_JOBS)
+
     def test_mutable_actions_missing_tests_or_additional_authority_require_review(self):
         path = '.github/workflows/ota-build.yml'
         original = yaml.load((ROOT / path).read_bytes(), Loader=yaml.BaseLoader)
