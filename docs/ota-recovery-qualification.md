@@ -245,6 +245,22 @@ service (ten optional cases ignored), scoped Clippy with warnings denied,
 Rust 1.89 all-target checks, the AArch64 release helper build and formatting.
 The ordinary system-service build also remains feature-independent.
 
+The [2026-10-17 native preflight and candidate record](data/ota-signed-installer-20261017.json)
+captures both primary Pis refusing an installer selection from the empty owner
+feed. Their boot IDs, installed binaries/selectors, recovery records and selected
+persistent stores remained identical. Both games and recovery services stayed
+healthy. This is refusal/preflight evidence, not a signed installation attempt.
+
+Clean source `0a0434b165dc389d624117e502e5cfd8b3fe016d` also built and passed
+independent rootfs qualification. Its 131,866,380-byte compressed payload is
+`700c7f50af011dc928964d9d6758044e5a78ed7690cae051e02940539393db51`;
+the boot identity matches both installed devices and the persistent format stays
+at version one. The disposable-key publisher fixture carried these exact bytes
+through Nightly, Release and renewal while preserving generation one and
+reconciling a lost checkpoint response. That fixture uses mocked GitHub/origin
+and Pi evidence: it does not establish main CI admission, publish to the owner
+feed or qualify physical rollback. The live authority and feed remain unchanged.
+
 The remaining live sequence is to publish and stage a verified candidate with
 the time fix, capture native inspection and preservation evidence, then exercise
 the selected trial and stopped-kiosk failure on both Pis. Do not enable the

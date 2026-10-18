@@ -2231,8 +2231,11 @@ service was not replaced and still reports time unusable. This is an empty-feed
 trust/transport check, not signed-image installation or unattended recovery
 qualification. The [owner-selected signed installer](ota-recovery-qualification.md#owner-selected-signed-trial)
 now connects the verified inactive-root writer to one-shot reboot admission,
-without granting unattended recovery capability. A signed candidate containing
-the time fix and physical rollback/quarantine checks remain next. The
+without granting unattended recovery capability. Its [native preflight](data/ota-signed-installer-20261017.json)
+passed on both Pis, and a clean compatible candidate containing the time fix
+passed image qualification and the disposable-key publication/promotion fixture.
+Real owner signing, installation and physical rollback/quarantine checks remain
+next. The
 [live trust record](data/ota-owner-feed-20261017.json)
 retains source, public pins, helper hashes, test results and device evidence.
 
