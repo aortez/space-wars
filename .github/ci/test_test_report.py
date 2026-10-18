@@ -117,6 +117,39 @@ class ReportTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 seconds(value)
 
+    def test_ui_budget_is_separate_from_test_success_and_handles_missing_timings(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for recorded, outcome in [(None, "Not recorded"), ("", "Not recorded"),
+                                      ("300\n", "within budget"),
+                                      ("Command exited with non-zero status 100\n301\n", "OVER BUDGET")]:
+                with self.subTest(recorded=recorded):
+                    if recorded is not None:
+                        (root / "ui.seconds").write_text(recorded)
+                    text = summarize(root, [], phases=("ui",), ui_budget_seconds=300)
+                    self.assertIn(f"PR UI smoke budget: **300s** — **{outcome}**", text)
+            self.assertNotIn("smoke budget", summarize(root, [], phases=("ui",)))
+
+    def test_ui_budget_warning_reaches_stderr_when_summary_is_redirected(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            command = [sys.executable, str(Path(__file__).with_name("test_report.py")),
+                       "--timings-dir", directory, "--phase", "ui", "--ui-budget-seconds", "300",
+                       str(root / "missing.xml")]
+            for duration, warning in [(299.9, False), (300, False), (300.1, True)]:
+                with self.subTest(duration=duration):
+                    (root / "ui.seconds").write_text(str(duration))
+                    result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual("::warning" in result.stderr, warning)
+                    self.assertNotIn("::warning", result.stdout)
+                    self.assertIn("Not produced", result.stdout)
+            for invalid in ["0", "-1", "nan", "inf"]:
+                with self.subTest(invalid=invalid):
+                    result = subprocess.run(command + ["--ui-budget-seconds", invalid],
+                                            capture_output=True, text=True, timeout=10)
+                    self.assertNotEqual(result.returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

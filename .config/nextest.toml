@@ -23,16 +23,55 @@ test-threads = 1
 [profile.ui.junit]
 path = "junit.xml"
 
-# Most UI workflows stay on PRs. Defer only these four long-running scenarios;
-# exact names ensure new tests are included by default. The CI selection guard
-# detects stale exclusions and accidental loss of other UI coverage.
+# Bounded PR smoke suite. Every UI case must also be classified in
+# .github/ci/ui-tests.json; the selection guard checks discovery against both.
+# Keep exact names: new tests need a deliberate coverage/runtime choice.
 [profile.ui-pr]
 inherits = "ui"
 default-filter = '''
-    package(=engine-client) & binary(=ui_control_functional) & not (
-        test(=spacewars_match::normal_spacewars_physical_round_reaches_result_and_play_again)
-        | test(=clock::demo_profile_automatically_runs_multiple_bounded_events)
-        | test(=clock::rain_settings_preview_pause_cleanup_and_persistence)
-        | test(=clock::duck_runs_jumps_exits_and_supports_live_controls_and_cleanup)
+    package(=engine-client) & binary(=ui_control_functional) & (
+        test(=attached::attached_workflows_preserve_automatic_clock_and_recover_failed_checks)
+        | test(=attached::attached_workflows_preserve_launcher_running_and_paused_sessions)
+        | test(=autostart::autostart_clock_launch_and_disable_smoke)
+        | test(=clock::aquarium_preview_pause_enablement_and_restart_use_the_public_ui)
+        | test(=clock::cell_swap_preview_and_saved_switch_use_the_public_controls)
+        | test(=clock::clock_fonts_save_live_choices_and_survive_restart)
+        | test(=clock::color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunch)
+        | test(=clock::crow_trigger_pause_settings_and_restart_preserve_the_resident_contract)
+        | test(=clock::digit_slide_controls_preview_cleanup_and_persistence)
+        | test(=clock::explosion_controls_pause_recovery_and_restart_preserve_settings)
+        | test(=clock::falling_digits_recover_and_survive_pause_restart_and_relaunch)
+        | test(=clock::live_clock_controls_preserve_events_preview_and_persist_across_restart_and_relaunch)
+        | test(=clock::marquee_message_guards_validation_and_save_failure_retry)
+        | test(=clock::marquee_preview_settings_and_recovery_smoke)
+        | test(=clock::meltdown_pools_drains_previews_and_cleans_up_through_the_real_client)
+        | test(=compact_hud::compact_hud_renders_with_bottom_instruments_in_both_backends)
+        | test(=controllers::controllers_are_reachable_from_launcher_and_pause_without_resuming)
+        | test(=device_info::device_info_is_shared_read_only_scrollable_and_returns_to_its_parent)
+        | test(=garden_lab::garden_lab_pause_step_and_renderers_smoke)
+        | test(=launcher_can_run_the_classic_spacewars_menu_lifecycle)
+        | test(=launcher_can_run_the_clock_menu_lifecycle)
+        | test(=launcher_can_run_the_pizza_menu_lifecycle)
+        | test(=launcher_catalog::direct_extra_and_hidden_launches_do_not_depend_on_the_picker_filter)
+        | test(=launcher_catalog::filter_save_failure_uses_app_settings_retry_and_persists_off_on_restart)
+        | test(=launcher_catalog::main_catalog_wraps_and_toggle_preserves_setup_and_extra_return)
+        | test(=launcher_catalog::saved_extra_automatically_expands_and_persists_the_catalog)
+        | test(=launcher_navigation_uses_the_public_control_api)
+        | test(=network::network_settings_handle_missing_service_and_preserve_paused_session)
+        | test(=performance::fps_counter_is_shared_by_scene_and_native_video_lifecycles)
+        | test(=sound::sound_controls_persist_across_scenarios_restart_and_process_restart)
+        | test(=spaceling_lab::material_expedition_two_players_settings_and_lifecycle)
+        | test(=spaceling_lab::spaceling_lab_launch_pause_restart_and_both_renderers)
+        | test(=spaceling_lab::surface_expedition_two_players_settings_and_lifecycle)
+        | test(=spacewars_match::normal_spacewars_new_worlds_rematches_and_relaunch_preserve_settings)
+        | test(=spacewars_match::scoreboard_keeps_rematches_and_new_worlds_and_resets_at_launcher)
+        | test(=spacewars_terrain::material_combat_ai_launch_pause_restart_and_both_renderers)
+        | test(=spacewars_terrain::material_jetpack_launch_pause_restart_and_both_renderers)
+        | test(=spacewars_terrain::material_travel_launch_pause_restart_and_both_renderers)
+        | test(=spacewars_terrain::planetary_tank_drive_and_pause_smoke)
+        | test(=spacewars_terrain::spacewars_terrain_launch_pause_restart_and_both_renderers)
+        | test(=terrain_lab::scorched_earth_launch_pause_restart_and_both_renderers)
+        | test(=terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers)
+        | test(=terrain_lab::terrain_lab_launch_pause_restart_and_both_renderers)
     )
 '''

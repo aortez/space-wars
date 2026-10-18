@@ -1,7 +1,7 @@
 name: UI functional tests
 
-# Full regression suite, including four long-running cases omitted on PRs.
-# The other UI workflows also run in normal CI with the ui-pr profile.
+# Full regression suite, including exhaustive workflows omitted on PRs.
+# Normal CI runs the representative ui-pr smoke selection.
 on:
   schedule:
     - cron: '29 9 * * *'
