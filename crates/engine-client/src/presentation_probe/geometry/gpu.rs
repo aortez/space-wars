@@ -695,7 +695,14 @@ pub(in crate::presentation_probe) fn run(
         !options.geometry_no_gpu_timing,
     )?;
     let viewport = Viewport::new(width as f32, height as f32);
-    let metadata = serde_json::json!({"version": 9, "gl": context.identity, "device": options.geometry_device, "width": width, "height": height, "seed": 7,
+    // Pizza's direction fixtures select their seed through real admission and
+    // report it per fixture; do not mislabel those captures with the lab default.
+    let seed = (!options
+        .geometry_cases
+        .iter()
+        .any(|case| case.starts_with("pizza-event-")))
+    .then_some(7);
+    let metadata = serde_json::json!({"version": 9, "gl": context.identity, "device": options.geometry_device, "width": width, "height": height, "seed": seed,
         "warmup_frames": WARMUP, "frames": options.presentation_frames, "repeats": options.presentation_repeats, "in_flight": options.geometry_in_flight,
         "cases": options.geometry_cases, "modes": options.geometry_modes, "gpu_queries": timer.is_some(), "simulation_timed": false, "producer_timed_cases": options.geometry_cases.iter().filter(|s| s.starts_with("ships-")).collect::<Vec<_>>(), "fresh_presenter_per_block": true, "text_ui_timed": false, "scanout": false, "paced": false, "gpu_memory_measured": false});
     eprintln!("geometry_probe={metadata}");
@@ -947,7 +954,7 @@ pub(in crate::presentation_probe) fn run(
                 );
                 field!("width", width);
                 field!("height", height);
-                field!("seed", 7);
+                field!("seed", f.seed);
                 field!("tick", f.tick);
                 field!("objects", f.objects);
                 field!(

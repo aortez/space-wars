@@ -7,6 +7,7 @@
 #[cfg(test)]
 mod event_tests;
 mod events;
+mod field;
 
 pub use events::{
     DIRECTIONAL_GRAVITY_TICKS, FIXED_HZ, MAX_EVENT_GAP_TICKS, MIN_EVENT_GAP_TICKS,
@@ -1000,6 +1001,7 @@ impl Scenario for PizzaScenario {
 
         let gravity_started = Instant::now();
         metrics.gravity = apply_gravity_to_physics(state);
+        let field_applied = field::apply(state);
         metrics.gravity_time = gravity_started.elapsed();
 
         let physics = state
@@ -1007,6 +1009,11 @@ impl Scenario for PizzaScenario {
             .as_mut()
             .expect("interactive Pizza uses the canonical physics world");
         metrics.rapier = physics.step(dt * WORLD_TIME_SCALE);
+        // The event owns only this update's acceleration. Clear even on its
+        // final update, leaving no persistent force during pause or afterward.
+        if field_applied {
+            physics.clear_forces();
+        }
         metrics.physics_time = metrics.rapier.wall_time;
         metrics.collision_time = metrics.rapier.narrow_phase_time + metrics.rapier.solver_time;
 
@@ -1062,6 +1069,7 @@ impl Scenario for PizzaScenario {
                 }),
             );
         }
+        field::render_cue(state, &mut frame);
         if let Some(benchmark) = state.config.benchmark {
             let counts = state.benchmark_counts();
             let mut text = RenderText::new(
