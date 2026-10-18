@@ -61,10 +61,10 @@ disable_text_console_for_kiosk() {
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " disable_text_console_for_kiosk;"
 
-# This is a Wi-Fi/DNS client, not a DNS or NFS server. Upstream recommendations
-# install these daemons; their public listeners prevent safe network-idle
-# detection. Keep the packages available for private NetworkManager helpers,
-# while preventing standalone servers and RPC socket activation at boot.
+# Standalone listeners prevent safe network-idle detection. NetworkManager can
+# use dnsmasq as a private helper; rpcbind is a dependency of packagegroup-base-nfs
+# from the nfs distro feature, not a NetworkManager helper. Keep those packages
+# while masking unused standalone services and RPC socket activation at boot.
 disable_unused_network_servers() {
     install -d ${IMAGE_ROOTFS}/etc/systemd/system
     for unit in dnsmasq.service rpcbind.service rpcbind.socket; do

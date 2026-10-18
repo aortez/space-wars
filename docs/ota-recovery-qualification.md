@@ -345,6 +345,6 @@ not establish interrupted boot-selector promotion, physical power-loss safety,
 unattended installation, real Release promotion or download/gameplay performance.
 The [later installed-image record](data/ota-profile-image-20261018.json) adds
 Pi 5 startup/radio/time-wake feed checks and isolated Pi 4 controls. The rest of
-the installed download/network matrix, second-Picade qualification and production
+the installed download/network matrix, second-Picade failure matrix and production
 publisher/installer/overnight-policy integration remain rollout gates before
 tag-triggered releases and automatic Nightlies are enabled.

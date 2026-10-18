@@ -60,6 +60,29 @@ already-current candidate was ineligible, so neither cycle downloaded or
 installed another image. Both installation automation and publication automation
 remain disabled. Devices were left on Release with partial offline disabled.
 
+### Review corrections and next network gate
+
+PR #510's review found missing prelaunch isolation checks in the native NM test
+launcher and silent rejection of the service's namespace handoff. The launcher
+now rejects exposed rfkill, missing or nonempty private bus/udev binds, and
+unreadable namespace evidence before starting either daemon. Inert-daemon tests
+exercise these guards without exposing host devices or the production bus.
+
+The service retains the handoff result and warns once for missing, invalid or
+different-namespace evidence. Default logging now includes warnings. Only owner
+diagnostics may fall back to direct PID 1 inspection; `serve` requires inherited
+evidence before idle shutdown. The unit's `graceful` open keeps the independent
+service available when that open fails. Static tests bind the unit name/options
+and the three listener masks to their source contracts. SSH boot-ID lookup is
+limited to the stopped-service fallback; failure there does not prevent a later
+coordinator admission.
+
+These changes require a new image qualification. The generation-6 records above
+remain evidence for source `0a32db2`, not for the revised executable. The older
+delayed-rfkill-readback risk is tracked separately in
+[#511](https://github.com/aortez/space-wars/issues/511), with bounded transition,
+expiry and conflict tests required before unattended partial-offline rollout.
+
 ### Remaining work and ownership
 
 Completed bootstrap and signed-delivery evidence remains valid within its
@@ -80,9 +103,10 @@ New image changes and previously untested failure cases still need qualification
 
 ### Next implementation sequence
 
-1. Finish review and merge #510 with the Pi 5 and selected second-Picade
-   qualification. The owner selected `sw-picade-2.local` for this Pi 4 run; the
-   primary Picade's corrected-image rollout remains separately tracked in #267.
+1. Network reliability: #510 has recorded Pi 5 and selected second-Picade
+   qualification for generation 6; its review corrections await revised-image
+   checks. #511 is the next bounded-readback correction before install-flow work.
+   The primary Picade's corrected-image rollout remains tracked in #267.
 2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
    consent, app save/acknowledgement, fixed privileged install operation, progress,
    trial and confirmed outcome. Define their shared handoff together; the
@@ -107,6 +131,23 @@ opt-in, initially 03:00–05:00 local,
 after ten minutes idle in Clock or the launcher, with a sixty-second countdown.
 Input postpones until the next overnight window. Running and paused games stay
 protected.
+
+### Cleanup candidates for later deletion review
+
+Keep active instructions short and update them as work lands. The following are
+review candidates, not authorization to delete evidence or recovery data:
+
+| Material | Review before deletion or consolidation |
+| --- | --- |
+| Dated experiments in this document and the generation-zero commands in `ota-recovery-qualification.md` | Move historical detail into an archive if useful, preserving linked anchors, source identities and the active-plan pointer. Do not present old commands as today's next step. |
+| Revision-specific `canary*.py`, `publish.py`, `qualify-*.py` and `record-*.py` under local `target/idle-qualification/` | Separate obsolete executable entry points from retained proof. Archive any script whose hash is referenced by a qualification record; review unreferenced drafts for removal after the replacement workflow is recorded. Never rerun an old script merely because it exists. |
+| Repeated extracted root filesystems, build outputs and copied executables under local qualification directories | Inventory references and retain verified image/artifact hashes plus the evidence needed to reproduce a result. Review redundant copies only after archival and current-device recovery requirements are satisfied. |
+| Local flash/bootstrap/recovery helpers and saved `/data` archives from replaced media | Treat these as recovery records until device identity, restoration and replacement-drive checks are closed. Review independently of ordinary build-cache cleanup. |
+
+Original failed comparisons and their subsequent reviews remain part of the
+qualification record. The serial-test requirement is also retained: shared-process
+parallel libtest has reproduced fixture-lock contention; changing that needs test
+isolation work, not deleting failing results or weakening assertions.
 
 ## PR and nightly recovery coverage
 
@@ -2783,8 +2824,9 @@ capability sandbox, inspecting `/proc/1/ns/net` also fails. An unrestricted
 owner probe alone therefore cannot qualify the daemon's idle observation.
 
 The image now masks `dnsmasq.service`, `rpcbind.service` and `rpcbind.socket`.
-NetworkManager, systemd-resolved and Bluetooth provisioning remain enabled;
-the packages remain available for private helpers. Unknown listeners still
+NetworkManager, systemd-resolved and Bluetooth provisioning remain enabled.
+`dnsmasq` remains available as a private NetworkManager helper; `rpcbind` remains
+installed through the NFS package-group dependency. Unknown listeners still
 defer shutdown. The service uses systemd's
 [OpenFile handoff](https://www.freedesktop.org/software/systemd/man/257/systemd.service.html#OpenFile=)
 to obtain a read-only host-network-namespace descriptor before entering the
@@ -3026,11 +3068,14 @@ This test is ignored in ordinary CI. Its
 [launcher](../yocto/tests/nm-profile-refresh.sh) requires a fresh root-owned
 mode-0700 directory under `/data/spacewars-nm-qualification-*`, with `baseline`
 or `candidate` case directories and private binds for `/etc/NetworkManager`,
-`/run/NetworkManager` and `/var/lib/NetworkManager`. Launch through a bounded
+`/run/NetworkManager` and `/var/lib/NetworkManager`, plus empty mode-0700
+`bus-denied` and `udev-denied` directories bound over `/run/dbus` and `/run/udev`.
+It rejects exposed `/dev/rfkill`, incorrect binds and unreadable host namespace
+links before starting its private bus or NetworkManager. Launch through a bounded
 systemd unit with private network, mounts, devices and temporary files;
 read-only kernel settings; and a private replacement for `/run/dbus` and
-`/run/udev`. The launcher starts its own bus and daemon, verifies namespace/bind
-isolation, and uses only non-autoconnecting synthetic profiles. It never stops
+`/run/udev`. The launcher verifies isolation before starting its own bus and
+daemon, and uses only non-autoconnecting synthetic profiles. It never stops
 or replaces production NetworkManager. Preserve the pre/post production checks
 and collect the case logs even when a control fails.
 

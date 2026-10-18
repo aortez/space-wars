@@ -96,6 +96,43 @@ fn namespace_handoff_requires_this_process_and_exact_named_descriptor() {
 }
 
 #[test]
+fn missing_and_rejected_handoffs_never_authorize_service_idle() {
+    let metadata = || {
+        [
+            Ok(std::process::id().to_string()),
+            Ok("1".into()),
+            Ok(HOST_NAMESPACE_NAME.into()),
+        ]
+    };
+    let missing = namespace_handoff(
+        std::array::from_fn(|_| Err(std::env::VarError::NotPresent)),
+        -1,
+    );
+    assert!(matches!(missing, NamespaceHandoff::Missing));
+    assert!(!missing.confirmed(true));
+    let mut partial = metadata();
+    partial[2] = Err(std::env::VarError::NotPresent);
+    let mut wrong_name = metadata();
+    wrong_name[2] = Ok("connection".into());
+    for input in [partial, wrong_name, metadata()] {
+        let rejected = namespace_handoff(input, -1);
+        assert!(matches!(rejected, NamespaceHandoff::Rejected(_)));
+        assert!(!rejected.confirmed(true));
+    }
+    let file = File::open("/proc/self/ns/net").unwrap();
+    let accepted = namespace_handoff(metadata(), file.as_raw_fd());
+    assert!(matches!(accepted, NamespaceHandoff::Accepted(_)));
+    assert!(accepted.confirmed(true));
+    // The fallback remains available to owner diagnostics, independently of
+    // whether this test's host allows inspecting PID 1.
+    let direct = fs::read_link("/proc/self/ns/net")
+        .ok()
+        .zip(fs::read_link("/proc/1/ns/net").ok())
+        .is_some_and(|(a, b)| a == b);
+    assert_eq!(missing.confirmed(false), direct);
+}
+
+#[test]
 fn namespace_handoff_pins_kernel_identity_and_closes_in_exec_children() {
     let source = File::open("/proc/self/ns/net").unwrap();
     // Simulate a descriptor handed to exec by systemd, without CLOEXEC.

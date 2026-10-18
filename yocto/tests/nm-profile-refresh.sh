@@ -9,12 +9,27 @@ test "$EUID" = 0
 [[ "$directory" =~ ^/data/spacewars-nm-qualification-[a-z0-9-]+/(baseline|candidate)$ ]]
 test "$(realpath "$directory")" = "$directory"
 test "$(stat -c '%u:%a' "$directory")" = '0:700'
+# rfkill is global, even in a private network namespace. These checks must run
+# before dbus-daemon or NetworkManager can start, not inside the later Rust test.
+test ! -e /dev/rfkill
+test ! -L /dev/rfkill
 for namespace in net mnt; do
-    test "$(readlink "/proc/self/ns/$namespace")" != "$(readlink "/proc/1/ns/$namespace")"
+    current=$(readlink "/proc/self/ns/$namespace")
+    host=$(readlink "/proc/1/ns/$namespace")
+    test -n "$current"
+    test -n "$host"
+    test "$current" != "$host"
 done
-for pair in 'etc /etc/NetworkManager' 'run /run/NetworkManager' 'state /var/lib/NetworkManager'; do
+for pair in 'etc /etc/NetworkManager' 'run /run/NetworkManager' 'state /var/lib/NetworkManager' \
+    'bus-denied /run/dbus' 'udev-denied /run/udev'; do
     read -r local bound <<< "$pair"
+    test -d "$directory/$local"
+    test ! -L "$directory/$local"
+    test "$(stat -c '%u:%a' "$directory/$local")" = '0:700'
     test "$(stat -c '%d:%i' "$directory/$local")" = "$(stat -c '%d:%i' "$bound")"
+done
+for blocked in /run/dbus /run/udev; do
+    test -z "$(find "$blocked" -mindepth 1 -print -quit)"
 done
 test "$(stat -c '%u:%a' "$binary")" = '0:500'
 test ! -e "$directory/bus"
@@ -36,7 +51,7 @@ cleanup() {
 trap cleanup EXIT
 dbus-daemon --session --nofork --nopidfile --address="$DBUS_SYSTEM_BUS_ADDRESS" > "$directory/bus.log" 2>&1 &
 bus_pid=$!
-for attempt in {1..50}; do
+for _attempt in {1..50}; do
     test -S "$directory/bus" && break
     sleep 0.1
 done
@@ -61,7 +76,7 @@ EOF
     --state-file="$directory/state/NetworkManager.state" --pid-file="$directory/run/NetworkManager.pid" \
     > "$directory/manager.log" 2>&1 &
 nm_pid=$!
-for attempt in {1..50}; do
+for _attempt in {1..50}; do
     kill -0 "$nm_pid"
     if busctl --address="$DBUS_SYSTEM_BUS_ADDRESS" get-property org.freedesktop.NetworkManager \
         /org/freedesktop/NetworkManager org.freedesktop.NetworkManager Startup | grep -q 'false'; then break; fi

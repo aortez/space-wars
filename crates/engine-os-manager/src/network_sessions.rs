@@ -18,7 +18,29 @@ const ROOT: &str = "/org/freedesktop/systemd1";
 const TEMPLATE: &str = "sshd@spacewars-network-check.service";
 const DEADLINE: Duration = Duration::from_secs(5);
 const HOST_NAMESPACE_NAME: &str = "spacewars-host-netns";
-static HOST_NAMESPACE: OnceLock<Option<File>> = OnceLock::new();
+static HOST_NAMESPACE: OnceLock<NamespaceHandoff> = OnceLock::new();
+static SERVICE_HANDOFF_REQUIRED: OnceLock<()> = OnceLock::new();
+
+enum NamespaceHandoff {
+    Missing,
+    Rejected(&'static str),
+    Accepted(File),
+}
+
+impl NamespaceHandoff {
+    fn confirmed(&self, required: bool) -> bool {
+        match self {
+            Self::Accepted(file) => same_namespace(file, Path::new("/proc/self/ns/net")),
+            _ if required => false,
+            // Only owner diagnostics may use direct PID 1 inspection. A service
+            // with a failed handoff must not accidentally acquire this fallback.
+            _ => fs::read_link("/proc/self/ns/net")
+                .ok()
+                .zip(fs::read_link("/proc/1/ns/net").ok())
+                .is_some_and(|(a, b)| a == b),
+        }
+    }
+}
 type Fields = HashMap<String, OwnedValue>;
 type UnitRow = (
     String,
@@ -84,12 +106,55 @@ fn namespace_file(fd: i32) -> Option<File> {
 /// A socket-activated SSH admission command must leave its socket untouched.
 pub fn initialize_host_namespace() {
     HOST_NAMESPACE.get_or_init(|| {
-        let pid = std::env::var("LISTEN_PID").ok()?;
-        let count = std::env::var("LISTEN_FDS").ok()?;
-        let names = std::env::var("LISTEN_FDNAMES").ok()?;
-        namespace_descriptor(&pid, &count, &names)
-            .then(|| namespace_file(3))
-            .flatten()
+        namespace_handoff(
+            ["LISTEN_PID", "LISTEN_FDS", "LISTEN_FDNAMES"].map(std::env::var),
+            3,
+        )
+    });
+}
+
+fn namespace_handoff(
+    metadata: [std::result::Result<String, std::env::VarError>; 3],
+    fd: i32,
+) -> NamespaceHandoff {
+    if metadata
+        .iter()
+        .all(|value| matches!(value, Err(std::env::VarError::NotPresent)))
+    {
+        return NamespaceHandoff::Missing;
+    }
+    if let [Ok(pid), Ok(count), Ok(names)] = &metadata
+        && namespace_descriptor(pid, count, names)
+    {
+        return namespace_file(fd).map_or(
+            NamespaceHandoff::Rejected("descriptor is unavailable or not a network namespace"),
+            NamespaceHandoff::Accepted,
+        );
+    }
+    NamespaceHandoff::Rejected("activation metadata does not identify the expected descriptor")
+}
+
+/// Called once by serve, after logging initialization and before worker startup.
+/// Missing evidence disables idle shutdown, not the independent device service.
+pub fn require_service_namespace() {
+    SERVICE_HANDOFF_REQUIRED.get_or_init(|| {
+        match HOST_NAMESPACE.get().unwrap_or(&NamespaceHandoff::Missing) {
+            NamespaceHandoff::Accepted(file)
+                if same_namespace(file, Path::new("/proc/self/ns/net")) =>
+            {
+                tracing::info!("host network namespace handoff accepted");
+            }
+            NamespaceHandoff::Accepted(_) => tracing::warn!(
+                "host network namespace handoff differs from service namespace; idle shutdown disabled"
+            ),
+            NamespaceHandoff::Missing => tracing::warn!(
+                "host network namespace handoff missing; idle shutdown disabled"
+            ),
+            NamespaceHandoff::Rejected(reason) => tracing::warn!(
+                reason,
+                "host network namespace handoff rejected; idle shutdown disabled"
+            ),
+        }
     });
 }
 
@@ -101,15 +166,10 @@ fn same_namespace(file: &File, current: &Path) -> bool {
 }
 
 fn host_namespace_confirmed() -> bool {
-    if let Some(Some(file)) = HOST_NAMESPACE.get() {
-        return same_namespace(file, Path::new("/proc/self/ns/net"));
-    }
-    // Owner diagnostics can inspect PID 1 directly. The service sandbox cannot;
-    // missing or invalid inherited evidence therefore continues to defer idle.
-    fs::read_link("/proc/self/ns/net")
-        .ok()
-        .zip(fs::read_link("/proc/1/ns/net").ok())
-        .is_some_and(|(a, b)| a == b)
+    HOST_NAMESPACE
+        .get()
+        .unwrap_or(&NamespaceHandoff::Missing)
+        .confirmed(SERVICE_HANDOFF_REQUIRED.get().is_some())
 }
 
 fn endpoint(value: &str, ipv6: bool) -> Result<(IpAddr, u16)> {
