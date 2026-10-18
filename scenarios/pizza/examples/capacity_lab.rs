@@ -64,8 +64,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     let initial = state.population();
+    // Export the exact f32 starting state for cross-engine diagnostics. Matching
+    // RNG seeds alone would not match fixtures across languages. Outside timing.
+    let initial_balls: Vec<_> = state
+        .balls
+        .iter()
+        .map(|ball| {
+            json!({
+                "id":ball.id, "x":ball.position.x, "y":ball.position.y,
+                "vx":ball.velocity.x, "vy":ball.velocity.y,
+                "radius":ball.radius, "hp":ball.hp,
+                "color":[ball.color.r, ball.color.g, ball.color.b],
+                "moving":ball.moving, "invincible":ball.invincible,
+            })
+        })
+        .collect();
     let mut timings = Vec::with_capacity(steps as usize);
     let mut samples = Vec::with_capacity(steps as usize);
+    #[cfg(feature = "ccd-diagnostics")]
+    let mut ccd_profiles = Vec::with_capacity(steps as usize);
     let mut peak = state.balls.len();
     let mut contact_samples = 0;
     let mut explosion_steps = 0;
@@ -79,8 +96,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         let started = Instant::now();
+        #[cfg(feature = "ccd-diagnostics")]
+        let (_, ccd) = engine_rapier::world::ccd_diagnostics::measure(|| {
+            PizzaScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        });
+        #[cfg(not(feature = "ccd-diagnostics"))]
         PizzaScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
         let micros = started.elapsed().as_secs_f64() * 1e6;
+        #[cfg(feature = "ccd-diagnostics")]
+        ccd_profiles.push(ccd);
         timings.push(micros);
         let counts = state.population();
         assert_eq!(counts.balls, counts.physics_balls);
@@ -101,17 +125,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     timings.sort_by(f64::total_cmp);
     let percentile =
         |p: f64| timings[((timings.len() as f64 * p).ceil() as usize).saturating_sub(1)];
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&json!({
-            "fixture_version":capacity_lab::FIXTURE_VERSION, "seed":seed, "field":field, "ordinary":ordinary,
-            "width":width,"height":height,"steps":steps,"fixed_dt_ns":16_666_667,
-            "initial":initial,"final":state.population(),"peak_balls":peak,
-            "contact_samples":contact_samples,"explosion_steps":explosion_steps,
-            "step_us":{"p50":percentile(0.50),"p95":percentile(0.95),"p99":percentile(0.99),"worst":timings.last()},
-            "scope":"headless simulation only; no renderer, frame pacing or Pi CPU qualification",
-            "samples":samples,
-        }))?
-    );
+    let mut report = json!({
+        "fixture_version":capacity_lab::FIXTURE_VERSION, "seed":seed, "field":field, "ordinary":ordinary,
+        "width":width,"height":height,"steps":steps,"fixed_dt_ns":16_666_667,
+        "initial":initial,"final":state.population(),"peak_balls":peak,
+        "initial_balls":initial_balls,
+        "contact_samples":contact_samples,"explosion_steps":explosion_steps,
+        "step_us":{"p50":percentile(0.50),"p95":percentile(0.95),"p99":percentile(0.99),"worst":timings.last()},
+        "scope":"headless simulation only; no renderer, frame pacing or Pi CPU qualification",
+        "ccd_instrumented":cfg!(feature = "ccd-diagnostics"),
+        "samples":samples,
+    });
+    if cfg!(feature = "ccd-diagnostics") {
+        report["scope"] = json!(
+            "CCD instrumented diagnostic; per-query timer overhead included, not a benchmark"
+        );
+    }
+    #[cfg(feature = "ccd-diagnostics")]
+    {
+        report["ccd_profiles"] = serde_json::to_value(ccd_profiles)?;
+    }
+    println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
 }

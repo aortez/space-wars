@@ -76,6 +76,24 @@ filtering, cached values, shape-cast ordering or response. See the GPU-default
 follow-up in the same investigation document; its timings include diagnostic
 overhead and are not a new optimization result.
 
+The Pizza cascade investigation also defers the existing-contact lookup in
+`ccd_solver.rs` until `toi_entry.rs` has checked relative travel against shape
+thickness alone. The original rejection threshold adds
+`smallest_contact_dist.max(0.0)` to that thickness, so a candidate rejected by the
+lower threshold must also fail the original test. Surviving candidates retain
+the original addition, comparison, cast order and response. The public
+`TOIEntry::try_from_colliders` signature is unchanged; only its private helper
+takes a lazy contact-distance closure. No contact cache or new persistent state
+is introduced. This applies to first-impact searches, clamping and resweeps.
+
+With diagnostics enabled, contact-lookup time now nests inside TOI time; do not
+sum those inclusive timers. The feature-gated
+`ccd_shared_motion_rejects_before_contact_graph_lookup` regression exercises
+fast bodies travelling together with one/four CCD substeps. Existing moving
+ground, impact, compound, snapshot and filtering regressions cover the remaining
+CCD paths. See `docs/pizza-reference-comparison.md` for measured work and replay
+equivalence; instrumentation timings are separate from uninstrumented runs.
+
 These ten Rust files and the diagnostic feature in `Cargo.toml` are the
 complete source/configuration differences from the published crate. See
 `docs/picade-late-match-physics.md` for the retained inputs and qualification.
