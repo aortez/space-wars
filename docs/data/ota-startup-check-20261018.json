@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "issue": 265,
+  "source": {
+    "base": "ac5270cf39864c31f8e7ba75b372476088125312",
+    "files": {
+      "crates/engine-os-manager/src/update_runtime.rs": "8adca5a1f4812c8df5370a0d0a31b500a875b731c0acae29a6551af2ee50f133",
+      "crates/engine-os-manager/src/update_native.rs": "8e1fb17fb495c22e4682e29cb9f57b0c1e0b9d288787cb86aca6ba25f855e374",
+      "crates/engine-os-manager/src/update_runtime_tests.rs": "0a5bd50df1cbc26998e747d554923e4f34baf6dbc281bbb33183f9d9f2242bcd"
+    }
+  },
+  "bug_reproduction": {
+    "before_fix": "runtime_boot_maintenance_contention_preserves_the_original_attempt failed: busy recovery prematurely completed the attempt",
+    "log_sha256": "d97ad138700715ce7f4f1b1cfa6325771297b28e635aa25ba42db6a26f9fd7e7"
+  },
+  "host_validation": {
+    "rust": "1.89.0",
+    "profile": "ci",
+    "tests_passed": 217,
+    "service_tests": 193,
+    "download_tests": 20,
+    "install_lock_tests": 4,
+    "nextest_processes": 4,
+    "retries": 0,
+    "execution_seconds": 6.85,
+    "command": "cargo nextest run --locked --cargo-profile ci --profile ci -p engine-os-manager -p engine-ota --all-targets -E 'package(=engine-os-manager) | (package(=engine-ota) & (test(download::tests::) | test(install_lock::tests::)))' --test-threads 4 --no-tests fail",
+    "log_sha256": "6f6cdbf7e35d8ba3c3e9ba9677d2f0375fe82805ea9b3776e4acb088d2ef4dc8",
+    "junit_sha256": "7dc965fbe6c9841a017628b82d7c41e334ecdc586b1fc44791507778e86bfa12",
+    "clippy": "passed (--all-targets --no-deps -D warnings)",
+    "clippy_log_sha256": "db412fa0667207c9f2ccc0a2620fb1ad150cef0745ccf17866ecf931627dc2e3",
+    "formatting": "passed"
+  },
+  "hardware_validation": {
+    "binary_sha256": "0f0fa874ebbfaecc5a17fa1b7f1f9699f985f60613fb22ce8075b71b0892749c",
+    "architecture": "aarch64-unknown-linux-gnu",
+    "runner_sha256": "3c8b828b1944962153b33a5ff3e637b378b607b0b70e347caa7a612337628473",
+    "devices": [
+      {
+        "host": "spacewars.local",
+        "binary_sha256": "0f0fa874ebbfaecc5a17fa1b7f1f9699f985f60613fb22ce8075b71b0892749c",
+        "boot_id": "2ff5cbbf-ad5d-4b26-b787-53c21ac16931",
+        "runtime_fixture_tests": 19,
+        "native_preparation_tests": 1,
+        "elapsed_seconds": 4.034,
+        "installed_state_unchanged": true,
+        "installation_or_reboot": false,
+        "limit": "Native preparation and isolated runtime fixtures; no live startup or partial-offline HTTP qualification"
+      },
+      {
+        "host": "sw-picade-2.local",
+        "binary_sha256": "0f0fa874ebbfaecc5a17fa1b7f1f9699f985f60613fb22ce8075b71b0892749c",
+        "boot_id": "17580888-c48c-44c6-97db-29431d4b3298",
+        "runtime_fixture_tests": 19,
+        "native_preparation_tests": 1,
+        "elapsed_seconds": 6.604,
+        "installed_state_unchanged": true,
+        "installation_or_reboot": false,
+        "limit": "Native preparation and isolated runtime fixtures; no live startup or partial-offline HTTP qualification"
+      }
+    ],
+    "evidence": {
+      "spacewars.local/after.json": "fe76469018746a742d2ce7a67db401fafae9f7a12c0759a9adfc5f68bc84011d",
+      "spacewars.local/before.json": "fe76469018746a742d2ce7a67db401fafae9f7a12c0759a9adfc5f68bc84011d",
+      "spacewars.local/native-preparation.log": "11537fab7609a5042820733e17359570056780dcfee65146eef84f1605dc31b9",
+      "spacewars.local/result.json": "909a174656adfda588e8a0b4e5853ea1468fd93fe234adae4ac8d9b37a09794e",
+      "spacewars.local/runtime-tests.log": "69d999fcb2c41e8a0318361aad06d54a2190ab7d0fd74a09a5b9b6d9aa59267f",
+      "sw-picade-2.local/after.json": "ecabbed4994adeb1ec3bdd7b283292a9ba285b3901e170dd1e8d983b000467e6",
+      "sw-picade-2.local/before.json": "ecabbed4994adeb1ec3bdd7b283292a9ba285b3901e170dd1e8d983b000467e6",
+      "sw-picade-2.local/native-preparation.log": "850f73a3f63acb30d1e76fd6326108e400f1bf6444aa318d39634395ccf0f803",
+      "sw-picade-2.local/result.json": "5938420d97d059cde8209809f493254906f29c68fc6d711a1d29c63e3fc6a844",
+      "sw-picade-2.local/runtime-tests.log": "1a59b940880673a9a2eae16494638f7a3bbe259adef79a607fb3d5b173cba32a"
+    },
+    "native_probe": "update_runtime::native::tests::installed_preparation_recognizes_maintenance_and_reopens_after_release"
+  },
+  "limits": [
+    "Historical startup errors discarded their specific cause; this reproduces the shared-lock failure, not the original boots.",
+    "Installed services were not replaced or restarted. Native preparation and isolated scheduler/runtime fixtures passed on both platforms.",
+    "Real download cancellation/resume ran against host HTTP/TLS fixtures. Live partial-offline transport, a signed canary boot and frame-time qualification remain.",
+    "No automatic installation or publication was enabled."
+  ]
+}
