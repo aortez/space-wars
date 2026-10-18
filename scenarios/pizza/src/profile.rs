@@ -19,6 +19,10 @@ pub struct Sample {
     pub sizes: [usize; 3],
     pub generations: [usize; 4],
     pub fingerprint: u64,
+    /// Entire circle outside the visible playfield (may still touch a wall).
+    pub outside_playfield: usize,
+    /// Entire circle beyond the physical walls: a real containment failure.
+    pub escaped_walls: usize,
     pub event: PizzaEventState,
     pub step_us: f64,
     pub spawning_us: f64,
@@ -43,6 +47,10 @@ impl Sample {
         let started = Instant::now();
         let mut sizes = [0; 3];
         let mut generations = [0; 4];
+        let mut outside_playfield = 0;
+        let mut escaped_walls = 0;
+        let bounds = state.config.bounds;
+        let thickness = wall_thickness(bounds);
         let mut fingerprint = 0xcbf29ce484222325u64;
         let mut hash = |bytes: &[u8]| {
             for byte in bytes {
@@ -50,6 +58,14 @@ impl Sample {
             }
         };
         for ball in &state.balls {
+            let outside = |margin: f32| {
+                ball.position.x + ball.radius < -margin
+                    || ball.position.y + ball.radius < -margin
+                    || ball.position.x - ball.radius > bounds.width + margin
+                    || ball.position.y - ball.radius > bounds.height + margin
+            };
+            outside_playfield += usize::from(outside(0.0));
+            escaped_walls += usize::from(outside(thickness));
             sizes[size_band(ball.radius)] += 1;
             generations[usize::from(ball.fragment_generation).min(3)] += 1;
             hash(&ball.id.to_le_bytes());
@@ -81,6 +97,8 @@ impl Sample {
             sizes,
             generations,
             fingerprint,
+            outside_playfield,
+            escaped_walls,
             event: state.event_state(),
             step_us: us(m.total_time),
             spawning_us: us(m.spawning_time),

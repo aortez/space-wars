@@ -267,3 +267,44 @@ fn unchanged_viewports_preserve_the_fixed_step_cascade_across_frame_grouping() {
     assert!(reference.birth_counts.exploded > 0);
     assert!(reference.birth_counts.fragments_created > 0);
 }
+
+#[test]
+fn normal_fast_balls_cannot_tunnel_through_any_playfield_wall() {
+    for radius in [0.002, 0.08] {
+        for velocity in [
+            Vec2::new(100.0, 0.0),
+            Vec2::new(-100.0, 0.0),
+            Vec2::new(0.0, 100.0),
+            Vec2::new(0.0, -100.0),
+            Vec2::new(100.0, 100.0),
+            Vec2::new(-100.0, 100.0),
+            Vec2::new(100.0, -100.0),
+            Vec2::new(-100.0, -100.0),
+        ] {
+            let mut state = PizzaScenario::init(
+                PizzaConfig {
+                    desired_ball_count: 0,
+                    automatic_events: false,
+                    ..Default::default()
+                },
+                7,
+            );
+            let mut ball = state.allocate_ball(state.config.bounds.center(), radius, Color::RED);
+            ball.velocity = velocity;
+            state.push_ball(ball);
+            for _ in 0..8 {
+                PizzaScenario::step(&mut state, &[], DT);
+                let ball = state.balls[0];
+                assert!(
+                    ball.position.x >= 0.0 && ball.position.x <= state.config.bounds.width,
+                    "escaped horizontal wall: {ball:?}"
+                );
+                assert!(
+                    ball.position.y >= 0.0 && ball.position.y <= state.config.bounds.height,
+                    "escaped vertical wall: {ball:?}"
+                );
+                assert_eq!(ball.hp, radius, "walls bounce without contact damage");
+            }
+        }
+    }
+}

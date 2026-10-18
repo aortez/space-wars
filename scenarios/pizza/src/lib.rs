@@ -557,6 +557,7 @@ impl PizzaState {
                 &mut physics,
                 *ball,
                 self.held_ball_id == Some(ball.id),
+                self.config.benchmark.is_none(),
             ));
         }
         self.physics = Some(physics);
@@ -565,7 +566,12 @@ impl PizzaState {
     fn push_ball(&mut self, ball: BallState) {
         if let Some(physics) = &mut self.physics {
             assert!(
-                insert_physics_ball(physics, ball, self.held_ball_id == Some(ball.id)),
+                insert_physics_ball(
+                    physics,
+                    ball,
+                    self.held_ball_id == Some(ball.id),
+                    self.config.benchmark.is_none()
+                ),
                 "Pizza generated an invalid or duplicate physics ball"
             );
         }
@@ -749,6 +755,10 @@ impl PizzaState {
     }
 }
 
+fn wall_thickness(bounds: PizzaBounds) -> f32 {
+    (bounds.width.min(bounds.height) * 0.02).max(0.001)
+}
+
 fn create_physics_world(config: &PizzaConfig) -> PhysicsWorld {
     let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
         gravity: Vec2::ZERO,
@@ -764,7 +774,7 @@ fn create_physics_world(config: &PizzaConfig) -> PhysicsWorld {
         0,
     );
 
-    let thickness = (config.bounds.width.min(config.bounds.height) * 0.02).max(0.001);
+    let thickness = wall_thickness(config.bounds);
     let half_width = config.bounds.width * 0.5;
     let half_height = config.bounds.height * 0.5;
     let wall_geometry = [
@@ -827,7 +837,7 @@ fn ball_collider_id(id: u64) -> ColliderId {
     ColliderId::new(PhysicsId::new(id), BALL_COLLIDER_ROLE, 0)
 }
 
-fn insert_physics_ball(physics: &mut PhysicsWorld, ball: BallState, held: bool) -> bool {
+fn insert_physics_ball(physics: &mut PhysicsWorld, ball: BallState, held: bool, ccd: bool) -> bool {
     let mut collider = ColliderSpec::ball(ball_collider_id(ball.id), ball.radius);
     collider.density = 1.0;
     collider.friction = 0.3;
@@ -843,6 +853,9 @@ fn insert_physics_ball(physics: &mut PhysicsWorld, ball: BallState, held: bool) 
             position: ball.position,
             linear_velocity: ball.velocity,
             can_sleep: false,
+            // Keep fast bodies inside physical walls without a frame-dependent
+            // containment/rebuild pass. Benchmark collision settings stay fixed.
+            ccd_enabled: ccd,
             ..BodySpec::default()
         },
         &[collider],

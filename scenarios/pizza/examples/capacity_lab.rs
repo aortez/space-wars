@@ -91,7 +91,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         last_exploded = counts.births.exploded;
         let metrics = state.last_step_metrics;
         contact_samples += metrics.rapier.contacts;
-        samples.push(Sample::capture(&state));
+        let sample = Sample::capture(&state);
+        assert_eq!(
+            sample.escaped_walls, 0,
+            "a live body escaped the physical playfield"
+        );
+        samples.push(sample);
     }
     timings.sort_by(f64::total_cmp);
     let percentile =
