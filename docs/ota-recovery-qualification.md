@@ -165,9 +165,10 @@ boot selector writes, firmware, production feed provisioning or a physical
 rollback. No test keys are installed on a Pi.
 
 Live preflight found a [time-validation defect](data/ota-time-marker-20261017.json)
-on both installed images. The fix passed read-only native probes, but is not yet
-installed. [Owner trust and staging](data/ota-owner-feed-20261017.json) are now
-provisioned on both primary Pis, and both verified the empty Release/Nightly
+on both installed images. The fix initially passed read-only native probes;
+the physical signed trials below subsequently installed it.
+[Owner trust and staging](data/ota-owner-feed-20261017.json) are now provisioned
+on both primary Pis, and both verified the empty Release/Nightly
 feed. A disposable test authority must not consume the production recovery
 generation floor: first provisioning correctly rejects prior signed attempts.
 The intended fault remains stopping only the kiosk service after verifying the
@@ -259,10 +260,69 @@ at version one. The disposable-key publisher fixture carried these exact bytes
 through Nightly, Release and renewal while preserving generation one and
 reconciling a lost checkpoint response. That fixture uses mocked GitHub/origin
 and Pi evidence: it does not establish main CI admission, publish to the owner
-feed or qualify physical rollback. The live authority and feed remain unchanged.
+feed or qualify physical rollback. The subsequent physical trials below use the
+retained live authority and real public feed.
 
-The remaining live sequence is to publish and stage a verified candidate with
-the time fix, capture native inspection and preservation evidence, then exercise
-the selected trial and stopped-kiosk failure on both Pis. Do not enable the
-tag/Nightly automatic rollout until the resulting rollback, quarantine and
-interrupted-promotion evidence supports that admission.
+## Physical signed trials, 2026-10-17
+
+The [signed-trial record](data/ota-signed-trials-20261017.json) now captures real
+owner-signed Nightly publication, native HTTPS staging, inactive-root writes,
+firmware trial boots and application-health recovery on both primary Pis. These
+are explicitly selected branch images, not main/CI-admitted production releases.
+Automatic publishing and installation remain disabled; the Release channel is
+still empty. The same owner authority and durable publisher journal were retained.
+
+| Device | Stopped-kiosk trial | Healthy signed install | Subsequent normal boot |
+| --- | --- | --- | --- |
+| Primary Picade, Pi 4 | Generation 1, attempt 1: `health-timeout`, returned to good slot B and quarantined the payload | Generation 2, attempt 1: committed slot A, retained generation 1's two consumed attempts | Correct image and default slot; advancing game frames; installed time service usable |
+| Replacement Pi 5 | Generation 1, attempt 1: `health-timeout`, returned to good slot B and quarantined the payload | Explicit generation 1 retry, attempt 2: committed slot A | Correct image and default slot; advancing game frames; installed time service usable |
+
+The fault runner verified each exact candidate trial, then stopped only
+`spacewars-kiosk.service` early in that boot. Ordinary recovery hit the health
+deadline, persisted failure history, rebooted and returned to the original good
+image. Both rejected ordinary re-selection of the failed payload without changing
+the journal. Healthy trials completed the continuous health window, and a
+separate normal reboot verified the promoted root. The corrected installed time
+service now accepts native network synchronization on both boards.
+
+Selected settings, ROMs, owner/kiosk access, Wi-Fi, SSH host identity and peer
+Bluetooth pairings survived each completed trial and normal boot. BlueZ's
+adapter-local GATT attributes regenerated across boots; the record distinguishes
+these from durable pairing data and does not claim every byte was unchanged.
+Screenshot and advancing-frame evidence are retained with each final normal boot.
+
+The Picade also exposed an error in the workstation observer. Before a new retry
+transaction appeared, it mistook the retained prior `rolled-back` record for the
+new attempt failing. Its SSH cleanup closed the installation channel after
+attempt two reached `Writing`, before a trial reboot. The old good image kept
+running. After confirming the helper was gone and no reboot was pending, the
+operator restarted the recovery service; it recorded `interrupted-before-trial`.
+A third explicit selection was refused as `Quarantined`, with unchanged history.
+This required manual service reconciliation and is not evidence of automatic
+interrupted-write recovery.
+
+The corrected observer matches a new transaction ID as well as the originating
+boot, and stops accepting new SSH channels without killing an active installation
+channel. A separate SSH lifetime check verified that behavior. Original and
+corrected runner hashes and the incomplete attempt remain in the evidence.
+No retry count or generation floor was reset. Clean source `5b420c9` produced a
+fresh qualified image, published as generation 2, which the Picade selected
+normally and installed successfully with the exhausted generation-1 history intact.
+
+Publication itself exposed a stale GitHub CDN redirect for the replaced mutable
+`timestamp.json`. Exact-byte verification correctly stopped the first publication.
+The publisher now reads that public URL with the validated replacement asset ID,
+retaining credential-free downloads and length/hash verification. All 23 delivery
+tests passed, including the regression. The retained pending publication resumed
+without new keys, re-signing or version/generation resets; the second publication
+completed through the same path. Feed metadata is now version 3, image generation
+2, with no pending publisher transaction. Its timestamp expires on
+2026-10-25 at 04:45:25 UTC; future renewals must continue the same journal.
+
+This establishes physical signed installation, application-health rollback,
+quarantine, a bounded explicit retry and durable successful normal boots. It does
+not establish interrupted boot-selector promotion, physical power-loss safety,
+unattended installation, real Release promotion or download/gameplay performance.
+Those checks, installed download/network qualification, second-Picade rollout and
+the production publisher/installer/overnight-policy integration remain rollout
+gates before tag-triggered releases and automatic Nightlies are enabled.

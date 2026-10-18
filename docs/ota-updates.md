@@ -10,9 +10,11 @@ outside this update path; incompatible boot assets require a supervised upgrade.
 `crates/engine-ota` implements the shared verification and image eligibility
 contract for [#261](https://github.com/aortez/space-wars/issues/261), plus the
 recovery journal, Linux boot adapters and verified inactive-root writer. It is
-not an enabled end-to-end updater. An owner-local signing authority and empty
-signed feed now work on both primary Pis. Automated publishing,
-installation-service integration and Pi failure qualification remain outstanding.
+not an enabled automatic updater. Both primary Pis have now installed real
+owner-signed Nightly images and passed application-health rollback/quarantine and
+successful normal-boot checks. Automated publishing, installation-service/policy
+integration and the remaining physical failure/performance qualification are
+outstanding. See the [physical signed trials](ota-recovery-qualification.md#physical-signed-trials-2026-10-17).
 
 `engine-os-manager` contains the independent time/status service for
 [#256](https://github.com/aortez/space-wars/issues/256), plus a separate network
@@ -33,12 +35,12 @@ Remaining work retains the full OTA scope:
 
 | Issue | Integration required |
 | --- | --- |
-| #256 | Service implemented; installed-provider and RTC retention qualification remain |
+| #256 | Corrected installed time service verified after signed update and normal boot on both primary Pis; broader provider and RTC retention qualification remain |
 | #258–#260 | Native coordinator, continuous monitoring, operation holds, durable time checks and OTA handoff implemented; expected setup profile changes and SSH idle qualification remain |
-| #262 | Owner-local authority and empty signed feed published; isolated automated Release/Nightly publishing and signer operation remain |
-| #263 | Recovery service and health/watchdog handling implemented; bootstrap through baseline handoff verified on the replacement Pi 5 and primary Picade; second Picade rollout and physical recovery qualification remain |
+| #262 | Owner-local authority published two signed Nightly generations with durable journal/readback; isolated automated Release/Nightly publishing, admission and signer operation remain |
+| #263 | Signed install, stopped-app rollback/quarantine, bounded retry and normal-boot success verified on the replacement Pi 5 and primary Picade; interrupted promotion, power loss and second Picade rollout remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | Download worker and public trust provisioned; both primary Pis verified the empty Release/Nightly feed with a native owner helper; installed worker/time-provider qualification and real-image delivery remain |
+| #265 | Public trust and real signed-image delivery verified on both primary Pis with the native owner helper; installed worker/network/performance qualification remains |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
 
@@ -2208,12 +2210,13 @@ rollout. The authority is retained outside Git and build outputs at
 directories mode 0700 and key files mode 0600. Its public root digest is
 `825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9`.
 The [initial feed](https://github.com/aortez/space-wars/releases/tag/ota-feed)
-contains the six verified version-one metadata files and archived timestamp,
+first contained six verified version-one metadata files and an archived timestamp,
 with no images. Delivery used the existing timestamp-last publisher and public
 download verification, under one local publication lock. No automated publisher
-or remote journal branch was enabled. The initial timestamp expires at
-2026-10-25 03:28:30 UTC; later refreshes must retain this authority and advance
-the existing publisher journal, not regenerate or reset it.
+or remote journal branch was enabled. The initial timestamp had an expiry of
+2026-10-25 at 03:28:30 UTC; the newer signed-trial publication below supersedes it.
+Later refreshes must retain this authority and advance the existing publisher
+journal, not regenerate or reset it.
 
 The root-only operator import established trust, staging and data schema 1 on
 `spacewars.local` and `sw-picade.local`. Both then verified Release and Nightly
@@ -2226,18 +2229,32 @@ script now reuses one SSH connection: its initial burst of separate Pi 5
 connections encountered a banner timeout before trust provisioning, and the
 subsequent run completed without a service restart or reboot.
 
-These native checks use the corrected in-memory time validator; the installed
-service was not replaced and still reports time unusable. This is an empty-feed
-trust/transport check, not signed-image installation or unattended recovery
-qualification. The [owner-selected signed installer](ota-recovery-qualification.md#owner-selected-signed-trial)
-now connects the verified inactive-root writer to one-shot reboot admission,
-without granting unattended recovery capability. Its [native preflight](data/ota-signed-installer-20261017.json)
-passed on both Pis, and a clean compatible candidate containing the time fix
-passed image qualification and the disposable-key publication/promotion fixture.
-Real owner signing, installation and physical rollback/quarantine checks remain
-next. The
-[live trust record](data/ota-owner-feed-20261017.json)
-retains source, public pins, helper hashes, test results and device evidence.
+Those initial native checks used the corrected in-memory time validator and
+left the installed service unchanged. The [live trust record](data/ota-owner-feed-20261017.json)
+retains their public pins, helper hashes and evidence. The
+[owner-selected signed installer](ota-recovery-qualification.md#owner-selected-signed-trial)
+then passed empty-feed refusal checks and independent image qualification.
+
+The subsequent [physical signed trials](data/ota-signed-trials-20261017.json)
+published real Nightly images, staged them through native HTTPS/signature checks
+and installed them on both primary Pis. Both returned to their prior good root
+after a deliberately stopped kiosk, quarantined the failed payload, and later
+completed a healthy install and normal boot. The installed time service now
+reports usable native network time. The Pi 5 runs generation 1; the Picade runs
+generation 2 while retaining its exhausted generation-1 retry history. The
+[trial report](ota-recovery-qualification.md#physical-signed-trials-2026-10-17)
+also records a workstation observer interruption that needed manual recovery-service
+reconciliation; this is not claimed as automatic interrupted-write recovery.
+
+The publisher now verifies replaced mutable timestamps through an asset-specific
+public URL to avoid a stale CDN redirect, while still checking exact signed bytes.
+Its 23 delivery tests pass. The retained owner journal is at image generation 2,
+metadata version 3, with no pending operation; current timestamp expiry is
+2026-10-25 04:45:25 UTC. These publications explicitly select branch images and do
+not claim production main/CI admission. Release is still empty, automatic
+publishing/installation remain disabled, and interrupted promotion, power-loss,
+installed-worker/performance qualification and installer/overnight-policy
+integration remain before automatic rollout.
 
 The bundle has exactly three fields: `schema: 1`, `root` (the signed TUF root
 object), and `location` (credential-free HTTPS `metadata` and `targets` base URLs
