@@ -64,6 +64,57 @@ fn fresh_applied_non_spike_completion_is_usable_and_deduplicated() {
 }
 
 #[test]
+fn coarse_notification_time_can_precede_the_successful_receipt() {
+    // Live Pi 4/Pi 5 observations lagged the high-resolution receipt by
+    // 4,334/2,939 us. Linux inode timestamps use its coarse realtime clock.
+    for lag in [1, 2_939, 4_334, 2 * SECOND] {
+        let mut state = tracker();
+        let mut sample = observed(100, 1);
+        sample.notification_realtime_us = Some(sample.receipt.realtime_us - lag);
+        assert!(state.observe(&sample), "notification lag {lag} us");
+        assert!(!state.observe(&sample));
+        let record = state.record().clone();
+        let mut restarted = TimeTracker::new(
+            "boot-a".into(),
+            record,
+            TimeReason::MissingState,
+            reading(120),
+            None,
+        );
+        sample.now = reading(120);
+        assert!(!restarted.observe(&sample));
+        let status = restarted.status(reading(120));
+        assert!(status.usable);
+        assert_eq!(status.success_generation, 1);
+        assert_eq!(
+            status.sync_age,
+            SyncAge::Known {
+                seconds: 20,
+                overdue: false
+            }
+        );
+    }
+}
+
+#[test]
+fn notification_outside_the_receipt_window_never_establishes_time() {
+    for delta in [-2_000_001i64, 2_000_001, -100_000_000, 100_000_000] {
+        let mut state = tracker();
+        let mut sample = observed(100, 1);
+        sample.notification_realtime_us = Some(
+            sample
+                .receipt
+                .realtime_us
+                .checked_add_signed(delta)
+                .unwrap(),
+        );
+        assert!(!state.observe(&sample));
+        assert!(!state.status(sample.now).usable);
+        assert_eq!(state.record().success_generation, 0);
+    }
+}
+
+#[test]
 fn marker_checkpoint_link_and_sticky_kernel_state_are_not_completion() {
     let mut samples = Vec::new();
     let mut zero = observed(100, 1);

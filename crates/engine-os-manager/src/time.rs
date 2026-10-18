@@ -247,7 +247,10 @@ impl TimeTracker {
             && observation.kernel_synchronized
             && receipt.matches_running_clock(observation.now)
             && observation.notification_realtime_us.is_some_and(|mtime| {
-                mtime >= receipt.realtime_us && mtime - receipt.realtime_us <= CLOCK_TOLERANCE_US
+                // Inode timestamps use the kernel's coarse realtime clock, so
+                // a marker touched after correction can predate the precise
+                // receipt. Correlate within the same bounded clock tolerance.
+                mtime.abs_diff(receipt.realtime_us) <= CLOCK_TOLERANCE_US
             });
         if !valid {
             self.tick(observation.now);
