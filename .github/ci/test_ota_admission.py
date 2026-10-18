@@ -223,6 +223,31 @@ class AdmissionTests(unittest.TestCase):
         self.api.job_lists[10][0]['steps'].append(copy.deepcopy(self.api.job_lists[10][0]['steps'][0]))
         self.rejects()
 
+    def test_only_exact_reviewed_opt_in_jobs_can_be_skipped(self):
+        workflow = replace(POLICY.ci, skipped_jobs=('Extended sweep',))
+        skipped = dict(id=1199, name='Extended sweep', run_id=11, run_attempt=1, head_sha=SOURCE,
+                       status='completed', conclusion='skipped', steps=[],
+                       started_at='2026-10-16T12:01:00Z', completed_at='2026-10-16T12:01:00Z')
+        api = FakeGitHub()
+        api.job_lists[11].append(skipped)
+        receipt = helper.inspect_run(api, workflow, 11, 1, SOURCE, NOW)
+        self.assertEqual(set(receipt['jobs']), {'Linux', 'Pi'})
+        self.assertEqual(set(receipt['skipped_jobs']), {'Extended sweep'})
+        for field, value in [('name', 'Other'), ('conclusion', 'failure'), ('conclusion', 'success'),
+                             ('status', 'queued'), ('head_sha', 'b' * 40), ('run_attempt', 2),
+                             ('run_id', 10), ('id', 1100), ('started_at', '2026-10-16T11:00:00Z'),
+                             ('steps', [dict(name='Executed', number=1, status='completed', conclusion='success')])]:
+            with self.subTest(field=field, value=value):
+                api = FakeGitHub()
+                api.job_lists[11].append({**skipped, field: value})
+                with self.assertRaises(ValueError):
+                    helper.inspect_run(api, workflow, 11, 1, SOURCE, NOW)
+        for skipped_names in (('Linux',), ('Extended sweep', 'Extended sweep')):
+            with self.assertRaises(ValueError):
+                replace(workflow, skipped_jobs=skipped_names).validate()
+        with self.assertRaises(ValueError):
+            helper.inspect_run(FakeGitHub(), workflow, 11, 1, SOURCE, NOW)
+
     def test_optional_failure_report_step_can_be_skipped(self):
         self.api.job_lists[10][0]['steps'].append(
             dict(name='Upload failure logs', number=4, status='completed', conclusion='skipped'))

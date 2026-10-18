@@ -1,40 +1,61 @@
 # CI performance and test timings
 
-The normal `CI` workflow runs on pull requests and pushes to `main`. Its Linux
-workspace job builds all test targets and retains the full non-ignored headless
-suite and all existing platform/rendering/diagnostic checks. PR UI execution uses
-**43 representative smoke workflows**, budgeted at **3–5 minutes**. The complete
-**65-workflow UI suite** runs in `UI functional tests` (`ui-functional.yml`),
-nightly and on manual dispatch. All tests still compile on every PR.
+The normal `CI` workflow runs on pull requests and pushes to `main`. It retains
+all non-ignored workspace tests, platform checks, rendering checks and physics
+diagnostics. PR UI execution uses **44 representative smoke workflows**, budgeted
+at **3–5 minutes**. Every workspace test target still compiles on every PR.
 
-The overall target is successful required PR checks in **under 30 minutes**, from
-the first job starting through the last required job completing, including setup,
-builds, cache transfers and artifacts, but excluding GitHub queue delays.
-The five-minute UI budget covers its execution command, including cached build
-checks/discovery, separately from the initial compilation. It is not a timeout:
-tests finish and retain their diagnostics; an overrun appears in the summary and
-as an Actions warning. Review overruns instead of hiding failures or trimming
-production behavior. Both Linux jobs retain a 60-minute cold-run safety ceiling.
+Linux compilation produces nextest archives once. Independent runners execute
+headless tests and UI tests from those binaries, without invoking Cargo builds.
+GPU/LinuxKMS/Lyon checks and CCD diagnostics start in parallel with that build.
+The archive consumers use the same Ubuntu version, source SHA and absolute
+checkout/target paths as the builder: several integration tests embed
+`CARGO_BIN_EXE_engine-client` at compile time. UI gets a smaller archive containing
+only its test binary, the application, metadata and runtime support files.
 
-Both workflows use Cargo's `ci` profile: optimization level 2, line-table debug
+The overall target remains successful PR checks in **under 30 minutes**, including
+setup, compilation, cache transfers and artifacts, but excluding queue delays.
+The five-minute UI execution budget reports overruns without terminating tests.
+The separate Windows release job is another critical path; Linux improvements
+cannot reduce the run below its duration. Parallelism can increase runner minutes,
+so compare elapsed time, transferred bytes and compilation overhead together.
+
+Cargo's `ci` profile is unchanged: optimization level 2, line-table debug
 information, debug assertions and overflow checks enabled, no incremental
-compilation, no LTO, and 16 codegen units. Headless and rendered UI tests use the
-same workspace/target selection. Each workflow builds on its own runner and
-reuses that build for execution; it does not transfer a complete test build
-between jobs. Production `release` settings, the NES release benchmark and AI
-baseline jobs remain unchanged.
+compilation, no LTO, and 16 codegen units. Production `release`, the NES benchmark
+and AI baseline profiles are unchanged. The build job still repeats compilation
+and requires every artifact to be `fresh` before archiving it.
 
-After compilation, normal CI repeats the same build and requires every compiler
-artifact to be `fresh`, including the client binary. Cargo fingerprint diagnostics
-identify invalidated inputs. Execution still runs after a freshness/headless
-failure if compilation succeeded; any failed command still fails its job.
+## Two cache layers
 
-`Swatinem/rust-cache` retains Cargo dependencies and compiled dependency artifacts,
-including the LinuxKMS vendor manifest (and Lyon in normal CI), even after test
-failures. Keys include the toolchain and Cargo configuration. PR caches are scoped
-by GitHub; main's cache supplies future branches. An exact cache-key miss can
-still restore a compatible dependency cache, so inspect the restore log before
-calling a run cold.
+`Swatinem/rust-cache` restores compiled dependency artifacts and Cargo downloads.
+The GPU job also caches the independent LinuxKMS and Lyon vendor manifests.
+The workspace cache preserves its historical path list so GitHub can restore
+existing entries: the path list affects the cache version as well as the key.
+Only `main` saves these large caches, avoiding a new copy for every PR. An exact
+key miss can still restore a compatible cache; inspect the restore log before
+calling a run cold. The manual UI workflow shares the workspace dependency key.
+
+The workspace and GPU builds additionally use **sccache 0.18.0**, with the setup
+action pinned by commit. Its content-addressed library results use GitHub's cache
+backend directly. PRs read that cache; main and manually dispatched runs can warm
+it. The wrapper is enabled *after* dependency restoration so it does not invalidate
+the existing dependency-cache keys. Both layers share the repository's cache
+storage budget; this does not increase the configured storage allowance.
+
+This is narrower than a C++ object cache: sccache cannot cache Rust crates invoking
+the system linker, including application and test executables. The client binary
+and its test binary are currently the slowest compile units. Cache hit percentages
+therefore apply to cacheable requests, not to total build time. See
+[sccache's Rust limitations](https://github.com/mozilla/sccache/blob/v0.18.0/docs/Rust.md)
+and [GitHub cache backend](https://github.com/mozilla/sccache/blob/v0.18.0/docs/GHA.md).
+Structured statistics, including non-cacheable reasons, accompany the timings.
+
+For a controlled hosted comparison, dispatch `ci.yml` on the same commit with
+`compiler-cache=true` and `compiler-cache=false`. Keep the dependency cache warm
+in both, compare Cargo timelines as well as wall time, and retain the first
+sccache population run separately from a warm run. GitHub runner variance remains
+significant. No cache or test coverage settings change production builds.
 
 ## Coverage and execution
 
@@ -43,13 +64,15 @@ non-ignored workspace tests, including display-free UI/HUD checks. The `ui-pr`
 profile runs a reviewed selection of ignored `ui_control_functional` cases under
 Xvfb. The `ui` profile runs every eligible UI case, including the smoke cases.
 Fail-fast and retries remain disabled. Headless cases can run in parallel;
-UI cases remain serial because they share a display. Xvfb does not accelerate
-application time.
+UI cases remain serial within each runner because they share a display. Full
+nightly uses four nextest slice partitions with separate runners/displays; PRs
+use one partition. Xvfb does not accelerate application time.
 
 The PR selection covers:
 
 - launcher/navigation and catalog filtering, lifecycle transitions, saved settings,
-  save-failure recovery, Device Info, network/controller controls and attached APIs;
+  save-failure recovery, Device Info, network/controller controls, attached APIs
+  and live UI-thread kiosk health checks;
 - normal Spacewars and its scoreboard/rematches, Classic, Pizza, Clock and Scorched
   Earth, plus representative terrain, combat, travel and expedition workflows;
 - both rendering paths and HUD/performance integration;
@@ -83,40 +106,73 @@ CI before smoke execution and retains both discovery lists; it cannot masquerade
 as a successful empty run. A new test cannot silently join the PR critical path
 or disappear from the full suite.
 
-## Running the full UI suite on GitHub
+## Comprehensive nightly and manual runs
 
-The full suite is scheduled daily at 09:29 UTC on the default branch. GitHub's
-[scheduled runs](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
-can be delayed; the schedule is not an exact-time guarantee.
-To validate a UI-related branch before merging, use Actions → **UI functional
-tests** → **Run workflow**, select the branch, or run:
+`windows-nightly.yml` is now **Comprehensive nightly**, scheduled daily at
+**08:23 UTC**. It calls `ci.yml` with one immutable source SHA and `full=true`,
+running every normal PR check plus:
+
+- all **66 UI workflows**, partitioned across four isolated runners, with tests
+  serial within each runner/display;
+- Clock's **240-visit mixed-event sweep**;
+- all three extended duck sweeps: jumping profiles, authored patterns and platform seeds;
+- the extended normal Spacewars match versus deterministic arena parity test.
+
+Normal checks include the dedicated OTA updater/publisher fixtures merged in
+#494. The OTA admission policy requires all fourteen ordinary CI jobs to pass;
+only the two explicitly named full-only jobs may be skipped in that configuration.
+Full nightly enables them and still requires every result before publishing.
+The required `Linux workspace` check aggregates all five split Linux jobs; a
+failure, skip or cancellation in any of them prevents it from passing.
+
+Each extended job fails normally, uses `--no-tests fail`, retains diagnostics and
+has no automatic retries. Windows publication waits for the reusable workflow's
+**entire validation result**, rather than just the Windows build. It downloads the
+Windows evidence by artifact ID from that same run and checks the existing SHA,
+run, executable and package hashes. Failed, skipped or cancelled validation does
+not publish. Manual dispatch defaults to **no publication**; publishing also
+requires the `main` ref. Only the publisher gets `contents: write` permission.
+
+This is the complete unattended regression configuration, not an indiscriminate
+`--ignored` run. Capture exporters, timing experiments and diagnostic tools needing
+external/frozen inputs or a fresh explicitly chosen output path remain manual.
+Examples include recovery qualification/replay tools, drain-splash profiling,
+retained packing/geometry inspection, visual fixture exports and durability
+measurement. Feature-gated diagnostic assertions continue in their normal jobs.
+This workflow does not perform physical Pi or hardware GPU acceptance. The
+separate scheduled `OTA image candidate` workflow builds and qualifies an unsigned
+Yocto image; it is not part of the Windows nightly publication gate.
 
 ```sh
-gh workflow run ui-functional.yml --ref main
-# Replace main with a pushed branch name to test that branch.
-gh run list --workflow ui-functional.yml
-gh run watch RUN_ID --exit-status
+# Full validation of a pushed branch, without publishing a nightly release:
+gh workflow run windows-nightly.yml --ref BRANCH -f publish=false
+# PR-sized checks, with a switch for compiler-cache comparisons:
+gh workflow run ci.yml --ref BRANCH -f full=false -f compiler-cache=true
+# UI-only or mixed-event-only investigation:
+gh workflow run ui-functional.yml --ref BRANCH
+gh workflow run clock-regression.yml --ref BRANCH
 ```
 
-The workflow file must first be merged into the default branch for
-[manual dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
-to be available. Keep **Full UI workflows** out of required PR status checks:
-it intentionally has no pull-request trigger. Local full-suite execution remains
-available using the commands below.
+The UI-only workflow no longer has a duplicate nightly schedule. GitHub schedules
+may be delayed; 08:23 is not an exact-time guarantee. The workflow file must exist
+on the default branch for manual dispatch. Use a branch containing the new inputs
+when testing this change before merge.
 
 ## Reading CI results
 
 Open the Actions run's summary for:
 
 - wall durations for the phases belonging to that workflow: compilation plus
-  headless/PR-UI/LinuxKMS tests in normal CI, or compilation plus full UI tests in
-  the nightly/manual run;
+  headless/UI execution (including archive extraction) and the independent renderer/physics jobs;
 - pass/failure counts for each nextest report; and
 - the 20 slowest executed tests, with their binary, name, status, and duration.
 
-Download `linux-test-timings` from normal CI or `ui-test-timings` from the UI
-workflow for per-test results in JUnit XML, Cargo's HTML compilation timeline,
-and phase durations. Both are retained for 14 days, on success or failure.
+Download `linux-build-timings` for Cargo timelines and cache statistics,
+`linux-test-timings` / `ui-test-timings` (suffixed per full-UI shard) for JUnit
+and execution timings, and the
+renderer, physics and extended-job artifacts for their evidence. Diagnostics are
+retained for 14 days; binary archives for one day and Windows release evidence
+for two days, on success or failure where available.
 Normal CI uses `target/nextest/ui-pr/junit.xml`; the complete run uses
 `target/nextest/ui/junit.xml`. Each summary lists only its expected phases; an
 expected but missing phase/report remains explicit, not shown as passing.
@@ -124,7 +180,7 @@ Both workflows retain failed-UI screenshots, app logs and protocol histories
 separately as `ui-functional-test-artifacts`.
 
 Per-test durations overlap under parallel execution; do not sum them as job wall
-time. Timed execution commands include cached build checks and discovery. Cache
+time. Timed execution commands include archive extraction and test discovery. Cache
 transfer and machine setup are separately visible as Actions steps. Compare both
 cold and warm runs on the same runner class before claiming an overall speedup.
 
@@ -202,6 +258,37 @@ Future work should follow these measurements: profile remaining computational
 hotspots, split large internal parameter loops into individually scheduled cases,
 and isolate UI displays or add explicit controlled-time support if faster full
 UI runs are needed. Separating the workflow does not change the application clock.
+
+## Parallel CI and compiler-cache measurements (2026-10-18)
+
+At commit `7fe058c`, on the development workstation with Rust 1.89.0, each build
+started after cleaning only workspace packages from the `ci` target directory;
+compiled third-party dependencies remained available. The identical command was
+`cargo test --locked --workspace --all-targets --profile ci --no-run --timings`.
+
+| Compilation measurement | Wall time |
+|---|---:|
+| Compiled dependencies restored; no sccache wrapper | 109.36 s |
+| Compiled dependencies restored; warm sccache | 87.45 s |
+
+This pair is about **20% faster** with sccache. It is a local illustration, not a
+hosted-run promise: other workstation workloads were active and remote cache
+latency is absent. The warm run reported 23 Rust cache hits, zero misses/errors,
+and 121 non-cacheable crate-type calls. Its local compiler cache occupied about
+47 MiB. Repeating the unchanged build found all 775 compiler artifacts fresh.
+
+The full archive contained 119 binaries (117 tests and two application binaries),
+was about 523 MiB and took 2.25 seconds to pack locally. The UI-only archive was
+59 MiB; Clock-only was 13 MiB. Extracted tests ran with `RUSTC_WRAPPER=/bin/false`,
+confirming they did not invoke compilation; UI smoke and extended normal-match/
+arena parity passed. Hosted transfer/setup times still belong in the final
+elapsed-time comparison.
+
+Enabling the previously unscheduled Clock sweeps exposed two existing failures,
+tracked in [#493](https://github.com/aortez/space-wars/issues/493): the platform
+seed sweep and mixed-event dry-control assertions. They are deliberately required
+nightly checks, not allowed failures. Until corrected, comprehensive nightly
+validation must fail and rolling Windows publication must remain blocked.
 
 ## Initial local measurements (2026-09-13)
 
