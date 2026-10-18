@@ -2765,13 +2765,13 @@ offline disabled. Final readback passed after unmount and remount. On boot
 are working; the installed `f58d725` image remains healthy and committed. Radio
 state has no pending command, suspension or owned-off flag. The startup update
 check recorded `network-unavailable`; an explicit retry then completed with
-`no-candidate` on Release and no error. No image was installed or reboot requested. The application checksum/schema reader accepts the proposed
-record and the controller admits SSH without issuing a radio command. No image
-installation was requested. This is not a passing idle-cycle qualification,
+`no-candidate` on Release and no error. The application checksum/schema reader
+accepts the repaired record and the controller admits SSH without issuing a
+radio command. No image was installed. This is not a passing idle-cycle qualification,
 nor proof that the earlier Picade delay has the same cause. The
 [idle qualification evidence](data/ota-network-idle-20261018.json) retains exact
 source, binary, image, probe, collected-trace and recovery identities. Diagnose
-native radio notifications and recovery admission, then correct the skipped-sync
+native radio notifications, then correct the skipped-sync
 and restoration harness before repeating qualification or attempting unattended
 rollout. Successful recovery does not qualify the interrupted idle cycle.
 
@@ -2786,8 +2786,40 @@ Both new controller regressions failed before the change. The fixed controller
 also admits SSH using a copy of the exact collected record, without changing its
 radio fault, policy or deployments or issuing a radio command. All 200 device
 service tests pass, with three opt-in tests skipped; formatting, Clippy with
-warnings denied and the AArch64 build pass. Native recovery qualification remains
-pending.
+warnings denied and the AArch64 build pass.
+
+The opt-in [SSH executable qualification](../crates/engine-os-manager/tests/ssh_recovery_cli.rs)
+then passed all four controls on Pi 5 in 90.14 seconds. It uses the actual
+`ssh-network-admit` executable with accepted TCP sockets, private network and
+mount namespaces, and a copy of the collected fault. Previous-boot state is
+admitted with the coordinator running and stopped; changing only the boot
+identity and checksum to the current boot causes rejection after the normal
+45-second deadline in both paths. Radio observations are deliberately unavailable
+and attempted radio writes fail the fixture. The saved radio fault, policy,
+deployments and unread incoming SSH bytes are preserved in every case.
+
+This test requires explicit owner execution as root with
+`SPACEWARS_SSH_QUALIFICATION_ROOT` naming a fresh private directory directly under
+`/data`, prefixed `spacewars-ssh-qualification-`. That directory supplies the
+candidate `engine-os-manager`, `retained-state.json`, and root-owned mode-0700
+`state` and `run` directories. A transient systemd unit uses `PrivateNetwork=yes`
+and `PrivateMounts=yes`, binding those directories over `/data/spacewars-system`
+and `/run/spacewars-system`. The test verifies isolation before opening any store;
+it is ignored in ordinary test runs. Bound the unit to 150 seconds and collect
+its output and saved case states. Use a shared SSH control connection during
+setup to avoid accumulating unexpired admission reservations.
+
+The initial fixture run admitted the previous-boot stopped-service case but then
+failed while moving evidence across a bind-mount alias. Retaining evidence within
+the mounted paths corrected the harness. A later setup SSH connection stalled
+at the banner and recovered after a pause; reservation capacity is suspected,
+but was not captured at the time. The successful run and both earlier outcomes
+are retained in the evidence record. Post-test checks confirm the same boot,
+image, system service and kiosk, clean radio state and a fresh independent SSH
+login. There were no live radio writes or device reboots. This qualifies the SSH
+executable paths with a radio fixture, not real NetworkManager notifications or
+the interrupted idle cycle. The fix must persist across reboot, or independent
+recovery must be available, before another disruptive live-radio test.
 
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains

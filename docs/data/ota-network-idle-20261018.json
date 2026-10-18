@@ -175,6 +175,42 @@
       "bytes": 9215,
       "sha256": "2d6770b2b096e1c54aacc9535a36211728a2fed656450523608762e4a085eeb1"
     },
+    "ssh-native-qualification-2/after.json": {
+      "bytes": 4900,
+      "sha256": "ac196b2cd7169e962f962fa598e8438338112eb877925c155dab51a0f6e7b7ee"
+    },
+    "ssh-native-qualification-2/before.json": {
+      "bytes": 6158,
+      "sha256": "0abd6ab978ce21dcc4b49f53ec135707595e16aa3ab9dec5b9280a26798281f6"
+    },
+    "ssh-native-qualification-2/files.json": {
+      "bytes": 389,
+      "sha256": "22a271d16f1ce44f90cf4b6b4896e48963eede02561797dfeb3c1a6e6fc98706"
+    },
+    "ssh-native-qualification-2/fresh-login.log": {
+      "bytes": 37,
+      "sha256": "bfa32ca8ed42c911e0759908944579684df66b22d563739b28dd892b69a0d460"
+    },
+    "ssh-native-qualification-2/isolated-state.tar.gz": {
+      "bytes": 905,
+      "sha256": "315c8bed49d86a6f22d495e3afc847e74e151d7efd07e2b60168a062b0f13fe9"
+    },
+    "ssh-native-qualification-2/result.json": {
+      "bytes": 983,
+      "sha256": "7cc6a8a4d34f77dde6ba1b6456fa0ecdf445b76c164f4be9591fc7612f5f9290"
+    },
+    "ssh-native-qualification-2/run-isolated.log": {
+      "bytes": 947,
+      "sha256": "6add4501ea0b690ebab9a8d6089190e5be406de737750df7d009b1cd86d2ced1"
+    },
+    "ssh-native-qualification-2/run.log": {
+      "bytes": 92,
+      "sha256": "3e603e9834c0cec56d5cc352c8fe9c0e865162f6d324ad2fd48097321d178748"
+    },
+    "ssh-native-qualification/run.log": {
+      "bytes": 892,
+      "sha256": "d74ad32b14da84c1b0a5b1e4276ffdb29401490a3f2361050775cdf6b8fb7fbe"
+    },
     "ssh-recovery-aarch64.log": {
       "bytes": 280,
       "sha256": "a6991cd1db0b042035a795be716c488a7de01f941bd9ae1b340239c9bad04c32"
@@ -190,6 +226,18 @@
     "ssh-recovery-full-tests.log": {
       "bytes": 22723,
       "sha256": "e5cb8e6de239be505e5dc8fe527294e26db1e687009e2d98d146642abf3527d9"
+    },
+    "ssh-recovery-native-build-2.jsonl": {
+      "bytes": 238000,
+      "sha256": "3773243072fb4fa20963f888ea09feb5efb35bce90137411de7bf263e9e81815"
+    },
+    "ssh-recovery-native-clippy-2.log": {
+      "bytes": 175,
+      "sha256": "b9e18849c4d2925b19b501998a1c06eb6c9171a54b85b6e2475a244bfc5dfbe5"
+    },
+    "ssh-recovery-opt-in.log": {
+      "bytes": 594,
+      "sha256": "b81ad3cc276898532e5ffdfdc4b81965ed50d51794606166b2d692a519621784"
     },
     "ssh-recovery-regression-before.log": {
       "bytes": 1825,
@@ -226,8 +274,9 @@
   "implementation_commit": "22e49a2fd72ae32505b543518212161cd629f95f",
   "issue": 265,
   "next_qualification": [
-    "Qualify the tested SSH reboot-recovery fix on hardware; trace native radio notifications and correct their reconciliation",
-    "Correct skipped-sync harness and restoration checks, then repeat detached off/time-wake/OTA/off qualification",
+    "Build and qualify a persistent image containing the tested SSH recovery fix before another disruptive live-radio test, or provide an independent recovery path",
+    "Trace native radio notifications and correct their reconciliation; the external-change suspension cause remains unproven",
+    "Correct skipped-sync harness and require clean radio state plus fresh SSH in restoration checks, then repeat detached off/time-wake/OTA/off qualification",
     "Signed-image normal boot and verified interrupted/resumed download",
     "Frame-time impact before unattended rollout"
   ],
@@ -392,7 +441,88 @@
       "ignored": 3,
       "passed": 200
     },
-    "native_recovery_qualification": "pending",
+    "native_recovery_qualification": {
+      "boot_id": "8a3a1171-3b1f-4980-bcfe-d222bd7ba1f9",
+      "case_inputs": "actual retained Pi 5 record; current-boot controls change only boot identity and checksum",
+      "cases": [
+        {
+          "coordinator": "stopped",
+          "result": "admitted",
+          "retained_state_boot": "previous"
+        },
+        {
+          "coordinator": "stopped",
+          "result": "rejected after the normal 45-second deadline",
+          "retained_state_boot": "current"
+        },
+        {
+          "coordinator": "running",
+          "result": "admitted",
+          "retained_state_boot": "previous"
+        },
+        {
+          "coordinator": "running",
+          "result": "rejected after the normal 45-second deadline",
+          "retained_state_boot": "current"
+        }
+      ],
+      "execution": "Explicitly enabled ignored integration test; actual ssh-network-admit child executable and loopback TCP accepted sockets on port 22 in private network and mount namespaces.",
+      "files": {
+        "engine-os-manager": {
+          "bytes": 16917640,
+          "sha256": "ef61e4594041899d29fb272f681c6e67fea358f5eaa33d5976064edd640b655e"
+        },
+        "retained-state.json": {
+          "bytes": 735,
+          "sha256": "ad1fec4ae2529e40890a1e7be598646d09ad0327b71feda1feb195b79bce0b4f"
+        },
+        "tests": {
+          "bytes": 1839952,
+          "sha256": "23bcfc28a19d4115a7c34c694ab25f3fad59fd06864d742abbda7d1385896a40"
+        }
+      },
+      "first_attempt": {
+        "artifacts": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/ssh-native-qualification",
+        "passed": false,
+        "result": "Previous-boot stopped-service admission succeeded; evidence retention then failed with EXDEV when renaming across a bind-mount alias. The harness now retains files within the mounted paths. No production state changed."
+      },
+      "fresh_login_passed": true,
+      "host": "spacewars.local",
+      "implementation_commit": "3c7aecf4f3e46a49842844684ae09507877efb4f",
+      "invocation_id": "07b73757600f4e04931876fd26b3c5aa",
+      "kiosk_pid_unchanged": true,
+      "limits": "Qualifies the actual SSH executable and coordinator/fallback paths with unavailable radio observations on Pi 5. Does not qualify real NetworkManager signals, actual reboot recovery, live off/time-wake/OTA/off cycling, deployment or unattended rollout.",
+      "live_radio_writes": false,
+      "local_artifacts": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/ssh-native-qualification-2",
+      "namespace_isolation": [
+        "mount",
+        "network"
+      ],
+      "passed": true,
+      "production_fix_deployed": false,
+      "production_image_unchanged": true,
+      "production_radio_clean": true,
+      "production_service_unchanged": true,
+      "radio_backend": "Unavailable observation fixture; radio writes and shutdown guards panic.",
+      "real_device_reboot": false,
+      "remote_artifacts": "/data/spacewars-ssh-qualification-20261018-3c7aecf-2",
+      "seconds": 90.14,
+      "setup_connection_pause": {
+        "mitigation": "Remaining setup, execution and collection shared one SSH control connection; a separate fresh login passed afterwards, then the control connection was closed.",
+        "observed": "Fresh SSH connection timed out at the banner after multiple separate setup connections; recovered after a pause without reboot or policy edit.",
+        "suspected_cause": "Unexpired 120-second SSH reservations reaching admission capacity; no contemporaneous capacity snapshot proves the cause."
+      },
+      "state_preservation": "Original radio fault, policy and deployments preserved in all four cases; incoming SSH banner bytes were not consumed.",
+      "test_source": "crates/engine-os-manager/tests/ssh_recovery_cli.rs",
+      "test_source_sha256": "a1fa82476829c1d6922e13453cd9a0ce683f9d6569ca84ea47ee6fd0e2174c0f",
+      "unit": "spacewars-ssh-qualification-20261018-2.service",
+      "validation": {
+        "aarch64_build": "passed",
+        "clippy_all_targets": "passed with warnings denied",
+        "format": "passed",
+        "ordinary_host_invocation": "1 ignored as intended"
+      }
+    },
     "patch_sha256": "a6865597a34d2766e232854378f6ff8eb0d07725e4f6c59eac4f8467af3e7bae",
     "regressions_before_fix": "Both new controller regressions fail with SSH protection awaits radio reconciliation"
   },
