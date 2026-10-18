@@ -229,3 +229,41 @@ fn indexed_contact_damage_matches_linear_lookup_through_fragment_churn() {
         assert!(state.birth_counts.fragments_created > 0);
     }
 }
+
+#[test]
+fn unchanged_viewports_preserve_the_fixed_step_cascade_across_frame_grouping() {
+    let mut reference = fixture(500, 500);
+    let mut every_frame = fixture(500, 500);
+    let mut batched = fixture(500, 500);
+    let aspect = reference.config.bounds.width / reference.config.bounds.height;
+    for tick in 0..240 {
+        every_frame.set_aspect_ratio(aspect);
+        // Different frame pacing must not reset the solver between fixed steps.
+        if tick % 7 == 0 {
+            batched.set_aspect_ratio(aspect);
+        }
+        let actions = if tick == 120 {
+            vec![PizzaAction::TriggerEvent(PizzaEventKind::DirectionalGravity).encode()]
+        } else {
+            Vec::new()
+        };
+        for state in [&mut reference, &mut every_frame, &mut batched] {
+            PizzaScenario::step(state, &actions, DT);
+        }
+        for candidate in [&every_frame, &batched] {
+            assert_eq!(candidate.balls, reference.balls, "tick {tick}");
+            assert_eq!(candidate.population(), reference.population());
+            assert_eq!(candidate.event_state(), reference.event_state());
+            assert_eq!(
+                candidate.last_step_metrics.rapier.candidate_pairs,
+                reference.last_step_metrics.rapier.candidate_pairs
+            );
+            assert_eq!(
+                candidate.last_step_metrics.rapier.contacts,
+                reference.last_step_metrics.rapier.contacts
+            );
+        }
+    }
+    assert!(reference.birth_counts.exploded > 0);
+    assert!(reference.birth_counts.fragments_created > 0);
+}

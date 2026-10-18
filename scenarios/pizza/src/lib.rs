@@ -368,7 +368,14 @@ impl PizzaState {
         if self.config.benchmark.is_some() {
             return;
         }
-        self.config.bounds = PizzaBounds::from_aspect_ratio(aspect_ratio);
+        let bounds = PizzaBounds::from_aspect_ratio(aspect_ratio);
+        // The host refreshes the viewport every UI tick. Rebuilding an unchanged
+        // world discards solver/contact history and makes physics depend on how
+        // fixed updates happened to be grouped into rendered frames.
+        if self.config.bounds == bounds {
+            return;
+        }
+        self.config.bounds = bounds;
         for ball in &mut self.balls {
             contain_ball(ball, self.config.bounds);
         }
