@@ -179,6 +179,13 @@ fn start(case: Case) -> ClockState {
         ],
         Duration::ZERO,
     );
+    // Keep the original route synchronized with these fixed rain/debris times.
+    // The flap-detour suite covers interruptions of the new optional stunt.
+    state
+        .duck_visit
+        .as_mut()
+        .unwrap()
+        .skip_flap_detour_for_fixture();
     state
 }
 

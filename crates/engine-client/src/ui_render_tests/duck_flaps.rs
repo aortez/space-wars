@@ -18,7 +18,7 @@ fn rigid_flap_fixtures_render_through_both_adapters() {
     render_fixtures(
         "SPACEWARS_DUCK_FLAP_FRAMES",
         "SPACEWARS_DUCK_FLAP_ARTIFACTS",
-        48,
+        Some(48),
     );
 }
 
@@ -28,7 +28,7 @@ fn ledge_fixtures_render_through_both_adapters() {
     render_fixtures(
         "SPACEWARS_DUCK_LEDGE_FRAMES",
         "SPACEWARS_DUCK_LEDGE_ARTIFACTS",
-        36,
+        Some(36),
     );
 }
 
@@ -38,17 +38,41 @@ fn automatic_ledge_fixtures_render_through_both_adapters() {
     render_fixtures(
         "SPACEWARS_DUCK_AUTO_LEDGE_FRAMES",
         "SPACEWARS_DUCK_AUTO_LEDGE_ARTIFACTS",
-        36,
+        Some(36),
     );
 }
 
-fn render_fixtures(source_env: &str, output_env: &str, count: usize) {
+#[test]
+#[ignore = "exports SPACEWARS_DUCK_DETOUR_FRAMES to SPACEWARS_DUCK_DETOUR_ARTIFACTS"]
+fn flap_detour_fixtures_render_through_both_adapters() {
+    render_fixtures(
+        "SPACEWARS_DUCK_DETOUR_FRAMES",
+        "SPACEWARS_DUCK_DETOUR_ARTIFACTS",
+        Some(108),
+    );
+}
+
+#[test]
+#[ignore = "exports SPACEWARS_DUCK_DETOUR_CLIP_FRAMES to SPACEWARS_DUCK_DETOUR_CLIP_ARTIFACTS"]
+fn flap_detour_clip_renders_through_both_adapters() {
+    render_fixtures(
+        "SPACEWARS_DUCK_DETOUR_CLIP_FRAMES",
+        "SPACEWARS_DUCK_DETOUR_CLIP_ARTIFACTS",
+        None,
+    );
+}
+
+fn render_fixtures(source_env: &str, output_env: &str, count: Option<usize>) {
     let source = std::env::var_os(source_env).expect("scenario fixture file");
     let output = std::path::PathBuf::from(std::env::var_os(output_env).expect("capture directory"));
     std::fs::create_dir_all(&output).unwrap();
     let mut fixtures: Vec<serde_json::Value> =
         serde_json::from_slice(&std::fs::read(source).unwrap()).unwrap();
-    assert_eq!(fixtures.len(), count);
+    if let Some(count) = count {
+        assert_eq!(fixtures.len(), count);
+    } else {
+        assert!(!fixtures.is_empty() && fixtures.len() <= 100);
+    }
     let windows = Rc::new(RefCell::new(Vec::new()));
     slint::platform::set_platform(Box::new(CapturePlatform(windows.clone()))).unwrap();
     let ui = MainWindow::new().unwrap();

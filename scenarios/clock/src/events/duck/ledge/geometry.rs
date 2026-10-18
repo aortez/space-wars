@@ -18,9 +18,18 @@ impl Edge {
     pub fn in_reach(self, duck: &DuckEvent) -> bool {
         let world = duck.world.as_ref().unwrap();
         let motion = world.motion(DUCK_BODY).unwrap();
-        let offset = motion.position - self.anchor(world).unwrap();
-        let relative = motion.linear_velocity - self.velocity(world).unwrap();
-        let r = duck.radius;
+        self.in_reach_from(world, motion.position, motion.linear_velocity, duck.radius)
+    }
+
+    pub fn in_reach_from(
+        self,
+        world: &PhysicsWorld,
+        position: Vec2,
+        velocity: Vec2,
+        r: f32,
+    ) -> bool {
+        let offset = position - self.anchor(world).unwrap();
+        let relative = velocity - self.velocity(world).unwrap();
         offset.length() <= r * REACH_RADII
             && (0.3 * r..=2.0 * r).contains(&(offset.x * self.outward))
             && (-2.0 * r..=-0.1 * r).contains(&offset.y)
