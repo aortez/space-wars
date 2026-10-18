@@ -14,6 +14,11 @@ fn assert_coherent(state: &PizzaState) {
     assert_eq!(population.ball_colliders, population.balls);
     let ids: HashSet<_> = state.balls.iter().map(|b| b.id).collect();
     assert_eq!(ids.len(), state.balls.len());
+    let indices = state.ball_indices.as_ref().unwrap();
+    assert_eq!(indices.len(), state.balls.len());
+    for (index, ball) in state.balls.iter().enumerate() {
+        assert_eq!(indices.get(&ball.id), Some(&index));
+    }
     let physics = state.physics.as_ref().unwrap();
     for ball in &state.balls {
         assert!(ball.position.x.is_finite() && ball.position.y.is_finite());
@@ -172,5 +177,55 @@ fn pizza_capacity_fixture_rejects_invalid_requests_and_supports_target_aspects()
             capacity_lab::mixed_size_fixture(5000, 5000, PizzaBounds::from_aspect_ratio(aspect), 7)
                 .unwrap();
         assert_coherent(&state);
+    }
+}
+
+// Independent old linear lookup as an oracle. Reapply the same real contacts
+// to cloned metadata, then restore HP so this check cannot change the cascade.
+#[test]
+fn indexed_contact_damage_matches_linear_lookup_through_fragment_churn() {
+    for count in [64, 500] {
+        let mut state = fixture(count, 500);
+        let mut contact_updates = 0;
+        for tick in 0..180 {
+            if tick == 20 {
+                let position = state.balls[0].position;
+                press(&mut state, position);
+            } else if tick == 40 {
+                state.release_pointer();
+            } else if tick == 60 {
+                state.set_aspect_ratio(480.0 / 800.0);
+            }
+            PizzaScenario::step(&mut state, &[], DT);
+            let before = state.balls.clone();
+            let mut expected = before.clone();
+            let physics = state.physics.as_ref().unwrap();
+            contact_updates += usize::from(!physics.contact_events().is_empty());
+            for contact in physics.contact_events() {
+                if contact.collider_a.role != BALL_COLLIDER_ROLE
+                    || contact.collider_b.role != BALL_COLLIDER_ROLE
+                {
+                    continue;
+                }
+                for entity in [contact.collider_a.entity, contact.collider_b.entity] {
+                    let mass = physics
+                        .body_mass(ball_body_id(entity.value()))
+                        .unwrap_or(1.0)
+                        .max(f32::EPSILON);
+                    if let Some(ball) = expected.iter_mut().find(|b| b.id == entity.value())
+                        && !ball.invincible
+                    {
+                        ball.hp -= contact.impulse_magnitude / mass * DAMAGE_SCALAR;
+                    }
+                }
+            }
+            apply_contact_damage(&mut state);
+            assert_eq!(state.balls, expected);
+            state.balls = before;
+            assert_coherent(&state);
+        }
+        assert!(contact_updates > 10);
+        assert!(state.birth_counts.exploded > 0);
+        assert!(state.birth_counts.fragments_created > 0);
     }
 }

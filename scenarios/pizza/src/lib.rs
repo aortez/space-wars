@@ -20,6 +20,7 @@ pub use events::{
     PizzaEventDirection, PizzaEventKind, PizzaEventState, PizzaEventTrigger, PizzaObservation,
 };
 
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use engine_common::{
@@ -32,8 +33,8 @@ use engine_gravity::{
     GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver, GravityStepMetrics,
 };
 use engine_rapier::world::{
-    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, ContactEvent,
-    PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
+    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
+    PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
 };
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -173,6 +174,8 @@ pub struct PizzaStepMetrics {
     pub gravity_time: Duration,
     pub collision_time: Duration,
     pub physics_time: Duration,
+    /// Complete canonical step, including contact collection and metrics.
+    pub physics_total_time: Duration,
     pub snapshot_time: Duration,
     pub added: usize,
     pub removed: usize,
@@ -343,6 +346,8 @@ pub struct PizzaState {
     pub cursor_velocity: Vec2,
     pub last_step_metrics: PizzaStepMetrics,
     birth_counts: PizzaBirthCounts,
+    // Normal gameplay only: contact damage needs ID lookup, benchmarks do not.
+    ball_indices: Option<HashMap<u64, usize>>,
     seed: u64,
     next_ball_id: u64,
     rng: StdRng,
@@ -557,6 +562,9 @@ impl PizzaState {
                 "Pizza generated an invalid or duplicate physics ball"
             );
         }
+        if let Some(indices) = &mut self.ball_indices {
+            assert!(indices.insert(ball.id, self.balls.len()).is_none());
+        }
         self.balls.push(ball);
     }
 
@@ -571,7 +579,14 @@ impl PizzaState {
                 "Pizza metadata and physics lifecycle stay aligned"
             );
         }
-        Some(self.balls.swap_remove(index))
+        let removed = self.balls.swap_remove(index);
+        if let Some(indices) = &mut self.ball_indices {
+            assert_eq!(indices.remove(&id), Some(index));
+            if let Some(moved) = self.balls.get(index) {
+                indices.insert(moved.id, index);
+            }
+        }
+        Some(removed)
     }
 
     fn advance_spawner(&mut self) {
@@ -705,7 +720,10 @@ impl PizzaState {
     }
 
     fn ball_mut(&mut self, id: u64) -> Option<&mut BallState> {
-        self.balls.iter_mut().find(|ball| ball.id == id)
+        match &self.ball_indices {
+            Some(indices) => indices.get(&id).map(|index| &mut self.balls[*index]),
+            None => self.balls.iter_mut().find(|ball| ball.id == id),
+        }
     }
 
     fn remove_replaceable_ball(&mut self) {
@@ -893,36 +911,36 @@ fn apply_gravity_to_classic(state: &mut PizzaState) -> GravityStepMetrics {
 }
 
 fn apply_contact_damage(state: &mut PizzaState) {
-    let contacts = state
+    let physics = state
         .physics
         .as_ref()
-        .expect("interactive Pizza uses canonical physics")
-        .contact_events()
-        .to_vec();
-    for contact in contacts {
+        .expect("interactive Pizza uses canonical physics");
+    let indices = state
+        .ball_indices
+        .as_ref()
+        .expect("normal Pizza indexes its live metadata");
+    // Borrow contacts directly. Preserve contact order and the separate, ordered
+    // subtraction for each participant; never aggregate impulses or change mass.
+    for contact in physics.contact_events() {
         if contact.collider_a.role != BALL_COLLIDER_ROLE
             || contact.collider_b.role != BALL_COLLIDER_ROLE
         {
             continue;
         }
-        apply_contact_damage_to_ball(state, contact.collider_a.entity, contact);
-        apply_contact_damage_to_ball(state, contact.collider_b.entity, contact);
-    }
-}
-
-fn apply_contact_damage_to_ball(state: &mut PizzaState, entity: PhysicsId, contact: ContactEvent) {
-    let id = entity.value();
-    let body = ball_body_id(id);
-    let mass = state
-        .physics
-        .as_ref()
-        .and_then(|physics| physics.body_mass(body))
-        .unwrap_or(1.0)
-        .max(f32::EPSILON);
-    if let Some(ball) = state.ball_mut(id)
-        && !ball.invincible
-    {
-        ball.hp -= contact.impulse_magnitude / mass * DAMAGE_SCALAR;
+        for entity in [contact.collider_a.entity, contact.collider_b.entity] {
+            let id = entity.value();
+            let mass = physics
+                .body_mass(ball_body_id(id))
+                .unwrap_or(1.0)
+                .max(f32::EPSILON);
+            if let Some(index) = indices.get(&id) {
+                let ball = &mut state.balls[*index];
+                debug_assert_eq!(ball.id, id);
+                if !ball.invincible {
+                    ball.hp -= contact.impulse_magnitude / mass * DAMAGE_SCALAR;
+                }
+            }
+        }
     }
 }
 
@@ -933,7 +951,9 @@ impl Scenario for PizzaScenario {
     fn init(config: Self::Config, seed: u64) -> Self::State {
         let config = config.normalized();
         let events = events::Events::new(seed, config.automatic_events, config.benchmark.is_some());
+        let ball_indices = config.benchmark.is_none().then(HashMap::new);
         let mut state = PizzaState {
+            ball_indices,
             config,
             balls: Vec::new(),
             tick: 0,
@@ -1034,7 +1054,9 @@ impl Scenario for PizzaScenario {
             .physics
             .as_mut()
             .expect("interactive Pizza uses the canonical physics world");
+        let physics_started = Instant::now();
         metrics.rapier = physics.step(dt * WORLD_TIME_SCALE);
+        metrics.physics_total_time = physics_started.elapsed();
         // The event owns only this update's acceleration. Clear even on its
         // final update, leaving no persistent force during pause or afterward.
         if field_applied {
