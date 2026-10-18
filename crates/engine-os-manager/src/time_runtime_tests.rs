@@ -526,13 +526,17 @@ fn cached_network_view_expires_on_sleep_and_coordinator_restart() {
     let watch = Watch::default();
     watch.reset();
     watch.publish(Some(fake.network(&clock(1000)).unwrap().status));
-    let first = watch.read(&clock(1000)).unwrap();
-    assert!(watch.read(&clock(6001)).is_none());
-    assert!(watch.read(&clock(999)).is_none());
+    let first = watch.read(|| Some(clock(1000))).unwrap();
+    assert!(watch.read(|| Some(clock(6001))).is_none());
+    assert!(watch.read(|| Some(clock(999))).is_none());
+    assert!(watch.read(|| None).is_none());
+    let mut other_boot = clock(1000);
+    other_boot.boot_id = "different-boot".into();
+    assert!(watch.read(|| Some(other_boot)).is_none());
     watch.reset();
-    assert!(watch.read(&clock(1000)).is_none());
+    assert!(watch.read(|| Some(clock(1000))).is_none());
     watch.publish(Some(fake.network(&clock(1000)).unwrap().status));
-    assert_ne!(watch.read(&clock(1000)).unwrap().epoch, first.epoch);
+    assert_ne!(watch.read(|| Some(clock(1000))).unwrap().epoch, first.epoch);
 }
 
 #[test]

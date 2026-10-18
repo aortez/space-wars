@@ -1882,6 +1882,7 @@ pub struct PizzaSettings {
     pub desired_balls: u32,
     #[serde(default = "default_pizza_ball_spawn_rate")]
     pub ball_spawn_rate: f32,
+    pub automatic_events: bool,
 }
 
 impl Default for PizzaSettings {
@@ -1889,6 +1890,7 @@ impl Default for PizzaSettings {
         Self {
             desired_balls: DEFAULT_PIZZA_DESIRED_BALLS,
             ball_spawn_rate: DEFAULT_PIZZA_BALL_SPAWN_RATE,
+            automatic_events: true,
         }
     }
 }
@@ -1898,6 +1900,7 @@ impl PizzaSettings {
         Self {
             desired_balls: self.desired_balls.min(MAX_PIZZA_DESIRED_BALLS),
             ball_spawn_rate: normalize_pizza_ball_spawn_rate(self.ball_spawn_rate),
+            automatic_events: self.automatic_events,
         }
     }
 }

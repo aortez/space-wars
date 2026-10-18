@@ -708,6 +708,15 @@ fn handle_request(
         }
         ControlCommand::Status => {
             let mut diagnostics = window.get_runtime_diagnostics().to_string();
+            if !window.get_launcher_visible()
+                && !window.get_launcher_busy()
+                && let Some(status) = scenario_controls.borrow().pizza_status()
+            {
+                diagnostics.push_str("\npizza=");
+                diagnostics.push_str(
+                    &serde_json::to_string(status).expect("bounded Pizza status serializes"),
+                );
+            }
             diagnostics.push_str(&format!(
                 "\nraster_upload_format={}",
                 crate::raster::publication::requested_format().name(),
@@ -1567,6 +1576,10 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             spacewars_player_2: window.get_launcher_p2_controller().to_string(),
             pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
+            pizza_automatic_events: window.get_launcher_pizza_automatic_events(),
+            pizza_event_available: window.get_pizza_event_available(),
+            pizza_event_can_trigger: window.get_pizza_event_can_trigger(),
+            pizza_event_status: window.get_pizza_event_status().to_string(),
             expedition_players: window.get_launcher_expedition_players().to_string(),
             clock_time_format: window.get_launcher_clock_time_format().to_string(),
             clock_show_date: window.get_launcher_clock_show_date(),

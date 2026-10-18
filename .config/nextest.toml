@@ -61,6 +61,7 @@ default-filter = '''
         | test(=launcher_catalog::saved_extra_automatically_expands_and_persists_the_catalog)
         | test(=launcher_navigation_uses_the_public_control_api)
         | test(=network::network_settings_handle_missing_service_and_preserve_paused_session)
+        | test(=pizza::pizza_event_controls_settings_and_lifecycle_smoke)
         | test(=performance::fps_counter_is_shared_by_scene_and_native_video_lifecycles)
         | test(=sound::sound_controls_persist_across_scenarios_restart_and_process_restart)
         | test(=spaceling_lab::material_expedition_two_players_settings_and_lifecycle)

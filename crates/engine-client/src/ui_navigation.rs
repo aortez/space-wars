@@ -93,6 +93,16 @@ pub(crate) fn moved_launcher_controls_selection(current: i32, action: UiAction) 
     }
 }
 
+pub(crate) fn moved_pizza_selection(current: i32, action: UiAction) -> i32 {
+    match (current, action) {
+        (0 | 1, UiAction::Up) | (4 | 5, UiAction::Down) => 6,
+        (6, UiAction::Up) => 4,
+        (6, UiAction::Down) => 0,
+        (6, _) => 6,
+        _ => moved_ingame_selection(current, true, action),
+    }
+}
+
 /// Two columns, ending with Sound (paired with Benchmark/Clock's extra item).
 pub(crate) fn moved_ingame_selection(current: i32, extra_row_item: bool, action: UiAction) -> i32 {
     if extra_row_item {

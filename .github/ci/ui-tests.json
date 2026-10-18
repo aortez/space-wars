@@ -32,6 +32,7 @@
     "launcher_navigation_uses_the_public_control_api",
     "network::network_settings_handle_missing_service_and_preserve_paused_session",
     "performance::fps_counter_is_shared_by_scene_and_native_video_lifecycles",
+    "pizza::pizza_event_controls_settings_and_lifecycle_smoke",
     "sound::sound_controls_persist_across_scenarios_restart_and_process_restart",
     "spaceling_lab::material_expedition_two_players_settings_and_lifecycle",
     "spaceling_lab::spaceling_lab_launch_pause_restart_and_both_renderers",
@@ -91,6 +92,10 @@
     {
       "test": "garden_lab::garden_lab_controls_lifecycle_and_both_renderers",
       "reason": "Exhaustive growth, shade, cutting and physiology transitions (about 13 minutes); pause/step/reset/rendering smoke stays on PRs."
+    },
+    {
+      "test": "pizza::pizza_event_completes_without_queuing_busy_requests",
+      "reason": "Waits for the full 15-second gravity event on GPU; PR smoke covers admission, busy refusal, pause/resume, persistence and lifecycle."
     },
     {
       "test": "spaceling_lab::surface_expedition_launch_pause_restart_and_both_renderers",

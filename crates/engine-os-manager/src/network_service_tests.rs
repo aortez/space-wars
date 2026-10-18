@@ -160,7 +160,7 @@ fn network_watch_revokes_old_authority_before_a_blocking_policy_mutation() {
     };
     assert!(
         watch
-            .read(&clock)
+            .read(|| Some(clock.clone()))
             .unwrap()
             .status
             .policy
@@ -183,14 +183,14 @@ fn network_watch_revokes_old_authority_before_a_blocking_policy_mutation() {
     });
     entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
     assert!(
-        watch.read(&clock).is_none(),
+        watch.read(|| Some(clock.clone())).is_none(),
         "provider guard must not see old mode during write"
     );
     resume_tx.send(()).unwrap();
     assert!(work.join().unwrap()["error"].is_null());
     assert!(
         !watch
-            .read(&clock)
+            .read(|| Some(clock.clone()))
             .unwrap()
             .status
             .policy

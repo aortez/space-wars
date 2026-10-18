@@ -564,8 +564,8 @@ impl Backend for Native {
     fn clock(&self) -> Result<Clock> {
         (self.clock)()
     }
-    fn network(&self, now: &Clock) -> Option<Snapshot> {
-        self.network.read(now)
+    fn network(&self, _now: &Clock) -> Option<Snapshot> {
+        self.network.read(|| self.clock().ok())
     }
     fn evidence(&self, now: &Clock) -> Option<Evidence> {
         let shared = self.time.lock().ok()?;

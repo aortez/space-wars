@@ -96,6 +96,7 @@ pub(super) fn build(name: &str, viewport: Viewport) -> Result<Fixture, Box<dyn s
     }
     let fixture = Fixture {
         name: name.into(),
+        seed: 7,
         frames: sequence[0].clone(),
         tick: 0,
         objects: 384 * 2,

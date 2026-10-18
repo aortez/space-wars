@@ -12,9 +12,8 @@ Classic remains available only as a collision benchmark reference.
 ## Event runtime
 
 Normal Pizza now owns a small deterministic event scheduler (#356). The first
-kind is directional gravity. This increment supplies admission, timing and
-diagnostics; the actual force/visual cue is #357, and user controls plus the
-saved automatic-events preference are #358.
+kind is directional gravity, with the physical field and direction cue from
+#357. Launcher settings and pause-menu controls are implemented in #358.
 
 `PizzaConfig::automatic_events` defaults to true for normal runs. The scheduler
 samples 3,600–7,200 ticks of ordinary play on initialization and after each
@@ -23,7 +22,7 @@ the physics `WORLD_TIME_SCALE`. After the quiet gap's last update, the next
 update admits an event. An event owns exactly 900 updates, including its
 admission update, then starts a fresh gap. There is no wall-clock catch-up.
 
-Headless callers and future host controls use the ordinary action boundary:
+Headless callers and host controls use the ordinary action boundary:
 
 ```rust
 use engine_common::Scenario;
@@ -54,8 +53,116 @@ schedule. Leaving the scenario drops the scheduler and any pending request.
 Sparse/dense/churn benchmark configurations always disable both automatic and
 manual events, regardless of the requested setting. Normal-path cascade labs
 can instead set `automatic_events: false` without selecting benchmark mode,
-then send a typed manual request with a recorded run seed when needed. No
-settings migration, UI test or CI workflow is added by this runtime slice.
+then send a typed manual request with a recorded run seed when needed.
+
+## Interactive controls and diagnostics
+
+Pizza settings include **Automatic events**, default On (including older settings
+without this field). Starting a game saves the choice through the normal launcher
+settings lifecycle. It applies to fresh runs/restarts; Off still permits manual
+admission. Existing grab/drag/fling controls remain available during the field.
+
+Pause, then choose **Run gravity & resume** to start one gravity event in the same
+world. The menu closes, and the next positive simulation step admits it. During an
+active event the action is disabled; **Resume** continues the paused phase. Menu
+navigation uses the usual keyboard, controller and pointer paths. Benchmark mode
+and other scenarios do not expose this action. Restart and launcher transitions
+clear requests; a busy refusal never queues an event for later.
+
+Public UI IDs are `launcher.settings.pizza.automatic-events.previous` / `.next`
+and `pause.pizza.gravity`. The existing control socket `status` response includes
+one bounded `pizza=<JSON>` line while Pizza is hosted. It contains the existing
+version-1 observation (`tick`, `event`), `scenario_revision`, `paused`, `ball_count`
+and `held_ball_id`. `event` reports idle wait/pending request or active
+kind/direction/trigger/elapsed/remaining ticks; benchmarks report `disabled`.
+Status is sampled from the latest host update, including paused updates, without
+serializing the world or changing the UI revision on every simulation tick.
+
+The short `pizza::pizza_event_controls_settings_and_lifecycle_smoke` public UI
+case runs on PRs. The real-time completion/GPU case runs in the full nightly/manual
+UI suite. Deterministic host tests cover build-up/hold/fade pause and resize, busy
+refusal, input cancellation, restart/benchmark/revision guards and remaining idle
+past the maximum automatic gap with the setting Off. Target-size UI tests dispatch
+real keyboard/pointer events; optional menu PNGs use
+`SPACEWARS_PIZZA_CONTROLS_ARTIFACTS`. [Live target-size captures](screenshots/pizza-controls/validation.json)
+record the public UI workflow at 800×480, 1024×768 and 480×800.
+
+## Directional gravity
+
+The extra field builds for 120 ticks (2 seconds), holds for 660 (11 seconds),
+then fades for 120 (2 seconds). Both ramps use smoothstep, `t²(3−2t)`, with
+zero strength at time 0 and 15 seconds. The existing scheduler counts unpaused
+60 Hz updates; the field uses that same phase and selected screen edge.
+
+Full strength is **0.30 world units per physics-second squared**, independent
+of ball mass. The longest playfield dimension is one world unit. The existing
+Rapier acceleration binding applies force proportional to each body's actual
+mass, alongside unchanged mutual attraction. Rapier integrates it over the
+existing `dt * WORLD_TIME_SCALE` step (0.9), including solver substeps. Thus a
+full-strength 60 Hz update contributes 0.0045 world units per physics-second
+of velocity before contacts. There is no additional time-scale multiplier.
+
+Held kinematic balls receive no field force. A released or cancelled ball
+responds on its first dynamic update, including during fade-out. Spawned balls
+participate in their creation update; fragments created after physics join on
+their next update. Affected dynamic bodies are woken. The normal update clears
+the field force immediately after physics, including the event's last update.
+Completion removes the field and cue while retaining actual positions,
+velocities, health, spawning and ordinary mutual gravity.
+
+A small arrow badge sits inside the selected edge, above the balls, with
+opacity following the same envelope. Its diameter is 7% of the shorter
+playfield dimension (about 34 pixels on an 800×480 display). It uses ordinary
+shared circle/polygon primitives and has no input handler or physical collider.
+
+### Calibration and captures
+
+The October 18, 2026 local sweep used all four directions, 800×480, 1024×768
+and 480×800 viewports, and target populations of 24 and 120 with normal
+spawning, damage and fragmentation. Each run warmed up for 300 ticks, admitted
+one typed manual event, and continued through 60 ticks after completion.
+Actual starting populations ranged from 24 to 500 due to normal cascades.
+At six seconds, the mass-weighted position toward the chosen edge ranged
+from 0.61 to 0.86 (0 is the opposite edge, 1 is the target edge), compared with
+0.42–0.58 before admission. All runs remained finite and continued producing
+contacts and new bodies. Captures show the gathering effect and readable cue;
+focused gesture tests also verify a fling can travel against full-strength pull.
+This calibrates behavior at the existing 500-ball cap, not 5,000-ball capacity
+or device performance; #364 and #359 retain those qualifications.
+Representative [native captures and validation records](screenshots/pizza-gravity/validation.json)
+are checked in alongside this document, including paired software/GPU images.
+
+Reproduce the normal-path sweep and export native software captures:
+
+```sh
+RUST_MIN_STACK=16777216 SPACEWARS_PIZZA_EVENT_ARTIFACTS=/tmp/pizza-event-captures \
+  cargo test --locked --profile ci -p engine-client --bin engine-client \
+  pizza_event_calibration_and_captures -- --ignored --nocapture
+```
+
+The existing offscreen GPU geometry probe has four opt-in fixtures,
+`pizza-event-left`, `pizza-event-right`, `pizza-event-top` and
+`pizza-event-bottom`. Each replays the normal 120-target-ball scene to six
+seconds into the event, then captures identical frames through the production
+GPU and software renderers. The first seed whose real manual admission chooses
+the requested direction is recorded as `pizza_event_fixture` in the log.
+The standard sparse/dense/churn fixtures and default probe list are unchanged.
+
+```sh
+cargo build --locked --profile ci -p engine-client --bin engine-client \
+  --no-default-features --features pi-kiosk-gpu
+target/ci/engine-client --benchmark-presentation --presentation-geometry \
+  --geometry-device /dev/dri/renderD128 \
+  --geometry-cases pizza-event-left,pizza-event-right,pizza-event-top,pizza-event-bottom \
+  --geometry-modes triangles --presentation-frames 2 --presentation-repeats 1 \
+  --benchmark-width 800 --benchmark-height 480 \
+  --geometry-output /tmp/pizza-event-gpu-800
+```
+
+Repeat with 1024×768 and 480×800 and a fresh output directory. These are local
+offscreen scene captures at target dimensions; they do not deploy to a device
+or measure its frame rate. The longer calibration sweep is opt-in, while the
+focused field and interaction tests run with the ordinary Pizza test suite.
 
 ## Visual verification
 

@@ -17,6 +17,7 @@ use scenario_pizza::PizzaBenchmarkConfig;
 use std::{sync::Arc, time::Duration};
 
 mod meshes;
+mod pizza;
 mod ships;
 
 struct AuthoredMesh {
@@ -28,6 +29,7 @@ struct AuthoredMesh {
 
 pub(super) struct Fixture {
     pub name: String,
+    pub seed: u64,
     pub frames: Vec<RenderFrame>,
     pub tick: u32,
     pub objects: usize,
@@ -112,6 +114,9 @@ impl Fixture {
 }
 
 pub(super) fn build(name: &str, viewport: Viewport) -> Result<Fixture, Box<dyn std::error::Error>> {
+    if let Some(direction) = name.strip_prefix("pizza-event-") {
+        return pizza::build(direction, viewport);
+    }
     if matches!(
         name,
         "ships-pair"
@@ -138,6 +143,7 @@ pub(super) fn build(name: &str, viewport: Viewport) -> Result<Fixture, Box<dyn s
             .collect();
         return Ok(Fixture {
             name: name.into(),
+            seed: 7,
             frames: sequence[0].clone(),
             tick: 0,
             objects: if name == "moving-circles" {
@@ -213,6 +219,7 @@ pub(super) fn build(name: &str, viewport: Viewport) -> Result<Fixture, Box<dyn s
     let checksum = checksum(&serde_json::to_vec(&frames)?);
     Ok(Fixture {
         name: name.into(),
+        seed: 7,
         frames,
         tick,
         objects,

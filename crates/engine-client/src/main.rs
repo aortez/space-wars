@@ -822,6 +822,7 @@ fn show_launcher(
         setup.player_2_controller,
     )));
     let pizza = settings.pizza.normalized();
+    window.set_launcher_pizza_automatic_events(pizza.automatic_events);
     window
         .set_launcher_pizza_desired_balls_text(SharedString::from(pizza.desired_balls.to_string()));
     window.set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(
@@ -1099,6 +1100,11 @@ fn install_ingame_menu_callbacks(
     settings_writer: settings_writer::SettingsWriter,
     rom_catalog: SharedNesRomCatalog,
 ) {
+    let controls = Rc::clone(&scenario_controls);
+    window.on_ingame_pizza_gravity(move || {
+        controls.borrow_mut().request_pizza_gravity();
+    });
+
     let controls = Rc::clone(&scenario_controls);
     window.on_ingame_resume(move || {
         controls.borrow_mut().request_resume();
@@ -1454,6 +1460,13 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
     let benchmark_offset = i32::from(window.get_scenario_benchmark_available());
     match action {
         UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
+            if window.get_pizza_event_available() {
+                window.set_ingame_menu_focus_index(ui_navigation::moved_pizza_selection(
+                    window.get_ingame_menu_focus_index(),
+                    action,
+                ));
+                return;
+            }
             window.set_ingame_menu_focus_index(ui_navigation::moved_ingame_selection(
                 window.get_ingame_menu_focus_index(),
                 benchmark_offset == 1
@@ -1466,7 +1479,11 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
         }
         UiAction::Confirm => {
             let selected = window.get_ingame_menu_focus_index();
-            if selected == 0 {
+            if selected == 6 && window.get_pizza_event_available() {
+                if window.get_pizza_event_can_trigger() {
+                    window.invoke_ingame_pizza_gravity();
+                }
+            } else if selected == 0 {
                 window.invoke_ingame_resume();
             } else if selected == 1 {
                 window.invoke_ingame_restart();
@@ -1523,7 +1540,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 11,
         "spacewars-classic" => 8,
-        "pizza" => 5,
+        "pizza" => 6,
         "spacewars-terrain-combat" | "spacewars-terrain-duel" => 9,
         "spacewars-terrain-travel"
         | "spacewars-terrain-travel-duel"
@@ -1789,6 +1806,8 @@ fn adjust_spacewars_launcher_setting(window: &MainWindow, focus: i32, delta: i32
 
 fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
     match focus {
+        4 => window
+            .set_launcher_pizza_automatic_events(!window.get_launcher_pizza_automatic_events()),
         2 => {
             let current = window
                 .get_launcher_pizza_desired_balls_text()
@@ -2043,6 +2062,8 @@ fn handle_launcher_zoom(weak_window: &slint::Weak<MainWindow>, player: usize, zo
 }
 
 fn clear_runtime_diagnostics(window: &MainWindow) {
+    window.set_pizza_event_available(false);
+    window.set_pizza_event_can_trigger(false);
     camera_probe::end_session();
     gpu_scene::end_session();
     window.set_runtime_diagnostics(SharedString::from(NO_ACTIVE_SCENARIO_DIAGNOSTICS));
@@ -2447,6 +2468,7 @@ fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String>
     pizza_setup_from_values(
         window.get_launcher_pizza_desired_balls_text().as_str(),
         window.get_launcher_pizza_spawn_rate_text().as_str(),
+        window.get_launcher_pizza_automatic_events(),
     )
 }
 
@@ -2633,8 +2655,10 @@ fn clock_time_format_from_label(label: &str) -> Result<ClockTimeFormat, String> 
 fn pizza_setup_from_values(
     desired_balls: &str,
     ball_spawn_rate: &str,
+    automatic_events: bool,
 ) -> Result<PizzaSettings, String> {
     Ok(PizzaSettings {
+        automatic_events,
         desired_balls: parse_u32_setting(
             desired_balls,
             "Desired balls",
@@ -4273,6 +4297,7 @@ mod tests {
                 player_2_controller: SpacewarsController::RuleBot,
             },
             pizza: PizzaSettings {
+                automatic_events: true,
                 desired_balls: 321,
                 ball_spawn_rate: 0.42,
             },
@@ -4436,21 +4461,23 @@ mod tests {
     #[test]
     fn pizza_setup_values_parse_and_validate_caps() {
         assert_eq!(
-            pizza_setup_from_values("321", "0.42").unwrap(),
+            pizza_setup_from_values("321", "0.42", true).unwrap(),
             PizzaSettings {
+                automatic_events: true,
                 desired_balls: 321,
                 ball_spawn_rate: 0.42,
             }
         );
         assert_eq!(
-            pizza_setup_from_values("501", "1.0").unwrap(),
+            pizza_setup_from_values("501", "1.0", true).unwrap(),
             PizzaSettings {
+                automatic_events: true,
                 desired_balls: MAX_PIZZA_DESIRED_BALLS,
                 ball_spawn_rate: MAX_PIZZA_BALL_SPAWN_RATE,
             }
         );
-        assert!(pizza_setup_from_values("many", "0.42").is_err());
-        assert!(pizza_setup_from_values("24", "often").is_err());
+        assert!(pizza_setup_from_values("many", "0.42", true).is_err());
+        assert!(pizza_setup_from_values("24", "often", true).is_err());
     }
 
     #[test]

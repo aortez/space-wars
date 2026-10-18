@@ -3,7 +3,7 @@
 The normal `CI` workflow runs on pull requests and pushes to `main`. It retains
 platform checks, rendering checks, physics diagnostics and non-ignored workspace
 tests, with three exhaustive OTA sweeps deferred only for verified unrelated PRs
-as described below. PR UI execution uses **46 representative smoke workflows**, budgeted
+as described below. PR UI execution uses **47 representative smoke workflows**, budgeted
 at **3–5 minutes**. Every workspace test target still compiles on every PR.
 
 Linux compilation produces nextest archives once. Independent runners execute
@@ -82,7 +82,7 @@ The PR selection covers:
   settings persistence and recovery, automatic Clock launch/disable, and planetary
   tank driving/pause/rendering, alongside the existing shorter Clock event cases.
 
-The **26 full-only cases** retain all their original assertions. They cover the
+The **27 full-only cases** retain all their original assertions. They cover the
 long Garden Lab physiology sequence, repeated marquee recipes, complete tank
 fixture/player-choice matrices, autostart repetition/relaunch, complete rain/duck/
 Demo/match lifecycles, and additional variants of shared scenario lifecycle tests.
@@ -130,7 +130,7 @@ or disappear from the full suite.
 **08:23 UTC**. It calls `ci.yml` with one immutable source SHA and `full=true`,
 running every normal PR check plus:
 
-- all **72 UI workflows**, partitioned across four isolated runners, with tests
+- all **74 UI workflows**, partitioned across four isolated runners, with tests
   serial within each runner/display;
 - Clock's **240-visit mixed-event sweep**;
 - all three extended duck sweeps: jumping profiles, authored patterns and platform seeds;
