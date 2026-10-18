@@ -182,24 +182,92 @@ class AdmissionTests(unittest.TestCase):
             with self.subTest(status=status, conclusion=conclusion):
                 self.api = FakeGitHub()
                 self.api.runs[20] = dict(self.api.runs[10], id=20, run_number=20,
+                                         run_started_at='2026-10-16T12:25:00Z',
+                                         updated_at='2026-10-16T12:26:00Z',
                                          status=status, conclusion=conclusion)
                 self.rejects()
                 self.assertNotIn('download', self.api.calls)
 
     def test_new_build_appearing_during_download_invalidates_admission(self):
         self.api.hook = lambda api: api.runs.update({20: dict(api.runs[10], id=20, run_number=20,
+                                                           run_started_at='2026-10-16T12:25:00Z',
+                                                           updated_at='2026-10-16T12:26:00Z',
                                                            status='in_progress', conclusion=None)})
         self.rejects()
         self.assertIn('download', self.api.calls)
 
-    def test_history_is_sorted_by_run_number_and_duplicate_or_foreign_entries_reject(self):
-        self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, conclusion='failure')
+    def test_old_attempt_is_allowed_but_duplicate_or_foreign_history_rejects(self):
+        self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, conclusion='failure',
+                                run_started_at='2026-10-16T11:50:00Z')
         with self.admit():
             pass
-        for field, value in [('run_number', 10), ('id', 10), ('head_branch', 'topic')]:
-            self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, conclusion='failure')
+        for field, value in [('run_number', 10), ('id', 10), ('head_branch', 'topic'),
+                             ('run_attempt', None), ('run_attempt', True), ('run_attempt', 0)]:
+            self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, conclusion='failure',
+                                    run_started_at='2026-10-16T11:50:00Z')
             self.api.runs[9][field] = value
             self.rejects()
+
+    def test_later_attempt_of_older_run_cannot_be_bypassed_in_any_state(self):
+        # Run 10 succeeds at 12:20; run 9 is rerun at 12:25, keeping its number.
+        for status, conclusion in [('completed', 'failure'), ('completed', 'cancelled'),
+                                   ('queued', None), ('in_progress', None), ('completed', 'success')]:
+            for reverse in (False, True):
+                with self.subTest(status=status, conclusion=conclusion, reverse=reverse):
+                    self.api = FakeGitHub()
+                    self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, run_attempt=3,
+                                            run_started_at='2026-10-16T12:25:00Z',
+                                            updated_at='2026-10-16T12:26:00Z',
+                                            status=status, conclusion=conclusion)
+                    if reverse:
+                        self.api.runs = dict(reversed(self.api.runs.items()))
+                    self.rejects()
+                    self.assertNotIn('download', self.api.calls)
+
+    def test_attempt_start_not_run_number_or_completion_determines_latest(self):
+        # The selected run 10 attempt 2 started after run 20, even though run 20
+        # eventually completed later. Its old failure does not supersede run 10.
+        self.api.runs[20] = dict(self.api.runs[10], id=20, run_number=20, run_attempt=1,
+                                 run_started_at='2026-10-16T11:50:00Z',
+                                 updated_at='2026-10-16T12:25:00Z', conclusion='failure')
+        with self.admit():
+            pass
+
+    def test_missing_invalid_future_or_tied_attempt_chronology_rejects(self):
+        for field, value in [('run_started_at', None), ('run_started_at', 'invalid'),
+                             ('run_started_at', '2026-10-16T12:00:00Z'),
+                             ('run_started_at', '2026-10-16T10:59:59Z'),
+                             ('run_started_at', '2026-10-16T12:31:00Z'),
+                             ('created_at', None), ('updated_at', None),
+                             ('updated_at', '2026-10-16T11:49:59Z'),
+                             ('updated_at', '2026-10-16T12:31:00Z')]:
+            with self.subTest(field=field, value=value):
+                self.api = FakeGitHub()
+                self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, run_attempt=3,
+                                        run_started_at='2026-10-16T11:50:00Z', conclusion='failure')
+                self.api.runs[9][field] = value
+                self.rejects()
+                self.assertNotIn('download', self.api.calls)
+
+    def test_history_selected_attempt_times_must_match_independent_inspection(self):
+        for field, value in [('created_at', '2026-10-16T10:59:59Z'),
+                             ('run_started_at', '2026-10-16T11:59:59Z'),
+                             ('updated_at', '2026-10-16T12:20:01Z')]:
+            with self.subTest(field=field):
+                self.api = FakeGitHub()
+                history = [dict(self.api.runs[10], **{field: value})]
+                with patch.object(self.api, 'workflow_runs', return_value=history):
+                    self.rejects()
+                self.assertNotIn('download', self.api.calls)
+
+    def test_older_run_rerun_during_download_invalidates_admission(self):
+        self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, run_attempt=2,
+                                run_started_at='2026-10-16T11:50:00Z', conclusion='failure')
+        self.api.hook = lambda api: api.runs[9].update(run_attempt=3,
+            run_started_at='2026-10-16T12:25:00Z', updated_at='2026-10-16T12:26:00Z',
+            status='in_progress', conclusion=None)
+        self.rejects()
+        self.assertIn('download', self.api.calls)
 
     def test_workflow_file_and_registration_are_independently_checked(self):
         for path in (POLICY.build.path, POLICY.ci.path):

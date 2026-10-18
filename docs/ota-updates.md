@@ -74,8 +74,11 @@ OTA job, avoiding their duplicate execution in one CI run.
 The existing nightly/manual image workflow runs the **complete** OTA suite on
 its exact source before building and uploading a candidate. Publisher admission
 requires that successful step, successful main CI for the same source, and the
-latest image-workflow run/attempt for that source. A newer failed, cancelled or
-unfinished run blocks admission of an older successful artifact; this history
+latest image-workflow attempt for that source, ordered by `run_started_at`
+(which resets on rerun). A later attempt of an older run also supersedes an
+earlier attempt of a higher-numbered run. Missing, invalid or tied latest start
+times stop admission. A newer failed, cancelled or unfinished attempt blocks
+admission of an older successful artifact; this history
 is checked again after downloading and validating it. Other source revisions
 do not substitute for the candidate's coverage.
 

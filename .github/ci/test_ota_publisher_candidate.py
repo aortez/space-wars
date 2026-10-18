@@ -129,6 +129,16 @@ class PublisherCandidateTests(unittest.TestCase):
                 patch.object(helper.subprocess, 'run', side_effect=self.validator):
             self.rejects()
 
+    def test_older_build_rerun_after_image_validation_invalidates_origin(self):
+        self.patches()
+        self.api.runs[9] = dict(self.api.runs[10], id=9, run_number=9, run_attempt=2,
+                                run_started_at='2026-10-16T11:50:00Z', conclusion='failure')
+        self.hook = lambda _: self.api.runs[9].update(run_attempt=3,
+            run_started_at='2026-10-16T12:25:00Z', updated_at='2026-10-16T12:26:00Z',
+            status='completed', conclusion='cancelled')
+        self.rejects()
+        self.assertEqual(self.validation_calls, 1)
+
     def test_backwards_time_or_expiry_during_validation_fails(self):
         self.patches()
         for duration in (timedelta(seconds=-1), timedelta(days=2)):
