@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T00:20:10.924961+00:00",
+  "implementation_commit": "9833758b58b367db1175594fa0e34be822b4706c",
+  "scope": "Schema 2 bootstrap packaging of 17 fixed fallback-root replacements from the selected ext4 image. Workstation artifacts and temporary Pi fixtures only; no installed configuration or privilege migration was performed.",
+  "host_validation": {
+    "ota_tests_passed": 153,
+    "manager_tests_passed": 38,
+    "additional_real_pi5_package_check": "passed with explicitly synthetic device and capacity inputs",
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "aarch64_tests_and_examples": "built"
+  },
+  "artifact_validation": {
+    "packages": {
+      "pi5": {
+        "package_directory": "target/ota-bootstrap-c14c53f-pi5-v2",
+        "schema": 2,
+        "bundle_sha256": "e02a52e73d3ede0cc84f773b87d7381a2b5c41c1b4a3fe9ff61af98f97677710",
+        "files_verified": 210,
+        "legacy_asset_count": 17,
+        "image_source": {
+          "schema": 1,
+          "commit": "c14c53f53012722e653c303834499906393fe2cb",
+          "dirty": false,
+          "revision": "c14c53f53012"
+        },
+        "image_build_id": "rootfs-6aaf7ad17c4d58851034ab15986b1fcd29f5efb49a8c22ae5ea0cc89cc1ba855",
+        "expanded": {
+          "bytes": 520093696,
+          "sha256": "cc3d206b235b11d3c7e234cd7901140176ff51d5c85738fef6485f1b2af83731"
+        },
+        "compressed": {
+          "bytes": 128350393,
+          "sha256": "5c2baf985365733b5acee66ab0add6a855707efd0f35479a4882760b3e22aca0"
+        },
+        "private_modes_verified": true,
+        "scope": "Workstation artifact with operator planning inputs; no live-device preflight or installation"
+      },
+      "pi4": {
+        "package_directory": "target/ota-bootstrap-c14c53f-pi4-v2",
+        "schema": 2,
+        "bundle_sha256": "527d51b1559f9f2208fb9572bf58b6b61f299a67b6c0fff9933ca0ff7fc890ee",
+        "files_verified": 210,
+        "legacy_asset_count": 17,
+        "image_source": {
+          "schema": 1,
+          "commit": "c14c53f53012722e653c303834499906393fe2cb",
+          "dirty": false,
+          "revision": "c14c53f53012"
+        },
+        "image_build_id": "rootfs-6aaf7ad17c4d58851034ab15986b1fcd29f5efb49a8c22ae5ea0cc89cc1ba855",
+        "expanded": {
+          "bytes": 520093696,
+          "sha256": "cc3d206b235b11d3c7e234cd7901140176ff51d5c85738fef6485f1b2af83731"
+        },
+        "compressed": {
+          "bytes": 128350393,
+          "sha256": "5c2baf985365733b5acee66ab0add6a855707efd0f35479a4882760b3e22aca0"
+        },
+        "private_modes_verified": true,
+        "scope": "Workstation artifact with operator planning inputs; no live-device preflight or installation"
+      }
+    },
+    "identical_rootfs_roundtrip_verified": true
+  },
+  "common_legacy_assets": {
+    "legacy-root/etc/ssh/sshd_config.d/10-spacewars-access.conf": {
+      "bytes": 238,
+      "sha256": "d8b1276b04ff97ac9296b7c869aedf386a8cd6af6e6ff3d5595959f36a20ef9e"
+    },
+    "legacy-root/etc/sudoers.d/spacewars-ota": {
+      "bytes": 237,
+      "sha256": "76d791ab7a88988390249b22749f702f3d7c260e893b285f99e393a80109e36a"
+    },
+    "legacy-root/usr/lib/systemd/system/NetworkManager.service.d/spacewars-persistent-network.conf": {
+      "bytes": 80,
+      "sha256": "34599163e3d657ef2ba6ab13aee6950a177e218c6a3a7bd10b431742365c8028"
+    },
+    "legacy-root/usr/lib/systemd/system/persistent-data-bind.service": {
+      "bytes": 731,
+      "sha256": "6d67bf00d6e6417b6f14e9069fc0507b830f543e2c5050b8f02fae34e84fd810"
+    },
+    "legacy-root/usr/lib/systemd/system/persistent-data-init.service": {
+      "bytes": 254,
+      "sha256": "93e9bb208d7ff373b5f8e98e8a029ce062663fdd00e883d708446a67d6e851a2"
+    },
+    "legacy-root/usr/lib/systemd/system/spacewars-access.service": {
+      "bytes": 932,
+      "sha256": "e617915f9413df0c16045996160eaca0b904cda7c435a200970368dc57aebc80"
+    },
+    "legacy-root/usr/lib/systemd/system/sshd.service.d/spacewars-access.conf": {
+      "bytes": 148,
+      "sha256": "46622cb97aa42b258dc5fa27758d0af32b9dae1f83813582dcd27d47860b49eb"
+    },
+    "legacy-root/usr/lib/systemd/system/sshd@.service.d/spacewars-access.conf": {
+      "bytes": 148,
+      "sha256": "46622cb97aa42b258dc5fa27758d0af32b9dae1f83813582dcd27d47860b49eb"
+    },
+    "legacy-root/usr/lib/tmpfiles.d/spacewars-install.conf": {
+      "bytes": 196,
+      "sha256": "2790b7eda971a4bfec4af36a85de149c29b752f94722d612c832ea146318d8f2"
+    },
+    "legacy-root/usr/libexec/spacewars/fast-update": {
+      "bytes": 5264,
+      "sha256": "161c7a40f879b4c2c8afd64b4c86b422fb2b5d0b8526e9b49b2ce02c0b19b5f0"
+    },
+    "legacy-root/usr/libexec/spacewars/renderer": {
+      "bytes": 3356,
+      "sha256": "205de0c9922522e2b650f258fe8e74dda76485fc957deac13380518c64122954"
+    },
+    "legacy-root/usr/sbin/ab-boot-manager": {
+      "bytes": 3546,
+      "sha256": "a3a4947edae8df0e552dd0ffa0e8c118bf7be0fa3daf6ca8cb4ad6f5e8944a12"
+    },
+    "legacy-root/usr/sbin/ab-update": {
+      "bytes": 185,
+      "sha256": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594"
+    },
+    "legacy-root/usr/sbin/ab-update-with-key": {
+      "bytes": 185,
+      "sha256": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594"
+    },
+    "legacy-root/usr/sbin/persistent-data-init": {
+      "bytes": 633,
+      "sha256": "05c5fa83114629af914f448d97f6009f720b65614d713e2658a1e813b982e2e5"
+    },
+    "legacy-root/usr/sbin/spacewars-fast-update": {
+      "bytes": 64,
+      "sha256": "cf9fdf0ac8e92417665e6e9e39db57962f41b28b61df0e79e3fc2b13db2bf1a4"
+    },
+    "legacy-root/usr/sbin/spacewars-renderer": {
+      "bytes": 68,
+      "sha256": "022bfd940f30a66bd8f310a80cb4b1c2833e254d459e8781181fbbe13a6c89cb"
+    }
+  },
+  "pi5_validation": {
+    "uid": 1000,
+    "fixture_tests_passed": 43,
+    "optional_workstation_tests_ignored": 4,
+    "elapsed_seconds": 60.11,
+    "binary": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f7c7f1697874a6b9",
+    "binary_sha256": "7b32fc4cfe38fb5b23cadef3bf1000a8bdd51dede3ae04332a907be8c3d07f1c",
+    "remote_directory": "/tmp/spacewars-legacy-assets.Sr2xpm",
+    "boot_id_unchanged": "de606400-dc75-446e-b26b-385592b0f562",
+    "scope": "Temporary regular-file ext4 fixtures and private directories; no installed root/boot/data writes"
+  },
+  "legacy_observations": {
+    "pi5_runtime_still_granted": [
+      "ab-update-with-key",
+      "systemctl reboot",
+      "spacewars-fast-update",
+      "spacewars-renderer",
+      "spacewars-logs"
+    ],
+    "pi5_old_network_initializer_still_merges_rootfs_profiles_each_boot": true,
+    "pi5_old_slot_switcher_still_installed": true,
+    "root_ssh": "root@spacewars.local: Permission denied (publickey,password).",
+    "picade_access": "ssh: Could not resolve hostname sw-picade.local: Temporary failure in name resolution",
+    "credential_contents_read": false
+  },
+  "device_mutations": {
+    "temporary_uid_1000_fixture_binary": true,
+    "root_preparation": false,
+    "installed_files": false,
+    "services_stopped": false,
+    "boot_remount": false,
+    "raw_partition_write": false,
+    "watchdog_open": false,
+    "reboot": false
+  },
+  "remaining": [
+    "Authenticated root access on both Pis and fresh physical/layout observations",
+    "Live raw/data recovery copies, independent exports and restore rehearsal",
+    "Durable per-file original contents/absence and restartable fallback-root replacements",
+    "Drain legacy helpers; validate effective sudo, SSH and systemd configuration and both login roles",
+    "Inactive-root apply, staged trial, persistence health, watchdog handoff and canonical migration",
+    "Explicit recovery baseline, hardware failure qualification and end-to-end auto-update integration"
+  ],
+  "logs": {
+    "host": {
+      "path": "target/ota-legacy-assets-host.log",
+      "sha256": "d3f7f631bbe87f1e6630bf3e11383c41e4560c29f475c686a71d18f732110a56",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.24s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.49s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 131 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 23.84s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "real-package": {
+      "path": "target/ota-legacy-assets-real-package.log",
+      "sha256": "48b729bfc88c6007c3795f3ee7d35aa43ea1c0c56a1131388170000369db2f63",
+      "test_results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 136 filtered out; finished in 3.33s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy-final": {
+      "path": "target/ota-legacy-assets-clippy-final.log",
+      "sha256": "d2a9a017ab3c88704ee0257783c8db525cbfde4af8848b015012e1e137562558"
+    },
+    "msrv-final": {
+      "path": "target/ota-legacy-assets-msrv-final.log",
+      "sha256": "2330fdc399a133578c85e8ee58f40722cc2bc681017eb3fd209ef9587a583c66"
+    },
+    "aarch64": {
+      "path": "target/ota-legacy-assets-aarch64.log",
+      "sha256": "31b2091f072b3aabaf73d52a7cca5056fb04c88992832c07db3079da67cdb9ee"
+    },
+    "pi5-tests": {
+      "path": "target/ota-legacy-assets-pi5-tests.log",
+      "sha256": "c525e939e3e6a96d6d304e854ad6b9fa784dd83206531f545b6d6d43949357ce",
+      "test_results": [
+        "test result: ok. 43 passed; 0 failed; 4 ignored; 0 measured; 90 filtered out; finished in 60.11s"
+      ]
+    },
+    "pi5-observation": {
+      "path": "target/ota-legacy-assets-pi5-observation.log",
+      "sha256": "e21fcbc3992665e7173d942e4e493b2b55e7aefb2071622621094eae4f579bf2"
+    },
+    "pi5-package": {
+      "path": "target/ota-legacy-assets-pi5-package.log",
+      "sha256": "9a79525452152caebad134a8f4edcdc7dbfe5928fcd95fd1161ed9d37d8dedd6"
+    },
+    "pi4-package": {
+      "path": "target/ota-legacy-assets-pi4-package.log",
+      "sha256": "d12448b78fd6342231e85308534e00f90d69e72c5640881bd456c317d6c26dc6"
+    },
+    "pi5-checksums": {
+      "path": "target/ota-legacy-assets-pi5-checksums.log",
+      "sha256": "700375b6abcfeacb7aa1d911754b3c9492c7d8988c300e78ac71c5ddcf765590"
+    },
+    "pi4-checksums": {
+      "path": "target/ota-legacy-assets-pi4-checksums.log",
+      "sha256": "81a8eb160f2a1075bee742c14ca2d92b6669720fddcd870b01fb2bfd17b47d6d"
+    },
+    "root-access": {
+      "path": "target/ota-legacy-assets-root-access.log",
+      "sha256": "41655827d03b11187394d73ca9d3d587af5a1334bec70b6121210ea86c0cdc05"
+    },
+    "picade-access": {
+      "path": "target/ota-legacy-assets-picade-access.log",
+      "sha256": "7b449f722bf2e78290a1cdd56239b205dbddad1bdced0484cccef30b1e5dd4c9"
+    },
+    "ota-legacy-closure-pi5-helpers": {
+      "path": "target/ota-legacy-closure-pi5-helpers.log",
+      "sha256": "55dd17e75bfaaaa2f7110d8b4be85ba3e2c13a8efb68fa9e04763dcbb835ce27"
+    },
+    "ota-legacy-closure-pi5-access": {
+      "path": "target/ota-legacy-closure-pi5-access.log",
+      "sha256": "5777a38ed96a686433ce0cb20d39a56e87b9836fae4299d9533368cdb484c32f"
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "cargo test --locked -p engine-ota -p engine-os-manager --target aarch64-unknown-linux-gnu --no-run",
+    "SPACEWARS_BOOTSTRAP_TEST_PACKAGE=/absolute/path/to/pi5-package cargo test --locked -p engine-ota bootstrap::device::tests::real_private_package_is_checked_without_device_writes -- --ignored --nocapture --test-threads=1",
+    "On Pi 5 as UID 1000: test binary bootstrap --test-threads=1"
+  ]
+}

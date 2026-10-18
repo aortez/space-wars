@@ -11,10 +11,19 @@ SRC_URI = " \
     file://70-spacewars-picade.rules \
     file://spacewars-hardware.sh \
     file://spacewars-hardware.service \
+    file://spacewars-profile.dts.in \
 "
+DEPENDS += "dtc-native"
 RDEPENDS:${PN} = "coreutils grep sed"
 SYSTEMD_SERVICE:${PN} = "spacewars-hardware.service"
 SYSTEMD_AUTO_ENABLE = "enable"
+
+do_compile() {
+    for profile in hdmi hyperpixel picade; do
+        sed "s/@PROFILE@/$profile/g" ${WORKDIR}/spacewars-profile.dts.in > ${B}/spacewars-profile-$profile.dts
+        dtc -@ -I dts -O dtb -o ${B}/spacewars-profile-$profile.dtbo ${B}/spacewars-profile-$profile.dts
+    done
+}
 
 do_install() {
     install -d ${D}${bindir} ${D}${systemd_system_unitdir} ${D}${nonarch_base_libdir}/udev/rules.d
@@ -28,6 +37,7 @@ do_deploy() {
     install -m 0644 ${WORKDIR}/spacewars-device.txt ${DEPLOYDIR}/
     for profile in hdmi hyperpixel picade; do
         install -m 0644 ${WORKDIR}/$profile.txt ${DEPLOYDIR}/spacewars-profiles/
+        install -m 0644 ${B}/spacewars-profile-$profile.dtbo ${DEPLOYDIR}/
     done
 }
 addtask deploy after do_install before do_build

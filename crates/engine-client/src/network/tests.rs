@@ -41,6 +41,7 @@ struct Fake {
     ready_calls: AtomicUsize,
     events: async_channel::Sender<&'static str>,
     scan_release: Option<async_channel::Receiver<()>>,
+    rollback_release: Option<async_channel::Receiver<()>>,
     fail_inventory: AtomicBool,
 }
 
@@ -132,6 +133,10 @@ impl Backend for Fake {
     async fn rollback(&self, trial: &Trial) -> Result<(), String> {
         assert_eq!(trial.checkpoint, "/checkpoint");
         self.call("rollback");
+        if let Some(release) = &self.rollback_release {
+            release.recv().await.unwrap();
+            self.call("rollback-done");
+        }
         if matches!(self.failure, Failure::Rollback) {
             Err("Daemon unavailable.".into())
         } else {
@@ -192,6 +197,7 @@ fn exercise_target(
             ready_calls: AtomicUsize::new(0),
             events,
             scan_release: None,
+            rollback_release: None,
             fail_inventory: AtomicBool::new(false),
         };
         tx.send(if saved {
@@ -276,6 +282,179 @@ fn keep_is_explicit_and_happens_only_after_activation() {
     assert!(view.status.starts_with("Connection kept"));
 }
 
+struct FakeProtection<'a> {
+    backend: &'a Fake,
+    started: std::time::Instant,
+    deny: bool,
+    fail_renew: AtomicBool,
+}
+
+impl worker::Protection for FakeProtection<'_> {
+    fn now(&self) -> Result<Duration, ()> {
+        Ok(self.started.elapsed())
+    }
+    async fn admit(&self) -> Result<(), ()> {
+        self.backend.call("admit");
+        if self.deny { Err(()) } else { Ok(()) }
+    }
+    async fn renew(&self) -> Result<(), ()> {
+        self.backend.call("renew");
+        if self.fail_renew.load(Ordering::Relaxed) {
+            Err(())
+        } else {
+            Ok(())
+        }
+    }
+    async fn release(&self) -> Result<(), ()> {
+        self.backend.call("release");
+        Ok(())
+    }
+}
+
+#[test]
+fn protected_setup_denial_prevents_automatic_scan_and_connection_work() {
+    async_io::block_on(async {
+        let (commands, receiver) = async_channel::bounded(2);
+        let shared = Arc::new(Mutex::new(View::default()));
+        let (events, _received) = async_channel::unbounded();
+        let fake = Fake {
+            inventory: Mutex::new(Inventory {
+                can_connect: true,
+                can_scan: true,
+                devices: vec!["/wifi".into()],
+                networks: vec![network()],
+                ..Inventory::default()
+            }),
+            calls: Mutex::new(vec![]),
+            failure: Failure::None,
+            ready_calls: AtomicUsize::new(0),
+            events,
+            scan_release: None,
+            rollback_release: None,
+            fail_inventory: AtomicBool::new(false),
+        };
+        let protection = FakeProtection {
+            backend: &fake,
+            started: std::time::Instant::now(),
+            deny: true,
+            fail_renew: AtomicBool::new(false),
+        };
+        commands
+            .send(Command::Connect {
+                id: network().id,
+                password: Some("secret123".into()),
+            })
+            .await
+            .unwrap();
+        worker::protected_with_timing(
+            &fake,
+            &protection,
+            receiver,
+            shared.clone(),
+            Duration::from_millis(10),
+            Duration::from_secs(1),
+            Duration::from_secs(1),
+        )
+        .await;
+        assert_eq!(*fake.calls.lock().unwrap(), ["admit", "release"]);
+        assert!(commands.is_closed());
+        assert!(!shared.lock().unwrap().inventory.can_connect);
+    });
+}
+
+#[test]
+fn protected_setup_holds_through_panel_close_and_rollback_and_renews_during_cleanup() {
+    protected_cleanup(false);
+}
+
+#[test]
+fn protected_setup_renewal_failure_cancels_the_trial_before_releasing() {
+    protected_cleanup(true);
+}
+
+fn protected_cleanup(fail_renew: bool) {
+    async_io::block_on(async {
+        let (commands, receiver) = async_channel::bounded(2);
+        let shared = Arc::new(Mutex::new(View::default()));
+        let (events, received) = async_channel::unbounded();
+        let (cleanup, rollback_release) = async_channel::bounded(1);
+        let fake = Fake {
+            inventory: Mutex::new(Inventory {
+                can_connect: true,
+                can_scan: true,
+                devices: vec!["/wifi".into()],
+                networks: vec![network()],
+                ..Inventory::default()
+            }),
+            calls: Mutex::new(vec![]),
+            failure: Failure::Hang,
+            ready_calls: AtomicUsize::new(0),
+            events,
+            scan_release: None,
+            rollback_release: Some(rollback_release),
+            fail_inventory: AtomicBool::new(false),
+        };
+        let protection = FakeProtection {
+            backend: &fake,
+            started: std::time::Instant::now(),
+            deny: false,
+            fail_renew: AtomicBool::new(false),
+        };
+        commands
+            .send(Command::Connect {
+                id: network().id,
+                password: Some("secret123".into()),
+            })
+            .await
+            .unwrap();
+        let run = worker::protected_with_timing(
+            &fake,
+            &protection,
+            receiver,
+            shared.clone(),
+            Duration::from_millis(20),
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+        );
+        let driver = async {
+            while received.recv().await.unwrap() != "activate" {}
+            if fail_renew {
+                protection.fail_renew.store(true, Ordering::Relaxed);
+            } else {
+                commands.close();
+            }
+            while received.recv().await.unwrap() != "rollback" {}
+            if !fail_renew {
+                while received.recv().await.unwrap() != "renew" {}
+            }
+            assert!(!fake.calls.lock().unwrap().contains(&"release"));
+            cleanup.send(()).await.unwrap();
+        };
+        worker::bounded(Duration::from_secs(3), async {
+            futures_lite::future::zip(run, driver).await;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        let calls = fake.calls.lock().unwrap();
+        assert_eq!(calls.first(), Some(&"admit"));
+        assert_eq!(calls.last(), Some(&"release"));
+        assert!(calls.contains(&"scan"));
+        assert!(calls.contains(&"rollback-done"));
+        assert!(!calls.contains(&"keep"));
+        if fail_renew {
+            assert!(commands.is_closed());
+            assert!(
+                shared
+                    .lock()
+                    .unwrap()
+                    .status
+                    .contains("lost connection protection")
+            );
+        }
+    });
+}
+
 #[test]
 fn cancellation_close_timeouts_and_save_failure_all_restore() {
     for (failure, finish) in [
@@ -323,6 +502,7 @@ fn opening_scans_once_keeps_cached_results_and_rescan_is_rate_limited() {
             ready_calls: AtomicUsize::new(0),
             events,
             scan_release: Some(scan_release),
+            rollback_release: None,
             fail_inventory: AtomicBool::new(false),
         };
         let (mut session, latest, receiver) = Session::simulated(View::default());
@@ -494,6 +674,7 @@ fn profile_worker_revalidates_stale_views_and_refreshes_successes_and_failures()
                 ready_calls: AtomicUsize::new(0),
                 events,
                 scan_release: None,
+                rollback_release: None,
                 fail_inventory: AtomicBool::new(false),
             };
             let (mut session, latest, receiver) = Session::simulated(View {

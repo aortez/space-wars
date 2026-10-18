@@ -1155,14 +1155,27 @@ the flap resumes from its held pose at the ordinary rate, without catching up to
 an expired deadline. An empty exit stays open until the visit ends. Ordinary
 jumps inherit the supporting point's current physical velocity. The flaps have
 no spring response or extra jump bonus; [#474](https://github.com/aortez/space-wars/issues/474)
-records that future experiment. The attachment seam is qualified with fixtures;
-the player ledge-grab controller follows in [#281](https://github.com/aortez/space-wars/issues/281).
+records that future experiment. Shared ledge mechanics support
+[player controls](clock-duck-player-ledges-validation.md) and an
+[occasional automatic pull-up detour](clock-duck-flap-detour-validation.md).
 
 The public duck diagnostics include `flaps` in entrance/exit order, reporting
 requested/actual opening, hinge, angle, body ID, motion and any standing,
 attachment or obstruction hold. Older payloads may omit this additive field.
 [Rigid-flap validation and target-size captures](clock-duck-flaps-validation.md)
 cover standing, jumping, delayed closure, shared ownership and cleanup.
+
+`SPACEWARS_CLOCK_DUCK_FLAP_DETOUR=direct-landing` selects the separate
+[direct-landing experiment](clock-duck-direct-flap-validation.md) on those
+occasional visits. It uses ordinary jumps to reach the narrow upper edge of a
+nearly closed flap, perches briefly, then returns to the course. Default visits
+retain the pull-up route; the experiment does not change saved settings.
+
+An open exit becomes the automatic duck's destination, even behind it. A
+committed jump or climb finishes first; a grounded duck within one body length
+of tagging the opposite wall gets at most 0.75 seconds to finish that tag before
+turning. Normal acceleration, recovery and visit deadlines still apply. See
+[exit-priority validation and captures](clock-duck-exit-validation.md).
 
 This close-up uses the production renderer at half speed, with the camera moved
 to the entrance of the 800×480 layout:
@@ -1653,6 +1666,16 @@ segment poses and resource counts. Water/material accounting, passive-duck
 suppression and zero-body/zero-collider/closed-floor cleanup are also checked.
 Every case is bounded to 3,600 ticks, including event cleanup after duck departure.
 
+Dry controls still require zero collision-recovery ticks. Rain-cleared controls
+must exit from the last bank with dry, grounded footing and recovery finished.
+They need not have zero recovery: altered arrival timing can bring a duck into
+contact with the opening physical exit flap. The focused seed-1 Flowing/Light
+fixture covers this at all three layouts, observes the actual panel contact,
+requires one lost-support recovery within one second without an escape jump,
+and retains tick-by-tick replay and complete cleanup. The recorded contact is at
+tick 1250, recovery runs at 1253–1290, and the duck exits at 1333. No collision
+response, movement tuning or visit deadline was changed for this regression.
+
 Run the small suite or explicitly opt into the sweep:
 
 ```sh
@@ -1673,7 +1696,8 @@ normal, surface velocity, separation), course support, behavior, jump target and
 recovery state. Sampling is post-physics; the behavior/plan is the command decision
 that preceded that step. Coordinates are entrance-relative X and world Y; the
 artifact includes the static course spans/heights and body radius. Course entity
-IDs start at 1000, Falling digit bodies at 3000, Meltdown blocks at 4000.
+IDs start at 1000, entrance/exit flaps are 2100/2101, Falling digit bodies at 3000,
+and Meltdown blocks at 4000.
 The trace has **no production runtime or logging cost**. Files are written once
 per case instead of repeatedly serializing the full sweep's contact histories.
 
@@ -2561,8 +2585,11 @@ The mixed-default live UI workflow also passed under Xvfb using the debug client
 
 Fixed single-platform, stepped and gap fixtures run at all seven aspect ratios.
 Every confirmed landing must match the planned collider's actual physical
-support. Every course must tag both walls, complete at least three traversals
-of its surface links, exit and release all bodies. Separate fault injection
+support. Every course must complete its initial traversal and tag the far wall,
+exit and release all bodies. Once the exit opens, the duck may leave before
+finishing its return crossing; a second wall tag or three complete traversals
+are no longer required. The aspect-4, seed-79 regression exercises that early
+departure with one completed crossing. Separate fault injection
 verifies short, long and wrong-surface classifications, refusal of impossible
 plans, bounded retries and timeout cleanup. Forced generator exhaustion checks
 the fallback course at every aspect ratio; pause, resize, replacement and
@@ -2584,7 +2611,7 @@ confirmed target contact, and every jump must begin grounded.
 
 The normal pattern matrix covers four seeds × four patterns × seven aspects ×
 two profiles (224 runs). Its extended sweep covers seeds 4–31. Both enforce
-zero missed landings/falls/timeouts, both wall tags, at least three traversals
+zero missed landings/falls/timeouts, the initial far-wall tag and traversal
 (counting skipped links), bounded bodies and complete cleanup. Rendering tests
 cover all four patterns with both personalities at four resolutions.
 

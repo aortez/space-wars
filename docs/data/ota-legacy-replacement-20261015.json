@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T01:34:16.860951+00:00",
+  "implementation_commit": "643930bafa2065331008a926471ad9e8d6009003",
+  "scope": "Restartable fixed-file replacement and runtime-quiescence guards for supervised fallback-root migration. Installed Pi roots remain unchanged; this is not physical power-loss or effective privilege/access qualification.",
+  "host_validation": {
+    "ota_tests_passed": 181,
+    "manager_tests_passed": 38,
+    "ordinary_suite_ignored": 7,
+    "tmpfs_full_interruption_sweep": "passed at every reported directory/file checkpoint",
+    "ext4_final_selected_tests_passed": 22,
+    "ext4_final_scope": "All original-file and replacement tests except the exhaustive checkpoint sweep; includes actual process exits after link and exchange, preserved originals, conflicts, concurrency and replay.",
+    "ext4_exploratory_full_sweep": {
+      "passed": 22,
+      "ignored": 1,
+      "elapsed_seconds": 389.68,
+      "scope": "Earlier development binary, before the final explicit original-file fsync and concurrency test; not counted as validation of the final commit.",
+      "log": {
+        "path": "target/ota-legacy-replace-ext4.log",
+        "sha256": "ce91378b55be15d78561bf0b09a77664a5e5aaeb9c64d05461689603497d89d0"
+      }
+    },
+    "optional_same_filesystem_bind_test_passed": 1,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "aarch64_tests_and_operator_example": "built",
+    "final_host_test_binary": {
+      "path": "target/debug/deps/engine_ota-6f09450237c0bb77",
+      "sha256": "6e99e9bbee926436f28c6652ddc0ecfafbe791a82c0bdc21c6a65ecaaf252692"
+    },
+    "fault_scope": "Injected callback errors at every reported checkpoint and child _exit(86) after link/exchange with no destructors; not hardware power loss."
+  },
+  "pi5_validation": {
+    "uid": 1000,
+    "fixture_tests_passed": 27,
+    "optional_namespace_tests_ignored": 1,
+    "elapsed_seconds": 79.9,
+    "remote_directory": "/tmp/spacewars-legacy-replace.HOBWJP",
+    "test_binary": {
+      "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-bfa87321f5ceb7b8",
+      "sha256": "6cf2bed71ce99149844fd2b9c3dd8eb369d6b122458d986fc5daa52de16dcc9b"
+    },
+    "command_binary": {
+      "path": "target/aarch64-unknown-linux-gnu/debug/examples/bootstrap_replace_legacy",
+      "sha256": "fb0019d7d8b2ba954852808e9c8a3a870672c1b073317c9adbe276d50333dc75"
+    },
+    "remote_hashes_match": true,
+    "replacement_rejected_without_root": true,
+    "boot_id_unchanged": "de606400-dc75-446e-b26b-385592b0f562",
+    "scope": "Temporary regular-file fixtures under /tmp plus the actual command entry-point refusal. The production root-only process guard and installed-root replacement were not executed.",
+    "lock_directory_observation": "/run/lock is root-owned 01777; existing legacy fast-update lock is root-owned 0600.",
+    "capacity_after": [
+      "Filesystem      Size  Used Avail Use% Mounted on",
+      "tmpfs           3.9G  1.2G  2.8G  31% /tmp",
+      "/dev/sda4        94G  1.2G   88G   2% /data"
+    ]
+  },
+  "device_mutations": {
+    "temporary_uid_1000_fixture_binaries": true,
+    "installed_legacy_files": false,
+    "root_preparation": false,
+    "live_original_file_capture": false,
+    "service_or_radio_changes": false,
+    "boot_remount": false,
+    "raw_partition_write": false,
+    "watchdog_open": false,
+    "reboot": false,
+    "credential_contents_read": false
+  },
+  "artifact_scope": {
+    "new_runtime_image_built": false,
+    "latest_validated_runtime_image_source": "c14c53f53012722e653c303834499906393fe2cb",
+    "schema_2_packages_unchanged": [
+      "target/ota-bootstrap-c14c53f-pi5-v2",
+      "target/ota-bootstrap-c14c53f-pi4-v2"
+    ],
+    "replacement_command_is_a_separately_built_operator_example": true
+  },
+  "remaining": [
+    "Root connections and supervised live backup/original capture with independent exports and restore rehearsal",
+    "Effective runtime sudo/SSH/service checks and independently verified root/runtime logins after replacement",
+    "Inactive-root write, staged trial, local persistent-store health and watchdog handoff",
+    "Confirmed normal and canonical boot migration, explicit recovery baseline",
+    "Physical Pi 4/5 failure qualification and end-to-end feed/updater/policy/UI integration"
+  ],
+  "logs": {
+    "host-final": {
+      "path": "target/ota-legacy-replace-host-final.log",
+      "sha256": "ab608ababb5174e21c2db30716db8e4f7a739c9f2fceb498511f9e7cec8232be",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.06s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.28s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 159 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 21.67s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "ext4-final": {
+      "path": "target/ota-legacy-replace-ext4-final.log",
+      "sha256": "1fa6afafbb0db387c57103bee695a686431d0e724ad1cc4bd7882a9cfbe9f3b3",
+      "test_results": [
+        "test result: ok. 22 passed; 0 failed; 1 ignored; 0 measured; 143 filtered out; finished in 8.52s"
+      ]
+    },
+    "bind": {
+      "path": "target/ota-legacy-replace-bind.log",
+      "sha256": "9dd6ee98a90a9ee4cbd0c1c1305b40235d25a1d3ff0e2488e238304ba3a8e0fb",
+      "test_results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 165 filtered out; finished in 0.01s"
+      ]
+    },
+    "clippy-final": {
+      "path": "target/ota-legacy-replace-clippy-final.log",
+      "sha256": "f2704e1538e30c0b0b8f675b3c920f187cca183575300fea3c56a36dfd866183"
+    },
+    "msrv-final": {
+      "path": "target/ota-legacy-replace-msrv-final.log",
+      "sha256": "032216f011156027cd678ff5963c5d73bb1c7e1afa305f687cc6ef829ef10635"
+    },
+    "aarch64": {
+      "path": "target/ota-legacy-replace-aarch64.log",
+      "sha256": "cfb4cadab9092ebe95a7def9a4ceb855921debe8c67d5501b25f52419dd8f791"
+    },
+    "aarch64-artifacts": {
+      "path": "target/ota-legacy-replace-aarch64-artifacts.jsonl",
+      "sha256": "fc1eb49ec34d94c8d6cb51e7870dd76c2de32a2d39c6d35f3235cd8e4d37bd9f"
+    },
+    "pi5-tests": {
+      "path": "target/ota-legacy-replace-pi5-tests.log",
+      "sha256": "82e2fd0eb70cd3643039920da5ddc394344d22c2a4e4101cfe3dac00f844f3e9",
+      "test_results": [
+        "test result: ok. 27 passed; 0 failed; 1 ignored; 0 measured; 138 filtered out; finished in 79.90s"
+      ]
+    },
+    "pi5-denial": {
+      "path": "target/ota-legacy-replace-pi5-denial.log",
+      "sha256": "a2fe1c8b5f69df030c1d6dd5858052d8d438e27556269cf87252ee0fcbd79517"
+    },
+    "pi5-hashes": {
+      "path": "target/ota-legacy-replace-pi5-hashes.log",
+      "sha256": "7a696a9ba8fa40017dcafbb41459cb1434c92357a67ac159b5b1d17425a9b627"
+    },
+    "pi5-observation": {
+      "path": "target/ota-legacy-replace-pi5-observation.log",
+      "sha256": "e6ed4a8f1cf82b48f6bbee530b1ff7eac5bb32d1c2c116c2b5c67d7f17986871"
+    },
+    "pi5-after": {
+      "path": "target/ota-legacy-replace-pi5-after.log",
+      "sha256": "a2fab8ff80d5506cb03aa280a0e8e41177485b4195af452666bf68faf1bb3137"
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "cargo build --locked -p engine-ota --tests --example bootstrap_replace_legacy --target aarch64-unknown-linux-gnu --message-format=json",
+    "Select the exact test executable from Cargo output; with TMPDIR on ext4 run bootstrap::legacy_ --skip every_directory_and_file_boundary --nocapture",
+    "On Pi 5 as UID 1000: test binary bootstrap::legacy_ bootstrap::quiesce --nocapture"
+  ]
+}

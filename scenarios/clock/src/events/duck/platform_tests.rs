@@ -217,14 +217,18 @@ fn run_stats(mut event: DuckEvent, label: &str) -> RunStats {
     let final_state = event.diagnostics();
     let navigation = final_state.navigation.unwrap();
     assert!(
-        navigation.wall_tags.iter().all(|count| *count > 0),
-        "{label}: {final_state:?}"
+        navigation.wall_tags[usize::from(event.direction > 0.0)] > 0,
+        "{label}: must complete the initial crossing: {final_state:?}"
     );
     assert_eq!(event.physics_counts(), (0, 0));
     let planning = navigation.planning.unwrap();
+    // Once the exit opens, departure can interrupt the return crossing. A
+    // complete initial traversal remains required; two wall tags and three
+    // crossings are no longer the visit's contract.
     assert!(
         landings + planning.skipped_platforms
-            >= (event.course.as_ref().unwrap().surfaces.len() - 1) as u32 * 3
+            >= (event.course.as_ref().unwrap().surfaces.len() - 1) as u32,
+        "{label}: {final_state:?}"
     );
     stats.landings = landings;
     stats.exit_tick = exit_tick.expect("must exit");
@@ -414,6 +418,16 @@ fn fixed_platform_step_and_gap_courses_land_in_both_directions() {
 #[test]
 fn generated_platform_courses_have_confirmed_landings_and_bounded_exits() {
     generated_matrix(0..32);
+}
+
+#[test]
+fn wide_course_can_depart_without_completing_a_return_crossing() {
+    let event = DuckEvent::new_platforms(Layout::new(4.0), 79);
+    let crossing_landings = event.course.as_ref().unwrap().surfaces.len() as u32 - 1;
+    let stats = run_stats(event, "wide departure after the first crossing");
+    assert_eq!(stats.landings, crossing_landings);
+    assert!(stats.first_crossing < OPENING_TICKS + EXIT_DELAY_TICKS);
+    assert!(stats.exit_tick < DUCK_TICKS - RESET_TICKS);
 }
 
 #[test]

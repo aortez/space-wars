@@ -1152,6 +1152,9 @@ pub enum ClockDuckFlapDetourOutcome {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockDuckFlapDetourState {
+    /// Development-only route selection; ordinary visits retain pull-ups.
+    #[serde(default)]
+    pub direct_landing: bool,
     pub phase: ClockDuckFlapDetourPhase,
     pub attempts: u32,
     pub ticks: u32,

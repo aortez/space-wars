@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-16T22:46:14.415264+00:00",
+  "source_commit": "7dda62a202dece92410f5daddf5f1a4959e04ba1",
+  "branch": "feat/ota-updates-254",
+  "issues": [
+    "https://github.com/aortez/space-wars/issues/259",
+    "https://github.com/aortez/space-wars/issues/258"
+  ],
+  "scope": "Persistent boot/daily time schedule, single bounded fixed-provider request and in-place TimeCheck Wi-Fi fallback; runtime/API and OTA handoff integration remain",
+  "source_files": {
+    "crates/engine-os-manager/src/lib.rs": "5dc0e4f099f015e3109ca4625241fdeb5855701f75aaf119c9d986787f6b98f1",
+    "crates/engine-os-manager/src/linux.rs": "800d5c77cf7a2427d34fc11c1bf9246d50dbd69fec5767aabe8c771b988a62b4",
+    "crates/engine-os-manager/src/network_controller.rs": "73e89321a832c8c906c9625e0164f04b20b296f9ae270bed0102d726db140dd5",
+    "crates/engine-os-manager/src/network_controller_tests.rs": "2690518392830b4c25f0ff6caf7bebdfe5dabc69b41e3770ba7f87de77ac022a",
+    "crates/engine-os-manager/src/network_policy.rs": "7929944795dc0657d1c0eb7204cd98ab49c6fc2bd0954469fd7aa67fdf706c36",
+    "crates/engine-os-manager/src/network_policy_tests.rs": "80400d2e6fcf4c89e49534cff72fa1d9df6a2da147ae4bd2893131a5615a37ca",
+    "crates/engine-os-manager/src/network_service.rs": "067d4aa5f74abe1ae7571956e2d544853781dcfbdfa704c5ca428b99b62ed585",
+    "crates/engine-os-manager/src/network_service_tests.rs": "07c41a9b6620e81d2b965f5a87152110929888856b61cbdef415e5298a19525a",
+    "crates/engine-os-manager/src/time_query.rs": "6f4c8dce4d4d5d3ab98fba6dd8ab36c589a5486d1d349f3bc26a09b5ed952195",
+    "crates/engine-os-manager/src/time_query_tests.rs": "67349c854b597025b97d4497520d9f04998adde4aee51398f8247504c1d5ba62",
+    "crates/engine-os-manager/src/time_schedule.rs": "bcc74dbdd3d583aa2dde74283e5e9e1c9b4380cdc5d71fce6774c2e4423a7812",
+    "crates/engine-os-manager/src/time_schedule_store.rs": "83320bdb36f98f92df4e66dc67cc570107659067c2a14a4e5d737c693e7288b1",
+    "crates/engine-os-manager/src/time_schedule_tests.rs": "c3ad67a2431c0b86849a7cf26648efbc05098a18f7c9cafbdfa71f769dd5901f",
+    "docs/ota-updates.md": "83f50458f9cef65887847b12383785bf2acbde74b4d0667ecc8312f7c6ba9a12"
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked -p engine-os-manager -- --test-threads=1",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-time-schedule-full.log",
+      "sha256": "275234cfdc32360dc386e558e99d58ee559cce7644d33748b08c2a9f791accc5",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.35s",
+        "test result: ok. 104 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 29.75s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.68s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "command": "cargo clippy --locked -p engine-os-manager --all-targets --no-deps -- -D warnings",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-time-schedule-clippy-final.log",
+      "sha256": "01cbd91ed9f4ed996c98e2ac2fe7899391a5693da80ec717847db22e6d7a959c",
+      "results": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.87s"
+      ]
+    },
+    {
+      "command": "cargo +1.89.0 check --locked -p engine-os-manager --all-targets",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-time-schedule-msrv.log",
+      "sha256": "af6dd82a34926accc989c08c91c6994c6dcab388b92f9b3687e6d963ce01fde1",
+      "results": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.27s"
+      ]
+    },
+    {
+      "command": "cargo test --locked -p engine-os-manager --lib --target aarch64-unknown-linux-gnu --no-run --message-format=json",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-time-schedule-arm.log",
+      "sha256": "f4f918177354059d5c70d765cdd22389ac38bd53dc1734a4fe82f4e631464e71",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.45s"
+      ]
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-time-schedule-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "results": []
+    }
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "fixture_directory": "/data/spacewars/ota-time-schedule-fixtures.pZmGNS",
+      "data_free_bytes_before": 94292889600,
+      "artifact": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-time-schedule-arm-tests",
+        "sha256": "5ac4039140c838d9ec009f59d027d020e8f25ae150bd864a2238802698a09359",
+        "bytes": 9904088
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 77 filtered out; finished in 1.80s",
+      "network": "Private D-Bus fixtures and fake radio/clock observations only, plus workstation SSH for the test run",
+      "production_schedule_opened": false,
+      "system_provider_restarted": false,
+      "radio_mutations": false,
+      "installed_service_changes": false,
+      "root_partition_writes": false,
+      "reboots": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "fixture_directory": "/data/spacewars/ota-time-schedule-fixtures.3a4Wah",
+      "data_free_bytes_before": 44341239808,
+      "artifact": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-time-schedule-arm-tests",
+        "sha256": "5ac4039140c838d9ec009f59d027d020e8f25ae150bd864a2238802698a09359",
+        "bytes": 9904088
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 77 filtered out; finished in 2.80s",
+      "network": "Private D-Bus fixtures and fake radio/clock observations only, plus workstation SSH for the test run",
+      "production_schedule_opened": false,
+      "system_provider_restarted": false,
+      "radio_mutations": false,
+      "installed_service_changes": false,
+      "root_partition_writes": false,
+      "reboots": false
+    }
+  ],
+  "device_test_filters": [
+    "time_schedule::tests::",
+    "time_query::tests::",
+    "wireless_fallback",
+    "time_check_can_fall_back",
+    "time_fallback_honors"
+  ],
+  "coverage": [
+    "Default Off and unchanged/read-only observations perform no schedule writes or work",
+    "Boot/enable/recent accepted time/daily boundary and actual success timestamp",
+    "Same-boot restart preserves deadlines, backoff and consumed provider allowance",
+    "Manual coalescing, 30-second admission and original two-minute attempt window",
+    "Ethernet 15-second fallback keeps the existing hold, expiry and query allowance",
+    "Exact 15-minute, one-hour and six-hour failure backoff; external accepted success resets it",
+    "Mode Off cancels automatic work, preserves explicit manual work and rejects stale callbacks",
+    "New boot invalidates prior attempts; suspend collapses overdue work without retry replay",
+    "Atomic persistence cuts, missing/corrupt/replaced/public state and exclusive ownership",
+    "Accepted evidence only; unconfirmed wall changes, old providers and regressed generations do not complete a check",
+    "Private D-Bus fixtures verify exact TryRestartUnit interface, fixed unit and fail mode",
+    "Missing/inactive/disabled/masked provider and wrong manager credentials dispatch nothing",
+    "Provider change after durable claim, rejected reply and stalled call cannot replenish query allowance",
+    "Network socket fallback validates ownership, expiry, kind, hardware/conflicts and Mode Off"
+  ],
+  "provider_contract": "https://raw.githubusercontent.com/systemd/systemd/v255/man/org.freedesktop.systemd1.xml",
+  "fixture_scope": {
+    "durable_state": "Private temporary directories owned by the invoking user; /data/spacewars on Pis",
+    "provider": "Private dbus-daemon and mock systemd/timesyncd services; no system bus mutations",
+    "network": "Fake NetworkManager observations/writes; no host or Pi radio changes",
+    "time": "Injected boot-clock observations; no system-clock or RTC changes"
+  },
+  "remaining": [
+    "Drive the scheduler and query adapter from a dedicated production worker with fresh policy/time/hold observations",
+    "Provision the fixed private schedule state directory",
+    "Expose authenticated Sync now and read-only check status independently of the UI",
+    "Acquire, retain, escalate and release only the time-check connection hold across all worker endings",
+    "Register the OTA hold before the time check releases connectivity",
+    "Separate OTA daily due/attempt state from NTP retry history and integrate DownloadSession",
+    "Production signing/feed, verified installer and Ask/Automatic installation policy",
+    "Supervised bootstrap, installed provider/RTC and Wi-Fi qualification, physical recovery and frame-time qualification"
+  ],
+  "installed_service_changes": false,
+  "system_provider_restarted": false,
+  "radio_mutations": false,
+  "live_installation_performed": false,
+  "auto_update_enabled": false,
+  "pushed": false
+}

@@ -464,6 +464,16 @@ impl SoilHabitat {
         if x < 0 || x >= self.terrain.width() as i32 {
             return None;
         }
+        // A floor transform alone is not a material attachment. Once a falling
+        // column is exported, its shoots must lose support through the same
+        // bounded retirement path as roots, even if the floor has closed.
+        if !(0..SOIL_DEPTH_CELLS).any(|y| {
+            self.terrain
+                .cell(CellCoord::new(x, y as i32))
+                .is_some_and(|c| c.material == CLOCK_DIRT)
+        }) {
+            return None;
+        }
         if let Some((surface, _)) = self.falling.get(&x) {
             return Some(*surface);
         }
@@ -560,7 +570,9 @@ impl SoilHabitat {
                 spec.shape = ColliderShape::Compound {
                     children: children.to_vec(),
                 };
-                spec.friction = 0.9;
+                // Clock actors supply their own bounded traction, as on the
+                // course floor. Solver friction must not cancel that drive.
+                spec.friction = 0.0;
                 spec
             })
             .collect();

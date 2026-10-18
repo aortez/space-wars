@@ -1,0 +1,212 @@
+{
+  "date": "2026-10-15",
+  "scope": "Verified inactive-root writer library, real ext4 file-backed fault fixtures, unprivileged Pi 5 execution and full development artifact format/readback check. No real block-device writes or physical boot changes.",
+  "source_base": "21550b41be21f0e7b9fb7e9d071b601c4c27ef43",
+  "source_files_sha256": {
+    ".github/workflows/ci.yml": "dd9db9ecff97a7036d297d3aee01af0ec61f3185a1ff92d1f6c3e6408fb727a3",
+    "Cargo.lock": "0017a90c5d1cf0af85ec47de32d00c746f5b335b3a91302c91b4ccdf204044bd",
+    "crates/engine-ota/Cargo.toml": "97080f2e610b42748352f58fc99321954ebc2eface35b3d233affb12e9864521",
+    "crates/engine-ota/src/boot_linux.rs": "985bcb238f93f49560881c03a0d91ef6540d54f126d9d8b56041d4da8fd76e82",
+    "crates/engine-ota/src/image_tools.rs": "031166e941abd0512f24e9fe8976edc8696cdcb88db6cb5800304744e5f0a961",
+    "crates/engine-ota/src/install_linux.rs": "dc3ea1eb48c9452baf399e60cab7a6351fe0d552e7965afe402245d937f65a01",
+    "crates/engine-ota/src/install_linux_tests.rs": "5d1a9e92613d326cca25ceb88e261d50169b91851c5951162a87a25c1cdd94be",
+    "crates/engine-ota/src/lib.rs": "3f81054d36253f984ba3da196ede129f680ff92e2d62a82e39baba262e1d747a",
+    "crates/engine-ota/src/recovery.rs": "20a80a594b30ef9bd697458c05d51e44e56b71ee72c665c9fce602ea15c1f533",
+    "crates/engine-ota/src/recovery_tests.rs": "4fc396bb875b08c32bdece7a4295b60879ef81cc232897900cd9ccfabd9d43a3",
+    "docs/ota-updates.md": "24f335f1ce81454d9ff718e1f9d0fd3d6573e99a5991816f5064ce95069ba2f3",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "11c7c9d086e27c29ec9339f2a8e5210935c49006ddb962487b48de990e7d816e"
+  },
+  "checks": {
+    "host-tests": {
+      "log": "target/ota-writer-host-tests.log",
+      "sha256": "d19a4614c77a9c198b68ccd1287b0d2e463599d0b662ab527f7c0f8d8d35528a",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.22s",
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.43s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.50s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 73 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.81s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "final-fixtures": {
+      "log": "target/ota-writer-final-fixtures.log",
+      "sha256": "443d3524d7ff0e1938c36e1d32f96cfbe76b5ce7633f46223d85947a2a429afd",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.55s",
+        "test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 68 filtered out; finished in 2.76s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "log": "target/ota-writer-clippy.log",
+      "sha256": "6824a61a505d5b91c51518e5645a20d7dcadc1efb466f56fbb2337813b961f25",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.70s"
+      ]
+    },
+    "rust189": {
+      "log": "target/ota-writer-rust189.log",
+      "sha256": "0e874f6b5aa4957e7392574555b0006e8cfa23679374a65db1f29539827e5d21",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.53s"
+      ]
+    },
+    "aarch64": {
+      "log": "target/ota-writer-aarch64.log",
+      "sha256": "536b6ef31ef14149ba5d1da395ba8b84ae2f35db1e6791c5a4915f1351bde742",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.04s"
+      ]
+    },
+    "pi5-tests": {
+      "log": "target/ota-writer-pi5-tests.log",
+      "sha256": "8c0210010be19b2bb43e6e43734b14750cda4d44fd47c1e0c0b2c1e5d3d106b2",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 73 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 42.24s"
+      ]
+    },
+    "dirty-artifact": {
+      "log": "target/ota-writer-dirty-artifact.log",
+      "sha256": "d5bf4832003f947093bf9bef8b2e08b4e95fd8b7044938f6373fe28b250777ec",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 74 filtered out; finished in 28.59s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+      ]
+    }
+  },
+  "pi5": {
+    "uid": 1000,
+    "boot_id_before_and_after": "de606400-dc75-446e-b26b-385592b0f562",
+    "test_output": "de606400-dc75-446e-b26b-385592b0f562\n\nrunning 75 tests\ntest boot::tests::hardware_selection_is_data_only_and_requires_one_known_profile ... ok\ntest boot::tests::firmware_prefix_is_allowed_but_cannot_override_recovery_arguments ... ok\ntest boot::tests::malformed_asset_sets_cannot_hide_missing_mutable_or_ambiguous_files ... ok\ntest boot::tests::real_pi_kernel_notes_decode_and_truncation_duplicates_are_rejected ... ok\ntest boot::tests::root_selection_accepts_only_canonical_provisioned_normal_or_trial_files ... ok\ntest boot::tests::unsafe_or_ambiguous_templates_are_rejected_before_rendering ... ok\ntest boot::tests::python_manifest_identity_binds_files_and_excludes_only_defined_mutable_state ... ok\ntest boot_files::tests::changed_immutable_assets_or_selectors_block_writes_without_overwriting_evidence ... ok\ntest boot_files::tests::every_persistence_failure_poisons_the_handle_and_reopen_observes_old_or_new ... ok\ntest boot_files::tests::interrupted_temporaries_are_bounded_and_cannot_become_boot_configuration ... ok\ntest boot_files::tests::late_journal_or_deadline_rejection_prevents_even_creating_a_temporary ... ok\ntest boot_files::tests::links_permissions_missing_and_unlisted_assets_fail_closed ... ok\ntest boot_files::tests::trial_writes_preserve_default_and_manifest_and_promotion_preserves_trial ... ok\ntest boot_linux::tests::boot_context_is_stable_across_time_but_not_boot_or_image_changes ... ok\ntest boot_linux::tests::qualification_identity_changes_with_board_firmware_or_usb_medium ... ok\ntest boot_linux::tests::disk_files_cannot_substitute_for_loaded_kernel_profile_or_firmware_trial_evidence ... ok\ntest coordinator::tests::actual_journal_orders_health_selector_commit_and_watchdog_completion ... ok\ntest coordinator::tests::failed_sample_restarts_window_and_late_service_start_cannot_extend_deadline ... ok\ntest coordinator::tests::failure_and_missing_watchdog_reboot_without_refresh_or_promotion ... ok\ntest coordinator::tests::rollback_reboot_requires_recorded_failure_and_restored_previous_default ... ok\ntest coordinator::tests::selector_error_leaves_durable_proof_and_restart_reconciles_actual_choice ... ok\ntest image_identity::linux::tests::installed_reader_rejects_symlinks_permissions_owner_size_and_missing_state ... ok\ntest coordinator::tests::stop_failure_does_not_report_success_or_undo_the_committed_good_root ... ok\ntest image_identity::tests::malformed_or_incoherent_image_records_are_rejected ... ok\ntest image_identity::tests::python_generated_image_matches_descriptor_and_survives_channel_promotion ... ok\ntest image_identity::tests::signed_metadata_cannot_relabel_packaged_content_or_compatibility ... ok\ntest image_tools::tests::checker_deadline_output_exit_status_and_inherited_file_are_enforced ... ok\ntest install_linux::tests::corrupt_truncated_trailing_and_concatenated_streams_never_validate ... ok\ntest install_linux::tests::raw_write_requires_current_durable_writing_phase_and_matching_candidate ... ok\ntest install_linux::tests::bad_filesystem_identity_or_checker_mutation_never_produces_success ... ok\ntest install_linux::tests::staging_is_private_named_by_hash_and_rechecks_the_open_file_and_name ... ok\ntest install_linux::tests::write_flush_and_readback_failures_stop_before_filesystem_acceptance ... ok\ntest install_linux::tests::yocto_artifact_checks_actual_format_and_retains_dirty_source_rejection ... ignored, requires SPACEWARS_OTA_TEST_EXT4 pointing to an expanded Yocto rootfs artifact\ntest install_lock::tests::independently_opened_installers_and_flock_tools_share_one_lock ... ok\ntest install_lock::tests::replacing_or_unlinking_the_held_lock_does_not_silently_allow_writes ... ok\ntest install_lock::tests::symlinks_hardlinks_wrong_owner_and_writable_private_state_are_rejected ... ok\ntest recovery::tests::committed_trial_context_cannot_transfer_to_another_boot_token_or_payload ... ok\ntest recovery::tests::corrupted_or_cross_phase_records_fail_validation ... ok\ntest recovery::tests::default_changes_only_after_continuous_health_and_old_root_is_retained ... ok\ntest recovery::tests::duplicate_trial_request_and_stale_transaction_cannot_repeat_reboot ... ok\ntest recovery::tests::explicit_retry_is_bounded_and_never_lowers_persisted_history ... ok\ntest recovery::tests::failed_journal_replace_releases_no_action_and_requires_reopen ... ok\ntest recovery::tests::generation_floor_commits_before_writing_and_corrupt_write_never_arms_trial ... ok\ntest recovery::tests::health_proofs_cannot_be_reused_after_a_gap_or_from_a_different_trial ... ok\ntest recovery::tests::journal_rejects_stale_plans_and_never_replaces_corruption_with_bootstrap ... ok\ntest recovery::tests::journal_rejects_world_readable_state_and_symlinked_files ... ok\ntest recovery::tests::journal_reopen_keeps_attempt_floor_and_lock_excludes_a_second_owner ... ok\ntest recovery::tests::next_update_stops_advertising_retained_slot_before_overwriting_it ... ok\ntest recovery::tests::promotion_interruption_reconciles_both_selector_choices ... ok\ntest recovery::tests::reset_or_service_restart_before_trial_preserves_old_root_and_quarantines_attempt ... ok\ntest recovery::tests::selector_writes_require_the_corresponding_durable_phase_and_live_context ... ok\ntest recovery::tests::service_restart_before_selector_commit_requires_fresh_health_window ... ok\ntest recovery::tests::stale_controls_frames_missing_requests_gaps_and_process_restarts_break_health ... ok\ntest recovery::tests::subsequent_update_works_from_the_committed_trial_without_an_extra_normal_reboot ... ok\ntest recovery::tests::trial_requires_matching_firmware_token_new_boot_and_actual_candidate ... ok\ntest recovery::tests::trial_timeout_uses_boot_uptime_and_cannot_be_extended_by_service_restart ... ok\ntest recovery::tests::uncommitted_temporary_file_never_supersedes_the_last_complete_journal ... ok\ntest recovery::tests::unknown_roots_wrong_devices_and_unqualified_recovery_never_grant_writes ... ok\ntest recovery::tests::wrong_executable_build_or_unwritable_state_cannot_produce_health_proof ... ok\ntest recovery_linux::tests::cloned_disk_uuid_cannot_hide_behind_the_single_udev_alias ... ok\ntest recovery_linux::tests::different_disk_data_bind_mounts_duplicates_and_unknown_root_fail_closed ... ok\ntest recovery_linux::tests::even_a_read_only_inactive_mount_prevents_installation ... ok\ntest recovery_linux::tests::layout_identity_survives_device_enumeration_but_changes_with_geometry_or_uuid ... ok\ntest recovery_linux::tests::malformed_or_oversized_kernel_evidence_is_rejected ... ok\ntest recovery_linux::tests::mounted_device_numbers_choose_both_slots_without_parsing_name_suffixes ... ok\ntest recovery_linux::tests::opened_directory_mount_id_is_kernel_evidence_and_rejects_malformed_records ... ok\ntest recovery_linux::tests::overlapping_out_of_disk_duplicate_and_unequal_partitions_are_rejected ... ok\ntest recovery_linux::tests::real_service_style_bind_mount_selects_the_opened_visible_mount ... ignored, requires unshare and mount with an unprivileged private user/mount namespace\ntest recovery_linux::tests::root_selectors_are_strict_and_duplicate_root_arguments_are_rejected ... ok\ntest recovery_linux::tests::visible_mount_id_handles_service_bind_mounts_without_hiding_inactive_roots ... ok\ntest watchdog_linux::tests::driver_timeout_and_disable_failures_never_record_success ... ok\ntest watchdog_linux::tests::early_record_must_be_private_bounded_and_not_a_link ... ok\ntest watchdog_linux::tests::invalid_early_or_completion_evidence_never_opens_the_device ... ok\ntest watchdog_linux::tests::only_durable_success_can_open_and_disarm_and_repeat_calls_do_not_reopen ... ok\ntest install_linux::tests::real_ext4_round_trip_checks_readback_fsck_identity_and_preserves_unused_tail ... ok\n\ntest result: ok. 73 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 42.24s\n\nde606400-dc75-446e-b26b-385592b0f562",
+    "binary": {
+      "path": "target/ota-writer-pi5-tests",
+      "bytes": 4658120,
+      "sha256": "a155361587bf8c25ac29eaa71952c8735109a5aa8b37ffc3a00e40caef381e45"
+    }
+  },
+  "artifact": {
+    "descriptor": {
+      "architecture": "aarch64",
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-9d78c15fe1555c225ebc28f4e87371e2dc075082b313bed777dfd57978bdd9bf",
+      "channel": "release",
+      "compressed": {
+        "bytes": 128574178,
+        "sha256": "8cd98e5545fe282071e71ebbfaec4ded54caf8835e39fe51a431c8519d635c50"
+      },
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "expanded": {
+        "bytes": 520093696,
+        "sha256": "d5a6aee71b332efea7121722ccba28c4779c651e0c5e89a6ded8275c7b068cfd"
+      },
+      "format": "rootfs-ext4-zstd",
+      "generation": 2,
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "min_recovery_protocol": 1,
+      "min_updater_protocol": 1,
+      "schema": 1,
+      "source_commit": "0a90df6909016f42f7499add8989adb94b9751d0"
+    },
+    "result": "invalid image identity: dirty development source is not eligible for the signed feed",
+    "source": {
+      "commit": "0a90df6909016f42f7499add8989adb94b9751d0",
+      "dirty": true,
+      "revision": "0a90df690901-dirty",
+      "schema": 1
+    },
+    "stages": [
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "flushing",
+      "reading-back",
+      "reading-back",
+      "checking-filesystem"
+    ],
+    "target_is_temporary_regular_file": true
+  },
+  "artifact_origin": "spacewars-image-raspberrypi-spacewars.rootfs-20261015192010.ext4.gz",
+  "artifact_format": {
+    "ext4_block_bytes": 1024,
+    "clean": true,
+    "expanded_bytes": 520093696
+  },
+  "validated_failures": [
+    "Truncated/corrupt compressed frames, wrong compressed hash, trailing bytes and concatenated frames",
+    "Signed-length mismatches, valid frames with truncated/extra expanded output, unsupported block sizes and journal/dirty headers",
+    "Failed writes, flush errors, corrupted readback and read-only checker rejection",
+    "Dirty or mismatched embedded identity, and a checker modifying target bytes",
+    "Missing/writable/symlinked/hardlinked/replaced/mutated staging files",
+    "Wrong candidate, wrong active root and calls after the durable Writing phase",
+    "Checker exit status, output bound, deadline and inherited target descriptor"
+  ],
+  "sources": {
+    "ext4_superblock": "https://www.kernel.org/doc/html/latest/filesystems/ext4/super.html",
+    "zstd_decoder": "https://docs.rs/zstd/0.13.3/zstd/stream/read/struct.Decoder.html",
+    "e2fsck_readonly": "https://github.com/tytso/e2fsprogs/blob/v1.47.0/e2fsck/unix.c",
+    "ext2fs_mount_check": "https://github.com/tytso/e2fsprogs/blob/v1.47.0/lib/ext2fs/ismounted.c",
+    "kernel_block_source_commit": "e442e5c1ab6bff5b5460b4fc949beb72aaf77970"
+  },
+  "limitations": [
+    "The tested artifact remains dirty and ineligible; its failure is the expected source-identity rejection after filesystem validation",
+    "Regular-file targets do not qualify real block-device O_EXCL/ioctl behavior or storage durability",
+    "No Pi 4 execution, raw partition write, boot selection, watchdog operation or reboot in this pass",
+    "Writer is not yet exposed through a production installation service or one-use UI handoff",
+    "Legacy helper privileges/shared locking, maintenance holds, persistent-key migration and final data preservation remain integration work",
+    "Signing/feed publication, downloader, UI and physical recovery qualification remain incomplete"
+  ]
+}

@@ -82,6 +82,8 @@ impl DuckEvent {
         self.world.as_mut()
     }
     pub(super) fn synchronize_soil(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) {
+        self.soil_supports.clear();
+        self.soil_course = None;
         if let Some(soil) = soil {
             let state = if self.responsive_floor().is_some() {
                 crate::grass::SoilSupportState::Responsive
@@ -93,6 +95,30 @@ impl DuckEvent {
             soil.set_surfaces(crate::grass::surfaces::duck(self), state);
             if let Some(world) = &mut self.world {
                 soil.bind_current(world);
+            }
+            // Only retained material on the actual fixed course inherits course
+            // identity. Drain/panel contacts and foreign bodies keep their own rules.
+            if state == crate::grass::SoilSupportState::Course {
+                if let Some(course) = &self.course {
+                    let mut navigation = course.clone();
+                    for quad in soil.quads() {
+                        let min = quad[0];
+                        let max = quad[2];
+                        let a = min.x * self.direction + self.width * 0.5;
+                        let b = max.x * self.direction + self.width * 0.5;
+                        if let Some(index) = course.surfaces.iter().position(|s| {
+                            s.start <= a.min(b) + 0.01
+                                && a.max(b) <= s.end + 0.01
+                                && (min.y - self.layout.floor_y - s.height).abs() < 0.01
+                        }) {
+                            self.soil_supports.push((index, min, max));
+                            navigation.surfaces[index].height = navigation.surfaces[index]
+                                .height
+                                .max(max.y - self.layout.floor_y);
+                        }
+                    }
+                    self.soil_course = Some(navigation);
+                }
             }
         }
     }
@@ -207,6 +233,60 @@ impl DuckEvent {
             if let Some(world) = &mut self.world {
                 floor.move_panels(world);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod soil_tests {
+    use super::*;
+
+    #[test]
+    fn clock_grass_contract_partial_soil_maps_only_retained_supported_material() {
+        for direction in [-1.0, 1.0] {
+            let layout = Layout::new(800.0 / 480.0);
+            let mut duck = DuckEvent::new_platforms(layout, 42);
+            duck.direction = direction;
+            duck.spawn();
+            let mut soil = crate::grass::SoilHabitat::new(layout);
+            let plan = soil.admit(&[(-duck.width * 0.5, duck.width * 0.5)], |site| {
+                // An actual short bank, leaving most course surfaces bare.
+                site.min.x < -duck.width * 0.5 + 20.0 || site.max.x > -duck.width * 0.5 + 80.0
+            });
+            assert!(!plan.sites.is_empty());
+            let accounting = soil.accounting();
+            duck.synchronize_soil(Some(&mut soil));
+            assert!(!duck.soil_supports.is_empty());
+            let course = duck.course.as_ref().unwrap();
+            let navigation = duck.soil_course.as_ref().unwrap();
+            for (index, surface) in course.surfaces.iter().enumerate() {
+                let retained = duck.soil_supports.iter().any(|(i, _, _)| *i == index);
+                assert_eq!(navigation.surfaces[index].height > surface.height, retained);
+            }
+            // Settle onto actual dirt through the canonical solver.
+            let (index, min, max) = duck.soil_supports[0];
+            let world = duck.world.as_mut().unwrap();
+            world.set_pose(
+                DUCK_BODY,
+                Vec2::new((min.x + max.x) * 0.5, max.y + duck.radius),
+                0.0,
+                true,
+            );
+            for _ in 0..30 {
+                world.step(DT);
+            }
+            assert_eq!(duck.supported_surface(), Some(index));
+            assert_eq!(soil.accounting(), accounting);
+
+            // Actual support loss must clear mapping even while dirt is retained
+            // and falling. Restoring a floor cannot reattach detached columns.
+            soil.revalidate(Some(&[]), true);
+            soil.advance_loss(std::time::Duration::from_millis(250));
+            duck.synchronize_soil(Some(&mut soil));
+            assert!(duck.soil_supports.is_empty());
+            assert_eq!(duck.supported_surface(), None);
+            duck.synchronize_soil(None);
+            assert!(duck.soil_course.is_none());
         }
     }
 }

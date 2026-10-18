@@ -51,6 +51,7 @@ default-filter = '''
         | test(=controllers::controllers_are_reachable_from_launcher_and_pause_without_resuming)
         | test(=device_info::device_info_is_shared_read_only_scrollable_and_returns_to_its_parent)
         | test(=garden_lab::garden_lab_pause_step_and_renderers_smoke)
+        | test(=kiosk_health_challenges_run_on_the_live_ui_thread)
         | test(=launcher_can_run_the_classic_spacewars_menu_lifecycle)
         | test(=launcher_can_run_the_clock_menu_lifecycle)
         | test(=launcher_can_run_the_pizza_menu_lifecycle)

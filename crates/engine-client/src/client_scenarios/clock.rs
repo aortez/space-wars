@@ -87,6 +87,8 @@ fn create(
             ),
             duck_debug_overlay: std::env::var("SPACEWARS_CLOCK_DUCK_DEBUG")
                 .is_ok_and(|value| value == "1"),
+            duck_direct_flap_landing: std::env::var("SPACEWARS_CLOCK_DUCK_FLAP_DETOUR")
+                .is_ok_and(|value| value == "direct-landing"),
             duck_jump_profile: duck_jump_profile(
                 std::env::var("SPACEWARS_CLOCK_DUCK_PROFILE")
                     .ok()

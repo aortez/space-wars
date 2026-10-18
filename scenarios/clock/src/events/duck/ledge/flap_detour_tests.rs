@@ -4,12 +4,12 @@ use engine_common::{
     ClockDuckJumpProfile,
 };
 
-const ASPECTS: [f32; 3] = [800.0 / 480.0, 1024.0 / 768.0, 480.0 / 800.0];
-const PROFILES: [ClockDuckJumpProfile; 2] =
+pub(super) const ASPECTS: [f32; 3] = [800.0 / 480.0, 1024.0 / 768.0, 480.0 / 800.0];
+pub(super) const PROFILES: [ClockDuckJumpProfile; 2] =
     [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing];
 const SEED: u64 = 3;
 
-fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> DuckEvent {
+pub(super) fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> DuckEvent {
     assert!(flap_detour::selected(SEED));
     let mut duck = DuckEvent::new_platforms(Layout::new(aspect), SEED);
     duck.direction = direction;
@@ -17,7 +17,7 @@ fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> DuckE
     duck
 }
 
-fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool) {
+pub(super) fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool) {
     for _ in 0..400 {
         if predicate(duck) {
             return;
@@ -27,7 +27,7 @@ fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool) {
     panic!("stage not reached: {:?}", duck.diagnostics());
 }
 
-fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) {
+pub(super) fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) {
     let entity = PhysicsId::new(9000);
     assert!(duck.world.as_mut().unwrap().insert_body(
         BodyId::new(entity, BodyRole::PRIMARY),
@@ -207,7 +207,7 @@ fn changed_flap_failed_catch_and_late_return_block_end_the_single_attempt() {
     }
 }
 
-fn flood(duck: &DuckEvent) -> WaterWorld {
+pub(super) fn flood(duck: &DuckEvent) -> WaterWorld {
     use engine_water::{Boundary, PoolSpec, WaterConfig};
     let mut water = WaterWorld::new(
         WaterConfig::default(),
@@ -232,7 +232,7 @@ fn flood(duck: &DuckEvent) -> WaterWorld {
 }
 
 #[test]
-fn wet_interruption_timeout_departure_and_lost_support_release_the_detour() {
+fn wet_interruption_timeout_deadline_and_lost_support_release_the_detour() {
     for case in 0..5 {
         let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[1]);
         until(&mut duck, |d| d.ledge.stats.phase == Phase::Hanging);
@@ -241,7 +241,7 @@ fn wet_interruption_timeout_departure_and_lost_support_release_the_detour() {
         match case {
             0 => water = Some(flood(&duck)),
             1 => duck.ledge.detour.stats.ticks = flap_detour::BUDGET_TICKS - 1,
-            2 => duck.tick = OPENING_TICKS + EXIT_DELAY_TICKS,
+            2 => duck.tick = DUCK_TICKS - RESET_TICKS - u64::from(flap_detour::BUDGET_TICKS),
             3 => {
                 duck.world
                     .as_mut()
@@ -347,6 +347,47 @@ fn stationary_responsive_support_can_return_but_moving_slopes_are_skipped() {
                 Some(Outcome::Unsafe | Outcome::Expired)
             ));
             assert_eq!(duck.ledge.stats.catches, 0);
+        }
+    }
+}
+
+#[test]
+fn exit_opening_finishes_committed_flap_movement_without_an_optional_perch() {
+    for direct in [false, true] {
+        for direction in [-1.0, 1.0] {
+            for stage in [
+                if direct {
+                    DetourPhase::Approaching
+                } else {
+                    DetourPhase::Recovering
+                },
+                DetourPhase::Perching,
+                DetourPhase::Returning,
+            ] {
+                let mut duck = ordinary(ASPECTS[0], direction, PROFILES[0]);
+                duck.select_direct_flap_landing(direct);
+                until(&mut duck, |d| {
+                    d.ledge.detour.stats.phase == stage
+                        && (stage != DetourPhase::Approaching
+                            || (!d.grounded() && d.ledge.detour.age >= 25))
+                });
+                duck.tick = OPENING_TICKS + EXIT_DELAY_TICKS - 1;
+                until(&mut duck, |d| {
+                    d.ledge.detour.stats.phase == DetourPhase::Finished
+                });
+                assert_eq!(
+                    duck.ledge.detour.stats.outcome,
+                    Some(Outcome::Returned),
+                    "{direct} {direction} {stage:?}: {:?}",
+                    duck.diagnostics()
+                );
+                if stage != DetourPhase::Returning {
+                    assert!(duck.ledge.detour.stats.perch_ticks < flap_detour::PERCH_TICKS);
+                }
+                assert!(!duck.ledge_attached());
+                assert!(duck.grounded());
+                assert_eq!(duck.controller.direction, 1.0);
+            }
         }
     }
 }

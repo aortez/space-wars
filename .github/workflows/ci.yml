@@ -6,6 +6,30 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      full:
+        description: Run full UI and extended Clock sweeps
+        type: boolean
+        default: false
+      compiler-cache:
+        description: Use sccache (disable for a measured baseline)
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        default: false
+      compiler-cache:
+        type: boolean
+        default: true
+      source:
+        type: string
+        required: true
+    outputs:
+      windows-artifact:
+        description: Validated Windows release evidence from this run
+        value: ${{ jobs.windows-release.outputs.artifact }}
 
 permissions:
   contents: read
@@ -18,13 +42,71 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  ota-publisher:
+    name: OTA updater and publisher
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SPACEWARS_OTA_FULL: ${{ inputs.full && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Select OTA recovery coverage
+        run: python3 .github/ci/ota_test_selection.py select --output "$RUNNER_TEMP/ota-selection.json"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install image fixture tools
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends e2fsprogs python3-cryptography
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Test updater, metadata, image and publisher fixtures
+        # Separate test processes isolate flock descriptors across crash fixtures.
+        run: python3 .github/ci/ota_test_selection.py run --selection "$RUNNER_TEMP/ota-selection.json"
+      - name: Build publisher fixture tools
+        run: cargo build --locked --profile ci -p engine-ota --features publisher --example feed_sign --example feed_inventory
+      - name: Check separately enabled supervised installer
+        run: cargo check --locked --profile ci -p engine-os-manager --features recovery-qualification --all-targets
+      - name: Test initial owner authority with disposable keys
+        run: /usr/bin/python3 .github/ci/ota_authority_tests.py -v
+        env:
+          SPACEWARS_OTA_INVENTORY: target/ci/examples/feed_inventory
+      - name: Exercise resumable publication with disposable keys
+        run: |
+          /usr/bin/python3 .github/ci/ota_publisher_fixture.py \
+            --signer target/ci/examples/feed_sign \
+            --inventory target/ci/examples/feed_inventory
+      - name: Lint OTA publisher
+        run: cargo clippy --locked --profile ci -p engine-ota --features publisher --all-targets -- -D warnings
+      - name: Upload OTA coverage and timings
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ota-test-timings
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/ota-selection.json
+            target/ota-test-report.json
+            target/nextest/ci/junit.xml
+
   yocto-tools:
     name: Pi hardware profiles and update safety
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - name: Install device-tree and isolated updater test tools
@@ -44,10 +126,12 @@ jobs:
             --unshare-user --uid 0 --gid 0 --unshare-pid --unshare-net \
             --proc /proc --dev /dev --tmpfs /run --chdir / \
             -- /bin/sh -ec 'test "$(id -u)" -eq 0; test "$(id -g)" -eq 0'
-      - run: npm --prefix yocto test
+      - name: Test Pi deployment helpers
+        run: npm --prefix yocto test
         env:
           SPACEWARS_REQUIRE_UPDATE_SANDBOX: 1
-      - run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh
+      - name: Lint Pi deployment scripts
+        run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update-wrapper.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer-wrapper.sh yocto/meta-spacewars/recipes-support/ab-boot/files/spacewars-legacy-update-disabled yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh
       - name: Report sandbox configuration and kernel denials
         if: failure()
         run: |
@@ -66,29 +150,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
           components: clippy, rustfmt
-      - run: cargo fmt --all -- --check
-      - run: cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets
-      - run: cargo clippy --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets --no-deps -- -D warnings
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Test core and scenarios
+        run: cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets
+      - name: Lint NES core and scenarios
+        run: cargo clippy --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets --no-deps -- -D warnings
       - name: Exercise bundled-ROM release benchmark
         run: cargo run --locked --release -p scenario-falling --bin falling-benchmark -- 120 10
 
   linux-workspace:
-    name: Linux workspace
-    runs-on: ubuntu-latest
-    # Keep the cold-run ceiling while collecting optimized, cached timings.
-    # The PR UI smoke suite is budgeted at 3–5 minutes; ui-functional.yml retains
-    # the full suite. This timeout is a safety ceiling, not the performance target.
-    timeout-minutes: 60
+    name: Build Linux tests once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     env:
-      # Material-world fixtures can exceed the default test-thread stack.
       RUST_MIN_STACK: 16777216
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
       - name: Install pinned test runner
         uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
         with:
@@ -98,18 +188,33 @@ jobs:
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # Cache versions include the path list, even with identical keys.
+          # Preserve the historical paths so main's warm cache remains usable.
           workspaces: |
             . -> target
             vendor/i-slint-backend-linuxkms -> target
             vendor/lyon_tessellation -> target
       - name: Install native client dependencies
-        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
+        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon e2fsprogs openssh-client libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - name: Test CI reports, build identity, and input diagnostic safety
         run: |
           python3 -m unittest discover -s .github/ci -p 'test_*.py'
           python3 -m unittest discover -s tools -p 'test_picade_input.py'
       - name: Test recorded bot-trip analysis
         run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
+      - name: Install pinned Rust compiler cache
+        if: github.event_name != 'workflow_dispatch' || inputs.compiler-cache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        with:
+          version: v0.18.0
+      - name: Enable compiler caching after dependency restore
+        if: github.event_name != 'workflow_dispatch' || inputs.compiler-cache
+        env:
+          CACHE_MODE: ${{ github.event_name == 'pull_request' && 'READ_ONLY' || 'READ_WRITE' }}
+        run: |
+          printf '%s\n' 'RUSTC_WRAPPER=sccache' 'SCCACHE_GHA_ENABLED=on' \
+            "SCCACHE_GHA_RW_MODE=$CACHE_MODE" >> "$GITHUB_ENV"
       - name: Build optimized Linux test executables
         id: build
         run: |
@@ -122,18 +227,8 @@ jobs:
           CARGO_LOG=cargo::core::compiler::fingerprint=info \
             cargo test --locked --workspace --all-targets --profile ci --no-run --message-format=json | \
             python3 .github/ci/assert_fresh_build.py
-      - name: Run Linux workspace tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        env:
-          # Eight fast-headless mixed/recovery cases stay in normal CI. The broader
-          # ignored sweep runs only in clock-regression.yml or explicitly locally.
-          SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
-        run: |
-          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
-            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
       - name: Verify PR UI selection
         id: ui-selection
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           for profile in ui ui-pr; do
             cargo nextest list --locked --workspace --all-targets --cargo-profile ci --profile "$profile" \
@@ -143,36 +238,332 @@ jobs:
           python3 .github/ci/assert_ui_selection.py \
             "$RUNNER_TEMP/spacewars-ci-timings/ui-list.json" \
             "$RUNNER_TEMP/spacewars-ci-timings/ui-pr-list.json"
-      - name: Run PR UI smoke tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.ui-selection.outcome == 'success' }}
+      - name: Archive tests for independent runners
         run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/archive.seconds" \
+            cargo nextest archive --locked --workspace --all-targets --cargo-profile ci \
+              --archive-file "$RUNNER_TEMP/workspace-tests.tar.zst"
+          cargo nextest archive --locked --workspace --all-targets --cargo-profile ci \
+            -E 'package(=engine-client) & binary(=ui_control_functional)' \
+            --archive-file "$RUNNER_TEMP/ui-tests.tar.zst"
+          du -h "$RUNNER_TEMP/"*-tests.tar.zst >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload workspace test archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-workspace-tests
+          path: ${{ runner.temp }}/workspace-tests.tar.zst
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Upload UI test archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-ui-tests
+          path: ${{ runner.temp }}/ui-tests.tar.zst
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Archive extended Clock tests
+        if: inputs.full
+        run: |
+          cargo nextest archive --locked --workspace --all-targets --cargo-profile ci \
+            -E 'package(=scenario-clock) & kind(lib)' \
+            --archive-file "$RUNNER_TEMP/clock-tests.tar.zst"
+      - name: Upload extended Clock test archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: inputs.full
+        with:
+          name: linux-clock-tests
+          path: ${{ runner.temp }}/clock-tests.tar.zst
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Record compiler-cache statistics
+        if: ${{ always() && env.RUSTC_WRAPPER == 'sccache' }}
+        run: sccache --show-stats --stats-format json > "$RUNNER_TEMP/spacewars-ci-timings/sccache.json"
+      - name: Summarize build and test timings
+        if: always()
+        run: |
+          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
+            --phase build --phase archive \
+            target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload timing and diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-build-timings
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/spacewars-ci-timings/
+            target/cargo-timings/
+          if-no-files-found: ignore
+
+  linux-headless:
+    name: Linux workspace tests
+    needs: linux-workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_MIN_STACK: 16777216
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Install native client dependencies
+        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon e2fsprogs openssh-client libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-workspace-tests
+          path: ${{ runner.temp }}
+      - name: Run workspace tests without compiling
+        env:
+          SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
+        run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
+            python3 .github/ci/ota_test_selection.py workspace -- \
+              cargo nextest run --archive-file "$RUNNER_TEMP/workspace-tests.tar.zst" --extract-to "$GITHUB_WORKSPACE" --profile ci --no-tests fail
+      - name: Summarize build and test timings
+        if: always()
+        run: |
+          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
+            --phase workspace \
+            target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload timing and diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-test-timings
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/spacewars-ci-timings/
+            target/nextest/ci/junit.xml
+            target/clock-regression/
+          if-no-files-found: ignore
+
+  spacewars-extended:
+    if: inputs.full
+    name: Extended normal-match and arena parity
+    needs: linux-workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_MIN_STACK: 16777216
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Install native client dependencies
+        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-workspace-tests
+          path: ${{ runner.temp }}
+      - name: Compare normal matches against the deterministic arena
+        env:
+          SPACEWARS_MATCH_ARTIFACTS: ${{ github.workspace }}/target/match-regression
+        run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/match-extended.seconds" \
+            cargo nextest run --archive-file "$RUNNER_TEMP/workspace-tests.tar.zst" --extract-to "$GITHUB_WORKSPACE" --profile ci \
+              -E 'package(=engine-client) & test(=client_scenarios::surface_sortie::mission::tests::normal_match_reproduces_the_arena_in_bounded_physical_rounds)' \
+              --run-ignored only --no-tests fail
+      - name: Summarize build and test timings
+        if: always()
+        run: |
+          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
+            --phase match-extended \
+            target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload timing and diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: spacewars-extended-timings
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/spacewars-ci-timings/
+            target/nextest/ci/junit.xml
+            target/match-regression/
+          if-no-files-found: ignore
+
+  linux-ui:
+    name: ${{ inputs.full && format('Full UI workflows ({0}/4)', matrix.shard) || 'PR UI smoke' }}
+    needs: linux-workspace
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.full && '[1,2,3,4]' || '[1]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_MIN_STACK: 16777216
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Install native client dependencies
+        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-ui-tests
+          path: ${{ runner.temp }}
+      - name: Run UI workflows without compiling
+        env:
+          UI_PROFILE: ${{ inputs.full && 'ui' || 'ui-pr' }}
+          UI_PARTITION: slice:${{ matrix.shard }}/${{ inputs.full && 4 || 1 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/ui.seconds" \
             xvfb-run -a -s "-screen 0 1280x1024x24" \
-            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui-pr \
+            cargo nextest run --archive-file "$RUNNER_TEMP/ui-tests.tar.zst" --extract-to "$GITHUB_WORKSPACE" --profile "$UI_PROFILE" --partition "$UI_PARTITION" \
               -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
+      - name: Summarize UI timings and PR budget
+        if: always()
+        env:
+          UI_PROFILE: ${{ inputs.full && 'ui' || 'ui-pr' }}
+        run: |
+          budget=()
+          if [[ "$UI_PROFILE" == ui-pr ]]; then budget=(--ui-budget-seconds 300); fi
+          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
+            --phase ui "${budget[@]}" \
+            "target/nextest/$UI_PROFILE/junit.xml" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload timing and diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.full && format('ui-test-timings-{0}', matrix.shard) || 'ui-test-timings' }}
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/spacewars-ci-timings/
+            target/nextest/ui*/junit.xml
+          if-no-files-found: ignore
+      - name: Upload functional-test failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.full && format('ui-functional-test-artifacts-{0}', matrix.shard) || 'ui-functional-test-artifacts' }}
+          retention-days: 14
+          path: target/functional-test-artifacts
+          if-no-files-found: ignore
+
+
+  linux-graphics:
+    name: GPU kiosk and vendored renderers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_MIN_STACK: 16777216
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
+      - name: Restore Rust dependencies
+        id: rust-cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          workspaces: |
+            . -> target
+            vendor/i-slint-backend-linuxkms -> target
+            vendor/lyon_tessellation -> target
+      - name: Install native client dependencies
+        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
+      - name: Install pinned Rust compiler cache
+        if: github.event_name != 'workflow_dispatch' || inputs.compiler-cache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        with:
+          version: v0.18.0
+      - name: Enable compiler caching after dependency restore
+        if: github.event_name != 'workflow_dispatch' || inputs.compiler-cache
+        env:
+          CACHE_MODE: ${{ github.event_name == 'pull_request' && 'READ_ONLY' || 'READ_WRITE' }}
+        run: |
+          printf '%s\n' 'RUSTC_WRAPPER=sccache' 'SCCACHE_GHA_ENABLED=on' \
+            "SCCACHE_GHA_RW_MODE=$CACHE_MODE" >> "$GITHUB_ENV"
+      - name: Prepare timing directory
+        run: mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
       - name: Test vendored LinuxKMS input and presentation renderers
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() }}
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/kms.seconds" \
             cargo test --locked --manifest-path vendor/i-slint-backend-linuxkms/Cargo.toml --features renderer-software,renderer-femtovg --lib
       - name: Test exact round-join shortcut against vendored tessellator reference
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() }}
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/lyon.seconds" \
             cargo test --locked --release --manifest-path vendor/lyon_tessellation/Cargo.toml --lib
       - name: Check default GPU kiosk client (no display required)
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() }}
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/gpu-check.seconds" \
             cargo check --locked --profile ci -p engine-client --no-default-features --features pi-kiosk-gpu
       - name: Test GPU defaults, startup safety, text and rotation (no display required)
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() }}
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/gpu-text.seconds" \
             cargo test --locked --profile ci -p femtovg -p i-slint-renderer-femtovg -p engine-client \
               --no-default-features --features engine-client/pi-kiosk-gpu --lib --bins --test backend_startup
+      - name: Record compiler-cache statistics
+        if: ${{ always() && env.RUSTC_WRAPPER == 'sccache' }}
+        run: sccache --show-stats --stats-format json > "$RUNNER_TEMP/spacewars-ci-timings/sccache.json"
+      - name: Summarize build and test timings
+        if: always()
+        run: |
+          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
+            --phase kms --phase lyon --phase gpu-check --phase gpu-text \
+            target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload timing and diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-graphics-timings
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/spacewars-ci-timings/
+          if-no-files-found: ignore
+
+  physics-diagnostics:
+    name: CCD physics diagnostics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      RUST_MIN_STACK: 16777216
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Restore Rust dependencies
+        id: rust-cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Prepare timing directory
+        run: mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
       - name: Test CCD cache and diagnostic lifecycle regressions
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           # Keep feature-gated work-count assertions in CI without enabling
           # instrumentation in the normal workspace/client test builds.
@@ -186,32 +577,88 @@ jobs:
         if: always()
         run: |
           python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
-            --cache-hit '${{ steps.rust-cache.outputs.cache-hit }}' \
-            --ui-budget-seconds 300 \
-            --phase build --phase workspace --phase ui --phase kms --phase lyon --phase gpu-check --phase gpu-text --phase physics-diagnostics \
-            target/nextest/ci/junit.xml target/nextest/ui-pr/junit.xml \
+            --phase physics-diagnostics \
             target/nextest/physics-diagnostics/junit.xml >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload build and per-test timings
+      - name: Upload timing and diagnostic evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: linux-test-timings
+          name: physics-diagnostic-timings
           retention-days: 14
           path: |
             ${{ runner.temp }}/spacewars-ci-timings/
-            target/cargo-timings/
-            target/nextest/ci/junit.xml
-            target/nextest/ui-pr/junit.xml
             target/nextest/physics-diagnostics/junit.xml
-            target/clock-regression/
           if-no-files-found: ignore
-      - name: Upload functional-test failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
+
+  linux-validation:
+    # Preserve the repository's required check while its work runs in parallel.
+    name: Linux workspace
+    needs: [linux-workspace, linux-headless, linux-ui, linux-graphics, physics-diagnostics]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require all Linux checks
+        env:
+          LINUX_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          results = {name: job['result'] for name, job in json.loads(os.environ['LINUX_RESULTS']).items()}
+          print(json.dumps(results, sort_keys=True))
+          raise SystemExit(any(result != 'success' for result in results.values()))
+          PY
+
+  clock-extended:
+    name: Clock extended / ${{ matrix.suite }}
+    if: inputs.full
+    needs: linux-workspace
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [mixed_event_sweep, jumping_profile_stress, authored_pattern_stress, platform_seed_stress]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_MIN_STACK: 16777216
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          name: ui-functional-test-artifacts
+          ref: ${{ inputs.source || github.sha }}
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-clock-tests
+          path: ${{ runner.temp }}
+      - name: Run extended deterministic sweep
+        env:
+          SUITE: ${{ matrix.suite }}
+          SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
+        run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/clock-extended.seconds" \
+            cargo nextest run --archive-file "$RUNNER_TEMP/clock-tests.tar.zst" --extract-to "$GITHUB_WORKSPACE" --profile ci \
+              -E "package(=scenario-clock) & test(/::$SUITE$/)" --run-ignored only --no-tests fail
+      - name: Summarize build and test timings
+        if: always()
+        run: |
+          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
+            --phase clock-extended \
+            target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload timing and diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: clock-extended-${{ matrix.suite }}
           retention-days: 14
-          path: target/functional-test-artifacts
+          path: |
+            ${{ runner.temp }}/spacewars-ci-timings/
+            target/nextest/ci/junit.xml
+            target/clock-regression/
           if-no-files-found: ignore
 
   spacewars-recovery:
@@ -221,11 +668,16 @@ jobs:
     env:
       RUST_MIN_STACK: 16777216
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # The workspace tests the live terrain-recovery host without profiling.
       # This job also covers historical profiles and diagnostic instrumentation.
       # Retained full-match diagnostics remain ignored and require their packages.
@@ -241,8 +693,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
       - name: Verify navigation-v1 baseline
         run: cargo run --locked --release -p engine-agent -- --suite navigation-v1 --verify
       - name: Verify strategy-v1 baseline
@@ -253,52 +709,68 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.89.0
-      - run: cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets
-      - run: cargo check --locked -p engine-client --all-targets
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
+      - name: Test core and scenarios
+        run: cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets
+      - name: Check Windows client
+        run: cargo check --locked -p engine-client --all-targets
 
   aarch64-core:
     name: AArch64 core and scenario
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ inputs.source || github.sha }}
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
           targets: aarch64-unknown-linux-gnu
       - name: Install AArch64 linker
         run: sudo apt-get update && sudo apt-get install --yes gcc-aarch64-linux-gnu
-      - run: cargo check --locked -p engine-nes -p scenario-falling -p scenario-nes --target aarch64-unknown-linux-gnu
+      - name: Check AArch64 core and scenarios
+        run: cargo check --locked -p engine-nes -p scenario-falling -p scenario-nes --target aarch64-unknown-linux-gnu
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
   windows-release:
     name: Windows release validation
+    outputs:
+      artifact: ${{ steps.evidence.outputs.artifact-id }}
     runs-on: windows-2025
     timeout-minutes: 60
     env:
-      RELEASE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      RELEASE_SHA: ${{ inputs.source || github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.source || github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Verify selected head
         shell: pwsh
         run: |
           $head = (git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $head -cne $env:RELEASE_SHA) { throw 'Wrong checkout' }
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
+          toolchain: '1.89.0'
           targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build and validate extracted release
         shell: pwsh
         run: .github/ci/windows-release.ps1 -SourceCommit $env:RELEASE_SHA -OutputDirectory "$env:RUNNER_TEMP/windows-release-evidence"
       - name: Upload release and failure evidence
+        id: evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-release-${{ env.RELEASE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/windows-release-evidence/

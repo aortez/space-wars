@@ -171,6 +171,137 @@ fn clock_grass_contract_moving_dirt_keeps_contact_and_real_loss_stops_supply() {
 }
 
 #[test]
+fn clock_grass_contract_developed_shoots_do_not_return_after_drain_export() {
+    fn visible_blades(s: &ClockState) -> usize {
+        ClockScenario::render_frame(s)
+            .layers
+            .iter()
+            .flat_map(|l| &l.primitives)
+            .filter(|p| {
+                matches!(p, engine_common::RenderPrimitive::Polygon(p)
+                if p.fill.as_ref().is_some_and(|f|
+                    f.color == engine_common::RenderColor::rgb(0.22, 0.65, 0.16)))
+            })
+            .count()
+    }
+
+    let mut s = fixture();
+    // Grow the drained patch alone before adding an unchanged bank resident.
+    s.plants = ClockPlants::new(215);
+    s.set_plant_conditions(1000, [1000; 2]);
+    s.plant_grass(200).unwrap();
+    for _ in 0..240 {
+        s.plants.advance(
+            Duration::from_secs(1),
+            s.soil.as_ref().unwrap(),
+            None,
+            &[],
+            vec![],
+        );
+    }
+    s.plant_grass(10).unwrap();
+    let before = s.plants().plants.observe();
+    let lost: Vec<_> = before
+        .tissues
+        .iter()
+        .filter(|t| t.cell[0] > 100)
+        .cloned()
+        .collect();
+    let bank: Vec<_> = before
+        .tissues
+        .iter()
+        .filter(|t| t.cell[0] < 100)
+        .cloned()
+        .collect();
+    assert!(
+        lost.iter()
+            .any(|t| t.role == Role::Shoot && (t.size > 1 || t.development[0] > 0)),
+        "{lost:?}"
+    );
+    assert!(!bank.is_empty());
+    assert!(visible_blades(&s) > 0);
+    let layout = Layout::new(s.aspect_ratio());
+    let soil = s.soil.as_mut().unwrap();
+    let accounting = soil.accounting();
+    let shoot = lost.iter().find(|t| t.role == Role::Shoot).unwrap();
+    let original = soil.world_point(shoot.cell).unwrap();
+    soil.set_surfaces(
+        surfaces::ordinary(crate::floor::test_drain(layout).geometry()),
+        SoilSupportState::Drain,
+    );
+    soil.advance_loss(Duration::from_millis(250));
+    let falling = soil.world_point(shoot.cell).unwrap();
+    assert!(falling.y < original.y);
+    soil.set_surfaces(
+        surfaces::ordinary(crate::floor::FloorGeometry::closed(layout)),
+        SoilSupportState::Ordinary,
+    );
+    assert_eq!(soil.world_point(shoot.cell), Some(falling));
+    s.plants.revalidate(s.soil.as_ref().unwrap());
+    assert_eq!(s.plants().plants.observe(), before);
+    for _ in 0..12 {
+        s.soil
+            .as_mut()
+            .unwrap()
+            .advance_loss(Duration::from_millis(250));
+        s.plants.revalidate(s.soil.as_ref().unwrap());
+    }
+    let after = s.plants().plants.observe();
+    assert_eq!(visible_blades(&s), 0);
+    // No restored transform can publish the old blades above bare floor.
+    for t in &lost {
+        assert_eq!(s.soil().unwrap().world_point(t.cell), None);
+        assert!(!after.tissues.iter().any(|a| a.id == t.id));
+    }
+    for t in &bank {
+        assert_eq!(after.tissues.iter().find(|a| a.id == t.id), Some(t));
+    }
+    for resource in 0..3 {
+        let reserves: u64 = lost.iter().map(|t| t.stores[resource]).sum();
+        assert_eq!(
+            after.ledger.loss[resource] - before.ledger.loss[resource],
+            reserves
+        );
+    }
+    let exported = s.soil().unwrap().accounting();
+    assert!(exported.exported > 0 && exported.retained > 0);
+    assert_eq!(exported.added, accounting.added);
+    assert_eq!(exported.added, exported.retained as u64 + exported.exported);
+    seconds(&mut s, 5);
+    assert!(
+        s.plants()
+            .plants
+            .observe()
+            .tissues
+            .iter()
+            .all(|t| !lost.iter().any(|old| old.id == t.id))
+    );
+    assert_eq!(s.soil().unwrap().accounting(), exported);
+    let refill = s.admit_soil();
+    assert_eq!(refill.sites.len() as u64, exported.exported);
+    assert!(
+        s.plants()
+            .plants
+            .observe()
+            .tissues
+            .iter()
+            .all(|t| !lost.iter().any(|old| old.id == t.id))
+    );
+    let new_seed = s.plant_grass(200).unwrap();
+    assert!(!lost.iter().any(|t| t.id == new_seed));
+    let current = s.plants().plants.observe();
+    assert_eq!(
+        current
+            .tissues
+            .iter()
+            .find(|t| t.id == new_seed)
+            .unwrap()
+            .stores,
+        SEED_STARTING_RESERVES
+    );
+}
+
+#[test]
 fn clock_grass_contract_all_floor_adapters_and_shared_arena_preserve_material_identity() {
     for kind in [
         ClockEventKind::Falling,

@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-15T22:32:12.360407+00:00",
+  "implementation_commit": "0ed6e5fe01a879772aa88ad2346fd3e1be439855",
+  "scope": "Package validation and durable preparation only; no privileged device preparation or installation was performed.",
+  "host_validation": {
+    "ota_tests_passed": 122,
+    "manager_tests_passed": 38,
+    "ignored_optional_ota_tests": 3,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "aarch64_tests_and_examples": "built"
+  },
+  "pi5_validation": {
+    "user": "spacewars",
+    "uid": 1000,
+    "bootstrap_related_tests_passed": 19,
+    "optional_artifact_test_ignored": 1,
+    "check_rejected_without_root": true,
+    "prepare_rejected_without_root": true,
+    "boot_id_unchanged": "de606400-dc75-446e-b26b-385592b0f562",
+    "boot_inventory_unchanged_files": 101,
+    "boot_inventory_sha256": "bc69b08539de96dd260d33dc78246a8a5c3e8b1762ffca1388b9bc1fd1fadc71",
+    "layout_unchanged": true,
+    "physical_device_unchanged": true,
+    "root_ssh": "current key rejected",
+    "privileged_preflight_completed": false
+  },
+  "picade_validation": {
+    "status": "sw-picade.local did not resolve; no live check performed"
+  },
+  "artifact": {
+    "path": "target/ota-bootstrap-private-514264c-pi5",
+    "image_source": {
+      "schema": 1,
+      "commit": "514264c9723d13db493b9fd2e6503f8c5859a4e3",
+      "dirty": false,
+      "revision": "514264c9723d"
+    },
+    "image_build_id": "rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3",
+    "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+    "bundle_sha256": "608529de32b4918e1999849121f7873da2823845853b2545260718c3f996107a",
+    "compressed": {
+      "bytes": 128386085,
+      "sha256": "d969f5ad44cf6933745eac17c6eca8a22ff07210caf44a9c07dda0e2227ac006"
+    },
+    "expanded": {
+      "bytes": 520093696,
+      "sha256": "7d63e950f48a66100d8db7bed122990a39c88b2bd797a114320ae7d672036081"
+    },
+    "listed_checksums_verified": 193,
+    "expanded_roundtrip_verified": true,
+    "private_directories_verified": 6,
+    "private_files_verified": 194,
+    "new_runtime_guards_in_image": false,
+    "device_checker_test": "Passed using this real package and an explicitly synthetic Pi 5 context on the workstation; not live-device preflight."
+  },
+  "logs": {
+    "tests": {
+      "path": "target/ota-bootstrap-preparation-tests.log",
+      "sha256": "8119cb16ce3380f78d80d06ab5800aea8cef08805f49f57ec60699d030d5e005",
+      "results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.85s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.68s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 100 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 13.32s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-bootstrap-preparation-clippy.log",
+      "sha256": "534342fceadf191d74dc416c3692317b1f238ec79b83cb23f1c0aef61d1da925"
+    },
+    "msrv": {
+      "path": "target/ota-bootstrap-preparation-msrv.log",
+      "sha256": "1e5ee26652e0c9b93adfce2355094f2307b23443b8111a0e219dd5c889b16859"
+    },
+    "aarch64": {
+      "path": "target/ota-bootstrap-preparation-aarch64.log",
+      "sha256": "e9662f605a7ab74e4614ba18bd19f91120e2fe82ff63a82c24a6d279cd0b24da"
+    },
+    "examples": {
+      "path": "target/ota-bootstrap-preparation-examples.log",
+      "sha256": "59639588a6f1826f129cbcd121edc07279dab94786f5fa5bde6b3439b2e845cc"
+    },
+    "pi5-tests": {
+      "path": "target/ota-bootstrap-preparation-pi5-tests.log",
+      "sha256": "71af307414a4474e38ff164f8ea9e6c501a73e3cca8c455b126441da021e88fd",
+      "results": [
+        "test result: ok. 19 passed; 0 failed; 1 ignored; 0 measured; 83 filtered out; finished in 32.59s"
+      ]
+    },
+    "pi5-check-denial": {
+      "path": "target/ota-bootstrap-preparation-pi5-check-denial.log",
+      "sha256": "a2fe1c8b5f69df030c1d6dd5858052d8d438e27556269cf87252ee0fcbd79517"
+    },
+    "pi5-prepare-denial": {
+      "path": "target/ota-bootstrap-preparation-pi5-prepare-denial.log",
+      "sha256": "a2fe1c8b5f69df030c1d6dd5858052d8d438e27556269cf87252ee0fcbd79517"
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "cargo test --locked -p engine-ota --target aarch64-unknown-linux-gnu --no-run",
+    "cargo build --locked -p engine-ota --example bootstrap_check --example bootstrap_prepare --target aarch64-unknown-linux-gnu",
+    "SPACEWARS_BOOTSTRAP_TEST_PACKAGE=/absolute/path/to/private-package cargo test --locked -p engine-ota bootstrap::device::tests::real_private_package_is_checked_without_device_writes -- --ignored --nocapture --test-threads=1",
+    "On Pi 5 as UID 1000: /tmp/ota-bootstrap-preparation-tests-aarch64 bootstrap --test-threads=1"
+  ],
+  "remaining": [
+    "authenticated root connection to both devices",
+    "verified recovery copies and independent export",
+    "closure of installed legacy unsigned update and reboot paths",
+    "inactive-root write and boot staging with durable checkpoints",
+    "supervised trial, staged-normal and canonical-normal boot verification",
+    "explicit recovery baseline and real failure qualification",
+    "end-to-end feed, updater, policy and UI integration"
+  ],
+  "shared_writer_followup": {
+    "implementation_commit": "ff78362d4fc3fafd96d4b8d751e1042d9c4a5694",
+    "scope": "Internal shared copy mechanism, not a bootstrap installation entry point; production signed OTA admission remains required.",
+    "ota_tests_passed": 124,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "aarch64_tests": "built",
+    "pi5_file_backed_tests_passed": 8,
+    "pi5_uid": 1000,
+    "pi5_elapsed_seconds": 100.6,
+    "real_clean_artifact_test": {
+      "passed": true,
+      "image_source_commit": "514264c9723d13db493b9fd2e6503f8c5859a4e3",
+      "expanded": {
+        "bytes": 520093696,
+        "sha256": "7d63e950f48a66100d8db7bed122990a39c88b2bd797a114320ae7d672036081"
+      },
+      "target": "anonymous temporary regular file on the workstation",
+      "descriptor": "test fixture, not a signed feed candidate",
+      "elapsed_seconds": 35.49
+    },
+    "production_device_writes": false,
+    "logs": {
+      "tests": {
+        "path": "target/ota-bootstrap-writer-tests.log",
+        "sha256": "379752afccf2fb00bed298529c6fa810b0b363e598b6642b256945316ef841e9",
+        "results": [
+          "test result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 96 filtered out; finished in 11.53s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+        ]
+      },
+      "full-ota": {
+        "path": "target/ota-bootstrap-writer-full-ota.log",
+        "sha256": "b01c47ed5cf6ab123820b4be933e158fd29d737341bb3838ee82c5ca5c38c6d7",
+        "results": [
+          "test result: ok. 102 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 16.59s",
+          "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ]
+      },
+      "real-artifact": {
+        "path": "target/ota-bootstrap-writer-real-artifact.log",
+        "sha256": "fc8abbd2d902084827de493880cdc165754fb3cbf80959ff2b4259304d9a2ac6",
+        "results": [
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 35.49s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+        ]
+      },
+      "clippy": {
+        "path": "target/ota-bootstrap-writer-clippy.log",
+        "sha256": "1f1ac6e5f6ad37d1964e9684d45f327e952199a2443bb5d3a5d66d1f4f195421"
+      },
+      "msrv": {
+        "path": "target/ota-bootstrap-writer-msrv.log",
+        "sha256": "ab9e24db9b73aa1e8f140c3b356d598465dd0183c25fbc2268d26426c794f385"
+      },
+      "aarch64": {
+        "path": "target/ota-bootstrap-writer-aarch64.log",
+        "sha256": "93c799ac332c21c3a5d023d3295fc128c5dfb30bb2af2c9040e8f72e6904afef"
+      },
+      "pi5": {
+        "path": "target/ota-bootstrap-writer-pi5.log",
+        "sha256": "acde91c6847dd5256e54310182d1243fdf204b1ef2a62e01d7d7e0e6ac5b02d0",
+        "results": [
+          "test result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 96 filtered out; finished in 100.60s"
+        ]
+      }
+    },
+    "reproduction": [
+      "cargo test --locked -p engine-ota -- --test-threads=1",
+      "SPACEWARS_OTA_TEST_EXT4=/absolute/path/to/rootfs.ext4 cargo test --locked -p engine-ota install_linux::tests::yocto_artifact_checks_actual_format_and_retains_dirty_source_rejection -- --ignored --nocapture --test-threads=1",
+      "On Pi 5 as UID 1000: /tmp/ota-bootstrap-writer-tests-aarch64 install_linux --test-threads=1"
+    ]
+  }
+}

@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "source": "f87a5ac2299dbc7b6a9d87f030d5132ac8e5eb4e",
+  "scope": "Read-only native provider evidence validated by the corrected TimeTracker in memory; installed service and OTA trust unchanged.",
+  "problem": "Linux inode timestamps can precede a later high-resolution successful NTP receipt. The old one-sided marker check rejected valid provider evidence.",
+  "fix": "Use absolute timestamp difference within the existing two-second tolerance; retain provider identity, successful receipt, NTP, kernel clock and replay checks.",
+  "helper": {
+    "path": "/data/spacewars-recovery-tools/075576469d2c00a27c97cb9a9cb02711e76da81d68230bae4627e6540527283a/time_validation_probe",
+    "sha256": "075576469d2c00a27c97cb9a9cb02711e76da81d68230bae4627e6540527283a",
+    "bytes": 2570784
+  },
+  "private_evidence": "/home/data/workspace/space-wars-ota/target/ota-time-marker-f87a5ac-20261017-run2",
+  "devices": [
+    {
+      "host": "sw-picade.local",
+      "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+      "accepted": true,
+      "duplicate_accepted": false,
+      "marker_minus_receipt_us": -3213,
+      "recovery_sha256": "0b2048f3d88e006e18d972e49b13514e02ab0da720f888ad5a0e254a61541abe",
+      "installed_state_unchanged": true,
+      "observation": {
+        "kernel_synchronized": true,
+        "notification_realtime_us": 1792292171435341,
+        "now": {
+          "boottime_us": 1653528486,
+          "monotonic_us": 1653528486,
+          "realtime_us": 1792292257236792
+        },
+        "ntp_packet_count": 4,
+        "ntp_spike": false,
+        "ntp_valid": true,
+        "provider": {
+          "bus_owner": ":1.1150",
+          "invocation_id": "29f7da7ec3d74171bb6ab1a0c3aa2e8a",
+          "pid": 3349,
+          "uid": 992
+        },
+        "receipt": {
+          "boottime_us": 1567730249,
+          "monotonic_us": 1567730249,
+          "packet_count": 4,
+          "realtime_us": 1792292171438554
+        }
+      },
+      "in_memory_status": {
+        "last_confirmed_sync_utc_us": 1792292171438554,
+        "reason": null,
+        "source": "network-sync",
+        "success_generation": 1,
+        "sync_age": {
+          "known": {
+            "overdue": false,
+            "seconds": 85
+          }
+        },
+        "usable": true,
+        "utc_us": 1792292257236792
+      },
+      "installed_image_source": {
+        "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+        "dirty": false,
+        "revision": "e9867188d211",
+        "schema": 1
+      },
+      "installed_hashes": [
+        "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14  /usr/bin/engine-os-manager",
+        "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc  /usr/bin/engine-client",
+        "fdded59f2261030750508e7a32f057f717c0ba79e7a5f4dae5daa685688e3bf4  /boot/cmdline.txt",
+        "265f1c4c4b1dc5f6beb93631da877c3ae695e68a77304085c92f6a415479f38a  /boot/spacewars-trial.txt"
+      ],
+      "evidence_files": {
+        "before.json": {
+          "sha256": "335126afa3d9c50ff2b1c0786209fe802462d6aa08b54b6bab8cf93df27ac62d",
+          "bytes": 3236
+        },
+        "probe.json": {
+          "sha256": "553c1a9dcfd98c5c679563e537e09ccb8dceedac629d79678b0791bbac0e4d99",
+          "bytes": 1262
+        },
+        "after.json": {
+          "sha256": "335126afa3d9c50ff2b1c0786209fe802462d6aa08b54b6bab8cf93df27ac62d",
+          "bytes": 3236
+        },
+        "result.json": {
+          "sha256": "8f46457d97e86a1cc30a01271f4c0baeb30b01d10cad1c33bd74a9beeac73604",
+          "bytes": 298
+        }
+      },
+      "old_marker_check_would_accept": false
+    },
+    {
+      "host": "spacewars.local",
+      "boot_id": "ec997cb4-c669-4b14-b593-e3b50d1f31d6",
+      "accepted": true,
+      "duplicate_accepted": false,
+      "marker_minus_receipt_us": -7187,
+      "recovery_sha256": "3885d51a486749ff5d668ce3d82d71f262d49e9e6dd7ee83dbe6125b2ea0bb21",
+      "installed_state_unchanged": true,
+      "observation": {
+        "kernel_synchronized": true,
+        "notification_realtime_us": 1792292217530655,
+        "now": {
+          "boottime_us": 10283260270,
+          "monotonic_us": 10283260270,
+          "realtime_us": 1792292255498281
+        },
+        "ntp_packet_count": 11,
+        "ntp_spike": false,
+        "ntp_valid": true,
+        "provider": {
+          "bus_owner": ":1.0",
+          "invocation_id": "d06755fac4d4490bb4bef8df2253895d",
+          "pid": 773,
+          "uid": 992
+        },
+        "receipt": {
+          "boottime_us": 10245299832,
+          "monotonic_us": 10245299831,
+          "packet_count": 11,
+          "realtime_us": 1792292217537842
+        }
+      },
+      "in_memory_status": {
+        "last_confirmed_sync_utc_us": 1792292217537842,
+        "reason": null,
+        "source": "network-sync",
+        "success_generation": 1,
+        "sync_age": {
+          "known": {
+            "overdue": false,
+            "seconds": 37
+          }
+        },
+        "usable": true,
+        "utc_us": 1792292255498281
+      },
+      "installed_image_source": {
+        "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+        "dirty": false,
+        "revision": "e9867188d211",
+        "schema": 1
+      },
+      "installed_hashes": [
+        "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14  /usr/bin/engine-os-manager",
+        "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc  /usr/bin/engine-client",
+        "fdded59f2261030750508e7a32f057f717c0ba79e7a5f4dae5daa685688e3bf4  /boot/cmdline.txt",
+        "265f1c4c4b1dc5f6beb93631da877c3ae695e68a77304085c92f6a415479f38a  /boot/spacewars-trial.txt"
+      ],
+      "evidence_files": {
+        "before.json": {
+          "sha256": "430eb4283a0513b1bb946e815151dbcd3b886b3239d0c2dbba3c22b828602279",
+          "bytes": 3216
+        },
+        "probe.json": {
+          "sha256": "8e989a756fc4010aa668a84df25a0dd1da215ddcfc1d666784b6fdf843930568",
+          "bytes": 1264
+        },
+        "after.json": {
+          "sha256": "430eb4283a0513b1bb946e815151dbcd3b886b3239d0c2dbba3c22b828602279",
+          "bytes": 3216
+        },
+        "result.json": {
+          "sha256": "547e76f65b86ba3547f67ded03cf56e46920d09d2de25759ef843699714f4d0f",
+          "bytes": 298
+        }
+      },
+      "old_marker_check_would_accept": false
+    }
+  ],
+  "validation": {
+    "os_manager_tests_passed": 187,
+    "os_manager_tests_ignored": 2,
+    "clippy": "passed: all targets, no deps, warnings denied",
+    "rust_1_89_check": "passed: all targets",
+    "aarch64_release_build": "passed",
+    "regression_before_fix": "coarse_notification_time_can_precede_the_successful_receipt failed at a 1 us marker lag"
+  },
+  "limits": [
+    "The installed services still run e986718 and reject these samples; this was not deployment of the fix.",
+    "No trust or staging provisioning, installation, reboot, health-failure injection or signed-candidate quarantine test was performed.",
+    "RTC retention and full installed-service time qualification remain outstanding."
+  ]
+}

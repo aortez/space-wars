@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "source": "a05944ba94bd985386bac3f5276731135df9e6a3",
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 23470072,
+        "sha256": "443dcf490f70d78b0b94251ac7d0a4f92b9052e956354f18ad85b271460aacf6"
+      },
+      "os_manager": {
+        "bytes": 11252736,
+        "sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-884d6f04516d025200e406671164ed947c9893dedb4baa805a366e74bf9475b9",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "884d6f04516d025200e406671164ed947c9893dedb4baa805a366e74bf9475b9",
+    "schema": 1,
+    "source": {
+      "commit": "a05944ba94bd985386bac3f5276731135df9e6a3",
+      "dirty": false,
+      "revision": "a05944ba94bd",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "expanded": {
+    "bytes": 528482304,
+    "sha256": "ad522e65cecaf4602c78966b87fea76f59b06192d926bebd67d551f59b482ea7"
+  },
+  "frozen": {
+    "image.ext4.gz": {
+      "bytes": 137714098,
+      "sha256": "e4ca29b927aa9ec1aee933fc23f967785774515cf3a0fac1be5013f3dec0d635"
+    },
+    "image.wic.gz": {
+      "bytes": 187190281,
+      "sha256": "35c69d6e320687dac6ecfd8effb56a1caa0127f9000480520505b60f82132c3f"
+    },
+    "image.wic.bmap": {
+      "bytes": 6517,
+      "sha256": "34bb0d2289e5e88cb41731e14edc29a62af5d51587f4dd2ff6255596c22f4dd5"
+    }
+  },
+  "packages": [
+    {
+      "board": "pi4",
+      "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+      "build_id": "rootfs-884d6f04516d025200e406671164ed947c9893dedb4baa805a366e74bf9475b9",
+      "compressed": {
+        "bytes": 131852964,
+        "sha256": "a3000e03440232f6eb05429844afe17aae17f353ed54c873e03849c6ffac21a6"
+      },
+      "device_changes": false,
+      "expanded": {
+        "bytes": 528482304,
+        "sha256": "ad522e65cecaf4602c78966b87fea76f59b06192d926bebd67d551f59b482ea7"
+      },
+      "output": "/home/data/workspace/space-wars-ota/target/ota-fresh-package-a05944b-pi4",
+      "profile": "picade",
+      "purpose": "supervised-bootstrap",
+      "source": {
+        "commit": "a05944ba94bd985386bac3f5276731135df9e6a3",
+        "dirty": false,
+        "revision": "a05944ba94bd",
+        "schema": 1
+      },
+      "staged_asset_bytes": 35574861,
+      "target": "b",
+      "bundle_sha256": "981a05a0799099e6393de4fa3d624b13cd9c86d0097845ef6ba7ea9cdd862f60",
+      "boot_probe": {
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "hardware_profile": "picade",
+        "immutable_bytes": 85396458,
+        "immutable_files": 103,
+        "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+        "provisioned_default": "b",
+        "trial": null
+      }
+    },
+    {
+      "board": "pi5",
+      "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+      "build_id": "rootfs-884d6f04516d025200e406671164ed947c9893dedb4baa805a366e74bf9475b9",
+      "compressed": {
+        "bytes": 131852964,
+        "sha256": "a3000e03440232f6eb05429844afe17aae17f353ed54c873e03849c6ffac21a6"
+      },
+      "device_changes": false,
+      "expanded": {
+        "bytes": 528482304,
+        "sha256": "ad522e65cecaf4602c78966b87fea76f59b06192d926bebd67d551f59b482ea7"
+      },
+      "output": "/home/data/workspace/space-wars-ota/target/ota-fresh-package-a05944b-pi5",
+      "profile": "hyperpixel",
+      "purpose": "supervised-bootstrap",
+      "source": {
+        "commit": "a05944ba94bd985386bac3f5276731135df9e6a3",
+        "dirty": false,
+        "revision": "a05944ba94bd",
+        "schema": 1
+      },
+      "staged_asset_bytes": 35599908,
+      "target": "b",
+      "bundle_sha256": "561a21a546e3c3a10efa354b36e5b5fc2ee54f6e4ba3516da782eb01076c824c",
+      "boot_probe": {
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "hardware_profile": "hyperpixel",
+        "immutable_bytes": 85396458,
+        "immutable_files": 103,
+        "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+        "provisioned_default": "b",
+        "trial": null
+      }
+    }
+  ],
+  "build": {
+    "inputs_record": "target/ota-fresh-build-inputs-a05944b.json",
+    "log": "target/ota-fresh-image-build-a05944b.log",
+    "tasks_succeeded": 6768,
+    "tasks_reused": 6738,
+    "clean_source_before_and_after": true
+  },
+  "qualification": {
+    "independent_source_policy": "target/ota-fresh-image-policy-a05944b.json",
+    "record": "target/ota-fresh-candidate-a05944b/qualification.json",
+    "build_inputs_sha256": "7c626d9f02371f81172a5d3f24087e02553e6487ea7a7cb255a58ba3301a1347",
+    "image_and_expanded_match": true,
+    "validator_source": "a05944ba94bd985386bac3f5276731135df9e6a3",
+    "validator_sha256": "1e96101ff91189b974735a73fee01d53e1cb974532a70189803716475d3b3971",
+    "initial_stale_validator_rejected_protocol": true,
+    "resolution": "Rebuilt the feature-gated image_candidate with --features publisher from a05944b; full candidate assembly and independent verification then passed."
+  },
+  "published": false,
+  "signed": false,
+  "automatic_ota_enabled": false,
+  "scope": "Clean build and static artifact qualification, not physical boot or power-loss qualification."
+}

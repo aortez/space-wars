@@ -1,0 +1,236 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "device": "spacewars.local",
+  "image_source": "a05944ba94bd985386bac3f5276731135df9e6a3",
+  "image_record": "ota-corrected-bootstrap-image-20261017.json",
+  "previous_attempt_reconciliation": "ota-pi5-failed-trial-reconciliation-20261017.json",
+  "selected_preservation": {
+    "package": "561a21a546e3c3a10efa354b36e5b5fc2ee54f6e4ba3516da782eb01076c824c",
+    "raw": "b6cd1f6cb12ae828a15aef5c9c9fb2e5fbfb5b56ebd76773800cc2b5673c2f4f",
+    "data": "cb20585e840b33b4997f2d7a079a430acdad44c5b1214fc294fbe14ea5fa407c",
+    "originals": "00e82571d47ab6ee5a9c8833c40276fbd01b83752eec864747dae35f211c80c6"
+  },
+  "data_archive": {
+    "entries": 18751,
+    "archive_sha256": "e73a0817a8618c95ea7ae097700a4bc34eb38932b7b2616a452f4fc8d9135e0b",
+    "workstation_content_modes_links_timestamps_verified": true,
+    "numeric_owners_retained_in_archive": true,
+    "numeric_owners_recreated_in_this_workstation_rehearsal": false
+  },
+  "access": {
+    "independent_administrator_uid": 1001,
+    "administrator_sudo_uid": 0,
+    "independent_runtime_uid": 1000,
+    "runtime_unrestricted_sudo_denied": true,
+    "runtime_recovery_command_denied": true,
+    "runtime_logind_can_reboot_denied": true,
+    "runtime_not_in_disk_group": true,
+    "loaded_configuration_check_passed": true
+  },
+  "root_install": {
+    "schema": 1,
+    "scope": "verified inactive-root copy only; original boot selection retained; no login, complete privilege audit, watchdog or boot authority",
+    "package_sha256": "561a21a546e3c3a10efa354b36e5b5fc2ee54f6e4ba3516da782eb01076c824c",
+    "journal_sha256": "2a5c9682e309bd2cbbc0f8c2c33ce384bc74d65a3913db5c630186786597f929",
+    "target": "b",
+    "expanded": {
+      "bytes": 528482304,
+      "sha256": "ad522e65cecaf4602c78966b87fea76f59b06192d926bebd67d551f59b482ea7"
+    },
+    "reused_written": false,
+    "ready_for_trial": false
+  },
+  "staging": {
+    "schema": 1,
+    "scope": "temporary boot tree and trial file prepared; normal default retained; one-shot reboot and physical qualification remain separate",
+    "package_sha256": "561a21a546e3c3a10efa354b36e5b5fc2ee54f6e4ba3516da782eb01076c824c",
+    "root_install_sha256": "2a5c9682e309bd2cbbc0f8c2c33ce384bc74d65a3913db5c630186786597f929",
+    "trial_id": "f952a6f49c6324c0c7eb31783eef08bb6d2a34f0d98c2cffbbfed0375e4bd047",
+    "phase": "trial-ready",
+    "original_default_retained": true,
+    "reboot_requested": false,
+    "automatic_updates_enabled": false
+  },
+  "activation": {
+    "schema": 1,
+    "scope": "one-shot reboot job accepted; trial boot, health and normal confirmation remain unobserved",
+    "package_sha256": "561a21a546e3c3a10efa354b36e5b5fc2ee54f6e4ba3516da782eb01076c824c",
+    "root_install_sha256": "2a5c9682e309bd2cbbc0f8c2c33ce384bc74d65a3913db5c630186786597f929",
+    "trial_id": "f952a6f49c6324c0c7eb31783eef08bb6d2a34f0d98c2cffbbfed0375e4bd047",
+    "request_boot_id": "340070d5-939e-4593-914a-e24ec9b52f12",
+    "reboot_job_accepted": true,
+    "automatic_updates_enabled": false
+  },
+  "trial": {
+    "boot_id": "098b06ac-0dc3-43d6-a3ab-3b4bb1db7588",
+    "first_observed_uptime_seconds": 17.3,
+    "last_observed_uptime_seconds": 173.07,
+    "phase_reached": "observing-trial",
+    "detail": "kiosk required state write failed",
+    "early_watchdog_armed_ms": 714,
+    "early_watchdog_timeout_seconds": 210,
+    "health_proof": null,
+    "normal_default_promoted": false
+  },
+  "fallback": {
+    "boot_id": "27cf796a-01bb-4fea-ac8e-85023c81945d",
+    "slot": "a",
+    "first_observer_uptime_seconds": 16.51,
+    "journal_phase": "failed",
+    "journal_failure": "health-timeout",
+    "journal_sha256": "64c1ba083d2955474c50658ef8e36d75babde719c3b040b76a25c4a93e49a191",
+    "final": {
+      "root": "2050:2",
+      "root-mount": [
+        "/dev/sda2 / ext4 rw,relatime 0 0",
+        "/dev/sda1 /boot vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,errors=remount-ro 0 0",
+        "/dev/sda4 /data ext4 rw,relatime 0 0"
+      ],
+      "config": "6b5bd746c4a91f9cc3e66b5b53a931d5b7a7e5c359aa44510131c94ed48dc314  /boot/config.txt",
+      "tryboot": "0   0   0   0",
+      "binaries": "6829dd3f83d5c820e1e1bdb6ea039a285c5eff7304d68e96b9021dd539110d96  /usr/bin/engine-client\n1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14  /usr/bin/engine-os-manager",
+      "services": "active\nactive\nactive",
+      "storage_errors_observed": false,
+      "failed-record": "64c1ba083d2955474c50658ef8e36d75babde719c3b040b76a25c4a93e49a191  /data/spacewars-bootstrap/active/boot-trial/record.json",
+      "archived-record": "f9f8ed32d30df3da790d9d33d9b189ced0bbd19ca91ef6c3435d163efa3698b9  /data/logs/spacewars-bootstrap-failed-afef8ee0/attempt/active/boot-trial/record.json"
+    },
+    "no_manual_reboot_or_watchdog_action_after_activation": true,
+    "reset_cause_register_captured": false
+  },
+  "diagnosis": {
+    "outside_sandbox_state_probe_passed": true,
+    "sandbox_error": "setpriv: setresuid failed: Operation not permitted",
+    "capability_bounding_set": "00000000002800e0",
+    "capability_permitted_and_effective_before": "0000000000280060",
+    "systemd_version": "255.22^",
+    "systemd_source": "356c54394add8c6a1d52773852c23656590dc33b",
+    "source_reference": "https://github.com/systemd/systemd-stable/blob/356c54394add8c6a1d52773852c23656590dc33b/src/core/exec-invoke.c#L4917",
+    "change": "AmbientCapabilities=CAP_SETUID; existing capability bounding set and sandbox retained"
+  },
+  "native_regression": {
+    "schema": 1,
+    "host": "spacewars.local",
+    "boot_id": "27cf796a-01bb-4fea-ac8e-85023c81945d",
+    "unit_sha256": "55861bd1be0d2c078fca1ff7b0aec4f8699e137f748415b63317456298b4f654",
+    "properties": {
+      "User": "root",
+      "Group": "spacewars",
+      "UMask": "0077",
+      "TimeoutStartSec": "195",
+      "TimeoutStopSec": "5",
+      "NoNewPrivileges": "yes",
+      "ProtectSystem": "strict",
+      "ReadWritePaths": "/boot /data/spacewars-system /data/spacewars/config -/data/spacewars-bootstrap/active/boot-trial /run/spacewars-updater /run/spacewars-install -/run/spacewars-recovery",
+      "ProtectHome": "yes",
+      "PrivateTmp": "yes",
+      "ProtectKernelTunables": "yes",
+      "ProtectKernelModules": "yes",
+      "ProtectControlGroups": "yes",
+      "CapabilityBoundingSet": "CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_KILL CAP_SYS_ADMIN",
+      "AmbientCapabilities": "CAP_SETUID",
+      "RestrictNamespaces": "yes",
+      "SystemCallFilter": "~@mount",
+      "DevicePolicy": "closed",
+      "DeviceAllow": "/dev/watchdog0 w",
+      "RestrictAddressFamilies": "AF_UNIX",
+      "RestrictRealtime": "yes",
+      "LockPersonality": "yes",
+      "MemoryDenyWriteExecute": "yes",
+      "SystemCallArchitectures": "native"
+    },
+    "manager_sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14",
+    "expected_kiosk": {
+      "build_id": "rootfs-188b26379dd5104887b3f069eb0a2550839b8f9ed2cffe65f773d978ee0f8f0a",
+      "build_revision": "04b6cb75f863",
+      "executable_bytes": 23470072,
+      "executable_sha256": [
+        104,
+        41,
+        221,
+        63,
+        131,
+        213,
+        200,
+        32,
+        225,
+        225,
+        189,
+        182,
+        234,
+        3,
+        154,
+        40,
+        92,
+        94,
+        255,
+        115,
+        4,
+        214,
+        142,
+        150,
+        185,
+        2,
+        29,
+        213,
+        57,
+        17,
+        13,
+        150
+      ]
+    },
+    "samples": [
+      {
+        "boot_id": "27cf796a-01bb-4fea-ac8e-85023c81945d",
+        "uptime_ms": 433738,
+        "process_id": 868,
+        "start_ticks": 439,
+        "invocation_id": "ec064b0d80874194aeb63a4f119dc869",
+        "build_id": "rootfs-188b26379dd5104887b3f069eb0a2550839b8f9ed2cffe65f773d978ee0f8f0a",
+        "control_response": 7,
+        "presented_frames": 23946
+      },
+      {
+        "boot_id": "27cf796a-01bb-4fea-ac8e-85023c81945d",
+        "uptime_ms": 434305,
+        "process_id": 868,
+        "start_ticks": 439,
+        "invocation_id": "ec064b0d80874194aeb63a4f119dc869",
+        "build_id": "rootfs-188b26379dd5104887b3f069eb0a2550839b8f9ed2cffe65f773d978ee0f8f0a",
+        "control_response": 9,
+        "presented_frames": 23980
+      }
+    ],
+    "case_names": [
+      "previous",
+      "credentials",
+      "healthy-1",
+      "readonly",
+      "healthy-2"
+    ],
+    "journal_hashes_before": "64c1ba083d2955474c50658ef8e36d75babde719c3b040b76a25c4a93e49a191  /data/spacewars-bootstrap/active/boot-trial/record.json\nabsent /data/spacewars-bootstrap/completed/boot-trial/record.json",
+    "journal_hashes_after": "64c1ba083d2955474c50658ef8e36d75babde719c3b040b76a25c4a93e49a191  /data/spacewars-bootstrap/active/boot-trial/record.json\nabsent /data/spacewars-bootstrap/completed/boot-trial/record.json",
+    "read_only_state_rejected": true,
+    "kiosk_uid": 1000,
+    "kiosk_effective_capabilities": 0,
+    "recovery_policy_executed": false,
+    "watchdog_opened": false,
+    "reboot_requested": false,
+    "scope": "Native sandbox diagnostic only; no promotion or boot qualification"
+  },
+  "tests": {
+    "artifact_policy_tests_passed": 6,
+    "kiosk_health_tests_passed": 9,
+    "live_smoke_cases_passed": 5,
+    "smoke_tool": "yocto/scripts/check-recovery-health.py"
+  },
+  "private_evidence": "/home/data/workspace/space-wars-ota/target/ota-pi5-bootstrap-a05944b",
+  "automatic_ota_enabled": false,
+  "production_recovery_baseline_created": false,
+  "remaining": [
+    "Clean image containing the capability correction",
+    "Explicit reconciliation of consumed f952a6f4 attempt",
+    "Fresh corrected trial and staged/canonical normal-boot confirmation",
+    "Picade trials and remaining failure qualification"
+  ]
+}

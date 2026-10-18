@@ -21,6 +21,7 @@
     "controllers::controllers_are_reachable_from_launcher_and_pause_without_resuming",
     "device_info::device_info_is_shared_read_only_scrollable_and_returns_to_its_parent",
     "garden_lab::garden_lab_pause_step_and_renderers_smoke",
+    "kiosk_health_challenges_run_on_the_live_ui_thread",
     "launcher_can_run_the_classic_spacewars_menu_lifecycle",
     "launcher_can_run_the_clock_menu_lifecycle",
     "launcher_can_run_the_pizza_menu_lifecycle",

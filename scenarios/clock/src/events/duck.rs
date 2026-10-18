@@ -7,6 +7,8 @@ mod controller;
 mod debris_tests;
 mod drain;
 #[cfg(test)]
+mod exit_tests;
+#[cfg(test)]
 mod flap_tests;
 pub(crate) mod flaps;
 mod flow;
@@ -84,6 +86,9 @@ pub(crate) struct DuckEvent {
     pub direction: f32,
     pub obstacles: [Obstacle; 3],
     pub course: Option<planner::Course>,
+    // Derived from current retained soil; never changes authored arena geometry.
+    soil_course: Option<planner::Course>,
+    soil_supports: Vec<(usize, Vec2, Vec2)>,
     // Rain/Meltdown advance the authoritative actuator while active. This small
     // snapshot drives contacts/rendering; after the wet event, it settles dry.
     responsive_floor: Option<ResponsiveFloor>,
@@ -313,6 +318,8 @@ impl DuckEvent {
             water_report: BuoyancyReport::default(),
             paddling: false,
             course: None,
+            soil_course: None,
+            soil_supports: Vec::new(),
             responsive_floor: None,
             drain_floor: None,
             spawn_motion: None,
@@ -539,6 +546,17 @@ impl DuckEvent {
         let course = self.course.as_ref()?;
         world.surface_contacts(DUCK_COLLIDER).find_map(|contact| {
             if contact.normal.y > 0.7 && contact.separation <= self.radius * 0.05 {
+                if contact.collider.entity.value() == crate::grass::SOIL_PHYSICS_ID {
+                    // Soil is a fixed compound at the world origin. Its local
+                    // surface point stays on the material even during penetration.
+                    return self.soil_supports.iter().find_map(|(index, min, max)| {
+                        (contact.local_surface.position.x >= min.x
+                            && contact.local_surface.position.x <= max.x
+                            && (contact.local_surface.position.y - max.y).abs()
+                                <= self.radius * 0.1)
+                            .then_some(*index)
+                    });
+                }
                 let index = contact.collider.entity.value().checked_sub(1000)? as usize;
                 (index < course.surfaces.len()).then_some(index)
             } else {
@@ -556,6 +574,22 @@ impl DuckEvent {
                 .expect("duck hull and non-overlapping course water"),
             _ => BuoyancyReport::default(),
         };
+        if self.player.is_none() && self.exit_visible() {
+            let motion = self.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+            let x = motion.position.x * self.direction + self.width * 0.5;
+            let wall = self.radius * 3.0;
+            // Only finish a tag already within one body length on the same
+            // bank. A fresh jump, wet recovery or flap perch gets no detour.
+            let near_wall = (wall - self.radius * 0.3..=wall + self.radius * 2.0).contains(&x)
+                && motion.linear_velocity.x * self.direction < 0.0
+                && self.grounded()
+                && self.water_report.submerged_fraction <= 0.05
+                && self
+                    .course
+                    .as_ref()
+                    .is_none_or(|_| self.supported_surface() == Some(0));
+            self.controller.notice_exit(self.tick, near_wall);
+        }
         self.decide_player_ledge();
         self.decide_automatic_ledge();
         let detour_command = self.decide_flap_detour(water);
@@ -574,7 +608,6 @@ impl DuckEvent {
         }
         let grounded = self.grounded();
         let support = self.supported_surface();
-        let exit_visible = self.exit_visible();
         let Some(world) = &mut self.world else { return };
         let motion = world.motion(DUCK_BODY).expect("live duck body");
         let screen = self.direction;
@@ -644,7 +677,7 @@ impl DuckEvent {
                 direction: axis.signum(),
                 jump: std::mem::take(&mut player.jump_pending),
             }
-        } else if let Some(course) = &self.course {
+        } else if let Some(course) = self.soil_course.as_ref().or(self.course.as_ref()) {
             let context = CourseContext {
                 course,
                 obstacles: &self.obstacles,
@@ -654,18 +687,10 @@ impl DuckEvent {
             };
             self.controller
                 .decide_water(observed, self.water_report.submerged_fraction, context)
-                .unwrap_or_else(|| {
-                    self.controller
-                        .decide_course(observed, context, exit_visible)
-                })
+                .unwrap_or_else(|| self.controller.decide_course(observed, context))
         } else {
-            self.controller.decide(
-                observed,
-                &self.obstacles,
-                self.width,
-                self.radius,
-                exit_visible,
-            )
+            self.controller
+                .decide(observed, &self.obstacles, self.width, self.radius)
         };
         let mut delta = self.movement.velocity_delta(observed, &command);
         self.paddling = false;

@@ -4,6 +4,16 @@
 //! solver supplies either exact O(n²) gravity or deterministic Barnes-Hut
 //! gravity, making this scenario both an interactive toy and a scale lab.
 
+#[cfg(test)]
+mod event_tests;
+mod events;
+
+pub use events::{
+    DIRECTIONAL_GRAVITY_TICKS, FIXED_HZ, MAX_EVENT_GAP_TICKS, MIN_EVENT_GAP_TICKS,
+    PIZZA_ACTION_TRIGGER_EVENT, PIZZA_ACTION_VERSION, PIZZA_OBSERVATION_VERSION, PizzaAction,
+    PizzaEventDirection, PizzaEventKind, PizzaEventState, PizzaEventTrigger, PizzaObservation,
+};
+
 use std::time::{Duration, Instant};
 
 use engine_common::{
@@ -216,6 +226,8 @@ pub struct PizzaConfig {
     pub ball_spawn_rate: f32,
     pub bounds: PizzaBounds,
     pub gravity: PizzaGravityModel,
+    /// Applied when the run is created. Manual requests remain available when off.
+    pub automatic_events: bool,
     pub benchmark: Option<PizzaBenchmarkConfig>,
 }
 
@@ -241,6 +253,7 @@ impl PizzaConfig {
             gravity: benchmark
                 .map(|benchmark| benchmark.gravity)
                 .unwrap_or(self.gravity),
+            automatic_events: self.automatic_events && benchmark.is_none(),
             benchmark,
         }
     }
@@ -252,6 +265,7 @@ impl PizzaConfig {
             ball_spawn_rate: MAX_SPAWN_RATE,
             bounds,
             gravity: benchmark.gravity,
+            automatic_events: false,
             benchmark: Some(benchmark),
         }
     }
@@ -264,6 +278,7 @@ impl Default for PizzaConfig {
             ball_spawn_rate: 0.10,
             bounds: PizzaBounds::default(),
             gravity: PizzaGravityModel::Fast,
+            automatic_events: true,
             benchmark: None,
         }
     }
@@ -311,12 +326,17 @@ pub struct PizzaState {
     seed: u64,
     next_ball_id: u64,
     rng: StdRng,
+    events: events::Events,
     physics: Option<PhysicsWorld>,
     gravity_solver: GravitySolver,
     gravity_participants: Vec<GravityParticipant>,
 }
 
 impl PizzaState {
+    pub fn event_state(&self) -> PizzaEventState {
+        self.events.state()
+    }
+
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
         // Benchmark walls and fixture dimensions are part of the workload.
         // Resizing the presentation must not silently change the physics case.
@@ -888,8 +908,10 @@ impl Scenario for PizzaScenario {
     type Config = PizzaConfig;
 
     fn init(config: Self::Config, seed: u64) -> Self::State {
+        let config = config.normalized();
+        let events = events::Events::new(seed, config.automatic_events, config.benchmark.is_some());
         let mut state = PizzaState {
-            config: config.normalized(),
+            config,
             balls: Vec::new(),
             tick: 0,
             held_ball_id: None,
@@ -899,6 +921,7 @@ impl Scenario for PizzaScenario {
             seed,
             next_ball_id: 1,
             rng: StdRng::seed_from_u64(seed),
+            events,
             physics: None,
             gravity_solver: GravitySolver::new(),
             gravity_participants: Vec::new(),
@@ -913,6 +936,8 @@ impl Scenario for PizzaScenario {
             for action in actions {
                 if let Action::Pointer(pointer) = action {
                     state.apply_pointer_action(*pointer);
+                } else if let Some(PizzaAction::TriggerEvent(kind)) = PizzaAction::decode(action) {
+                    state.events.request(kind);
                 }
             }
         }
@@ -968,6 +993,7 @@ impl Scenario for PizzaScenario {
             return StepResult::default();
         }
 
+        state.events.begin_tick();
         let mut metrics = PizzaStepMetrics::default();
         state.advance_held_ball(dt);
         state.advance_spawner();
@@ -997,13 +1023,19 @@ impl Scenario for PizzaScenario {
         metrics.added = balls_after_explosions.saturating_sub(balls_before_explosions);
         metrics.removed = balls_before_explosions.saturating_sub(balls_after_explosions);
         state.last_step_metrics = metrics;
+        state.events.finish_tick();
         state.tick += 1;
         StepResult::default()
     }
 
-    fn observe(_state: &Self::State) -> Observation {
+    fn observe(state: &Self::State) -> Observation {
         Observation {
-            payload: Vec::new(),
+            payload: serde_json::to_vec(&PizzaObservation {
+                version: PIZZA_OBSERVATION_VERSION,
+                tick: state.tick,
+                event: state.event_state(),
+            })
+            .expect("Pizza observation contains only bounded integers and enums"),
         }
     }
 
@@ -1053,7 +1085,7 @@ impl Scenario for PizzaScenario {
     }
 
     fn tick_model() -> TickModel {
-        TickModel::FixedTimestep { hz: 60 }
+        TickModel::FixedTimestep { hz: FIXED_HZ }
     }
 }
 

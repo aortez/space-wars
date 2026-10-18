@@ -8,6 +8,8 @@ use super::flow;
 use super::planner::{self, Capabilities, Course, Plan};
 use super::{DT, Obstacle};
 
+#[path = "exit_controller.rs"]
+mod exit;
 #[path = "recovery_controller.rs"]
 mod recovery;
 #[path = "water_controller.rs"]
@@ -143,6 +145,7 @@ pub(super) struct Controller {
     pub navigator: Navigator,
     pub water: water::WaterNavigation,
     pub recovery: recovery::Recovery,
+    exit: exit::ExitIntent,
     trial: Option<JumpTrial>,
     previous_speed: f32,
     jumped: u8,
@@ -164,6 +167,7 @@ impl Controller {
             navigator: Navigator::default(),
             water: water::WaterNavigation::default(),
             recovery: recovery::Recovery::default(),
+            exit: exit::ExitIntent::default(),
             trial: None,
             previous_speed: 0.0,
             jumped: 0,
@@ -192,7 +196,6 @@ impl Controller {
         obstacles: &[Obstacle; 3],
         width: f32,
         radius: f32,
-        exit_visible: bool,
     ) -> Command {
         self.observe_jump(observed, radius);
         let mut command = Command {
@@ -246,6 +249,8 @@ impl Controller {
         };
         command.gait = Gait::Run;
 
+        self.prioritize_exit(observed, radius);
+
         // Tag a safe line just inside either edge. Reverse the requested motion
         // through the acceleration limiter, never reflect/teleport the body.
         let wall = if self.direction > 0.0 {
@@ -254,7 +259,7 @@ impl Controller {
             radius * 3.0
         };
         let distance = (wall - observed.position.x) * self.direction;
-        if !(exit_visible && self.direction > 0.0) {
+        if !(self.exit.visible && self.direction > 0.0) {
             if distance <= 0.0 && observed.grounded {
                 self.wall_tags[usize::from(self.direction > 0.0)] += 1;
                 self.direction = -self.direction;
@@ -267,7 +272,7 @@ impl Controller {
         command.direction = self.direction;
         if observed.velocity.x * self.direction < 0.0 {
             self.behavior = ClockDuckBehavior::Turning;
-        } else if exit_visible && self.direction > 0.0 {
+        } else if self.exit.visible && self.direction > 0.0 {
             self.behavior = ClockDuckBehavior::Exiting;
         }
 
@@ -379,12 +384,7 @@ impl Controller {
         })
     }
 
-    pub fn decide_course(
-        &mut self,
-        observed: Observation,
-        context: CourseContext<'_>,
-        exit_visible: bool,
-    ) -> Command {
+    pub fn decide_course(&mut self, observed: Observation, context: CourseContext<'_>) -> Command {
         let CourseContext {
             course,
             obstacles,
@@ -393,7 +393,7 @@ impl Controller {
             floor,
         } = context;
         if self.heights.count < 2 || self.speeds.count < 9 {
-            return self.decide(observed, obstacles, width, radius, exit_visible);
+            return self.decide(observed, obstacles, width, radius);
         }
         let Some(capabilities) = self.capabilities() else {
             self.behavior = ClockDuckBehavior::Blocked;
@@ -477,6 +477,7 @@ impl Controller {
                 jump: false,
             };
         };
+        self.prioritize_exit(observed, radius);
         let last = course.surfaces.len() - 1;
         self.cleared = if self.direction > 0.0 {
             source
@@ -489,7 +490,7 @@ impl Controller {
             } else {
                 radius * 3.0
             };
-            if exit_visible && self.direction > 0.0 {
+            if self.exit.visible && self.direction > 0.0 {
                 self.behavior = ClockDuckBehavior::Exiting;
                 return Command {
                     gait: Gait::Run,

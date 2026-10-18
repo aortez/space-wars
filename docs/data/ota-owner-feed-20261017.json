@@ -1,0 +1,840 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "date_timezone": "America/Los_Angeles",
+  "source": "e30ddef4db7a978210929ccbe2916ad1a8afa90f",
+  "scope": "Initial owner-local signing, public empty-feed delivery and native Pi trust checks; no signed-image install or recovery qualification",
+  "authority_creation": {
+    "bundle_sha256": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+    "created_utc": "2026-10-18T03:28:30Z",
+    "devices_provisioned": false,
+    "feed": "https://github.com/aortez/space-wars/releases/download/ota-feed/",
+    "images": 0,
+    "inventory_sha256": "4902321fce875038814a3d95411c6a23e0ad731c533a768ab0d2fc14327f0d27",
+    "published": false,
+    "roles": {
+      "nightly": {
+        "keyids": [
+          "e52eda0efc05645c12e4dc94334207168890f22c7e056a3fa0d422da7609088b"
+        ],
+        "threshold": 1
+      },
+      "release": {
+        "keyids": [
+          "af9a420331592633add7390e2b2a043c4cdb52980e6f8e1f8187354d795b63db",
+          "bb0c5180078b3d1047fcb0109b0603116d76a4741186af95b56871fd3fa5933c"
+        ],
+        "threshold": 2
+      },
+      "root": {
+        "keyids": [
+          "5691f317359f861420604d9676c9686215e46914effedd193466d52cd253e0b9",
+          "951b8002b500af0cf95ed0b0898f770bd97e2cb75ae6cd98c7089362e5a6d29e",
+          "8241d7ed0bd778494c0766fbec7e4ea815392118b99f18c793cc4e19364709da"
+        ],
+        "threshold": 2
+      },
+      "snapshot": {
+        "keyids": [
+          "9c4de4d5532e5fe2296c3af140cb9f4c8b9607eb3277b843b5a1a0680ac49c6e"
+        ],
+        "threshold": 1
+      },
+      "targets": {
+        "keyids": [
+          "e1273f0bfea5e57e45ff3573f27a11d2080db638f2529e6aa8e3770e26d65d6d"
+        ],
+        "threshold": 1
+      },
+      "timestamp": {
+        "keyids": [
+          "26e1ea82039d621e73930cf644d7d24664fbbefab758a519affaf8d51ece72e4"
+        ],
+        "threshold": 1
+      }
+    },
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "scope": "Owner-local authority; keys co-located, no isolated signing service or production rollout claim",
+    "verifier_sha256": "6f9c96849c2b4ef1fc60208648025f66c85f78a88bb9bc8e08a6c6cfaaa44a53"
+  },
+  "publication": {
+    "assets": {
+      "1.nightly.json": {
+        "bytes": 340,
+        "id": 652360342
+      },
+      "1.release.json": {
+        "bytes": 554,
+        "id": 652360364
+      },
+      "1.root.json": {
+        "bytes": 2304,
+        "id": 652360383
+      },
+      "1.snapshot.json": {
+        "bytes": 725,
+        "id": 652360408
+      },
+      "1.targets.json": {
+        "bytes": 1331,
+        "id": 652360448
+      },
+      "timestamp-1-6fef7bfc93700e011f5c2405456201f081fef305accb1d0629231e88e18c2d22.json": {
+        "bytes": 468,
+        "id": 652360467
+      },
+      "timestamp.json": {
+        "bytes": 468,
+        "id": 652360534
+      }
+    },
+    "bundle_sha256": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+    "current": {
+      "manifest_sha256": "4902321fce875038814a3d95411c6a23e0ad731c533a768ab0d2fc14327f0d27",
+      "timestamp": {
+        "bytes": 468,
+        "sha256": "6fef7bfc93700e011f5c2405456201f081fef305accb1d0629231e88e18c2d22"
+      },
+      "version": 1
+    },
+    "image_count": 0,
+    "inventory_sha256": "4902321fce875038814a3d95411c6a23e0ad731c533a768ab0d2fc14327f0d27",
+    "pending": null,
+    "published_utc": "2026-10-18T03:32:04.533454+00:00",
+    "release_id": 416212208,
+    "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+    "result": "published",
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "scope": "Owner-local initial empty feed; sole serialized publisher, no automatic installation",
+    "source": "e30ddef4db7a978210929ccbe2916ad1a8afa90f"
+  },
+  "public_bootstrap": {
+    "location": {
+      "metadata": "https://github.com/aortez/space-wars/releases/download/ota-feed/",
+      "targets": "https://github.com/aortez/space-wars/releases/download/ota-feed/"
+    },
+    "root": {
+      "signatures": [
+        {
+          "keyid": "5691f317359f861420604d9676c9686215e46914effedd193466d52cd253e0b9",
+          "sig": "47409b1655258ee89e036149c43dec5fbdb4ec484c9af685df2c2b10d8d30b44d799b09cc22e00133d65cb7914ff367095c9eddba70b86a6e6f3cb5a86252c09"
+        },
+        {
+          "keyid": "951b8002b500af0cf95ed0b0898f770bd97e2cb75ae6cd98c7089362e5a6d29e",
+          "sig": "abf5c25696c3918c42b196f07a7bcf46add2d75b84c9171d0249fab46548925666896b4ad7e65516e434b3a7079fc921cd6cdfcc369eab63ea95703686d50202"
+        }
+      ],
+      "signed": {
+        "_type": "root",
+        "consistent_snapshot": true,
+        "expires": "2027-10-18T03:28:30Z",
+        "keys": {
+          "26e1ea82039d621e73930cf644d7d24664fbbefab758a519affaf8d51ece72e4": {
+            "keytype": "ed25519",
+            "keyval": {
+              "public": "7d065f68e9f3bb8679a87fb904e3490e22ee595dc97280a41911bfcd048d94ee"
+            },
+            "scheme": "ed25519"
+          },
+          "5691f317359f861420604d9676c9686215e46914effedd193466d52cd253e0b9": {
+            "keytype": "ed25519",
+            "keyval": {
+              "public": "c6ed2bb66ef082420ed93452d0fb36c871ac7316746a6788226f7ba4ed912d37"
+            },
+            "scheme": "ed25519"
+          },
+          "8241d7ed0bd778494c0766fbec7e4ea815392118b99f18c793cc4e19364709da": {
+            "keytype": "ed25519",
+            "keyval": {
+              "public": "fa1af82c6e01bcb34d043ee14b7d2e1e30a028fd6bea5121e360b6a1808b767d"
+            },
+            "scheme": "ed25519"
+          },
+          "951b8002b500af0cf95ed0b0898f770bd97e2cb75ae6cd98c7089362e5a6d29e": {
+            "keytype": "ed25519",
+            "keyval": {
+              "public": "2a8b4a0c49b6619ae26a1d21617ff31925648f5df4c04b845b48d86b1031ad24"
+            },
+            "scheme": "ed25519"
+          },
+          "9c4de4d5532e5fe2296c3af140cb9f4c8b9607eb3277b843b5a1a0680ac49c6e": {
+            "keytype": "ed25519",
+            "keyval": {
+              "public": "cd55a9679c0bcae0e9956c2ffc815d70bb140686f2e558c4a57cb873390b7ba8"
+            },
+            "scheme": "ed25519"
+          },
+          "e1273f0bfea5e57e45ff3573f27a11d2080db638f2529e6aa8e3770e26d65d6d": {
+            "keytype": "ed25519",
+            "keyval": {
+              "public": "93fdfaf0600a96b9ade88ee0f6d2713f4d1fbd31e593dda2e1c437dd144a8579"
+            },
+            "scheme": "ed25519"
+          }
+        },
+        "roles": {
+          "root": {
+            "keyids": [
+              "5691f317359f861420604d9676c9686215e46914effedd193466d52cd253e0b9",
+              "951b8002b500af0cf95ed0b0898f770bd97e2cb75ae6cd98c7089362e5a6d29e",
+              "8241d7ed0bd778494c0766fbec7e4ea815392118b99f18c793cc4e19364709da"
+            ],
+            "threshold": 2
+          },
+          "snapshot": {
+            "keyids": [
+              "9c4de4d5532e5fe2296c3af140cb9f4c8b9607eb3277b843b5a1a0680ac49c6e"
+            ],
+            "threshold": 1
+          },
+          "targets": {
+            "keyids": [
+              "e1273f0bfea5e57e45ff3573f27a11d2080db638f2529e6aa8e3770e26d65d6d"
+            ],
+            "threshold": 1
+          },
+          "timestamp": {
+            "keyids": [
+              "26e1ea82039d621e73930cf644d7d24664fbbefab758a519affaf8d51ece72e4"
+            ],
+            "threshold": 1
+          }
+        },
+        "spec_version": "1.0.0",
+        "version": 1
+      }
+    },
+    "schema": 1
+  },
+  "public_inventory": {
+    "schema": 1,
+    "trusted_root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "timestamp_version": 1,
+    "files": {
+      "1.nightly.json": {
+        "bytes": 340,
+        "sha256": "9117e44bbd42a68e2e00178990bb488dde16771d2d914b5cced374b6130902ae"
+      },
+      "1.release.json": {
+        "bytes": 554,
+        "sha256": "ff8644cd8a16b79481a22298e113df62b072017a1c4bdb86124ab70e65dec937"
+      },
+      "1.root.json": {
+        "bytes": 2304,
+        "sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9"
+      },
+      "1.snapshot.json": {
+        "bytes": 725,
+        "sha256": "ffcd7df53eb64efcf1d641d6e9725e9c0b6db629de7f7a6be28e08b65636cf69"
+      },
+      "1.targets.json": {
+        "bytes": 1331,
+        "sha256": "18fe9c70c8b36870c9a4b7d7c5ebd0901e99055b695f15f7e7538b910f491356"
+      },
+      "timestamp.json": {
+        "bytes": 468,
+        "sha256": "6fef7bfc93700e011f5c2405456201f081fef305accb1d0629231e88e18c2d22"
+      }
+    }
+  },
+  "local_publisher_journal_sha256": "f5a0406d0b28025cb341e4b1a5809e24cb3fca875acd0d13d77c7cea5225ab43",
+  "private_keys": {
+    "count": 9,
+    "location": "/home/oldman/.spacewars-ota-signing/initial-supervised-20261017/keys",
+    "directory_mode": "0700",
+    "file_mode": "0600",
+    "exported": false,
+    "scope": "Owner-controlled local private keys; co-located, not isolated production signers"
+  },
+  "devices": [
+    {
+      "host": "spacewars.local",
+      "boot_id": "ec997cb4-c669-4b14-b593-e3b50d1f31d6",
+      "provision": {
+        "schema": 1,
+        "bundle": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+        "initial_root": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+        "persistent_schema": 1
+      },
+      "outcomes": {
+        "release": {
+          "status": "no-candidate"
+        },
+        "nightly": {
+          "status": "no-candidate"
+        }
+      },
+      "recovery_sha256": "3885d51a486749ff5d668ce3d82d71f262d49e9e6dd7ee83dbe6125b2ea0bb21",
+      "installed_state_unchanged": true,
+      "reprovision_preserved_trust_floors": true,
+      "stores": {
+        "all_bytes_unchanged": true,
+        "durable_stores_unchanged": true,
+        "regenerated_local_gatt_databases": []
+      },
+      "automatic_installation_enabled": false,
+      "images_installed": 0,
+      "reboot_requested": false,
+      "trust_anchors": [
+        "399abb509641e12e639f75ea41bc6598cb006e6cb96bfde672e37d0abf6d52ee  /data/spacewars-system/update-provision.json",
+        "f4194df0c2c3b24c84f81d26036e5bdbd4274cb0b7db1385542e28385e518339  /data/spacewars-system/updates/trust/state.json",
+        "cb33a4a9af74f40d820d1cc0d981f9a8693ba2459b1278145cc075adf8429c77  /data/spacewars-system/updates/data-schema.json"
+      ],
+      "evidence": "/home/data/workspace/space-wars-ota/target/ota-owner-feed-20261017/spacewars.local/20261018T033338Z",
+      "image": {
+        "architecture": "aarch64",
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc"
+          },
+          "os_manager": {
+            "bytes": 11252736,
+            "sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14"
+          }
+        },
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "data": {
+          "reads": {
+            "max": 1,
+            "min": 1
+          },
+          "writes": 1
+        },
+        "layout": "spacewars-ab-v1",
+        "machine": "raspberrypi-spacewars",
+        "recovery_protocol": 2,
+        "rootfs_tree": "9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "schema": 1,
+        "source": {
+          "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+          "dirty": false,
+          "revision": "e9867188d211",
+          "schema": 1
+        },
+        "updater_protocol": 1
+      },
+      "installed_hashes": [
+        "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14  /usr/bin/engine-os-manager",
+        "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc  /usr/bin/engine-client",
+        "fdded59f2261030750508e7a32f057f717c0ba79e7a5f4dae5daa685688e3bf4  /boot/cmdline.txt",
+        "265f1c4c4b1dc5f6beb93631da877c3ae695e68a77304085c92f6a415479f38a  /boot/spacewars-trial.txt"
+      ],
+      "kiosk_health": {
+        "boot_id": "ec997cb4-c669-4b14-b593-e3b50d1f31d6",
+        "uptime_ms": 12458083,
+        "process_id": 870,
+        "start_ticks": 554,
+        "invocation_id": "575d25ae7d71443f85bb25df6e3e5274",
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "control_response": 32,
+        "presented_frames": 746055
+      },
+      "inspected_store_entries": 62,
+      "installed_time_status": {
+        "usable": false,
+        "source": null,
+        "reason": "rtc-uninitialized",
+        "utc_us": null,
+        "last_confirmed_sync_utc_us": null,
+        "sync_age": "unknown",
+        "success_generation": 0
+      },
+      "installed_update_status": {
+        "phase": "idle",
+        "reason": "preparation-unavailable",
+        "schedule": {
+          "generation": 39,
+          "channel": "release",
+          "selection_generation": 0,
+          "active": null,
+          "next_ms": 86405767,
+          "due": false,
+          "completion": "failed"
+        },
+        "progress": null,
+        "ready": null,
+        "manual_pending": false
+      },
+      "native_checks": {
+        "release": {
+          "boot_id": "ec997cb4-c669-4b14-b593-e3b50d1f31d6",
+          "bundle": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+          "channel": "release",
+          "initial_root": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+          "installed_time_service_replaced": false,
+          "outcome": {
+            "status": "no-candidate"
+          },
+          "recovery_record_sha256": "d11bc7615a9332044d51d37c71de4cbd146f4a1144dcc2c79866595c8acd28ff",
+          "schema": 1,
+          "scope": "Owner-run native HTTPS/TUF/staging check; no root write, trial or reboot",
+          "time_observation": {
+            "kernel_synchronized": true,
+            "notification_realtime_us": 1792294265635145,
+            "now": {
+              "boottime_us": 12454704424,
+              "monotonic_us": 12454704424,
+              "realtime_us": 1792294426942435
+            },
+            "ntp_packet_count": 12,
+            "ntp_spike": false,
+            "ntp_valid": true,
+            "provider": {
+              "bus_owner": ":1.0",
+              "invocation_id": "d06755fac4d4490bb4bef8df2253895d",
+              "pid": 773,
+              "uid": 992
+            },
+            "receipt": {
+              "boottime_us": 12293400101,
+              "monotonic_us": 12293400101,
+              "packet_count": 12,
+              "realtime_us": 1792294265638111
+            }
+          },
+          "time_source": "native successful NTP receipt validated in memory"
+        },
+        "nightly": {
+          "boot_id": "ec997cb4-c669-4b14-b593-e3b50d1f31d6",
+          "bundle": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+          "channel": "nightly",
+          "initial_root": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+          "installed_time_service_replaced": false,
+          "outcome": {
+            "status": "no-candidate"
+          },
+          "recovery_record_sha256": "d11bc7615a9332044d51d37c71de4cbd146f4a1144dcc2c79866595c8acd28ff",
+          "schema": 1,
+          "scope": "Owner-run native HTTPS/TUF/staging check; no root write, trial or reboot",
+          "time_observation": {
+            "kernel_synchronized": true,
+            "notification_realtime_us": 1792294265635145,
+            "now": {
+              "boottime_us": 12455652861,
+              "monotonic_us": 12455652861,
+              "realtime_us": 1792294427890872
+            },
+            "ntp_packet_count": 12,
+            "ntp_spike": false,
+            "ntp_valid": true,
+            "provider": {
+              "bus_owner": ":1.0",
+              "invocation_id": "d06755fac4d4490bb4bef8df2253895d",
+              "pid": 773,
+              "uid": 992
+            },
+            "receipt": {
+              "boottime_us": 12293400101,
+              "monotonic_us": 12293400101,
+              "packet_count": 12,
+              "realtime_us": 1792294265638111
+            }
+          },
+          "time_source": "native successful NTP receipt validated in memory"
+        }
+      },
+      "runner": {
+        "source": "e30ddef4db7a978210929ccbe2916ad1a8afa90f",
+        "runner_sha256": "02bb1116d6a74f3918bc3d31444c05e71ec522005da9688622f689140d8f2d83",
+        "host": "spacewars.local",
+        "mode": "apply",
+        "tools": {
+          "engine-os-manager": [
+            "target/aarch64-unknown-linux-gnu/release/engine-os-manager",
+            "71c3b3700b608639fe2c814cc80d84a0534326b2ed814a17d4e900ab87bc1fbd"
+          ],
+          "stage_update": [
+            "target/aarch64-unknown-linux-gnu/release/examples/stage_update",
+            "b0537270daea20aa22159ad1355864f222bf5eadb2d3182f10e651f75be06407"
+          ]
+        },
+        "bundle_sha256": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+        "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9"
+      },
+      "evidence_files": {
+        "after.json": {
+          "bytes": 9421,
+          "sha256": "522ad87e5fd96b7073e9cf544511c207e999a31d8576421df94c9d16604318af"
+        },
+        "before.json": {
+          "bytes": 9421,
+          "sha256": "0e3fd7b6e278f3056ae3a2775c1dd5f9572d5c4b2c51616f098ad7bcad732ba3"
+        },
+        "check-nightly-exit.json": {
+          "bytes": 22,
+          "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+        },
+        "check-nightly.err": {
+          "bytes": 61,
+          "sha256": "7860ae0019b408f71d46ed2b4aba79cd926537c8806c8615c90f646608804ba3"
+        },
+        "check-nightly.json": {
+          "bytes": 1223,
+          "sha256": "07bd63ead144f99f7f2e577bbb171bb1410bd05fc0c9803a4cdb1bd14befe12a"
+        },
+        "check-release-exit.json": {
+          "bytes": 22,
+          "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+        },
+        "check-release.err": {
+          "bytes": 61,
+          "sha256": "7860ae0019b408f71d46ed2b4aba79cd926537c8806c8615c90f646608804ba3"
+        },
+        "check-release.json": {
+          "bytes": 1223,
+          "sha256": "18b5f268f9feb8ba38f530f256add5d1d9845afe887a14254764e9f9a319140c"
+        },
+        "provision-exit.json": {
+          "bytes": 22,
+          "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+        },
+        "provision.err": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "provision.json": {
+          "bytes": 193,
+          "sha256": "0b0a2f06602376061ac5f6631210bd01a7b6a9be76a53cbddc4ee66891bd5511"
+        },
+        "repeat-provision-exit.json": {
+          "bytes": 22,
+          "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+        },
+        "repeat-provision.err": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "repeat-provision.json": {
+          "bytes": 193,
+          "sha256": "0b0a2f06602376061ac5f6631210bd01a7b6a9be76a53cbddc4ee66891bd5511"
+        },
+        "result.json": {
+          "bytes": 1355,
+          "sha256": "bd8121533de642ca2d8fefc3e79a5c57e807c45b98103113a6073d377606f378"
+        },
+        "run.json": {
+          "bytes": 732,
+          "sha256": "51a2e1ebe375f7371873d46eb9c9ba405004d5378fb652ec855721f8276ed5ae"
+        }
+      }
+    },
+    {
+      "host": "sw-picade.local",
+      "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+      "provision": {
+        "schema": 1,
+        "bundle": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+        "initial_root": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+        "persistent_schema": 1
+      },
+      "outcomes": {
+        "release": {
+          "status": "no-candidate"
+        },
+        "nightly": {
+          "status": "no-candidate"
+        }
+      },
+      "recovery_sha256": "0b2048f3d88e006e18d972e49b13514e02ab0da720f888ad5a0e254a61541abe",
+      "installed_state_unchanged": true,
+      "reprovision_preserved_trust_floors": true,
+      "stores": {
+        "all_bytes_unchanged": true,
+        "durable_stores_unchanged": true,
+        "regenerated_local_gatt_databases": []
+      },
+      "automatic_installation_enabled": false,
+      "images_installed": 0,
+      "reboot_requested": false,
+      "trust_anchors": [
+        "147026d02a7be99e22eba2c3febbc33a262e4dc3ce8b4a78c3d73aba539778e7  /data/spacewars-system/update-provision.json",
+        "a344de30d98e54cd0169e892a117da8210aa602d90e1f62056faba5f1c9096ec  /data/spacewars-system/updates/trust/state.json",
+        "cb33a4a9af74f40d820d1cc0d981f9a8693ba2459b1278145cc075adf8429c77  /data/spacewars-system/updates/data-schema.json"
+      ],
+      "evidence": "/home/data/workspace/space-wars-ota/target/ota-owner-feed-20261017/sw-picade.local/20261018T033324Z",
+      "image": {
+        "architecture": "aarch64",
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc"
+          },
+          "os_manager": {
+            "bytes": 11252736,
+            "sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14"
+          }
+        },
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "data": {
+          "reads": {
+            "max": 1,
+            "min": 1
+          },
+          "writes": 1
+        },
+        "layout": "spacewars-ab-v1",
+        "machine": "raspberrypi-spacewars",
+        "recovery_protocol": 2,
+        "rootfs_tree": "9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "schema": 1,
+        "source": {
+          "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+          "dirty": false,
+          "revision": "e9867188d211",
+          "schema": 1
+        },
+        "updater_protocol": 1
+      },
+      "installed_hashes": [
+        "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14  /usr/bin/engine-os-manager",
+        "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc  /usr/bin/engine-client",
+        "fdded59f2261030750508e7a32f057f717c0ba79e7a5f4dae5daa685688e3bf4  /boot/cmdline.txt",
+        "265f1c4c4b1dc5f6beb93631da877c3ae695e68a77304085c92f6a415479f38a  /boot/spacewars-trial.txt"
+      ],
+      "kiosk_health": {
+        "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+        "uptime_ms": 3828705,
+        "process_id": 818,
+        "start_ticks": 915,
+        "invocation_id": "201c8bd3619943a59d15625a0cbbdd62",
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "control_response": 5,
+        "presented_frames": 70697
+      },
+      "inspected_store_entries": 94,
+      "installed_time_status": {
+        "usable": false,
+        "source": null,
+        "reason": "unconfirmed-clock-change",
+        "utc_us": null,
+        "last_confirmed_sync_utc_us": null,
+        "sync_age": "unknown",
+        "success_generation": 0
+      },
+      "installed_update_status": {
+        "phase": "idle",
+        "reason": "preparation-unavailable",
+        "schedule": {
+          "generation": 30,
+          "channel": "release",
+          "selection_generation": 0,
+          "active": null,
+          "next_ms": 86409676,
+          "due": false,
+          "completion": "failed"
+        },
+        "progress": null,
+        "ready": null,
+        "manual_pending": false
+      },
+      "native_checks": {
+        "release": {
+          "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+          "bundle": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+          "channel": "release",
+          "initial_root": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+          "installed_time_service_replaced": false,
+          "outcome": {
+            "status": "no-candidate"
+          },
+          "recovery_record_sha256": "ad1a3552ca808e36a21102a9ca389e886a78603e19050269d90b01ff2b5a4773",
+          "schema": 1,
+          "scope": "Owner-run native HTTPS/TUF/staging check; no root write, trial or reboot",
+          "time_observation": {
+            "kernel_synchronized": true,
+            "notification_realtime_us": 1792293707943301,
+            "now": {
+              "boottime_us": 3822047312,
+              "monotonic_us": 3822047312,
+              "realtime_us": 1792294425755618
+            },
+            "ntp_packet_count": 6,
+            "ntp_spike": false,
+            "ntp_valid": true,
+            "provider": {
+              "bus_owner": ":1.1150",
+              "invocation_id": "29f7da7ec3d74171bb6ab1a0c3aa2e8a",
+              "pid": 3349,
+              "uid": 992
+            },
+            "receipt": {
+              "boottime_us": 3104239318,
+              "monotonic_us": 3104239318,
+              "packet_count": 6,
+              "realtime_us": 1792293707947624
+            }
+          },
+          "time_source": "native successful NTP receipt validated in memory"
+        },
+        "nightly": {
+          "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+          "bundle": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+          "channel": "nightly",
+          "initial_root": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+          "installed_time_service_replaced": false,
+          "outcome": {
+            "status": "no-candidate"
+          },
+          "recovery_record_sha256": "ad1a3552ca808e36a21102a9ca389e886a78603e19050269d90b01ff2b5a4773",
+          "schema": 1,
+          "scope": "Owner-run native HTTPS/TUF/staging check; no root write, trial or reboot",
+          "time_observation": {
+            "kernel_synchronized": true,
+            "notification_realtime_us": 1792293707943301,
+            "now": {
+              "boottime_us": 3824496445,
+              "monotonic_us": 3824496445,
+              "realtime_us": 1792294428204751
+            },
+            "ntp_packet_count": 6,
+            "ntp_spike": false,
+            "ntp_valid": true,
+            "provider": {
+              "bus_owner": ":1.1150",
+              "invocation_id": "29f7da7ec3d74171bb6ab1a0c3aa2e8a",
+              "pid": 3349,
+              "uid": 992
+            },
+            "receipt": {
+              "boottime_us": 3104239318,
+              "monotonic_us": 3104239318,
+              "packet_count": 6,
+              "realtime_us": 1792293707947624
+            }
+          },
+          "time_source": "native successful NTP receipt validated in memory"
+        }
+      },
+      "runner": {
+        "source": "e30ddef4db7a978210929ccbe2916ad1a8afa90f",
+        "runner_sha256": "02bb1116d6a74f3918bc3d31444c05e71ec522005da9688622f689140d8f2d83",
+        "host": "sw-picade.local",
+        "mode": "apply",
+        "tools": {
+          "engine-os-manager": [
+            "target/aarch64-unknown-linux-gnu/release/engine-os-manager",
+            "71c3b3700b608639fe2c814cc80d84a0534326b2ed814a17d4e900ab87bc1fbd"
+          ],
+          "stage_update": [
+            "target/aarch64-unknown-linux-gnu/release/examples/stage_update",
+            "b0537270daea20aa22159ad1355864f222bf5eadb2d3182f10e651f75be06407"
+          ]
+        },
+        "bundle_sha256": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+        "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9"
+      },
+      "evidence_files": {
+        "after.json": {
+          "bytes": 12223,
+          "sha256": "419d7bba9b87f97dfa0613d70c8e207ca37435116a8784a4de19895b2a65a900"
+        },
+        "before.json": {
+          "bytes": 12223,
+          "sha256": "945190f7ce99c61dd212510240121656cde6018797a1f1caa4ab10a2c06b3ac5"
+        },
+        "check-nightly-exit.json": {
+          "bytes": 22,
+          "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+        },
+        "check-nightly.err": {
+          "bytes": 61,
+          "sha256": "7860ae0019b408f71d46ed2b4aba79cd926537c8806c8615c90f646608804ba3"
+        },
+        "check-nightly.json": {
+          "bytes": 1221,
+          "sha256": "a70e8683a844ae44de20f1f0bcb36ff958f0e0be80dfdddbb476c5baa0dab6b8"
+        },
+        "check-release-exit.json": {
+          "bytes": 22,
+          "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+        },
+        "check-release.err": {
+          "bytes": 61,
+          "sha256": "7860ae0019b408f71d46ed2b4aba79cd926537c8806c8615c90f646608804ba3"
+        },
+        "check-release.json": {
+          "bytes": 1221,
+          "sha256": "143f7b30625961dc2cf7edbdb8005410945fc6e8f20c09843c353e38b1080359"
+        },
+        "provision-exit.json": {
+          "bytes": 22,
+          "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+        },
+        "provision.err": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "provision.json": {
+          "bytes": 193,
+          "sha256": "0b0a2f06602376061ac5f6631210bd01a7b6a9be76a53cbddc4ee66891bd5511"
+        },
+        "repeat-provision-exit.json": {
+          "bytes": 22,
+          "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+        },
+        "repeat-provision.err": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "repeat-provision.json": {
+          "bytes": 193,
+          "sha256": "0b0a2f06602376061ac5f6631210bd01a7b6a9be76a53cbddc4ee66891bd5511"
+        },
+        "result.json": {
+          "bytes": 1355,
+          "sha256": "375838d1b91a698897fbd17cf3990d13c59ab17a5eaa49c3738af5820c9bc6d9"
+        },
+        "run.json": {
+          "bytes": 732,
+          "sha256": "8529c0e1bf5ab714dc4f78175acf27fd0b605a6888b0a97ce5b353065b0f86b4"
+        }
+      }
+    }
+  ],
+  "validation": {
+    "rust_ota_unit_passed": 342,
+    "rust_ota_unit_ignored": 8,
+    "signed_feed_integration_passed": 22,
+    "python_ota_passed": 114,
+    "python_authority_passed": 4,
+    "maintenance_cli_passed": 1,
+    "clippy": "passed",
+    "rust_1_89": "passed",
+    "aarch64_release_manager_and_stage_helper": "passed",
+    "rustfmt": "passed",
+    "rust_command": "cargo test --locked -p engine-ota --features recovery-qualification -- --test-threads=1",
+    "rust_log_sha256": "1e2800f6ce78c8de9d48fb7b9b60810a44f90b40125edeb08317a70a95f28516",
+    "python_ota_log_sha256": "79b5a7441d80635429de505eaff81f03ac4c1b9f3efc8348a19dc328a14280a7",
+    "notes": [
+      "One timing-sensitive interruption fixture was changed to count stable installation boundaries; production write/recovery code unchanged.",
+      "An initial parallel test invocation hit fixture locks. The configured serial run completed with zero failures.",
+      "Broader Python discovery failed Windows packaging checks because PowerShell is not installed locally; the 114 OTA and 4 authority cases passed.",
+      "Ignored hardware/fixture entry points are not claimed as qualification."
+    ]
+  },
+  "interruptions": [
+    {
+      "host": "spacewars.local",
+      "evidence": "target/ota-owner-feed-20261017/spacewars.local/20261018T033222Z",
+      "result": "SSH banner timeout after public bundle upload and before provision command",
+      "resolution": "Verified the existing uploads and resumed over one reused SSH connection; no restart, reboot or overwrite"
+    }
+  ],
+  "runner_sources": {
+    "publish-initial-owner-feed.py": "d13da0d7cc45abd70003047ac594bd9ca7fa0429815767ed3302516ebcaa2313",
+    "provision-owner-feed.py": "02bb1116d6a74f3918bc3d31444c05e71ec522005da9688622f689140d8f2d83"
+  },
+  "remaining": [
+    "Sign and deliver a real candidate, retaining this authority and publisher history.",
+    "Complete the explicitly supervised native installer and qualification admission without fabricating automatic recovery capability.",
+    "Qualify physical signed-image health failure, rollback/quarantine, and interrupted promotion on both Pis.",
+    "Install the corrected time service through the verified candidate and qualify the ordinary download worker.",
+    "Enable isolated automated publishing, durable remote checkpoint policy, installation policy/UI and full rollout separately.",
+    "Provision and qualify sw-picade-2.local separately."
+  ]
+}
