@@ -497,6 +497,7 @@ mod tests {
                     },
                     Default::default(),
                 ],
+                ledge: Default::default(),
                 outcome: None,
                 navigation: None,
             },
@@ -978,6 +979,7 @@ mod tests {
             entrance_open_milli: 0,
             exit_open_milli: 700,
             flaps: Default::default(),
+            ledge: Default::default(),
             outcome: Some(engine_common::ClockDuckOutcome::Exited),
             navigation: Some(engine_common::ClockDuckNavigationState {
                 recovery: engine_common::ClockDuckRecoveryState {
@@ -1158,6 +1160,7 @@ mod tests {
             .unwrap()
             .remove("navigation");
         old_payload["duck"].as_object_mut().unwrap().remove("flaps");
+        old_payload["duck"].as_object_mut().unwrap().remove("ledge");
         state.duck.as_mut().unwrap().navigation = None;
         assert_eq!(
             ClockState::from_json(&old_payload.to_string()).unwrap(),

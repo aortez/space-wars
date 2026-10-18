@@ -10,6 +10,9 @@ mod drain;
 mod flap_tests;
 pub(crate) mod flaps;
 mod flow;
+pub(crate) mod ledge;
+#[cfg(test)]
+mod ledge_tests;
 #[cfg(test)]
 mod movement_tests;
 pub(crate) mod planner;
@@ -102,6 +105,7 @@ pub(crate) struct DuckEvent {
     outcome: Option<ClockDuckOutcome>,
     player: Option<PlayerControl>,
     flaps: flaps::Flaps,
+    ledge: ledge::Ledge,
 }
 
 impl DuckEvent {
@@ -131,6 +135,7 @@ impl DuckEvent {
         if self.player.is_some() || self.phase == EventPhase::Resetting {
             return false;
         }
+        self.clear_ledge_command();
         // Keep an open exit open. Otherwise give the player a short delay before
         // its normal opening animation, without changing the current phase.
         let exit_at_tick = (self.tick + PLAYER_EXIT_DELAY_TICKS).clamp(
@@ -211,7 +216,7 @@ impl DuckEvent {
             swim_cooldown_ticks: player.next_swim_tick.saturating_sub(self.tick) as u32,
             dive_ticks_left: player.dive_ticks_left,
             dive_recharging: player.dive_recharging,
-            facing_right: player.facing * self.direction > 0.0,
+            facing_right: self.facing() * self.direction > 0.0,
             floor_open_milli: self
                 .responsive_floor
                 .as_ref()
@@ -314,6 +319,7 @@ impl DuckEvent {
             outcome: None,
             player: None,
             flaps: flaps::Flaps::default(),
+            ledge: ledge::Ledge::default(),
         }
     }
 
@@ -495,6 +501,9 @@ impl DuckEvent {
     }
 
     pub fn grounded(&self) -> bool {
+        if self.ledge_attached() {
+            return false;
+        }
         self.world.as_ref().is_some_and(|world| {
             world
                 .surface_contacts(DUCK_COLLIDER)
@@ -535,6 +544,24 @@ impl DuckEvent {
     }
 
     fn run(&mut self, water: Option<&WaterWorld>) {
+        let Some(world) = &mut self.world else { return };
+        world.clear_forces();
+        self.water_report = match (&self.buoyant, water) {
+            (Some(hull), Some(water)) => hull
+                .apply_forces(world, water, BuoyancyConfig::default(), f64::from(DT))
+                .expect("duck hull and non-overlapping course water"),
+            _ => BuoyancyReport::default(),
+        };
+        if self.drive_ledge() {
+            self.paddling = false;
+            if let Some(player) = &mut self.player {
+                player.jump_pending = false;
+                player.diving = false;
+            }
+            self.world.as_mut().unwrap().step(DT);
+            self.finish_ledge_step();
+            return;
+        }
         let grounded = self.grounded();
         let support = self.supported_surface();
         let exit_visible = self.exit_visible();
@@ -589,13 +616,6 @@ impl DuckEvent {
                     && contact.separation <= self.radius * 0.05
             }),
             support,
-        };
-        world.clear_forces();
-        self.water_report = match (&self.buoyant, water) {
-            (Some(hull), Some(water)) => hull
-                .apply_forces(world, water, BuoyancyConfig::default(), f64::from(DT))
-                .expect("duck hull and non-overlapping course water"),
-            _ => BuoyancyReport::default(),
         };
         let command = if let Some(player) = &mut self.player {
             // Translate screen input into the controller's entrance-relative convention.
@@ -675,7 +695,7 @@ impl DuckEvent {
         if let Some(world) = &mut self.world {
             world.remove_entity(DUCK_ENTITY);
         }
-        self.release_flap_attachment();
+        self.reset_ledge();
         self.buoyant = None;
         self.water_report = BuoyancyReport::default();
         self.paddling = false;
@@ -802,6 +822,9 @@ impl DuckEvent {
 
     /// Character facing is independent of the entrance-side course transform.
     pub fn facing(&self) -> f32 {
+        if let Some(facing) = self.ledge_facing() {
+            return facing;
+        }
         self.player
             .as_ref()
             .map_or_else(|| self.controller.facing(), |p| p.facing)
@@ -885,6 +908,7 @@ impl DuckEvent {
             entrance_open_milli: (entrance * 1000.0).round() as u32,
             exit_open_milli: (exit * 1000.0).round() as u32,
             flaps: self.flap_diagnostics(),
+            ledge: self.ledge.stats,
             outcome: self.outcome,
             navigation: self.player.is_none().then(|| ClockDuckNavigationState {
                 recovery: self.controller.recovery.stats,

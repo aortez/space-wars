@@ -9,7 +9,8 @@ incoming physical velocity without an added launch bonus.
 
 Spring response and a well-timed extra boost remain an experiment in
 [#474](https://github.com/aortez/space-wars/issues/474). The attachment fixture
-establishes the occupancy contract; player ledge-grab controls follow in #281.
+establishes the occupancy contract. [Shared ledge mechanics](clock-duck-ledges-validation.md)
+implement #281; player controls follow separately in #282.
 
 ## Local validation
 

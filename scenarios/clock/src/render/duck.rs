@@ -121,6 +121,8 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity
         );
     }
     let yellow = RenderColor::rgb(1.0, 0.88, 0.12);
+    let ledge = event.ledge_state();
+    let attached = event.ledge_anchor().is_some();
     // Code-native pixel art renders identically through both presentation paths.
     let rows = [
         "       YYYY  ",
@@ -161,7 +163,7 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity
             );
         }
     }
-    let stride = if event.feet_moving() {
+    let stride = if !attached && event.feet_moving() {
         ((event.tick / 6) % 2) as f32 * pixel
     } else {
         0.0
@@ -175,13 +177,54 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity
                 } else {
                     -offset_x - pixel * 2.0
                 },
-                -radius,
+                if attached { -radius * 0.45 } else { -radius },
             );
         rect(
             frame,
             event,
             min,
             min + Vec2::new(pixel * 2.0, pixel),
+            orange,
+            ACTIVE_CELL_LAYER,
+            1.0,
+        );
+    }
+    // Pose-only wings meet the authoritative anchor; they add no collision hull
+    // or animation-driven movement. Both adapters consume these same primitives.
+    if ledge.phase != engine_common::ClockDuckLedgePhase::Free {
+        let shoulder = position + Vec2::new(event.facing() * radius * 0.2, radius * 0.3);
+        let hand = event.ledge_anchor().map_or_else(
+            || {
+                position
+                    + Vec2::new(
+                        event.facing() * radius * 1.3,
+                        if ledge.phase == engine_common::ClockDuckLedgePhase::Reaching {
+                            radius * 2.0
+                        } else {
+                            0.0
+                        },
+                    )
+            },
+            |anchor| Vec2::new(anchor.x * event.direction + event.width * 0.5, anchor.y),
+        );
+        let elbow = (shoulder + hand) * 0.5 + Vec2::new(-event.facing() * pixel, -pixel);
+        for (from, to) in [(shoulder, elbow), (elbow, hand)] {
+            let from = event.render_position(from);
+            let to = event.render_position(to);
+            frame.push_primitive(
+                ACTIVE_CELL_LAYER,
+                RenderPrimitive::Line(engine_common::RenderLine::new(
+                    RenderPoint::new(from.x, from.y),
+                    RenderPoint::new(to.x, to.y),
+                    Stroke::new(yellow, pixel),
+                )),
+            );
+        }
+        rect(
+            frame,
+            event,
+            hand - Vec2::splat(pixel * 0.5),
+            hand + Vec2::splat(pixel * 0.5),
             orange,
             ACTIVE_CELL_LAYER,
             1.0,
