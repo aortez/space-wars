@@ -1,6 +1,7 @@
 # Pizza: common-fixture comparison and lazy CCD contact lookup
 
-This continues PR #505 / #354. It does not qualify the 5,000-ball ceiling or
+This continues PR #505 / #354; the measured optimization is #509 under #59.
+It does not qualify the 5,000-ball ceiling or
 resolve the earlier production GPU failures in #359. The saved default is 500.
 
 ## What the desktop screenshot establishes
@@ -102,6 +103,72 @@ Host timing varies: the 5,000-case per-run means range 7.616–9.603 ms before a
 common-fixture batch and this paired batch are distinct; do not mix their
 timings to calculate a gain. Small gains need device corroboration.
 
+Pi 4 headless means (Rust 1.89 release, same fixtures, three interleaved pairs):
+
+| Case | Before | After | Whole-update reduction | CCD before / after |
+| --- | ---: | ---: | ---: | ---: |
+| Mixed 500 | 3.603 ms | 3.563 ms | 1.1% | 0.500 / 0.463 ms |
+| Mixed 1,000 | 10.202 ms | 9.865 ms | 3.3% | 1.614 / 1.292 ms |
+| Mixed 2,500 | 37.390 ms | 35.509 ms | 5.0% | 6.352 / 4.516 ms |
+| Mixed 5,000 | 105.277 ms | 97.338 ms | 7.5% | 19.548 / 11.549 ms |
+| Ordinary 500, gravity On | 11.251 ms | 10.266 ms | 8.8% | 2.417 / 1.454 ms |
+
+There are **6,480 matched before/after updates on each platform**, 12,960 total.
+The Pi's installed kiosk was stopped during headless measurements and restored
+afterward; installed binaries/settings were untouched. The Pi 4 Model B Rev 1.4
+used its existing `ondemand` governor. Before/after run samples span
+65.7–67.7°C with firmware throttling flags zero. These boundary samples do not
+measure whole-run CPU utilization or exclude every intervening frequency change.
+At 500 the timing ranges overlap; the small difference is not a strong claim.
+The 5,000-case per-run means are 104.939–105.465 ms before and
+97.132–97.479 ms after. All sampled escapes remain zero.
+
+The earlier #505 capture and this batch have different timing distributions
+even with matching state fingerprints. Only the interleaved pairs above support
+the claimed gain. Do not subtract these headless values from older GPU results
+or chain their percentages with the earlier indexed-damage experiment.
+
+## Production GPU check after the optimization
+
+Runtime source `9170d99451ecba6e8ace8e6c2a1517058f0c7fdd` was built with the
+production Yocto Rust 1.94 release/fat-LTO `pi-kiosk-gpu` configuration. The
+client SHA-256 is
+`2051353849ac2916b4cdccd553c9735dcd195bc6d76619d98d8c3666bf36a103`.
+Tracked source was clean and frozen throughout the build; its dirty provenance
+flag comes from the four pre-existing unrelated untracked files.
+
+The actual Pi 4/Picade runs at 1024×768, 60 Hz with the Femtovg KMS path. These
+three sessions each capture 1,200 updates. Every recorded state/work field
+matches the earlier `ff21581` production GPU trace, including both independent
+gravity-On repeats. Screenshots are taken after timing. The installed kiosk is
+restored after each temporary session; installed binaries/settings are unchanged.
+
+Only CPU intervals and complete KMS windows that end before JSON export enter
+this table. Quantiles pool within-window physical flip intervals without joining
+gaps; coverage is bounded and not a complete session trace.
+
+| Case | UI core mean | Longest ≥95% | Captured flip intervals | Flip p50 / p95 / p99 / max |
+| --- | ---: | ---: | ---: | ---: |
+| Ordinary Off | 31.5% | 0 s | 955 | 16.7 / 16.7 / 33.3 / 200.0 ms |
+| Ordinary On, repeat 1 | 81.1% | 9.23 s | 467 | 16.7 / 66.7 / 100.0 / 216.7 ms |
+| Ordinary On, repeat 2 | 81.3% | 9.36 s | 472 | 16.7 / 66.7 / 100.0 / 166.6 ms |
+
+Mean normal update time is 2.18 ms Off and 11.12–11.13 ms On. Gravity-On update
+p95 is 20.5–20.6 ms, with individual updates up to 99–108 ms. Pre-export
+temperatures reach 68.7°C and firmware throttling flags remain zero. CPU means
+use 100% = one core and weight by interval duration; small individual estimates
+above 100% reflect separate proc reads, not extra core capacity.
+
+The previous GPU batch reported 82–83% mean UI-core usage and longer stalls.
+These are separate captures, so the reliable speedup claim remains the paired
+headless experiment. The new GPU capture establishes that **the ordinary
+gravity event still fails the frame-budget/headroom goal**. It does not qualify
+5,000 or remove the need for further collision-processing work and Pi 5 testing.
+
+[Updated device screenshot](screenshots/pizza-capacity/1024x768-pi4-gpu-after-gravity-ccd.png)
+shows the scene after the first On capture; its exact tick/population is not
+synchronized with a timing sample.
+
 ## Reproduction
 
 Run the reference comparison against a clean checkout with its Playwright
@@ -130,6 +197,21 @@ cargo +1.89.0 run --locked --release -p scenario-pizza --example capacity_lab \
 The feature is off by default. Each report labels its scope; the regular
 profiling samples now expose existing CCD, update and island timers as well.
 
+Retained [raw reports](data/pizza-reference-20261018-raw.tar.gz),
+[summary](data/pizza-reference-20261018-summary.json), and
+[manifest/checksums](data/pizza-reference-20261018-manifest.json) identify both
+headless executables and the production GPU pair. No binaries, credentials or
+user settings are included. The summary's paired groups are reproducible with:
+
+```sh
+python3 tools/pizza-reference-summary.py /path/to/extracted/desktop --pi /path/to/extracted/pi
+```
+
+The archive also retains the exact temporary Pi headless runner and per-run
+boundary temperature/frequency/throttling readings. Production runs use
+`tools/pizza-live-capture.sh`; `tools/pizza-profile-summary.py` supplies the
+conservative pre-export selection described in the earlier investigation.
+
 ## Verification and remaining qualification
 
 All 203 engine-physics tests (including CCD diagnostics) and 40 Pizza tests pass.
@@ -137,8 +219,12 @@ The new shared-motion regression fails against the old CCD path because it
 performs an unnecessary contact lookup, and passes with the optimization. It
 checks both one and four CCD substeps; the existing suite covers fast impacts,
 moving/compound ground, sensors, hooks, shape edits and snapshot continuation.
+Scoped Pizza Clippy, formatting, JavaScript syntax and the three report-unit
+tests pass. Strict engine-wide Clippy is blocked by existing warnings in plant,
+spaceling and tank-route code; this change does not edit those unrelated areas.
 
 This optimization preserves the recorded physics; it does not alter the
 capacity, field force or fragmentation distribution to make the test easier.
-Production rendered Pi 4 qualification must be repeated on the final candidate.
-Pi 5 remains offline. PR #505 stays draft and #354/#359 remain open.
+Production rendered Pi 4 qualification was repeated on `9170d99` and still
+exposes the stalls above. Pi 5 remains offline. PR #505 stays draft and
+#354/#359 remain open.

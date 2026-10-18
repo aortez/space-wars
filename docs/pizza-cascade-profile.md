@@ -2,6 +2,13 @@
 
 PR #505 spans capacity #364, profiling #354, measured fixes #506/#507/#508 under #59, and event qualification #359. It remains **draft**. Pi 5 is offline, and the Pi 4 measurements include frame-budget misses that must remain visible in the qualification decision. Five thousand is an opt-in experimental ceiling; the saved default remains 500 and desired population remains 24.
 
+The [reference comparison and CCD follow-up](pizza-reference-comparison.md)
+adds #509: a same-machine Chrome/Rust experiment and deferred contact lookups
+for CCD candidates already rejected by the existing motion rule. Its paired
+Pi 4 headless runs reduce total update time by 7.5% at 5,000 starting balls and
+8.8% in the ordinary gravity event, preserving the recorded simulation. Those
+new measurements are a separate batch from the evidence below.
+
 ## What changed
 
 The normal contact-damage loop formerly copied every contact and linearly searched all balls for each participant. It now borrows the contact slice and looks up the metadata index by stable ball ID. Insertion and swap-removal maintain that index. Contact order, each separate health subtraction, actual Rapier mass, damage, fragment admission, physics settings and random-number draws remain unchanged. Benchmarks do not allocate/use the new index.

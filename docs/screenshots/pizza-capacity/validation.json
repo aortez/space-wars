@@ -137,6 +137,15 @@
       "sha256": "d8a33cbec92e9ab3b2f01b227d4a20eccb830444e4296770f44d42d0ce633e2d",
       "source": "ff2158126d0c8b2ebe96eb8d0eb9e69e3a877c33",
       "client_sha256": "fbddc7ab7c2a174a5b6d2de199e0f4504c87d7a30cc410db1df79445a31c835a"
+    },
+    {
+      "image": "1024x768-pi4-gpu-after-gravity-ccd.png",
+      "capture": "Actual Pi 4/Picade production KMS GPU capture, after timing ordinary field-On repeat 1 for lazy CCD lookup. Exact tick/population not synchronized with screenshot.",
+      "width": 1024,
+      "height": 768,
+      "source": "9170d99451ecba6e8ace8e6c2a1517058f0c7fdd",
+      "sha256": "09371c98a67af272c1656124fe2d186e067b8daf4b9883acabb5d0c3463b41c0",
+      "client_sha256": "2051353849ac2916b4cdccd553c9735dcd195bc6d76619d98d8c3666bf36a103"
     }
   ]
 }
