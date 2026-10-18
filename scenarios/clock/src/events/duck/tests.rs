@@ -28,6 +28,11 @@ fn ready(aspect: f32, seed: u64) -> ClockState {
     let event_seed = state.duck_state().unwrap().navigation.unwrap().course_seed;
     state.duck_visit = Some(Box::new(DuckEvent::new(Layout::new(aspect), event_seed)));
     state
+        .duck_visit
+        .as_mut()
+        .unwrap()
+        .skip_flap_detour_for_fixture();
+    state
 }
 
 fn ticks(state: &mut ClockState, count: u64) {

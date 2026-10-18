@@ -60,6 +60,7 @@ impl DuckEvent {
             return;
         }
         if self.ledge_attached()
+            || self.ledge.detour.active()
             || self.grounded()
             || !self.controller.ledge_ready()
             || self.water_report.submerged_fraction >= 0.15
@@ -73,6 +74,10 @@ impl DuckEvent {
         let Some(edge) = self.automatic_ledge_target() else {
             return;
         };
+        self.start_automatic_ledge(edge);
+    }
+
+    pub(super) fn start_automatic_ledge(&mut self, edge: Edge) {
         self.set_ledge_command(LedgeCommand::Catch);
         // A failed clearance test must not silently catch an unrelated edge.
         self.ledge.catch_target = Some(edge);

@@ -1067,6 +1067,45 @@ pub struct ClockDuckNavigationState {
     pub recovery: ClockDuckRecoveryState,
     #[serde(default)]
     pub ledge: ClockDuckAutoLedgeState,
+    #[serde(default)]
+    pub flap_detour: ClockDuckFlapDetourState,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckFlapDetourPhase {
+    #[default]
+    Pending,
+    Approaching,
+    Recovering,
+    Perching,
+    Returning,
+    Finished,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckFlapDetourOutcome {
+    NotSelected,
+    Unsafe,
+    Expired,
+    Wet,
+    Blocked,
+    Interrupted,
+    TimedOut,
+    Deadline,
+    TakenOver,
+    Returned,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckFlapDetourState {
+    pub phase: ClockDuckFlapDetourPhase,
+    pub attempts: u32,
+    pub ticks: u32,
+    pub perch_ticks: u32,
+    pub clearance_queries: u32,
+    pub outcome: Option<ClockDuckFlapDetourOutcome>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

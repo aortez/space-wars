@@ -137,6 +137,7 @@ impl DuckEvent {
         }
         self.clear_ledge_command();
         self.stop_automatic_ledge();
+        self.stop_flap_detour();
         // Keep an open exit open. Otherwise give the player a short delay before
         // its normal opening animation, without changing the current phase.
         let exit_at_tick = (self.tick + PLAYER_EXIT_DELAY_TICKS).clamp(
@@ -554,6 +555,7 @@ impl DuckEvent {
             _ => BuoyancyReport::default(),
         };
         self.decide_automatic_ledge();
+        let detour_command = self.decide_flap_detour(water);
         let ledge_driven = self.drive_ledge();
         self.observe_automatic_ledge();
         if ledge_driven {
@@ -622,7 +624,9 @@ impl DuckEvent {
             }),
             support,
         };
-        let command = if let Some(player) = &mut self.player {
+        let command = if let Some(command) = detour_command {
+            command
+        } else if let Some(player) = &mut self.player {
             // Translate screen input into the controller's entrance-relative convention.
             let axis = f32::from(player.move_milli) / 1000.0 * self.direction;
             if axis != 0.0 {
@@ -917,6 +921,7 @@ impl DuckEvent {
             outcome: self.outcome,
             navigation: self.player.is_none().then(|| ClockDuckNavigationState {
                 ledge: self.ledge.automatic.stats,
+                flap_detour: self.ledge.detour.stats,
                 recovery: self.controller.recovery.stats,
                 water: self.controller.water.stats,
                 jump_profile: self.controller.profile,

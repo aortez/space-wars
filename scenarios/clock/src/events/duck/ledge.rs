@@ -8,6 +8,11 @@ use engine_common::{
 mod automatic;
 #[cfg(test)]
 mod automatic_tests;
+mod flap_detour;
+#[cfg(test)]
+mod flap_detour_capture_tests;
+#[cfg(test)]
+mod flap_detour_tests;
 mod geometry;
 use geometry::{Edge, clear_path, edges};
 
@@ -54,6 +59,7 @@ pub(super) struct Ledge {
     attachment: Option<Attachment>,
     pub stats: ClockDuckLedgeState,
     pub automatic: automatic::Automatic,
+    pub detour: flap_detour::Detour,
 }
 
 impl DuckEvent {
