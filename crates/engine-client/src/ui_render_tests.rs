@@ -11,6 +11,7 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 mod cell_swap;
+mod pizza;
 
 #[test]
 fn launcher_filter_keyboard_and_touch_share_selection_and_save_behavior() {

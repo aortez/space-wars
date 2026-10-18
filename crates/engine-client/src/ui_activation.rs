@@ -208,6 +208,7 @@ fn activation_target(
             focus: ActivationFocus::TouchTest,
             action: UiAction::Back,
         },
+        "pause.pizza.gravity" => pause_main(6),
         "pause.resume" => pause_main(0),
         "pause.restart" => pause_main(1),
         "pause.new-match" => pause_main(4),
@@ -281,7 +282,8 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.combat.break-duration"
         | "launcher.settings.pizza.spawn-rate"
         | "launcher.settings.clock.digit-slide" => 3,
-        "launcher.settings.travel.loose-dirt"
+        "launcher.settings.pizza.automatic-events"
+        | "launcher.settings.travel.loose-dirt"
         | "launcher.settings.spacewars.asteroids"
         | "launcher.settings.match.break-interval"
         | "launcher.settings.combat.mission"

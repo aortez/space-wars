@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling.",
+    controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling, even during gravity events. Pause and choose Run gravity & resume to start one manually. Automatic events can be turned off in Pizza settings.",
     create,
 };
 
@@ -46,7 +46,7 @@ fn create(
             ball_spawn_rate: setup.ball_spawn_rate,
             bounds,
             gravity: Default::default(),
-            automatic_events: true,
+            automatic_events: setup.automatic_events,
             benchmark: None,
         },
         ScenarioStartMode::Benchmark(configuration) => {
@@ -61,6 +61,20 @@ fn create(
 impl ClientScenario for PizzaClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
         &REGISTRATION
+    }
+
+    fn pizza_status(&self) -> Option<crate::host::PizzaStatus> {
+        Some(crate::host::PizzaStatus {
+            scenario_revision: 0,
+            paused: false,
+            observation: scenario_pizza::PizzaObservation {
+                version: scenario_pizza::PIZZA_OBSERVATION_VERSION,
+                tick: self.state.tick,
+                event: self.state.event_state(),
+            },
+            ball_count: self.state.balls.len(),
+            held_ball_id: self.state.held_ball_id,
+        })
     }
 
     fn tick_model(&self) -> TickModel {

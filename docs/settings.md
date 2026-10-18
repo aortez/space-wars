@@ -13,6 +13,14 @@ picker visibility only; explicit scenario launches and scenario settings are
 unchanged. A failed save shows a launcher warning directing users to the shared
 Retry Save action in App Settings; the warning clears once saving succeeds.
 
+## Pizza events
+
+`[pizza] automatic_events = true` enables occasional gravity events. The Pizza
+launcher settings expose **Automatic events** and save the choice when starting a
+run, alongside the other Pizza settings. Older settings default to On. The choice
+applies to each fresh run/restart; manual **Run gravity & resume** remains available
+from the pause menu with automatic events Off.
+
 ## Recovery contract
 
 - A missing file, section, or field uses its declared default. Existing values

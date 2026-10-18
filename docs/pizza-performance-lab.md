@@ -13,7 +13,7 @@ Classic remains available only as a collision benchmark reference.
 
 Normal Pizza now owns a small deterministic event scheduler (#356). The first
 kind is directional gravity, with the physical field and direction cue from
-#357. User controls plus the saved automatic-events preference are #358.
+#357. Launcher settings and pause-menu controls are implemented in #358.
 
 `PizzaConfig::automatic_events` defaults to true for normal runs. The scheduler
 samples 3,600–7,200 ticks of ordinary play on initialization and after each
@@ -22,7 +22,7 @@ the physics `WORLD_TIME_SCALE`. After the quiet gap's last update, the next
 update admits an event. An event owns exactly 900 updates, including its
 admission update, then starts a fresh gap. There is no wall-clock catch-up.
 
-Headless callers and future host controls use the ordinary action boundary:
+Headless callers and host controls use the ordinary action boundary:
 
 ```rust
 use engine_common::Scenario;
@@ -54,6 +54,38 @@ Sparse/dense/churn benchmark configurations always disable both automatic and
 manual events, regardless of the requested setting. Normal-path cascade labs
 can instead set `automatic_events: false` without selecting benchmark mode,
 then send a typed manual request with a recorded run seed when needed.
+
+## Interactive controls and diagnostics
+
+Pizza settings include **Automatic events**, default On (including older settings
+without this field). Starting a game saves the choice through the normal launcher
+settings lifecycle. It applies to fresh runs/restarts; Off still permits manual
+admission. Existing grab/drag/fling controls remain available during the field.
+
+Pause, then choose **Run gravity & resume** to start one gravity event in the same
+world. The menu closes, and the next positive simulation step admits it. During an
+active event the action is disabled; **Resume** continues the paused phase. Menu
+navigation uses the usual keyboard, controller and pointer paths. Benchmark mode
+and other scenarios do not expose this action. Restart and launcher transitions
+clear requests; a busy refusal never queues an event for later.
+
+Public UI IDs are `launcher.settings.pizza.automatic-events.previous` / `.next`
+and `pause.pizza.gravity`. The existing control socket `status` response includes
+one bounded `pizza=<JSON>` line while Pizza is hosted. It contains the existing
+version-1 observation (`tick`, `event`), `scenario_revision`, `paused`, `ball_count`
+and `held_ball_id`. `event` reports idle wait/pending request or active
+kind/direction/trigger/elapsed/remaining ticks; benchmarks report `disabled`.
+Status is sampled from the latest host update, including paused updates, without
+serializing the world or changing the UI revision on every simulation tick.
+
+The short `pizza::pizza_event_controls_settings_and_lifecycle_smoke` public UI
+case runs on PRs. The real-time completion/GPU case runs in the full nightly/manual
+UI suite. Deterministic host tests cover build-up/hold/fade pause and resize, busy
+refusal, input cancellation, restart/benchmark/revision guards and remaining idle
+past the maximum automatic gap with the setting Off. Target-size UI tests dispatch
+real keyboard/pointer events; optional menu PNGs use
+`SPACEWARS_PIZZA_CONTROLS_ARTIFACTS`. [Live target-size captures](screenshots/pizza-controls/validation.json)
+record the public UI workflow at 800×480, 1024×768 and 480×800.
 
 ## Directional gravity
 

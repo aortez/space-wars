@@ -31,6 +31,9 @@ mod launcher_catalog;
 #[path = "ui_control_functional/garden_lab.rs"]
 mod garden_lab;
 
+#[path = "ui_control_functional/pizza.rs"]
+mod pizza;
+
 #[path = "ui_control_functional/clock.rs"]
 mod clock;
 

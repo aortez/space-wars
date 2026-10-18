@@ -36,6 +36,8 @@ use crate::raster;
 use crate::render::{self, Viewport};
 
 mod performance_overlay;
+#[cfg(test)]
+mod pizza_tests;
 mod profiling;
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
@@ -78,10 +80,12 @@ pub struct ScenarioControls {
     audio: Option<engine_common::AudioSettings>,
     request: Option<ScenarioControlRequest>,
     clock_state: Option<spacewars_control::ClockState>,
+    pizza_status: Option<PizzaStatus>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScenarioControlRequest {
+    PizzaGravity { revision: u64 },
     Pause,
     Resume,
     Restart,
@@ -99,7 +103,88 @@ pub fn new_scenario_controls() -> SharedScenarioControls {
     Rc::new(RefCell::new(ScenarioControls::default()))
 }
 
+/// Bounded normal/benchmark Pizza status exposed by the existing `status` command.
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct PizzaStatus {
+    pub scenario_revision: u64,
+    pub paused: bool,
+    #[serde(flatten)]
+    pub observation: scenario_pizza::PizzaObservation,
+    pub ball_count: usize,
+    pub held_ball_id: Option<u64>,
+}
+
+impl PizzaStatus {
+    fn can_trigger(&self) -> bool {
+        self.paused
+            && matches!(
+                self.observation.event,
+                scenario_pizza::PizzaEventState::Idle {
+                    pending_manual: None,
+                    ..
+                }
+            )
+    }
+}
+
 impl ScenarioControls {
+    pub(crate) fn pizza_status(&self) -> Option<&PizzaStatus> {
+        self.pizza_status.as_ref()
+    }
+
+    pub(crate) fn request_pizza_gravity(&mut self) -> bool {
+        let Some(status) = self.pizza_status.as_ref() else {
+            return false;
+        };
+        if self.request.is_some() || !status.can_trigger() {
+            return false;
+        }
+        self.request = Some(ScenarioControlRequest::PizzaGravity {
+            revision: status.scenario_revision,
+        });
+        true
+    }
+
+    fn publish_pizza_status(
+        &mut self,
+        scenario: &HostedScenario,
+        revision: u64,
+        paused: bool,
+        window: &MainWindow,
+    ) {
+        self.pizza_status = scenario.inner.pizza_status().map(|mut status| {
+            status.scenario_revision = revision;
+            status.paused = paused;
+            status
+        });
+        window.set_pizza_event_available(self.pizza_status.as_ref().is_some_and(|s| {
+            !matches!(
+                s.observation.event,
+                scenario_pizza::PizzaEventState::Disabled
+            )
+        }));
+        window.set_pizza_event_can_trigger(
+            self.request.is_none()
+                && self
+                    .pizza_status
+                    .as_ref()
+                    .is_some_and(PizzaStatus::can_trigger),
+        );
+        window.set_pizza_event_status(
+            if self.pizza_status.as_ref().is_some_and(|s| {
+                matches!(
+                    s.observation.event,
+                    scenario_pizza::PizzaEventState::Active { .. }
+                )
+            }) {
+                "Gravity active · Resume to continue"
+            } else {
+                "Starts in this world · Grabbing and flinging stay available"
+            }
+            .into(),
+        );
+    }
+
     pub fn request_clock_benchmark(&mut self, case: client_scenarios::ClockBenchmarkCase) -> bool {
         if self.request.is_some() || self.clock_state.is_none() {
             return false;
@@ -208,6 +293,7 @@ impl ScenarioControls {
 
     pub fn clear(&mut self) {
         self.request = None;
+        self.pizza_status = None;
     }
 
     fn take_request(&mut self) -> Option<ScenarioControlRequest> {
@@ -558,6 +644,9 @@ pub fn start_scenario_loop(
     controls
         .borrow_mut()
         .publish_clock_state(&scenario, scenario_revision, paused);
+    controls
+        .borrow_mut()
+        .publish_pizza_status(&scenario, scenario_revision, paused, window);
     if scenario_name == "clock" {
         crate::clock_controls::publish_settings(window, settings.clock);
     }
@@ -769,6 +858,7 @@ pub fn start_scenario_loop(
         }
 
         controls.borrow_mut().publish_clock_state(&scenario, scenario_revision, paused);
+        controls.borrow_mut().publish_pizza_status(&scenario, scenario_revision, paused, &window);
         let clock_settings = controls.borrow().clock_state.as_ref().map(|clock| clock.settings);
         publish_runtime_clock_settings(
             &window,
@@ -1057,6 +1147,37 @@ fn step_scenario_inner(
 
     if let Some(request) = controls.take_request() {
         match request {
+            ScenarioControlRequest::PizzaGravity { revision } => {
+                if *paused
+                    && !*benchmark_active
+                    && controls
+                        .pizza_status
+                        .as_ref()
+                        .is_some_and(|s| s.scenario_revision == revision)
+                    && scenario.inner.pizza_status().is_some_and(|s| {
+                        matches!(
+                            s.observation.event,
+                            scenario_pizza::PizzaEventState::Idle {
+                                pending_manual: None,
+                                ..
+                            }
+                        )
+                    })
+                {
+                    deliver_pointer_cancellation(scenario, input, input_projections);
+                    input.clear();
+                    scenario.step(
+                        &[scenario_pizza::PizzaAction::TriggerEvent(
+                            scenario_pizza::PizzaEventKind::DirectionalGravity,
+                        )
+                        .encode()],
+                        Duration::ZERO,
+                    );
+                    *paused = false;
+                    *accumulator = Duration::ZERO;
+                }
+                return HostStepResult::default();
+            }
             ScenarioControlRequest::ClockSettings(settings) => {
                 if *paused {
                     scenario.inner.configure_clock(settings);
