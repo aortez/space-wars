@@ -27,7 +27,7 @@ CI_JOBS = (
     ('Linux workspace', ('Test CI reports, build identity, and input diagnostic safety',
         'Test recorded bot-trip analysis', 'Build optimized Linux test executables',
         'Verify unchanged builds reuse compiled artifacts', 'Run Linux workspace tests',
-        'Verify PR UI selection', 'Run PR UI functional tests',
+        'Verify PR UI selection', 'Run PR UI smoke tests',
         'Test vendored LinuxKMS input and presentation renderers',
         'Test exact round-join shortcut against vendored tessellator reference',
         'Check default GPU kiosk client (no display required)',
