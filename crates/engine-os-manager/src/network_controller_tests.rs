@@ -13,6 +13,8 @@ enum Behavior {
     Timeout,
     NoChange,
     LoseReadback,
+    /// Returns before readback changes, with the monitor's transition live.
+    Delay,
 }
 
 struct World {
@@ -30,7 +32,13 @@ struct World {
     calls: Vec<bool>,
     barrier: Option<(mpsc::Sender<()>, mpsc::Receiver<()>)>,
     elapsed_on_write: u64,
+    expected: Option<bool>,
+    on_pause: Option<PauseEvent>,
+    pauses: usize,
+    reconciles: usize,
 }
+
+type PauseEvent = Box<dyn FnMut(&mut World, usize) + Send>;
 
 #[derive(Clone)]
 struct Fake(Arc<Mutex<World>>);
@@ -80,6 +88,10 @@ impl Fake {
             calls: Vec::new(),
             barrier: None,
             elapsed_on_write: 0,
+            expected: None,
+            on_pause: None,
+            pauses: 0,
+            reconciles: 0,
         })))
     }
     fn edit(&self, f: impl FnOnce(&mut World)) {
@@ -87,6 +99,16 @@ impl Fake {
     }
     fn calls(&self) -> Vec<bool> {
         self.0.lock().unwrap().calls.clone()
+    }
+    /// Runs after each readback pause, with that pause's one-based count.
+    fn on_pause(&self, event: impl FnMut(&mut World, usize) + Send + 'static) {
+        self.edit(|w| w.on_pause = Some(Box::new(event)));
+    }
+    fn pauses(&self) -> usize {
+        self.0.lock().unwrap().pauses
+    }
+    fn reconciles(&self) -> usize {
+        self.0.lock().unwrap().reconciles
     }
 }
 
@@ -106,6 +128,7 @@ impl Backend for Fake {
             radio: world.radio.clone(),
             activity: world.activity,
             change: world.change,
+            expected: world.expected,
         })
     }
     fn shutdown_guard(&mut self) -> Result<Option<Guard>> {
@@ -122,11 +145,23 @@ impl Backend for Fake {
     }
     fn reconcile(&mut self) -> Result<()> {
         let mut world = self.0.lock().unwrap();
+        world.reconciles += 1;
         if world.reject_reconcile {
             return Err(invalid("monitor unavailable"));
         }
         world.change = None;
+        world.expected = None;
         Ok(())
+    }
+    fn pause(&mut self, duration: Duration) {
+        let mut world = self.0.lock().unwrap();
+        world.pauses += 1;
+        world.clock.ms += duration.as_millis() as u64;
+        let pauses = world.pauses;
+        if let Some(mut event) = world.on_pause.take() {
+            event(&mut world, pauses);
+            world.on_pause.get_or_insert(event);
+        }
     }
     fn set_wireless(&mut self, expected: &Observation, enabled: bool) -> Result<WriteResult> {
         let barrier = {
@@ -152,6 +187,7 @@ impl Backend for Fake {
                 world.radio.wireless_enabled = enabled;
                 world.fail_snapshots = 1;
             }
+            Behavior::Delay => world.expected = Some(enabled),
         }
         Ok(WriteResult::Returned)
     }
@@ -881,6 +917,263 @@ fn returned_commands_require_matching_readback_and_survive_lost_observation() {
             );
             assert_eq!(fake.calls(), [false]);
         }
+    }
+}
+
+#[test]
+fn delayed_readback_completes_within_the_original_transition_without_another_write() {
+    for (restore, complete_at) in [(false, 1), (false, 3), (true, 2)] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        ready(&mut controller, &fake);
+        if restore {
+            assert!(controller.tick().unwrap().owned_off);
+        }
+        fake.edit(|w| w.behavior = Behavior::Delay);
+        fake.on_pause(move |w, pause| {
+            if pause == complete_at {
+                w.radio.wireless_enabled = restore;
+            }
+        });
+        let status = if restore {
+            let admission = controller
+                .admit(&token(), caller(), HoldKind::Setup)
+                .unwrap();
+            assert_eq!(admission.availability, Availability::WirelessReady);
+            admission.status
+        } else {
+            controller.tick().unwrap()
+        };
+        assert_eq!(status.owned_off, !restore);
+        assert!(status.pending.is_none() && status.suspended.is_none());
+        assert!(status.deferred.is_none());
+        assert_eq!(fake.pauses(), complete_at);
+        let calls = if restore {
+            vec![false, true]
+        } else {
+            vec![false]
+        };
+        assert_eq!(fake.calls(), calls);
+    }
+    // A wait longer than one call's poll cap is still the same transition.
+    let temp = tempfile::tempdir().unwrap();
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    fake.edit(|w| w.behavior = Behavior::Delay);
+    fake.on_pause(|w, pause| {
+        if pause > READBACK_POLLS {
+            w.radio.wireless_enabled = false;
+        }
+    });
+    let status = controller.tick().unwrap();
+    assert_eq!(status.deferred, Some(Deferred::ReadbackPending));
+    assert_eq!(
+        status.pending,
+        Some(Transition {
+            target_enabled: false,
+            method_returned: true,
+        })
+    );
+    assert!(status.suspended.is_none() && !status.owned_off);
+    assert_eq!(fake.pauses(), READBACK_POLLS);
+    // Status only reports the wait; the next coordinator tick resumes it.
+    let status = controller.status().unwrap();
+    assert_eq!(status.deferred, Some(Deferred::ReadbackPending));
+    assert_eq!(fake.pauses(), READBACK_POLLS);
+    let status = controller.tick().unwrap();
+    assert!(status.owned_off && status.pending.is_none() && status.deferred.is_none());
+    assert_eq!(fake.pauses(), READBACK_POLLS + 1);
+    assert_eq!(fake.calls(), [false]);
+}
+
+#[test]
+fn delayed_readback_expiry_remains_a_fault_after_late_completion_and_restart() {
+    for signalled in [false, true] {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("network");
+        let fake = Fake::new();
+        let mut controller = Controller::open(&path, fake.clone()).unwrap();
+        ready(&mut controller, &fake);
+        fake.edit(|w| w.behavior = Behavior::Delay);
+        // At its deadline the monitor drops the transition. Without the target
+        // notification it also latches lost observation.
+        fake.on_pause(move |w, pause| {
+            if pause == 2 {
+                w.expected = None;
+                if !signalled {
+                    w.change = Some(Suspension::ObservationLost);
+                }
+            }
+        });
+        let fault = if signalled {
+            Suspension::ReadbackMismatch
+        } else {
+            Suspension::ObservationLost
+        };
+        let status = controller.tick().unwrap();
+        assert_eq!(status.suspended, Some(fault));
+        assert!(
+            status
+                .pending
+                .is_some_and(|p| p.method_returned && !p.target_enabled)
+        );
+        assert!(!status.owned_off);
+        // Neither a late readback nor a reported transition completes it.
+        fake.edit(|w| {
+            w.radio.wireless_enabled = false;
+            w.expected = Some(false);
+        });
+        assert_eq!(controller.tick().unwrap().suspended, Some(fault));
+        drop(controller);
+        fake.edit(|w| w.change = None);
+        let mut controller = Controller::open(&path, fake.clone()).unwrap();
+        let status = controller.tick().unwrap();
+        assert_eq!(status.suspended, Some(fault));
+        assert!(status.pending.is_some() && !status.owned_off);
+        assert!(
+            controller
+                .admit(&token(), caller(), HoldKind::Setup)
+                .is_err()
+        );
+        assert_eq!(fake.calls(), [false]);
+        assert_eq!(fake.pauses(), 2);
+        assert_eq!(fake.reconciles(), 0);
+    }
+}
+
+#[test]
+fn restart_during_a_deferred_readback_does_not_reconstruct_its_allowance() {
+    for caught_up in [false, true] {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("network");
+        let fake = Fake::new();
+        let mut controller = Controller::open(&path, fake.clone()).unwrap();
+        ready(&mut controller, &fake);
+        fake.edit(|w| w.behavior = Behavior::Delay);
+        assert_eq!(
+            controller.tick().unwrap().deferred,
+            Some(Deferred::ReadbackPending)
+        );
+        drop(controller);
+        // A reopened service has a new monitor without the old transition.
+        fake.edit(|w| {
+            w.expected = None;
+            w.radio.wireless_enabled = !caught_up;
+        });
+        let mut controller = Controller::open(&path, fake.clone()).unwrap();
+        let status = controller.tick().unwrap();
+        if caught_up {
+            // A matching readback still confirms a returned command.
+            assert!(status.owned_off && status.pending.is_none());
+            assert!(status.suspended.is_none());
+        } else {
+            assert_eq!(status.suspended, Some(Suspension::ReadbackMismatch));
+            assert!(status.pending.is_some() && !status.owned_off);
+        }
+        assert_eq!(fake.calls(), [false]);
+        assert_eq!(fake.pauses(), READBACK_POLLS);
+    }
+}
+
+#[test]
+fn readback_deferral_never_accepts_witness_changes_or_monitor_conflicts() {
+    for case in [
+        "manager",
+        "pid",
+        "profiles",
+        "networking",
+        "hardware",
+        "external",
+        "lost",
+        "target",
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        ready(&mut controller, &fake);
+        fake.edit(|w| w.behavior = Behavior::Delay);
+        fake.on_pause(move |w, pause| {
+            if pause != 1 {
+                return;
+            }
+            match case {
+                "manager" => w.radio.bus_owner = ":1.8".into(),
+                "pid" => w.radio.pid = 48,
+                "profiles" => w.radio.profile_revision = engine_ota::Sha256::digest(b"changed"),
+                "networking" => w.radio.networking_enabled = false,
+                "hardware" => w.radio.wireless_hardware_enabled = false,
+                "external" => w.change = Some(Suspension::ExternalRadioChange),
+                "lost" => w.change = Some(Suspension::ObservationLost),
+                "target" => w.expected = Some(true),
+                _ => unreachable!(),
+            }
+        });
+        let fault = match case {
+            "external" => Suspension::ExternalRadioChange,
+            "lost" => Suspension::ObservationLost,
+            _ => Suspension::ReadbackMismatch,
+        };
+        let status = controller.tick().unwrap();
+        assert_eq!(status.suspended, Some(fault), "{case}");
+        assert!(status.pending.is_some() && !status.owned_off, "{case}");
+        // The original target arriving afterward does not clear the conflict.
+        fake.edit(|w| w.radio.wireless_enabled = false);
+        assert_eq!(controller.tick().unwrap().suspended, Some(fault), "{case}");
+        assert!(
+            controller
+                .admit(&token(), caller(), HoldKind::Setup)
+                .is_err()
+        );
+        assert_eq!(fake.calls(), [false], "{case}");
+        assert_eq!(fake.pauses(), 1, "{case}");
+    }
+}
+
+#[test]
+fn ssh_admission_waits_for_delayed_restoration_and_failure_never_rewrites_or_resumes() {
+    for outcome in ["complete", "expire", "never"] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        ready(&mut controller, &fake);
+        assert!(controller.tick().unwrap().owned_off);
+        fake.edit(|w| w.behavior = Behavior::Delay);
+        fake.on_pause(move |w, pause| match (outcome, pause) {
+            ("complete", 3) => w.radio.wireless_enabled = true,
+            ("expire", 3) => {
+                w.expected = None;
+                w.change = Some(Suspension::ObservationLost);
+            }
+            _ => {}
+        });
+        let admitted = controller.admit(&token(), ssh_caller(), HoldKind::Ssh);
+        let pauses = if outcome == "never" {
+            READBACK_POLLS
+        } else {
+            3
+        };
+        assert_eq!(fake.pauses(), pauses, "{outcome}");
+        if outcome == "complete" {
+            let admitted = admitted.unwrap();
+            assert_eq!(admitted.availability, Availability::SessionProtected);
+            assert!(!admitted.status.owned_off && admitted.status.pending.is_none());
+        } else {
+            assert!(admitted.is_err(), "{outcome}");
+            // The helper's bounded retries only observe the unresolved write.
+            for _ in 0..3 {
+                assert!(
+                    controller
+                        .admit(&token(), ssh_caller(), HoldKind::Ssh)
+                        .is_err()
+                );
+            }
+            let status = controller.status().unwrap();
+            assert!(status.owned_off && status.pending.is_some(), "{outcome}");
+        }
+        assert_eq!(fake.calls(), [false, true], "{outcome}");
+        assert_eq!(fake.reconciles(), 0, "{outcome}");
     }
 }
 

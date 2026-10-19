@@ -109,9 +109,15 @@ channel and device service stayed responsive, with no kernel storage errors
 observed; trial health committed at 415.962 seconds. Keep this in #265/#267's
 performance work, rather than claiming an established cause or a fixed latency.
 
-The older delayed-rfkill-readback risk is tracked separately in
-[#511](https://github.com/aortez/space-wars/issues/511), with bounded transition,
-expiry and conflict tests required before unattended partial-offline rollout.
+The older delayed-rfkill-readback risk from
+[#511](https://github.com/aortez/space-wars/issues/511) now has a
+[bounded readback wait](#wi-fi-policy-and-connection-ownership). Deterministic
+tests cover a delayed signal and readback, duplicate old-value notifications,
+expiry with late or queued completion, service restart, witness changes, monitor
+conflicts and SSH restoration. The monitor tests, and one coordinator test,
+use the real monitor on a private bus. The change is not yet device-qualified;
+keep partial offline disabled outside supervised tests until it passes on the
+selected Pi.
 
 ### Remaining work and ownership
 
@@ -134,10 +140,10 @@ New image changes and previously untested failure cases still need qualification
 ### Next implementation sequence
 
 1. Network reliability: #510 has generation-6 Pi 5 evidence and revised
-   generation-7 qualification on the selected second Picade. #511 is the next
-   bounded-readback correction before install-flow work; qualify #510's logging
-   follow-up on the same image. Per-device corrected-image rollout remains
-   tracked in #267.
+   generation-7 qualification on the selected second Picade. #511's
+   bounded-readback correction has local deterministic tests. Before install-flow
+   work, qualify it and #510's logging follow-up together, on one image on the
+   selected Pi. Per-device corrected-image rollout remains tracked in #267.
 2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
    consent, app save/acknowledgement, fixed privileged install operation, progress,
    trial and confirmed outcome. Define their shared handoff together; the
@@ -523,7 +529,14 @@ a usable Wi-Fi connection.
 radio transitions. Before a write it saves the intended change in the same
 durable record as policy and deployment holds. It records a successful method
 reply separately from matching readback; only the latter confirms radio
-ownership. Disabling partial offline mode restores a policy-owned shutdown,
+ownership. NetworkManager can reply before its cached rfkill state is exported.
+While the monitor's prepared transition is within its original five-second
+deadline and nothing else in the radio witness has changed, status reports
+`readback-pending`. The coordinator keeps observing, without resending the
+write. Any other witness change (manager, profiles, networking or hardware), a
+monitor conflict or expiry is a fault. A restarted service has no live
+transition, so an unchanged readback then faults. Disabling partial offline
+mode restores a policy-owned shutdown,
 while mode Off leaves an independently disabled radio alone. Time-check and
 download holds may use an already activated primary Ethernet connection without
 waking Wi-Fi. Admission reports radio/network availability, not Internet access
@@ -584,7 +597,11 @@ owner and radio-property changes. An external change reversed between snapshots
 still suspends automatic toggles. One matching transition can be attributed to
 a prepared write. Identical `WirelessEnabled` notifications do not consume or
 extend that allowance; later reversals, invalidated properties, lost observation
-or owner replacement cannot erase a conflict. The saved suspension survives
+or owner replacement cannot erase a conflict. Signals carry no arrival time, so
+the deadline is checked as each notification is drained. A notification queued
+before the deadline but drained after it is late: the unfinished write latches
+lost observation. A matching notification keeps the original deadline until
+readback agrees. The saved suspension survives
 restart. Explicit resume establishes a new monitor baseline only after checking
 that there is no unresolved command from the current boot. Profile revisions
 continue to come from the bounded per-connection inventory.
@@ -659,7 +676,10 @@ SSH admission reserves a root-only 120-second hold through the same coordinator
 queue as radio transitions. `session-protected` permits the accepted connection
 to continue; it does not claim Wi-Fi or Internet readiness. An independently off
 radio in mode Off stays off, preserving Ethernet logins. A policy-owned off state
-or pending command from the current boot must be reconciled first. After a real
+or pending command from the current boot must be reconciled first. Restoring
+Wi-Fi for an admission completes in the same coordinator request, including a
+delayed readback within its deadline. Failure or expiry neither repeats the
+write nor resumes automatic control. After a real
 reboot, the saved command cannot execute, so an accepted TCP connection can gain
 SSH protection and reach owner recovery. Admission retains the pending command,
 suspension and old ownership; it does not silently resume automatic radio control.

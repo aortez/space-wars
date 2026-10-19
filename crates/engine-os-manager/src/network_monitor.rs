@@ -17,6 +17,8 @@ const QUEUE: usize = 128;
 struct Expected {
     enabled: bool,
     until: Instant,
+    /// The matching transition was drained; readback may still trail it.
+    signalled: bool,
 }
 
 pub struct Monitor {
@@ -115,15 +117,23 @@ impl Monitor {
         if observation.bus_owner != self.owner {
             self.latch(Suspension::ManagerChanged);
         }
+        self.expire();
+        // The transition and its readback now agree, so the write is complete.
         if self
             .expected
             .as_ref()
-            .is_some_and(|write| Instant::now() >= write.until)
+            .is_some_and(|write| write.signalled && write.enabled == observation.wireless_enabled)
         {
             self.expected = None;
-            self.latch(Suspension::ObservationLost);
         }
         Ok((observation, self.change))
+    }
+
+    /// The prepared target, if its original deadline was still live at the
+    /// latest observation. Reading it never renews that deadline, and a new
+    /// monitor has none.
+    pub fn expected(&self) -> Option<bool> {
+        self.expected.as_ref().map(|write| write.enabled)
     }
 
     /// Reserve exactly one expected radio transition after a fresh fence.
@@ -144,6 +154,7 @@ impl Monitor {
         self.expected = Some(Expected {
             enabled,
             until: Instant::now() + DEADLINE,
+            signalled: false,
         });
         Ok(true)
     }
@@ -156,6 +167,29 @@ impl Monitor {
 
     fn latch(&mut self, change: Suspension) {
         self.change.get_or_insert(change);
+    }
+
+    /// Signals carry no arrival time, so the deadline is checked when one is
+    /// drained. A notification queued before it but drained after it is late.
+    fn expire(&mut self) {
+        let Some(write) = &self.expected else {
+            return;
+        };
+        if Instant::now() >= write.until {
+            let signalled = write.signalled;
+            self.expected = None;
+            if !signalled {
+                self.latch(Suspension::ObservationLost);
+            }
+        }
+    }
+
+    /// Moves a live deadline to now, without draining queued signals.
+    #[cfg(test)]
+    pub(crate) fn reach_deadline(&mut self) {
+        if let Some(write) = &mut self.expected {
+            write.until = Instant::now();
+        }
     }
 
     async fn drain(&mut self) {
@@ -232,17 +266,18 @@ impl Monitor {
                     continue;
                 }
                 self.wireless_enabled = value;
-            }
-            if name == "WirelessEnabled"
-                && self
+                self.expire();
+                if let Some(write) = self
                     .expected
-                    .as_ref()
-                    .is_some_and(|write| write.enabled == value)
-            {
-                self.expected = None;
-            } else {
-                self.latch(Suspension::ExternalRadioChange);
+                    .as_mut()
+                    .filter(|write| !write.signalled && write.enabled == value)
+                {
+                    // Keep the original deadline until readback agrees.
+                    write.signalled = true;
+                    continue;
+                }
             }
+            self.latch(Suspension::ExternalRadioChange);
         }
         Ok(())
     }

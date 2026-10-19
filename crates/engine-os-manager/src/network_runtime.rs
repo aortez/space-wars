@@ -136,7 +136,9 @@ impl Backend for Native {
         let ssh = network_sessions::observe()
             .ok()
             .and_then(|report| report.ssh_activity);
-        let (radio, change) = self.monitor()?.snapshot()?;
+        let monitor = self.monitor()?;
+        let (radio, change) = monitor.snapshot()?;
+        let expected = monitor.expected();
         Ok(Snapshot {
             clock: self.clock()?,
             radio,
@@ -150,6 +152,7 @@ impl Backend for Native {
                 operations: Some(false),
             },
             change,
+            expected,
         })
     }
 
