@@ -237,10 +237,10 @@ fn continuous_monitor_attributes_one_own_change_and_keeps_later_changes_external
         let (after, change) = monitor.observe().await.unwrap();
         assert!(!after.wireless_enabled);
         assert!(change.is_none());
-        // A second matching notification is not another allowance for our Set.
+        // A later transition is not another allowance for our Set.
         radio_signal(
             &server,
-            HashMap::from([("WirelessEnabled".into(), OwnedValue::from(false))]),
+            HashMap::from([("WirelessEnabled".into(), OwnedValue::from(true))]),
             vec![],
         )
         .await;
@@ -249,6 +249,133 @@ fn continuous_monitor_attributes_one_own_change_and_keeps_later_changes_external
             Some(Suspension::ExternalRadioChange)
         );
         assert_eq!(fixture.mutations.load(Ordering::SeqCst), 1);
+    });
+}
+
+#[test]
+fn continuous_monitor_ignores_redundant_notifications_around_own_transition() {
+    use crate::network_controller::{Suspension, WriteResult};
+    use crate::network_monitor::Monitor;
+    let bus = PrivateBus::new();
+    futures_lite::future::block_on(async {
+        for enabled in [true, false] {
+            let fixture = Arc::new(Fixture::default());
+            fixture.controls.store(true, Ordering::SeqCst);
+            fixture.radio_off.store(enabled, Ordering::SeqCst);
+            let server = server(&bus, &fixture).await;
+            let uid = unsafe { libc::geteuid() };
+            let client = bus.connect().await;
+            let mut monitor = Monitor::connect(bus.connect().await, uid).await.unwrap();
+            let (before, _) = monitor.observe().await.unwrap();
+            assert!(monitor.prepare(&before, enabled).await.unwrap());
+            // NM 1.46.6 reports the old exported value while its cached rfkill
+            // bit catches up, then reports the requested value. Replay both.
+            radio_signal(
+                &server,
+                HashMap::from([("WirelessEnabled".into(), OwnedValue::from(!enabled))]),
+                vec![],
+            )
+            .await;
+            let result = crate::network_radio::write(&client, uid, &before, enabled).await;
+            assert_eq!(result.as_ref().unwrap(), &WriteResult::Returned);
+            monitor.finish_write(&result);
+            let (after, change) = monitor.observe().await.unwrap();
+            assert_eq!(after.wireless_enabled, enabled);
+            assert_eq!(change, None, "redundant old value before target {enabled}");
+            for _ in 0..2 {
+                radio_signal(
+                    &server,
+                    HashMap::from([("WirelessEnabled".into(), OwnedValue::from(enabled))]),
+                    vec![],
+                )
+                .await;
+            }
+            assert!(monitor.observe().await.unwrap().1.is_none());
+            // A real reversal remains external even if the next snapshot is
+            // identical and more duplicate notifications follow it.
+            for value in [!enabled, !enabled, enabled, enabled] {
+                radio_signal(
+                    &server,
+                    HashMap::from([("WirelessEnabled".into(), OwnedValue::from(value))]),
+                    vec![],
+                )
+                .await;
+            }
+            let (last, change) = monitor.observe().await.unwrap();
+            assert_eq!(last, after);
+            assert_eq!(change, Some(Suspension::ExternalRadioChange));
+            assert_eq!(fixture.mutations.load(Ordering::SeqCst), 1);
+            server.release_name(NAME).await.unwrap();
+        }
+    });
+}
+
+#[test]
+fn continuous_monitor_redundant_notifications_do_not_complete_a_missing_transition() {
+    use crate::network_controller::{Suspension, WriteResult};
+    use crate::network_monitor::Monitor;
+    let bus = PrivateBus::new();
+    futures_lite::future::block_on(async {
+        let fixture = Arc::new(Fixture::default());
+        fixture.controls.store(true, Ordering::SeqCst);
+        fixture.radio_off.store(true, Ordering::SeqCst);
+        let server = server(&bus, &fixture).await;
+        let uid = unsafe { libc::geteuid() };
+        let mut monitor = Monitor::connect(bus.connect().await, uid).await.unwrap();
+        let (before, _) = monitor.observe().await.unwrap();
+        assert!(monitor.prepare(&before, true).await.unwrap());
+        // A returned method without the target signal is still incomplete.
+        monitor.finish_write(&Ok(WriteResult::Returned));
+        for delay in [Duration::ZERO, Duration::from_millis(5100)] {
+            async_io::Timer::after(delay).await;
+            radio_signal(
+                &server,
+                HashMap::from([("WirelessEnabled".into(), OwnedValue::from(false))]),
+                vec![],
+            )
+            .await;
+            let (_, change) = monitor.observe().await.unwrap();
+            if delay.is_zero() {
+                assert!(change.is_none());
+            } else {
+                assert_eq!(change, Some(Suspension::ObservationLost));
+            }
+        }
+        assert!(!monitor.prepare(&before, true).await.unwrap());
+        assert_eq!(fixture.mutations.load(Ordering::SeqCst), 0);
+    });
+}
+
+#[test]
+fn continuous_monitor_expected_wireless_transition_keeps_other_radio_controls_external() {
+    use crate::network_controller::Suspension;
+    use crate::network_monitor::Monitor;
+    let bus = PrivateBus::new();
+    futures_lite::future::block_on(async {
+        let fixture = Arc::new(Fixture::default());
+        fixture.controls.store(true, Ordering::SeqCst);
+        let server = server(&bus, &fixture).await;
+        let uid = unsafe { libc::geteuid() };
+        for name in ["NetworkingEnabled", "WirelessHardwareEnabled"] {
+            let mut monitor = Monitor::connect(bus.connect().await, uid).await.unwrap();
+            let (before, _) = monitor.observe().await.unwrap();
+            assert!(monitor.prepare(&before, false).await.unwrap());
+            radio_signal(
+                &server,
+                HashMap::from([
+                    ("WirelessEnabled".into(), OwnedValue::from(false)),
+                    (name.into(), OwnedValue::from(false)),
+                ]),
+                vec![],
+            )
+            .await;
+            assert_eq!(
+                monitor.observe().await.unwrap().1,
+                Some(Suspension::ExternalRadioChange),
+                "{name}"
+            );
+        }
+        assert_eq!(fixture.mutations.load(Ordering::SeqCst), 0);
     });
 }
 

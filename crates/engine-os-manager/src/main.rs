@@ -157,9 +157,15 @@ enum CanonicalCommand {
 }
 
 fn main() -> ExitCode {
+    #[cfg(target_os = "linux")]
+    engine_os_manager::network_sessions::initialize_host_namespace();
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing::level_filters::LevelFilter::WARN.into())
+                .from_env_lossy(),
+        )
         .init();
     match run(Args::parse()) {
         Ok(()) => ExitCode::SUCCESS,
@@ -497,6 +503,7 @@ mod daemon {
     }
 
     pub fn serve() -> Result<()> {
+        engine_os_manager::network_sessions::require_service_namespace();
         require_root()?;
         match fs::DirBuilder::new()
             .mode(0o700)

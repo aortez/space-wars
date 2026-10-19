@@ -76,6 +76,98 @@ fn truncated_malformed_or_oversized_tcp_tables_cannot_report_idle() {
     }
 }
 
+#[test]
+fn namespace_handoff_requires_this_process_and_exact_named_descriptor() {
+    let pid = std::process::id().to_string();
+    assert!(namespace_descriptor(&pid, "1", HOST_NAMESPACE_NAME));
+    for (owner, count, names) in [
+        ("", "1", HOST_NAMESPACE_NAME),
+        ("0", "1", HOST_NAMESPACE_NAME),
+        ("1", "1", HOST_NAMESPACE_NAME),
+        (&pid, "0", HOST_NAMESPACE_NAME),
+        (&pid, "2", HOST_NAMESPACE_NAME),
+        (&pid, "999999999999", HOST_NAMESPACE_NAME),
+        (&pid, "1", "connection"),
+        (&pid, "1", ""),
+        (&pid, "1", "spacewars-host-netns:connection"),
+    ] {
+        assert!(!namespace_descriptor(owner, count, names));
+    }
+}
+
+#[test]
+fn missing_and_rejected_handoffs_never_authorize_service_idle() {
+    let metadata = || {
+        [
+            Ok(std::process::id().to_string()),
+            Ok("1".into()),
+            Ok(HOST_NAMESPACE_NAME.into()),
+        ]
+    };
+    let missing = namespace_handoff(
+        std::array::from_fn(|_| Err(std::env::VarError::NotPresent)),
+        -1,
+    );
+    assert!(matches!(missing, NamespaceHandoff::Missing));
+    assert!(!missing.confirmed(true));
+    let mut partial = metadata();
+    partial[2] = Err(std::env::VarError::NotPresent);
+    let mut wrong_name = metadata();
+    wrong_name[2] = Ok("connection".into());
+    for input in [partial, wrong_name, metadata()] {
+        let rejected = namespace_handoff(input, -1);
+        assert!(matches!(rejected, NamespaceHandoff::Rejected(_)));
+        assert!(!rejected.confirmed(true));
+    }
+    let file = File::open("/proc/self/ns/net").unwrap();
+    let accepted = namespace_handoff(metadata(), file.as_raw_fd());
+    assert!(matches!(accepted, NamespaceHandoff::Accepted(_)));
+    assert!(accepted.confirmed(true));
+    // The fallback remains available to owner diagnostics, independently of
+    // whether this test's host allows inspecting PID 1.
+    let direct = fs::read_link("/proc/self/ns/net")
+        .ok()
+        .zip(fs::read_link("/proc/1/ns/net").ok())
+        .is_some_and(|(a, b)| a == b);
+    assert_eq!(missing.confirmed(false), direct);
+}
+
+#[test]
+fn namespace_handoff_pins_kernel_identity_and_closes_in_exec_children() {
+    let source = File::open("/proc/self/ns/net").unwrap();
+    // Simulate a descriptor handed to exec by systemd, without CLOEXEC.
+    let fd = unsafe { libc::fcntl(source.as_raw_fd(), libc::F_DUPFD, 3) };
+    assert!(fd >= 3);
+    // SAFETY: F_DUPFD returned a fresh descriptor owned by this test.
+    let inherited = unsafe { <File as std::os::fd::FromRawFd>::from_raw_fd(fd) };
+    let pinned = namespace_file(inherited.as_raw_fd()).unwrap();
+    for file in [&inherited, &pinned] {
+        assert_ne!(
+            unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFD) } & libc::FD_CLOEXEC,
+            0
+        );
+    }
+    drop(inherited);
+    assert!(same_namespace(&pinned, Path::new("/proc/self/ns/net")));
+    assert!(!same_namespace(&pinned, Path::new("/proc/self/ns/mnt")));
+    assert!(!same_namespace(&pinned, Path::new("/missing-namespace")));
+}
+
+#[test]
+fn namespace_handoff_rejects_regular_files_other_namespaces_and_sockets() {
+    let regular = tempfile::tempfile().unwrap();
+    let mount = File::open("/proc/self/ns/mnt").unwrap();
+    let (socket, _peer) = std::os::unix::net::UnixStream::pair().unwrap();
+    for fd in [
+        regular.as_raw_fd(),
+        mount.as_raw_fd(),
+        socket.as_raw_fd(),
+        -1,
+    ] {
+        assert!(namespace_file(fd).is_none());
+    }
+}
+
 struct PrivateBus(Child, String);
 impl PrivateBus {
     fn new() -> Self {

@@ -1,0 +1,685 @@
+{
+  "automatic_installation_enabled": false,
+  "automatic_publication_enabled": false,
+  "files": {
+    "canary-pi4-secondary.py": {
+      "bytes": 16287,
+      "sha256": "5e3bd2e6a9c7d4f623f37d788c966756e4dedb799607ebc01d01548c596f986a"
+    },
+    "observe-pi4-secondary-restart.py": {
+      "bytes": 6834,
+      "sha256": "03295067954442190299479827c91178dfde8bca7ea276c532620e69434b975f"
+    },
+    "pi4-readiness/sw-picade-2-helper/isolated-state.tar.gz": {
+      "bytes": 911,
+      "sha256": "340ff8d6ca3140987d82db054b241f631b35513a94cd1e353126906d6c96d23a"
+    },
+    "pi4-readiness/sw-picade-2-helper/result.json": {
+      "bytes": 2135,
+      "sha256": "ccec396c5fec832ac1d44c51500f45bad37960521736269701e749d45c462124"
+    },
+    "pi4-readiness/sw-picade-2-helper/run.log": {
+      "bytes": 945,
+      "sha256": "86e9dfa80280ab1b4dcf8ff28c792ffced149d41d390eeebafc23ef6e2458964"
+    },
+    "pi4-readiness/sw-picade-2-native/baseline/tests.log": {
+      "bytes": 612,
+      "sha256": "8a5efa775af559b706445c136badf535bdf7d51537e19878f98795e9ba833f13"
+    },
+    "pi4-readiness/sw-picade-2-native/candidate/tests.log": {
+      "bytes": 500,
+      "sha256": "7ea7f64563d5771e30d17f68245e11c9bce2456bd31a4e497b85edf6f9a9103f"
+    },
+    "pi4-readiness/sw-picade-2-native/inputs.json": {
+      "bytes": 655,
+      "sha256": "0fa6c5b02792615d729e0f66e7417ffef34cae6b89f671378182b722439275f2"
+    },
+    "pi4-readiness/sw-picade-2-native/preservation.json": {
+      "bytes": 292,
+      "sha256": "cb05b84b08a8f457298bfa3ba5f08de9d0af231f77fd0fac81074c88227145e8"
+    },
+    "pi4-readiness/sw-picade-2-native/result.json": {
+      "bytes": 377,
+      "sha256": "52d655fea0428db20a913cd637bde57d07a8508831f0643371129279a3d144c3"
+    },
+    "pi4-readiness/sw-picade-2-preflight.json": {
+      "bytes": 12627,
+      "sha256": "53bad5cb5d9cbe789adff40d7a146903cefc849adb36c541e4234e10fd2f8916"
+    },
+    "pi4-secondary-canary/install/normal-boot/result.json": {
+      "bytes": 639,
+      "sha256": "8bb02bfbcb409caacfcc7ace1e2f798dc694518e0bf220c50a2e312211c207af"
+    },
+    "pi4-secondary-canary/install/normal-boot/startup-journal.log": {
+      "bytes": 252,
+      "sha256": "973f85dd6bdd65159c163fbd500a8511be6cc6880e933c9ff0bda2dc9727a881"
+    },
+    "pi4-secondary-canary/install/observations.jsonl": {
+      "bytes": 7013,
+      "sha256": "d75f0f6861b28bc42c74f8549c0b606b0f928db05b070e4b55f30c8aa93b6a0f"
+    },
+    "pi4-secondary-canary/install/preservation-investigation/kiosk-journal.log": {
+      "bytes": 2898,
+      "sha256": "00dafe9d6e612c77cfe4db99f0b6652e4cc70eff07a7e657f898608311b8a057"
+    },
+    "pi4-secondary-canary/install/preservation-investigation/owner-report.json": {
+      "bytes": 181,
+      "sha256": "9aef279be999cccf84ddaabff24d1309fbd2502444726a77cf6e5f9ad7d1b843"
+    },
+    "pi4-secondary-canary/install/preservation-investigation/reviewed-normalization.json": {
+      "bytes": 885,
+      "sha256": "ab6d88b6ef048c5ae507479a202a704d87f882ebe74c093e63788a4945dc70fb"
+    },
+    "pi4-secondary-canary/install/preservation-investigation/settings-after.toml": {
+      "bytes": 1829,
+      "sha256": "d358d0c47bf5195d1594e2f7a21404236119dc6c422ad6cad54a75d8665ff0f9"
+    },
+    "pi4-secondary-canary/install/preservation-investigation/settings-before.toml": {
+      "bytes": 1767,
+      "sha256": "cc5bef5fa737417d70b3f5725469850900ee6dead509997b611c518c28a24396"
+    },
+    "pi4-secondary-canary/install/preservation-investigation/settings-diff.json": {
+      "bytes": 520,
+      "sha256": "01bbc155fc645ca2887d86499bca8c3700372b2db6f04c2148905e9ce210ec35"
+    },
+    "pi4-secondary-canary/install/preservation-review.json": {
+      "bytes": 357,
+      "sha256": "1bf104b03f3e50422bafa32565093a02e16c9eb2a4b571378e14b75fd950a512"
+    },
+    "pi4-secondary-canary/install/result.json": {
+      "bytes": 1833,
+      "sha256": "e1da4e9cb139d6d611484881a92ae304588dc3df6660c2a02710ae71adb87f0b"
+    },
+    "pi4-secondary-canary/restart/continuation.json": {
+      "bytes": 327,
+      "sha256": "fc0ea85da5f6dabeca934976c7c0ac2e639f3350d9871f4c1db49cee5172499a"
+    },
+    "pi4-secondary-canary/restart/continued-observations.json": {
+      "bytes": 38695,
+      "sha256": "216bbc41b81c9427c74dc1632977a26246ecf5328b9aea4043d0027a93423d9b"
+    },
+    "pi4-secondary-canary/restart/result.json": {
+      "bytes": 484,
+      "sha256": "238972e860b4d3d6df03632ce916fc2f3477fb6f4a39193c504c1e402a5736d0"
+    },
+    "pi4-secondary-canary/stage/access-observation.json": {
+      "bytes": 695,
+      "sha256": "6cfcd96d16d71116f097ece872a03571c718eacd7c63f21e84071daad1a9b8a1"
+    },
+    "pi4-secondary-canary/stage/during-stage-diagnostic.bin": {
+      "bytes": 1811,
+      "sha256": "d7398a1315fce9e8c3775fdfc00ff2ae445d373b29cae885deda0f5a8afee9de"
+    },
+    "pi4-secondary-canary/stage/during-stage-processes.log": {
+      "bytes": 7877,
+      "sha256": "07b8f1ce7ee785b246eea81fe72b3475814ef0db7d0476fd99ee137e826d16a7"
+    },
+    "pi4-secondary-canary/stage/result.json": {
+      "bytes": 191,
+      "sha256": "800fced18e8cfb1f1db3c772b7dcfdaa06fbed455a546578e1b8bf8badd47875"
+    },
+    "pi4-secondary-idle/analysis.json": {
+      "bytes": 2571,
+      "sha256": "dc414437aa56c1e0923907f98e83ca49730412e3b41114e9925764efd13ee08c"
+    },
+    "pi4-secondary-idle/analyze.py": {
+      "bytes": 4975,
+      "sha256": "5461bd28bde71ea63933f9d88a1f1784cae72db11a801702ea9e00c3cd960634"
+    },
+    "pi4-secondary-idle/cycle.sh": {
+      "bytes": 7450,
+      "sha256": "26f93fe2c9684a287ad45011cfcb62f005b53682e5603365c9e604152dc95238"
+    },
+    "pi4-secondary-idle/profiles.sh": {
+      "bytes": 1243,
+      "sha256": "b743bd80d11ad2d474274ae7821a4007b3f7f652e8105ea21014edb39602a0fe"
+    },
+    "pi4-secondary-idle/restore.sh": {
+      "bytes": 3817,
+      "sha256": "492aaa3373625e658ea83b3b434d04385e32e4d64020dedef76bcac854e64dcc"
+    },
+    "pi4-secondary-idle/run.py": {
+      "bytes": 9127,
+      "sha256": "9c34db3804df22bae8db6a24f2ea61558c87f6cc535447c600b8b4f24fe1b689"
+    },
+    "pi4-secondary-idle/run/device-evidence.tar.gz": {
+      "bytes": 53748,
+      "sha256": "0ba0ec6677a672c3b59bb20ead58acc66b53a0d02e88bc4ac037302c522bf61d"
+    },
+    "pi4-secondary-idle/run/intent.json": {
+      "bytes": 1039,
+      "sha256": "0b38e60d73df43c8c8db9cc15eb85c8eadbe57b342d0b714207d056cfc4838ea"
+    },
+    "pi4-secondary-idle/run/result.json": {
+      "bytes": 433,
+      "sha256": "9f61bf3ce5741691c55bb426e8268f334c5f89fb87d6699d2174a4ae613a27df"
+    },
+    "pi4-secondary-profile/analysis.json": {
+      "bytes": 3610,
+      "sha256": "5b24f064a0e7c86981cc37a1fdd3063f1c65a5d605033458be63a7f90272b9bc"
+    },
+    "pi4-secondary-profile/analyze.py": {
+      "bytes": 3754,
+      "sha256": "26b54917f819bc39d13400f548d434ed7d923ac051c97ebe941ab7f6badef45b"
+    },
+    "pi4-secondary-profile/cycle.sh": {
+      "bytes": 4127,
+      "sha256": "655191eb8706a551b15852116398cef09abd2e4868e0cf3da5fe2e9d13f66cf4"
+    },
+    "pi4-secondary-profile/profiles.sh": {
+      "bytes": 1243,
+      "sha256": "b743bd80d11ad2d474274ae7821a4007b3f7f652e8105ea21014edb39602a0fe"
+    },
+    "pi4-secondary-profile/radio.py": {
+      "bytes": 8860,
+      "sha256": "cf8406dd134f4998b215e509d0faf0b20a50e45d3a3052a445c05c9e3b57f5f3"
+    },
+    "pi4-secondary-profile/restore.sh": {
+      "bytes": 3506,
+      "sha256": "90132c0b968c6d900e647c7d93d275d654522d3cd828abb0af0e4801b6570b5a"
+    },
+    "pi4-secondary-profile/run/device-evidence.tar.gz": {
+      "bytes": 29075,
+      "sha256": "8b247adf87046cc483386a2eec156fea26ee210b9a2f32ba53b5e7db19e11ca4"
+    },
+    "pi4-secondary-profile/run/intent.json": {
+      "bytes": 1034,
+      "sha256": "0269981d2f46fe73f93ca02f421a4a35dd295b839b8d3f0926f0b552ec401134"
+    },
+    "pi4-secondary-profile/run/result.json": {
+      "bytes": 434,
+      "sha256": "bbe05791368294484a753a901be2dc41037f5f299d0205c0989a96e50448ae3a"
+    },
+    "pi4-secondary-radio-runner-review.json": {
+      "bytes": 3376,
+      "sha256": "9dd2fa706486593052d92d3ec12883fa84e9aaae6a09d3a74c5a229f9e86f087"
+    },
+    "pi4-secondary-runner-review.json": {
+      "bytes": 1089,
+      "sha256": "8d3d586264a2dcbf822ebc8a5de8e6dd43c7156af3fa855339395c1120934ca1"
+    },
+    "qualify-image-helper-pi4-secondary.py": {
+      "bytes": 7535,
+      "sha256": "d680573fdd77445de49f79cc9597788a75dbb93055cdf33578ed27174372e4e6"
+    },
+    "qualify-provider-pi4-secondary.py": {
+      "bytes": 7658,
+      "sha256": "d925354b52e99a423706903f476d46451537acb6cc40cd27f24033477ebe9ed4"
+    },
+    "review-pi4-secondary-trial.py": {
+      "bytes": 6951,
+      "sha256": "95c961158181170a8fe89faf46983592df9bd2f4e26f8cde5b5a711061447b48"
+    }
+  },
+  "final_channel": "release",
+  "final_partial_offline": false,
+  "generation": 6,
+  "host": "sw-picade-2.local",
+  "idle_cycle": {
+    "accepted_sync_age_before_request_seconds": 305,
+    "attempts": {
+      "time_check": {
+        "deadline_ms": 942744,
+        "first_observed_seconds": 201,
+        "id": 1,
+        "last_observed_seconds": 207,
+        "started_ms": 822744,
+        "trigger": "manual"
+      },
+      "update": {
+        "deadline_ms": 2623266,
+        "first_observed_seconds": 201,
+        "id": 19,
+        "last_observed_seconds": 208,
+        "started_ms": 823266,
+        "trigger": "automatic"
+      }
+    },
+    "boot_id": "5281dd9a-d57c-4dbc-9943-d105d4008b48",
+    "due_offline_from_seconds": 121,
+    "due_offline_samples": 69,
+    "due_offline_until_seconds": 200,
+    "emergency_radio_enable": false,
+    "files": {
+      "before-wake.json": {
+        "bytes": 1810,
+        "sha256": "deedeb082c2f99b6989301c9d5c3247c061f29070adc29fdc8af538fe21aeb3b"
+      },
+      "handoff-complete.json": {
+        "bytes": 1804,
+        "sha256": "a39e885718d7c33903d25f2b2f2f48f139c6a4f5b1a4292a73660c39b925e794"
+      },
+      "journal.jsonl": {
+        "bytes": 287823,
+        "sha256": "a58285ad5e9558cd6c6e2adc825b5f45d91634fa9d64728c5f88a31122ad23b3"
+      },
+      "observations.jsonl": {
+        "bytes": 481453,
+        "sha256": "f6414600409f312eb87b48f28ba45037c5e1ea331ab7081f098b29e0ac912c34"
+      },
+      "radio-signals.log": {
+        "bytes": 25182,
+        "sha256": "2efa54b2900817176d62819cc022ef3203d85e7044419bcac4bd10cd04905825"
+      },
+      "restore.log": {
+        "bytes": 1076,
+        "sha256": "82bbd36bedb137636aa76a7476a01c981cfd78559b1c00fc2b4c5014466a69b4"
+      },
+      "sync-now.json": {
+        "bytes": 52,
+        "sha256": "6454e0445c65c4010d20a3f94e1a6a693657fa60437047f12b96e669375f0412"
+      }
+    },
+    "first_off_seconds": 119,
+    "fresh_ssh_passed": true,
+    "limits": [
+      "Manual time-sync request exercised the actual time worker; the daily timer was not advanced.",
+      "No update was installed during this cycle; the installed generation is already current.",
+      "Qualifies only this Pi 4 unit; other units and unattended rollout remain outside this test."
+    ],
+    "next_update_ms_after_handoff": 87223266,
+    "observed_hold_kinds": [
+      "download",
+      "time-check"
+    ],
+    "original_logging_restored": true,
+    "owner_resumes": 0,
+    "partial_offline_enabled": false,
+    "passed": true,
+    "restored_release": true,
+    "same_boot_image_kiosk": true,
+    "schema": 1,
+    "selected_durable_stores_unchanged": true,
+    "settled_seconds": 226,
+    "source": "0a32db244ea2d692da9588b133ae4c5f92092804",
+    "success_generation_after": 34,
+    "success_generation_before": 33,
+    "time_completion": "synchronized",
+    "update_completion": "ineligible"
+  },
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 26567800,
+        "sha256": "9b71d0cddf9d3e00fac6eefd528b05a2242b265196aece4790d624ad17af3267"
+      },
+      "os_manager": {
+        "bytes": 11266304,
+        "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-0ede218f3fff168475b06e0cda46ee94fac04de41e02a6497206669c72072126",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "0ede218f3fff168475b06e0cda46ee94fac04de41e02a6497206669c72072126",
+    "schema": 1,
+    "source": {
+      "commit": "0a32db244ea2d692da9588b133ae4c5f92092804",
+      "dirty": false,
+      "revision": "0a32db244ea2",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "initial_boot_id": "4a3be67f-8d76-4a98-a2ff-82959fd15da9",
+  "initial_good_generation": 2,
+  "initial_source": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+  "isolated_provider": {
+    "cases": {
+      "baseline": {
+        "returncode": 101,
+        "seconds": 0.545
+      },
+      "candidate": {
+        "returncode": 0,
+        "seconds": 0.694
+      }
+    },
+    "host": "sw-picade-2.local",
+    "model": "Raspberry Pi 4 Model B Rev 1.2",
+    "network_and_mount_namespaces_private": true,
+    "passed": true,
+    "production_replaced": false,
+    "synthetic_credentials_only": true
+  },
+  "isolated_provider_preservation": {
+    "boot_unchanged": true,
+    "image_unchanged": true,
+    "kiosk_unchanged": true,
+    "passed": true,
+    "production_nm_unchanged": true,
+    "radio_clean": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    }
+  },
+  "isolated_ssh_helper": {
+    "cases": 4,
+    "elapsed_seconds": 90.35,
+    "files": {
+      "engine-os-manager": {
+        "bytes": 11266304,
+        "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+      },
+      "retained-state.json": {
+        "bytes": 735,
+        "sha256": "ad1fec4ae2529e40890a1e7be598646d09ad0327b71feda1feb195b79bce0b4f"
+      },
+      "tests": {
+        "bytes": 1839952,
+        "sha256": "23bcfc28a19d4115a7c34c694ab25f3fad59fd06864d742abbda7d1385896a40"
+      }
+    },
+    "fresh_login_passed": true,
+    "kiosk_instance_unchanged": true,
+    "live_radio_writes": false,
+    "passed": true,
+    "production_image_unchanged": true,
+    "production_nm_unchanged": true,
+    "production_radio_clean": true,
+    "production_services_unchanged": true,
+    "production_stores_unchanged": true,
+    "real_device_reboot": false
+  },
+  "model": "Raspberry Pi 4 Model B Rev 1.2",
+  "normal_boot": {
+    "automatic_completion": "no-candidate",
+    "boot_id": "5281dd9a-d57c-4dbc-9943-d105d4008b48",
+    "elapsed_seconds": 56.185,
+    "host": "sw-picade-2.local",
+    "maintenance_resume_logged": false,
+    "maintenance_wait_logged": false,
+    "passed": true,
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": [
+        {
+          "after": "784a53c62528491e089b6dc9098d33529df9d7043c4362840de3cf13afca515a",
+          "before": "adc541d68a38ffb6d98744516cd2327df7cd4da5b5cb8bea842b1b010575bd23",
+          "path": "/data/bluetooth/DC:A6:32:82:36:12/attributes"
+        }
+      ]
+    }
+  },
+  "owner_reported_no_interaction_during_trial": true,
+  "payload_sha256": "c689c0e3b6d1ddfd1c5f9a9ab9d26623f7ee8ebbefabc645910e80cb685a517f",
+  "profile_diagnostic": {
+    "diagnostic_calls_get_secrets": false,
+    "journal_events": [
+      {
+        "marker": "manager: startup complete",
+        "monotonic_us": 13528629
+      },
+      {
+        "marker": "secrets request completed",
+        "monotonic_us": 282571485
+      },
+      {
+        "marker": "new agent secrets processed",
+        "monotonic_us": 282572166
+      }
+    ],
+    "original_logging_restored": true,
+    "owner_resumes": 0,
+    "raw_settings_published": false,
+    "schema": 1,
+    "snapshots": [
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "2",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "3",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "4",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-baseline-l2Pza8",
+        "uptime": 156.12
+      },
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [
+              "connection.timestamp"
+            ],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "2",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "3",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "4",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-offline-QwjdJ2",
+        "uptime": 278.48
+      },
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [
+              "connection.timestamp"
+            ],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "2",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "3",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "4",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-restored-CStqtD",
+        "uptime": 284.21
+      }
+    ],
+    "wireless_notifications": [
+      {
+        "seconds_since_first": "0.000000",
+        "serial": 3452,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "4.052366",
+        "serial": 3598,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "4.056227",
+        "serial": 3601,
+        "wireless_enabled": true
+      }
+    ]
+  },
+  "publication_evidence": "ota-profile-image-20261018.json",
+  "radio_diagnostic": {
+    "boot_id": "5281dd9a-d57c-4dbc-9943-d105d4008b48",
+    "diagnostic_completed": true,
+    "emergency_radio_enable": false,
+    "fresh_ssh_passed": true,
+    "image_unchanged": true,
+    "kiosk_unchanged": true,
+    "off_at_seconds": 119,
+    "radio_cycle_passed": true,
+    "restored": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    },
+    "suspensions": []
+  },
+  "remaining": [
+    "Primary Picade remains on its previous image; this run did not access or qualify it.",
+    "Review/merge the branch and qualify main-admitted candidates before unattended rollout.",
+    "Actual daily timer, new/resumed payload gameplay performance and the broader failure matrix remain.",
+    "Normal install-service/UI, automatic policy and protected automatic publication remain."
+  ],
+  "runner_worktree": "7bfebe0290c83a0209c4666e61c888b499c24d01",
+  "schema": 1,
+  "scope": "Supervised signed image and installed radio/time/OTA qualification on the second Pi 4 Picade only",
+  "service_restart": {
+    "boot_id": "5281dd9a-d57c-4dbc-9943-d105d4008b48",
+    "continuation": "Read-only observation after the transient startup status-socket gap; no second restart",
+    "daily_allowance_preserved": true,
+    "host": "sw-picade-2.local",
+    "kiosk_instance_unchanged": true,
+    "observed_seconds": 22.678,
+    "original_runner_passed": false,
+    "passed": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    }
+  },
+  "signed_trial": {
+    "automatic_installation_enabled": false,
+    "commit_observed_seconds": 215.082,
+    "completion": "Read-only review after the original byte-inventory assertion stopped; no installation replay",
+    "generation": 6,
+    "host": "sw-picade-2.local",
+    "original_boot": "4a3be67f-8d76-4a98-a2ff-82959fd15da9",
+    "original_runner_passed": false,
+    "passed": true,
+    "payload": "c689c0e3b6d1ddfd1c5f9a9ab9d26623f7ee8ebbefabc645910e80cb685a517f",
+    "reviewed_normalization": {
+      "all_existing_settings_values_preserved": true,
+      "exact_preinstall_settings_recovered_from_hash_matching_archive": true,
+      "new_defaults": {
+        "clock.events.aquarium": true,
+        "clock.events.cell_swap": true,
+        "launcher.show_all": false
+      },
+      "new_training_artifact": "Empty UID/GID 1000 worker.lock and its directory; created by TrainingManager at app startup",
+      "original_byte_inventory_passed": false,
+      "other_durable_bytes_and_all_existing_metadata_unchanged": true,
+      "passed": true,
+      "regenerated_local_gatt_database_count": 1,
+      "review_script_sha256": "95c961158181170a8fe89faf46983592df9bd2f4e26f8cde5b5a711061447b48",
+      "settings_after_sha256": "d358d0c47bf5195d1594e2f7a21404236119dc6c422ad6cad54a75d8665ff0f9",
+      "settings_before_sha256": "cc5bef5fa737417d70b3f5725469850900ee6dead509997b611c518c28a24396",
+      "subsequent_readonly_snapshot_preserved": true
+    },
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": false,
+      "regenerated_local_gatt_databases": [
+        {
+          "after": "adc541d68a38ffb6d98744516cd2327df7cd4da5b5cb8bea842b1b010575bd23",
+          "before": "f6b2740be3930361510636e9b372364aac50498f8a6dbacee0ca9ff8f048e8ac",
+          "path": "/data/bluetooth/DC:A6:32:82:36:12/attributes"
+        }
+      ]
+    },
+    "trial_boot": "71144d55-52d4-471d-9530-1d346cd35be4"
+  },
+  "source": "0a32db244ea2d692da9588b133ae4c5f92092804",
+  "stage": {
+    "installed_image_unchanged": true,
+    "staged": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    }
+  },
+  "staging_access_observation": {
+    "cause_established": false,
+    "device_service_healthy": true,
+    "existing_control_connection_status_succeeded": true,
+    "follow_up": "Measure fresh-login latency alongside payload verification/download and gameplay on the corrected image in #265/#267.",
+    "fresh_selection_connection_succeeded": true,
+    "fresh_ssh_connect_timeout_seconds": 5,
+    "host": "sw-picade-2.local",
+    "installed_source": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+    "observed_error": "Connection timed out during banner exchange",
+    "schema": 1,
+    "scope": "Incidental access observation during owner-helper staging on the old installed image; not a controlled performance comparison",
+    "stage_completed": true
+  },
+  "wireless_profile_revisions_preserved": true
+}

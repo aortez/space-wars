@@ -27,6 +27,7 @@ pub struct Monitor {
     uid: u32,
     change: Option<Suspension>,
     expected: Option<Expected>,
+    wireless_enabled: bool,
 }
 
 impl Monitor {
@@ -95,6 +96,7 @@ impl Monitor {
             uid,
             change: None,
             expected: None,
+            wireless_enabled: baseline.wireless_enabled,
         };
         monitor.drain().await;
         Ok(monitor)
@@ -124,7 +126,7 @@ impl Monitor {
         Ok((observation, self.change))
     }
 
-    /// Reserve exactly one expected radio notification after a fresh fence.
+    /// Reserve exactly one expected radio transition after a fresh fence.
     /// No caller may use this to dismiss prior or intervening external changes.
     pub fn prepare_write(&mut self, expected: &Observation, enabled: bool) -> Result<bool> {
         futures_lite::future::block_on(bounded(DEADLINE, self.prepare(expected, enabled)))
@@ -222,6 +224,15 @@ impl Monitor {
                 .map_err(bus_error)?
                 .try_into()
                 .map_err(bus_error)?;
+            if name == "WirelessEnabled" {
+                // NM can notify with the old exported value before its cached
+                // rfkill bit catches up. Only a transition consumes our Set's
+                // allowance; duplicates neither renew it nor erase a fault.
+                if value == self.wireless_enabled {
+                    continue;
+                }
+                self.wireless_enabled = value;
+            }
             if name == "WirelessEnabled"
                 && self
                     .expected

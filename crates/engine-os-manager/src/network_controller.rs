@@ -212,12 +212,11 @@ impl<B: Backend> Controller<B> {
         let kind = self.policy.held_kind(token, caller, &clock)?;
         let wireless_required = self.policy.requires_wireless(token, caller, &clock)?;
         if kind == HoldKind::Ssh {
-            // The queued hold excludes future off decisions. An old off request
-            // may still arrive after a timeout, and a completed policy-owned off
-            // must be restored before the admission helper allows authentication.
-            // With neither present, a suspended/unavailable provider is safe for
-            // this existing TCP connection and must not disable Ethernet recovery.
-            if status.pending.is_some() || status.owned_off {
+            // The queued hold excludes future off decisions. Same-boot pending
+            // writes and owned-off state still require reconciliation. A reboot
+            // fences old commands, permitting SSH recovery while retaining their
+            // saved fault and ownership until an explicit resume succeeds.
+            if self.policy.radio(&clock)?.blocks_ssh(&clock.boot_id) {
                 return Err(invalid("SSH protection awaits radio reconciliation"));
             }
             return Ok(Admission {

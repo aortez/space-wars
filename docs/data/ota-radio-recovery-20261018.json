@@ -1,0 +1,331 @@
+{
+  "ci": {
+    "result": "success",
+    "run": 39153810279,
+    "url": "https://github.com/aortez/space-wars/actions/runs/39153810279"
+  },
+  "files": {
+    "image-verification.json": {
+      "bytes": 5013,
+      "sha256": "fe089575fff2b38da741085cc4a374d2558577dd5d2047980f5480ef58b97f42"
+    },
+    "install/normal-boot/observer-stop.json": {
+      "bytes": 2120,
+      "sha256": "a4402096156e5b755b8a82e1c42f9d1de16e489e2b1feaabe4c409fa9299f6b2"
+    },
+    "install/normal-boot/result.json": {
+      "bytes": 882,
+      "sha256": "74321f237710abe3f9e0dce4deb0ab12381272513585196909a93dc0011e0b84"
+    },
+    "install/result.json": {
+      "bytes": 726,
+      "sha256": "109cfe1c3050011f0881bb7f9a23bddae9ade28d6e299b70e2bc761744cc4c88"
+    },
+    "native-helper/result.json": {
+      "bytes": 2023,
+      "sha256": "572393674fd4d4d826c858ae6ee9242340e2502a30555bbb7126ed76981cd65a"
+    },
+    "publication-result.json": {
+      "bytes": 1002,
+      "sha256": "fe2394b05a1d3de874307e17e68c0d52ebda4d502e44b2a58f331ef9d538c9a0"
+    },
+    "radio-diagnostic/aarch64-build.log": {
+      "bytes": 340,
+      "sha256": "5619eb728c54752675713c5815a5ed8288c648776efb51e6b18d35f44e4c75b4"
+    },
+    "radio-diagnostic/clippy.log": {
+      "bytes": 227,
+      "sha256": "94731dab9805dbe42dfbb171a953c02227fb54b6a7160a1ec372208ab0c3b2c3"
+    },
+    "radio-diagnostic/manager-tests.log": {
+      "bytes": 23394,
+      "sha256": "9f0810808b2faddaadbd1452fff05294c5de9661bc3c2558086d056044b70ec6"
+    },
+    "radio-diagnostic/restore-controls.json": {
+      "bytes": 256,
+      "sha256": "b007d805b6f5276bc026897bc91354a7b95d5d7d7af9042abf24a13c15d51f99"
+    },
+    "radio-diagnostic/run/after.json": {
+      "bytes": 10728,
+      "sha256": "79d405092484b0c1abd27cc9dc8075f280a8f4cdc3e21c163366817db69436f6"
+    },
+    "radio-diagnostic/run/before.json": {
+      "bytes": 11057,
+      "sha256": "152d12ea26987cc65d1fec07365c39581f99a4be6bba2fd270324cb58bd2663c"
+    },
+    "radio-diagnostic/run/collection-parser-failure.json": {
+      "bytes": 343,
+      "sha256": "b1491cdccf3fcd9f637953ac9140c788af89d92c8bea925c2767417ac958725d"
+    },
+    "radio-diagnostic/run/device-evidence.tar.gz": {
+      "bytes": 10895,
+      "sha256": "3cbe767f483fb84c2343e0f8aa03fb8bacbeb3b54191e34be3b4890ecac001ab"
+    },
+    "radio-diagnostic/run/device/fault-observed.jsonl": {
+      "bytes": 2269,
+      "sha256": "be32e91d0f11c401cd9caa95b609883ba889ddc3bb409fff683dbd8dcb486169"
+    },
+    "radio-diagnostic/run/device/observations.jsonl": {
+      "bytes": 265358,
+      "sha256": "e0c3d469e99af94c3a2883fc0a50d8ab3c6dcd636f2cb3a4903577ba64933b15"
+    },
+    "radio-diagnostic/run/device/radio-signals.log": {
+      "bytes": 12550,
+      "sha256": "428e9fcf99f9360b17eca2770e4431de470f67abcd40562f782a7eef1ed47cc9"
+    },
+    "radio-diagnostic/run/device/restore-observations.jsonl": {
+      "bytes": 8022,
+      "sha256": "a9f2d4c564b592393aaea5715aeaf688954c4ef44aa75d4e8d1ae63d42696441"
+    },
+    "radio-diagnostic/run/intent.json": {
+      "bytes": 848,
+      "sha256": "522ec55a7865b3355324fd220936f3649e4b913dfed0b7de69b977531c5ab6e3"
+    },
+    "radio-diagnostic/run/result.json": {
+      "bytes": 551,
+      "sha256": "09f5cba342b52f993c820c9a7760fc86b85a97c93c2b4c57044fc1d469ad42bd"
+    },
+    "review.json": {
+      "bytes": 8194,
+      "sha256": "26bc5a97979224e5394353e262407a6b07799203a187da93486da2d8139227f6"
+    },
+    "stage/result.json": {
+      "bytes": 191,
+      "sha256": "800fced18e8cfb1f1db3c772b7dcfdaa06fbed455a546578e1b8bf8badd47875"
+    }
+  },
+  "host": "spacewars.local",
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 26567800,
+        "sha256": "cb450ca858cc05b6d560339494400c8a7240f642e250fbb338e51b5931b57939"
+      },
+      "os_manager": {
+        "bytes": 11265792,
+        "sha256": "72d139c240a30bba715a20e4fcbf3273ae8b2a139c956aeefe80048d6771fc29"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-192c0e1a84e61c56e8201002f1ad2ba86b9b66e56ecce8097636e0415db9a4e4",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "192c0e1a84e61c56e8201002f1ad2ba86b9b66e56ecce8097636e0415db9a4e4",
+    "schema": 1,
+    "source": {
+      "commit": "d77ac20ed910ce618e47ca2b19376847fcc19e28",
+      "dirty": false,
+      "revision": "d77ac20ed910",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "image_helper_qualification": {
+    "boot_id": "8a3a1171-3b1f-4980-bcfe-d222bd7ba1f9",
+    "cases": 4,
+    "elapsed_seconds": 90.23,
+    "fresh_login_passed": true,
+    "helper_from_qualified_image": true,
+    "host": "swadmin@spacewars.local",
+    "image": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 26567800,
+          "sha256": "cb450ca858cc05b6d560339494400c8a7240f642e250fbb338e51b5931b57939"
+        },
+        "os_manager": {
+          "bytes": 11265792,
+          "sha256": "72d139c240a30bba715a20e4fcbf3273ae8b2a139c956aeefe80048d6771fc29"
+        }
+      },
+      "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+      "build_id": "rootfs-192c0e1a84e61c56e8201002f1ad2ba86b9b66e56ecce8097636e0415db9a4e4",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 2,
+      "rootfs_tree": "192c0e1a84e61c56e8201002f1ad2ba86b9b66e56ecce8097636e0415db9a4e4",
+      "schema": 1,
+      "source": {
+        "commit": "d77ac20ed910ce618e47ca2b19376847fcc19e28",
+        "dirty": false,
+        "revision": "d77ac20ed910",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "live_radio_writes": false,
+    "namespace_isolation": [
+      "mount",
+      "network"
+    ],
+    "passed": true,
+    "production_fix_deployed": false,
+    "production_image_unchanged": true,
+    "production_radio_clean": true,
+    "production_services_unchanged": true,
+    "real_device_reboot": false,
+    "remote_artifacts": "/data/spacewars-ssh-qualification-20261018-d77ac20-image"
+  },
+  "local_artifacts": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/recovery-image-d77ac20",
+  "local_monitor_fix": {
+    "behavior": "Remember the last WirelessEnabled value from the baseline and signal stream. Ignore identical notifications without consuming or renewing the single expected transition; preserve latched faults and all other property checks.",
+    "focused_tests": {
+      "failed": 0,
+      "passed": 6
+    },
+    "installed_on_pi": false,
+    "patch_sha256": "1b7c370dd5799187dab226fd3b23939d59834ef5384a24e41b081d9a848ae590",
+    "regression_before_fix": "Captured old-false then target-true signal sequence fails with ExternalRadioChange.",
+    "validation": {
+      "aarch64_lib_tests_compilation": "passed; not executed on hardware",
+      "clippy_all_targets": "passed with warnings denied",
+      "formatting": "passed",
+      "host_device_service": {
+        "execution": "cargo test --locked --profile ci -p engine-os-manager -- --test-threads=1",
+        "failed": 0,
+        "ignored": 4,
+        "passed": 203,
+        "toolchain": "Rust 1.89.0"
+      }
+    }
+  },
+  "normal_boot": {
+    "automatic_completion": "failed",
+    "automatic_reason": "network-unavailable",
+    "automatic_startup_check_passed": false,
+    "boot_id": "da44b467-4432-4de5-bb05-aa65143848d0",
+    "fresh_ssh_passed": true,
+    "generation": 4,
+    "host": "spacewars.local",
+    "image": "rootfs-192c0e1a84e61c56e8201002f1ad2ba86b9b66e56ecce8097636e0415db9a4e4",
+    "manual_completion": "no-candidate",
+    "manual_update_check_passed": true,
+    "network_clean": true,
+    "normal_boot_passed": true,
+    "passed": false,
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 1
+    }
+  },
+  "publication": {
+    "automatic_installation_enabled": false,
+    "channel": "nightly",
+    "current": {
+      "manifest_sha256": "08c97ccbadab630d33a9695c97fffe4474707bdc07e4392f5211b6614234bdf3",
+      "timestamp": {
+        "bytes": 469,
+        "sha256": "f891be3863f2a6e8e321702fad7b28d52c6955fad301617617522689a7775576"
+      },
+      "version": 5
+    },
+    "generation": 4,
+    "intent_sha256": "c6891ac7c7328878bc58fa077f3245e50db31e66fcc7a55853763eeedea6e276",
+    "main_ci_admission_claimed": false,
+    "payload": {
+      "bytes": 132945439,
+      "sha256": "a475ca11ed5b1381bd143f28eb09ccae1cf27cecdaa6e86e06986bdf6d4feb5a"
+    },
+    "publication_scope": "Owner-supervised branch candidate",
+    "publisher": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+    "release_id": 416212208,
+    "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+    "result": "published",
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "source": "d77ac20ed910ce618e47ca2b19376847fcc19e28"
+  },
+  "radio_diagnostic": {
+    "boot_id": "da44b467-4432-4de5-bb05-aa65143848d0",
+    "collection": "First local summary parser assumed JSON lines, but the retained fault stream has concatenated pretty JSON. Corrected the parser and summarized the already-collected evidence; no device operation was replayed.",
+    "collection_parser_corrected": true,
+    "diagnostic_completed": true,
+    "emergency_radio_enable": false,
+    "enable_notifications_separation_microseconds": 447,
+    "fresh_ssh_passed": true,
+    "image_unchanged": true,
+    "kiosk_unchanged": true,
+    "manager_replacement_observed": false,
+    "networking_or_hardware_notifications_observed": false,
+    "off_at_seconds": 121,
+    "owner_resumes": 2,
+    "profile_revision_case": {
+      "after": "f3c3a73f9955854fa0f4e5dd7aca0c0b81df89ed9c7829d5e890f968ebbcea24",
+      "before": "48c969157b1cc8e9199587eef73a3642a65bf0dad470a584b85e85c81a795fe2",
+      "cause": "Not established; individual profile revisions and change origins were not traced. Selected persistent-store bytes remained unchanged.",
+      "profile_count": 3
+    },
+    "radio_cycle_passed": false,
+    "remote_artifacts": "/data/spacewars-system/qualification/radio-d77ac20-20261018",
+    "restoration": "Two explicit public owner resumes cleared the returned enable suspension, then the separate profile-revision suspension. No emergency nmcli command or saved-state edit was used.",
+    "restored": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 0
+    },
+    "suspensions": [
+      "external-radio-change",
+      "profiles-changed"
+    ],
+    "wireless_notifications": [
+      {
+        "seconds": "120.772152",
+        "serial": 3114,
+        "wireless_enabled": false
+      },
+      {
+        "seconds": "124.063400",
+        "serial": 3221,
+        "wireless_enabled": false
+      },
+      {
+        "seconds": "124.063847",
+        "serial": 3223,
+        "wireless_enabled": true
+      }
+    ]
+  },
+  "remaining_work": [
+    "Qualify the corrected monitor on native NetworkManager after a new signed image installation.",
+    "Trace the separate profile-revision change during reconnect before changing profile conflict policy.",
+    "Identify the precise automatic-startup admission failure; a successful manual check is not an automatic pass.",
+    "Complete the off/time-wake/OTA/off cycle, then Pi 4 and unattended rollout qualification."
+  ],
+  "schema": 1,
+  "scope": "Supervised Pi 5 installation and radio-only diagnostic; full partial-offline/time/OTA cycle remains unqualified",
+  "signed_trial": {
+    "automatic_installation_enabled": false,
+    "elapsed_seconds": 95.853,
+    "generation": 4,
+    "host": "spacewars.local",
+    "original_boot": "8a3a1171-3b1f-4980-bcfe-d222bd7ba1f9",
+    "passed": true,
+    "payload": "a475ca11ed5b1381bd143f28eb09ccae1cf27cecdaa6e86e06986bdf6d4feb5a",
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 1
+    },
+    "trial_boot": "50ebb0e4-11f0-4d21-abb3-450a49992dcd"
+  },
+  "source": "d77ac20ed910ce618e47ca2b19376847fcc19e28"
+}

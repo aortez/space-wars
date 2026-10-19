@@ -425,26 +425,76 @@ fn observe_through(policy: &mut NetworkPolicy, begin: u64, end: u64, activity: A
 fn ssh_fallback_preserves_saved_bytes_and_excludes_an_active_coordinator() {
     let temp = tempfile::tempdir().unwrap();
     let path = temp.path().join("network");
-    protect_ssh_without_service(&path).unwrap();
+    protect_ssh_without_service(&path, BOOT).unwrap();
     assert!(!path.exists());
     let mut policy = NetworkPolicy::open(&path, clock(0)).unwrap();
     enable(&mut policy);
     policy
         .reserve(&token(1), caller(1), HoldKind::Deployment, &clock(0))
         .unwrap();
-    assert!(protect_ssh_without_service(&path).is_err());
+    assert!(protect_ssh_without_service(&path, BOOT).is_err());
     let bytes = fs::read(path.join("state.json")).unwrap();
     drop(policy);
-    let guard = protect_ssh_without_service(&path).unwrap();
+    let guard = protect_ssh_without_service(&path, BOOT).unwrap();
     assert!(NetworkPolicy::open(&path, clock(0)).is_err());
     assert_eq!(fs::read(path.join("state.json")).unwrap(), bytes);
     drop(guard);
     NetworkPolicy::open(&path, clock(0)).unwrap();
     fs::write(path.join("state.json"), b"damaged").unwrap();
-    assert!(protect_ssh_without_service(&path).is_err());
+    assert!(protect_ssh_without_service(&path, BOOT).is_err());
     fs::remove_file(path.join("state.json")).unwrap();
-    assert!(protect_ssh_without_service(&path).is_err());
+    assert!(protect_ssh_without_service(&path, BOOT).is_err());
     assert!(!path.join("state.json").exists());
+}
+
+#[test]
+fn ssh_fallback_after_reboot_preserves_radio_faults_and_deployments() {
+    use crate::network_radio_state::{Pending, Phase, Suspension, Witness};
+
+    for phase in [None, Some(Phase::Requested), Some(Phase::Returned)] {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("network");
+        let mut policy = NetworkPolicy::open(&path, clock(0)).unwrap();
+        enable(&mut policy);
+        policy
+            .reserve(&token(1), caller(1), HoldKind::Deployment, &clock(0))
+            .unwrap();
+        let before = Witness {
+            boot_id: BOOT.into(),
+            owner: ":1.7".into(),
+            pid: 47,
+            profile_revision: Sha256::digest(b"profiles"),
+            networking: true,
+            wireless: false,
+        };
+        policy
+            .save_radio(
+                RadioState {
+                    witness: Some(before.clone()),
+                    owned_off: true,
+                    pending: phase.map(|phase| Pending {
+                        before,
+                        enabled: true,
+                        phase,
+                    }),
+                    suspended: Some(Suspension::ExternalRadioChange),
+                },
+                &clock(0),
+            )
+            .unwrap();
+        // A different boot ID must never bypass the live owner's store lock.
+        assert!(protect_ssh_without_service(&path, OTHER_BOOT).is_err());
+        let bytes = fs::read(path.join("state.json")).unwrap();
+        drop(policy);
+        assert!(protect_ssh_without_service(&path, BOOT).is_err());
+        assert!(protect_ssh_without_service(&path, "").is_err());
+        let guard = protect_ssh_without_service(&path, OTHER_BOOT).unwrap();
+        assert!(NetworkPolicy::open(&path, clock(0)).is_err());
+        assert_eq!(fs::read(path.join("state.json")).unwrap(), bytes);
+        drop(guard);
+        // Admission must not rewrite the fault or consume deployment grace.
+        assert_eq!(fs::read(path.join("state.json")).unwrap(), bytes);
+    }
 }
 
 #[test]

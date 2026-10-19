@@ -1,5 +1,28 @@
 # Supervised recovery failure tests
 
+**Status reviewed 2026-10-18:** both primary Pis have passed supervised signed
+installation, application-health rollback/quarantine and subsequent normal boot
+([physical trials](#physical-signed-trials-2026-10-17)). Interrupted promotion,
+physical power loss and the broader failure matrix remain outstanding. See the
+[active OTA plan](ota-updates.md#current-implementation) for current images,
+device-specific coverage and rollout order. The
+[second-Picade follow-up](data/ota-picade2-profile-image-20261018.json) adds its
+successful signed trial/normal boot and installed radio/time/OTA qualification;
+it includes an explicitly reviewed additive settings migration, not a new
+deliberate-failure or power-loss trial.
+The [review-fix image record](data/ota-picade2-review-fixes-20261018.json) adds
+its subsequent generation-7 trial, default boot and installed service/network
+checks. Exact pre-update settings bytes were retained before installation;
+selected durable stores remained unchanged. Its deliberate-failure matrix is
+still outstanding.
+
+The missing-root commands immediately below are an **earlier generation-zero
+diagnostic**, not the next test for today's signed-update devices. Their
+preconditions exclude the current provisioned primary Pis. Preserve consumed
+attempts and exports; never clear recovery/trust history to make an old test
+eligible. The later supervised signed-installer procedure has its own admission
+and evidence requirements.
+
 The [first primary-Picade run](data/ota-picade-missing-root-20261017.json) observed
 return to the same normal image in 258.576 seconds after one accepted request.
 Operator cleanup restored recovery admission; all durable settings, ROMs,
@@ -315,14 +338,18 @@ The publisher now reads that public URL with the validated replacement asset ID,
 retaining credential-free downloads and length/hash verification. All 23 delivery
 tests passed, including the regression. The retained pending publication resumed
 without new keys, re-signing or version/generation resets; the second publication
-completed through the same path. Feed metadata is now version 3, image generation
-2, with no pending publisher transaction. Its timestamp expires on
-2026-10-25 at 04:45:25 UTC; future renewals must continue the same journal.
+completed through the same path. At the end of this run, feed metadata was
+version 3, image generation 2, with no pending publisher transaction. That
+timestamp's expiry was 2026-10-25 at 04:45:25 UTC. These are historical identities;
+later publications continue the same journal. The active plan records the
+latest qualified publication, not a replacement for reading current signed expiry.
 
 This establishes physical signed installation, application-health rollback,
 quarantine, a bounded explicit retry and durable successful normal boots. It does
 not establish interrupted boot-selector promotion, physical power-loss safety,
 unattended installation, real Release promotion or download/gameplay performance.
-Those checks, installed download/network qualification, second-Picade rollout and
-the production publisher/installer/overnight-policy integration remain rollout
-gates before tag-triggered releases and automatic Nightlies are enabled.
+The [later installed-image record](data/ota-profile-image-20261018.json) adds
+Pi 5 startup/radio/time-wake feed checks and isolated Pi 4 controls. The rest of
+the installed download/network matrix, second-Picade failure matrix and production
+publisher/installer/overnight-policy integration remain rollout gates before
+tag-triggered releases and automatic Nightlies are enabled.
