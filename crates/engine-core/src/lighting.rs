@@ -40,6 +40,17 @@ pub struct DirectionalSource {
     pub color: Color,
 }
 
+/// Vertical parallel sunlight through a finite horizontal opening. Bounds are
+/// inclusive; receivers at or above the ceiling receive no aperture light.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ApertureSource {
+    pub id: LightId,
+    pub left: f32,
+    pub right: f32,
+    pub ceiling_y: f32,
+    pub strength: f32,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Receiver {
     pub position: Vec2,
@@ -86,6 +97,7 @@ pub struct LightingSnapshot {
     directional: DirectionalSource,
     sources: Vec<LocalSource>,
     duplicate_copies: usize,
+    aperture: Option<ApertureSource>,
 }
 
 fn finite(p: Vec2) -> bool {
@@ -155,7 +167,28 @@ impl LightingSnapshot {
             directional,
             sources: unique.into_values().cloned().collect(),
             duplicate_copies,
+            aperture: None,
         })
+    }
+
+    pub fn with_aperture(mut self, aperture: ApertureSource) -> Result<Self, LightingError> {
+        if !finite(Vec2::new(aperture.left, aperture.ceiling_y))
+            || !finite(Vec2::new(aperture.right, aperture.ceiling_y))
+            || aperture.left >= aperture.right
+            || !strength(aperture.strength)
+            || self.sources.iter().any(|s| s.id == aperture.id)
+        {
+            return Err(LightingError::InvalidInput);
+        }
+        if self.sources.len() == MAX_SOURCES {
+            return Err(LightingError::Capacity);
+        }
+        self.aperture = Some(aperture);
+        Ok(self)
+    }
+
+    pub fn aperture(&self) -> Option<ApertureSource> {
+        self.aperture
     }
 
     pub fn tick(&self) -> u64 {
@@ -227,6 +260,18 @@ impl LightingSnapshot {
                         );
                     }
                 }
+                if let Some(source) = self.aperture
+                    && (source.left..=source.right).contains(&receiver.position.x)
+                    && receiver.position.y < source.ceiling_y
+                {
+                    result.local += sample(
+                        EmissionPoint {
+                            position: Vec2::new(receiver.position.x, source.ceiling_y),
+                            surface: Some(source.id),
+                        },
+                        source.strength,
+                    );
+                }
                 result.intensity = (result.directional + result.local).min(FULL_SUN);
                 result
             })
@@ -289,5 +334,74 @@ impl LightingPublisher {
                 Err(error)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod ceiling_light_contract {
+    use super::*;
+    struct Clear;
+    impl Visibility for Clear {
+        fn blocker(&self, _: LightRay) -> Option<LightId> {
+            None
+        }
+    }
+    struct Block;
+    impl Visibility for Block {
+        fn blocker(&self, _: LightRay) -> Option<LightId> {
+            Some(LightId(9, 9))
+        }
+    }
+    #[test]
+    fn ceiling_light_contract_bounds_occlusion_generations_and_caps() {
+        let s = LightingSnapshot::new(
+            10,
+            20,
+            DirectionalSource {
+                toward_source: Vec2::Y,
+                strength: 50.0,
+                color: Color::WHITE,
+            },
+            &[],
+        )
+        .unwrap()
+        .with_aperture(ApertureSource {
+            id: LightId(5, 1),
+            left: -10.0,
+            right: 10.0,
+            ceiling_y: 100.0,
+            strength: 950.0,
+        })
+        .unwrap();
+        let receivers: Vec<_> = [-10.01, -10.0, 0.0, 10.0, 10.01]
+            .into_iter()
+            .map(|x| Receiver {
+                position: Vec2::new(x, 0.0),
+                surface: None,
+            })
+            .collect();
+        let e = s.query(10, 20, &receivers, &Clear).unwrap();
+        assert_eq!(
+            e.iter().map(|e| e.intensity).collect::<Vec<_>>(),
+            [50.0, 1000.0, 1000.0, 1000.0, 50.0]
+        );
+        assert!(
+            s.query(10, 20, &receivers, &Block)
+                .unwrap()
+                .iter()
+                .all(|e| e.intensity == 0.0)
+        );
+        assert_eq!(
+            s.query(12, 20, &receivers, &Clear),
+            Err(LightingError::Stale)
+        );
+        assert_eq!(
+            s.query(10, 21, &receivers, &Clear),
+            Err(LightingError::GeometryGeneration)
+        );
+        assert_eq!(
+            s.query(10, 20, &vec![receivers[0]; 65], &Clear),
+            Err(LightingError::Capacity)
+        );
     }
 }

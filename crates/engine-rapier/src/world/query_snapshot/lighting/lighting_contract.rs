@@ -725,3 +725,95 @@ fn canonical_shape_clipping_matches_untrimmed_query_oracle() {
         }
     }
 }
+
+#[test]
+fn ceiling_light_contract_moving_solids_tissue_and_source_boundaries() {
+    use engine_core::lighting::{ApertureSource, DirectionalSource, LightingSnapshot};
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+    let solid = add(&mut world, 991, Vec2::new(0.0, 5.0), false);
+    world.step(1.0 / 60.0);
+    let publication = LightingSnapshot::new(
+        1,
+        1,
+        DirectionalSource {
+            toward_source: Vec2::Y,
+            strength: 50.0,
+            color: engine_core::Color::WHITE,
+        },
+        &[],
+    )
+    .unwrap()
+    .with_aperture(ApertureSource {
+        id: LightId(992, 1),
+        left: -2.0,
+        right: 2.0,
+        ceiling_y: 10.0,
+        strength: 950.0,
+    })
+    .unwrap();
+    let receivers = [
+        Receiver {
+            position: Vec2::ZERO,
+            surface: None,
+        },
+        Receiver {
+            position: Vec2::new(1.0, 0.0),
+            surface: None,
+        },
+        Receiver {
+            position: Vec2::new(2.1, 0.0),
+            surface: None,
+        },
+    ];
+    let old = world.query_snapshot();
+    let visible = old.lighting_visibility(&[], &[]).unwrap();
+    let exposure = publication.query(1, 1, &receivers, &visible).unwrap();
+    assert_eq!(
+        exposure.iter().map(|e| e.intensity).collect::<Vec<_>>(),
+        [0.0, 1000.0, 50.0]
+    );
+    assert_eq!(exposure[0].first_blocker, Some(light_collider_id(solid)));
+    let silhouettes = old.lighting_occluder_silhouettes(&[]).unwrap();
+    assert!(
+        silhouettes
+            .iter()
+            .any(|p| p.iter().any(|v| v.x < 0.0) && p.iter().any(|v| v.x > 0.0))
+    );
+    world.set_pose(
+        BodyId::new(solid.entity, BodyRole::PRIMARY),
+        Vec2::new(8.0, 5.0),
+        0.0,
+        true,
+    );
+    world.step(1.0 / 60.0);
+    let fresh = world.query_snapshot();
+    let clear = fresh.lighting_visibility(&[], &[]).unwrap();
+    assert_eq!(
+        publication.query(1, 1, &receivers, &clear).unwrap()[0].intensity,
+        1000.0
+    );
+    assert_eq!(
+        publication.query(1, 1, &receivers, &visible).unwrap()[0].intensity,
+        0.0,
+        "old geometry stays immutable"
+    );
+    let tissue = [OpaqueFootprint {
+        id: LightId(993, 1),
+        center: Vec2::new(1.0, 4.0),
+        radius: 0.4,
+    }];
+    let shade = fresh.lighting_visibility(&tissue, &[]).unwrap();
+    let samples = publication.query(1, 1, &receivers, &shade).unwrap();
+    assert_eq!(samples[0].intensity, 1000.0);
+    assert_eq!(samples[1].intensity, 0.0);
+    assert_eq!(samples[1].first_blocker, Some(tissue[0].id));
+    world.remove_entity(solid.entity);
+    world.step(1.0 / 60.0);
+    assert!(
+        world
+            .query_snapshot()
+            .lighting_occluder_silhouettes(&[])
+            .unwrap()
+            .is_empty()
+    );
+}

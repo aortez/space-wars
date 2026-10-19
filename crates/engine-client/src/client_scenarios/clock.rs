@@ -74,12 +74,14 @@ fn create(
             benchmark: Some(driver),
         }));
     }
+    let grass_fixture = std::env::var("SPACEWARS_CLOCK_GRASS_FIXTURE").unwrap_or_default();
     let mut state = ClockScenario::init(
         ClockConfig {
+            ceiling_sunlight: grass_fixture != "shortage-v1",
+            ceiling_optics: std::env::var("SPACEWARS_CLOCK_CEILING_OPTICS").is_ok_and(|v| v == "1"),
             grass_inspection: std::env::var("SPACEWARS_CLOCK_GRASS_INSPECT")
                 .is_ok_and(|v| v == "1"),
-            favorable_grass_fixture: std::env::var("SPACEWARS_CLOCK_GRASS_FIXTURE")
-                .is_ok_and(|v| v == "favorable-v1"),
+            favorable_grass_fixture: grass_fixture == "favorable-v1",
             fonts: settings.clock.fonts,
             aspect_ratio: viewport.aspect_ratio(),
             water_lab: scenario_clock::ClockWaterLab::from_override(
@@ -108,7 +110,7 @@ fn create(
         },
         seed,
     );
-    if std::env::var("SPACEWARS_CLOCK_GRASS_FIXTURE").is_ok_and(|v| v == "shortage-v1") {
+    if grass_fixture == "shortage-v1" {
         state.set_plant_conditions(0, [0; 2]);
     }
     let reading = local_clock_reading();

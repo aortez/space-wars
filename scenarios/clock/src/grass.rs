@@ -13,27 +13,11 @@ pub const SEED_BATCH: usize = 3;
 pub const SEED_SPACING_CELLS: i32 = 4;
 pub const SEED_STARTING_RESERVES: [u64; 3] = [30; 3];
 
+#[derive(Default)]
 pub(crate) struct Introduction {
     pub tick: u64,
-    seed: u64,
-    committed: bool,
 }
 impl Introduction {
-    pub fn new(seed: u64) -> Self {
-        Self {
-            tick: 0,
-            seed,
-            committed: false,
-        }
-    }
-    pub fn take_seed(&mut self) -> Option<u64> {
-        if self.committed {
-            None
-        } else {
-            self.committed = true;
-            Some(self.seed)
-        }
-    }
     pub fn step(&mut self) -> bool {
         self.tick += 1;
         self.tick >= INTRODUCTION_TICKS
@@ -44,7 +28,7 @@ impl Introduction {
 mod contracts;
 mod habitat;
 pub(crate) mod inspection;
-mod residents;
+pub(crate) mod residents;
 pub(crate) mod surfaces;
 pub use habitat::{
     CLOCK_DIRT, MAX_SOIL_BODIES, MAX_SOIL_CHUNK_COLLIDERS, MAX_SOIL_EXPORTS_PER_UPDATE,

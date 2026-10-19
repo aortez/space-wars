@@ -38,7 +38,7 @@ fn grass_admission_smoke(name: &'static str, renderer: &'static str) {
         let early = loop {
             let current = h.clock_state();
             assert!(current.player_duck.is_none());
-            if current.grass.as_ref().unwrap().shoots > 0 {
+            if current.grass.as_ref().unwrap().shoots > 0 && current.event_kind.is_none() {
                 break current;
             }
             assert!(
@@ -74,9 +74,13 @@ fn grass_admission_smoke(name: &'static str, renderer: &'static str) {
             thread::sleep(Duration::from_millis(10));
         };
         assert!(!paused.settings.events.grass);
+        assert_eq!(
+            paused.event_kind, None,
+            "the short Grass notice has finished"
+        );
         assert_eq!(paused.grass.as_ref().unwrap().soil_added, grass.soil_added);
         assert_eq!(paused.grass.as_ref().unwrap().organisms, grass.organisms);
-        h.assert_clock_stays_paused(&paused);
+        h.assert_clock_ceiling_stays_paused(&paused);
         write_json(&h.run_path().join("disabled-paused.json"), &paused);
         let page = h.activate_guarded("pause.clock.back", &page);
         h.activate_guarded("pause.restart", &page);
@@ -88,6 +92,8 @@ fn grass_admission_smoke(name: &'static str, renderer: &'static str) {
         assert_eq!(clean.living_tissues, 0);
         assert!(clean.organisms.is_empty());
         assert!(!restarted.settings.events.grass);
+        assert_eq!(clean.ceiling_phase, "closed");
+        assert_eq!(clean.ceiling_sequence, 0);
         h.capture_screenshot(&format!("grass-{renderer}-normal-restarted.png"));
         write_json(&h.run_path().join("restarted.json"), &restarted);
     });
@@ -336,7 +342,7 @@ fn grass_shortage(name: &'static str, renderer: &'static str) {
         let initial = h.clock_state();
         h.clock_trigger_event(&initial, ClockEventKind::Grass);
         let start = Instant::now();
-        let mut checkpoints = [1, 5, 30, 60, 90].into_iter().peekable();
+        let mut checkpoints = [1, 5, 30, 60, 90, 180, 240].into_iter().peekable();
         let mut admitted = false;
         loop {
             let current = h.clock_state();
@@ -376,7 +382,7 @@ fn grass_shortage(name: &'static str, renderer: &'static str) {
                 );
                 break;
             }
-            assert!(start.elapsed() < Duration::from_secs(180));
+            assert!(start.elapsed() < Duration::from_secs(360));
             thread::sleep(Duration::from_millis(200));
         }
     });
@@ -1785,6 +1791,35 @@ impl FunctionalHarness {
     fn assert_clock_stays_paused(&mut self, paused: &ClockState) {
         assert!(paused.paused);
         assert!(paused.event_kind.is_some() || paused.duck.is_some() || paused.crow.is_some());
+        self.assert_clock_paused_state_unchanged(paused);
+    }
+
+    fn assert_clock_ceiling_stays_paused(&mut self, paused: &ClockState) {
+        assert!(paused.paused);
+        let grass = paused.grass.as_ref().expect("retained ceiling habitat");
+        assert_eq!(grass.ceiling_phase, "open");
+        assert_eq!(grass.ceiling_opening_milli, 1000);
+        assert_eq!(grass.ceiling_sequence, 1);
+        assert_eq!(grass.ceiling_deliveries, 1);
+        assert!(grass.biology_tick > 0 && grass.living_tissues > 0);
+        assert!(grass.soil_retained > 0);
+        assert_eq!(grass.ceiling_pending_material, 0);
+        let observed = self.assert_clock_paused_state_unchanged(paused);
+        let after = observed.grass.as_ref().unwrap();
+        assert_eq!(after.ceiling_elapsed_ms, grass.ceiling_elapsed_ms);
+        assert_eq!(after.ceiling_phase, grass.ceiling_phase);
+        assert_eq!(after.ceiling_sequence, grass.ceiling_sequence);
+        assert_eq!(after.biology_tick, grass.biology_tick);
+        assert_eq!(after.organisms, grass.organisms);
+        assert_eq!(after.reserves, grass.reserves);
+        assert_eq!(after.soil_added, grass.soil_added);
+        assert_eq!(after.soil_retained, grass.soil_retained);
+        assert_eq!(after.soil_exported, grass.soil_exported);
+        assert_eq!(after, grass);
+    }
+
+    fn assert_clock_paused_state_unchanged(&mut self, paused: &ClockState) -> ClockState {
+        assert!(paused.paused);
         let predicate = ClockStatePredicate {
             scenario_revision: paused.scenario_revision,
             lifecycle: Some(paused.lifecycle.clone()),
@@ -1813,6 +1848,7 @@ impl FunctionalHarness {
             .clock_state_before(Instant::now() + TRANSITION_TIMEOUT);
         let observed = self.require_clock("clock state (verify paused state after wait)", result);
         assert_eq!(&observed, paused);
+        observed
     }
 
     fn clock_state(&mut self) -> ClockState {
@@ -1874,7 +1910,7 @@ impl FunctionalHarness {
         self.clock_trigger_event(state, ClockEventKind::Falling);
     }
 
-    fn clock_trigger_event(&mut self, state: &ClockState, event: ClockEventKind) {
+    fn clock_trigger_event(&mut self, state: &ClockState, event: ClockEventKind) -> ClockState {
         let request = ClockTriggerRequest::new(state, event);
         let result = self
             .client
@@ -1882,6 +1918,7 @@ impl FunctionalHarness {
         let accepted = self.require_clock(&format!("clock trigger {request:?}"), result);
         assert!(accepted.trigger_pending);
         assert!(!accepted.can_trigger);
+        accepted
     }
 
     fn clock_trigger_failure(&mut self, state: &ClockState, code: ControlFailureCode) {
@@ -2214,4 +2251,444 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         assert_eq!(relaunched.body_count, 0);
         assert!(!relaunched.settings.events.duck);
     });
+}
+
+#[test]
+#[ignore = "requires display and the complete ordinary-speed sunlight/aftermath sequence"]
+fn ceiling_opening_vector_normal_speed_and_aftermath() {
+    ceiling_sequence("clock-ceiling-vector", "vector");
+}
+#[test]
+#[ignore = "requires display and the complete ordinary-speed sunlight/aftermath sequence"]
+fn ceiling_opening_raster_normal_speed_and_aftermath() {
+    ceiling_sequence("clock-ceiling-raster", "raster");
+}
+fn ceiling_sequence(name: &'static str, renderer: &'static str) {
+    run_functional_test_with_backend(name, "winit-femtovg", |h| {
+        let provenance = ceiling_source_provenance(h);
+        let ready = h.wait_until_ready();
+        let page = h.activate_until_scenario("clock", ready);
+        let mut page = h.activate_guarded("launcher.settings", &page);
+        if control_value(&page, "launcher.settings.renderer.next") != Some(renderer) {
+            page = h.activate_guarded("launcher.settings.renderer.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "launcher.settings.renderer.next"),
+            Some(renderer)
+        );
+        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        h.activate_guarded("launcher.settings.start", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let initial = h.clock_state();
+        assert_eq!(initial.profile, "off");
+        assert_eq!(initial.grass.as_ref().unwrap().intensity, 50);
+        // Measure checkpoints from the accepted request, not the earlier read.
+        let origin = h
+            .clock_trigger_event(&initial, ClockEventKind::Grass)
+            .simulation_tick;
+        let start = Instant::now();
+        let mut checkpoints = [
+            (1, "opening"),
+            (6, "material-arrival"),
+            (30, "early-growth"),
+            (180, "paid-growth"),
+            (304, "hold-end"),
+            (335, "partial-closing"),
+            (366, "closed"),
+            (426, "aftermath-60"),
+            (486, "aftermath-120"),
+            (546, "aftermath-180"),
+            (666, "aftermath-300"),
+        ]
+        .into_iter()
+        .peekable();
+        let mut history = Vec::new();
+        let mut readings = std::collections::BTreeSet::new();
+        let mut hold_shoots = 0;
+        loop {
+            let current = h.clock_state();
+            let g = current.grass.as_ref().unwrap();
+            let seconds = current.simulation_tick.saturating_sub(origin) / 60;
+            readings.insert(current.reading);
+            assert_eq!(g.ceiling_sequence, 1);
+            assert_eq!(g.optical_refusals, 0);
+            assert_eq!(g.soil_added, g.soil_retained as u64 + g.soil_exported);
+            assert!(g.living_tissues <= 64 && g.soil_retained <= 2880);
+            assert_eq!(
+                g.ceiling_planned_material,
+                g.ceiling_pending_material as u64
+                    + g.ceiling_committed_material
+                    + g.ceiling_cancelled_material
+            );
+            if checkpoints.peek().is_some_and(|(at, _)| seconds >= *at) {
+                let (at, label) = checkpoints.next().unwrap();
+                if label == "opening" {
+                    assert_eq!(g.ceiling_phase, "opening");
+                }
+                if label == "material-arrival" {
+                    assert_eq!(g.ceiling_deliveries, 1);
+                    assert_eq!(g.seeded, 3);
+                }
+                if label == "hold-end" {
+                    assert_eq!(g.ceiling_phase, "open");
+                    assert!(g.shoots > 0 && g.development.iter().all(|v| *v > 0));
+                    assert!(g.maintenance.iter().all(|v| *v > 0));
+                    hold_shoots = g.shoots;
+                }
+                if label == "partial-closing" {
+                    assert_eq!(g.ceiling_phase, "closing");
+                    assert!((100..900).contains(&g.ceiling_opening_milli));
+                }
+                if at >= 366 {
+                    assert_eq!(g.ceiling_phase, "closed");
+                }
+                if label == "aftermath-60" {
+                    assert!(g.shoots > 0 && g.stressed_tissues > 0);
+                }
+                if label == "aftermath-120" {
+                    assert!(g.shoots > 0 && g.stressed_tissues > 0);
+                }
+                if label == "aftermath-180" {
+                    assert_eq!(g.shoots, 0);
+                }
+                if label == "aftermath-300" {
+                    assert!(g.shoots < hold_shoots);
+                }
+                let capture = format!("ceiling-{renderer}-{at:03}-{label}.png");
+                h.capture_screenshot(&capture);
+                write_json(
+                    &h.run_path()
+                        .join(format!("ceiling-{renderer}-{at:03}-{label}.json")),
+                    &current,
+                );
+                history.push(serde_json::json!({"label":label,"simulation_seconds":seconds,
+                    "wall_seconds":start.elapsed().as_secs_f64(),"capture":capture,"state":current}));
+                write_json(
+                    &h.run_path().join("ceiling-sequence.json"),
+                    &serde_json::json!({
+                    "seed":4242,"renderer":renderer,"playback":1,"room_intensity":50,
+                    "opening_seconds":5,"hold_seconds":300,"closing_seconds":60,
+                    "grace_seconds":60,"damage_per_second":1,
+                    "source_commit":provenance["source_commit"],
+                    "client_sha256":provenance["client_sha256"],
+                    "source_manifest_sha256":provenance["source_manifest_sha256"],"history":history}),
+                );
+            }
+            if checkpoints.peek().is_none() {
+                break;
+            }
+            assert!(
+                start.elapsed() < Duration::from_secs(900),
+                "normal-speed ceiling sequence exceeded deadline"
+            );
+            thread::sleep(Duration::from_millis(100));
+        }
+        assert!(
+            readings.len() >= 5,
+            "Clock readings must continue through sunlight and aftermath"
+        );
+        let before = h.clock_state();
+        let gameplay = h.state();
+        h.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = h.activate_guarded("pause.clock.back", &page);
+        h.activate_guarded("pause.restart", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let restarted = h.clock_state();
+        assert!(restarted.scenario_revision > before.scenario_revision);
+        assert_eq!(restarted.grass.as_ref().unwrap().ceiling_sequence, 0);
+        assert_eq!(restarted.grass.as_ref().unwrap().soil_retained, 0);
+    });
+}
+
+#[test]
+#[ignore = "requires display and same-pose moving-blocker captures"]
+fn ceiling_opening_vector_moving_blocker_evidence() {
+    ceiling_moving_blocker("clock-ceiling-moving-vector", "vector");
+}
+#[test]
+#[ignore = "requires display and same-pose moving-blocker captures"]
+fn ceiling_opening_raster_moving_blocker_evidence() {
+    ceiling_moving_blocker("clock-ceiling-moving-raster", "raster");
+}
+
+fn ceiling_moving_blocker(name: &'static str, renderer: &'static str) {
+    run_functional_test_with_backend(name, "winit-femtovg", |h| {
+        let sources = ceiling_source_provenance(h);
+        let provenance = json!({"seed":4242,"renderer":renderer,"backend":"winit-femtovg",
+            "playback":1,"room_intensity":50,"opening_seconds":5,"hold_seconds":300,"closing_seconds":60,
+            "source_commit":sources["source_commit"],
+            "source_manifest_sha256":sources["source_manifest_sha256"],
+            "client_sha256":sources["client_sha256"],
+            "capture_method":"public pause, fresh state, screenshot, identical fresh state, resume",
+            "controller_script":"North takeover; Right until x > aperture.right+16; Left until x < right-4; Left until x < midpoint+4; Right until x > right+16; 100ms direction leases, with at most six 100ms East jumps at the grounded soil lip (x < right+10)",
+            "camera_height_world":480,
+            "presentation_note":"Pause menu is visible; inspect the left-margin beam outside the central menu."});
+        write_json(
+            &h.run_path().join("ceiling-moving-provenance.json"),
+            &provenance,
+        );
+        let ready = h.wait_until_ready();
+        let page = h.activate_until_scenario("clock", ready);
+        let mut page = h.activate_guarded("launcher.settings", &page);
+        if control_value(&page, "launcher.settings.renderer.next") != Some(renderer) {
+            page = h.activate_guarded("launcher.settings.renderer.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "launcher.settings.renderer.next"),
+            Some(renderer)
+        );
+        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        h.activate_guarded("launcher.settings.start", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let initial = h.clock_state();
+        assert_eq!(initial.profile, "off");
+        h.clock_trigger_event(&initial, ClockEventKind::Grass);
+        let start = Instant::now();
+        // Wait for the transient Grass notice/cooldown, retaining its independent
+        // sunlight owner, before submitting a public Duck trigger.
+        loop {
+            let s = h.clock_state();
+            if s.can_trigger && s.grass.as_ref().unwrap().ceiling_phase == "open" {
+                break;
+            }
+            assert!(start.elapsed() < Duration::from_secs(90));
+            thread::sleep(Duration::from_millis(25));
+        }
+        let mut history = Vec::new();
+        let s = h.clock_state();
+        h.clock_trigger_event(&s, ClockEventKind::Duck);
+        loop {
+            let s = h.clock_state();
+            if s.duck.as_ref().is_some_and(|d| d.position_milli.is_some()) {
+                break;
+            }
+            assert!(start.elapsed() < Duration::from_secs(100));
+            thread::sleep(Duration::from_millis(20));
+        }
+        // Public North takes over the existing body without teleporting it.
+        ceiling_drive_input(h, spacewars_control::InputButton::North);
+        assert!(h.clock_state().player_duck.is_some());
+        let mut stage = 0;
+        let mut hops = 0;
+        let mut stage_started = Instant::now();
+        let mut crossing_samples = Vec::new();
+        let source_id = h
+            .clock_state()
+            .grass
+            .unwrap()
+            .ceiling_optics
+            .unwrap()
+            .source_id;
+        loop {
+            let s = h.clock_state();
+            let optics = s.grass.as_ref().unwrap().ceiling_optics.as_ref().unwrap();
+            assert_eq!(optics.simulation_tick, s.simulation_tick);
+            assert_eq!(optics.geometry_generation, s.simulation_tick);
+            let [a, b, _] = optics.aperture_milli;
+            let x = s
+                .player_duck
+                .as_ref()
+                .and_then(|d| d.duck.position_milli)
+                .expect("controlled solid remains present")[0];
+            let reached = match stage {
+                0 => x > b + 16000,
+                1 => x < b - 4000,
+                2 => x < (a + b) / 2 + 4000,
+                3 => x > b + 16000,
+                _ => unreachable!(),
+            };
+            if reached {
+                let label = ["before-entry", "entering", "crossing", "leaving"][stage];
+                let frozen = ceiling_frozen_capture(h, renderer, label, start, &mut history);
+                assert_eq!(frozen.source_id, source_id, "one source owns the crossing");
+                if stage == 2 {
+                    crossing_samples = frozen
+                        .samples
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, s)| {
+                            (s.sunlight == 0
+                                && s.first_blocker.is_some()
+                                && s.first_blocker == frozen.moving_blocker)
+                                .then_some(i)
+                        })
+                        .collect();
+                    assert!(
+                        !crossing_samples.is_empty(),
+                        "captured crossing must contain a Duck shadow"
+                    );
+                }
+                if stage == 3 {
+                    assert!(
+                        crossing_samples
+                            .iter()
+                            .any(|i| frozen.samples[*i].sunlight > 0),
+                        "light returns at a previously Duck-shadowed receiver after departure"
+                    );
+                    break;
+                }
+                stage += 1;
+                stage_started = Instant::now();
+            }
+            // The short released leases can stop against retained soil's real
+            // six-unit lip. Jump with the public East button, then steer during
+            // ordinary airborne physics; never synthesize contact or motion.
+            let duck = &s.player_duck.as_ref().unwrap().duck;
+            write_json(
+                &h.run_path().join("ceiling-moving-progress.json"),
+                &json!({"stage":stage,"simulation_tick":s.simulation_tick,
+                    "wall_seconds":start.elapsed().as_secs_f64(),"position_milli":duck.position_milli,
+                    "velocity_milli":s.player_duck.as_ref().unwrap().velocity_milli,
+                    "grounded":duck.grounded,"hops":hops,"aperture_milli":optics.aperture_milli}),
+            );
+            assert!(
+                stage_started.elapsed() < Duration::from_secs(30),
+                "controlled blocker made no stage progress; stage={stage}; see ceiling-moving-progress.json"
+            );
+            if stage == 1 && duck.grounded && x < b + 10000 {
+                hops += 1;
+                assert!(hops <= 6, "bounded soil lip jump attempts");
+                ceiling_drive_input(h, spacewars_control::InputButton::East);
+            }
+            assert!(
+                start.elapsed() < Duration::from_secs(180),
+                "controlled blocker stalled; stage={stage}"
+            );
+            ceiling_drive_input(
+                h,
+                if stage == 1 || stage == 2 {
+                    spacewars_control::InputButton::Left
+                } else {
+                    spacewars_control::InputButton::Right
+                },
+            );
+        }
+        write_json(
+            &h.run_path().join("ceiling-moving-summary.json"),
+            &json!({"provenance":provenance,"history":history,"canonical_shadow_observed":true}),
+        );
+    });
+}
+
+/// Source commit, a digest of the workspace Rust/Slint sources and Cargo
+/// manifests, and the client executable digest for ceiling evidence records.
+fn ceiling_source_provenance(h: &mut FunctionalHarness) -> Value {
+    use sha2::{Digest, Sha256};
+    let revision = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(workspace_root())
+        .output()
+        .unwrap();
+    assert!(revision.status.success());
+    let listing = Command::new("git")
+        .args([
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .unwrap();
+    assert!(listing.status.success());
+    let paths: std::collections::BTreeSet<_> = listing
+        .stdout
+        .split(|b| *b == 0)
+        .filter_map(|p| std::str::from_utf8(p).ok())
+        .filter(|p| {
+            *p == "Cargo.lock"
+                || *p == "Cargo.toml"
+                || ((p.starts_with("crates/") || p.starts_with("scenarios/"))
+                    && (p.ends_with(".rs") || p.ends_with(".slint") || p.ends_with(".toml")))
+        })
+        .collect();
+    let sources: Vec<_> = paths
+        .iter()
+        .map(|path| {
+            let bytes = fs::read(workspace_root().join(path)).unwrap();
+            (*path, format!("{:x}", Sha256::digest(bytes)))
+        })
+        .collect();
+    write_json(&h.run_path().join("ceiling-source-files.json"), &sources);
+    let executable = fs::read(env!("CARGO_BIN_EXE_engine-client")).unwrap();
+    json!({
+        "source_commit": String::from_utf8_lossy(&revision.stdout).trim(),
+        "source_manifest_sha256": format!("{:x}", Sha256::digest(serde_json::to_vec(&sources).unwrap())),
+        "client_sha256": format!("{:x}", Sha256::digest(&executable)),
+    })
+}
+
+fn ceiling_drive_input(h: &mut FunctionalHarness, button: spacewars_control::InputButton) {
+    let state = h.state();
+    let mut request = spacewars_control::InputPressRequest::new(&state, button);
+    request.hold_ms = 100;
+    let result = h
+        .client
+        .input_press_before(&request, request_deadline())
+        .unwrap();
+    assert_eq!(
+        result.release_reason,
+        spacewars_control::InputReleaseReason::Elapsed
+    );
+    assert_eq!(result.state.screen, UiScreen::Gameplay);
+    h.history
+        .push(json!({"command":"input press","request":request,"result":result}));
+}
+
+fn ceiling_frozen_capture(
+    h: &mut FunctionalHarness,
+    renderer: &str,
+    label: &str,
+    start: Instant,
+    history: &mut Vec<Value>,
+) -> engine_common::ClockCeilingOptics {
+    use sha2::{Digest, Sha256};
+    let gameplay = h.state();
+    h.pause_guarded(&gameplay);
+    let menu = h.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+    let before = h.clock_state();
+    assert!(before.paused);
+    let optics = before
+        .grass
+        .as_ref()
+        .unwrap()
+        .ceiling_optics
+        .as_ref()
+        .unwrap();
+    assert_eq!(optics.simulation_tick, before.simulation_tick);
+    if matches!(label, "entering" | "crossing") {
+        let x = before
+            .player_duck
+            .as_ref()
+            .and_then(|d| d.duck.position_milli)
+            .unwrap()[0];
+        assert!(
+            optics.aperture_milli[0] < x && x < optics.aperture_milli[1],
+            "frozen capture missed the aperture; retain failure evidence"
+        );
+    }
+    let capture = format!("ceiling-{renderer}-blocker-{label}.png");
+    let path = h.capture_screenshot(&capture);
+    let capture_sha256 = format!("{:x}", Sha256::digest(fs::read(path).unwrap()));
+    let frozen = optics.clone();
+    let after = h.clock_state();
+    assert_eq!(
+        before, after,
+        "capture must use exactly the queried solid pose"
+    );
+    let record = json!({"label":label,"capture":capture,"wall_seconds":start.elapsed().as_secs_f64(),
+        "simulation_tick":before.simulation_tick,"state":before,"capture_sha256":capture_sha256});
+    write_json(
+        &h.run_path()
+            .join(format!("ceiling-{renderer}-blocker-{label}.json")),
+        &record,
+    );
+    history.push(record);
+    // Save incrementally so a failed later pose preserves useful evidence.
+    write_json(&h.run_path().join("ceiling-moving-history.json"), history);
+    h.activate_guarded("pause.resume", &menu);
+    h.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+    frozen
 }

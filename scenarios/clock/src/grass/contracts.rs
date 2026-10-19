@@ -384,7 +384,7 @@ fn clock_grass_contract_dim_light_and_shortage_are_real_biology() {
     assert_ne!(bright.plants().plants, dim.plants().plants);
     let mut dark = fixture();
     dark.set_plant_conditions(0, [0; 2]);
-    seconds(&mut dark, 60);
+    seconds(&mut dark, 240);
     assert!(
         dark.plants()
             .plants
@@ -423,6 +423,7 @@ fn clock_grass_contract_favorable_establishment_timing() {
         ],
         Duration::from_nanos(16_666_667),
     );
+    seconds(&mut s, 5);
     assert_eq!(s.grass_state().seeded, SEED_BATCH);
     let mut visible = None;
     let mut established = None;
@@ -485,6 +486,7 @@ fn clock_grass_contract_introduction_commit_cancel_repeat_disable_and_restart() 
         Duration::ZERO,
     );
     assert!(s.soil().is_none());
+    s.cancel_ceiling();
     ClockScenario::step(
         &mut s,
         &[ClockAction::preview_event(ClockEventKind::ColorCycle)],
@@ -496,6 +498,7 @@ fn clock_grass_contract_introduction_commit_cancel_repeat_disable_and_restart() 
         &[ClockAction::preview_event(ClockEventKind::Grass)],
         Duration::from_nanos(16_666_667),
     );
+    seconds(&mut s, 5);
     assert_eq!(s.grass_state().seeded, SEED_BATCH);
     let before = s.plants().plants.observe();
     let material = s.soil().unwrap().accounting();
@@ -641,7 +644,7 @@ fn clock_grass_contract_connected_shade_dies_while_sunlit_shoot_survives() {
         center: soil.world_point(shaded.cell).unwrap() + engine_core::Vec2::Y * 8.0,
         radius: 0.9,
     };
-    for _ in 0..80 {
+    for _ in 0..180 {
         s.plants
             .advance(Duration::from_secs(1), soil, None, &[], vec![shade]);
     }
@@ -931,5 +934,53 @@ fn clock_grass_contract_inspection_reveals_paid_underground_spread_without_mutat
         let path = std::path::PathBuf::from(path);
         std::fs::create_dir_all(&path).unwrap();
         std::fs::write(path.join("root-runner-inspection.json"),serde_json::to_vec_pretty(&serde_json::json!({"initial":first,"developed":view,"frame":frame,"tick":before.tick})).unwrap()).unwrap();
+    }
+}
+
+#[test]
+fn ceiling_light_contract_independent_shortages_recover_before_death() {
+    for resource in 0..3 {
+        let mut s = fixture();
+        seconds(&mut s, 120);
+        let mut availability = [1000; 2];
+        let intensity = if resource == 2 {
+            250
+        } else {
+            availability[resource] = 0;
+            1000
+        };
+        s.set_plant_conditions(intensity, availability);
+        let mut damaged = None;
+        let mut unmet = false;
+        for second in 1..=240 {
+            seconds(&mut s, 1);
+            let o = s.plants.plants.observe();
+            unmet |= o.ledger.unmet[resource] > 0;
+            assert!(
+                o.tissues.iter().all(|t| t.shade_ticks == 0),
+                "resource shortage must be independent of shade"
+            );
+            if let Some(t) = o.tissues.iter().find(|t| t.health > 0 && t.health < 100) {
+                damaged = Some((second, t.id, t.health));
+                break;
+            }
+        }
+        let (second, id, health) =
+            damaged.expect("sustained independent shortage must damage paid tissue");
+        assert!(unmet);
+        println!(
+            "independent shortage resource={resource} first-damage-after={second}s health={health}"
+        );
+        s.set_plant_conditions(1000, [1000; 2]);
+        seconds(&mut s, 20);
+        let o = s.plants.plants.observe();
+        let recovered = o
+            .tissues
+            .iter()
+            .find(|t| t.id == id)
+            .expect("recovery must retain tissue identity");
+        assert!(recovered.health > health);
+        assert_eq!(recovered.shade_ticks, 0);
+        assert_eq!(recovered.shortage_ticks, 0);
     }
 }

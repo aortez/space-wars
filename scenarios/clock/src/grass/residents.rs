@@ -40,6 +40,7 @@ pub struct ClockPlants {
     pub playback: PlantPlayback,
     /// Real incident source intensity; the ordinary room stays dim.
     pub intensity: u16,
+    pub(crate) aperture: Option<lighting::ApertureSource>,
     pub availability: [u16; 2],
     pub exposure: BTreeMap<u64, Exposure>,
     pub admitted_at: BTreeMap<u64, u64>,
@@ -57,6 +58,7 @@ impl ClockPlants {
             plants: Plants::new(config, seed).unwrap(),
             grass: None,
             playback: PlantPlayback::Normal,
+            aperture: None,
             intensity: engine_rapier::plant_light::DIM_ROOM as u16,
             availability: [1000; 2],
             exposure: BTreeMap::new(),
@@ -217,58 +219,45 @@ impl ClockPlants {
             self.pending_ns -= 1_000_000_000;
             self.revalidate(soil);
             let before = self.plants.observe();
-            let mut opaque = footprints.clone();
-            let mut receivers = Vec::new();
-            let mut shoots = Vec::new();
-            for t in &before.tissues {
-                if t.role == Role::Root {
-                    continue;
-                }
-                if let Some(center) = soil.world_point(t.cell) {
-                    let radius = SOIL_CELL_SIZE * 0.25 * f32::from(t.size).sqrt();
-                    let id = LightId(SOIL_PHYSICS_ID, t.id);
-                    opaque.push(OpaqueFootprint { id, center, radius });
-                    if t.role == Role::Shoot && t.health > 0 {
-                        receivers.push(Receiver {
-                            position: center + Vec2::Y * radius,
-                            surface: Some(id),
-                        });
-                        shoots.push(t.id);
-                    }
-                }
-            }
-            let mut source = engine_rapier::plant_light::full_sun(Vec2::Y);
-            source.strength = if optical_overflow {
-                0.0
-            } else {
-                f32::from(self.intensity.min(1000))
-            };
-            let snapshot =
-                lighting::LightingSnapshot::new(before.tick, before.tick, source, &[]).unwrap();
-            let fallback = StaticVisibility {
-                footprints: &opaque,
-                quads: soil
-                    .quads()
+            let mut polygons = optical_polygons(
+                soil.quads()
                     .into_iter()
                     .map(|q| q.to_vec())
-                    .chain(self.host_polygons.iter().cloned())
-                    .collect(),
-            };
-            let samples = if let Some(geometry) = geometry {
-                match geometry.lighting_visibility(&opaque, transparent) {
-                    Ok(visibility) => snapshot.query(
-                        before.tick,
-                        before.tick,
-                        &receivers,
-                        &CombinedVisibility {
-                            canonical: &visibility,
-                            material: &fallback,
-                        },
-                    ),
-                    Err(e) => Err(e),
+                    .chain(self.host_polygons.iter().cloned()),
+            );
+            polygons.extend(tissue_polygons(&before, soil));
+            let mut receivers = Vec::new();
+            let mut shoots = Vec::new();
+            // Receivers sit at the same paid-development tips that are drawn
+            // and that occlude neighbours.
+            for t in before
+                .tissues
+                .iter()
+                .filter(|t| t.role == Role::Shoot && t.health > 0)
+            {
+                if let Some(polygon) = shoot_polygon(t, &before, soil) {
+                    receivers.push(Receiver {
+                        position: polygon[2],
+                        surface: Some(LightId(SOIL_PHYSICS_ID, t.id)),
+                    });
+                    shoots.push(t.id);
                 }
+            }
+            let samples = if optical_overflow {
+                Err(lighting::LightingError::Capacity)
             } else {
-                snapshot.query(before.tick, before.tick, &receivers, &fallback)
+                OpticalScene {
+                    footprints: &footprints,
+                    polygons: &polygons,
+                    geometry,
+                    transparent,
+                }
+                .query_light(
+                    before.tick,
+                    self.intensity,
+                    self.aperture,
+                    &receivers,
+                )
             };
             // A refused optical publication grants no light. Physiology still
             // charges maintenance and shortage/dieback, rather than freezing.
@@ -303,6 +292,98 @@ impl ClockPlants {
                 .tick(before.tick, false, 1, &intents, &env)
                 .expect("shared paid Clock physiology");
         }
+    }
+}
+
+/// Stable host surface identities are disjoint from tissue and physical IDs.
+pub(crate) fn optical_polygons(
+    quads: impl IntoIterator<Item = Vec<Vec2>>,
+) -> Vec<(LightId, Vec<Vec2>)> {
+    quads
+        .into_iter()
+        .enumerate()
+        .map(|(i, q)| (LightId(SOIL_PHYSICS_ID + 1, i as u64), q))
+        .collect()
+}
+/// The same paid-development silhouette is used for drawing and occlusion.
+pub(crate) fn shoot_polygon(
+    t: &Tissue,
+    observation: &plants::Observation,
+    soil: &SoilHabitat,
+) -> Option<Vec<Vec2>> {
+    let center = soil.world_point(t.cell)?;
+    let surface = soil.surface_at(t.cell[0])?;
+    let progress = t.development[0] as f32 / observation.config.development_per_size[0] as f32;
+    let height = (f32::from(t.size) + progress) * 2.0;
+    Some(
+        [
+            Vec2::new(-0.5, -1.0),
+            Vec2::new(0.5, -1.0),
+            Vec2::new(0.0, height),
+        ]
+        .map(|p| center + p.rotate_radians(surface.angle))
+        .to_vec(),
+    )
+}
+pub(crate) fn tissue_polygons(
+    observation: &plants::Observation,
+    soil: &SoilHabitat,
+) -> Vec<(LightId, Vec<Vec2>)> {
+    observation
+        .tissues
+        .iter()
+        .filter(|t| t.role == Role::Shoot)
+        .filter_map(|t| {
+            shoot_polygon(t, observation, soil).map(|p| (LightId(SOIL_PHYSICS_ID, t.id), p))
+        })
+        .collect()
+}
+
+/// Opaque geometry copied at one completed simulation boundary. Biology,
+/// presentation and telemetry all query light through this one adapter, so
+/// none of them can consume a cached render input.
+pub(crate) struct OpticalScene<'a> {
+    pub(crate) footprints: &'a [OpaqueFootprint],
+    pub(crate) polygons: &'a [(LightId, Vec<Vec2>)],
+    pub(crate) geometry: Option<&'a QuerySnapshot>,
+    pub(crate) transparent: &'a [ColliderId],
+}
+impl OpticalScene<'_> {
+    pub(crate) fn query_light(
+        &self,
+        tick: u64,
+        intensity: u16,
+        aperture: Option<lighting::ApertureSource>,
+        receivers: &[Receiver],
+    ) -> Result<Vec<lighting::Exposure>, lighting::LightingError> {
+        if self.polygons.len() + self.footprints.len() > engine_rapier::world::MAX_LIGHT_FOOTPRINTS
+            || self.polygons.iter().any(|(_, p)| p.len() > 16)
+        {
+            return Err(lighting::LightingError::Capacity);
+        }
+        let mut source = engine_rapier::plant_light::full_sun(Vec2::Y);
+        source.strength = f32::from(intensity.min(1000));
+        let mut snapshot = lighting::LightingSnapshot::new(tick, tick, source, &[])?;
+        if let Some(aperture) = aperture {
+            snapshot = snapshot.with_aperture(aperture)?;
+        }
+        let material = StaticVisibility {
+            footprints: self.footprints,
+            quads: self.polygons,
+        };
+        let Some(geometry) = self.geometry else {
+            return snapshot.query(tick, tick, receivers, &material);
+        };
+        let canonical = geometry.lighting_visibility(self.footprints, self.transparent)?;
+        snapshot.query(
+            tick,
+            tick,
+            receivers,
+            &CombinedVisibility {
+                canonical: &canonical,
+                material: &material,
+            },
+        )
     }
 }
 
@@ -366,13 +447,14 @@ impl<V: Visibility> Visibility for CombinedVisibility<'_, V> {
 }
 struct StaticVisibility<'a> {
     footprints: &'a [OpaqueFootprint],
-    quads: Vec<Vec<Vec2>>,
+    quads: &'a [(LightId, Vec<Vec2>)],
 }
 impl Visibility for StaticVisibility<'_> {
     fn blocker(&self, ray: LightRay) -> Option<LightId> {
         let a = ray.receiver.position;
         let b = ray.endpoint.position;
         let delta = b - a;
+        let length = delta.length();
         for p in self.footprints {
             if Some(p.id) == ray.receiver.surface || Some(p.id) == ray.endpoint.surface {
                 continue;
@@ -382,7 +464,17 @@ impl Visibility for StaticVisibility<'_> {
                 return Some(p.id);
             }
         }
-        for (i, quad) in self.quads.iter().enumerate() {
+        for (id, quad) in self.quads {
+            if ray.receiver.surface == Some(*id) || ray.endpoint.surface == Some(*id) {
+                continue;
+            }
+            // An edge-only segment test misses a ray wholly inside an opaque
+            // polygon (including a polygon crossing the ceiling/source plane).
+            // Keep the existing local endpoint exemptions above and boundary
+            // tolerance below; only strict containment adds this missing case.
+            if polygon_interior(quad, a) && polygon_interior(quad, b) {
+                return Some(*id);
+            }
             for j in 0..quad.len() {
                 let c = quad[j];
                 let edge = quad[(j + 1) % quad.len()] - c;
@@ -393,13 +485,41 @@ impl Visibility for StaticVisibility<'_> {
                 }
                 let t = cross(c - a, edge) / divisor;
                 let u = cross(c - a, delta) / divisor;
-                if t > 0.000001 && t < 1.0 && (0.0..=1.0).contains(&u) {
-                    return Some(LightId(SOIL_PHYSICS_ID + 1, i as u64));
+                if t * length > lighting::ENDPOINT_TOLERANCE && t < 1.0 && (0.0..=1.0).contains(&u)
+                {
+                    return Some(*id);
                 }
             }
         }
         None
     }
+}
+
+fn polygon_interior(polygon: &[Vec2], point: Vec2) -> bool {
+    if polygon.len() < 3 {
+        return false;
+    }
+    let mut inside = false;
+    for (a, b) in polygon.iter().zip(polygon.iter().cycle().skip(1)) {
+        let edge = *b - *a;
+        let length = edge.length_squared();
+        if length == 0.0 {
+            continue;
+        }
+        let u = ((point - *a).dot(edge) / length).clamp(0.0, 1.0);
+        if (point - (*a + edge * u)).length() <= lighting::ENDPOINT_TOLERANCE {
+            return false;
+        }
+        if (a.y > point.y) != (b.y > point.y) {
+            let x = a.x as f64
+                + (point.y as f64 - a.y as f64) * (b.x as f64 - a.x as f64)
+                    / (b.y as f64 - a.y as f64);
+            if (point.x as f64) < x {
+                inside = !inside;
+            }
+        }
+    }
+    inside
 }
 
 // Separating axes use actual convex rendered pixels/wing, not the enclosing

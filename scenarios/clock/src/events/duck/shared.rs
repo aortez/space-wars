@@ -84,6 +84,7 @@ impl DuckEvent {
     pub(super) fn synchronize_soil(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) {
         self.soil_supports.clear();
         self.soil_course = None;
+        self.soil_navigation_owners.clear();
         if let Some(soil) = soil {
             let state = if self.responsive_floor().is_some() {
                 crate::grass::SoilSupportState::Responsive
@@ -100,24 +101,97 @@ impl DuckEvent {
             // identity. Drain/panel contacts and foreign bodies keep their own rules.
             if state == crate::grass::SoilSupportState::Course {
                 if let Some(course) = &self.course {
+                    // Split only at actual material edges. Keeping one bank
+                    // at a single raised height invents support beyond a patch.
+                    // Stable left-to-right order retains deterministic planning.
+                    const MAX_SOIL_NAV_SURFACES: usize = 64;
+                    let patches: Vec<_> = soil
+                        .quads()
+                        .into_iter()
+                        .filter_map(|q| {
+                            let min = q[0];
+                            let max = q[2];
+                            let a = min.x * self.direction + self.width * 0.5;
+                            let b = max.x * self.direction + self.width * 0.5;
+                            course
+                                .surfaces
+                                .iter()
+                                .position(|s| {
+                                    s.start <= a.min(b) + 0.01
+                                        && a.max(b) <= s.end + 0.01
+                                        && min.y >= self.layout.floor_y + s.height - 0.01
+                                        && max.y
+                                            <= self.layout.floor_y
+                                                + s.height
+                                                + crate::grass::SOIL_CELL_SIZE
+                                                    * crate::grass::SOIL_DEPTH_CELLS as f32
+                                                + 0.01
+                                })
+                                .map(|owner| (owner, min, max, a.min(b), a.max(b)))
+                        })
+                        .collect();
                     let mut navigation = course.clone();
-                    for quad in soil.quads() {
-                        let min = quad[0];
-                        let max = quad[2];
-                        let a = min.x * self.direction + self.width * 0.5;
-                        let b = max.x * self.direction + self.width * 0.5;
-                        if let Some(index) = course.surfaces.iter().position(|s| {
-                            s.start <= a.min(b) + 0.01
-                                && a.max(b) <= s.end + 0.01
-                                && (min.y - self.layout.floor_y - s.height).abs() < 0.01
-                        }) {
-                            self.soil_supports.push((index, min, max));
-                            navigation.surfaces[index].height = navigation.surfaces[index]
-                                .height
-                                .max(max.y - self.layout.floor_y);
+                    navigation.surfaces.clear();
+                    let mut owners = Vec::new();
+                    for (owner, surface) in course.surfaces.iter().enumerate() {
+                        let mut edges = vec![surface.start, surface.end];
+                        for (index, _, _, a, b) in &patches {
+                            if *index == owner {
+                                edges.extend([*a, *b]);
+                            }
+                        }
+                        edges.sort_by(f32::total_cmp);
+                        edges.dedup_by(|a, b| (*a - *b).abs() < 0.01);
+                        for pair in edges.windows(2) {
+                            let x = (pair[0] + pair[1]) * 0.5;
+                            let height = patches
+                                .iter()
+                                .filter(|(i, _, _, a, b)| *i == owner && *a <= x && x <= *b)
+                                .map(|(_, _, max, _, _)| max.y - self.layout.floor_y)
+                                .fold(surface.height, f32::max);
+                            if let Some(previous) = navigation.surfaces.last_mut()
+                                && owners.last() == Some(&owner)
+                                && (previous.height - height).abs() < 0.01
+                            {
+                                previous.end = pair[1];
+                            } else {
+                                navigation.surfaces.push(planner::Surface {
+                                    start: pair[0],
+                                    end: pair[1],
+                                    height,
+                                });
+                                owners.push(owner);
+                            }
                         }
                     }
-                    self.soil_course = Some(navigation);
+                    // A real sliver remains collision geometry, but is not a
+                    // safe landing interval. Plan across it to a measured-size
+                    // foothold instead of repeatedly selecting an impossible hop.
+                    let viable: Vec<_> = navigation
+                        .surfaces
+                        .into_iter()
+                        .zip(owners)
+                        .filter(|(s, _)| s.end - s.start > self.radius * 3.0)
+                        .collect();
+                    let (surfaces, owners): (Vec<_>, Vec<_>) = viable.into_iter().unzip();
+                    navigation.surfaces = surfaces;
+                    if !navigation.surfaces.is_empty()
+                        && navigation.surfaces.len() <= MAX_SOIL_NAV_SURFACES
+                    {
+                        for (index, s) in navigation.surfaces.iter().enumerate() {
+                            for (owner, min, max, a, b) in &patches {
+                                if owners[index] == *owner
+                                    && s.start < *b
+                                    && *a < s.end
+                                    && (s.height - (max.y - self.layout.floor_y)).abs() < 0.01
+                                {
+                                    self.soil_supports.push((index, *min, *max));
+                                }
+                            }
+                        }
+                        self.soil_navigation_owners = owners;
+                        self.soil_course = Some(navigation);
+                    }
                 }
             }
         }
@@ -259,10 +333,18 @@ mod soil_tests {
             assert!(!duck.soil_supports.is_empty());
             let course = duck.course.as_ref().unwrap();
             let navigation = duck.soil_course.as_ref().unwrap();
-            for (index, surface) in course.surfaces.iter().enumerate() {
+            for (index, surface) in navigation.surfaces.iter().enumerate() {
+                let original = course.surfaces[duck.soil_navigation_owners[index]];
                 let retained = duck.soil_supports.iter().any(|(i, _, _)| *i == index);
-                assert_eq!(navigation.surfaces[index].height > surface.height, retained);
+                assert_eq!(surface.height > original.height, retained);
+                assert!(surface.start >= original.start && surface.end <= original.end);
             }
+            assert!(
+                navigation.surfaces.iter().enumerate().any(
+                    |(i, s)| s.height == course.surfaces[duck.soil_navigation_owners[i]].height
+                ),
+                "bare ground retains its own real height"
+            );
             // Settle onto actual dirt through the canonical solver.
             let (index, min, max) = duck.soil_supports[0];
             let world = duck.world.as_mut().unwrap();
