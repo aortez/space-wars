@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use std::io::IsTerminal;
 use std::process::ExitCode;
 
 #[derive(Parser)]
@@ -161,6 +162,11 @@ fn main() -> ExitCode {
     engine_os_manager::network_sessions::initialize_host_namespace();
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
+        // Color only terminals; journalctl shows lines with escape codes as blob data.
+        .with_ansi(
+            std::io::stderr().is_terminal()
+                && std::env::var_os("NO_COLOR").is_none_or(|value| value.is_empty()),
+        )
         .with_env_filter(
             tracing_subscriber::EnvFilter::builder()
                 .with_default_directive(tracing::level_filters::LevelFilter::WARN.into())

@@ -1,4 +1,4 @@
-"""Keep service namespace evidence and unused listener masks aligned with Rust."""
+"""Keep network service unit contracts aligned with the Rust code and image."""
 import re
 import unittest
 from pathlib import Path
@@ -14,6 +14,12 @@ class NetworkServiceContractTest(unittest.TestCase):
         directives = [line for line in unit.splitlines() if line.startswith("OpenFile=")]
         self.assertEqual(directives, [f"OpenFile=/proc/1/ns/net:{name}:read-only,graceful"])
         self.assertIn("ExecStart=/usr/bin/engine-os-manager serve", unit)
+
+    def test_ssh_admission_errors_stay_off_the_client_connection(self):
+        dropin = (ROOT / "yocto/meta-spacewars/recipes-spacewars/spacewars/files/sshd-spacewars-network.conf").read_text()
+        lines = dropin.splitlines()
+        self.assertIn("ExecStartPre=/usr/bin/engine-os-manager ssh-network-admit", lines)
+        self.assertIn("StandardError=journal", lines)
 
     def test_image_masks_all_three_standalone_listeners(self):
         recipe = (ROOT / "yocto/meta-spacewars/recipes-core/images/spacewars-image.bb").read_text()
