@@ -32,21 +32,38 @@ pub fn admit() -> Result<()> {
         kind: HoldKind::Ssh,
     };
     let deadline = Instant::now() + DEADLINE;
+    admit_before(
+        deadline,
+        || {
+            network_service::request_before(
+                Path::new(network_service::SOCKET_PATH),
+                &request,
+                0,
+                deadline,
+            )
+        },
+        || {
+            let boot_id = crate::linux::boot_id()?;
+            protect_ssh_without_service(Path::new(network_service::STATE_DIRECTORY), &boot_id)
+                .map(|_guard| ())
+        },
+    )
+}
+
+fn admit_before(
+    deadline: Instant,
+    mut coordinator: impl FnMut() -> Result<serde_json::Value>,
+    mut fallback: impl FnMut() -> Result<()>,
+) -> Result<()> {
     loop {
-        let reply = network_service::request_before(
-            Path::new(network_service::SOCKET_PATH),
-            &request,
-            0,
-            deadline,
-        );
+        let reply = coordinator();
         if reply.as_ref().is_ok_and(protected) {
             return Ok(());
         }
         // A stopped/uninstalled service must not unnecessarily disable SSH.
         // Taking its exclusive policy lock excludes a live coordinator. This
         // never initializes state, writes radio settings or clears uncertainty.
-        if let Ok(_guard) = protect_ssh_without_service(Path::new(network_service::STATE_DIRECTORY))
-        {
+        if fallback().is_ok() {
             return Ok(());
         }
         let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
@@ -106,6 +123,34 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::{TcpListener, UdpSocket};
     use std::os::unix::net::UnixStream;
+
+    #[test]
+    fn coordinator_admission_does_not_require_fallback_boot_evidence() {
+        admit_before(
+            Instant::now(),
+            || Ok(serde_json::json!({"schema":1,"error":null,"availability":"session-protected"})),
+            || panic!("a protected session must not read the fallback boot ID"),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn unavailable_fallback_does_not_prevent_later_coordinator_admission() {
+        let mut attempts = 0;
+        let mut fallbacks = 0;
+        admit_before(Instant::now() + Duration::from_secs(2), || {
+            attempts += 1;
+            if attempts == 1 { Err(unavailable()) }
+            else { Ok(serde_json::json!({"schema":1,"error":null,"availability":"session-protected"})) }
+        }, || {
+            fallbacks += 1;
+            Err(std::io::Error::from(std::io::ErrorKind::NotFound).into())
+        }).unwrap();
+        assert_eq!((attempts, fallbacks), (2, 1));
+        assert!(
+            admit_before(Instant::now(), || Err(unavailable()), || Err(unavailable())).is_err()
+        );
+    }
 
     #[test]
     fn helper_requires_an_accepted_tcp_socket_and_preserves_its_bytes() {

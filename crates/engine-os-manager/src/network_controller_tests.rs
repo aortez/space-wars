@@ -288,7 +288,112 @@ fn ssh_admission_restores_owned_off_and_never_accepts_a_late_or_failed_off_comma
     );
     assert_eq!(fake.calls(), [false]);
     drop(controller);
-    assert!(network_policy::protect_ssh_without_service(&path).is_err());
+    assert!(network_policy::protect_ssh_without_service(&path, BOOT).is_err());
+}
+
+#[test]
+fn ssh_recovery_after_reboot_preserves_the_retained_enable_fault_until_owner_resume() {
+    // Pi 5 cleanup completed an enable request but retained its old off witness
+    // and external-change suspension. Restarting the service is not a reboot.
+    for reboot in [false, true] {
+        for unknown in [false, true] {
+            let temp = tempfile::tempdir().unwrap();
+            let path = temp.path().join("network");
+            let mut fake = Fake::new();
+            fake.edit(|w| w.radio.wireless_enabled = false);
+            let mut controller = Controller::open(&path, fake.clone()).unwrap();
+            let before = Witness::new(&fake.clock().unwrap(), &fake.0.lock().unwrap().radio);
+            let retained = RadioState {
+                witness: Some(before.clone()),
+                owned_off: true,
+                pending: Some(Pending {
+                    before,
+                    enabled: true,
+                    phase: Phase::Returned,
+                }),
+                suspended: Some(Suspension::ExternalRadioChange),
+            };
+            controller
+                .policy
+                .save_radio(retained.clone(), &fake.clock().unwrap())
+                .unwrap();
+            drop(controller);
+            fake.edit(|w| {
+                if reboot {
+                    w.clock.boot_id = NEXT_BOOT.into();
+                }
+                w.radio.wireless_enabled = true;
+                w.activity.ssh_sessions = Some(true);
+                w.unknown = unknown;
+            });
+            let mut controller = Controller::open(&path, fake.clone()).unwrap();
+            let result = controller.admit(&token(), ssh_caller(), HoldKind::Ssh);
+            assert_eq!(result.is_ok(), reboot, "reboot={reboot}, unknown={unknown}");
+            assert_eq!(
+                controller.policy.radio(&fake.clock().unwrap()).unwrap(),
+                retained
+            );
+            assert!(fake.calls().is_empty());
+            if reboot {
+                let admitted = result.unwrap();
+                assert_eq!(admitted.availability, Availability::SessionProtected);
+                assert!(admitted.status.owned_off && admitted.status.pending.is_some());
+                assert_eq!(
+                    admitted.status.suspended,
+                    Some(Suspension::ExternalRadioChange)
+                );
+                assert_eq!(admitted.status.policy.holds[0].kind, HoldKind::Ssh);
+                fake.edit(|w| w.unknown = false);
+                let generation = controller.status().unwrap().policy.generation;
+                let resumed = controller.resume(generation).unwrap();
+                assert!(!resumed.owned_off);
+                assert!(resumed.pending.is_none() && resumed.suspended.is_none());
+                assert_eq!(resumed.policy.policy, Policy::default());
+                assert!(fake.calls().is_empty());
+            }
+        }
+    }
+}
+
+#[test]
+fn ssh_recovery_after_reboot_does_not_clear_a_timed_out_off_command() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network");
+    let mut fake = Fake::new();
+    let mut controller = Controller::open(&path, fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    fake.edit(|w| w.behavior = Behavior::Timeout);
+    assert!(controller.tick().unwrap().pending.is_some());
+    drop(controller);
+    fake.edit(|w| {
+        w.clock = Clock {
+            boot_id: NEXT_BOOT.into(),
+            ms: 0,
+        };
+        w.behavior = Behavior::Apply;
+        w.radio.wireless_enabled = false;
+        w.radio.wireless_available = false;
+        w.radio.ethernet_available = true;
+        w.activity.ssh_sessions = Some(true);
+    });
+    let mut controller = Controller::open(&path, fake.clone()).unwrap();
+    let retained = controller.policy.radio(&fake.clock().unwrap()).unwrap();
+    let admitted = controller
+        .admit(&token(), ssh_caller(), HoldKind::Ssh)
+        .unwrap();
+    assert_eq!(admitted.availability, Availability::SessionProtected);
+    assert_eq!(
+        controller.policy.radio(&fake.clock().unwrap()).unwrap(),
+        retained
+    );
+    assert_eq!(fake.calls(), [false]);
+    // Only explicit owner reconciliation may retire the uncertain command.
+    let resumed = controller
+        .resume(admitted.status.policy.generation)
+        .unwrap();
+    assert!(resumed.pending.is_none() && resumed.suspended.is_none());
+    assert!(resumed.actual.unwrap().wireless_enabled);
+    assert_eq!(fake.calls(), [false, true]);
 }
 
 #[test]
@@ -366,7 +471,7 @@ fn off_is_inert_and_only_policy_owned_shutdown_is_restored() {
     assert!(status.owned_off);
     assert_eq!(fake.calls(), [false]);
     drop(controller);
-    assert!(network_policy::protect_ssh_without_service(&path).is_err());
+    assert!(network_policy::protect_ssh_without_service(&path, BOOT).is_err());
     let mut controller = Controller::open(&path, fake.clone()).unwrap();
     let generation = controller.status().unwrap().policy.generation;
     let status = controller

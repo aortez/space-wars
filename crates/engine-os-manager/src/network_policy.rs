@@ -276,10 +276,21 @@ pub(crate) struct OfflineSshGuard {
     _store: Option<store::Store>,
 }
 
-pub(crate) fn protect_ssh_without_service(directory: &Path) -> Result<OfflineSshGuard> {
+pub(crate) fn protect_ssh_without_service(
+    directory: &Path,
+    boot_id: &str,
+) -> Result<OfflineSshGuard> {
+    if !(Clock {
+        boot_id: boot_id.into(),
+        ms: 0,
+    })
+    .valid()
+    {
+        return Err(invalid("invalid SSH recovery boot identity"));
+    }
     let store = match store::Store::existing(directory)? {
         Some((store, record)) => {
-            if record.radio.pending.is_some() || record.radio.owned_off {
+            if record.radio.blocks_ssh(boot_id) {
                 return Err(invalid("SSH protection requires the radio coordinator"));
             }
             Some(store)

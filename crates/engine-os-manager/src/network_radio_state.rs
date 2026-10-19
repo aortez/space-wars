@@ -93,6 +93,20 @@ pub(crate) struct RadioState {
 }
 
 impl RadioState {
+    /// A reboot fences old radio writes. A protected, already accepted TCP
+    /// connection can then reach owner recovery without forgiving the saved
+    /// fault or claiming radio availability. Same-boot responsibility remains.
+    pub fn blocks_ssh(&self, boot_id: &str) -> bool {
+        self.pending
+            .as_ref()
+            .is_some_and(|pending| pending.before.boot_id == boot_id)
+            || (self.owned_off
+                && self
+                    .witness
+                    .as_ref()
+                    .is_none_or(|witness| witness.boot_id == boot_id))
+    }
+
     pub fn validate(&self) -> Result<()> {
         let valid = self.witness.as_ref().is_none_or(Witness::validate)
             && (!self.owned_off || self.witness.as_ref().is_some_and(|w| !w.wireless))

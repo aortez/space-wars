@@ -283,4 +283,4 @@ covers seed 7 only; a multi-seed device comparison needs a seed argument in the
 capture script. Pi 5 remains offline. The capacity fixture screenshots and
 [functional counts](pizza-capacity.md#local-functional-evidence) now record
 bounded gravity: the 800×480 mixed 5,000 fixture has 3,471 bodies after 60
-updates instead of 3,434. PR #505 stays draft.
+updates instead of 3,434.

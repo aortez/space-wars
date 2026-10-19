@@ -1,6 +1,6 @@
 # Pizza normal-cascade investigation
 
-PR #505 spans capacity #364, profiling #354, measured fixes #506/#507/#508 under #59, and event qualification #359. It remains **draft**. Pi 5 is offline, and the Pi 4 measurements include frame-budget misses that must remain visible in the qualification decision. Five thousand is an opt-in experimental ceiling; the saved default remains 500 and desired population remains 24.
+PR #505 spans capacity #364, profiling #354, measured fixes #506/#507/#508 under #59, and event qualification #359. Event qualification is not complete: Pi 5 is offline, and the Pi 4 measurements include frame-budget misses that must remain visible in the qualification decision. Five thousand is an opt-in experimental ceiling; the saved default remains 500 and desired population remains 24.
 
 The [reference comparison and CCD follow-up](pizza-reference-comparison.md)
 adds #509: a same-machine Chrome/Rust experiment and deferred contact lookups
@@ -106,7 +106,7 @@ These CPU and page-flip results use only the conservative **before-export** wind
 
 The final ordinary field-On run averages 12.35 ms per simulation update: 9.87 ms in physics/contact collection, 1.84 ms gravity, 0.27 ms contact damage and 0.30 ms lifecycle. Its 120-update windows reach 19.21 ms mean during the cascade; the host can perform multiple updates in one displayed frame. The final 5,000 field-Off capture averages 112.72 ms per update, with 84.02 ms in physics and 25.42 ms gravity. Neither fits the 16.67 ms target. These are separate workloads from the isolated lookup experiment above.
 
-The 500 mixed-size fixture has smaller bodies than ordinary spawning and often decays to a low population, particularly with the field On. Its smooth sampled frames do not establish that every 500-ball scene is cheap. The ordinary run has a quiet lead-in followed by repeated dense descendant explosions. **A population cap alone is not a CPU-headroom guarantee.** No lower ordinary field-On operating envelope is qualified yet, and this PR must stay draft. #354 retains the remaining physics investigation; #359 retains performance acceptance. Five thousand remains an experimental ceiling rather than an ordinary play target.
+The 500 mixed-size fixture has smaller bodies than ordinary spawning and often decays to a low population, particularly with the field On. Its smooth sampled frames do not establish that every 500-ball scene is cheap. The ordinary run has a quiet lead-in followed by repeated dense descendant explosions. **A population cap alone is not a CPU-headroom guarantee.** No lower ordinary field-On operating envelope is qualified yet. #354 retains the remaining physics investigation; #359 retains performance acceptance. Five thousand remains an experimental ceiling rather than an ordinary play target.
 
 Final before-export device temperatures stayed at or below 76°C and firmware throttle bits were zero. Runs used the normal ondemand governor, fresh processes and isolated settings, sequentially; clocks and GPU caches were not reset/pinned. Fresh process startup is not a cold GPU-cache measurement. The installed kiosk and binaries were preserved, and the kiosk was restored active after capture.
 

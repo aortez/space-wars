@@ -903,7 +903,7 @@ pub fn start_scenario_loop(
             scoreboard.record(scenario_revision, &result);
             scoreboard.publish(&window, &result);
         }
-        window.set_game_over_visible(game_over);
+        set_game_over(&window, game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
         drop(result_trace);
@@ -1584,6 +1584,15 @@ fn publish_runtime_clock_settings(
         crate::clock_controls::publish_settings(window, clock_settings);
         window.invoke_clock_settings_applied();
     }
+}
+
+fn set_game_over(window: &MainWindow, game_over: bool) {
+    if game_over && !window.get_game_over_visible() {
+        // Reset focus before exposing the result so external state observers
+        // do not see a selection carried over from the previous result.
+        window.set_game_over_focus_index(0);
+    }
+    window.set_game_over_visible(game_over);
 }
 
 fn set_ingame_menu(window: &MainWindow, paused: bool) {
@@ -2857,6 +2866,22 @@ mod tests {
         }
         slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
         MainWindow::new().unwrap()
+    }
+
+    #[test]
+    fn a_new_game_over_starts_on_play_again_before_slint_reacts() {
+        let window = render_test_window();
+        set_game_over(&window, true);
+        // The player chose New Match on the previous result.
+        window.set_game_over_focus_index(1);
+        set_game_over(&window, false);
+        set_game_over(&window, true);
+        // No event loop has run, so Slint's change handler has not reset it.
+        assert_eq!(window.get_game_over_focus_index(), 0);
+        // An unchanged result keeps the player's current selection.
+        window.set_game_over_focus_index(2);
+        set_game_over(&window, true);
+        assert_eq!(window.get_game_over_focus_index(), 2);
     }
 
     #[test]

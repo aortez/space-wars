@@ -7,6 +7,12 @@ outside this update path; incompatible boot assets require a supervised upgrade.
 
 ## Current implementation
 
+Status reviewed **2026-10-18**. This section is the active OTA plan; the detailed
+implementation and dated experiments below retain their original source and
+device scope. A past experiment's “not installed” or “remaining” statement is
+not the current fleet status. Do not replay a retained operator script without
+rechecking its source, device identity and current transaction state.
+
 `crates/engine-ota` implements the shared verification and image eligibility
 contract for [#261](https://github.com/aortez/space-wars/issues/261), plus the
 recovery journal, Linux boot adapters and verified inactive-root writer. It is
@@ -21,34 +27,157 @@ outstanding. See the [physical signed trials](ota-recovery-qualification.md#phys
 coordinator and scheduled download worker, described below. Its local APIs expose
 bounded time/update checks, channel selection and network policy. Installation,
 reboot and arbitrary-command operations are not exposed. The freshly flashed
-kiosks run the device service; public OTA trust is provisioned on the replacement
-Pi 5 and primary Picade, while automatic installation remains disabled. The failed
-Pi 5 USB drive was replaced with verified data
-restoration. The [replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json)
+kiosks run the device service; public OTA trust and signed staging have been
+verified on all three units, while automatic installation remains disabled. The
+failed Pi 5 USB drive was replaced with verified data restoration. The
+[replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json)
 and [primary Picade](data/ota-picade-bootstrap-success-20261017.json) have completed
 supervised bootstrap through the initial recovery baseline. Both passed trial,
 staged normal and canonical normal boots, independent archive verification and
 production recovery-service checks. See the [bootstrap status](ota-bootstrap.md)
 for preservation, hardware evidence and the remaining rollout gates.
 
-Remaining work retains the full OTA scope:
+### Latest qualified state
+
+The latest qualified image source is `bde737f96c82182ca908e544bc6f81b5252cac2b`
+in [PR #510](https://github.com/aortez/space-wars/pull/510), installed only on the
+owner-selected second Picade. The [review-fix record](data/ota-picade2-review-fixes-20261018.json)
+binds its exact build, signed generation 7, native controls and installed checks.
+These remain supervised branch results, not unattended rollout qualification.
+The [generation-6 Pi 5 record](data/ota-profile-image-20261018.json) and
+[earlier second-Picade record](data/ota-picade2-profile-image-20261018.json) retain
+their original source `0a32db2` and scope.
+
+| Device or feed | Latest recorded state | Next qualification |
+| --- | --- | --- |
+| `spacewars.local`, Pi 5 / HyperPixel | Source `0a32db2`, signed Nightly generation 6; healthy trial/normal boot and radio/time/OTA cycles | Review-fix image rollout, actual daily timer, payload/gameplay checks, integrated install policy |
+| `sw-picade.local`, primary Pi 4 / Picade | Source `5b420c9`, good generation 2; healthy game/recovery, update preparation failing; candidate provider/SSH controls passed | Corrected-image rollout and installed startup/radio/time/OTA checks |
+| `sw-picade-2.local`, second Pi 4 / Picade | Source `bde737f`, signed Nightly generation 7; healthy trial/default boot, restart, native startup/SSH/provider controls and combined radio/time/OTA cycle | #511 readback correction; actual daily timer, payload/SSH/gameplay performance, integrated install policy and remaining failure matrix |
+| Owner feed | Seven supervised Nightly generations, metadata version 8; Release empty | Protected automated publishing, renewal and explicit Release promotion |
+
+The time-wake experiments used the real `sync-now` API, and OTA joined
+automatically. They did not observe the daily timer. The already-current image
+was ineligible, so those cycles downloaded or installed no new payload. Publication
+and installation automation remain disabled. The selected device was returned
+to Release with partial offline disabled; the other two units were not accessed
+or changed during this review-fix qualification.
+
+### Review corrections and next network gate
+
+PR #510's review found missing prelaunch isolation checks in the native NM test
+launcher and silent rejection of the service's namespace handoff. The launcher
+now rejects exposed rfkill, missing or nonempty private bus/udev binds, and
+unreadable namespace evidence before starting either daemon. Inert-daemon tests
+exercise these guards without exposing host devices or the production bus.
+
+The service retains the handoff result and warns once for missing, invalid or
+different-namespace evidence. Default logging now includes warnings. Only owner
+diagnostics may fall back to direct PID 1 inspection; `serve` requires inherited
+evidence before idle shutdown. The unit's `graceful` open keeps the independent
+service available when that open fails. Static tests bind the unit name/options
+and the three listener masks to their source contracts. SSH boot-ID lookup is
+limited to the stopped-service fallback; failure there does not prevent a later
+coordinator admission.
+
+The revised image passed qualification on the selected second Picade. Native
+startup checks kept the actual packaged daemon responsive for missing, invalid
+and valid handoffs; the negative cases emitted the default warning. The first
+observer failed because `nsenter` is absent on the image; its logs and the
+corrected mount-sandbox observer are retained. All four native SSH recovery
+controls and the hardened launcher/provider controls passed. Signed installation,
+normal boot, a single service restart and the combined radio/time/OTA check
+passed with durable saved-data preservation. Regenerated local Bluetooth GATT
+databases are reported separately. Local validation passed 209 Rust tests (five
+owner-only skips), four Python tests, formatting, Clippy and ShellCheck; exact-source
+hosted CI passed.
+
+The owner staging helper first rejected its native NTP receipt precondition,
+before opening trust/staging or starting a download. The general service still
+reported usable time; the exact rejected receipt predicate is unestablished.
+One real `sync-now` success permitted a separately recorded staging attempt.
+During installation on the previous generation-6 image, disk flushing was slow
+and two fresh SSH logins exceeded the five-second banner deadline. The existing
+channel and device service stayed responsive, with no kernel storage errors
+observed; trial health committed at 415.962 seconds. Keep this in #265/#267's
+performance work, rather than claiming an established cause or a fixed latency.
+
+The older delayed-rfkill-readback risk is tracked separately in
+[#511](https://github.com/aortez/space-wars/issues/511), with bounded transition,
+expiry and conflict tests required before unattended partial-offline rollout.
+
+### Remaining work and ownership
+
+Completed bootstrap and signed-delivery evidence remains valid within its
+recorded scope; neither needs to be repeated merely to restart this plan.
+New image changes and previously untested failure cases still need qualification.
 
 | Issue | Integration required |
 | --- | --- |
 | #256 | Corrected installed time service verified after signed update and normal boot on both primary Pis; broader provider and RTC retention qualification remain |
-| #258–#260 | Native coordinator, continuous monitoring, operation holds, durable time checks and OTA handoff implemented; expected setup profile changes and SSH idle qualification remain |
-| #262 | Owner-local authority published two signed Nightly generations with durable journal/readback; isolated automated Release/Nightly publishing, admission and signer operation remain |
-| #263 | Signed install, stopped-app rollback/quarantine, bounded retry and normal-boot success verified on the replacement Pi 5 and primary Picade; interrupted promotion, power loss and second Picade rollout remain |
-| #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | Public trust and real signed-image delivery verified on both primary Pis with the native owner helper; installed worker/network/performance qualification remains |
-| #266 | Update settings, overnight policy and serialized cancellable handoff |
-| #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
+| #258–#260 | Native off/time-wake/automatic-OTA/off cycle and SSH controls passed on Pi 5 and the selected second Picade; expected setup profile changes and remaining per-device rollout remain |
+| #261 | Shared metadata/image contract and verification fixtures implemented and used by the supervised path; retain those checks through normal service integration |
+| #262 | Owner-local publication, admission checks and durable journal/readback implemented; daily CI builds unsigned candidates; protected automatic signing/publication, renewal and Release promotion remain |
+| #263 | Signed install, stopped-app rollback/quarantine, bounded retry and normal-boot success verified on the replacement Pi 5 and primary Picade; remaining startup/service failures, interrupted promotion and physical power loss need qualification |
+| #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; fixed install-service operations, candidate-bound app handoff and remaining physical maintenance/data checks remain |
+| #265 | Signed delivery verified; corrected startup/time-wake feed checks passed on Pi 5 and the second Picade; actual daily opportunity, new/resumed payload performance and fresh-SSH latency remain |
+| #266 | Updates UI/CLI, saved Ask/Automatic policy, manual consent, overnight admission, countdown and serialized cancellable app handoff |
+| #267 | Complete the Pi 4/5 failure/channel/mode/performance matrix, primary-Picade corrected-image rollout and operator documentation; retain exact pre-update settings for migration comparisons |
 
-The product defaults remain Release and Ask before installing. Downloads occur
-in both modes. Automatic installation is opt-in, initially 03:00–05:00 local,
+### Next implementation sequence
+
+1. Network reliability: #510 has generation-6 Pi 5 evidence and revised
+   generation-7 qualification on the selected second Picade. #511 is the next
+   bounded-readback correction before install-flow work. Per-device corrected-image
+   rollout remains tracked in #267.
+2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
+   consent, app save/acknowledgement, fixed privileged install operation, progress,
+   trial and confirmed outcome. Define their shared handoff together; the
+   installer transaction belongs to #264 and user/host consent to #266.
+3. Add saved Ask/Automatic settings and the overnight/idle/countdown/postponement
+   policy to that same install flow. Automatic must not be a second installer.
+4. Finish #262's protected publisher and daily metadata renewal. Tag-triggered
+   Release promotion must approve an exact already-qualified artifact; a tag
+   alone is not qualification. This work can proceed alongside device integration.
+5. Complete #267's physical interruption, full channel/mode, networking and
+   download/gameplay checks. Start Automatic Nightly on one designated test unit;
+   use Release on everyday units and expand only after recorded qualification.
+
+The scheduled [image workflow](../.github/workflows/ota-build.yml) already builds
+and validates unsigned main candidates. It does not sign, promote or trigger
+device installation. Keep the existing issue set; kernel/firmware/partition OTA
+stays in the separate, nonblocking [#268](https://github.com/aortez/space-wars/issues/268).
+
+**Agreed product policy, still to integrate:** defaults are Release and Ask
+before installing, with downloads in both modes. Automatic installation is
+opt-in, initially 03:00–05:00 local,
 after ten minutes idle in Clock or the launcher, with a sixty-second countdown.
 Input postpones until the next overnight window. Running and paused games stay
 protected.
+
+### Cleanup candidates for later deletion review
+
+Keep active instructions short and update them as work lands. The following are
+review candidates, not authorization to delete evidence or recovery data:
+
+| Material | Review before deletion or consolidation |
+| --- | --- |
+| Dated experiments in this document and the generation-zero commands in `ota-recovery-qualification.md` | Move historical detail into an archive if useful, preserving linked anchors, source identities and the active-plan pointer. Do not present old commands as today's next step. |
+| Revision-specific `canary*.py`, `publish.py`, `qualify-*.py` and `record-*.py` under local `target/idle-qualification/` | Separate obsolete executable entry points from retained proof. Archive any script whose hash is referenced by a qualification record; review unreferenced drafts for removal after the replacement workflow is recorded. Never rerun an old script merely because it exists. |
+| Repeated extracted root filesystems, build outputs and copied executables under local qualification directories | Inventory references and retain verified image/artifact hashes plus the evidence needed to reproduce a result. Review redundant copies only after archival and current-device recovery requirements are satisfied. |
+| Per-run qualification directories on the Pi, including copied binaries and isolated state | Verify local archives/hashes and ensure their transient services/timers have finished before reviewing removal. Keep live production state, holds and recovery history separate. |
+| Local flash/bootstrap/recovery helpers and saved `/data` archives from replaced media | Treat these as recovery records until device identity, restoration and replacement-drive checks are closed. Review independently of ordinary build-cache cleanup. |
+
+The review-fix inventory found four extracted rootfs copies using about 1.98 GiB;
+all still have their compressed candidate and verification record. These are
+concrete cleanup candidates after reference/recovery review. The local operator
+script inventory also distinguishes hash-referenced scripts from entries needing
+further review; absence of a found reference does not prove a file is unused.
+No recovery archive or historical evidence was deleted.
+
+Original failed comparisons and their subsequent reviews remain part of the
+qualification record. The serial-test requirement is also retained: shared-process
+parallel libtest has reproduced fixture-lock contention; changing that needs test
+isolation work, not deleting failing results or weakening assertions.
 
 ## PR and nightly recovery coverage
 
@@ -216,9 +345,10 @@ cargo run --locked -p engine-os-manager -- probe
 
 All 24 tests passed on the host, Pi 4 and Pi 5, including a private D-Bus provider,
 restart races, metadata corruption, permission checks, socket exhaustion and
-worker/request deadlines. The physical kiosks' stock systemd 255.21 providers
-correctly report the missing receipt capability. The patched systemd 255.22
-package and complete development image build with the current Yocto configuration.
+worker/request deadlines. At this 2026-10-14 checkpoint, the kiosks' stock
+systemd 255.21 providers correctly reported the missing receipt capability.
+The patched systemd 255.22 package and complete development image built with
+the recorded Yocto configuration.
 The image contains the provider receipt property and enabled service units;
 static verification of both units against the extracted image succeeds. This
 does not establish their runtime startup ordering. The rebuilt kernel has a
@@ -331,9 +461,10 @@ The time worker now offers an admitted connection to the updater before its
 provider query, so an early synchronization can release the time hold after a due
 updater has registered its own reservation. The offer waits at most five seconds
 within the original NTP deadline. OTA's daily due/attempt record remains separate
-from NTP retry history. The service has not yet been enabled on either kiosk; saved-profile
-association, captive-portal behavior and installed provider qualification remain
-physical integration work.
+from NTP retry history. At the 2026-10-16 fixture run, the service had not been
+enabled on either kiosk; saved-profile association, captive-portal behavior and
+installed provider qualification were outside that run. See the current plan
+above for subsequent installed results and remaining coverage.
 
 ## Wi-Fi policy and connection ownership
 
@@ -407,9 +538,9 @@ and actual radio/checkpoint state, then sets only `WirelessEnabled`, with a boun
 deadline. It does not invoke global networking control or change profiles. The
 controller requires a shutdown guard across its final activity check, command and
 readback; an unavailable guard or incomplete live-activity observation defers off.
-The private policy record is now schema 3. These unpublished policy
-records have not been installed on either kiosk; older schemas are rejected
-rather than silently reset.
+The private policy record is schema 3; older schemas are rejected rather than
+silently reset. These records were unpublished and not installed on either
+kiosk during the initial policy fixtures described below.
 
 `network_service::NetworkServer` adds the bounded control boundary around that
 controller. Its version-1 requests are status, saved policy changes, explicit
@@ -441,8 +572,9 @@ activity evidence used by the decision.
 
 The native monitor retains authenticated D-Bus subscriptions for NetworkManager
 owner and radio-property changes. An external change reversed between snapshots
-still suspends automatic toggles. One matching notification can be attributed to
-a prepared write; extra notifications, invalidated properties, lost observation
+still suspends automatic toggles. One matching transition can be attributed to
+a prepared write. Identical `WirelessEnabled` notifications do not consume or
+extend that allowance; later reversals, invalidated properties, lost observation
 or owner replacement cannot erase a conflict. The saved suspension survives
 restart. Explicit resume establishes a new monitor baseline only after checking
 that there is no unresolved command from the current boot. Profile revisions
@@ -518,8 +650,13 @@ SSH admission reserves a root-only 120-second hold through the same coordinator
 queue as radio transitions. `session-protected` permits the accepted connection
 to continue; it does not claim Wi-Fi or Internet readiness. An independently off
 radio in mode Off stays off, preserving Ethernet logins. A policy-owned off state
-must be restored first, and an uncertain prior command cannot produce a successful
-admission. Expired holds remain protective while live sessions or unknown activity
+or pending command from the current boot must be reconciled first. After a real
+reboot, the saved command cannot execute, so an accepted TCP connection can gain
+SSH protection and reach owner recovery. Admission retains the pending command,
+suspension and old ownership; it does not silently resume automatic radio control.
+The stopped-service fallback applies the same boot-identity rule under the
+exclusive policy lock without rewriting saved state. A service restart does not
+qualify as a reboot. Expired holds remain protective while live sessions or unknown activity
 remain. A new root SSH admission or Wi-Fi setup admission can replace expired
 SSH holds with its fresh 120-second hold, maintaining protection without needing
 to prove idle first. Otherwise an active session or an incomplete observer could
@@ -540,7 +677,7 @@ reservations were replaced. Both runs began with an empty reservation set,
 kept one control connection active, and waited 130 seconds between their first
 16 logins and the next batch. The kiosk process and boot remained unchanged.
 The temporary service override was removed afterwards and the installed binary
-hash verified; the fix is not yet permanently installed. The stalled primary
+hash verified; that comparison did not permanently install the fix. The stalled primary
 Picade's hold count could not be read.
 [SSH admission comparison and restoration evidence](data/ota-ssh-admission-20261017.json).
 
@@ -565,7 +702,7 @@ was rejected while all reservations were live. After 130 seconds, status still
 showed 32 expired SSH reservations; setup then admitted, renewed and released
 successfully, leaving no holds. Radio observations, the game PID and boot ID
 remained unchanged. The original service was restored and its executable hash
-verified. The installed image still needs the correction; this test did not
+verified. That experiment did not update the installed image; it did not
 enable partial offline policy or change saved Wi-Fi profiles.
 
 The helper has a 45-second socket/retry budget and reuses one capability. Its unit
@@ -577,22 +714,22 @@ change the radio. Corrupt/missing records inside an existing state directory and
 an active coordinator prevent the fallback. An uninitialized image keeps ordinary
 SSH startup behavior.
 
-**Integration remains incomplete:** the verified workstation A/B service path and
-physical deployment qualification remain required. The native observer currently defers idle
-qualification for other TCP listeners; both installed images have additional
-listeners on ports 53 and 111 that still need classification. Namespace confirmation
-must also work under the installed service's capability restrictions, without
-granting broad tracing access.
+**Historical integration limits:** at the above admission experiments, the
+verified workstation A/B service path and physical deployment qualification were
+still outstanding. The native observer deferred idle qualification for TCP
+listeners on ports 53 and 111; namespace confirmation also needed to work under
+the installed service's capability restrictions without broad tracing access.
+Later #510 experiments below cover the corrected observer and Pi 5 radio cycle;
+the active plan above identifies the remaining installed qualification.
 Expected profile changes from the setup worker need coordination with the observer.
 For now, even a profile edit made by setup conservatively leaves automatic policy
 suspended until explicit resume; completing setup does not silently accept a new
 profile baseline.
 The controller tests use fake radios and temporary state. The freshly flashed
 admin images include the native coordinator and SSH hook. The comparison above
-qualifies expired SSH reservation replacement; automatic radio transitions
-still need physical qualification.
-Partial offline remains disabled by default; neither board's installed policy
-or radio settings have changed.
+qualifies expired SSH reservation replacement, not automatic radio transitions.
+Partial offline remains disabled by default; those admission experiments left
+the boards' installed policy and radio settings unchanged.
 
 The implementation at `7dde8ca` passed all 53 manager tests with temporary files
 on host ext4, Clippy, Rust 1.89, formatting and AArch64 compilation. Its 13 new
@@ -669,7 +806,8 @@ root installation, native lease admission and physical reboot qualification.
 of [#263](https://github.com/aortez/space-wars/issues/263). The Linux adapter below
 now applies journal-authorized boot-selector changes. The separate recovery
 service below connects reconciliation, kiosk observation and watchdog completion.
-The partition writer is described below; production installation remains unavailable.
+The partition writer is described below. Signed installation is available through
+the supervised owner helper; normal device-service installation remains unavailable.
 
 The journal binds a provisioned board, layout, hardware profile and immutable
 boot assets to the good and candidate root images. Its phases distinguish
@@ -809,8 +947,9 @@ It still runs if one fails, so it can observe the failure and roll back. New-ima
 Bluetooth and SSH host-key startup helpers refuse to reimport a missing store
 while bootstrap is active or a recovery journal exists. The host-key generator
 requires successful host-store preparation, preventing a failed preservation
-check from being followed by automatic key generation. Actual boot/service
-behavior still needs qualification on the Pis.
+check from being followed by automatic key generation. The following persistence
+fixtures did not qualify actual boot/service behavior; later bootstrap and
+signed-trial records supply their own installed evidence.
 
 The persistence checkpoint passed 202 OTA tests, 38 device-service tests and
 71 Yocto tests, including required sandbox tests of the startup helpers. A
@@ -1056,8 +1195,9 @@ BlueZ's generated local GATT database changed and is recorded separately. A
 repeat activation of the consumed diagnostic was refused. See the
 [runner and cleanup procedure](ota-recovery-qualification.md) and
 [physical observation record](data/ota-picade-missing-root-20261017.json).
-Signed-candidate quarantine and the remaining ordinary OTA watchdog/promotion
-failure cases remain. The corrected kernel changes the shared
+At this early watchdog experiment, signed-candidate quarantine and ordinary
+OTA watchdog/promotion failure cases remained untested. Later signed trials
+established quarantine; the active plan lists the remaining cases. The corrected kernel changes the shared
 boot identity and therefore required boot-asset provisioning, not a rootfs-only
 OTA. See the [bootstrap results](ota-bootstrap.md#primary-picade-bootstrap).
 [Hardware probe and regression evidence](data/ota-watchdog-hardware-20261017.json).
@@ -1143,9 +1283,9 @@ durability. Those remain part of supervised physical qualification.
 `InstallLock` owns `/run/spacewars-install/lock` through private directory/file
 handles. It excludes separately opened installers and ordinary `flock` clients,
 and checks that neither its directory nor lock name was replaced. Its directory
-must not be a service `RuntimeDirectory` removed on restart. Existing legacy
-operator helpers do not yet participate; they must be integrated or disabled
-before enabling the coordinator.
+must not be a service `RuntimeDirectory` removed on restart. Legacy operator
+helpers did not participate at this initial checkpoint. Their later maintenance
+guards, described below, enforce the shared lock; integration must preserve it.
 
 `BootController` holds that lock and accepts only a durable `RecoveryStore`
 plus its corresponding selector action. Preparing a trial preserves the old
@@ -1244,10 +1384,10 @@ transition. In-progress snapshots become stale after 15 seconds; malformed or
 missing recovery reports do not make time queries fail. The lock directory is
 created by tmpfiles, not removed with a service runtime directory on restart.
 
-This implementation is not yet deployed. Legacy privileged update helpers must
-be constrained before provisioning, and real boot/watchdog/power-loss trials
-remain prerequisites for enabling installation. Fixture tests and image build
-checks do not establish physical recovery qualification.
+This initial implementation had not been deployed at the following fixture
+checkpoint. Later operator-boundary, bootstrap and signed-trial records describe
+that integration. Fixture tests and image builds alone do not establish physical
+recovery; the active plan retains the outstanding failure/power-loss cases.
 
 All 88 OTA and 36 device-service tests pass on the host, with scoped Clippy,
 Rust 1.89 and AArch64 compilation. The 66 OTA and 15 device-service unit tests
@@ -1374,12 +1514,14 @@ fast-update/renderer rollback fixtures. The real command wrappers run in a
 disposable root namespace with temporary files: a conflicting lock and corrupt
 journal reject both helpers before worker execution. Three changed OTA tests
 and the actual manager's unprivileged rejection paths also pass on the Pi 5.
-These checks do not yet qualify the installed sudo policy on the physical Pis.
+Those fixtures did not qualify the installed sudo policy on the physical Pis;
+later bootstrap records include actual owner/runtime access checks.
 
 Workstation deployment holds now span transfer, cleanup and reconnect, as
-described above. Provisioning operator keys on the devices, the verified
-workstation A/B service path, and preservation across real trials remain
-integration work. Fast changes deliberately alter the packaged client
+described above. Operator-key provisioning and preservation across real trials
+were still pending at this checkpoint; later bootstrap and signed-trial records
+cover those cases. Remaining physical maintenance races belong to #267.
+Fast changes deliberately alter the packaged client
 identity; automatic-install admission must account for that development state
 instead of treating the old image record as proof of the replacement binary.
 [Source and execution evidence](data/ota-maintenance-20261015.json) records
@@ -1629,8 +1771,8 @@ the explicit cache selection. The configuration now retains the imported
 datastore value with a weak default, and an actual BitBake datastore probe
 confirms download, sstate and compiler caches retain the supplied path. A
 standard build umask is also required. The corrected isolated build subsequently
-completed all 6,768 tasks and its exact output passed image qualification;
-GitHub runner capacity still needs validation.
+completed all 6,768 tasks and its exact output passed image qualification.
+That workstation result did not validate GitHub runner capacity.
 
 ## Standard-runner candidate build
 
@@ -1688,10 +1830,10 @@ real Docker smoke test exercised source transfer, four-core/12 GiB limits,
 credential exclusion, output collection and container removal in 1.336 seconds;
 its synthetic payload was not an image qualification. The
 [runner preparation evidence](data/ota-standard-runner-20261016.json) records
-component and log hashes. These checks do not yet establish a successful cold
-build on the standard GitHub runner. The workflow is prepared locally, and
-publication, unchanged-source skipping and device qualification remain
-separate work.
+component and log hashes. These preparation checks did not establish a successful
+cold build on the standard GitHub runner. The workflow was locally prepared at
+that checkpoint; publication, unchanged-source skipping and device qualification
+remain separate from building and uploading an unsigned candidate.
 
 The first completed cold container build used source `75c0dee`, eight CPUs and
 24 GiB, with no compiled/sstate cache reuse. All 6,768 tasks ran successfully in
@@ -2520,11 +2662,11 @@ AArch64 test compilation and formatting also passed. Exact source/artifact
 identities and outputs are recorded in the
 [download validation evidence](data/ota-download-20261016.json).
 
-The production service integration is described below. Public trust and staging
-are now provisioned, and an owner helper has verified the empty signed feed on
-both primary Pis. Installed-worker qualification and installation-policy handoff
-remain; neither signed-image installation nor an enabled auto updater has been
-qualified by these checks.
+The production service integration is described below. Initial owner-helper
+checks verified an empty signed feed after provisioning both primary Pis.
+Those checks did not qualify signed-image installation or an enabled automatic
+updater. Later signed trials and installed-worker results are separate evidence;
+the active plan records the remaining device and policy integration.
 
 ### Durable update-check schedule
 
@@ -2703,6 +2845,391 @@ startup and verified resumed-download checks, and frame-time qualification
 remain before unattended rollout. Exact identities, observed outcomes and
 validation are in the [canary and observation evidence](data/ota-network-observation-20261018.json).
 
+### Network-idle sandbox qualification (2026-10-18)
+
+The idle investigation confirmed two independent blockers. Default standalone
+`dnsmasq` and `rpcbind` services expose four TCP listeners that the observer
+correctly treats as unclassified activity. Inside the production service's
+capability sandbox, inspecting `/proc/1/ns/net` also fails. An unrestricted
+owner probe alone therefore cannot qualify the daemon's idle observation.
+
+The image now masks `dnsmasq.service`, `rpcbind.service` and `rpcbind.socket`.
+NetworkManager, systemd-resolved and Bluetooth provisioning remain enabled.
+`dnsmasq` remains available as a private NetworkManager helper; `rpcbind` remains
+installed through the NFS package-group dependency. Unknown listeners still
+defer shutdown. The service uses systemd's
+[OpenFile handoff](https://www.freedesktop.org/software/systemd/man/257/systemd.service.html#OpenFile=)
+to obtain a read-only host-network-namespace descriptor before entering the
+sandbox. Startup validates its process, descriptor count/name and kernel
+namespace type, pins its identity and sets close-on-exec. Observation compares
+it with the current namespace. No capabilities are added.
+
+On both Pi 5 and Pi 4, restricted native probes accepted the host descriptor
+and rejected missing descriptors, a mount-namespace descriptor and a private
+network namespace. All 197 device-service tests pass under Rust 1.89 with
+serial libtest execution; the initial threaded run hit the documented inherited
+fixture-lock contention. The six session tests also pass natively on Pi 4.
+Clippy, formatting, AArch64 compilation and 95 Yocto Python cases (one skipped)
+pass. The complete image from clean source `22e49a2` built and passed independent
+candidate validation. Inspection of its actual ext4 contents confirmed the
+service handoff and three masks. This candidate is unsigned and unpublished.
+
+A temporary Pi 5 service override then retained the installed production
+sandbox while running the preview binary and runtime masks. The 30-second
+active-SSH control passed, including DNS/TLS access with the standalone servers
+stopped. A detached partial-offline/time/OTA cycle was launched with an
+independent restoration timer and durable logs. Collection failed at the SSH
+banner; two longer attempts were reset before authentication, and an owner
+reboot did not recover access. Read-only collection from the removed Pi 5 drive
+then recovered 576 samples: Wi-Fi switched off at 121 seconds, and the due OTA
+check correctly remained idle while offline. The manual time request was
+skipped as `recent-success`, so it did not produce the wake the harness expected.
+The test timed out without an automatic OTA attempt.
+
+Cleanup turned Wi-Fi on and restored the original daemon, disabled partial
+offline and selected Release. However, the saved radio state retained
+`owned_off=true`, a returned enable transition, and `external-radio-change`
+suspension. SSH admission rejects that state even after reboot; replaying the
+collected state through the real controller reproduces the rejection. The
+monitor's reason for latching that suspension during cleanup was unresolved at
+this checkpoint; later native tracing and corrections are recorded below.
+The harness's restoration markers did not check pending radio
+state and therefore did not establish restored owner access.
+
+The owner applied the narrowly bound offline recovery: it preserved the
+original record, required its exact hash and unchanged OTA state, advanced
+generation 458 to 459, and cleared stale radio ownership while keeping partial
+offline disabled. Final readback passed after unmount and remount. On boot
+`8a3a1171-3b1f-4980-bcfe-d222bd7ba1f9`, SSH, the kiosk and original device service
+are working; the installed `f58d725` image remains healthy and committed. Radio
+state has no pending command, suspension or owned-off flag. The startup update
+check recorded `network-unavailable`; an explicit retry then completed with
+`no-candidate` on Release and no error. The application checksum/schema reader
+accepts the repaired record and the controller admits SSH without issuing a
+radio command. No image was installed. This is not a passing idle-cycle qualification,
+nor proof that the earlier Picade delay has the same cause. The
+[idle qualification evidence](data/ota-network-idle-20261018.json) retains exact
+source, binary, image, probe, collected-trace and recovery identities. Diagnose
+native radio notifications, then correct the skipped-sync
+and restoration harness before repeating qualification or attempting unattended
+rollout. Successful recovery does not qualify the interrupted idle cycle.
+
+The follow-up SSH fix uses the saved transition's boot identity in both the live
+coordinator and stopped-service fallback. Regressions preserve the Pi 5 failure
+shape (owned-off witness, returned enable request and external-change suspension),
+admit recovery only after reboot, and require explicit owner resume before clearing
+the fault. They also cover an ambiguous off command and unavailable observation,
+while retaining same-boot rejection, exclusive policy ownership and deployment
+records. At this stage the Pi 5 still ran its original image; deployment is recorded
+below.
+Both new controller regressions failed before the change. The fixed controller
+also admits SSH using a copy of the exact collected record, without changing its
+radio fault, policy or deployments or issuing a radio command. All 200 device
+service tests pass, with three opt-in tests skipped; formatting, Clippy with
+warnings denied and the AArch64 build pass.
+
+The opt-in [SSH executable qualification](../crates/engine-os-manager/tests/ssh_recovery_cli.rs)
+then passed all four controls on Pi 5 in 90.14 seconds. It uses the actual
+`ssh-network-admit` executable with accepted TCP sockets, private network and
+mount namespaces, and a copy of the collected fault. Previous-boot state is
+admitted with the coordinator running and stopped; changing only the boot
+identity and checksum to the current boot causes rejection after the normal
+45-second deadline in both paths. Radio observations are deliberately unavailable
+and attempted radio writes fail the fixture. The saved radio fault, policy,
+deployments and unread incoming SSH bytes are preserved in every case.
+
+This test requires explicit owner execution as root with
+`SPACEWARS_SSH_QUALIFICATION_ROOT` naming a fresh private directory directly under
+`/data`, prefixed `spacewars-ssh-qualification-`. That directory supplies the
+candidate `engine-os-manager`, `retained-state.json`, and root-owned mode-0700
+`state` and `run` directories. A transient systemd unit uses `PrivateNetwork=yes`
+and `PrivateMounts=yes`, binding those directories over `/data/spacewars-system`
+and `/run/spacewars-system`. The test verifies isolation before opening any store;
+it is ignored in ordinary test runs. Bound the unit to 150 seconds and collect
+its output and saved case states. Use a shared SSH control connection during
+setup to avoid accumulating unexpired admission reservations.
+
+The initial fixture run admitted the previous-boot stopped-service case but then
+failed while moving evidence across a bind-mount alias. Retaining evidence within
+the mounted paths corrected the harness. A later setup SSH connection stalled
+at the banner and recovered after a pause; reservation capacity is suspected,
+but was not captured at the time. The successful run and both earlier outcomes
+are retained in the evidence record. Post-test checks confirm the same boot,
+image, system service and kiosk, clean radio state and a fresh independent SSH
+login. There were no live radio writes or device reboots. This qualifies the SSH
+executable paths with a radio fixture, not real NetworkManager notifications or
+the interrupted idle cycle. The fix must persist across reboot, or independent
+recovery must be available, before another disruptive live-radio test.
+
+### Installed SSH recovery and radio trace (2026-10-18)
+
+The image built from `d77ac20` passed hosted CI and all four isolated SSH
+executable controls using its actual extracted manager binary. The owner signed
+and published it as Nightly generation 4, metadata version 5, then installed it
+on Pi 5 through the signed-trial path. The trial committed healthy in 95.853
+seconds. A subsequent normal boot verified the installed image, service masks,
+SSH admission hook, kiosk and fresh SSH access. Selected durable stores survived;
+only the adapter-local BlueZ GATT database regenerated across boots. Automatic
+publication and installation remain disabled; this is a supervised branch image,
+not an admitted main-branch nightly. Exact identities and receipts are in the
+[radio recovery evidence](data/ota-radio-recovery-20261018.json).
+
+Normal boot did **not** pass automatic update qualification: its startup check
+ended with `network-unavailable`. A later explicit Release check completed
+`no-candidate`. The failed automatic attempt and its consumed daily allowance
+remain recorded. The exact failing admission condition is still unknown.
+
+A separate detached radio-only diagnostic then disabled partial-offline Wi-Fi
+after 121 seconds of idle. On restoration, NetworkManager 1.46.6 emitted
+`WirelessEnabled=false` again, followed 447 microseconds later by `true`. There
+was no observed manager replacement or networking/hardware-property signal.
+The old monitor treated the redundant `false` as an external radio change,
+leaving a returned enable request suspended even though Wi-Fi was on. An explicit
+owner resume cleared that fault. Reconnection subsequently changed the aggregate
+profile revision with the same profile count, causing a separate
+`profiles-changed` suspension and requiring a second owner resume. Individual
+profile changes were not traced, so their cause remains unresolved.
+
+The diagnostic restored a clean controller and connected Wi-Fi without its
+emergency fallback. Fresh SSH succeeded, the same kiosk kept rendering, and all
+selected persistent-store bytes, boot selectors and recovery journal stayed
+unchanged. These are successful recovery checks, **not** a passing automatic radio
+cycle. The first workstation summary parser rejected the retained pretty-printed
+JSON stream; correcting it allowed the already-collected evidence to be analyzed
+without repeating device actions.
+
+The follow-up monitor change tracks actual `WirelessEnabled` transitions from
+its initial baseline and retained signal stream. Identical notifications neither
+consume nor extend the single expected transition; subsequent reversals still
+latch a fault even when the next snapshot matches. Other radio properties,
+invalidations, daemon replacement and timeout checks remain enforced. The
+captured enable sequence fails before this change and passes afterward, with
+controls for both directions, duplicates after completion, reversals between
+snapshots, a missing target transition and other radio controls. This correction
+was initially qualified only locally. Its subsequent installation and native
+results follow below; the earlier evidence record describes that earlier state.
+
+### Startup readiness and native radio correction (2026-10-18)
+
+The startup investigation found an automatic attempt beginning at 5.561 seconds,
+before NetworkManager completed startup at 10.866 seconds. This exposed an
+ordering hazard: policy can be available while its radio observation is still
+missing. A regression test reproduced the premature `network-unavailable`
+failure. The updater now waits for its first usable radio observation within the same persisted
+attempt. Its admission/preparation/session deadlines, coalescing and daily
+allowance remain unchanged; readiness at the admission deadline cannot revive
+an expired attempt. The original device failure did not log the precise
+admission subcondition, so the timing evidence and reproduced missing-observation
+path are recorded separately.
+
+The combined corrections in `1d5c671` passed 205 device-service tests (four
+opt-in tests ignored), formatting, Clippy with warnings denied, AArch64 test
+compilation and hosted CI. Its complete image passed the four native isolated
+SSH executable controls before supervised signing and publication as Nightly
+generation 5, metadata version 6. The Pi 5 signed trial committed healthy in
+97.049 seconds. A normal reboot then completed its automatic Release check with
+`no-candidate`, without a manual retry: the attempt began at 5.731 seconds,
+before NetworkManager startup completed at 11.034 seconds. Restarting the device
+service preserved the completed check, next daily deadline and running kiosk.
+Selected durable stores survived both boots; only the adapter-local BlueZ GATT
+database regenerated. Exact identities, receipts and artifact hashes are in the
+[startup and radio evidence](data/ota-startup-radio-20261018.json).
+
+A detached radio-only diagnostic then left SSH disconnected for 430 seconds,
+with independent bounded restoration. Wi-Fi turned off after 121 seconds. On
+restoration, NetworkManager again emitted redundant `false` followed by `true`,
+this time 279 microseconds apart. The corrected monitor accepted that transition
+without an `external-radio-change` suspension. A separate `profiles-changed`
+suspension still occurred; one explicit public owner resume cleared it. No
+emergency radio command or stored-state edit was needed. Fresh SSH, the same
+rendering kiosk, all selected persistent-store bytes, boot selectors and recovery
+journal passed verification. Original NetworkManager logging was also restored.
+
+The bounded SETTINGS debug trace identifies NetworkManager's secrets-processing
+callback immediately before the saved Wi-Fi profile's `VersionId` changes from
+3 to 4. `GetSettings` was identical across that transition. NetworkManager
+1.46.6's `get_secrets_cb` calls the settings update path, which increments
+`VersionId` even when its exact content comparison finds no change. This
+identifies the update path; it does **not** prove unchanged in-memory secrets,
+which the diagnostic never requested. `connection.timestamp` changed separately,
+before and after the revision bump. Raw profile values and journals remain in
+the private local evidence; the public summary contains changed field names and
+fixed source-code message markers only.
+
+This qualifies the startup and redundant-notification corrections on Pi 5, but
+the complete radio cycle still fails its no-suspension criterion. Reconnection
+needs to distinguish routine settings refresh from a real profile edit without
+simply accepting every revision change. The full off/time-wake/OTA/off cycle,
+Pi 4 qualification and unattended rollout remain outstanding. Automatic
+publication and installation remain disabled; the installed image is a
+supervised branch candidate, not an admitted main-branch nightly.
+
+### Identical credential refresh qualification (2026-10-18)
+
+The bundled NetworkManager 1.46.6 now has a narrow provider patch for the
+reconnect conflict. Its existing full comparison includes credentials. When
+that comparison is equal, storage and flags are unchanged, and the operation
+is exactly an internal non-persisted agent-secret refresh, it retains
+`VersionId`. Cache updates and `Updated` notifications still occur. Changed
+credentials, explicit updates (including no-ops), clearing secrets, reloads,
+storage changes and other update reasons retain their normal revision behavior.
+The radio controller's profile-conflict check is unchanged. This avoids
+requesting or hashing real credentials in the controller, or overlooking a
+password-only edit because `GetSettings` excludes secrets.
+
+The patched provider built successfully with Yocto. An opt-in
+[native D-Bus test](../crates/engine-os-manager/tests/nm_profile_refresh.rs)
+then ran the original and candidate daemons in separate private network/mount
+namespaces and private buses on Pi 5. The original failed the unchanged-secret
+control, advancing revision 2 to 3. The patched daemon passed repeated unchanged
+refreshes, explicit no-op updates, stale-version rejection, password-only edits,
+ClearSecrets, UpdateUnsaved/Save, deletion and changed/identical credentials from
+an actual synthetic secret agent. The signal trace confirms all three initial
+unchanged refreshes still emitted `Updated` while retaining revision 2; the
+following explicit update advanced it to 3. The test uses uncached property
+reads, correcting a cache-related assertion in its first run. Both runs retained
+the same production NetworkManager, boot, image, kiosk and selected store bytes.
+The final candidate test completed in 0.06 seconds. Formatting, Clippy with
+warnings denied, shell syntax and AArch64 test compilation passed.
+[Provider evidence](data/ota-profile-refresh-20261018.json) records the source
+archive, patch, executable and retained native test identities.
+
+This test is ignored in ordinary CI. Its
+[launcher](../yocto/tests/nm-profile-refresh.sh) requires a fresh root-owned
+mode-0700 directory under `/data/spacewars-nm-qualification-*`, with `baseline`
+or `candidate` case directories and private binds for `/etc/NetworkManager`,
+`/run/NetworkManager` and `/var/lib/NetworkManager`, plus empty mode-0700
+`bus-denied` and `udev-denied` directories bound over `/run/dbus` and `/run/udev`.
+It rejects exposed `/dev/rfkill`, incorrect binds and unreadable host namespace
+links before starting its private bus or NetworkManager. Launch through a bounded
+systemd unit with private network, mounts, devices and temporary files;
+read-only kernel settings; and a private replacement for `/run/dbus` and
+`/run/udev`. The launcher verifies isolation before starting its own bus and
+daemon, and uses only non-autoconnecting synthetic profiles. It never stops
+or replaces production NetworkManager. Preserve the pre/post production checks
+and collect the case logs even when a control fails.
+
+The isolated result above did not establish installed radio behavior. The
+following image qualification supplies that evidence.
+
+### Installed profile-refresh correction (2026-10-18)
+
+Source `0a32db244ea2d692da9588b133ae4c5f92092804` passed hosted CI, including
+4,028 Linux workspace tests (112 skipped). Its complete Yocto image was built
+and independently verified. The exact stripped NetworkManager binary extracted
+from that image passed the isolated native comparison: the original daemon
+reproduced the revision fault; the packaged candidate passed every credential,
+explicit-update and conflict control. The packaged SSH helper is byte-identical
+to the previously qualified executable, so its four native controls were reused
+with a recorded hash comparison rather than rerun.
+
+The existing signing authority published this owner-supervised Nightly as
+generation 6 (metadata version 7). All earlier targets remain retained and
+Release remains empty. The signed trial committed healthy on Pi 5 in 96.989
+seconds. A subsequent normal boot completed its automatic Release check with
+`no-candidate` in 49.973 seconds, without a manual retry. The installed provider
+hash matches the independently verified image. These are branch-candidate
+results, not main-branch admission or unattended rollout.
+
+The real-radio diagnostic now passes. With SSH disconnected, Wi-Fi switched off
+after 121 seconds, then reconnected through the public policy API without a
+suspension, owner resume or emergency command. The native trace recorded the
+previously problematic secret-refresh callback, but the wireless profile stayed
+at revision 2 across baseline, offline and restored snapshots. Only
+`connection.timestamp` changed in the visible settings. The redundant false
+notification followed by true was also accepted. The diagnostic never called
+`GetSecrets` or exported real profile values. A fresh SSH login succeeded;
+boot, image, kiosk, selected saved-data bytes and original logging were preserved.
+
+[Installed image and radio evidence](data/ota-profile-image-20261018.json)
+records the source, image/provider identities, signed publication, boot checks,
+radio trace summary and hashes of the retained private evidence.
+
+The subsequent native off/time-wake/automatic-OTA/off cycle also passed. The
+Nightly check remained due while offline for 107 recorded samples.
+At an accepted-sync age of 305 seconds, a manual `sync-now` started one
+new time-check attempt. The accepted success generation advanced from
+84 to 85; completion was `synchronized`, not `recent-success`.
+The due OTA check ran automatically during that connection, with separate
+`time-check` and `download` holds observed, and finished `ineligible`.
+Both workers retained their original attempt identities and deadlines. Wi-Fi
+returned to owned-off idle at 259 seconds, with no holds remaining and
+the next OTA deadline unchanged through five final observations. Cleanup restored
+Release and partial-offline disabled. Fresh SSH, the same kiosk/boot/image and
+selected saved-data bytes were verified, with zero suspensions, owner resumes
+or emergency commands. This exercised the actual time worker through its manual
+request API; it did not advance the daily timer or install another payload.
+
+The packaged provider also passed its isolated comparison on the primary
+Pi 4 Picade: the original reproduced the revision fault and the candidate
+passed every native control. Its exact packaged SSH helper passed all four
+isolated old-boot/current-boot controls in 90.30 seconds. Both experiments kept
+the production image, network service, kiosk, boot and selected store bytes
+unchanged. These are isolated executable checks, not a Pi 4 image installation
+or real-radio qualification. At that checkpoint both Picades ran source
+`5b420c9` and reported failed update preparation; the primary Picade's boot
+identity, data format and installed operator helpers are compatible with the
+selected candidate.
+
+That checkpoint left Pi 4 installed-image/radio qualification outstanding.
+The following second-Picade run supplies it; unattended rollout remains separate.
+
+### Second Picade installed qualification (2026-10-18)
+
+The owner selected `sw-picade-2.local`, a Pi 4 Model B Rev 1.2, for this run.
+Its isolated baseline reproduced the profile-revision fault, and the exact
+packaged provider passed every native control. All four isolated SSH helper
+controls passed in 90.35 seconds. These experiments preserved its
+production image, services, kiosk and selected store bytes before installation.
+
+The existing signed generation-6 payload staged successfully and its first
+trial was observed committed at 215.082 seconds. A normal reboot then completed
+the automatic Release check with `no-candidate` in 56.185 seconds. The image became
+the default without resetting prior failure or generation history.
+
+The original trial observer stopped on its byte-inventory assertion. An archived
+settings file exactly matched the pre-install hash. Parsed comparison established
+that every old value was preserved; startup added only `clock.events.aquarium`,
+`clock.events.cell_swap` and `launcher.show_all` at their new defaults. The new
+empty `training/worker.lock` and its directory are created by app startup.
+All other durable bytes and existing metadata matched; the adapter-local BlueZ
+GATT database regenerated separately. A read-only review retained the original
+failed comparison and accepted only these exact additive changes. No install
+was replayed, and no byte-for-byte settings preservation is claimed for this trial.
+
+The restart observer also encountered a brief missing status socket immediately
+after its requested service restart. Read-only follow-up verified the original
+daily deadline and completed check, healthy service, same kiosk/boot and unchanged
+stores; it did not request a second restart. Future qualification should capture
+exact pre-update settings privately and tolerate a bounded startup socket gap
+without resetting or repeating operations.
+
+The real radio off/reconnect diagnostic passed with profile revisions preserved,
+zero suspensions or owner resumes, restored logging and fresh SSH. The subsequent
+off/time-wake/automatic-OTA/off cycle passed: `sync-now` at accepted-sync age
+305 seconds established a new success, the due OTA check joined automatically,
+and the result was `ineligible` because the installed image was already current.
+The two workers retained their original attempt IDs/deadlines and separate holds.
+Wi-Fi returned to idle at 226 seconds; five final observations retained the same
+next OTA deadline. Cleanup restored Release and disabled partial offline, with
+the same boot/image/kiosk, selected store bytes and zero emergency intervention.
+This tests the real time worker through its manual API, not the daily timer or
+a new payload download. It does not qualify automatic installation.
+
+During staging on the old `5b420c9` image, a fresh SSH connection exceeded its
+five-second banner deadline while the existing control channel and service
+remained responsive. Fresh access succeeded after staging. Its cause is not
+established; retain fresh-login latency in the payload/gameplay performance
+matrix rather than claiming this corrected image fixed that observation.
+
+[Second-Picade evidence](data/ota-picade2-profile-image-20261018.json) retains the
+source, image, trial/review results, normal boot, both cycles and private-artifact
+hashes. This run did not access or update the primary Picade. Automatic publishing
+and installation remain disabled; PR review and the remaining #267 gates still
+precede unattended rollout.
+
+### Download readiness contract
+
 Persistent data compatibility also requires the private, checksummed
 `/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
 `record: {schema: 1, version: <positive integer>}` and the SHA-256 of the compact
@@ -2722,11 +3249,13 @@ evidence only: installation still needs its own full revalidation. After process
 restart, retained bytes are not advertised as Ready without another verification
 session. Partial bytes remain available for a later eligible or explicit retry.
 
-The operator provisioning path and live empty-feed checks are described above.
-Installed network/provider qualification, startup presentation of retained
-partial-byte status, installer/policy/UI integration and physical
-failure/performance qualification remain. These earlier fixture runs did not
-install or enable the service on either Pi.
+### Earlier download runtime fixtures (2026-10-16)
+
+The following results predate the installed image experiments above. They did
+not install or enable the service on either Pi. Installed network/provider
+qualification, startup presentation of retained partial-byte status,
+installer/policy/UI integration and physical failure/performance qualification
+were outside these fixture runs; use the current plan for their present status.
 
 The final service suite passed 182 tests, and 63 runtime/schedule/handoff cases
 passed on each Pi (4.14 seconds on Pi 5; 5.36 seconds on Pi 4). The OTA suite passed

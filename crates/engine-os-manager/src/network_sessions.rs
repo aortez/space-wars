@@ -3,11 +3,13 @@
 use crate::{Error, Result};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
+use std::sync::OnceLock;
 use std::time::Duration;
 use zbus::zvariant::{OwnedObjectPath, OwnedValue};
 
@@ -15,6 +17,30 @@ const NAME: &str = "org.freedesktop.systemd1";
 const ROOT: &str = "/org/freedesktop/systemd1";
 const TEMPLATE: &str = "sshd@spacewars-network-check.service";
 const DEADLINE: Duration = Duration::from_secs(5);
+const HOST_NAMESPACE_NAME: &str = "spacewars-host-netns";
+static HOST_NAMESPACE: OnceLock<NamespaceHandoff> = OnceLock::new();
+static SERVICE_HANDOFF_REQUIRED: OnceLock<()> = OnceLock::new();
+
+enum NamespaceHandoff {
+    Missing,
+    Rejected(&'static str),
+    Accepted(File),
+}
+
+impl NamespaceHandoff {
+    fn confirmed(&self, required: bool) -> bool {
+        match self {
+            Self::Accepted(file) => same_namespace(file, Path::new("/proc/self/ns/net")),
+            _ if required => false,
+            // Only owner diagnostics may use direct PID 1 inspection. A service
+            // with a failed handoff must not accidentally acquire this fallback.
+            _ => fs::read_link("/proc/self/ns/net")
+                .ok()
+                .zip(fs::read_link("/proc/1/ns/net").ok())
+                .is_some_and(|(a, b)| a == b),
+        }
+    }
+}
 type Fields = HashMap<String, OwnedValue>;
 type UnitRow = (
     String,
@@ -51,6 +77,99 @@ struct Tcp {
     active: usize,
     ssh: usize,
     other_listeners: usize,
+}
+
+fn namespace_descriptor(pid: &str, count: &str, names: &str) -> bool {
+    pid.parse::<u32>().ok() == Some(std::process::id())
+        && count == "1"
+        && names == HOST_NAMESPACE_NAME
+}
+
+fn namespace_file(fd: i32) -> Option<File> {
+    // Reopen our own descriptor with CLOEXEC; keep the namespace pinned so its
+    // inode cannot be recycled. Do not take ownership of an unrelated caller FD.
+    let file = File::open(format!("/proc/self/fd/{fd}")).ok()?;
+    // SAFETY: NS_GET_NSTYPE takes no pointer and only inspects the open file.
+    if unsafe { libc::ioctl(file.as_raw_fd(), libc::NS_GET_NSTYPE) } != libc::CLONE_NEWNET {
+        return None;
+    }
+    // systemd passes the original without CLOEXEC. It must not reach helpers.
+    // SAFETY: fcntl operates on a descriptor number, with no pointer arguments.
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+    if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC) } < 0 {
+        return None;
+    }
+    Some(file)
+}
+
+/// Capture systemd's OpenFile before starting threads or spawning helpers.
+/// A socket-activated SSH admission command must leave its socket untouched.
+pub fn initialize_host_namespace() {
+    HOST_NAMESPACE.get_or_init(|| {
+        namespace_handoff(
+            ["LISTEN_PID", "LISTEN_FDS", "LISTEN_FDNAMES"].map(std::env::var),
+            3,
+        )
+    });
+}
+
+fn namespace_handoff(
+    metadata: [std::result::Result<String, std::env::VarError>; 3],
+    fd: i32,
+) -> NamespaceHandoff {
+    if metadata
+        .iter()
+        .all(|value| matches!(value, Err(std::env::VarError::NotPresent)))
+    {
+        return NamespaceHandoff::Missing;
+    }
+    if let [Ok(pid), Ok(count), Ok(names)] = &metadata
+        && namespace_descriptor(pid, count, names)
+    {
+        return namespace_file(fd).map_or(
+            NamespaceHandoff::Rejected("descriptor is unavailable or not a network namespace"),
+            NamespaceHandoff::Accepted,
+        );
+    }
+    NamespaceHandoff::Rejected("activation metadata does not identify the expected descriptor")
+}
+
+/// Called once by serve, after logging initialization and before worker startup.
+/// Missing evidence disables idle shutdown, not the independent device service.
+pub fn require_service_namespace() {
+    SERVICE_HANDOFF_REQUIRED.get_or_init(|| {
+        match HOST_NAMESPACE.get().unwrap_or(&NamespaceHandoff::Missing) {
+            NamespaceHandoff::Accepted(file)
+                if same_namespace(file, Path::new("/proc/self/ns/net")) =>
+            {
+                tracing::info!("host network namespace handoff accepted");
+            }
+            NamespaceHandoff::Accepted(_) => tracing::warn!(
+                "host network namespace handoff differs from service namespace; idle shutdown disabled"
+            ),
+            NamespaceHandoff::Missing => tracing::warn!(
+                "host network namespace handoff missing; idle shutdown disabled"
+            ),
+            NamespaceHandoff::Rejected(reason) => tracing::warn!(
+                reason,
+                "host network namespace handoff rejected; idle shutdown disabled"
+            ),
+        }
+    });
+}
+
+fn same_namespace(file: &File, current: &Path) -> bool {
+    file.metadata()
+        .ok()
+        .zip(fs::metadata(current).ok())
+        .is_some_and(|(host, current)| host.dev() == current.dev() && host.ino() == current.ino())
+}
+
+fn host_namespace_confirmed() -> bool {
+    HOST_NAMESPACE
+        .get()
+        .unwrap_or(&NamespaceHandoff::Missing)
+        .confirmed(SERVICE_HANDOFF_REQUIRED.get().is_some())
 }
 
 fn endpoint(value: &str, ipv6: bool) -> Result<(IpAddr, u16)> {
@@ -446,10 +565,7 @@ pub fn observe() -> Result<Observation> {
                 .map_err(|_| unavailable())?,
             true,
         )?;
-        let namespace = fs::read_link("/proc/self/ns/net")
-            .ok()
-            .zip(fs::read_link("/proc/1/ns/net").ok())
-            .is_some_and(|(a, b)| a == b);
+        let namespace = host_namespace_confirmed();
         let defaults_valid = defaults(Path::new("/etc/default/ssh"));
         let connection = zbus::connection::Builder::system()
             .map_err(|_| unavailable())?

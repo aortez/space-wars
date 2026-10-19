@@ -228,8 +228,7 @@ spaceling and tank-route code; this change does not edit those unrelated areas.
 This optimization preserves the recorded physics; it does not alter the
 capacity, field force or fragmentation distribution to make the test easier.
 Production rendered Pi 4 qualification was repeated on `9170d99` and still
-exposes the stalls above. Pi 5 remains offline. PR #505 stays draft and
-#354/#359 remain open.
+exposes the stalls above. Pi 5 remains offline, and #354/#359 remain open.
 
 ## Planned performance work
 
@@ -242,7 +241,7 @@ The current Pi 4 production gravity event averages 11.12–11.13 ms per update,
 with p95 around 20.6 ms and individual updates near 100 ms. The separate headless
 experiment starting at 5,000 averages 97.34 ms while the population falls; it
 does not establish sustained 5,000-ball throughput. Both CPU headroom and frame
-stalls need improvement before PR #505 is ready.
+stalls need improvement before the ordinary gravity event qualifies (#359).
 
 ### Experiment priorities
 

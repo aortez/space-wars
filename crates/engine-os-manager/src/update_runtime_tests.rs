@@ -65,6 +65,8 @@ struct World {
     mode: u64,
     partial: bool,
     route: bool,
+    radio_observed: bool,
+    radio_startup: bool,
     time: bool,
     work: Work,
     fail_prepare: bool,
@@ -89,6 +91,8 @@ impl Fake {
             mode: 1,
             partial: true,
             route: true,
+            radio_observed: true,
+            radio_startup: false,
             time: true,
             work: Work::Finish,
             fail_prepare: false,
@@ -143,14 +147,14 @@ impl Inputs for Fake {
                         })
                         .collect(),
                 },
-                actual: Some(Observation {
+                actual: w.radio_observed.then_some(Observation {
                     schema: 1,
                     bus_owner: ":1.1".into(),
                     pid: 11,
                     networking_enabled: true,
                     wireless_enabled: true,
                     wireless_hardware_enabled: true,
-                    startup: false,
+                    startup: w.radio_startup,
                     checkpoint_count: 0,
                     state: 70,
                     profile_revision: Sha256::digest(b"fixture"),
@@ -167,7 +171,8 @@ impl Inputs for Fake {
                 owned_off: false,
                 pending: None,
                 suspended: None,
-                deferred: None,
+                deferred: (!w.radio_observed)
+                    .then_some(network_controller::Deferred::ObservationUnavailable),
             },
         })
     }
@@ -331,6 +336,94 @@ impl Fixture {
             self.step();
             thread::sleep(Duration::from_millis(2));
         }
+    }
+}
+
+#[test]
+fn runtime_startup_waits_for_radio_observation_within_the_original_attempt() {
+    for startup in [false, true] {
+        let mut f = Fixture::new();
+        f.fake.edit(|w| {
+            w.ms = 5561;
+            w.partial = false;
+            w.radio_observed = startup;
+            w.radio_startup = startup;
+            w.route = false;
+        });
+        f.step();
+        let waiting = f.handle.status().unwrap();
+        let active = waiting
+            .schedule
+            .unwrap()
+            .active
+            .expect("wait for NM startup");
+        assert_eq!(waiting.phase, Phase::WaitingForNetwork);
+        assert_eq!(waiting.reason, None);
+        assert_eq!(f.fake.0.lock().unwrap().prepares, 0);
+        assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1);
+        assert!(f.handle.check_now().unwrap().coalesced);
+        f.fake.edit(|w| {
+            w.ms = 10866;
+            w.radio_observed = true;
+            w.radio_startup = false;
+            w.route = true;
+            w.work = Work::Wait;
+        });
+        f.step();
+        f.until(|f| f.fake.0.lock().unwrap().sessions == 1);
+        let resumed = &f.runner.job.as_ref().unwrap().active;
+        assert_eq!(resumed.id, active.id);
+        assert_eq!(resumed.started_ms, active.started_ms);
+        assert_eq!(resumed.admission_deadline_ms, active.admission_deadline_ms);
+        assert_eq!(
+            resumed.preparation_deadline_ms,
+            active.preparation_deadline_ms
+        );
+        assert_eq!(resumed.deadline_ms, active.deadline_ms);
+        assert_eq!(f.fake.0.lock().unwrap().prepares, 1);
+    }
+}
+
+#[test]
+fn runtime_unobserved_radio_expires_without_extending_the_attempt_or_daily_allowance() {
+    for manual in [false, true] {
+        let mut f = Fixture::new();
+        f.fake.edit(|w| {
+            w.partial = false;
+            w.radio_observed = false;
+        });
+        if manual {
+            f.handle.check_now().unwrap();
+        }
+        f.step();
+        let started = f.handle.status().unwrap().schedule.unwrap();
+        let active = started.active.unwrap();
+        for ms in [2000, active.admission_deadline_ms - 1] {
+            f.fake.edit(|w| w.ms = ms);
+            f.step();
+            assert!(f.handle.check_now().unwrap().coalesced);
+            let status = f.handle.status().unwrap().schedule.unwrap();
+            assert_eq!(status.active.as_ref(), Some(&active));
+            assert_eq!(status.next_ms, started.next_ms);
+        }
+        // Even a good observation at the original deadline cannot revive it.
+        f.fake.edit(|w| {
+            w.ms = active.admission_deadline_ms;
+            w.radio_observed = true;
+        });
+        f.step();
+        let expired = f.handle.status().unwrap().schedule.unwrap();
+        assert!(expired.active.is_none());
+        assert_eq!(expired.completion, Some(Completion::AdmissionTimeout));
+        assert_eq!(expired.next_ms, started.next_ms);
+        for ms in [900_000, 3_600_000, 21_600_000] {
+            f.fake.edit(|w| w.ms = ms);
+            f.step();
+        }
+        let world = f.fake.0.lock().unwrap();
+        assert_eq!(world.prepares, 0);
+        assert_eq!(world.sessions, 0);
+        assert_eq!(world.holds.len(), 1);
     }
 }
 

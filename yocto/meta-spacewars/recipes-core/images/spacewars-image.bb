@@ -61,6 +61,18 @@ disable_text_console_for_kiosk() {
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " disable_text_console_for_kiosk;"
 
+# Standalone listeners prevent safe network-idle detection. NetworkManager can
+# use dnsmasq as a private helper; rpcbind is a dependency of packagegroup-base-nfs
+# from the nfs distro feature, not a NetworkManager helper. Keep those packages
+# while masking unused standalone services and RPC socket activation at boot.
+disable_unused_network_servers() {
+    install -d ${IMAGE_ROOTFS}/etc/systemd/system
+    for unit in dnsmasq.service rpcbind.service rpcbind.socket; do
+        ln -sf /dev/null ${IMAGE_ROOTFS}/etc/systemd/system/$unit
+    done
+}
+ROOTFS_POSTPROCESS_COMMAND:append = " disable_unused_network_servers;"
+
 setup_boot_mount() {
     install -d ${IMAGE_ROOTFS}/boot
     install -d ${IMAGE_ROOTFS}/etc/systemd/system/local-fs.target.wants
