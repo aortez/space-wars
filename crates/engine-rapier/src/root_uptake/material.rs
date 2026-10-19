@@ -17,14 +17,17 @@ impl MaterialUptake<'_> {
         if tissue.health == 0 {
             return ContactReason::Dead;
         }
-        if tissue.role != Role::Root {
-            return ContactReason::NotRoot;
+        if !matches!(tissue.role, Role::Root | Role::Moss) {
+            return ContactReason::NotAbsorbing;
         }
         if tissue.support != Some(self.support) {
             return ContactReason::Support;
         }
         if !self.geometry.is_current(self.terrain) {
             return ContactReason::StaleGeometry;
+        }
+        if tissue.role == Role::Moss {
+            return crate::moss::contact(self.terrain, self.geometry, tissue.cell);
         }
         material_contact(self.terrain, self.geometry, self.dirt, tissue.cell)
     }
@@ -44,8 +47,10 @@ impl Environment for MaterialUptake<'_> {
             };
         }
         let fractions = supply_fractions(self.rates, self.availability, self.tick_ms);
+        let eligible = self.contact(tissue) == ContactReason::Eligible;
         Exposure {
-            dirt_contact: self.contact(tissue) == ContactReason::Eligible,
+            dirt_contact: eligible && tissue.role == Role::Root,
+            surface_contact: eligible && tissue.role == Role::Moss,
             nutrients: fractions[0],
             water: fractions[1],
             light: 0,
@@ -74,6 +79,7 @@ impl Environment for MaterialUptake<'_> {
                 solid && material == self.dirt && material != MaterialId::VOID
             }
             Role::Shoot => !solid,
+            Role::Moss => crate::moss::site(self.terrain, self.geometry, cell),
         }
     }
 }

@@ -1,5 +1,8 @@
 //! Bounded overhead-only environment publication for one support-local tissue set.
-use crate::{root_uptake::RootUptake, world::OpaqueFootprint};
+use crate::{
+    root_uptake::RootUptake,
+    world::{BodyMotion, OpaqueFootprint},
+};
 use engine_core::{
     Color,
     lighting::{self, DirectionalSource, LightId, LightingError, LightingPublisher, Receiver},
@@ -124,25 +127,24 @@ impl<'a, 'w> PlantLight<'a, 'w> {
             if tissue.size == 0 || tissue.support != Some(roots.assembly.plant_support()) {
                 return Err(LightingError::InvalidInput);
             }
-            if tissue.role == Role::Root {
+            let (center, footprint) = disk(roots, &motion, tissue, namespace);
+            footprints.extend(footprint);
+            if tissue.health == 0 {
                 continue;
             }
-            let center = motion.position
-                + roots
-                    .terrain
-                    .cell_center(CellCoord::new(tissue.cell[0], tissue.cell[1]))
-                    .rotate_radians(motion.angle);
-            // A declared opaque disk, not a collider or a physiological size rule.
-            let radius = roots.terrain.cell_size() * 0.25 * f32::from(tissue.size).sqrt();
-            let id = LightId(namespace, tissue.id);
-            footprints.push(OpaqueFootprint { id, center, radius });
-            if tissue.role == Role::Shoot && tissue.health > 0 {
-                receivers.push(Receiver {
-                    position: center + source.toward_source * radius,
-                    surface: Some(id),
-                });
-                shoots.push(tissue);
+            match (tissue.role, footprint) {
+                // A thin moss mat samples at its own surface point and shades nothing.
+                (Role::Moss, _) => receivers.push(Receiver {
+                    position: center,
+                    surface: None,
+                }),
+                (Role::Shoot, Some(disk)) => receivers.push(Receiver {
+                    position: center + source.toward_source * disk.radius,
+                    surface: Some(disk.id),
+                }),
+                _ => continue,
             }
+            shoots.push(tissue);
         }
         footprints.extend_from_slice(occluders.footprints);
         let geometry = roots.world.query_snapshot();
@@ -206,11 +208,57 @@ impl<'a, 'w> PlantLight<'a, 'w> {
         Ok(LitEnvironment(self))
     }
 }
+/// World center of a tissue's cell and its declared opaque disk, if any.
+fn disk(
+    roots: &RootUptake<'_>,
+    motion: &BodyMotion,
+    tissue: &Tissue,
+    namespace: u64,
+) -> (engine_core::Vec2, Option<OpaqueFootprint>) {
+    let center = motion.position
+        + roots
+            .terrain
+            .cell_center(CellCoord::new(tissue.cell[0], tissue.cell[1]))
+            .rotate_radians(motion.angle);
+    // A declared opaque disk, not a collider or a physiological size rule.
+    // Roots are underground and thin moss is flat against its surface.
+    let footprint = matches!(tissue.role, Role::Runner | Role::Shoot).then(|| OpaqueFootprint {
+        id: LightId(namespace, tissue.id),
+        center,
+        radius: roots.terrain.cell_size() * 0.25 * f32::from(tissue.size).sqrt(),
+    });
+    (center, footprint)
+}
+
+/// The world-space disks a publication declares for this support's tissues,
+/// for a host to pass to other supports' publications as `WorldOccluders`.
+/// Recompute after any motion, growth or removal; roots and moss declare none.
+pub fn footprints(
+    roots: &RootUptake<'_>,
+    tissues: &[Tissue],
+    namespace: u64,
+) -> Result<Vec<OpaqueFootprint>, LightingError> {
+    let motion = roots
+        .world
+        .motion(roots.assembly.body())
+        .ok_or(LightingError::InvalidInput)?;
+    tissues
+        .iter()
+        .map(|tissue| {
+            if tissue.size == 0 || tissue.support != Some(roots.assembly.plant_support()) {
+                return Err(LightingError::InvalidInput);
+            }
+            Ok(disk(roots, &motion, tissue, namespace).1)
+        })
+        .filter_map(Result::transpose)
+        .collect()
+}
+
 struct LitEnvironment<'a, 'b, 'w>(&'a PlantLight<'b, 'w>);
 impl Environment for LitEnvironment<'_, '_, '_> {
     fn exposure(&self, tissue: &Tissue) -> Exposure {
         let mut exposure = self.0.roots.exposure(tissue);
-        if tissue.role == Role::Shoot && tissue.health > 0 {
+        if matches!(tissue.role, Role::Shoot | Role::Moss) && tissue.health > 0 {
             // Incident intensity also drives shade classification. Energy uses
             // the runtime's configured per-logical-tick coefficient separately.
             exposure.light = self

@@ -621,3 +621,202 @@ fn assert_selected_target(path: &Path, tissue: &Value) {
         "marker does not identify selected tissue cell: {tissue}"
     );
 }
+
+fn near(p: &[u8], c: [u8; 3]) -> bool {
+    (0..3).all(|i| (i16::from(p[i]) - i16::from(c[i])).abs() < 12)
+}
+/// Count matching pixels inside a world-space box, using the lab camera's
+/// fixed 22-unit view height. Keeps anti-aliased HUD text out of the count.
+fn region_pixels(path: &Path, [x0, x1, y0, y1]: [f64; 4], c: [u8; 3]) -> usize {
+    let mut decoder = png::Decoder::new(File::open(path).unwrap());
+    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = decoder.read_info().unwrap();
+    let mut pixels = vec![0; reader.output_buffer_size()];
+    let frame = reader.next_frame(&mut pixels).unwrap();
+    let channels = match frame.color_type {
+        png::ColorType::Rgba => 4,
+        png::ColorType::Rgb => 3,
+        other => panic!("unexpected {other:?}"),
+    };
+    let scale = frame.height as f64 / 22.0;
+    pixels[..frame.buffer_size()]
+        .chunks_exact(channels)
+        .enumerate()
+        .filter(|(i, p)| {
+            let x = ((i % frame.width as usize) as f64 - frame.width as f64 / 2.0) / scale;
+            let y = (frame.height as f64 / 2.0 - (i / frame.width as usize) as f64) / scale;
+            (x0..=x1).contains(&x) && (y0..=y1).contains(&y) && near(p, c)
+        })
+        .count()
+}
+/// The rock's frame at any quarter turn, clear of the bed and the HUD text.
+const ROCK_REGION: [f64; 4] = [8.2, 17.0, -6.0, 3.0];
+const SLATE: [u8; 3] = [92, 97, 107];
+fn moss(v: &Value) -> Vec<&Value> {
+    tissues(v).iter().filter(|t| t["role"] == "Moss").collect()
+}
+fn rock_tissues(v: &Value) -> &Vec<Value> {
+    v["moss"]["rock"]["tissues"].as_array().unwrap()
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn garden_lab_moss_surfaces_light_motion_and_support_loss_in_both_renderers() {
+    run_functional_test_with_seed("garden-moss", "winit-femtovg", 42, |h| {
+        let ready = h.wait_until_ready();
+        let mut s = h.activate_until_scenario("garden-lab", ready);
+        for renderer in ["vector", "raster"] {
+            s = h.activate_guarded("launcher.settings", &s);
+            if control_value(&s, "launcher.settings.renderer.next") != Some(renderer) {
+                s = h.activate_guarded("launcher.settings.renderer.next", &s);
+            }
+            assert_eq!(
+                control_value(&s, "launcher.settings.renderer.next"),
+                Some(renderer)
+            );
+            s = h.activate_guarded("launcher.settings.back", &s);
+            h.activate_guarded("launcher.start", &s);
+            s = h.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::Gameplay),
+                    scenario: Some("garden-lab".into()),
+                    ..Default::default()
+                },
+                TRANSITION_TIMEOUT,
+            );
+            let mut c = 0;
+            fresh(h, &mut s, &mut c);
+            choose(h, &mut s, &mut c, 18);
+            let placed = snapshot(h, |v| {
+                v["moss"]["placed"] == true && v["moss"]["rock"]["tissues"].is_array()
+            });
+            assert_eq!(moss(&placed).len(), 1);
+            assert_eq!(moss(&placed)[0]["cell"], json!([1, 4]));
+            assert_eq!(rock_tissues(&placed).len(), 1);
+
+            // The dim room starves grass but pays for moss on dirt and rock.
+            choose(h, &mut s, &mut c, 4);
+            snapshot(h, |v| v["intensity"] == 50);
+            let dim = until(h, &mut s, &mut c, 90);
+            let bed = moss(&dim);
+            assert!(bed.len() >= 3, "dirt moss did not spread: {dim}");
+            for t in &bed {
+                assert_eq!(t["health"], 100);
+                assert_eq!(t["light"], 50);
+                assert_eq!(t["surface"]["eligible"], true);
+                assert_eq!(t["contact"], "Eligible");
+            }
+            assert!(
+                tissues(&dim)
+                    .iter()
+                    .any(|t| t["role"] == "Shoot" && t["shade"].as_u64().unwrap() > 0)
+            );
+            let living = |v: &Value| {
+                rock_tissues(v)
+                    .iter()
+                    .filter(|t| t["health"].as_u64().unwrap() > 0)
+                    .count()
+            };
+            assert!(living(&dim) >= 5, "rock moss did not spread: {dim}");
+            let image = capture(h, renderer, "moss-dim", &dim);
+            assert!(color_pixels(&image, |p| near(p, [115, 184, 46])) > 20);
+            assert!(region_pixels(&image, ROCK_REGION, SLATE) > 20);
+
+            // Upside down, the old top face sits under its own rock.
+            choose(h, &mut s, &mut c, 19);
+            choose(h, &mut s, &mut c, 19);
+            let turned = snapshot(h, |v| v["moss"]["rock"]["quarter_turns"] == 2);
+            let top: Vec<_> = rock_tissues(&turned)
+                .iter()
+                .filter(|t| t["cell"][1] == 4 && t["health"] == 100)
+                .map(|t| t["id"].clone())
+                .collect();
+            assert!(!top.is_empty());
+            let inverted = until(h, &mut s, &mut c, tick(&turned) + 1);
+            for t in rock_tissues(&inverted) {
+                if top.contains(&t["id"]) {
+                    assert_eq!(t["light"], 0, "inverted moss still lit: {t}");
+                    assert_eq!(t["contact"], "Eligible");
+                    assert!(t["world"][1].as_f64().unwrap() < -1.5);
+                }
+            }
+            capture(h, renderer, "moss-inverted", &inverted);
+
+            // Sustained darkness kills the inverted face beside lit moss, while
+            // the same dim room has killed the grass and still feeds dirt moss.
+            let config = engine_core::plants::grass::physiology();
+            let deadline =
+                u64::from(config.grace_ticks) + 100 / u64::from(config.damage_per_tick) + 2;
+            let dieback = until(h, &mut s, &mut c, tick(&inverted) + deadline);
+            for t in rock_tissues(&dieback) {
+                if top.contains(&t["id"]) {
+                    assert_eq!(t["health"], 0, "inverted moss survived: {t}");
+                }
+            }
+            assert!(
+                rock_tissues(&dieback)
+                    .iter()
+                    .any(|t| !top.contains(&t["id"]) && t["health"] == 100)
+            );
+            assert!(
+                tissues(&dieback)
+                    .iter()
+                    .filter(|t| t["role"] != "Moss")
+                    .all(|t| t["health"] == 0)
+            );
+            assert!(moss(&dieback).iter().all(|t| t["health"] == 100));
+            let image = capture(h, renderer, "moss-dieback", &dieback);
+            assert!(region_pixels(&image, ROCK_REGION, [128, 102, 102]) > 20);
+
+            // Breakage detaches unsupported moss; removal detaches the rest.
+            choose(h, &mut s, &mut c, 20);
+            let broken = snapshot(h, |v| v["moss"]["rock"]["broken"] == true);
+            assert!(rock_tissues(&broken).iter().all(|t| t["cell"][0] != 6));
+            capture(h, renderer, "moss-broken", &broken);
+            choose(h, &mut s, &mut c, 21);
+            let removed = snapshot(h, |v| v["moss"]["rock"]["removed"] == true);
+            assert!(rock_tissues(&removed).is_empty());
+            let image = capture(h, renderer, "moss-rock-removed", &removed);
+            assert_eq!(region_pixels(&image, ROCK_REGION, SLATE), 0);
+
+            // Scraping discards the strip's own shares; only new, paid tissue
+            // refills it.
+            choose(h, &mut s, &mut c, 22);
+            let scraped = snapshot(h, |v| moss(v).iter().all(|t| t["cell"][0] != 2));
+            let strip: Vec<_> = moss(&removed)
+                .into_iter()
+                .filter(|t| t["cell"][0] == 2)
+                .collect();
+            assert!(!strip.is_empty());
+            for resource in 0..3 {
+                let lost: u64 = strip
+                    .iter()
+                    .map(|t| t["stores"][resource].as_u64().unwrap())
+                    .sum();
+                assert_eq!(
+                    scraped["loss"][resource].as_u64().unwrap(),
+                    removed["loss"][resource].as_u64().unwrap() + lost
+                );
+            }
+            let old: Vec<_> = moss(&removed).iter().map(|t| t["id"].clone()).collect();
+            let regrown = until(h, &mut s, &mut c, tick(&scraped) + 8);
+            let refill = moss(&regrown)
+                .into_iter()
+                .find(|t| t["cell"][0] == 2)
+                .expect("scraped strip was not regrown");
+            assert!(!old.contains(&refill["id"]));
+            capture(h, renderer, "moss-regrowth", &regrown);
+
+            h.pause_guarded(&s);
+            s = h.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::PauseMain),
+                    ..Default::default()
+                },
+                TRANSITION_TIMEOUT,
+            );
+            h.activate_guarded("pause.return-to-launcher", &s);
+            s = h.wait_until_ready();
+        }
+    });
+}

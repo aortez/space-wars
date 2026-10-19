@@ -16,3 +16,5 @@ pub mod root_uptake;
 pub mod plant_light;
 
 pub mod grass;
+
+pub mod moss;

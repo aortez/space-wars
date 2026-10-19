@@ -110,6 +110,10 @@
       "reason": "Exhaustive growth, shade, cutting and physiology transitions (about 13 minutes); pause/step/reset/rendering smoke stays on PRs."
     },
     {
+      "test": "garden_lab::garden_lab_moss_surfaces_light_motion_and_support_loss_in_both_renderers",
+      "reason": "Moss placement, dim-room comparison, rock turning, breakage, removal and paid regrowth in both renderers; Garden Lab pause/step/reset/rendering smoke stays on PRs."
+    },
+    {
       "test": "pizza::pizza_event_completes_without_queuing_busy_requests",
       "reason": "Waits for the full 15-second gravity event on GPU; PR smoke covers admission, busy refusal, pause/resume, persistence and lifecycle."
     },

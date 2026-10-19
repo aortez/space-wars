@@ -1,4 +1,5 @@
-//! Terrain eligibility for the shared grass brain; no duplicate physiology.
+//! Terrain eligibility for the shared grass brain, plus the shared moss surface
+//! rule so mixed patches on one support validate together. No duplicate physiology.
 use crate::root_uptake::RootUptake;
 use engine_core::{
     Vec2,
@@ -36,6 +37,7 @@ impl<E: Environment> Environment for GrassEnvironment<'_, E> {
                 solid && material == self.roots.dirt && material != MaterialId::VOID
             }
             Role::Shoot => !solid,
+            Role::Moss => crate::moss::site(self.roots.terrain, self.roots.geometry, cell),
         }
     }
 }

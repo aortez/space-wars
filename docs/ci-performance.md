@@ -82,8 +82,8 @@ The PR selection covers:
   settings persistence and recovery, automatic Clock launch/disable, and planetary
   tank driving/pause/rendering, alongside the existing shorter Clock event cases.
 
-The **31 full-only cases** retain all their original assertions. They cover the
-long Garden Lab physiology sequence, repeated marquee recipes, complete tank
+The **32 full-only cases** retain all their original assertions. They cover the
+long Garden Lab physiology sequence and its moss surface workflow, repeated marquee recipes, complete tank
 fixture/player-choice matrices, autostart repetition/relaunch, complete rain/duck/
 Demo/match lifecycles, and additional variants of shared scenario lifecycle tests.
 The two full-only Clock ceiling workflows retain the 300-second sunlight hold,
@@ -135,7 +135,7 @@ or disappear from the full suite.
 **08:23 UTC**. It calls `ci.yml` with one immutable source SHA and `full=true`,
 running every normal PR check plus:
 
-- all **78 UI workflows**, partitioned across four isolated runners, with tests
+- all **79 UI workflows**, partitioned across four isolated runners, with tests
   serial within each runner/display;
 - Clock's **240-visit mixed-event sweep**;
 - all three extended duck sweeps: jumping profiles, authored patterns and platform seeds;
