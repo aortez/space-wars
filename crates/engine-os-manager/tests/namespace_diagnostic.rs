@@ -31,5 +31,7 @@ fn missing_and_rejected_service_handoffs_are_visible_without_rust_log() {
         };
         assert_eq!(stderr.matches(expected).count(), 1, "{stderr}");
         assert!(stderr.contains("idle shutdown disabled"), "{stderr}");
+        // A pipe, like the journal, must receive plain text.
+        assert!(!stderr.contains('\u{1b}'), "{stderr:?}");
     }
 }

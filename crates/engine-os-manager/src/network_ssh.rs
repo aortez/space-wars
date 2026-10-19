@@ -124,11 +124,15 @@ mod tests {
     use std::net::{TcpListener, UdpSocket};
     use std::os::unix::net::UnixStream;
 
+    fn session_protected() -> serde_json::Value {
+        serde_json::json!({"schema":1,"error":null,"availability":"session-protected"})
+    }
+
     #[test]
     fn coordinator_admission_does_not_require_fallback_boot_evidence() {
         admit_before(
             Instant::now(),
-            || Ok(serde_json::json!({"schema":1,"error":null,"availability":"session-protected"})),
+            || Ok(session_protected()),
             || panic!("a protected session must not read the fallback boot ID"),
         )
         .unwrap();
@@ -138,14 +142,22 @@ mod tests {
     fn unavailable_fallback_does_not_prevent_later_coordinator_admission() {
         let mut attempts = 0;
         let mut fallbacks = 0;
-        admit_before(Instant::now() + Duration::from_secs(2), || {
-            attempts += 1;
-            if attempts == 1 { Err(unavailable()) }
-            else { Ok(serde_json::json!({"schema":1,"error":null,"availability":"session-protected"})) }
-        }, || {
-            fallbacks += 1;
-            Err(std::io::Error::from(std::io::ErrorKind::NotFound).into())
-        }).unwrap();
+        admit_before(
+            Instant::now() + Duration::from_secs(2),
+            || {
+                attempts += 1;
+                if attempts == 1 {
+                    Err(unavailable())
+                } else {
+                    Ok(session_protected())
+                }
+            },
+            || {
+                fallbacks += 1;
+                Err(std::io::Error::from(std::io::ErrorKind::NotFound).into())
+            },
+        )
+        .unwrap();
         assert_eq!((attempts, fallbacks), (2, 1));
         assert!(
             admit_before(Instant::now(), || Err(unavailable()), || Err(unavailable())).is_err()
@@ -174,8 +186,7 @@ mod tests {
 
     #[test]
     fn only_explicit_ssh_admission_is_accepted() {
-        let valid = serde_json::json!({"schema":1,"error":null,"availability":"session-protected"});
-        assert!(protected(&valid));
+        assert!(protected(&session_protected()));
         for reply in [
             serde_json::json!({"schema":1,"error":null,"availability":"wireless-ready"}),
             serde_json::json!({"schema":1,"error":"unavailable","availability":"session-protected"}),

@@ -91,6 +91,14 @@ databases are reported separately. Local validation passed 209 Rust tests (five
 owner-only skips), four Python tests, formatting, Clippy and ShellCheck; exact-source
 hosted CI passed.
 
+A follow-up review of #510 found two logging problems. Log lines carried
+terminal color codes, which `journalctl` shows as blob data, and SSH admission
+errors went to the client connection. Logs are now plain text unless stderr is a
+terminal, and the `sshd@` drop-in sends helper errors to the journal. CI
+ShellCheck now covers the NM launcher. These changes are not yet device-qualified.
+Qualify them with #511: SSH logins must still work, and a rejected admission's
+reason must appear in `journalctl -u 'sshd@*'`.
+
 The owner staging helper first rejected its native NTP receipt precondition,
 before opening trust/staging or starting a download. The general service still
 reported usable time; the exact rejected receipt predicate is unestablished.
@@ -127,8 +135,9 @@ New image changes and previously untested failure cases still need qualification
 
 1. Network reliability: #510 has generation-6 Pi 5 evidence and revised
    generation-7 qualification on the selected second Picade. #511 is the next
-   bounded-readback correction before install-flow work. Per-device corrected-image
-   rollout remains tracked in #267.
+   bounded-readback correction before install-flow work; qualify #510's logging
+   follow-up on the same image. Per-device corrected-image rollout remains
+   tracked in #267.
 2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
    consent, app save/acknowledgement, fixed privileged install operation, progress,
    trial and confirmed outcome. Define their shared handoff together; the
