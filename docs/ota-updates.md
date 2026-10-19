@@ -30,9 +30,10 @@ reboot and arbitrary-command operations are not exposed. The freshly flashed
 kiosks run the device service; public OTA trust and signed staging have been
 verified on all three units, while automatic installation remains disabled. The
 failed Pi 5 USB drive was replaced with verified data restoration. The
-[replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json)
-and [primary Picade](data/ota-picade-bootstrap-success-20261017.json) have completed
-supervised bootstrap through the initial recovery baseline. Both passed trial,
+[replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json),
+[primary Picade](data/ota-picade-bootstrap-success-20261017.json) and
+[second Picade](data/ota-second-picade-rollout-20261018.json) have completed
+supervised bootstrap through the initial recovery baseline. All three passed trial,
 staged normal and canonical normal boots, independent archive verification and
 production recovery-service checks. See the [bootstrap status](ota-bootstrap.md)
 for preservation, hardware evidence and the remaining rollout gates.
@@ -2665,8 +2666,10 @@ identities and outputs are recorded in the
 The production service integration is described below. Initial owner-helper
 checks verified an empty signed feed after provisioning both primary Pis.
 Those checks did not qualify signed-image installation or an enabled automatic
-updater. Later signed trials and installed-worker results are separate evidence;
-the active plan records the remaining device and policy integration.
+updater. Later signed trials and
+[installed-worker results](#installed-download-worker-qualification-2026-10-17)
+are separate evidence; the active plan records the remaining device and policy
+integration.
 
 ### Durable update-check schedule
 
@@ -2788,6 +2791,38 @@ these probes from live startup qualification. Historical startup errors omitted
 their cause; the controlled reproduction does not recover that missing evidence.
 The subsequent signed canary and its remaining failures are recorded below;
 these fixture results alone do not qualify unattended checks.
+
+### Installed download worker qualification (2026-10-17)
+
+Explicit connected-network checks through the installed device service used its
+normal API, rather than the owner's staging helper. On the Pi 5, selecting
+Nightly through `update-channel` downloaded and verified the 131,865,641-byte
+signed generation-two image. The worker reached `ready` after 41.3 seconds; the
+complete observation and channel restoration took 43.8 seconds. The primary
+Picade's Release check completed with `no-candidate` in 5.1 seconds, as expected
+for the empty Release feed.
+
+Both checks preserved the running image, boot and selected durable stores, and
+the same kiosk processes kept presenting frames. The Pi 5 was returned to Release
+through the ordinary channel API. No image was installed and no reboot was
+requested. The [retained report](data/ota-installed-worker-20261017.json) pins the
+installed images, runner and observations. Frame-time performance, partial-offline
+operation and restart/resume were not tested.
+
+Earlier boot-time automatic checks had reported `preparation-unavailable` on both
+devices; these explicit checks did not establish why. On the Picade, that
+automatic attempt began at 9.794 seconds while the recovery unit was active from
+9.621 to 11.771 seconds, consistent with contention on their shared installation
+lock. The preparation path then discarded the specific error. The bounded lock
+wait and error journaling described in
+[Dedicated download worker and network handoff](#dedicated-download-worker-and-network-handoff)
+followed.
+
+After its signed generation-two update and normal reboot, the second Picade's
+installed worker also passed an explicit Release check (`no-candidate` in 6.1
+seconds), with the same image, boot, kiosk instance and durable stores. Its
+initial automatic check had also reported `preparation-unavailable`. The
+[second Picade report](data/ota-second-picade-rollout-20261018.json) retains both.
 
 ### Signed startup canary and observation ordering (2026-10-18)
 

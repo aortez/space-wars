@@ -1,7 +1,7 @@
 # Preparing the existing Pis for OTA
 
 **Status reviewed 2026-10-18:** bootstrap is complete on the replacement Pi 5 and
-primary Picade. This document retains the migration runbook and historical
+both Picades. This document retains the migration runbook and historical
 recovery evidence. The [active OTA plan](ota-updates.md#current-implementation)
 owns current device status and next steps; a fresh flash or repeated bootstrap
 is not the next action for those units.
@@ -30,8 +30,8 @@ inactive-root installer, independent-export verifiers, restartable boot staging,
 consumed one-shot activation, a first-boot recovery coordinator, and restartable
 canonical asset preparation/activation with separate staged and canonical
 normal-boot health checks, and an explicit archive/cleanup/recovery handoff.
-**Verified on the replacement Pi 5 and primary Picade:** the corrected image
-passed the trial, staged normal and canonical normal boots on both devices.
+**Verified on the replacement Pi 5 and both Picades:** the corrected image
+passed the trial, staged normal and canonical normal boots on all three devices.
 Finalization archived the temporary assets and established an initial
 generation-zero recovery baseline on each, accepted by the production recovery
 service.
@@ -39,11 +39,16 @@ service.
 on both primary Pis ([original evidence](data/ota-owner-feed-20261017.json)).
 Both subsequently passed real signed installation and application-health
 rollback/quarantine ([signed trials](ota-recovery-qualification.md#physical-signed-trials-2026-10-17)).
-The latest owner-supervised publication is Nightly generation 6 / metadata
-version 7; Release remains empty. The Pi 5 and owner-selected second Picade now
-run that corrected image; the primary Picade remains on generation 2 / source
-`5b420c9`. The [second-Picade evidence](data/ota-picade2-profile-image-20261018.json)
-records its own signed trial, normal boot and installed radio/time/OTA checks.
+The second Picade's [rollout record](data/ota-second-picade-rollout-20261018.json)
+covers its trust provisioning, a healthy signed generation-two install and a
+normal reboot, without the primary boards' injected failure cases.
+The latest owner-supervised publication is Nightly generation 7 / metadata
+version 8; Release remains empty. The Pi 5 runs generation 6 and the
+owner-selected second Picade generation 7; the primary Picade remains on
+generation 2 / source `5b420c9`. The [generation-6](data/ota-picade2-profile-image-20261018.json)
+and [generation-7](data/ota-picade2-review-fixes-20261018.json) second-Picade
+records cover its later signed trials, normal boots and installed radio/time/OTA
+checks.
 **Remaining:** primary-Picade corrected-image rollout, the rest of the Pi 4/5
 failure/performance matrix, normal install-service/policy integration and
 automated publishing. A successful second-Picade update does not establish its
@@ -446,6 +451,29 @@ Reduce that repeated work in a separate change while retaining complete final
 verification and interruption/change detection. This is not a measurement of
 ordinary rootfs OTA performance.
 
+The second Picade's raw recovery set is 157,286,400 bytes of boot plus
+3,221,225,472 bytes of inactive root (3.38 GB total). The helper writes this set
+to the same USB device, checks both copy and source, and verifies the completed
+copy before it is independently exported and checked on the workstation. The
+export was 2,939,591,478 compressed bytes; compression did not make this old
+partition image small. Workstation evidence-file timestamps put the raw-copy
+operation, including its device checks, at about 25 minutes 33 seconds and the
+archive transfer at about 9 minutes 32 seconds; the independent workstation
+verification was additional. These copies belong to the one-time migration, not
+each ordinary OTA download (the supervised generation-two payload is 131,865,641
+bytes).
+
+Preflight the data/configuration selection before this expensive raw copy.
+On the second Picade, six inactive Unix sockets left by earlier graphics tests
+caused data preservation to reject the selection after raw backup had finished.
+Their paths were absent from the live Unix socket inventory. The operator
+preserved the socket inodes, owners and modes under a private diagnostic
+directory in `/data/logs`, retained the failed-attempt evidence, and resumed data
+preservation without repeating the raw backup. Do not silently skip unknown
+special files or treat an active socket as disposable. The native archive helper
+still rejects unsupported special files; early reporting and a single resumable
+rollout runner remain follow-up improvements.
+
 ## Read the existing device
 
 Build `bootstrap_probe` for AArch64, copy it to an ordinary account's temporary
@@ -494,10 +522,11 @@ selected device's current inventory when planning a new migration:
 ```sh
 cargo run --locked -p engine-ota --example bootstrap_package -- \
   /path/to/rootfs.ext4 /path/to/extracted-boot /path/to/new-pi5-package \
-  pi5 hyperpixel 076c4a2a-02 076c4a2a-03 a
+  pi5 hyperpixel 076c4a2a-02 076c4a2a-03 b
 ```
 
-For the Picade, use `pi4 picade` and the inactive slot/UUIDs from a fresh probe.
+The final argument is the inactive target slot: `b` when this example's current
+root is `a`. For the Picade, use `pi4 picade` and the slots/UUIDs from a fresh probe.
 These command arguments are planning inputs; the eventual root apply command
 must derive them again from live evidence under the installation lock.
 
@@ -1420,10 +1449,9 @@ boards. [Raspberry Pi tryboot documentation](https://www.raspberrypi.com/documen
 ## Supervised migration sequence
 
 The following sequence summarizes the implemented commands and their evidence
-requirements. The replacement Pi 5 and primary Picade completed it through the
-initial baseline; second Picade rollout and the final failure/rollout
-qualification remain pending. It is not a substitute for the command-specific
-preconditions above:
+requirements. The replacement Pi 5 and both Picades completed it through the
+initial baseline; the final failure/rollout qualification remains pending. It is
+not a substitute for the command-specific preconditions above:
 
 1. Establish the selected root access, take the shared install lock, repeat
    the device and private-state preflight, and preserve verified recovery
@@ -1448,8 +1476,8 @@ preconditions above:
    The shared kiosk health worker now checks persistent network/Bluetooth binds
    and SSH-store structure as well as settings writes. The separate bootstrap
    coordinator uses that worker and its own persisted health authorization for
-   watchdog completion. Pi 5 and primary Picade staging and trial health have
-   passed; remaining physical failure qualification is still pending.
+   watchdog completion. Staging and trial health have passed on the Pi 5 and
+   both Picades; remaining physical failure qualification is still pending.
 5. After a successful supervised trial, select a normal boot using the staged
    assets and reboot normally. Keep the backed-up legacy configuration/assets
    available until the canonical migration is proven.
