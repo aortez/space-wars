@@ -1,0 +1,519 @@
+{
+  "schema": 1,
+  "device": "sw-picade-2.local",
+  "date_utc": "2026-10-18",
+  "scope": "Second Picade supervised bootstrap, signed generation-two install and normal boot; no injected failure or physical power-loss test.",
+  "bootstrap_image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 23470072,
+        "sha256": "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc"
+      },
+      "os_manager": {
+        "bytes": 11252736,
+        "sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+    "schema": 1,
+    "source": {
+      "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+      "dirty": false,
+      "revision": "e9867188d211",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "package_sha256": "74af5720248d8883bf89b67c4426317fb6184790e27b4c304c7c8fd50dcc8b13",
+  "raw_backup": {
+    "schema": 1,
+    "scope": "verified raw boot and inactive-root recovery copies; data/config backup, independent export, legacy closure and installation remain pending",
+    "copies_sha256": "96812b459e27328782b1382b2d5f36051c796362351e433cc3c5bc18a4c63e77",
+    "boot": {
+      "schema": 1,
+      "binding_sha256": "e3e5f675b3e5a6454dc21b9ee180729e77c860be9ad15c0ee27a96f8c3a4bb64",
+      "partition": "boot",
+      "image": {
+        "bytes": 157286400,
+        "sha256": "d5be6651c73c25c8485e9d3f2b93c9f165d01f460b762109b78352a6b26b5b49"
+      }
+    },
+    "inactive_root": {
+      "schema": 1,
+      "binding_sha256": "e3e5f675b3e5a6454dc21b9ee180729e77c860be9ad15c0ee27a96f8c3a4bb64",
+      "partition": "inactive-root",
+      "image": {
+        "bytes": 3221225472,
+        "sha256": "db8679dd4e21ef4d9bbe525759b3139dc80c88aec98bb59e2c370f22619b5062"
+      }
+    },
+    "reused_copies": 0,
+    "ready_for_write": false
+  },
+  "data_backup": {
+    "schema": 1,
+    "scope": "verified original data/configuration recovery archive; independent export, legacy closure, installation and physical restore qualification remain pending",
+    "receipt": {
+      "schema": 1,
+      "selection_version": 2,
+      "binding_sha256": "e3e5f675b3e5a6454dc21b9ee180729e77c860be9ad15c0ee27a96f8c3a4bb64",
+      "source_sha256": "6d9b5a4443451063db199d4a50f1d64ec584895be16b45aceb75c8d6a24bbf1a",
+      "entries": 5837,
+      "payload_bytes": 386762014,
+      "archive": {
+        "bytes": 399271936,
+        "sha256": "88e0d59f0518460adc41361946c5d0e25f7b8a6d2709e711d499b32e112cce47"
+      }
+    },
+    "receipt_sha256": "8b0829671b10999062ee1ccaa4cf1034e2380311c7f21399252c4d0220353b39",
+    "reused": false,
+    "source_matches": true,
+    "ready_for_write": false
+  },
+  "extraction": {
+    "archive_sha256": "88e0d59f0518460adc41361946c5d0e25f7b8a6d2709e711d499b32e112cce47",
+    "entries": 5837,
+    "files": 5217,
+    "links": 331,
+    "directories": 289,
+    "content_modes_links_nanosecond_timestamps_verified": true,
+    "numeric_owners_retained_in_archive": true,
+    "numeric_owners_recreated": false,
+    "scope": "unprivileged workstation extraction; ownership restore and physical recovery not qualified"
+  },
+  "operator_access": {
+    "independent_administrator_uid": 1001,
+    "administrator_sudo_uid": 0,
+    "independent_runtime_uid": 1000,
+    "runtime_unrestricted_sudo_denied": true,
+    "runtime_recovery_command_denied": true,
+    "runtime_logind_can_reboot_denied": true,
+    "runtime_not_in_disk_group": true,
+    "loaded_configuration_check_passed": true
+  },
+  "bootstrap_health": {
+    "trial": {
+      "boot_id": "22ac0bd1-708c-453b-ab07-6290a35b6144",
+      "continuous_health_ms": 60186
+    },
+    "staged_normal": {
+      "boot_id": "7d86214a-e34d-4ee8-bb74-b25f495f67b1",
+      "continuous_health_ms": 60169
+    },
+    "canonical_normal": {
+      "boot_id": "74ec37df-0dcd-4e0d-bddc-a48f27747fa1",
+      "continuous_health_ms": 60661
+    }
+  },
+  "handoff": {
+    "boot_id": "74ec37df-0dcd-4e0d-bddc-a48f27747fa1",
+    "slot": "b",
+    "completed_trial_sha256": "5ba4f82d77080647e922f2f2ac0091e188455c80e633f4519171fb185b905dee",
+    "baseline_sha256": "88d5cead5641797e75c86111a627615d02ee7b819ad9f84095ed7edc6f045746",
+    "baseline_generation": 0,
+    "retained_good": null,
+    "active_bootstrap_absent": true,
+    "retired_files": 78,
+    "retired_unique_blobs": 78,
+    "retired_archive_independently_exported_and_verified": true,
+    "boot_probe_sha256": "24819e6da2c1aed9665419ff88d37727a90b63a615f17d62a48ffef2541707b7",
+    "production_recovery_service_status": {
+      "schema": 1,
+      "boot_id": "74ec37df-0dcd-4e0d-bddc-a48f27747fa1",
+      "uptime_ms": 1047855,
+      "progress": {
+        "stage": "healthy",
+        "phase": null,
+        "transaction": null,
+        "good_build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "candidate_build_id": null,
+        "detail": null
+      }
+    },
+    "production_recovery_service_accepted_baseline": true,
+    "baseline_and_completed_journal_unchanged": true,
+    "reboot_requested": false,
+    "trust_and_staging_unprovisioned": true,
+    "automatic_ota_enabled": false
+  },
+  "bootstrap_store_comparison": {
+    "all_bytes_unchanged": false,
+    "durable_stores_unchanged": true,
+    "regenerated_local_gatt_databases": [
+      {
+        "path": "/data/bluetooth/DC:A6:32:82:36:12/attributes",
+        "before": "4488bf67552ec69d955e2276e082962dc2cb07ff03d6fa221df2e6b84912eaa0",
+        "after": "764bd7a3118028d92e2694cdd12baee0c9cfda9902d3e9f50dd7a25320aed970"
+      }
+    ]
+  },
+  "bootstrap_timings_seconds": {
+    "root_install_and_staging": 1071.088,
+    "canonical_prepare": 1028.298,
+    "canonical_finish": 914.698
+  },
+  "trust_provision": {
+    "bundle": "58320795ed9e9c57a6fdd2abb9896060241cc7d33e0fb9e97d4080d877181ca6",
+    "initial_root": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "release_outcome": "no-candidate",
+    "nightly_outcome": "ready",
+    "reprovision_preserved_trust_floors": true
+  },
+  "signed_trial": {
+    "host": "sw-picade-2.local",
+    "case": "fresh",
+    "passed": true,
+    "elapsed_seconds": 437.733,
+    "original_boot": "74ec37df-0dcd-4e0d-bddc-a48f27747fa1",
+    "trial_boot": "fcda60a6-07c5-4627-9374-f77ca7a51a5d",
+    "final_boot": "fcda60a6-07c5-4627-9374-f77ca7a51a5d",
+    "final_phase": "committed",
+    "transaction": {
+      "id": "b1cd86d4718719fe001966b839e30a3ff88a2bd97009784409f015cb4c2ecaef",
+      "candidate_id": "86fab715203f2609727776b61f206f1150c941a8b09fbd8ba30bcd7056f4f510",
+      "previous_good": {
+        "slot": "b",
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "generation": 0,
+        "payload": "8aced72e48517b4fbe93a836a70700db8f6bfaf42250133130354f71042aec55",
+        "expanded": "8a6e9c365a6b0e4af3c21dd6366f2bc92d7d15f397ffc237686d4fc4be3610e3",
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        }
+      },
+      "candidate": {
+        "slot": "a",
+        "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "generation": 2,
+        "payload": "3928c3ad6457286f37498d11dd9a995b34055c7de147bc0f94d4d7ee2dfbdf41",
+        "expanded": "f18d3697c9cf34382f29cf06627daacd32b1655b3119f824436e7d37b4b328b6",
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        }
+      },
+      "attempt": 1,
+      "origin_boot_id": "74ec37df-0dcd-4e0d-bddc-a48f27747fa1",
+      "trial_boot_id": "fcda60a6-07c5-4627-9374-f77ca7a51a5d",
+      "phase": "committed",
+      "health": {
+        "transaction": "b1cd86d4718719fe001966b839e30a3ff88a2bd97009784409f015cb4c2ecaef",
+        "boot_id": "fcda60a6-07c5-4627-9374-f77ca7a51a5d",
+        "started_ms": 11078,
+        "finished_ms": 73445,
+        "instance": {
+          "pid": 881,
+          "start_ticks": 757,
+          "invocation_id": "17998412a9c04ab79179205cba7ffa64"
+        }
+      },
+      "failure": null
+    },
+    "highest_attempted_generation": 2,
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": [
+        {
+          "path": "/data/bluetooth/DC:A6:32:82:36:12/attributes",
+          "before": "764bd7a3118028d92e2694cdd12baee0c9cfda9902d3e9f50dd7a25320aed970",
+          "after": "f6b2740be3930361510636e9b372364aac50498f8a6dbacee0ca9ff8f048e8ac"
+        }
+      ]
+    },
+    "kiosk_progress_verified": true,
+    "automatic_installation_enabled": false
+  },
+  "signed_normal_boot": {
+    "host": "sw-picade-2.local",
+    "passed": true,
+    "normal_boot": "17580888-c48c-44c6-97db-29431d4b3298",
+    "image": {
+      "schema": 1,
+      "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+      "rootfs_tree": "5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+      "source": {
+        "schema": 1,
+        "commit": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+        "dirty": false,
+        "revision": "5b420c95b87b"
+      },
+      "machine": "raspberrypi-spacewars",
+      "architecture": "aarch64",
+      "layout": "spacewars-ab-v1",
+      "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+      "updater_protocol": 1,
+      "recovery_protocol": 2,
+      "data": {
+        "reads": {
+          "min": 1,
+          "max": 1
+        },
+        "writes": 1
+      },
+      "binaries": {
+        "client": {
+          "bytes": 23470072,
+          "sha256": "fcbf0e501fa9358e87b90d6cef5a7622faa69abeabda3146f6067ed385b5e3a8"
+        },
+        "os_manager": {
+          "bytes": 11255296,
+          "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+        }
+      }
+    },
+    "good": {
+      "slot": "a",
+      "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+      "generation": 2,
+      "payload": "3928c3ad6457286f37498d11dd9a995b34055c7de147bc0f94d4d7ee2dfbdf41",
+      "expanded": "f18d3697c9cf34382f29cf06627daacd32b1655b3119f824436e7d37b4b328b6",
+      "data": {
+        "reads": {
+          "min": 1,
+          "max": 1
+        },
+        "writes": 1
+      }
+    },
+    "elapsed_seconds": 55.225,
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": [
+        {
+          "path": "/data/bluetooth/DC:A6:32:82:36:12/attributes",
+          "before": "f6b2740be3930361510636e9b372364aac50498f8a6dbacee0ca9ff8f048e8ac",
+          "after": "8756fde64ad05c6f4958d69c279f090a36a69ac81e981787592ca7670c6d5ba7"
+        }
+      ]
+    },
+    "installed_time_service_usable": true,
+    "kiosk_progress_verified": true,
+    "automatic_installation_enabled": false
+  },
+  "evidence": [
+    {
+      "path": "target/ota-second-picade-rollout-20261017/raw-backup.json",
+      "bytes": 886,
+      "sha256": "ac65bf050557fd99d8564a78fefd2f01213a36c225181311cd4d45f9e3a40fb3"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/exported-raw-verified.json",
+      "bytes": 647,
+      "sha256": "0485822f92fce1fcd5360d8ac9fde678049b9db0b9a4903ec9ce14111237f5d0"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/data-backup.json",
+      "bytes": 776,
+      "sha256": "8df68fef291884d13ec39b626f541a8c7e8b580db7afe9e7f22b59a2cac34f53"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/exported-data-verified.json",
+      "bytes": 514,
+      "sha256": "7de98c7d1548e619a78d03b7fb6e965b4c55b9d9119908439bd3fb33cf574bff"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/data-extraction/extraction-verification.json",
+      "bytes": 415,
+      "sha256": "0dd3bdd07671ad2b31d6d8c5d541cb13059a04606cce7e2121b4f3ab68b1adc0"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/legacy-replacement.json",
+      "bytes": 387,
+      "sha256": "3e44ef07d0fbd1916cc41eb205f20168bbcf009386452f6c61bf42e5a1199238"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/operator-access-verification.json",
+      "bytes": 323,
+      "sha256": "18b824650ad74da379063359d0543657e613addea26774a385482a5d158e5913"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/root-install.json",
+      "bytes": 537,
+      "sha256": "81a43858f6a87934f56d6868d6283ded782b06dd0a5dbe0d30dce2fc6406bd9d"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/boot-stage.json",
+      "bytes": 554,
+      "sha256": "c163232a95da3604fe074b9ffb3f9d602e63b243b8467f99446dc6ec6a9c6861"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/installation-timing.json",
+      "bytes": 102,
+      "sha256": "33e3766ed7175ebf3a2f00a7662a1e52584159832614efd86084e760d76a6948"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/canonical-prepare-exit.json",
+      "bytes": 202,
+      "sha256": "665904ab7e353bf892ebdefd7254e5ff87019115ee164168401b89da71492dfc"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/canonical-finish-exit.json",
+      "bytes": 202,
+      "sha256": "0ce003c97c54da1e5ba03eedd5493c735985827c41d68814297f52046cd8c320"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/canonical-finish.json",
+      "bytes": 584,
+      "sha256": "e4f455fa6d29c48fdec25d28c551199e7509cf84e5bb512f7bbe7f2f0a0aedd4"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/handoff-verification.json",
+      "bytes": 1162,
+      "sha256": "3ea32fcc0bfdec862c509c9814564c02c0e3238c005ad60b570191a7e743469f"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/stores-before-boots.json",
+      "bytes": 6034,
+      "sha256": "fe91e34fbe436209a815bd8f36cc3bbe281c3cfaef4a0fb10061200cd0fb933f"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/stores-after-bootstrap.json",
+      "bytes": 6034,
+      "sha256": "792f49b2f5c2a41fcbd1231eed69fbb89443d9dc0a544cdb6c1ef5ef99535a6a"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/stores-bootstrap-comparison.json",
+      "bytes": 356,
+      "sha256": "cc6f0ffa23d34124a71e105b01a8594671da266ee0393364e2a3334d5288a728"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/staged-normal-verified/verification.json",
+      "bytes": 1818,
+      "sha256": "329b0fec05a878fbb20ab3dfc1748739af984ca7b9ae43934485400d3cbfdf3a"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/staged-normal-verified/screenshot.png",
+      "bytes": 189825,
+      "sha256": "e70ab1a67b0133911dd6f83d0333e10ae328a90df01ea13507999086a431c5dc"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/canonical-normal-verified/verification.json",
+      "bytes": 1818,
+      "sha256": "ee9e08618e8da12cf8a0bb4f2e6560f76b86a3b98c355e19c09dcfbab148b3c5"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/canonical-normal-verified/screenshot.png",
+      "bytes": 198098,
+      "sha256": "f02bf4247ce5c3c634f67c59a28e34e27919028cd05416d6a1c16fb8cae9ed9f"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/signed-generation2/run.json",
+      "bytes": 615,
+      "sha256": "65a392c2434f3cdc91515c616fd148d8ec85fa0e37ccd692470ea8ec30e46496"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/signed-generation2/result.json",
+      "bytes": 2437,
+      "sha256": "13303d26fed94b3c8063bb9f93302ce76024eee68705dc82f40c924a9e48d834"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/signed-generation2/observations.jsonl",
+      "bytes": 20378,
+      "sha256": "96f5e1fb42ebe2d6a43a828b61ee4357ee461ab6396adee94774ac30d800204f"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/signed-generation2/stores-comparison.json",
+      "bytes": 356,
+      "sha256": "e3cc0f23009081702fa9497a38a366ee8ad7354fe992894906079eb052788f47"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/signed-generation2/normal-boot/run.json",
+      "bytes": 385,
+      "sha256": "35e523bc86e2c0c6ae226323da0b5e07e05fdb1e59174fee5c6444405e910f19"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/signed-generation2/normal-boot/result.json",
+      "bytes": 2081,
+      "sha256": "b4aec96ab5335418ddd140ccbc17a50bbe6c07adee1e460f1e320666a87deb4d"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/signed-generation2/normal-boot/screenshot.png",
+      "bytes": 236417,
+      "sha256": "eecf720d56e0ff1ad1372bb25b8bc246b02915658745086f0a7cd441f57389dd"
+    },
+    {
+      "path": "target/ota-owner-feed-20261017/sw-picade-2.local/20261018T071327Z/result.json",
+      "bytes": 2677,
+      "sha256": "b670c12b397d68d9f0664b026c035df9985f8413c944a617f15c1460a45e64b1"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/installed-worker-release/after.json",
+      "bytes": 9840,
+      "sha256": "99c1d5f0c3492771369029dff41dc692340b91334d697f829e70dde869412b5b"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/installed-worker-release/before.json",
+      "bytes": 9855,
+      "sha256": "d6ea72af24ba57528f4934145cd00aa7bbaa13c01cc0a51ad0efc7b9847fffb7"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/installed-worker-release/completed.json",
+      "bytes": 1792,
+      "sha256": "617f89e203ad4dff0b6edb1ea1eacf7693acd8120cd24cf831e98c1b84f403c1"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/installed-worker-release/request.json",
+      "bytes": 64,
+      "sha256": "d6760a2709286a8dade2bfa49585729515f1973869f2fc876d0e6a536f9337be"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/installed-worker-release/result.json",
+      "bytes": 485,
+      "sha256": "1facffdc3e1f77a945f0cc7206fcbc2f95755856772c68a83c1016577a742abf"
+    },
+    {
+      "path": "target/ota-second-picade-rollout-20261017/installed-worker-release/run.json",
+      "bytes": 246,
+      "sha256": "8f93031ee8000faddf981d6279ad1f525dcb7cef0e25849fd6a13fd8abbbe2bf"
+    }
+  ],
+  "limitations": [
+    "This device was not subjected to the primary boards' rollback/quarantine or bounded-retry failure cases.",
+    "Interrupted promotion, physical power-loss recovery and installed automatic policy remain unqualified.",
+    "The unprivileged extraction rehearsal verified content, metadata and links, but did not recreate numeric owners or restore a physical disk.",
+    "Automatic image installation and automatic signed publishing remain disabled.",
+    "Private recovery exports are retained; this report includes only their identities and verification results.",
+    "Initial automatic download check reported preparation-unavailable before the successful explicit check; startup coordination remains a follow-up."
+  ],
+  "installed_release_worker": {
+    "host": "sw-picade-2.local",
+    "channel": "release",
+    "completion": "no-candidate",
+    "expected": "no-candidate",
+    "ready": null,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    },
+    "elapsed_seconds": 6.128,
+    "image_and_boot_unchanged": true,
+    "kiosk_instance_unchanged": true,
+    "kiosk_progress_verified": true,
+    "original_channel_restored": true,
+    "automatic_installation_enabled": false,
+    "initial_automatic_check_reason": "preparation-unavailable"
+  }
+}
