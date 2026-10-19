@@ -1,0 +1,153 @@
+{
+  "schema_version": 2,
+  "source": "ff2158126d0c8b2ebe96eb8d0eb9e69e3a877c33",
+  "installed_deployment": false,
+  "images": [
+    {
+      "fixture_version": 1,
+      "image": "pizza-capacity-800x480-000.png",
+      "population": {
+        "ball_colliders": 5000,
+        "balls": 5000,
+        "births": {
+          "exploded": 0,
+          "exploded_by_generation": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "exploded_by_size": [
+            0,
+            0,
+            0
+          ],
+          "fragment_capacity_stops": 0,
+          "fragment_parents_skipped": 0,
+          "fragments_created": 0,
+          "pointer_created": 0,
+          "pointer_replaced": 0,
+          "spawned": 0
+        },
+        "limit": 5000,
+        "physics_balls": 5000
+      },
+      "seed": 7,
+      "tick": 0,
+      "capture": "Production raster renderer export under CI profile, Rust 1.89. No device-performance claim.",
+      "width": 800,
+      "height": 480,
+      "sha256": "6443f47e6a59b2f4d7f3c237cbf3a1ab721c6c13a370ebead48efb7eada4e10a"
+    },
+    {
+      "fixture_version": 1,
+      "image": "pizza-capacity-800x480-060.png",
+      "population": {
+        "ball_colliders": 3471,
+        "balls": 3471,
+        "births": {
+          "exploded": 2345,
+          "exploded_by_generation": [
+            2289,
+            51,
+            5,
+            0
+          ],
+          "exploded_by_size": [
+            2193,
+            120,
+            32
+          ],
+          "fragment_capacity_stops": 1,
+          "fragment_parents_skipped": 128,
+          "fragments_created": 816,
+          "pointer_created": 0,
+          "pointer_replaced": 0,
+          "spawned": 0
+        },
+        "limit": 5000,
+        "physics_balls": 3471
+      },
+      "seed": 7,
+      "tick": 60,
+      "capture": "Production raster renderer export under CI profile, Rust 1.89. No device-performance claim.",
+      "width": 800,
+      "height": 480,
+      "sha256": "1772511d6aca7f8b256ebc247b11895b459801e758a7de54a4943c583b3d448a",
+      "source": "b7b2b43ed448a5dc8a877417e95ddbdf4d76a946"
+    },
+    {
+      "fixture_version": 1,
+      "image": "pizza-capacity-1024x768-060.png",
+      "population": {
+        "ball_colliders": 3569,
+        "balls": 3569,
+        "births": {
+          "exploded": 1709,
+          "exploded_by_generation": [
+            1697,
+            12,
+            0,
+            0
+          ],
+          "exploded_by_size": [
+            1558,
+            119,
+            32
+          ],
+          "fragment_capacity_stops": 1,
+          "fragment_parents_skipped": 128,
+          "fragments_created": 278,
+          "pointer_created": 0,
+          "pointer_replaced": 0,
+          "spawned": 0
+        },
+        "limit": 5000,
+        "physics_balls": 3569
+      },
+      "seed": 7,
+      "tick": 60,
+      "capture": "Production raster renderer export under CI profile, Rust 1.89. No device-performance claim.",
+      "width": 1024,
+      "height": 768,
+      "sha256": "510926063033000cb4cfecd2f5fb2a80caeaaab8ae217a8a6576e92f21bf7da5",
+      "source": "b7b2b43ed448a5dc8a877417e95ddbdf4d76a946"
+    },
+    {
+      "image": "800x480-settings-software.png",
+      "capture": "Live local client via public controls, target-sized Xvfb window, winit-software, CI profile/Rust 1.89.",
+      "live_ball_limit": 5000,
+      "desired_balls": 0,
+      "width": 800,
+      "height": 480,
+      "sha256": "872ad085dd2aa9d160924ce8305215781824775d22edbadef635e4a208a32cb5"
+    },
+    {
+      "image": "1024x768-settings-software.png",
+      "capture": "Live local client via public controls, target-sized Xvfb window, winit-software, CI profile/Rust 1.89.",
+      "live_ball_limit": 5000,
+      "desired_balls": 0,
+      "width": 1024,
+      "height": 768,
+      "sha256": "4ebeabaee9188f5bb4c1e35e5e7e7ebe217291849497a7dd3fdd92dcf4a127a1"
+    },
+    {
+      "image": "1024x768-pi4-gpu-after-gravity.png",
+      "capture": "Actual Pi 4/Picade production KMS GPU capture, after timing ordinary field-On run 1. Post-event scene; population/tick not synchronized with screenshot.",
+      "width": 1024,
+      "height": 768,
+      "sha256": "d8a33cbec92e9ab3b2f01b227d4a20eccb830444e4296770f44d42d0ce633e2d",
+      "source": "ff2158126d0c8b2ebe96eb8d0eb9e69e3a877c33",
+      "client_sha256": "fbddc7ab7c2a174a5b6d2de199e0f4504c87d7a30cc410db1df79445a31c835a"
+    },
+    {
+      "image": "1024x768-pi4-gpu-after-gravity-ccd.png",
+      "capture": "Actual Pi 4/Picade production KMS GPU capture, after timing ordinary field-On repeat 1 for lazy CCD lookup. Exact tick/population not synchronized with screenshot.",
+      "width": 1024,
+      "height": 768,
+      "source": "9170d99451ecba6e8ace8e6c2a1517058f0c7fdd",
+      "sha256": "09371c98a67af272c1656124fe2d186e067b8daf4b9883acabb5d0c3463b41c0",
+      "client_sha256": "2051353849ac2916b4cdccd553c9735dcd195bc6d76619d98d8c3666bf36a103"
+    }
+  ]
+}

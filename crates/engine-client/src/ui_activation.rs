@@ -289,7 +289,8 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.match.break-interval"
         | "launcher.settings.combat.mission"
         | "launcher.settings.clock.event-profile" => 4,
-        "launcher.settings.spacewars.player-health"
+        "launcher.settings.pizza.live-ball-limit"
+        | "launcher.settings.spacewars.player-health"
         | "launcher.settings.match.break-duration"
         | "launcher.settings.combat.asteroid-interval"
         | "launcher.settings.clock.falling" => 5,

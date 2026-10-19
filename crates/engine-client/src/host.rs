@@ -111,6 +111,7 @@ pub(crate) struct PizzaStatus {
     #[serde(flatten)]
     pub observation: scenario_pizza::PizzaObservation,
     pub ball_count: usize,
+    pub population: scenario_pizza::PizzaPopulation,
     pub held_ball_id: Option<u64>,
 }
 

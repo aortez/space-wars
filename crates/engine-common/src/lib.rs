@@ -1870,7 +1870,10 @@ fn normalize_spacewars_player_view_height(value: f32) -> f32 {
 }
 
 pub const DEFAULT_PIZZA_DESIRED_BALLS: u32 = 24;
-pub const MAX_PIZZA_DESIRED_BALLS: u32 = 500;
+/// Experimental ceiling, not a recommended sustained population on a Pi.
+pub const MAX_PIZZA_LIVE_BALLS: u32 = 5_000;
+pub const DEFAULT_PIZZA_LIVE_BALL_LIMIT: u32 = 500;
+pub const MAX_PIZZA_DESIRED_BALLS: u32 = MAX_PIZZA_LIVE_BALLS;
 pub const DEFAULT_PIZZA_BALL_SPAWN_RATE: f32 = 0.10;
 pub const MIN_PIZZA_BALL_SPAWN_RATE: f32 = 0.01;
 pub const MAX_PIZZA_BALL_SPAWN_RATE: f32 = 0.99;
@@ -1878,6 +1881,8 @@ pub const MAX_PIZZA_BALL_SPAWN_RATE: f32 = 0.99;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PizzaSettings {
+    /// Includes spawned balls, fragments and the held ball.
+    pub live_ball_limit: u32,
     #[serde(default = "default_pizza_desired_balls")]
     pub desired_balls: u32,
     #[serde(default = "default_pizza_ball_spawn_rate")]
@@ -1888,6 +1893,7 @@ pub struct PizzaSettings {
 impl Default for PizzaSettings {
     fn default() -> Self {
         Self {
+            live_ball_limit: DEFAULT_PIZZA_LIVE_BALL_LIMIT,
             desired_balls: DEFAULT_PIZZA_DESIRED_BALLS,
             ball_spawn_rate: DEFAULT_PIZZA_BALL_SPAWN_RATE,
             automatic_events: true,
@@ -1897,8 +1903,10 @@ impl Default for PizzaSettings {
 
 impl PizzaSettings {
     pub fn normalized(&self) -> Self {
+        let live_ball_limit = self.live_ball_limit.clamp(1, MAX_PIZZA_LIVE_BALLS);
         Self {
-            desired_balls: self.desired_balls.min(MAX_PIZZA_DESIRED_BALLS),
+            live_ball_limit,
+            desired_balls: self.desired_balls.min(live_ball_limit),
             ball_spawn_rate: normalize_pizza_ball_spawn_rate(self.ball_spawn_rate),
             automatic_events: self.automatic_events,
         }

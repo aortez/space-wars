@@ -81,6 +81,53 @@ mod tests {
         thruster_visual_tests::write_png,
     };
 
+    #[test]
+    #[ignore = "explicit normal-capacity screenshot export, not a performance test"]
+    fn pizza_capacity_captures() {
+        let output = std::path::PathBuf::from(
+            std::env::var_os("SPACEWARS_PIZZA_CAPACITY_ARTIFACTS")
+                .expect("set SPACEWARS_PIZZA_CAPACITY_ARTIFACTS"),
+        );
+        std::fs::create_dir_all(&output).unwrap();
+        let mut records = Vec::new();
+        for (width, height) in [(800, 480), (1024, 768)] {
+            let viewport = Viewport::new(width as f32, height as f32);
+            let mut state = scenario_pizza::capacity_lab::mixed_size_fixture(
+                5_000,
+                5_000,
+                PizzaBounds::from_aspect_ratio(viewport.aspect_ratio()),
+                7,
+            )
+            .unwrap();
+            for tick in 0..=60 {
+                if tick == 0 || tick == 60 {
+                    let frame = PizzaScenario::render_frame(&state);
+                    let pixels = RasterRenderer::new()
+                        .image_from_frames_with_layout(
+                            &[frame],
+                            viewport,
+                            FrameLayout::EqualHorizontal,
+                            RasterOptions::default(),
+                        )
+                        .to_rgb8()
+                        .unwrap();
+                    let name = format!("pizza-capacity-{width}x{height}-{tick:03}.png");
+                    write_png(&output.join(&name), &pixels);
+                    records.push(serde_json::json!({"image":name,"seed":7,"tick":tick,
+                        "population":state.population(),"fixture_version":scenario_pizza::capacity_lab::FIXTURE_VERSION}));
+                }
+                if tick < 60 {
+                    PizzaScenario::step(&mut state, &[], DT);
+                }
+            }
+        }
+        std::fs::write(
+            output.join("captures.json"),
+            serde_json::to_vec_pretty(&records).unwrap(),
+        )
+        .unwrap();
+    }
+
     // Opt-in full physical runs for tuning/captures; focused field tests cover
     // correctness on every PR without adding this visual sweep to its runtime.
     #[test]

@@ -140,6 +140,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) spacewars_player_1: String,
     pub(crate) spacewars_player_2: String,
     pub(crate) pizza_desired_balls: String,
+    pub(crate) pizza_live_ball_limit: String,
     pub(crate) pizza_spawn_rate: String,
     pub(crate) pizza_automatic_events: bool,
     pub(crate) pizza_event_available: bool,
@@ -717,12 +718,18 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     "Off"
                 },
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.pizza.live-ball-limit",
+                &context.pizza_live_ball_limit,
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.pizza.desired-balls",
                 "launcher.settings.pizza.spawn-rate",
                 "launcher.settings.pizza.automatic-events",
+                "launcher.settings.pizza.live-ball-limit",
                 "launcher.settings.back",
             ]
         }
@@ -1248,6 +1255,7 @@ mod tests {
             spacewars_player_1: "human".into(),
             spacewars_player_2: "rule bot".into(),
             pizza_desired_balls: "75".into(),
+            pizza_live_ball_limit: "500".into(),
             pizza_spawn_rate: "0.10".into(),
             pizza_automatic_events: true,
             pizza_event_available: false,
@@ -1533,7 +1541,7 @@ mod tests {
                 16,
                 "launcher.settings.spacewars.player-2",
             ),
-            ("pizza", 12, "launcher.settings.pizza.spawn-rate"),
+            ("pizza", 14, "launcher.settings.pizza.live-ball-limit"),
             ("clock", 39, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
@@ -1570,7 +1578,7 @@ mod tests {
                 | "spacewars-surface-round" => 2,
                 "spacewars" => 3,
                 "spacewars-classic" => 6,
-                "pizza" => 3,
+                "pizza" => 5,
                 "clock" => 8,
                 "rover-lab" => 1,
                 "falling" => 0,

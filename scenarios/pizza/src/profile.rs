@@ -1,0 +1,134 @@
+//! Bounded callers capture these after normal steps, outside simulation timing.
+use super::*;
+use serde::Serialize;
+
+pub fn size_band(radius: f32) -> usize {
+    if radius < 0.005 {
+        0
+    } else if radius < 0.01 {
+        1
+    } else {
+        2
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Sample {
+    pub tick: u64,
+    pub population: PizzaPopulation,
+    pub sizes: [usize; 3],
+    pub generations: [usize; 4],
+    pub fingerprint: u64,
+    /// Entire circle outside the visible playfield (may still touch a wall).
+    pub outside_playfield: usize,
+    /// Entire circle beyond the physical walls: a real containment failure.
+    pub escaped_walls: usize,
+    pub event: PizzaEventState,
+    pub step_us: f64,
+    pub spawning_us: f64,
+    pub gravity_us: f64,
+    /// Rapier solve, excluding canonical contact reconstruction.
+    pub physics_us: f64,
+    pub physics_total_us: f64,
+    pub broad_phase_us: f64,
+    pub narrow_phase_us: f64,
+    pub solver_us: f64,
+    pub update_us: f64,
+    pub island_us: f64,
+    pub island_constraints_us: f64,
+    pub ccd_us: Option<f64>,
+    pub ccd_first_impact_us: f64,
+    pub ccd_clamping_us: f64,
+    pub ccd_substeps: usize,
+    pub snapshot_us: f64,
+    pub damage_us: f64,
+    pub lifecycle_us: f64,
+    pub contacts: usize,
+    pub contact_pairs: usize,
+    pub candidate_pairs: usize,
+    pub capture_us: f64,
+}
+
+impl Sample {
+    pub fn capture(state: &PizzaState) -> Self {
+        let started = Instant::now();
+        let mut sizes = [0; 3];
+        let mut generations = [0; 4];
+        let mut outside_playfield = 0;
+        let mut escaped_walls = 0;
+        let bounds = state.config.bounds;
+        let thickness = wall_thickness(bounds);
+        let mut fingerprint = 0xcbf29ce484222325u64;
+        let mut hash = |bytes: &[u8]| {
+            for byte in bytes {
+                fingerprint = (fingerprint ^ u64::from(*byte)).wrapping_mul(0x100000001b3);
+            }
+        };
+        for ball in &state.balls {
+            let outside = |margin: f32| {
+                ball.position.x + ball.radius < -margin
+                    || ball.position.y + ball.radius < -margin
+                    || ball.position.x - ball.radius > bounds.width + margin
+                    || ball.position.y - ball.radius > bounds.height + margin
+            };
+            outside_playfield += usize::from(outside(0.0));
+            escaped_walls += usize::from(outside(thickness));
+            sizes[size_band(ball.radius)] += 1;
+            generations[usize::from(ball.fragment_generation).min(3)] += 1;
+            hash(&ball.id.to_le_bytes());
+            for value in [
+                ball.position.x,
+                ball.position.y,
+                ball.velocity.x,
+                ball.velocity.y,
+                ball.hp,
+                ball.radius,
+                ball.color.r,
+                ball.color.g,
+                ball.color.b,
+                ball.color.a,
+            ] {
+                hash(&value.to_bits().to_le_bytes());
+            }
+            hash(&[
+                ball.fragment_generation,
+                u8::from(ball.moving),
+                u8::from(ball.invincible),
+            ]);
+        }
+        let m = state.last_step_metrics;
+        let us = |d: Duration| d.as_secs_f64() * 1e6;
+        Self {
+            tick: state.tick,
+            population: state.population(),
+            sizes,
+            generations,
+            fingerprint,
+            outside_playfield,
+            escaped_walls,
+            event: state.event_state(),
+            step_us: us(m.total_time),
+            spawning_us: us(m.spawning_time),
+            gravity_us: us(m.gravity_time),
+            physics_us: us(m.physics_time),
+            physics_total_us: us(m.physics_total_time),
+            broad_phase_us: us(m.rapier.broad_phase_time),
+            narrow_phase_us: us(m.rapier.narrow_phase_time),
+            solver_us: us(m.rapier.solver_time),
+            update_us: us(m.rapier.update_time),
+            island_us: us(m.rapier.island_time),
+            island_constraints_us: us(m.rapier.island_constraints_time),
+            ccd_us: m.rapier.ccd_time.map(us),
+            ccd_first_impact_us: us(m.rapier.ccd_first_impact_time),
+            ccd_clamping_us: us(m.rapier.ccd_clamping_time),
+            ccd_substeps: m.rapier.ccd_substeps,
+            snapshot_us: us(m.snapshot_time),
+            damage_us: us(m.damage_time),
+            lifecycle_us: us(m.lifecycle_time),
+            contacts: m.rapier.contacts,
+            contact_pairs: m.rapier.contact_pairs,
+            candidate_pairs: m.rapier.candidate_pairs,
+            capture_us: us(started.elapsed()),
+        }
+    }
+}

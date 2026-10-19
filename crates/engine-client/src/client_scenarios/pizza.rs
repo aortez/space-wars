@@ -23,12 +23,13 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling, even during gravity events. Pause and choose Run gravity & resume to start one manually. Automatic events can be turned off in Pizza settings.",
+    controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling, even during gravity events. Pause and choose Run gravity & resume to start one manually. Pizza settings include automatic events and a live ball limit (including fragments). Higher limits increase CPU use; 5,000 is experimental.",
     create,
 };
 
 pub(crate) struct PizzaClientScenario {
     pub(crate) state: PizzaState,
+    lab: Option<crate::pizza_lab::Recorder>,
 }
 
 fn create(
@@ -36,12 +37,13 @@ fn create(
     settings: &Settings,
     viewport: Viewport,
     mode: ScenarioStartMode,
-    _asset: &ScenarioAsset,
+    asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     let setup = settings.pizza.normalized();
     let bounds = PizzaBounds::from_aspect_ratio(viewport.aspect_ratio());
     let config = match mode {
         ScenarioStartMode::Normal => PizzaConfig {
+            live_ball_limit: setup.live_ball_limit as usize,
             desired_ball_count: setup.desired_balls as usize,
             ball_spawn_rate: setup.ball_spawn_rate,
             bounds,
@@ -53,9 +55,39 @@ fn create(
             PizzaConfig::benchmark(configuration.pizza, bounds)
         }
     };
-    Ok(Box::new(PizzaClientScenario {
-        state: PizzaScenario::init(config, seed),
-    }))
+    let mut state = PizzaScenario::init(config, seed);
+    let lab = if let ScenarioAsset::PizzaLab(config) = asset {
+        if !mode.is_benchmark() {
+            state = if config.ordinary {
+                PizzaScenario::init(
+                    PizzaConfig {
+                        live_ball_limit: config.limit,
+                        automatic_events: false,
+                        bounds,
+                        ..Default::default()
+                    },
+                    seed,
+                )
+            } else {
+                scenario_pizza::capacity_lab::mixed_size_fixture(
+                    config.balls,
+                    config.limit,
+                    bounds,
+                    seed,
+                )
+                .map_err(|detail| ScenarioCreateError::RuntimeInitialization {
+                    name: "pizza",
+                    detail: detail.into(),
+                })?
+            };
+            Some(crate::pizza_lab::Recorder::new(config.clone()))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    Ok(Box::new(PizzaClientScenario { state, lab }))
 }
 
 impl ClientScenario for PizzaClientScenario {
@@ -73,6 +105,7 @@ impl ClientScenario for PizzaClientScenario {
                 event: self.state.event_state(),
             },
             ball_count: self.state.balls.len(),
+            population: self.state.population(),
             held_ball_id: self.state.held_ball_id,
         })
     }
@@ -82,7 +115,14 @@ impl ClientScenario for PizzaClientScenario {
     }
 
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
-        PizzaScenario::step(&mut self.state, actions, dt)
+        if let Some(lab) = &self.lab {
+            lab.before_step(&mut self.state, dt);
+        }
+        let result = PizzaScenario::step(&mut self.state, actions, dt);
+        if let Some(lab) = &mut self.lab {
+            lab.after_step(&self.state, dt);
+        }
+        result
     }
 
     fn map_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {

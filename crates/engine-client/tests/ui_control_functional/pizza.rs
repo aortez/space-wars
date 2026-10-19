@@ -2,6 +2,7 @@ use super::*;
 use spacewars_control::{InputButton, InputPressRequest};
 
 const GRAVITY: &str = "pause.pizza.gravity";
+const LIMIT: &str = "launcher.settings.pizza.live-ball-limit.next";
 const AUTOMATIC: &str = "launcher.settings.pizza.automatic-events.next";
 
 fn status(h: &mut FunctionalHarness) -> Value {
@@ -56,13 +57,23 @@ fn pizza_event_controls_settings_and_lifecycle_smoke() {
             assert_eq!(control_value(&page, AUTOMATIC), Some("On"));
             let page = h.activate_guarded(AUTOMATIC, &page);
             assert_eq!(control_value(&page, AUTOMATIC), Some("Off"));
-            h.capture_screenshot("automatic-off.png");
+            assert_eq!(control_value(&page, LIMIT), Some("500"));
+            let page = h.activate_guarded(LIMIT, &page);
+            let page = h.activate_guarded(LIMIT, &page);
+            let page = h.activate_guarded(LIMIT, &page);
+            assert_eq!(control_value(&page, LIMIT), Some("5000"));
+            assert_eq!(
+                control_value(&page, "launcher.settings.pizza.desired-balls.next"),
+                Some("0")
+            );
+            h.capture_screenshot("capacity-5000.png");
             h.activate_guarded("launcher.settings.start", &page);
             let game = screen(h, UiScreen::Gameplay);
             let revision = game.scenario_revision;
             let page = pause(h);
             assert!(control_enabled(&page, GRAVITY));
             let idle = status(h);
+            assert_eq!(idle["population"]["limit"], 5000);
             assert_eq!(idle["event"]["phase"], "idle");
             assert!(idle["event"]["automatic_wait_ticks"].is_null());
             h.capture_screenshot("gravity-ready.png");
@@ -133,6 +144,7 @@ fn pizza_event_controls_settings_and_lifecycle_smoke() {
             h.activate_guarded("launcher.start", &page);
             screen(h, UiScreen::Gameplay);
             let idle = status(h);
+            assert_eq!(idle["population"]["limit"], 5000);
             assert_eq!(idle["event"]["phase"], "idle");
             assert!(idle["event"]["pending_manual"].is_null());
             assert!(idle["event"]["automatic_wait_ticks"].is_null());
@@ -149,6 +161,8 @@ fn pizza_event_controls_settings_and_lifecycle_smoke() {
             let saved: engine_common::Settings =
                 toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
             assert!(!saved.pizza.automatic_events);
+            assert_eq!(saved.pizza.live_ball_limit, 5000);
+            assert_eq!(saved.pizza.desired_balls, 0);
             assert_eq!(saved.audio.master_volume, 0.05);
             let log = File::create(h.run_path().join("restarted-client.log")).unwrap();
             h.child = OwnedChild(
@@ -172,6 +186,7 @@ fn pizza_event_controls_settings_and_lifecycle_smoke() {
             let page = h.activate_until_scenario("pizza", page);
             let page = h.activate_guarded("launcher.settings", &page);
             assert_eq!(control_value(&page, AUTOMATIC), Some("Off"));
+            assert_eq!(control_value(&page, LIMIT), Some("5000"));
             let page = h.activate_guarded(AUTOMATIC, &page);
             h.activate_guarded("launcher.settings.start", &page);
             screen(h, UiScreen::Gameplay);

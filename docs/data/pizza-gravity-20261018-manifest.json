@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "source_before": "7839926c0f02c874ed495efa07978a522eb10c54",
+  "source_after": {
+    "base": "7839926c0f02c874ed495efa07978a522eb10c54",
+    "commit": "b7b2b43",
+    "diff_command": "git diff 7839926 b7b2b43 -- crates scenarios",
+    "diff_sha256": "76bd6410b064987ff3d8516e1e27df693e166076149b78d72a2854db690673b8",
+    "note": "Measured as an uncommitted working tree with this diff, then committed unchanged. Evidence binaries predate a comment-only edit; both candidate capacity binaries rebuilt from this diff are byte-identical."
+  },
+  "compiler": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "profile": "release, fat LTO, codegen-units=1",
+  "host": {
+    "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+    "kernel": "7.0.0-38-generic",
+    "governor": "powersave",
+    "timing_cpu": 6,
+    "note": "Other builds shared the host. Timing runs alternate order and are pinned; counts and fingerprints are host-independent."
+  },
+  "scope": "Desktop headless capacity-lab comparison of point-mass and bounded-interior Pizza gravity, plus paired seed-7 production GPU captures on the Pi 4.",
+  "binaries": {
+    "capacity-baseline": "a072781baa9f04e6db1cdda21cd0f28c8864c9207d749214e5431a50fa9af9f7",
+    "capacity-baseline-diagnostics": "8f308d69d6938b14c5a07f1d355ede6f0759ea532fc68dfcef064d5f878c3f49",
+    "capacity-candidate": "a66ba2161ada596084878c6643bacf98dc9b9fd45834a0735435ee13266759b3",
+    "capacity-candidate-diagnostics": "c8a4db03a080eab845142f5f921d5b14997d215a07af49aba74df4aeb964a40f",
+    "gravity-benchmark-baseline": "b661140734db128821905099e64a6ca442cee61a1345dc5acb508cf1d78bff5e",
+    "gravity-benchmark-candidate": "3168078f67002ce5c4c51617bf5630271943144cdec540d2863a9bb8ccf6e0ba"
+  },
+  "binary_note": "The baseline capacity binaries are byte-identical to capacity-lazy and capacity-lazy-diagnostics in pizza-reference-20261018-manifest.json.",
+  "commands": {
+    "runs": "bash tools/pizza-gravity-runs.sh BASELINE_LAB CANDIDATE_LAB BASELINE_DIAG CANDIDATE_DIAG REPORTS",
+    "extract": "python3 tools/pizza-gravity-summary.py extract REPORTS EXTRACTS",
+    "summarize": "python3 tools/pizza-gravity-summary.py summarize EXTRACTS --pi PI",
+    "point_only_benchmark": "taskset -c 6 target/release/examples/gravity_benchmark --samples 40 --warmup 10",
+    "pi_capture": "sudo bash tools/pizza-live-capture.sh ROOT RUN 500 500 1200 on|off ordinary 30, alternating point and bounded"
+  },
+  "runs": {
+    "reports": 170,
+    "ordinary_on_ccd_instrumented": 40,
+    "ordinary_on_uninstrumented": 50,
+    "ordinary_off": 40,
+    "mixed": 40,
+    "updates": 165600
+  },
+  "matching": {
+    "replay_key": "ordered state fingerprint after every update",
+    "instrumented_against_uninstrumented_runs": 50,
+    "repeated_mixed_runs": 32,
+    "point_only_gravity_benchmark": "identical exact-source, approximation and error counts in all eight cases"
+  },
+  "validation": {
+    "engine_gravity_tests": 18,
+    "pizza_tests": 41,
+    "other_gravity_users": "scenario-spacewars 619 passed (1 ignored), two spacewars example suites 6 and 2, three lab packages 5, 7 and 61",
+    "agent_baselines": "navigation-v1 and strategy-v1 match",
+    "client_pizza_tests": "11 passed; 2 explicit capture tests ignored; 3 display tests left to CI under Xvfb",
+    "tool_tests": "1055 passed, including 7 new summary tests; tools/pizza-profile-summary.py output is unchanged on all nine retained Pi captures",
+    "negative_regressions": "new tree tests fail without the sphere guard; the Pizza test fails with point gravity in normal play",
+    "scoped_clippy": "pass (engine-gravity, scenario-pizza, all targets, --no-deps, -D warnings)",
+    "strict_dependency_clippy": "blocked by existing engine-core plant lint warnings outside this change",
+    "format": "pass"
+  },
+  "archive": {
+    "file": "pizza-gravity-20261018-raw.tar.gz",
+    "sha256": "120f142b8a7048bb3190e0887cec6ae6f1462f4cd1271c22ea01572adeb3e984",
+    "contents": "Per-update CSV extracts and run metadata for all 170 reports, complete seed-7 reports, point-only gravity benchmark CSVs, six Pi 4 production captures under pi/ with boundary readings and device file hashes, and SHA256SUMS.",
+    "reproducible": "tar --sort=name --mtime='2026-10-18 00:00:00Z' --owner=0 --group=0 --numeric-owner, gzip -n -9"
+  },
+  "summary_sha256": "9ca17bb7174a72db3687a5a98e648ad74be872b72f573f4c8a15728adb655656",
+  "pi": {
+    "device": "Raspberry Pi 4 Model B Rev 1.4 (Picade), Linux 6.6.63-v8, ondemand governor",
+    "installed_image": "5b420c95b87b, untouched; the kiosk was restored after every capture",
+    "capture_script": {
+      "file": "tools/pizza-live-capture.sh",
+      "sha256": "d534cb463643e72ff8abcacf89ed8d8896e14b495087f12ada1809a6b8f347ac"
+    },
+    "sequence": [
+      "point on-r1",
+      "bounded on-r1",
+      "point on-r2",
+      "bounded on-r2",
+      "point off-r1",
+      "bounded off-r1"
+    ],
+    "arguments": "500 balls, limit 500, 1,200 ordinary updates and 30 one-second intervals; the script fixes seed 7; 30 s pause between captures",
+    "point": {
+      "engine_client_sha256": "2051353849ac2916b4cdccd553c9735dcd195bc6d76619d98d8c3666bf36a103",
+      "spacewars_cli_sha256": "ab02df8fb49f1570e29397aabc89d2a5e0a7fc634caf5de6ba7edf5280c96b1d",
+      "note": "The 9170d99 production GPU pair in pizza-reference-20261018-manifest.json; 7839926 changed only documentation."
+    },
+    "bounded": {
+      "engine_client_sha256": "d9a7cc85abd63d651504507b96a087d49a65c1f213a30695894795bf79370ba6",
+      "spacewars_cli_sha256": "ab02df8fb49f1570e29397aabc89d2a5e0a7fc634caf5de6ba7edf5280c96b1d",
+      "command": "node yocto/scripts/build.mjs --target spacewars",
+      "source": "7839926 plus the source_after diff",
+      "note": "A second build from the frozen tree recompiled the client and produced byte-identical binaries and build metadata.",
+      "build": {
+        "kiosk_feature": "pi-kiosk-gpu",
+        "profile": "release",
+        "rust_target": "aarch64-unknown-linux-gnu",
+        "schema": 1,
+        "source": {
+          "commit": "7839926c0f02c874ed495efa07978a522eb10c54",
+          "dirty": true,
+          "revision": "7839926c0f02-dirty",
+          "schema": 1
+        },
+        "tools": {
+          "cargo": {
+            "details": "cargo 1.94.0 (85eff7c80 2026-01-15)\nrelease: 1.94.0\ncommit-hash: 85eff7c80277b57f78b11e28d14154ab12fcf643\ncommit-date: 2026-01-15\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.3 vendored)\nlibcurl: 8.17.0-DEV (sys:0.4.84+curl-8.17.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 [64-bit]",
+            "version": "1.94.0"
+          },
+          "cc": {
+            "details": "aarch64-poky-linux-gcc (GCC) 13.5.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+          },
+          "rustc": {
+            "details": "rustc 1.94.0 (4a4ef493e 2026-03-02)\nbinary: rustc\ncommit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db\ncommit-date: 2026-03-02\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.0\nLLVM version: 21.1.8",
+            "version": "1.94.0"
+          }
+        }
+      },
+      "bundle": {
+        "format": 1,
+        "machine": "raspberrypi-spacewars",
+        "target_arch": "aarch64",
+        "compatibility": "2d6025509c8ce4f50160f28a38d977bae561473d6c0677ad92f749026bbbc69d",
+        "binaries": {
+          "engine-client": {
+            "sha256": "d9a7cc85abd63d651504507b96a087d49a65c1f213a30695894795bf79370ba6",
+            "size": 26979448
+          },
+          "spacewars-cli": {
+            "sha256": "ab02df8fb49f1570e29397aabc89d2a5e0a7fc634caf5de6ba7edf5280c96b1d",
+            "size": 1814544
+          }
+        }
+      }
+    },
+    "matching": "All six runs reproduce the desktop seed-7 fingerprints of the same law at all 1,200 updates.",
+    "temperature_c": "pre-export samples 68.7 to 75.0 (earlier production batch 65.2 to 68.7); capture boundaries 68.7 to 74.5; firmware throttling flags zero in every sample",
+    "excluded": "Binaries, per-run temporary config directories and control sockets.",
+    "ordinary_gravity_performance_qualified": false,
+    "pi5": "offline"
+  }
+}
