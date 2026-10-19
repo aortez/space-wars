@@ -58,6 +58,7 @@ impl Backend for Fake {
         let world = self.0.lock().unwrap();
         Ok(Snapshot {
             change: None,
+            expected: None,
             clock,
             radio: world.radio.clone(),
             activity: world.activity,

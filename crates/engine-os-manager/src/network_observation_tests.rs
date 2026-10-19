@@ -46,6 +46,7 @@ struct Fixture {
     controls: AtomicBool,
     radio_off: AtomicBool,
     deny_write: AtomicBool,
+    delay_write: AtomicBool,
     slow_write: AtomicBool,
     write_received: AtomicBool,
     release_write: AtomicBool,
@@ -126,7 +127,11 @@ impl Manager {
             .map_err(|_| zbus::fdo::Error::Failed("fixture release deadline".into()))?;
         }
         self.0.mutations.fetch_add(1, Ordering::SeqCst);
-        self.0.radio_off.store(!enabled, Ordering::SeqCst);
+        // NM 1.46.6 can reply, and notify the old value, before its cached
+        // rfkill state is exported. Delayed tests apply the target later.
+        if !self.0.delay_write.load(Ordering::SeqCst) {
+            self.0.radio_off.store(!enabled, Ordering::SeqCst);
+        }
         Ok(())
     }
 }
@@ -173,6 +178,15 @@ async fn radio_signal(
         )
         .await
         .unwrap();
+}
+
+async fn wireless_signal(connection: &zbus::Connection, enabled: bool) {
+    radio_signal(
+        connection,
+        HashMap::from([("WirelessEnabled".into(), OwnedValue::from(enabled))]),
+        vec![],
+    )
+    .await;
 }
 
 #[test]
@@ -344,6 +358,276 @@ fn continuous_monitor_redundant_notifications_do_not_complete_a_missing_transiti
         assert!(!monitor.prepare(&before, true).await.unwrap());
         assert_eq!(fixture.mutations.load(Ordering::SeqCst), 0);
     });
+}
+
+#[test]
+fn continuous_monitor_keeps_a_delayed_transition_until_signal_and_readback_agree() {
+    use crate::network_controller::WriteResult;
+    use crate::network_monitor::Monitor;
+    let bus = PrivateBus::new();
+    futures_lite::future::block_on(async {
+        for enabled in [true, false] {
+            for signal_first in [true, false] {
+                let fixture = Arc::new(Fixture::default());
+                fixture.controls.store(true, Ordering::SeqCst);
+                fixture.radio_off.store(enabled, Ordering::SeqCst);
+                fixture.delay_write.store(true, Ordering::SeqCst);
+                let server = server(&bus, &fixture).await;
+                let uid = unsafe { libc::geteuid() };
+                let client = bus.connect().await;
+                let mut monitor = Monitor::connect(bus.connect().await, uid).await.unwrap();
+                let (before, _) = monitor.observe().await.unwrap();
+                assert!(monitor.prepare(&before, enabled).await.unwrap());
+                let result = crate::network_radio::write(&client, uid, &before, enabled).await;
+                assert_eq!(result.as_ref().unwrap(), &WriteResult::Returned);
+                monitor.finish_write(&result);
+                // The reply and old-value notifications leave readback unchanged.
+                for _ in 0..2 {
+                    let (after, change) = monitor.observe().await.unwrap();
+                    assert_eq!(after, before);
+                    assert!(change.is_none());
+                    assert_eq!(monitor.expected(), Some(enabled));
+                    wireless_signal(&server, !enabled).await;
+                }
+                if signal_first {
+                    wireless_signal(&server, enabled).await;
+                } else {
+                    fixture.radio_off.store(!enabled, Ordering::SeqCst);
+                }
+                let (partial, change) = monitor.observe().await.unwrap();
+                let readback = if signal_first { !enabled } else { enabled };
+                assert_eq!(partial.wireless_enabled, readback);
+                assert!(change.is_none());
+                assert_eq!(monitor.expected(), Some(enabled));
+                if signal_first {
+                    fixture.radio_off.store(!enabled, Ordering::SeqCst);
+                } else {
+                    wireless_signal(&server, enabled).await;
+                }
+                let (complete, change) = monitor.observe().await.unwrap();
+                assert_eq!(complete.wireless_enabled, enabled);
+                assert!(change.is_none(), "enabled={enabled}, first={signal_first}");
+                assert_eq!(monitor.expected(), None);
+                assert_eq!(fixture.mutations.load(Ordering::SeqCst), 1);
+                server.release_name(NAME).await.unwrap();
+            }
+        }
+    });
+}
+
+#[test]
+fn continuous_monitor_judges_a_delayed_transition_at_its_original_deadline() {
+    use crate::network_controller::{Suspension, WriteResult};
+    use crate::network_monitor::Monitor;
+    let bus = PrivateBus::new();
+    futures_lite::future::block_on(async {
+        for case in ["duplicates", "queued", "late", "signalled"] {
+            let fixture = Arc::new(Fixture::default());
+            fixture.controls.store(true, Ordering::SeqCst);
+            fixture.radio_off.store(true, Ordering::SeqCst);
+            fixture.delay_write.store(true, Ordering::SeqCst);
+            let server = server(&bus, &fixture).await;
+            let uid = unsafe { libc::geteuid() };
+            let client = bus.connect().await;
+            let mut monitor = Monitor::connect(bus.connect().await, uid).await.unwrap();
+            let (before, _) = monitor.observe().await.unwrap();
+            assert!(monitor.prepare(&before, true).await.unwrap());
+            let result = crate::network_radio::write(&client, uid, &before, true).await;
+            assert_eq!(result.as_ref().unwrap(), &WriteResult::Returned);
+            monitor.finish_write(&result);
+            match case {
+                // Old-value notifications do not extend the original deadline.
+                "duplicates" => {
+                    for _ in 0..3 {
+                        wireless_signal(&server, false).await;
+                    }
+                    assert!(monitor.observe().await.unwrap().1.is_none());
+                    wireless_signal(&server, false).await;
+                }
+                // Queued before the deadline, but drained after it.
+                "queued" => wireless_signal(&server, true).await,
+                "signalled" => {
+                    wireless_signal(&server, true).await;
+                    assert!(monitor.observe().await.unwrap().1.is_none());
+                    assert_eq!(monitor.expected(), Some(true));
+                }
+                _ => {}
+            }
+            monitor.reach_deadline();
+            let (_, change) = monitor.observe().await.unwrap();
+            assert_eq!(monitor.expected(), None, "{case}");
+            if case == "signalled" {
+                // The coordinator rejects the unchanged readback, not the monitor.
+                assert!(change.is_none());
+            } else {
+                assert_eq!(change, Some(Suspension::ObservationLost), "{case}");
+                // Late readback and notification cannot clear or renew it.
+                fixture.radio_off.store(false, Ordering::SeqCst);
+                wireless_signal(&server, true).await;
+                let (after, change) = monitor.observe().await.unwrap();
+                assert!(after.wireless_enabled);
+                assert_eq!(change, Some(Suspension::ObservationLost), "{case}");
+                assert!(!monitor.prepare(&after, false).await.unwrap());
+            }
+            assert_eq!(fixture.mutations.load(Ordering::SeqCst), 1);
+            server.release_name(NAME).await.unwrap();
+        }
+    });
+}
+
+#[derive(Clone, Copy)]
+enum Step {
+    Wait,
+    Duplicate,
+    Complete,
+    Deadline,
+}
+
+/// Runs the coordinator against the real monitor and private bus, with the
+/// native adapter's prepare, write and finish sequence.
+struct Bus {
+    monitor: crate::network_monitor::Monitor,
+    client: zbus::Connection,
+    server: zbus::Connection,
+    fixture: Arc<Fixture>,
+    uid: u32,
+    ms: u64,
+    steps: std::collections::VecDeque<Step>,
+    pauses: Arc<AtomicU32>,
+}
+
+impl crate::network_controller::Backend for Bus {
+    type ShutdownGuard = ();
+    fn clock(&mut self) -> Result<crate::network_policy::Clock> {
+        Ok(crate::network_policy::Clock {
+            boot_id: "11111111-2222-3333-4444-555555555555".into(),
+            ms: self.ms,
+        })
+    }
+    fn snapshot(&mut self) -> Result<crate::network_controller::Snapshot> {
+        let (radio, change) = futures_lite::future::block_on(self.monitor.observe())?;
+        Ok(crate::network_controller::Snapshot {
+            clock: self.clock()?,
+            radio,
+            activity: crate::network_policy::Activity {
+                ssh_sessions: Some(false),
+                checkpoints: None,
+                install_lock: Some(false),
+                operations: Some(false),
+            },
+            change,
+            expected: self.monitor.expected(),
+        })
+    }
+    fn shutdown_guard(&mut self) -> Result<Option<()>> {
+        Ok(Some(()))
+    }
+    fn set_wireless(
+        &mut self,
+        expected: &Observation,
+        enabled: bool,
+    ) -> Result<crate::network_controller::WriteResult> {
+        if !futures_lite::future::block_on(self.monitor.prepare(expected, enabled))
+            .is_ok_and(|ready| ready)
+        {
+            return Ok(crate::network_controller::WriteResult::NotSubmitted);
+        }
+        let result = futures_lite::future::block_on(crate::network_radio::write(
+            &self.client,
+            self.uid,
+            expected,
+            enabled,
+        ));
+        self.monitor.finish_write(&result);
+        result
+    }
+    fn pause(&mut self, duration: Duration) {
+        self.ms += duration.as_millis() as u64;
+        self.pauses.fetch_add(1, Ordering::SeqCst);
+        match self.steps.pop_front().unwrap_or(Step::Wait) {
+            Step::Wait => {}
+            Step::Duplicate => futures_lite::future::block_on(wireless_signal(&self.server, false)),
+            Step::Complete => {
+                self.fixture.radio_off.store(false, Ordering::SeqCst);
+                futures_lite::future::block_on(wireless_signal(&self.server, true));
+            }
+            Step::Deadline => self.monitor.reach_deadline(),
+        }
+    }
+}
+
+#[test]
+fn coordinator_waits_for_a_delayed_readback_from_the_real_monitor() {
+    use crate::network_controller::{Availability, Controller, Suspension};
+    use crate::network_monitor::Monitor;
+    use crate::network_policy::{Caller, HoldKind, HoldToken, Policy};
+    for (steps, completes) in [
+        (vec![Step::Wait, Step::Complete], true),
+        (vec![Step::Duplicate, Step::Duplicate, Step::Complete], true),
+        (vec![Step::Duplicate, Step::Deadline], false),
+    ] {
+        let bus = PrivateBus::new();
+        let fixture = Arc::new(Fixture::default());
+        fixture.controls.store(true, Ordering::SeqCst);
+        fixture.radio_off.store(true, Ordering::SeqCst);
+        fixture.delay_write.store(true, Ordering::SeqCst);
+        let uid = unsafe { libc::geteuid() };
+        let (server, monitor, client) = futures_lite::future::block_on(async {
+            let server = server(&bus, &fixture).await;
+            let monitor = Monitor::connect(bus.connect().await, uid).await.unwrap();
+            (server, monitor, bus.connect().await)
+        });
+        let pauses = Arc::new(AtomicU32::new(0));
+        let backend = Bus {
+            monitor,
+            client,
+            server: server.clone(),
+            fixture: fixture.clone(),
+            uid,
+            ms: 0,
+            steps: steps.iter().copied().collect(),
+            pauses: pauses.clone(),
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let mut controller = Controller::open(&temp.path().join("network"), backend).unwrap();
+        let generation = controller.status().unwrap().policy.generation;
+        let policy = Policy {
+            partial_offline: true,
+            stay_connected: false,
+        };
+        controller.set_policy(generation, policy).unwrap();
+        let token = HoldToken::parse("a".repeat(64)).unwrap();
+        let caller = Caller {
+            uid: 1000,
+            pid: 73,
+            process_start_ticks: 17,
+        };
+        // The setup hold restores Wi-Fi; NM replies before exporting it.
+        let admitted = controller.admit(&token, caller, HoldKind::Setup);
+        assert_eq!(pauses.load(Ordering::SeqCst) as usize, steps.len());
+        if completes {
+            let admitted = admitted.unwrap();
+            assert_eq!(admitted.availability, Availability::WirelessReady);
+            assert!(admitted.status.pending.is_none());
+            assert!(admitted.status.suspended.is_none());
+        } else {
+            assert!(admitted.is_err());
+            // A late completion is visible but does not complete the write.
+            fixture.radio_off.store(false, Ordering::SeqCst);
+            futures_lite::future::block_on(wireless_signal(&server, true));
+            let status = controller.tick().unwrap();
+            assert!(status.actual.unwrap().wireless_enabled);
+            assert_eq!(status.suspended, Some(Suspension::ObservationLost));
+            assert!(
+                status
+                    .pending
+                    .is_some_and(|p| p.method_returned && p.target_enabled)
+            );
+            assert!(controller.admit(&token, caller, HoldKind::Setup).is_err());
+            assert_eq!(pauses.load(Ordering::SeqCst) as usize, steps.len());
+        }
+        assert_eq!(fixture.mutations.load(Ordering::SeqCst), 1);
+    }
 }
 
 #[test]

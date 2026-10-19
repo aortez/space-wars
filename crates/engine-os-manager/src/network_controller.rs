@@ -9,8 +9,13 @@ use crate::network_radio_state::{Pending, Phase, RadioState, Witness};
 use crate::{Error, Result};
 use serde::Serialize;
 use std::path::Path;
+use std::time::Duration;
 
 pub use crate::network_radio_state::Suspension;
+
+/// The monitor's deadline ends a readback wait; this only caps one call.
+const READBACK_POLL: Duration = Duration::from_millis(100);
+const READBACK_POLLS: usize = 50;
 
 pub struct Snapshot {
     pub clock: Clock,
@@ -18,6 +23,9 @@ pub struct Snapshot {
     pub activity: Activity,
     /// Latched continuous-monitor evidence, even if the current values match.
     pub change: Option<Suspension>,
+    /// The monitor's single prepared target, while its original deadline is
+    /// live. A reopened monitor has none, so a restart cannot extend a wait.
+    pub expected: Option<bool>,
 }
 
 /// A successful D-Bus reply fences the request, but still requires readback.
@@ -48,6 +56,10 @@ pub trait Backend {
     fn reconcile(&mut self) -> Result<()> {
         Ok(())
     }
+    /// Spaces read-only observations while a returned command awaits readback.
+    fn pause(&mut self, duration: Duration) {
+        std::thread::sleep(duration);
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -58,6 +70,8 @@ pub enum Deferred {
     RadioUnavailable,
     Suspended,
     CommandUncertain,
+    /// A returned command awaits readback within the monitor's deadline.
+    ReadbackPending,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -318,7 +332,7 @@ impl<B: Backend> Controller<B> {
     }
 
     pub fn tick(&mut self) -> Result<Status> {
-        let Some(mut snapshot) = self.refresh()? else {
+        let Some(mut snapshot) = self.settle()? else {
             return self.report();
         };
         let Some(enabled) = self.desired(&snapshot)? else {
@@ -374,7 +388,7 @@ impl<B: Backend> Controller<B> {
             Ok(WriteResult::Returned) => {
                 state.pending.as_mut().expect("saved transition").phase = Phase::Returned;
                 self.policy.save_radio(state, &clock)?;
-                self.refresh()?;
+                self.settle()?;
             }
             Ok(WriteResult::Rejected) => {
                 state.pending = None;
@@ -423,12 +437,27 @@ impl<B: Backend> Controller<B> {
         Ok(Some(snapshot))
     }
 
+    /// Refresh, then keep observing while a returned command's readback is
+    /// deferred. This never repeats Set; the monitor's deadline ends the wait.
+    fn settle(&mut self) -> Result<Option<Snapshot>> {
+        let mut snapshot = self.refresh()?;
+        for _ in 0..READBACK_POLLS {
+            if self.deferred != Some(Deferred::ReadbackPending) {
+                break;
+            }
+            self.backend.pause(READBACK_POLL);
+            snapshot = self.refresh()?;
+        }
+        Ok(snapshot)
+    }
+
     fn refresh(&mut self) -> Result<Option<Snapshot>> {
         let Some(snapshot) = self.snapshot()? else {
             return Ok(None);
         };
         let mut state = self.policy.radio(&snapshot.clock)?;
         let observed = Witness::new(&snapshot.clock, &snapshot.radio);
+        let mut awaiting = false;
         if state.suspended.is_none() {
             state.suspended = snapshot.change;
         }
@@ -439,12 +468,20 @@ impl<B: Backend> Controller<B> {
                 let mut expected = pending.before.clone();
                 expected.wireless = pending.enabled;
                 // A reply followed by a daemon/reboot change is not attribution.
-                if expected != observed {
-                    state.suspended = Some(Suspension::ReadbackMismatch);
-                } else {
+                if expected == observed {
                     state.owned_off = !pending.enabled;
                     state.witness = Some(observed);
                     state.pending = None;
+                } else if observed == pending.before
+                    && snapshot.radio.wireless_hardware_enabled
+                    && snapshot.expected == Some(pending.enabled)
+                {
+                    // NM can return from Set before its cached rfkill state is
+                    // exported. Only the monitor's original, still-live
+                    // transition defers an otherwise unchanged readback.
+                    awaiting = true;
+                } else {
+                    state.suspended = Some(Suspension::ReadbackMismatch);
                 }
             }
         } else if state.suspended.is_none() {
@@ -459,7 +496,9 @@ impl<B: Backend> Controller<B> {
             }
         }
         self.policy.save_radio(state.clone(), &snapshot.clock)?;
-        self.deferred = if state.pending.is_some() {
+        self.deferred = if awaiting {
+            Some(Deferred::ReadbackPending)
+        } else if state.pending.is_some() {
             Some(Deferred::CommandUncertain)
         } else if state.suspended.is_some() {
             Some(Deferred::Suspended)
