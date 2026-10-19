@@ -5,6 +5,7 @@ mod autonomous_tests;
 mod calendar;
 #[cfg(test)]
 mod calendar_tests;
+pub mod ceiling;
 #[cfg(test)]
 mod cell_swap_tests;
 mod crow;
@@ -378,6 +379,9 @@ pub struct ClockConfig {
     pub water_lab: ClockWaterLab,
     /// Explicit reproducible full-sun fixture; ordinary Clock remains dim.
     pub favorable_grass_fixture: bool,
+    /// Isolate the pre-existing zero-input physiology fixture from sunlight.
+    /// Ordinary Clock always enables aperture illumination.
+    pub ceiling_sunlight: bool,
     /// Read-only material-coordinate cutaway below the Clock face.
     pub grass_inspection: bool,
     /// None chooses a seeded personality once per Duck event.
@@ -403,6 +407,7 @@ impl Default for ClockConfig {
             duck_direct_flap_landing: false,
             water_lab: ClockWaterLab::Off,
             favorable_grass_fixture: false,
+            ceiling_sunlight: true,
             grass_inspection: false,
             duck_jump_profile: None,
             duck_course_pattern: None,
@@ -427,6 +432,7 @@ impl ClockConfig {
             duck_direct_flap_landing: self.duck_direct_flap_landing,
             water_lab: self.water_lab,
             favorable_grass_fixture: self.favorable_grass_fixture,
+            ceiling_sunlight: self.ceiling_sunlight,
             grass_inspection: self.grass_inspection,
             duck_jump_profile: self.duck_jump_profile,
             duck_course_pattern: self.duck_course_pattern,
@@ -451,6 +457,7 @@ pub struct ClockState {
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
     floor: floor::FloorManager,
+    ceiling: ceiling::Ceiling,
     soil: Option<grass::SoilHabitat>,
     plants: grass::ClockPlants,
     grass_refusal: Option<&'static str>,
@@ -477,6 +484,23 @@ impl ClockState {
             .map(|s| s.accounting())
             .unwrap_or_default();
         engine_common::ClockGrassState {
+            ceiling_optics: render::ceiling::optical_evidence(self),
+            ceiling_phase: format!("{:?}", self.ceiling.phase).to_lowercase(),
+            ceiling_elapsed_ms: self.ceiling.elapsed.as_millis().min(u64::MAX as u128) as u64,
+            ceiling_opening_milli: (self.ceiling.fraction() * 1000.0).round() as u16,
+            ceiling_sequence: self.ceiling.sequence,
+            ceiling_deliveries: self.ceiling.deliveries,
+            ceiling_cancellations: self.ceiling.cancellations,
+            ceiling_pending_material: self.ceiling.material.len(),
+            ceiling_planned_material: self.ceiling.planned_material,
+            ceiling_committed_material: self.ceiling.committed_material,
+            ceiling_cancelled_material: self.ceiling.cancelled_material,
+            stressed_tissues: o
+                .tissues
+                .iter()
+                .filter(|t| t.health > 0 && (t.shade_ticks > 0 || t.shortage_ticks > 0))
+                .count(),
+            dead_tissues: o.tissues.iter().filter(|t| t.health == 0).count(),
             biology_tick: o.tick,
             soil_added: soil.added,
             soil_retained: soil.retained,
@@ -525,33 +549,44 @@ impl ClockState {
         };
         self.grass_refusal = refusal;
         if refusal.is_none() {
-            self.admit_soil();
+            self.admit_soil_with_region(true);
             let soil = self.soil.as_ref().unwrap();
             let width = soil.terrain().width() as i32;
             let mut rng = StdRng::seed_from_u64(seed);
             let start = if self.config.favorable_grass_fixture {
                 10
+            } else if self.ceiling.phase != ceiling::Phase::Closed {
+                let layout = Layout::new(self.aspect_ratio());
+                let (left, right) = ceiling::Ceiling::region(layout);
+                (((left + right) * 0.5 - layout.bounds_min.x) / grass::SOIL_CELL_SIZE) as i32
             } else {
                 rng.random_range(0..width)
             };
             let offsets = [0, -grass::SEED_SPACING_CELLS, grass::SEED_SPACING_CELLS];
-            let center = (0..width).map(|i| (start + i) % width).find(|center| {
-                offsets.iter().all(|offset| {
-                    let x = center + offset;
-                    soil.terrain()
-                        .cell(engine_terrain::CellCoord::new(
-                            x,
-                            grass::SOIL_DEPTH_CELLS as i32 - 1,
-                        ))
-                        .is_some_and(|c| c.material == grass::CLOCK_DIRT)
-                        && soil
-                            .world_point([x, grass::SOIL_DEPTH_CELLS as i32 - 1])
-                            .is_some()
-                })
-            });
+            let region = ceiling::Ceiling::region(Layout::new(self.aspect_ratio()));
+            let eligible = |x| {
+                let cell = [x, grass::SOIL_DEPTH_CELLS as i32 - 1];
+                soil.terrain()
+                    .cell(engine_terrain::CellCoord::new(cell[0], cell[1]))
+                    .is_some_and(|c| c.material == grass::CLOCK_DIRT)
+                    && soil.world_point(cell).is_some_and(|p| {
+                        self.config.favorable_grass_fixture || (p.x >= region.0 && p.x <= region.1)
+                    })
+            };
+            let center = (0..width)
+                .map(|i| (start + i) % width)
+                .find(|x| eligible(*x));
             if let Some(center) = center {
-                for offset in offsets.into_iter().take(grass::SEED_BATCH) {
-                    if self.plant_grass(center + offset).is_ok() {
+                // Narrow margins admit fewer finite seeds, rather than placing
+                // the side seeds under digits or outside the planned habitat.
+                let sites: Vec<_> = offsets
+                    .into_iter()
+                    .take(grass::SEED_BATCH)
+                    .map(|offset| center + offset)
+                    .filter(|x| eligible(*x))
+                    .collect();
+                for x in sites {
+                    if self.plant_grass(x).is_ok() {
                         self.grass_seeded += 1;
                     }
                 }
@@ -559,7 +594,7 @@ impl ClockState {
                     self.grass_refusal = Some("No seed capacity or safe dirt contact");
                 }
             } else {
-                self.grass_refusal = Some("No safe dirt habitat fits the seed spacing");
+                self.grass_refusal = Some("No safe dirt habitat fits a seed");
             }
         }
         self.event_notice = Some((
@@ -626,16 +661,43 @@ impl ClockState {
     /// Material commitment seam for the forthcoming seeding introduction.
     /// Admission alone does not introduce seeds or modify the event schedule.
     pub fn admit_soil(&mut self) -> grass::SoilAdmissionPlan {
+        self.admit_soil_with_region(false)
+    }
+    fn admit_soil_with_region(&mut self, aperture_only: bool) -> grass::SoilAdmissionPlan {
         use engine_rapier::world::{CollisionGroups, PhysicsId};
         let layout = Layout::new(self.aspect_ratio());
         self.synchronize_soil();
         let (surfaces, _) = self.soil_surfaces();
-        let supports: Vec<_> = surfaces.iter().map(|s| (s.left, s.right)).collect();
+        let region = ceiling::Ceiling::region(layout);
+        let supports: Vec<_> = surfaces
+            .iter()
+            .map(|s| {
+                if !aperture_only || self.config.favorable_grass_fixture {
+                    (s.left, s.right)
+                } else {
+                    (s.left.max(region.0), s.right.min(region.1))
+                }
+            })
+            .filter(|(a, b)| a < b)
+            .collect();
         let world = grass::surfaces::world(&self.active_event, self.duck_visit.as_deref());
         let soil = self
             .soil
             .get_or_insert_with(|| grass::SoilHabitat::new(layout));
+        let allowed = aperture_only.then(|| {
+            self.ceiling
+                .material
+                .iter()
+                .map(|s| (s.column, s.row))
+                .collect::<std::collections::BTreeSet<_>>()
+        });
         let plan = soil.admit(&supports, |site| {
+            if allowed
+                .as_ref()
+                .is_some_and(|sites| !sites.contains(&(site.column, site.row)))
+            {
+                return true;
+            }
             let Some(surface) = surfaces.iter().find(|s| s.covers(site.min.x, site.max.x)) else {
                 return true;
             };
@@ -753,6 +815,9 @@ impl ClockState {
         self.config.time_format = settings.time_format;
         self.config.show_date = settings.show_date;
         self.config.event_profile = settings.event_profile;
+        if !settings.events.grass {
+            self.ceiling.disable_delivery();
+        }
         self.config.events = settings.events;
         self.config.marquee_preset = settings.marquee_preset;
         self.config.marquee_message = settings.marquee_message;
@@ -831,6 +896,7 @@ impl ClockState {
         if self.config.aspect_ratio == aspect_ratio {
             return;
         }
+        self.cancel_ceiling();
         self.config.aspect_ratio = aspect_ratio;
         // A resize changes both anchors and floor geometry. Recover immediately
         // instead of leaving bodies in the old arena or teleporting colliders.
@@ -930,7 +996,9 @@ impl ClockState {
     }
 
     fn event_blocked(&self, kind: ClockEventKind) -> bool {
-        self.event_blocked_by_duck(kind) || self.event_blocked_by_crow(kind)
+        self.event_blocked_by_duck(kind)
+            || self.event_blocked_by_crow(kind)
+            || kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed
     }
 
     fn finish_crow_visit(&mut self) {
@@ -977,6 +1045,14 @@ impl ClockState {
 
     fn preview_event(&mut self, kind: ClockEventKind) {
         if self.reading.is_some() {
+            if kind == ClockEventKind::Grass && !self.config.events.grass {
+                self.grass_refusal = Some("Future grass seeding is disabled");
+                return;
+            }
+            if kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed {
+                self.grass_refusal = Some("Ceiling opening is already active");
+                return;
+            }
             if self.event_blocked_by_crow(kind) {
                 self.event_notice = Some(("Crow is already visiting", self.schedule.tick + 120));
                 return;
@@ -1002,6 +1078,7 @@ impl ClockState {
     }
 
     fn next_event(&mut self) {
+        self.cancel_ceiling();
         if self.reading.is_none() {
             return;
         }
@@ -1054,7 +1131,17 @@ impl ClockState {
             self.sync_event_schedule();
             return;
         }
+        if !ceiling::compatible_event(kind) {
+            self.cancel_ceiling();
+        }
         let seed = self.schedule.start(kind);
+        if kind == ClockEventKind::Grass {
+            if self.config.events.grass && self.ceiling.start(seed) {
+                self.plan_ceiling_material();
+                // Delivery belongs to the aperture, not the short notice event.
+                self.event_notice = Some(("Ceiling opening", self.schedule.tick + 360));
+            }
+        }
         let layout = Layout::new(self.aspect_ratio());
         if kind == ClockEventKind::Duck {
             let mut duck =
@@ -1267,13 +1354,6 @@ impl ClockState {
     /// Reports whether the event already stepped the visit's mechanics world.
     /// This remains true on its final tick, after cleanup removes the event.
     fn step_active_event(&mut self, layout: Layout) -> bool {
-        let seed = match &mut self.active_event {
-            Some(ActiveEvent::Grass(event)) => event.take_seed(),
-            _ => None,
-        };
-        if let Some(seed) = seed {
-            self.introduce_grass(seed);
-        }
         self.synchronize_soil();
         let event = self.active_event.as_mut().expect("active event");
         let visit_advanced = event.shares_visit_arena();
@@ -1412,6 +1492,7 @@ impl Scenario for ClockScenario {
             floor: floor::FloorManager::default(),
             soil: None,
             plants,
+            ceiling: ceiling::Ceiling::default(),
             grass_refusal: None,
             grass_seeded: 0,
             last_started_event: None,
@@ -1438,6 +1519,29 @@ impl Scenario for ClockScenario {
                 ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
         }
+        let delivery = state.ceiling.advance(dt);
+        if let Some(seed) = delivery {
+            let before = state
+                .soil
+                .as_ref()
+                .map(|s| s.accounting().added)
+                .unwrap_or(0);
+            state.introduce_grass(seed);
+            let added = state
+                .soil
+                .as_ref()
+                .map(|s| s.accounting().added)
+                .unwrap_or(0)
+                - before;
+            state.ceiling.committed_material += added;
+            state.ceiling.cancelled_material +=
+                (state.ceiling.material.len() as u64).saturating_sub(added);
+            state.ceiling.material.clear();
+        }
+        state.plants.aperture = state
+            .ceiling
+            .source(Layout::new(state.aspect_ratio()))
+            .filter(|_| state.config.ceiling_sunlight);
         state.synchronize_soil();
         // The fixed-timestep host supplies one tick per call. Zero duration is
         // used to synchronize inputs/control actions without advancing physics.
@@ -1451,6 +1555,10 @@ impl Scenario for ClockScenario {
             soil.advance_loss(dt);
         }
         state.synchronize_soil();
+        state.plants.aperture = state
+            .ceiling
+            .source(Layout::new(state.aspect_ratio()))
+            .filter(|_| state.config.ceiling_sunlight);
         state.advance_plants(dt);
         StepResult::default()
     }

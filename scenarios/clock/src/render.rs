@@ -10,6 +10,7 @@ use crate::{
 use engine_core::Vec2;
 
 mod aquarium;
+pub(crate) mod ceiling;
 mod cell_swap;
 mod crow;
 mod digit_slide;
@@ -91,6 +92,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     );
     frame::render(&mut frame, state, layout);
     render_canopy(&mut frame, layout);
+    ceiling::render(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Aquarium(event)) = &state.active_event {
         aquarium::water(&mut frame, event);
         floor::responsive(&mut frame, &event.floor, layout, 1.0);
@@ -176,28 +178,21 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             .iter()
             .filter(|t| t.role == engine_core::plants::Role::Shoot)
         {
-            if let (Some(center), Some(surface)) = (
-                soil.world_point(tissue.cell),
-                soil.surface_at(tissue.cell[0]),
-            ) {
-                let progress = tissue.development[0] as f32
-                    / observation.config.development_per_size[0] as f32;
-                let height = (f32::from(tissue.size) + progress) * 2.0;
-                let points = [
-                    Vec2::new(-0.5, -1.0),
-                    Vec2::new(0.5, -1.0),
-                    Vec2::new(0.0, height),
-                ]
-                .map(|p| {
-                    let p = center + p.rotate_radians(surface.angle);
-                    RenderPoint::new(p.x, p.y)
-                });
+            if let Some(points) = crate::grass::residents::shoot_polygon(tissue, &observation, soil)
+            {
+                let points = points
+                    .into_iter()
+                    .map(|p| RenderPoint::new(p.x, p.y))
+                    .collect();
                 frame.push_primitive(
                     ARENA_LAYER,
                     RenderPrimitive::Polygon(RenderPolygon::filled(
-                        points.to_vec(),
+                        points,
                         if tissue.health == 0 {
                             RenderColor::rgb(0.35, 0.28, 0.12)
+                        } else if tissue.shade_ticks > 0 || tissue.shortage_ticks > 0 {
+                            let health = f32::from(tissue.health) / 100.0;
+                            RenderColor::rgb(0.45 - 0.23 * health, 0.32 + 0.33 * health, 0.12)
                         } else {
                             RenderColor::rgb(0.22, 0.65, 0.16)
                         },

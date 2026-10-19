@@ -2770,3 +2770,6 @@ original saved settings were restored after the check.
 [Live Clock controls](screenshots/clock/live-controls.png) ·
 [Falling preview](screenshots/clock/live-falling.png) ·
 [Color Cycle replacing Falling](screenshots/clock/live-color-cycle.png)
+
+The Grass introduction also starts a temporary sunlight opportunity. See
+[ceiling timing, material ownership and measured decline](clock-ceiling.md).

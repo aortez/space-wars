@@ -745,6 +745,32 @@ impl ClockEvents {
 /// Persistent Clock habitat and paid plant diagnostics, including between events.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockGrassState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ceiling_optics: Option<ClockCeilingOptics>,
+    #[serde(default)]
+    pub ceiling_phase: String,
+    #[serde(default)]
+    pub ceiling_elapsed_ms: u64,
+    #[serde(default)]
+    pub ceiling_opening_milli: u16,
+    #[serde(default)]
+    pub ceiling_sequence: u64,
+    #[serde(default)]
+    pub ceiling_deliveries: u64,
+    #[serde(default)]
+    pub ceiling_cancellations: u64,
+    #[serde(default)]
+    pub ceiling_pending_material: usize,
+    #[serde(default)]
+    pub ceiling_planned_material: u64,
+    #[serde(default)]
+    pub ceiling_committed_material: u64,
+    #[serde(default)]
+    pub ceiling_cancelled_material: u64,
+    #[serde(default)]
+    pub stressed_tissues: usize,
+    #[serde(default)]
+    pub dead_tissues: usize,
     pub biology_tick: u64,
     pub soil_added: u64,
     pub soil_retained: usize,
@@ -763,6 +789,27 @@ pub struct ClockGrassState {
     pub optical_refusals: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inspection: Option<ClockGrassInspection>,
+}
+
+/// Same completed simulation boundary used by sunlight presentation and queries.
+/// Coordinates are world units ×1000; intensities are ordinary 0–1000 units.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCeilingOptics {
+    pub simulation_tick: u64,
+    pub geometry_generation: u64,
+    pub source_id: [u64; 2],
+    pub aperture_milli: [i32; 3],
+    pub collider_generations: Vec<[u64; 4]>,
+    pub moving_blocker: Option<[u64; 2]>,
+    pub silhouettes_milli: Vec<Vec<[i32; 2]>>,
+    pub samples: Vec<ClockCeilingSample>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCeilingSample {
+    pub position_milli: [i32; 2],
+    pub intensity: u16,
+    pub sunlight: u16,
+    pub first_blocker: Option<[u64; 2]>,
 }
 
 /// Bounded read-only view of one retained organism, in stable material cells.

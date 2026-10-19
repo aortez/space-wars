@@ -131,6 +131,7 @@ struct JumpTrial {
 }
 
 pub(super) struct Controller {
+    pub retained_soil_steps: bool,
     pub profile: ClockDuckJumpProfile,
     pub behavior: ClockDuckBehavior,
     pub direction: f32,
@@ -157,6 +158,7 @@ impl Controller {
             profile: ClockDuckJumpProfile::Careful,
             behavior: ClockDuckBehavior::WarmingUp,
             direction: 1.0,
+            retained_soil_steps: false,
             wall_tags: [0; 2],
             target_obstacle: None,
             cleared: 0,

@@ -58,6 +58,22 @@
       "reason": "Repeated idle/pause/countdown/relaunch waits; automatic launch, disable and preference-preservation smoke stays on PRs."
     },
     {
+      "test": "clock::ceiling_opening_raster_moving_blocker_evidence",
+      "reason": "Normal-speed moving-solid crossing with frozen same-pose screenshots and fresh exposure; bounded grass admission/control smoke remains on PRs."
+    },
+    {
+      "test": "clock::ceiling_opening_raster_normal_speed_and_aftermath",
+      "reason": "Complete 300-second unpaused sunlight hold, closing and five-minute aftermath at 1x; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
+    },
+    {
+      "test": "clock::ceiling_opening_vector_moving_blocker_evidence",
+      "reason": "Normal-speed moving-solid crossing with frozen same-pose screenshots and fresh exposure; bounded grass admission/control smoke remains on PRs."
+    },
+    {
+      "test": "clock::ceiling_opening_vector_normal_speed_and_aftermath",
+      "reason": "Complete 300-second unpaused sunlight hold, closing and five-minute aftermath at 1x; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
+    },
+    {
       "test": "clock::demo_profile_automatically_runs_multiple_bounded_events",
       "reason": "Repeated automatic event visits; individual event controls and cleanup stay on PRs."
     },

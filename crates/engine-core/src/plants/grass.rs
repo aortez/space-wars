@@ -3,10 +3,15 @@ use super::*;
 
 pub const POLICY: u64 = 0x6772_6173_7300_0002;
 
-/// Garden profile v2: resource units per size per one-second tick.
+/// Shared gradual grass profile v3: resource units per size per one-second tick.
+pub const DECLINE_GRACE_SECONDS: u32 = 60;
+pub const DECLINE_DAMAGE_PER_SECOND: u16 = 1;
+
 pub fn physiology() -> Config {
     Config {
-        identity: 2,
+        identity: 3,
+        grace_ticks: DECLINE_GRACE_SECONDS,
+        damage_per_tick: DECLINE_DAMAGE_PER_SECOND,
         root_intake_per_size: [8, 8, 0],
         development_per_size: [10; 3],
         ..Config::default()

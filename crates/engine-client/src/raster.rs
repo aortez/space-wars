@@ -1472,32 +1472,64 @@ fn fill_convex_polygon(
         return;
     };
 
-    // Scan the convex boundary once, instead of a triangle fan. Shared fan
-    // edges used to blend twice, making bright diagonal seams at partial alpha.
-    // One span per row also avoids repeated work and needs no scratch allocation.
+    // Even/odd scan conversion also supports the ceiling's concave shadow
+    // envelope. Union rounded spans before blending: subpixel gaps or touching
+    // boundaries must never apply the same translucent fill twice to a pixel.
+    // Ordinary convex primitives keep stack scratch; only large authored
+    // contours allocate, once per primitive rather than once per scanline.
+    let mut stack = [0.0_f32; MAX_STACK_POINTS];
+    let mut heap = Vec::new();
+    let intersections: &mut [f32] = if points.len() <= MAX_STACK_POINTS {
+        &mut stack[..points.len()]
+    } else {
+        heap.resize(points.len(), 0.0);
+        &mut heap
+    };
     for y in draw_clip.min_y..=draw_clip.max_y {
         let scan_y = y as f32 + 0.5;
-        let mut left = f32::INFINITY;
-        let mut right = f32::NEG_INFINITY;
+        let mut count = 0;
         let mut start = points[points.len() - 1];
         for &end in points {
             if (start.y <= scan_y && end.y > scan_y) || (end.y <= scan_y && start.y > scan_y) {
                 let t = (scan_y - start.y) / (end.y - start.y);
-                let x = start.x + (end.x - start.x) * t;
-                left = left.min(x);
-                right = right.max(x);
+                intersections[count] = start.x + (end.x - start.x) * t;
+                count += 1;
             }
             start = end;
         }
-        if left <= right {
+        let intersections = &mut intersections[..count];
+        intersections.sort_by(f32::total_cmp);
+        let mut pending: Option<(i32, i32)> = None;
+        for pair in intersections.chunks_exact(2) {
+            let span = (pair[0].floor() as i32, pair[1].ceil() as i32);
+            if let Some((left, right)) = pending {
+                if span.0 <= right.saturating_add(1) {
+                    pending = Some((left, right.max(span.1)));
+                    continue;
+                }
+                fill_span(
+                    pixels,
+                    width,
+                    height,
+                    draw_clip,
+                    y,
+                    left,
+                    right,
+                    raster_color,
+                    SpanFillMode::Normal,
+                );
+            }
+            pending = Some(span);
+        }
+        if let Some((left, right)) = pending {
             fill_span(
                 pixels,
                 width,
                 height,
                 draw_clip,
                 y,
-                left.floor() as i32,
-                right.ceil() as i32,
+                left,
+                right,
                 raster_color,
                 SpanFillMode::Normal,
             );
@@ -1731,6 +1763,114 @@ mod tests {
         Camera2, ClockEventKind, ClockEventProfile, Fill, RenderCircle, RenderFrame, RenderLine,
         RenderPrimitive, Scenario, Stroke,
     };
+
+    #[test]
+    fn ceiling_beam_pixels_blend_once_and_keep_concave_shadows() {
+        // Two shadow notches, including one subpixel notch. Outward-rounded
+        // spans overlap at the small notch; that pixel must still blend once.
+        let points: Vec<_> = [
+            (2., 2.),
+            (30., 2.),
+            (30., 28.),
+            (20., 28.),
+            (20., 10.),
+            (19.8, 10.),
+            (19.8, 28.),
+            (12., 28.),
+            (12., 12.),
+            (8., 12.),
+            (8., 28.),
+            (2., 28.),
+        ]
+        .into_iter()
+        .map(|(x, y)| PixelPoint { x, y })
+        .collect();
+        let mut pixels = vec![BACKGROUND; 32 * 32];
+        let color = RenderColor::rgba(1.0, 0.87, 0.46, 0.12);
+        let clip = PixelClip::new(32, 32, 0, 31, 0, 31).unwrap();
+        fill_convex_polygon(&mut pixels, 32, 32, clip, &points, color);
+        let once = pixels[4 * 32 + 4];
+        assert_ne!(once, BACKGROUND);
+        assert!(
+            pixels.iter().all(|p| *p == BACKGROUND || *p == once),
+            "any brighter value is repeated alpha coverage"
+        );
+        assert_eq!(
+            pixels[20 * 32 + 10],
+            BACKGROUND,
+            "opaque notch remains dark"
+        );
+        assert_eq!(
+            pixels[20 * 32 + 20],
+            once,
+            "subpixel pieces share a pixel only once"
+        );
+    }
+
+    #[test]
+    fn ceiling_beam_actual_frames_have_no_tessellation_bands() {
+        use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
+        let mut state = ClockScenario::init(
+            ClockConfig {
+                event_profile: ClockEventProfile::Off,
+                ..Default::default()
+            },
+            4242,
+        );
+        ClockScenario::step(
+            &mut state,
+            &[
+                ClockAction::set_reading(ClockReading::new(12, 34, 0).unwrap()),
+                ClockAction::trigger_event(ClockEventKind::Grass),
+            ],
+            Duration::ZERO,
+        );
+        let color = RenderColor::rgba(1.0, 0.87, 0.46, 0.12);
+        let mut renderer = RasterRenderer::new();
+        // Opening, fully open with paid tissue, and partial closing. Isolate
+        // only the actual authored beam; every lit pixel must have one blend.
+        for target in [60, 30 * 60, 31 * 60, 32 * 60, 335 * 60] {
+            while state.simulation_tick() < target {
+                ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+            }
+            if target == 30 * 60 {
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::trigger_event(ClockEventKind::Duck)],
+                    Duration::ZERO,
+                );
+            }
+            let mut frame = ClockScenario::render_frame(&state);
+            let mut count = 0;
+            for layer in &mut frame.layers {
+                layer.primitives.retain(|p| {
+                    matches!(p, RenderPrimitive::Polygon(p)
+                    if p.fill.is_some_and(|f| f.color == color))
+                });
+                count += layer.primitives.len();
+            }
+            assert_eq!(count, 1, "one coverage outline per frame");
+            for (width, height) in [(320, 180), (853, 480), (1280, 720)] {
+                let image = renderer.image_from_frames_with_layout(
+                    &[frame.clone()],
+                    Viewport::new(width as f32, height as f32),
+                    FrameLayout::EqualHorizontal,
+                    RasterOptions::default(),
+                );
+                let rgb = image.to_rgb8().unwrap();
+                let lit: Vec<_> = rgb
+                    .as_slice()
+                    .iter()
+                    .filter(|p| **p != BACKGROUND)
+                    .collect();
+                assert!(!lit.is_empty());
+                assert!(
+                    lit.iter().all(|p| *p == lit[0]),
+                    "bands at tick={target}, size={width}x{height}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn bulk_rgb_fill_matches_slice_fill_including_short_spans_and_tails() {

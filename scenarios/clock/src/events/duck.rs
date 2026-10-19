@@ -60,7 +60,7 @@ const RESET_TICKS: u64 = 30;
 const DT: f32 = 1.0 / 60.0;
 const DUCK_ENTITY: PhysicsId = PhysicsId::new(1);
 const DUCK_BODY: BodyId = BodyId::new(DUCK_ENTITY, BodyRole::PRIMARY);
-const DUCK_COLLIDER: ColliderId = ColliderId::new(DUCK_ENTITY, ColliderRole::PRIMARY, 0);
+pub(crate) const DUCK_COLLIDER: ColliderId = ColliderId::new(DUCK_ENTITY, ColliderRole::PRIMARY, 0);
 const DUCK_DENSITY: f32 = 0.45;
 const PLAYER_EXIT_DELAY_TICKS: u64 = 44;
 // One third of the dry actuator's acceleration. Water drag sets the eventual
@@ -89,6 +89,7 @@ pub(crate) struct DuckEvent {
     // Derived from current retained soil; never changes authored arena geometry.
     soil_course: Option<planner::Course>,
     soil_supports: Vec<(usize, Vec2, Vec2)>,
+    soil_navigation_owners: Vec<usize>,
     // Rain/Meltdown advance the authoritative actuator while active. This small
     // snapshot drives contacts/rendering; after the wet event, it settles dry.
     responsive_floor: Option<ResponsiveFloor>,
@@ -320,6 +321,7 @@ impl DuckEvent {
             course: None,
             soil_course: None,
             soil_supports: Vec::new(),
+            soil_navigation_owners: Vec::new(),
             responsive_floor: None,
             drain_floor: None,
             spawn_motion: None,
@@ -549,16 +551,35 @@ impl DuckEvent {
                 if contact.collider.entity.value() == crate::grass::SOIL_PHYSICS_ID {
                     // Soil is a fixed compound at the world origin. Its local
                     // surface point stays on the material even during penetration.
-                    return self.soil_supports.iter().find_map(|(index, min, max)| {
+                    let result = self.soil_supports.iter().find_map(|(index, min, max)| {
                         (contact.local_surface.position.x >= min.x
                             && contact.local_surface.position.x <= max.x
                             && (contact.local_surface.position.y - max.y).abs()
                                 <= self.radius * 0.1)
                             .then_some(*index)
                     });
+                    return result;
                 }
                 let index = contact.collider.entity.value().checked_sub(1000)? as usize;
-                (index < course.surfaces.len()).then_some(index)
+                if index >= course.surfaces.len() {
+                    return None;
+                }
+                if let Some(navigation) = &self.soil_course {
+                    let x = contact.position.x * self.direction + self.width * 0.5;
+                    navigation
+                        .surfaces
+                        .iter()
+                        .enumerate()
+                        .find_map(|(part, s)| {
+                            (self.soil_navigation_owners[part] == index
+                                && s.start <= x
+                                && x <= s.end
+                                && (s.height - course.surfaces[index].height).abs() < 0.01)
+                                .then_some(part)
+                        })
+                } else {
+                    Some(index)
+                }
             } else {
                 None
             }
@@ -660,6 +681,7 @@ impl DuckEvent {
             }),
             support,
         };
+        self.controller.retained_soil_steps = !self.soil_supports.is_empty();
         let command = if let Some(command) = detour_command {
             command
         } else if let Some(player) = &mut self.player {
@@ -945,7 +967,17 @@ impl DuckEvent {
             }),
             grounded: self.grounded(),
             jumps: self.jumps,
-            cleared_obstacles: self.controller.cleared,
+            cleared_obstacles: if self.soil_navigation_owners.is_empty() {
+                self.controller.cleared
+            } else {
+                let last = self.soil_navigation_owners.len() - 1;
+                if self.controller.direction > 0.0 {
+                    self.soil_navigation_owners[self.controller.cleared.min(last)]
+                } else {
+                    self.soil_navigation_owners[last]
+                        - self.soil_navigation_owners[last.saturating_sub(self.controller.cleared)]
+                }
+            },
             obstacle_count: if self.responsive_floor.is_some() {
                 0
             } else {
@@ -993,57 +1025,61 @@ impl DuckEvent {
                 spawned_ticks: self.tick.saturating_sub(OPENING_TICKS),
                 exit_visible: self.exit_visible(),
                 body_radius_milli: (self.radius * 1000.0).round() as u32,
-                planning: self.course.as_ref().map(|course| {
-                    use engine_common::{
-                        ClockDuckPlanState, ClockDuckPlanningState, ClockDuckRejection,
-                    };
-                    let navigator = &self.controller.navigator;
-                    let point = |position: Vec2| {
-                        let position =
-                            self.render_position(position + Vec2::new(0.0, self.layout.floor_y));
-                        [
-                            (position.x * 1000.0).round() as i32,
-                            (position.y * 1000.0).round() as i32,
-                        ]
-                    };
-                    ClockDuckPlanningState {
-                        pattern: course.pattern,
-                        surface_count: course.surfaces.len(),
-                        support: self.supported_surface(),
-                        plan: navigator.plan.map(|plan| ClockDuckPlanState {
-                            source: plan.source,
-                            target: plan.target,
-                            takeoff_milli: point(plan.takeoff),
-                            landing_milli: point(plan.landing),
-                            flight_ticks: (plan.flight / DT).round() as u32,
-                            cruise_speed_milli: (plan.cruise * 1000.0).round() as u32,
-                            running_takeoff: plan.running,
-                            next_target: plan.next_target,
-                        }),
-                        confirmed_landings: navigator.confirmed,
-                        undershoots: navigator.undershoots,
-                        overshoots: navigator.overshoots,
-                        wrong_surface_landings: navigator.wrong_surface,
-                        rejected_plans: navigator.rejected,
-                        rejection: navigator.reason.map(|reason| match reason {
-                            planner::Rejection::Narrow => ClockDuckRejection::TooNarrow,
-                            planner::Rejection::High => ClockDuckRejection::TooHigh,
-                            planner::Rejection::Range => ClockDuckRejection::OutOfRange,
-                            planner::Rejection::Obstructed => ClockDuckRejection::Obstructed,
-                        }),
-                        acceleration_milli: self
-                            .controller
-                            .accelerations
-                            .median()
-                            .map(|a| (a * 1000.0).round() as u32),
-                        generation_attempts: course.attempts,
-                        fallback_course: course.fallback,
-                        running_jumps: navigator.running_jumps,
-                        flowing_fallbacks: navigator.flowing_fallbacks,
-                        moving_landings: navigator.moving_landings,
-                        skipped_platforms: navigator.skipped_platforms,
-                    }
-                }),
+                planning: self
+                    .soil_course
+                    .as_ref()
+                    .or(self.course.as_ref())
+                    .map(|course| {
+                        use engine_common::{
+                            ClockDuckPlanState, ClockDuckPlanningState, ClockDuckRejection,
+                        };
+                        let navigator = &self.controller.navigator;
+                        let point = |position: Vec2| {
+                            let position = self
+                                .render_position(position + Vec2::new(0.0, self.layout.floor_y));
+                            [
+                                (position.x * 1000.0).round() as i32,
+                                (position.y * 1000.0).round() as i32,
+                            ]
+                        };
+                        ClockDuckPlanningState {
+                            pattern: course.pattern,
+                            surface_count: course.surfaces.len(),
+                            support: self.supported_surface(),
+                            plan: navigator.plan.map(|plan| ClockDuckPlanState {
+                                source: plan.source,
+                                target: plan.target,
+                                takeoff_milli: point(plan.takeoff),
+                                landing_milli: point(plan.landing),
+                                flight_ticks: (plan.flight / DT).round() as u32,
+                                cruise_speed_milli: (plan.cruise * 1000.0).round() as u32,
+                                running_takeoff: plan.running,
+                                next_target: plan.next_target,
+                            }),
+                            confirmed_landings: navigator.confirmed,
+                            undershoots: navigator.undershoots,
+                            overshoots: navigator.overshoots,
+                            wrong_surface_landings: navigator.wrong_surface,
+                            rejected_plans: navigator.rejected,
+                            rejection: navigator.reason.map(|reason| match reason {
+                                planner::Rejection::Narrow => ClockDuckRejection::TooNarrow,
+                                planner::Rejection::High => ClockDuckRejection::TooHigh,
+                                planner::Rejection::Range => ClockDuckRejection::OutOfRange,
+                                planner::Rejection::Obstructed => ClockDuckRejection::Obstructed,
+                            }),
+                            acceleration_milli: self
+                                .controller
+                                .accelerations
+                                .median()
+                                .map(|a| (a * 1000.0).round() as u32),
+                            generation_attempts: course.attempts,
+                            fallback_course: course.fallback,
+                            running_jumps: navigator.running_jumps,
+                            flowing_fallbacks: navigator.flowing_fallbacks,
+                            moving_landings: navigator.moving_landings,
+                            skipped_platforms: navigator.skipped_platforms,
+                        }
+                    }),
             }),
         }
     }

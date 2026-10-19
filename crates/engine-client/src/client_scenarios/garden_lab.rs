@@ -260,6 +260,10 @@ mod tests {
                 let state = serde_json::json!({"seed":o.seed,"simulation_seconds":o.tick,
                     "configuration":format!("{:?}",o.config),"profile":format!("{:?}",s.grass.traits),
                     "observation":format!("{:?}",o),"plan":format!("{:?}",s.plan),
+                    "tissues":o.tissues.iter().map(|t| serde_json::json!({
+                        "id":t.id,"role":format!("{:?}",t.role),"health":t.health,
+                        "shade_ticks":t.shade_ticks,"shortage_ticks":t.shortage_ticks
+                    })).collect::<Vec<_>>(),
                     "preview_only":true});
                 std::fs::write(
                     dir.join(format!("{name}-state.json")),
@@ -336,13 +340,50 @@ mod tests {
         }
         capture("growth", &s);
         s.command(Command::Shade);
-        for _ in 0..4 {
+        let physiology = engine_core::plants::grass::physiology();
+        let shade_started = s.plants.observe().tick;
+        let damage_ticks = 100u64.div_ceil(u64::from(physiology.damage_per_tick));
+        let deadline = shade_started + u64::from(physiology.grace_ticks) + damage_ticks + 2;
+        // Capture actual damage while the same shaded shoot is still alive.
+        // The shared minute-scale grace period must not turn this into a
+        // healthy or already-dead picture with a misleading label.
+        let stressed_shoot = loop {
+            let o = s.plants.observe();
+            if let Some(t) = o.tissues.iter().find(|t| {
+                t.role == engine_core::plants::Role::Shoot
+                    && t.shade_ticks > physiology.grace_ticks
+                    && t.health > 0
+                    && t.health < 100
+            }) {
+                break t.id;
+            }
+            assert!(
+                o.tick < deadline,
+                "no living damaged shoot before {deadline}"
+            );
             s.tick();
-        }
+        };
+        let stressed_tick = s.plants.observe().tick;
         capture("stressed", &s);
-        for _ in 0..12 {
+        loop {
+            let o = s.plants.observe();
+            let shoot = o
+                .tissues
+                .iter()
+                .find(|t| t.id == stressed_shoot)
+                .expect("the stressed shoot must remain observable through death");
+            if shoot.health == 0 {
+                break;
+            }
+            assert!(o.tick < deadline, "shaded shoot survived beyond {deadline}");
             s.tick();
         }
+        println!(
+            "Garden render seed=42 shade-start={shade_started} stressed={stressed_tick} dead={} grace={} damage={}",
+            s.plants.observe().tick,
+            physiology.grace_ticks,
+            physiology.damage_per_tick
+        );
         capture("dead", &s);
         s.command(Command::Reset);
         for _ in 0..10 {

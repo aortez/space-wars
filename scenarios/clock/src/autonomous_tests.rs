@@ -275,7 +275,8 @@ fn clock_grass_contract_automatic_duck_exits_retained_soil_course() {
                 ],
                 Duration::ZERO,
             );
-            ticks(&mut state, 1);
+            // Retained-soil case begins after the five-second delivery boundary.
+            ticks(&mut state, 301);
             ClockScenario::step(
                 &mut state,
                 &[ClockAction::preview_event(ClockEventKind::Duck)],

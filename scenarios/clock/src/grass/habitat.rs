@@ -592,8 +592,8 @@ impl SoilHabitat {
         self.collision_cache = specs;
     }
 
-    pub(crate) fn admit(
-        &mut self,
+    pub(crate) fn plan_admission(
+        &self,
         supports: &[(f32, f32)],
         mut protected: impl FnMut(SoilSite) -> bool,
     ) -> SoilAdmissionPlan {
@@ -603,7 +603,7 @@ impl SoilHabitat {
             .accounting
             .retained
             .max(MAX_SOIL_CELLS.saturating_sub(remaining_input));
-        let plan = plan_soil_admission(
+        plan_soil_admission(
             self.left,
             self.right,
             self.floor_y,
@@ -623,7 +623,15 @@ impl SoilHabitat {
                     SoilOccupancy::Empty
                 }
             },
-        );
+        )
+    }
+
+    pub(crate) fn admit(
+        &mut self,
+        supports: &[(f32, f32)],
+        protected: impl FnMut(SoilSite) -> bool,
+    ) -> SoilAdmissionPlan {
+        let plan = self.plan_admission(supports, protected);
         // No externally supplied plan can commit stale or occupied coordinates.
         // Planning and commit share this exclusive borrow and no world step.
         let deposits: Vec<_> = plan

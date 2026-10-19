@@ -440,7 +440,7 @@ fn garden_lab_controls_lifecycle_and_both_renderers() {
             );
             capture(h, renderer, "shade-recovery", &recovery);
             choose(h, &mut s, &mut c, 7);
-            let dead = until(h, &mut s, &mut c, 30);
+            let dead = until(h, &mut s, &mut c, 190);
             assert!(
                 tissues(&dead)
                     .iter()
@@ -521,7 +521,7 @@ fn garden_lab_controls_lifecycle_and_both_renderers() {
                         v["availability"][resource] == 0 && v["availability"][1 - resource] == 1000
                     }
                 });
-                let shortage = until(h, &mut s, &mut c, 10);
+                let shortage = until(h, &mut s, &mut c, 80);
                 assert!(
                     tissues(&shortage)
                         .iter()
@@ -529,7 +529,7 @@ fn garden_lab_controls_lifecycle_and_both_renderers() {
                 );
                 assert!(shortage["unmet"][resource].as_u64().unwrap() > 0);
                 capture(h, renderer, &format!("{name}-stress"), &shortage);
-                let dead = until(h, &mut s, &mut c, 40);
+                let dead = until(h, &mut s, &mut c, 240);
                 assert!(tissues(&dead).iter().all(|t| t["health"] == 0));
                 let image = capture(h, renderer, name, &dead);
                 assert_eq!(green(&image), 0, "shortage secretly sustained grass");

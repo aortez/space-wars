@@ -890,7 +890,7 @@ mod garden_lab_contract {
             if remove {
                 s.command(Command::Shade);
             }
-            h.extend(run(&mut s, 30));
+            h.extend(run(&mut s, 180));
             h
         };
         let dark = case(false);
@@ -964,7 +964,7 @@ mod garden_lab_contract {
         }));
         s.availability = [0; 2];
         s.intensity = 0;
-        run(&mut s, 100);
+        run(&mut s, 240);
         assert!(s.plants.observe().tissues.iter().all(|t| t.health == 0));
         s.availability = [1000; 2];
         s.intensity = 1000;
@@ -1153,7 +1153,7 @@ mod garden_lab_contract_rendered_milestones {
             s.tick();
         }
         s.command(Command::Shade);
-        for _ in 0..12 {
+        for _ in 0..180 {
             s.tick();
         }
         assert!(
@@ -1167,9 +1167,9 @@ mod garden_lab_contract_rendered_milestones {
             let mut s = GardenLabScenario::init((), 4242);
             s.intensity = light;
             s.availability = availability;
-            for i in 1..=40 {
+            for i in 1..=240 {
                 s.tick();
-                if i == 10 {
+                if i == 80 {
                     let o = s.plants.observe();
                     let resource = if light == 50 {
                         2
@@ -1181,11 +1181,11 @@ mod garden_lab_contract_rendered_milestones {
                     assert!(o.ledger.unmet[resource] > 0);
                     assert!(o.tissues.iter().any(|t| t.health < 100));
                     println!(
-                        "light={light} availability={availability:?} tick=10 unmet={:?}",
+                        "light={light} availability={availability:?} tick=80 unmet={:?}",
                         o.ledger.unmet
                     );
                 }
-                if i == 40 {
+                if i == 240 {
                     assert!(s.plants.observe().tissues.iter().all(|t| t.health == 0));
                 }
             }
