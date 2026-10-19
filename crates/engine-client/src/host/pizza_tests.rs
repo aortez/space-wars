@@ -39,6 +39,13 @@ impl Session {
         self.scenario.inner.pizza_status().unwrap()
     }
     fn step(&mut self, elapsed: Duration) -> HostStepResult {
+        self.step_projected(elapsed, &[])
+    }
+    fn step_projected(
+        &mut self,
+        elapsed: Duration,
+        projections: &[render::FrameProjection],
+    ) -> HostStepResult {
         let tick_model = self.scenario.tick_model();
         let result = step_scenario(
             &mut self.scenario,
@@ -55,7 +62,7 @@ impl Session {
             false,
             &self.settings,
             BENCHMARK_VIEWPORT,
-            &[],
+            projections,
         );
         if result.scenario_replaced {
             self.revision += 1;
@@ -65,6 +72,40 @@ impl Session {
         status.paused = self.paused;
         self.controls.pizza_status = Some(status);
         result
+    }
+    /// The same normal run, advanced by a manually paced simulation worker.
+    fn with_worker() -> Self {
+        use crate::client_scenarios::{PizzaClientScenario, PizzaWorkerClientScenario};
+        let mut session = Self::new();
+        let direct = session
+            .scenario
+            .inner
+            .as_any_mut()
+            .downcast_mut::<PizzaClientScenario>()
+            .unwrap();
+        let state = std::mem::replace(
+            &mut direct.state,
+            <scenario_pizza::PizzaScenario as engine_common::Scenario>::init(Default::default(), 0),
+        );
+        let worker =
+            PizzaWorkerClientScenario::spawn(state, None, BENCHMARK_VIEWPORT.aspect_ratio())
+                .unwrap();
+        worker.worker().use_manual_pacing();
+        session.scenario = HostedScenario {
+            inner: Box::new(worker),
+            asset: ScenarioAsset::None,
+        };
+        session
+    }
+    fn advance_worker(&self, updates: u64) {
+        use crate::client_scenarios::PizzaWorkerClientScenario;
+        self.scenario
+            .inner
+            .as_any()
+            .downcast_ref::<PizzaWorkerClientScenario>()
+            .unwrap()
+            .worker()
+            .advance(updates);
     }
     fn tick(&mut self) {
         self.step(Duration::from_secs_f64(1.0 / 60.0));
@@ -239,4 +280,83 @@ fn pizza_requests_do_not_survive_restart_benchmark_clear_or_revision_change() {
     s.controls.clear();
     assert!(s.controls.pizza_status().is_none());
     assert!(!s.controls.request_pizza_gravity());
+}
+
+#[test]
+fn pizza_worker_host_forwards_input_and_pauses_between_updates() {
+    let mut s = Session::with_worker();
+    // The host resumes the worker but leaves its updates to the worker.
+    assert_eq!(s.step(Duration::from_secs(1)).updates, 0);
+    s.advance_worker(10);
+    s.tick();
+    assert_eq!(s.status().observation.tick, 10);
+
+    // A paused trigger applies before the host resumes the worker.
+    s.pause();
+    assert!(s.controls.request_pizza_gravity());
+    s.tick();
+    assert!(!s.paused);
+    assert_eq!(s.status().observation.tick, 10);
+    assert!(matches!(
+        s.status().observation.event,
+        PizzaEventState::Idle {
+            pending_manual: Some(PizzaEventKind::DirectionalGravity),
+            ..
+        }
+    ));
+    s.advance_worker(1);
+    assert!(matches!(
+        s.status().observation.event,
+        PizzaEventState::Active {
+            trigger: PizzaEventTrigger::Manual,
+            elapsed_ticks: 1,
+            ..
+        }
+    ));
+
+    // Pointer input reaches the worker's next update; pausing cancels it.
+    let frames = s
+        .scenario
+        .render_frames(RenderBackend::Vector, BENCHMARK_VIEWPORT);
+    let projections =
+        render::frame_projections(&frames, BENCHMARK_VIEWPORT, s.scenario.frame_layout());
+    s.input
+        .push_pointer_event(crate::input::ScreenPointerEvent {
+            position: engine_common::RenderPoint::new(640.0, 200.0),
+            phase: engine_common::PointerPhase::Press,
+        });
+    assert_eq!(
+        s.step_projected(Duration::from_secs(1), &projections)
+            .updates,
+        0
+    );
+    s.advance_worker(1);
+    assert!(s.status().held_ball_id.is_some());
+    s.controls.request_pause();
+    s.step_projected(Duration::ZERO, &projections);
+    assert!(s.paused);
+    let paused = s.status();
+    assert!(paused.held_ball_id.is_none());
+    assert_eq!(paused.observation.tick, 12);
+    for _ in 0..10 {
+        s.step(Duration::from_secs(2));
+    }
+    assert_eq!(s.status().observation, paused.observation);
+
+    // Restart joins the worker and replaces the run.
+    s.controls.request_restart();
+    assert!(s.step(Duration::ZERO).scenario_replaced);
+    assert_eq!(s.status().observation.tick, 0);
+}
+
+#[test]
+fn worker_frames_are_presented_once_per_frame_and_viewport() {
+    let wide = Viewport::new(1024.0, 768.0);
+    let tall = Viewport::new(480.0, 800.0);
+    // Scenarios without a worker present every tick.
+    assert!(!worker_frame_on_screen(None, None));
+    assert!(!worker_frame_on_screen(Some((1, wide)), None));
+    assert!(worker_frame_on_screen(Some((1, wide)), Some((1, wide))));
+    assert!(!worker_frame_on_screen(Some((2, wide)), Some((1, wide))));
+    assert!(!worker_frame_on_screen(Some((2, tall)), Some((2, wide))));
 }

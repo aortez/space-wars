@@ -17,6 +17,7 @@ mod garden_lab;
 mod nes;
 mod null;
 mod pizza;
+mod pizza_worker;
 mod planetary_tanks;
 mod rover_lab;
 mod scorched_earth;
@@ -30,6 +31,8 @@ pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig};
 
 #[cfg(test)]
 pub(crate) use pizza::PizzaClientScenario;
+#[cfg(test)]
+pub(crate) use pizza_worker::PizzaWorkerClientScenario;
 #[cfg(test)]
 pub(crate) use spacewars::SpacewarsClientScenario;
 
@@ -312,8 +315,26 @@ pub trait ClientScenario {
     }
 
     /// Publishes one complete latest-state action snapshot. Realtime adapters
-    /// sample it at their next authoritative frame boundary.
+    /// sample it at their next authoritative frame boundary. Adapters with a
+    /// simulation worker instead queue every action for their next update.
     fn publish_realtime_actions(&self, _actions: &[Action], _observed_at: Instant) {}
+
+    /// True when a dedicated worker advances this adapter's fixed updates. The
+    /// host then forwards input instead of stepping and keeps presenting
+    /// `render_frames`.
+    fn has_simulation_worker(&self) -> bool {
+        false
+    }
+
+    /// Updates that worker has completed since it started.
+    fn simulation_worker_updates(&self) -> Option<u64> {
+        None
+    }
+
+    /// Changes whenever that worker publishes a new frame.
+    fn simulation_worker_frame(&self) -> Option<u64> {
+        None
+    }
 
     fn set_realtime_paused(&self, _paused: bool) {}
 

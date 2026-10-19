@@ -41,7 +41,7 @@ mod pizza_tests;
 mod profiling;
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
-const MAX_FIXED_STEPS_PER_TICK: usize = 5;
+pub(crate) const MAX_FIXED_STEPS_PER_TICK: usize = 5;
 #[cfg(test)]
 const BENCHMARK_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 static NEXT_SCENARIO_REVISION: AtomicU64 = AtomicU64::new(1);
@@ -733,6 +733,8 @@ pub fn start_scenario_loop(
 
     let mut last_realtime_emulated_frames = 0;
     let mut last_realtime_submitted_frames = 0;
+    let mut last_worker_updates = 0;
+    let mut presented_worker_frame = None;
     let mut last_diagnostics_revision = input.borrow().runtime_diagnostics_revision();
     let mut last_diagnostics_scenario_revision = scenario_revision;
     let mut last_diagnostics_paused = paused;
@@ -824,6 +826,8 @@ pub fn start_scenario_loop(
             performance = PerformanceStats::new(tick_model, now);
             last_realtime_emulated_frames = 0;
             last_realtime_submitted_frames = 0;
+            last_worker_updates = 0;
+            presented_worker_frame = None;
             let presentation = crate::gpu_scene::start_session(
                 &window,
                 renderer,
@@ -881,6 +885,10 @@ pub fn start_scenario_loop(
             last_realtime_submitted_frames = telemetry.submitted_video_frames;
             trace_realtime_telemetry(telemetry);
             (updates, frames)
+        } else if let Some(total) = scenario.inner.simulation_worker_updates() {
+            let updates = total.saturating_sub(last_worker_updates) as usize;
+            last_worker_updates = total;
+            (updates, 0)
         } else {
             (step_result.updates, 0)
         };
@@ -899,6 +907,7 @@ pub fn start_scenario_loop(
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
         drop(result_trace);
+        let worker_frame = scenario.inner.simulation_worker_frame().map(|frame| (frame, viewport));
         if scenario.has_realtime_runtime() {
             input_projections.clear();
             projection_viewport = viewport;
@@ -920,7 +929,7 @@ pub fn start_scenario_loop(
                     }
                 }
             }
-        } else {
+        } else if !worker_frame_on_screen(worker_frame, presented_worker_frame) {
             let scene_started = Instant::now();
             let scene_trace = crate::frame_trace::Scope::new(crate::frame_trace::Stage::HostScene);
             let frames = scenario.render_frames(renderer, viewport);
@@ -942,6 +951,7 @@ pub fn start_scenario_loop(
             );
             drop(publish_trace);
             submitted_frames = 1;
+            presented_worker_frame = worker_frame;
             if !paused {
                 let internal = if renderer == RenderBackend::Raster {
                     scaled_viewport(viewport, raster_scale)
@@ -1432,6 +1442,15 @@ fn step_scenario_inner(
         return HostStepResult::default();
     }
 
+    // The worker advances time itself; the UI thread only forwards input.
+    if scenario.inner.has_simulation_worker() {
+        let actions = scenario.actions(input, *benchmark_active, input_projections);
+        if !actions.is_empty() {
+            scenario.publish_realtime_actions(&actions, Instant::now());
+        }
+        return HostStepResult::default();
+    }
+
     match (tick_model, fixed_dt) {
         (TickModel::FixedTimestep { .. } | TickModel::EmulatorClock, Some(dt)) => {
             *accumulator += elapsed;
@@ -1754,7 +1773,16 @@ fn measured_diagnostics_label(value: Option<f32>) -> String {
         .unwrap_or_else(|| "--".into())
 }
 
-fn fixed_step_duration(tick_model: TickModel) -> Option<Duration> {
+/// A simulation worker publishes frames on its own schedule. One already
+/// presented at the current viewport stays on screen without presenting again.
+fn worker_frame_on_screen(
+    frame: Option<(u64, Viewport)>,
+    presented: Option<(u64, Viewport)>,
+) -> bool {
+    frame.is_some() && frame == presented
+}
+
+pub(crate) fn fixed_step_duration(tick_model: TickModel) -> Option<Duration> {
     match tick_model {
         TickModel::FixedTimestep { hz } => Some(Duration::from_secs_f64(1.0 / hz.max(1) as f64)),
         TickModel::Variable | TickModel::EmulatorClock => None,
