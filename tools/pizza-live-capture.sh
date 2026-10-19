@@ -1,8 +1,8 @@
 #!/bin/bash
 # Temporary production-KMS diagnostic. No installed binaries/settings are replaced.
 set -euo pipefail
-if [[ $EUID != 0 || $# != 8 ]]; then
-  echo "Usage (as administrator): $0 /tmp/spacewars-pizza-NAME RUN BALLS LIMIT STEPS off|on mixed|ordinary INTERVALS" >&2
+if [[ $EUID != 0 || ($# != 8 && $# != 9) ]]; then
+  echo "Usage (as administrator): $0 /tmp/spacewars-pizza-NAME RUN BALLS LIMIT STEPS off|on mixed|ordinary INTERVALS [direct|worker]" >&2
   exit 2
 fi
 root=$1
@@ -13,6 +13,8 @@ steps=$5
 field=$6
 kind=$7
 intervals=$8
+# Pizza normal play runs its updates on a simulation worker unless `direct`.
+simulation=${9:-worker}
 out="$root/$name"
 [[ "$root" == /tmp/spacewars-pizza-* && "$name" =~ ^[a-zA-Z0-9-]+$ && "$intervals" =~ ^[0-9]+$ ]]
 [[ "$(readlink -f "$root")" == "$root" ]]
@@ -20,6 +22,7 @@ out="$root/$name"
 ((balls >= 64 && balls <= limit && limit <= 5000 && steps >= 1 && steps <= 3600 && intervals >= 1 && intervals <= 600))
 [[ "$field" == off || "$field" == on ]]
 [[ "$kind" == mixed || "$kind" == ordinary ]]
+[[ "$simulation" == direct || "$simulation" == worker ]]
 [[ ! -e "$out" ]]
 if systemctl is-active --quiet spacewars-pizza-lab.service; then
   echo "Another Pizza capture is active" >&2
@@ -40,6 +43,9 @@ sudo -n systemctl stop spacewars-kiosk.service
 args=(--scenario pizza --seed 7 --fullscreen --renderer raster --raster-scale 1 --config-dir "$out/config" --pizza-lab-balls "$balls" --pizza-lab-limit "$limit" --pizza-lab-steps "$steps" --pizza-lab-report "$out/simulation.json")
 [[ "$field" == on ]] && args+=(--pizza-lab-field)
 [[ "$kind" == ordinary ]] && args+=(--pizza-lab-ordinary)
+worker=0
+[[ "$simulation" == worker ]] && worker=1
+printf '%s\n' "$simulation" > "$out/simulation.txt"
 printf '%q ' "$root/engine-client" "${args[@]}" > "$out/command.txt"
 uname -a > "$out/device.txt"
 cat /proc/device-tree/model >> "$out/device.txt"
@@ -52,6 +58,7 @@ sudo -n systemd-run --unit spacewars-pizza-lab --collect --service-type=exec \
   -p EnvironmentFile=/run/spacewars-hardware/hardware.env \
   -p EnvironmentFile=-/boot/spacewars-kiosk.env \
   --setenv=SLINT_BACKEND=linuxkms --setenv="SPACEWARS_CONTROL_SOCKET=$socket" \
+  --setenv="SPACEWARS_PIZZA_SIMULATION_WORKER=$worker" \
   "$root/engine-client" "${args[@]}"
 for i in {1..20}; do
   [[ -S "$socket" ]] && break
