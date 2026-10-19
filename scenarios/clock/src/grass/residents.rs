@@ -219,7 +219,6 @@ impl ClockPlants {
             self.pending_ns -= 1_000_000_000;
             self.revalidate(soil);
             let before = self.plants.observe();
-            let opaque = footprints.clone();
             let mut polygons = optical_polygons(
                 soil.quads()
                     .into_iter()
@@ -229,36 +228,34 @@ impl ClockPlants {
             polygons.extend(tissue_polygons(&before, soil));
             let mut receivers = Vec::new();
             let mut shoots = Vec::new();
-            for t in &before.tissues {
-                if t.role == Role::Root {
-                    continue;
-                }
-                if let Some(center) = soil.world_point(t.cell) {
-                    let id = LightId(SOIL_PHYSICS_ID, t.id);
-                    if t.role == Role::Shoot && t.health > 0 {
-                        let progress =
-                            t.development[0] as f32 / before.config.development_per_size[0] as f32;
-                        receivers.push(Receiver {
-                            position: center
-                                + (Vec2::Y * ((f32::from(t.size) + progress) * 2.0))
-                                    .rotate_radians(soil.surface_at(t.cell[0]).unwrap().angle),
-                            surface: Some(id),
-                        });
-                        shoots.push(t.id);
-                    }
+            // Receivers sit at the same paid-development tips that are drawn
+            // and that occlude neighbours.
+            for t in before
+                .tissues
+                .iter()
+                .filter(|t| t.role == Role::Shoot && t.health > 0)
+            {
+                if let Some(polygon) = shoot_polygon(t, &before, soil) {
+                    receivers.push(Receiver {
+                        position: polygon[2],
+                        surface: Some(LightId(SOIL_PHYSICS_ID, t.id)),
+                    });
+                    shoots.push(t.id);
                 }
             }
             let samples = if optical_overflow {
                 Err(lighting::LightingError::Capacity)
             } else {
-                query_light(
+                OpticalScene {
+                    footprints: &footprints,
+                    polygons: &polygons,
+                    geometry,
+                    transparent,
+                }
+                .query_light(
                     before.tick,
                     self.intensity,
                     self.aperture,
-                    &opaque,
-                    polygons,
-                    geometry,
-                    transparent,
                     &receivers,
                 )
             };
@@ -342,47 +339,51 @@ pub(crate) fn tissue_polygons(
         .collect()
 }
 
-/// One bounded optical adapter for biology and presentation. Callers supply
-/// geometry copied at their completed simulation boundary; no cached render input.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn query_light(
-    tick: u64,
-    intensity: u16,
-    aperture: Option<lighting::ApertureSource>,
-    opaque: &[OpaqueFootprint],
-    quads: Vec<(LightId, Vec<Vec2>)>,
-    geometry: Option<&QuerySnapshot>,
-    transparent: &[ColliderId],
-    receivers: &[Receiver],
-) -> Result<Vec<lighting::Exposure>, lighting::LightingError> {
-    if quads.len() + opaque.len() > engine_rapier::world::MAX_LIGHT_FOOTPRINTS
-        || quads.iter().any(|(_, p)| p.len() > 16)
-    {
-        return Err(lighting::LightingError::Capacity);
-    }
-    let mut source = engine_rapier::plant_light::full_sun(Vec2::Y);
-    source.strength = f32::from(intensity.min(1000));
-    let mut snapshot = lighting::LightingSnapshot::new(tick, tick, source, &[])?;
-    if let Some(aperture) = aperture {
-        snapshot = snapshot.with_aperture(aperture)?;
-    }
-    let fallback = StaticVisibility {
-        footprints: opaque,
-        quads,
-    };
-    if let Some(geometry) = geometry {
-        let visibility = geometry.lighting_visibility(opaque, transparent)?;
+/// Opaque geometry copied at one completed simulation boundary. Biology,
+/// presentation and telemetry all query light through this one adapter, so
+/// none of them can consume a cached render input.
+pub(crate) struct OpticalScene<'a> {
+    pub(crate) footprints: &'a [OpaqueFootprint],
+    pub(crate) polygons: &'a [(LightId, Vec<Vec2>)],
+    pub(crate) geometry: Option<&'a QuerySnapshot>,
+    pub(crate) transparent: &'a [ColliderId],
+}
+impl OpticalScene<'_> {
+    pub(crate) fn query_light(
+        &self,
+        tick: u64,
+        intensity: u16,
+        aperture: Option<lighting::ApertureSource>,
+        receivers: &[Receiver],
+    ) -> Result<Vec<lighting::Exposure>, lighting::LightingError> {
+        if self.polygons.len() + self.footprints.len() > engine_rapier::world::MAX_LIGHT_FOOTPRINTS
+            || self.polygons.iter().any(|(_, p)| p.len() > 16)
+        {
+            return Err(lighting::LightingError::Capacity);
+        }
+        let mut source = engine_rapier::plant_light::full_sun(Vec2::Y);
+        source.strength = f32::from(intensity.min(1000));
+        let mut snapshot = lighting::LightingSnapshot::new(tick, tick, source, &[])?;
+        if let Some(aperture) = aperture {
+            snapshot = snapshot.with_aperture(aperture)?;
+        }
+        let material = StaticVisibility {
+            footprints: self.footprints,
+            quads: self.polygons,
+        };
+        let Some(geometry) = self.geometry else {
+            return snapshot.query(tick, tick, receivers, &material);
+        };
+        let canonical = geometry.lighting_visibility(self.footprints, self.transparent)?;
         snapshot.query(
             tick,
             tick,
             receivers,
             &CombinedVisibility {
-                canonical: &visibility,
-                material: &fallback,
+                canonical: &canonical,
+                material: &material,
             },
         )
-    } else {
-        snapshot.query(tick, tick, receivers, &fallback)
     }
 }
 
@@ -433,9 +434,9 @@ impl Environment for HostEnvironment<'_> {
             && cell[1] < (SOIL_DEPTH_CELLS + MAX_SHOOT_HEIGHT_CELLS) as i32
     }
 }
-pub(crate) struct CombinedVisibility<'a, V> {
-    pub(crate) canonical: &'a V,
-    pub(crate) material: &'a StaticVisibility<'a>,
+struct CombinedVisibility<'a, V> {
+    canonical: &'a V,
+    material: &'a StaticVisibility<'a>,
 }
 impl<V: Visibility> Visibility for CombinedVisibility<'_, V> {
     fn blocker(&self, ray: LightRay) -> Option<LightId> {
@@ -444,15 +445,16 @@ impl<V: Visibility> Visibility for CombinedVisibility<'_, V> {
             .or_else(|| self.canonical.blocker(ray))
     }
 }
-pub(crate) struct StaticVisibility<'a> {
-    pub(crate) footprints: &'a [OpaqueFootprint],
-    pub(crate) quads: Vec<(LightId, Vec<Vec2>)>,
+struct StaticVisibility<'a> {
+    footprints: &'a [OpaqueFootprint],
+    quads: &'a [(LightId, Vec<Vec2>)],
 }
 impl Visibility for StaticVisibility<'_> {
     fn blocker(&self, ray: LightRay) -> Option<LightId> {
         let a = ray.receiver.position;
         let b = ray.endpoint.position;
         let delta = b - a;
+        let length = delta.length();
         for p in self.footprints {
             if Some(p.id) == ray.receiver.surface || Some(p.id) == ray.endpoint.surface {
                 continue;
@@ -462,7 +464,7 @@ impl Visibility for StaticVisibility<'_> {
                 return Some(p.id);
             }
         }
-        for (id, quad) in &self.quads {
+        for (id, quad) in self.quads {
             if ray.receiver.surface == Some(*id) || ray.endpoint.surface == Some(*id) {
                 continue;
             }
@@ -483,9 +485,7 @@ impl Visibility for StaticVisibility<'_> {
                 }
                 let t = cross(c - a, edge) / divisor;
                 let u = cross(c - a, delta) / divisor;
-                if t * delta.length() > lighting::ENDPOINT_TOLERANCE
-                    && t < 1.0
-                    && (0.0..=1.0).contains(&u)
+                if t * length > lighting::ENDPOINT_TOLERANCE && t < 1.0 && (0.0..=1.0).contains(&u)
                 {
                     return Some(*id);
                 }

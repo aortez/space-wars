@@ -1910,7 +1910,7 @@ impl FunctionalHarness {
         self.clock_trigger_event(state, ClockEventKind::Falling);
     }
 
-    fn clock_trigger_event(&mut self, state: &ClockState, event: ClockEventKind) {
+    fn clock_trigger_event(&mut self, state: &ClockState, event: ClockEventKind) -> ClockState {
         let request = ClockTriggerRequest::new(state, event);
         let result = self
             .client
@@ -1918,6 +1918,7 @@ impl FunctionalHarness {
         let accepted = self.require_clock(&format!("clock trigger {request:?}"), result);
         assert!(accepted.trigger_pending);
         assert!(!accepted.can_trigger);
+        accepted
     }
 
     fn clock_trigger_failure(&mut self, state: &ClockState, code: ControlFailureCode) {
@@ -2264,50 +2265,7 @@ fn ceiling_opening_raster_normal_speed_and_aftermath() {
 }
 fn ceiling_sequence(name: &'static str, renderer: &'static str) {
     run_functional_test_with_backend(name, "winit-femtovg", |h| {
-        use sha2::{Digest, Sha256};
-        let executable = fs::read(env!("CARGO_BIN_EXE_engine-client")).unwrap();
-        let executable_sha256 = format!("{:x}", Sha256::digest(&executable));
-        let revision = Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .current_dir(workspace_root())
-            .output()
-            .unwrap();
-        assert!(revision.status.success());
-        let listing = Command::new("git")
-            .args([
-                "ls-files",
-                "--cached",
-                "--others",
-                "--exclude-standard",
-                "-z",
-            ])
-            .current_dir(workspace_root())
-            .output()
-            .unwrap();
-        assert!(listing.status.success());
-        let paths: std::collections::BTreeSet<_> = listing
-            .stdout
-            .split(|b| *b == 0)
-            .filter_map(|p| std::str::from_utf8(p).ok())
-            .filter(|p| {
-                *p == "Cargo.toml"
-                    || *p == "Cargo.lock"
-                    || ((p.starts_with("crates/") || p.starts_with("scenarios/"))
-                        && (p.ends_with(".rs") || p.ends_with(".slint") || p.ends_with(".toml")))
-            })
-            .collect();
-        let sources: Vec<_> = paths
-            .iter()
-            .map(|path| {
-                let bytes = fs::read(workspace_root().join(path)).unwrap();
-                (*path, format!("{:x}", Sha256::digest(bytes)))
-            })
-            .collect();
-        let source_manifest_sha256 = format!(
-            "{:x}",
-            Sha256::digest(serde_json::to_vec(&sources).unwrap())
-        );
-        write_json(&h.run_path().join("ceiling-source-files.json"), &sources);
+        let provenance = ceiling_source_provenance(h);
         let ready = h.wait_until_ready();
         let page = h.activate_until_scenario("clock", ready);
         let mut page = h.activate_guarded("launcher.settings", &page);
@@ -2324,7 +2282,10 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
         let initial = h.clock_state();
         assert_eq!(initial.profile, "off");
         assert_eq!(initial.grass.as_ref().unwrap().intensity, 50);
-        h.clock_trigger_event(&initial, ClockEventKind::Grass);
+        // Measure checkpoints from the accepted request, not the earlier read.
+        let origin = h
+            .clock_trigger_event(&initial, ClockEventKind::Grass)
+            .simulation_tick;
         let start = Instant::now();
         let mut checkpoints = [
             (1, "opening"),
@@ -2347,10 +2308,7 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
         loop {
             let current = h.clock_state();
             let g = current.grass.as_ref().unwrap();
-            let seconds = current
-                .simulation_tick
-                .saturating_sub(initial.simulation_tick)
-                / 60;
+            let seconds = current.simulation_tick.saturating_sub(origin) / 60;
             readings.insert(current.reading);
             assert_eq!(g.ceiling_sequence, 1);
             assert_eq!(g.optical_refusals, 0);
@@ -2411,8 +2369,9 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
                     "seed":4242,"renderer":renderer,"playback":1,"room_intensity":50,
                     "opening_seconds":5,"hold_seconds":300,"closing_seconds":60,
                     "grace_seconds":60,"damage_per_second":1,
-                    "source_commit":String::from_utf8_lossy(&revision.stdout).trim(),
-                    "client_sha256":executable_sha256,"source_manifest_sha256":source_manifest_sha256,"history":history}),
+                    "source_commit":provenance["source_commit"],
+                    "client_sha256":provenance["client_sha256"],
+                    "source_manifest_sha256":provenance["source_manifest_sha256"],"history":history}),
                 );
             }
             if checkpoints.peek().is_none() {
@@ -2455,54 +2414,12 @@ fn ceiling_opening_raster_moving_blocker_evidence() {
 
 fn ceiling_moving_blocker(name: &'static str, renderer: &'static str) {
     run_functional_test_with_backend(name, "winit-femtovg", |h| {
-        use sha2::{Digest, Sha256};
-        let listing = Command::new("git")
-            .args([
-                "ls-files",
-                "--cached",
-                "--others",
-                "--exclude-standard",
-                "-z",
-            ])
-            .current_dir(workspace_root())
-            .output()
-            .unwrap();
-        assert!(listing.status.success());
-        let paths: std::collections::BTreeSet<_> = listing
-            .stdout
-            .split(|b| *b == 0)
-            .filter_map(|p| std::str::from_utf8(p).ok())
-            .filter(|p| {
-                *p == "Cargo.lock"
-                    || *p == "Cargo.toml"
-                    || ((p.starts_with("crates/") || p.starts_with("scenarios/"))
-                        && (p.ends_with(".rs") || p.ends_with(".slint") || p.ends_with(".toml")))
-            })
-            .collect();
-        let sources: Vec<_> = paths
-            .iter()
-            .map(|p| {
-                (
-                    *p,
-                    format!(
-                        "{:x}",
-                        Sha256::digest(fs::read(workspace_root().join(p)).unwrap())
-                    ),
-                )
-            })
-            .collect();
-        write_json(&h.run_path().join("ceiling-source-files.json"), &sources);
-        let revision = Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .current_dir(workspace_root())
-            .output()
-            .unwrap();
-        assert!(revision.status.success());
+        let sources = ceiling_source_provenance(h);
         let provenance = json!({"seed":4242,"renderer":renderer,"backend":"winit-femtovg",
             "playback":1,"room_intensity":50,"opening_seconds":5,"hold_seconds":300,"closing_seconds":60,
-            "source_commit":String::from_utf8_lossy(&revision.stdout).trim(),
-            "source_manifest_sha256":format!("{:x}",Sha256::digest(serde_json::to_vec(&sources).unwrap())),
-            "client_sha256":format!("{:x}",Sha256::digest(fs::read(env!("CARGO_BIN_EXE_engine-client")).unwrap())),
+            "source_commit":sources["source_commit"],
+            "source_manifest_sha256":sources["source_manifest_sha256"],
+            "client_sha256":sources["client_sha256"],
             "capture_method":"public pause, fresh state, screenshot, identical fresh state, resume",
             "controller_script":"North takeover; Right until x > aperture.right+16; Left until x < right-4; Left until x < midpoint+4; Right until x > right+16; 100ms direction leases, with at most six 100ms East jumps at the grounded soil lip (x < right+10)",
             "camera_height_world":480,
@@ -2652,6 +2569,55 @@ fn ceiling_moving_blocker(name: &'static str, renderer: &'static str) {
             &json!({"provenance":provenance,"history":history,"canonical_shadow_observed":true}),
         );
     });
+}
+
+/// Source commit, a digest of the workspace Rust/Slint sources and Cargo
+/// manifests, and the client executable digest for ceiling evidence records.
+fn ceiling_source_provenance(h: &mut FunctionalHarness) -> Value {
+    use sha2::{Digest, Sha256};
+    let revision = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(workspace_root())
+        .output()
+        .unwrap();
+    assert!(revision.status.success());
+    let listing = Command::new("git")
+        .args([
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .unwrap();
+    assert!(listing.status.success());
+    let paths: std::collections::BTreeSet<_> = listing
+        .stdout
+        .split(|b| *b == 0)
+        .filter_map(|p| std::str::from_utf8(p).ok())
+        .filter(|p| {
+            *p == "Cargo.lock"
+                || *p == "Cargo.toml"
+                || ((p.starts_with("crates/") || p.starts_with("scenarios/"))
+                    && (p.ends_with(".rs") || p.ends_with(".slint") || p.ends_with(".toml")))
+        })
+        .collect();
+    let sources: Vec<_> = paths
+        .iter()
+        .map(|path| {
+            let bytes = fs::read(workspace_root().join(path)).unwrap();
+            (*path, format!("{:x}", Sha256::digest(bytes)))
+        })
+        .collect();
+    write_json(&h.run_path().join("ceiling-source-files.json"), &sources);
+    let executable = fs::read(env!("CARGO_BIN_EXE_engine-client")).unwrap();
+    json!({
+        "source_commit": String::from_utf8_lossy(&revision.stdout).trim(),
+        "source_manifest_sha256": format!("{:x}", Sha256::digest(serde_json::to_vec(&sources).unwrap())),
+        "client_sha256": format!("{:x}", Sha256::digest(&executable)),
+    })
 }
 
 fn ceiling_drive_input(h: &mut FunctionalHarness, button: spacewars_control::InputButton) {

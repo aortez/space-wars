@@ -13,13 +13,11 @@ pub const SEED_BATCH: usize = 3;
 pub const SEED_SPACING_CELLS: i32 = 4;
 pub const SEED_STARTING_RESERVES: [u64; 3] = [30; 3];
 
+#[derive(Default)]
 pub(crate) struct Introduction {
     pub tick: u64,
 }
 impl Introduction {
-    pub fn new(_seed: u64) -> Self {
-        Self { tick: 0 }
-    }
     pub fn step(&mut self) -> bool {
         self.tick += 1;
         self.tick >= INTRODUCTION_TICKS

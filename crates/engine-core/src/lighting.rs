@@ -174,7 +174,7 @@ impl LightingSnapshot {
     pub fn with_aperture(mut self, aperture: ApertureSource) -> Result<Self, LightingError> {
         if !finite(Vec2::new(aperture.left, aperture.ceiling_y))
             || !finite(Vec2::new(aperture.right, aperture.ceiling_y))
-            || aperture.left > aperture.right
+            || aperture.left >= aperture.right
             || !strength(aperture.strength)
             || self.sources.iter().any(|s| s.id == aperture.id)
         {
@@ -261,7 +261,6 @@ impl LightingSnapshot {
                     }
                 }
                 if let Some(source) = self.aperture
-                    && source.left < source.right
                     && (source.left..=source.right).contains(&receiver.position.x)
                     && receiver.position.y < source.ceiling_y
                 {

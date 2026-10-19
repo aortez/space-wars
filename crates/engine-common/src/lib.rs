@@ -804,6 +804,8 @@ pub struct ClockCeilingOptics {
     pub silhouettes_milli: Vec<Vec<[i32; 2]>>,
     pub samples: Vec<ClockCeilingSample>,
 }
+
+/// One fresh receiver: total and aperture-only intensity plus its first blocker.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockCeilingSample {
     pub position_milli: [i32; 2],

@@ -771,6 +771,14 @@ impl FunctionalHarness {
                     ""
                 },
             )
+            .env(
+                "SPACEWARS_CLOCK_CEILING_OPTICS",
+                if test_name.starts_with("clock-ceiling-moving") {
+                    "1"
+                } else {
+                    "0"
+                },
+            )
             // These UI workflows must not reach the host's NetworkManager or
             // BlueZ. Wire-protocol tests supply their own private D-Bus daemon.
             .env(

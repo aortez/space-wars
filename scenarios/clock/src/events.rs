@@ -270,7 +270,7 @@ impl ActiveEvent {
         previous_display: Option<DisplaySnapshot>,
     ) -> Self {
         match kind {
-            ClockEventKind::Grass => Self::Grass(crate::grass::Introduction::new(seed)),
+            ClockEventKind::Grass => Self::Grass(crate::grass::Introduction::default()),
             ClockEventKind::Aquarium => {
                 Self::Aquarium(Box::new(aquarium::AquariumEvent::new(context, seed)))
             }

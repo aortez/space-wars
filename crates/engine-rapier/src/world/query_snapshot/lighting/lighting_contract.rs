@@ -773,11 +773,11 @@ fn ceiling_light_contract_moving_solids_tissue_and_source_boundaries() {
         [0.0, 1000.0, 50.0]
     );
     assert_eq!(exposure[0].first_blocker, Some(light_collider_id(solid)));
-    let bounds = old.lighting_occluder_bounds(&[]).unwrap();
+    let silhouettes = old.lighting_occluder_silhouettes(&[]).unwrap();
     assert!(
-        bounds
+        silhouettes
             .iter()
-            .any(|(a, b)| a.x < 0.0 && b.x > 0.0 && a.y > 0.0)
+            .any(|p| p.iter().any(|v| v.x < 0.0) && p.iter().any(|v| v.x > 0.0))
     );
     world.set_pose(
         BodyId::new(solid.entity, BodyRole::PRIMARY),
@@ -812,7 +812,7 @@ fn ceiling_light_contract_moving_solids_tissue_and_source_boundaries() {
     assert!(
         world
             .query_snapshot()
-            .lighting_occluder_bounds(&[])
+            .lighting_occluder_silhouettes(&[])
             .unwrap()
             .is_empty()
     );

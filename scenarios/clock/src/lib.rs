@@ -382,6 +382,9 @@ pub struct ClockConfig {
     /// Isolate the pre-existing zero-input physiology fixture from sunlight.
     /// Ordinary Clock always enables aperture illumination.
     pub ceiling_sunlight: bool,
+    /// Publish fresh per-tick sunlight optics in the grass state. Diagnostic
+    /// workflows only; ordinary Clock skips that per-frame geometry query.
+    pub ceiling_optics: bool,
     /// Read-only material-coordinate cutaway below the Clock face.
     pub grass_inspection: bool,
     /// None chooses a seeded personality once per Duck event.
@@ -408,6 +411,7 @@ impl Default for ClockConfig {
             water_lab: ClockWaterLab::Off,
             favorable_grass_fixture: false,
             ceiling_sunlight: true,
+            ceiling_optics: false,
             grass_inspection: false,
             duck_jump_profile: None,
             duck_course_pattern: None,
@@ -433,6 +437,7 @@ impl ClockConfig {
             water_lab: self.water_lab,
             favorable_grass_fixture: self.favorable_grass_fixture,
             ceiling_sunlight: self.ceiling_sunlight,
+            ceiling_optics: self.ceiling_optics,
             grass_inspection: self.grass_inspection,
             duck_jump_profile: self.duck_jump_profile,
             duck_course_pattern: self.duck_course_pattern,
@@ -538,7 +543,7 @@ impl ClockState {
         }
     }
 
-    fn introduce_grass(&mut self, seed: u64) {
+    fn introduce_grass(&mut self) {
         self.grass_seeded = 0;
         let refusal = if !self.config.events.grass {
             Some("Future grass seeding is disabled")
@@ -552,18 +557,14 @@ impl ClockState {
             self.admit_soil_with_region(true);
             let soil = self.soil.as_ref().unwrap();
             let width = soil.terrain().width() as i32;
-            let mut rng = StdRng::seed_from_u64(seed);
+            let layout = Layout::new(self.aspect_ratio());
+            let region = ceiling::Ceiling::region(layout);
             let start = if self.config.favorable_grass_fixture {
                 10
-            } else if self.ceiling.phase != ceiling::Phase::Closed {
-                let layout = Layout::new(self.aspect_ratio());
-                let (left, right) = ceiling::Ceiling::region(layout);
-                (((left + right) * 0.5 - layout.bounds_min.x) / grass::SOIL_CELL_SIZE) as i32
             } else {
-                rng.random_range(0..width)
+                (((region.0 + region.1) * 0.5 - layout.bounds_min.x) / grass::SOIL_CELL_SIZE) as i32
             };
             let offsets = [0, -grass::SEED_SPACING_CELLS, grass::SEED_SPACING_CELLS];
-            let region = ceiling::Ceiling::region(Layout::new(self.aspect_ratio()));
             let eligible = |x| {
                 let cell = [x, grass::SOIL_DEPTH_CELLS as i32 - 1];
                 soil.terrain()
@@ -1135,12 +1136,10 @@ impl ClockState {
             self.cancel_ceiling();
         }
         let seed = self.schedule.start(kind);
-        if kind == ClockEventKind::Grass {
-            if self.config.events.grass && self.ceiling.start(seed) {
-                self.plan_ceiling_material();
-                // Delivery belongs to the aperture, not the short notice event.
-                self.event_notice = Some(("Ceiling opening", self.schedule.tick + 360));
-            }
+        if kind == ClockEventKind::Grass && self.config.events.grass && self.ceiling.start() {
+            self.plan_ceiling_material();
+            // Delivery belongs to the aperture, not the short notice event.
+            self.event_notice = Some(("Ceiling opening", self.schedule.tick + 360));
         }
         let layout = Layout::new(self.aspect_ratio());
         if kind == ClockEventKind::Duck {
@@ -1519,14 +1518,13 @@ impl Scenario for ClockScenario {
                 ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
         }
-        let delivery = state.ceiling.advance(dt);
-        if let Some(seed) = delivery {
+        if state.ceiling.advance(dt) {
             let before = state
                 .soil
                 .as_ref()
                 .map(|s| s.accounting().added)
                 .unwrap_or(0);
-            state.introduce_grass(seed);
+            state.introduce_grass();
             let added = state
                 .soil
                 .as_ref()
@@ -1538,10 +1536,6 @@ impl Scenario for ClockScenario {
                 (state.ceiling.material.len() as u64).saturating_sub(added);
             state.ceiling.material.clear();
         }
-        state.plants.aperture = state
-            .ceiling
-            .source(Layout::new(state.aspect_ratio()))
-            .filter(|_| state.config.ceiling_sunlight);
         state.synchronize_soil();
         // The fixed-timestep host supplies one tick per call. Zero duration is
         // used to synchronize inputs/control actions without advancing physics.

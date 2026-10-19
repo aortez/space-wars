@@ -3,12 +3,15 @@ use super::*;
 use rapier2d::parry::shape::Shape;
 
 pub const MAX_LIGHT_SILHOUETTE_VERTICES: usize = 8192;
+pub const MAX_LIGHT_CIRCLE_VERTICES: usize = 256;
 /// Curves use circumscribed polygons: no chord can expose an opaque interior.
+/// Radii above about 66 units reach the per-circle cap and overshoot slightly more.
 pub const LIGHT_SILHOUETTE_ERROR: f32 = 0.005;
 
 impl QuerySnapshot {
     /// Closed polygons, or two-point open segments for polyline edges. Curves
-    /// conservatively exceed the true boundary by at most the named tolerance.
+    /// conservatively exceed the true boundary, by at most the named tolerance
+    /// until a circle reaches its vertex cap.
     /// This is presentation geometry, never a replacement physiological blocker.
     pub fn lighting_occluder_silhouettes(
         &self,
@@ -65,8 +68,8 @@ fn circle(
     let count = (std::f64::consts::PI
         / ((radius as f64) / (radius as f64 + LIGHT_SILHOUETTE_ERROR as f64)).acos())
     .ceil()
-    .max(16.0) as usize;
-    if count > 256 || count > *remaining {
+    .clamp(16.0, MAX_LIGHT_CIRCLE_VERTICES as f64) as usize;
+    if count > *remaining {
         return Err(LightingError::Capacity);
     }
     let outer = radius as f64 / (std::f64::consts::PI / count as f64).cos();
@@ -148,5 +151,5 @@ fn append(
         }
         return Ok(());
     }
-    Err(LightingError::Capacity)
+    Err(LightingError::InvalidInput)
 }

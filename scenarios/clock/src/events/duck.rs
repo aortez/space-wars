@@ -551,14 +551,13 @@ impl DuckEvent {
                 if contact.collider.entity.value() == crate::grass::SOIL_PHYSICS_ID {
                     // Soil is a fixed compound at the world origin. Its local
                     // surface point stays on the material even during penetration.
-                    let result = self.soil_supports.iter().find_map(|(index, min, max)| {
+                    return self.soil_supports.iter().find_map(|(index, min, max)| {
                         (contact.local_surface.position.x >= min.x
                             && contact.local_surface.position.x <= max.x
                             && (contact.local_surface.position.y - max.y).abs()
                                 <= self.radius * 0.1)
                             .then_some(*index)
                     });
-                    return result;
                 }
                 let index = contact.collider.entity.value().checked_sub(1000)? as usize;
                 if index >= course.surfaces.len() {

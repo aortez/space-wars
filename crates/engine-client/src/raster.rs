@@ -818,7 +818,7 @@ impl<'a> Canvas<'a> {
         polygon: &RenderPolygon,
     ) {
         if let Some(fill) = polygon.fill {
-            fill_convex_polygon(
+            fill_polygon(
                 self.pixels,
                 self.width,
                 self.height,
@@ -1438,7 +1438,7 @@ fn stroke_circle_pixels(
     }
 }
 
-fn fill_convex_polygon(
+fn fill_polygon(
     pixels: &mut [Rgb8Pixel],
     width: u32,
     height: u32,
@@ -1571,7 +1571,7 @@ fn draw_line_pixels(
 
     let nx = -dy / len * line_width * 0.5;
     let ny = dx / len * line_width * 0.5;
-    fill_convex_polygon(
+    fill_polygon(
         pixels,
         width,
         height,
@@ -1788,7 +1788,7 @@ mod tests {
         let mut pixels = vec![BACKGROUND; 32 * 32];
         let color = RenderColor::rgba(1.0, 0.87, 0.46, 0.12);
         let clip = PixelClip::new(32, 32, 0, 31, 0, 31).unwrap();
-        fill_convex_polygon(&mut pixels, 32, 32, clip, &points, color);
+        fill_polygon(&mut pixels, 32, 32, clip, &points, color);
         let once = pixels[4 * 32 + 4];
         assert_ne!(once, BACKGROUND);
         assert!(
@@ -2227,7 +2227,7 @@ mod tests {
         let black = Rgb8Pixel { r: 0, g: 0, b: 0 };
         let mut pixels = vec![black; 64];
         let clip = PixelClip::new(8, 8, 0, 7, 2, 5).unwrap();
-        fill_convex_polygon(
+        fill_polygon(
             &mut pixels,
             8,
             8,

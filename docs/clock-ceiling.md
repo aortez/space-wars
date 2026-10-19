@@ -9,12 +9,13 @@ Clock readings. Opening and closing settings are tuning defaults.
 
 The aperture occupies the real left margin: its left edge is two world units
 inside the frame and its right edge is two units before the face's 6×9 glyph
-envelope, capped at 48 world units wide on large arenas. This layout-derived corridor stays clear of all ordinary hour digits
-and all four fonts, including reading/font transitions; moving actors and event
-geometry still cast real shadows. Seed search begins at this same corridor's
-center and admits only supported dirt contacts inside it. Narrow layouts admit
-fewer than three seeds when the ordinary four-cell spacing does not fit. Existing
-soil outside the corridor cannot redirect admission beneath a digit.
+envelope, capped at 48 world units wide on large arenas. This layout-derived
+corridor stays clear of all ordinary hour digits and all four fonts, including
+reading/font transitions; moving actors and event geometry still cast real
+shadows. Seed search begins at this same corridor's center and admits only
+supported dirt contacts inside it. Narrow layouts admit fewer than three seeds
+when the ordinary four-cell spacing does not fit. Existing soil outside the
+corridor cannot redirect admission beneath a digit.
 The previous 14%-centered aperture overlapped the first digit and failed at
 00:34, 08:34, 20:34 and 23:34; the corrected default patch has the same sunlight
 opportunity at those hours as at 12:34.
@@ -33,9 +34,10 @@ trapezoid edges are never independently alpha blended. Raster scan conversion
 uses even/odd intersections and unions rounded pixel spans before a single blend;
 this preserves concave shadows without bright seams at adjacent/subpixel pieces.
 Canonical cuboids, convex polygons, polylines and compound children use their
-posed vertices. Balls and capsule endcaps use circumscribed polygons (up to 256
-vertices per circle, 0.005-world-unit radial approximation tolerance, subject to
-floating-point precision), so chords do not cut through curved solids.
+posed vertices. Balls and capsule endcaps use circumscribed polygons, so chords
+do not cut through curved solids. Each circle uses up to 256 vertices; the
+0.005-world-unit radial overshoot holds for radii up to about 66 units and
+grows slowly beyond that cap.
 Silhouettes come from the same immutable canonical query snapshot used by the
 shared light query; source/material publication is validated before drawing.
 Geometry above the ceiling is clipped out before projection. A ray wholly inside
@@ -95,7 +97,7 @@ rate. Connected sunlit tissue does not exempt a locally shaded shoot.
 
 The deterministic reference uses seed 4242, ordinary room intensity 50, resource
 availability [1000,1000], normal playback, and 60 fixed simulation steps/second.
-These are measured simulation-time results, not yet wall-time UI/image evidence:
+Its simulation-time checkpoints are:
 
 | Seconds since request | Phase | Living tissues | Shoots | Stressed tissues | Total health |
 | ---: | --- | ---: | ---: | ---: | ---: |
@@ -141,25 +143,25 @@ damaged tissue identity, increases health and clears shortage/shade counters.
 Those measured delays include store depletion before the shared grace period;
 they are not new universal death deadlines.
 
-Deterministic regressions cover every font, ordinary blocked/unblocked hours
-00, 08, 10, 12, 13, 20 and 23 at the default aspect, plus 00/12 and hour
-transitions at aspect ratios 0.25, 0.6, 0.75, 4:3 and 4. They require live
-shoots and nonzero paid development at 180 and 304 seconds, without extra light
-or reserves. Separate light queries at all six aspects and five readings verify
-unblocked margin sunlight, out-of-aperture rejection, actual glyph occlusion
-under a diagnostic wider source, and restored light after removing that glyph
-geometry. Existing moving-solid/tissue contracts remain required.
+Light queries at all six aspects, every font and five readings verify unblocked
+margin sunlight, out-of-aperture rejection, actual glyph occlusion under a
+diagnostic wider source, and restored light after removing that glyph geometry.
+A paid-growth sweep samples that matrix with full simulations: every font at
+the default aspect, the ordinary hours 00, 08, 10, 12, 13, 20 and 23 with the
+default font, and 00/12 with a leading-zero hour transition at aspect ratios
+0.25, 0.6, 0.75, 4:3 and 4. Each run requires live shoots and nonzero paid
+development at 180 and 304 seconds, without extra light or reserves. Existing
+moving-solid/tissue contracts remain required.
 
 ## Moving-solid beam regression
 
 The aligned seed-4242 regression uses aspect 16:9, ordinary ambient 50, static
-12:34, Grass for 180 seconds, then Duck preview and exactly 59 physics steps
-(0.98333335 seconds). At biology tick 176, tissue 27's tip is
-(-391.66666, -190.8). Both recorded biology and a fresh same-pose query report
-light 1000. The former one-unit draw strip overlapped a neighboring collider's
-AABB and raised its entire bottom to -157.06406: a false 33.735947-unit gap.
-The silhouette envelope draws light to the tip without drawing through the Duck.
-This is a same-boundary renderer mismatch, not delayed exposure telemetry.
+12:34, Grass for 180 seconds, then Duck preview and steps to the next biology
+boundary. For a living shoot whose recorded biology saw full sun there, a fresh
+same-pose query also reports light 1000, and the drawn beam contains that tip.
+An earlier one-unit draw strip had promoted a neighboring collider's AABB to an
+opaque strip, leaving a false dark gap of more than 30 units above lit tissue;
+the silhouette envelope draws light to the tip without drawing through the Duck.
 
 Focused regressions compare drawn trapezoid interiors with fresh shared queries:
 4096 receivers over eight actual Duck poses, 85644 receivers over six canonical
@@ -171,7 +173,7 @@ comparison for conservative curve tessellation. Sensor/transparent exclusions,
 immutable snapshots, removal and capacity/invalid-input refusal remain covered.
 These are deterministic geometry observations, not normal-speed UI screenshots.
 
-## Verification handoff
+## Test coverage
 
 `clock::ceiling_opening_vector_normal_speed_and_aftermath` and the corresponding
 `raster` workflow run the complete ordinary-speed sequence through 666 seconds.
@@ -179,18 +181,16 @@ They record opening, arrival, early/paid growth, hold end, partial closing, clos
 state and five aftermath checkpoints, assert changing readings and gradual
 loss, and check restart cleanup. Metadata includes seed/configuration, simulation
 and wall times, executable SHA-256, source commit and a digest/list of workspace
-Rust/Slint sources and Cargo manifests. Images and state histories must be retained
-on success. These two long cases are full-only in the coverage manifest; the
-existing two Grass admission/pause/disable/restart smoke workflows also check
-paused ceiling time and cleared restart ownership. No extra long PR cases or
-smoke filter changes are required. Full inclusion/discovery must remain exact.
+Rust/Slint sources and Cargo manifests. These two long cases are full-only in the
+coverage manifest; the existing two Grass admission/pause/disable/restart smoke
+workflows also check paused ceiling time and cleared restart ownership, so the
+PR smoke filter is unchanged.
 
-All fifteen configured launcher checks remain mandatory. Socket/display execution,
-normal-speed vector/raster images, matched moving-blocker beam/exposure inspection,
-readable digits, host runtime measurements and independent presentation review
-remain host evidence requirements. Worker headless passes do not establish those
-outcomes or replace separate launcher JUnit/discovery outputs. Moss admission,
-floor succession and the full artificial-light rollout remain later work.
+Normal-speed vector/raster images, matched moving-blocker beam/exposure
+inspection, readable digits and host runtime measurements come from those
+registered workflows on a real display; headless tests do not establish them.
+Moss admission, floor succession and the full artificial-light rollout remain
+later work.
 
 ## Moving-solid presentation verification
 
@@ -206,12 +206,12 @@ the automatic Duck, whose entrance spawn lies near the aperture's right edge.
 On approach, a grounded Duck within ten units right of the aperture can use the
 public East jump button (100 ms, at most six attempts) to clear retained soil's
 real six-unit lip. This is ordinary actor input; material/contact/source physics
-are unchanged. Short 50 ms leases separated by neutral polling gaps reproduced
-the host stall at x=-370.925, beside soil ending at x=-378.667. Continuous input
-had hidden this obstruction by retaining momentum. Deterministic coverage now
-models released leases with 50, 200 and 500 ms neutral gaps, freezes state through
-capture/resume boundaries, and requires the crossing shadow and restored light.
-The corrected sequence uses one or two jumps in those fixtures. Progress JSON
+are unchanged. Short leases separated by neutral polling gaps can stall against
+that lip, where continuous input had hidden the obstruction by retaining
+momentum. Deterministic coverage models released leases with 50, 200 and 500 ms
+neutral gaps, freezes state through capture/resume boundaries, and requires the
+crossing shadow and restored light. The corrected sequence uses one or two
+jumps in those fixtures. Progress JSON
 records pose, velocity, stage, aperture, simulation/wall time and jump count on
 every iteration; a 30-second stage watchdog leaves useful failure evidence before
 the parent deadline.
@@ -227,6 +227,9 @@ source identity and aperture, semantic collider identities and copied Rapier
 handle generations, canonical/material/tissue silhouettes, receiver positions,
 intensity, sunlight and first-blocker identities. These are fresh same-pose
 queries, not cached last-biology-tick exposure. Coordinates use world units ×1000.
+The client publishes them only when launched with
+`SPACEWARS_CLOCK_CEILING_OPTICS=1`, which these workflows set; ordinary sessions
+skip that per-frame geometry query.
 PNG filenames, wall timing, source-file and executable hashes, seed, configuration
 and backend accompany the records. Histories are saved incrementally on failure.
 
@@ -234,6 +237,4 @@ Headless pixel regressions exercise actual beam frames at opening, paid growth,
 moving-solid poses and partial closing at three resolutions, requiring every lit
 beam-only raster pixel to equal exactly one alpha blend. A concave/subpixel fixture
 also verifies retained dark shadow interiors. Vector consumes the same single
-contour; actual vector/raster capture inspection, the complete normal-speed
-hold/aftermath runs, all fifteen host groups and fresh independent review remain
-required after this editing checkpoint. Worker checks do not close F1/F2.
+contour.

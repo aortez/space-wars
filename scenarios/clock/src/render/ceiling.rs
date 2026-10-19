@@ -1,12 +1,70 @@
 //! Shared vector/raster primitives derived from the physiological sunlight query.
 use super::*;
-use engine_core::lighting::Receiver;
+use crate::grass::residents::OpticalScene;
+use engine_core::lighting::{LightId, LightingError, Receiver};
+use engine_rapier::world::{ColliderId, QuerySnapshot};
 
 mod beam;
+
+/// Falling parcels draw above the face labels and below the wooden frame.
+const PARCEL_LAYER: i32 = 6;
+
+/// Host geometry copied once at the completed simulation boundary: canonical
+/// solids, transparent soil identities, and the face/actor/soil/tissue
+/// polygons that physiology also treats as opaque.
+pub(crate) struct HostOptics {
+    geometry: Option<QuerySnapshot>,
+    transparent: Vec<ColliderId>,
+    polygons: Vec<(LightId, Vec<Vec2>)>,
+}
+impl HostOptics {
+    pub(crate) fn capture(state: &ClockState) -> Self {
+        let world = crate::grass::surfaces::world(&state.active_event, state.duck_visit.as_deref());
+        let mut quads = plant_face_polygons(state);
+        quads.extend(plant_actor_polygons(state));
+        if let Some(soil) = &state.soil {
+            quads.extend(soil.quads().into_iter().map(|q| q.to_vec()));
+        }
+        let mut polygons = crate::grass::residents::optical_polygons(quads);
+        if let Some(soil) = &state.soil {
+            polygons.extend(crate::grass::residents::tissue_polygons(
+                &state.plants.plants.observe(),
+                soil,
+            ));
+        }
+        Self {
+            geometry: world.map(|w| w.query_snapshot()),
+            transparent: world
+                .into_iter()
+                .flat_map(|w| w.collider_ids())
+                .filter(|id| id.entity.value() == crate::grass::SOIL_PHYSICS_ID)
+                .collect(),
+            polygons,
+        }
+    }
+    pub(crate) fn scene(&self) -> OpticalScene<'_> {
+        OpticalScene {
+            footprints: &[],
+            polygons: &self.polygons,
+            geometry: self.geometry.as_ref(),
+            transparent: &self.transparent,
+        }
+    }
+    /// Material/tissue polygons plus canonical silhouettes from the same copy.
+    fn silhouettes(&self) -> Result<Vec<Vec<Vec2>>, LightingError> {
+        let mut silhouettes: Vec<_> = self.polygons.iter().map(|(_, p)| p.clone()).collect();
+        if let Some(geometry) = &self.geometry {
+            silhouettes.extend(geometry.lighting_occluder_silhouettes(&self.transparent)?);
+        }
+        Ok(silhouettes)
+    }
+}
 
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     if state.ceiling.phase == crate::ceiling::Phase::Opening {
         let progress = state.ceiling.fraction();
+        let (left, right) = crate::ceiling::Ceiling::region(layout);
+        let center = (left + right) * 0.5;
         // Each displayed parcel references an owned pending site. No decorative
         // rain can imply unbudgeted material; cancellation clears these sites.
         for site in state
@@ -17,12 +75,10 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
             .take(32)
         {
             let target = (site.min + site.max) * 0.5;
-            let (left, right) = crate::ceiling::Ceiling::region(layout);
-            let center = (left + right) * 0.5;
             let x = center + (target.x - center) * progress;
             let y = layout.canopy_y + (target.y - layout.canopy_y) * progress * progress;
             frame.push_primitive(
-                6,
+                PARCEL_LAYER,
                 rectangle(
                     RenderPoint::new(x - 0.8, y - 0.8),
                     RenderPoint::new(x + 0.8, y + 0.8),
@@ -39,62 +95,31 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
     else {
         return;
     };
-    let world = crate::grass::surfaces::world(&state.active_event, state.duck_visit.as_deref());
-    let geometry = world.map(|w| w.query_snapshot());
-    let transparent: Vec<_> = world
-        .into_iter()
-        .flat_map(|w| w.collider_ids())
-        .filter(|id| id.entity.value() == crate::grass::SOIL_PHYSICS_ID)
-        .collect();
-    let canonical = match geometry
-        .as_ref()
-        .map(|g| g.lighting_occluder_silhouettes(&transparent))
-        .transpose()
-    {
-        Ok(polygons) => polygons.unwrap_or_default(),
-        Err(_) => return,
-    };
-    let mut quads = plant_face_polygons(state);
-    quads.extend(plant_actor_polygons(state));
-    if let Some(soil) = &state.soil {
-        quads.extend(soil.quads().into_iter().map(|q| q.to_vec()));
-    }
-    let mut polygons = crate::grass::residents::optical_polygons(quads);
-    if let Some(soil) = &state.soil {
-        polygons.extend(crate::grass::residents::tissue_polygons(
-            &state.plants.plants.observe(),
-            soil,
-        ));
-    }
+    let optics = HostOptics::capture(state);
     // Validate the same bounded publication as physiology before drawing any
-    // light. Canonical silhouettes are copied from this immutable query snapshot;
-    // the material/tissue polygons are exactly those supplied to query_light.
-    if crate::grass::residents::query_light(
+    // light. Capacity or invalid-input refusal draws no unverified beam.
+    let validation = optics.scene().query_light(
         state.simulation_tick(),
         0,
         Some(source),
-        &[],
-        polygons.clone(),
-        geometry.as_ref(),
-        &transparent,
         &[Receiver {
             position: Vec2::new((source.left + source.right) * 0.5, layout.floor_y),
             surface: None,
         }],
-    )
-    .is_err()
-    {
+    );
+    if validation.is_err() {
         return;
     }
-    let mut silhouettes: Vec<_> = polygons.into_iter().map(|(_, p)| p).collect();
-    silhouettes.extend(canonical);
+    let Ok(silhouettes) = optics.silhouettes() else {
+        return;
+    };
     let Some(beam) = beam::polygons(source, layout.floor_y, &silhouettes) else {
         return;
     };
     let points = beam::outline(&beam);
     if !points.is_empty() {
         frame.push_primitive(
-            2,
+            GLOW_LAYER,
             RenderPrimitive::Polygon(RenderPolygon::filled(
                 points,
                 RenderColor::rgba(1.0, 0.87, 0.46, 0.12),
@@ -103,7 +128,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
     }
     // The actual opening covers the corresponding portion of the canopy.
     frame.push_primitive(
-        2,
+        GLOW_LAYER,
         rectangle(
             RenderPoint::new(source.left, layout.canopy_y),
             RenderPoint::new(source.right, layout.bounds_max.y),
@@ -117,31 +142,17 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
 mod ceiling_light_contract;
 
 /// Fresh diagnostic receivers, never the biology cache from an earlier pose.
+/// Only diagnostic sessions pay for this per-frame geometry query.
 pub(crate) fn optical_evidence(state: &ClockState) -> Option<engine_common::ClockCeilingOptics> {
+    if !state.config.ceiling_optics {
+        return None;
+    }
     let layout = Layout::new(state.aspect_ratio());
     let source = state
         .ceiling
         .source(layout)
         .filter(|_| state.config.ceiling_sunlight)?;
-    let world = crate::grass::surfaces::world(&state.active_event, state.duck_visit.as_deref());
-    let geometry = world.map(|w| w.query_snapshot());
-    let transparent: Vec<_> = world
-        .into_iter()
-        .flat_map(|w| w.collider_ids())
-        .filter(|id| id.entity.value() == crate::grass::SOIL_PHYSICS_ID)
-        .collect();
-    let mut quads = plant_face_polygons(state);
-    quads.extend(plant_actor_polygons(state));
-    if let Some(soil) = &state.soil {
-        quads.extend(soil.quads().into_iter().map(|q| q.to_vec()));
-    }
-    let mut polygons = crate::grass::residents::optical_polygons(quads);
-    if let Some(soil) = &state.soil {
-        polygons.extend(crate::grass::residents::tissue_polygons(
-            &state.plants.plants.observe(),
-            soil,
-        ));
-    }
+    let optics = HostOptics::capture(state);
     // Fixed grid includes both aperture edges and an outside control. Two rows
     // expose low moving actors and higher course solids without soil interiors.
     let receivers: Vec<_> = [layout.floor_y + 10.0, layout.floor_y + 30.0]
@@ -156,22 +167,18 @@ pub(crate) fn optical_evidence(state: &ClockState) -> Option<engine_common::Cloc
             })
         })
         .collect();
-    let samples = crate::grass::residents::query_light(
-        state.simulation_tick(),
-        state.plants.intensity,
-        Some(source),
-        &[],
-        polygons.clone(),
-        geometry.as_ref(),
-        &transparent,
-        &receivers,
-    )
-    .ok()?;
-    let mut silhouettes: Vec<_> = polygons.into_iter().map(|(_, p)| p).collect();
-    if let Some(g) = &geometry {
-        silhouettes.extend(g.lighting_occluder_silhouettes(&transparent).ok()?);
-    }
+    let samples = optics
+        .scene()
+        .query_light(
+            state.simulation_tick(),
+            state.plants.intensity,
+            Some(source),
+            &receivers,
+        )
+        .ok()?;
+    let silhouettes = optics.silhouettes().ok()?;
     let milli = |v: f32| (v * 1000.0).round() as i32;
+    let world = crate::grass::surfaces::world(&state.active_event, state.duck_visit.as_deref());
     Some(engine_common::ClockCeilingOptics {
         simulation_tick: state.simulation_tick(),
         // query_light publishes generation == completed simulation tick.
@@ -182,7 +189,8 @@ pub(crate) fn optical_evidence(state: &ClockState) -> Option<engine_common::Cloc
             milli(source.right),
             milli(source.ceiling_y),
         ],
-        collider_generations: geometry
+        collider_generations: optics
+            .geometry
             .as_ref()
             .map(|g| g.lighting_collider_generations())
             .unwrap_or_default(),

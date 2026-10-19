@@ -28,12 +28,12 @@ fn seconds(s: &mut ClockState, n: u64) {
 #[test]
 fn ceiling_light_contract_exact_timing_pause_preview_and_duplicate() {
     let mut c = Ceiling::default();
-    assert!(c.start(4242));
-    c.advance(OPENING_DURATION - Duration::from_nanos(1));
+    assert!(c.start());
+    assert!(!c.advance(OPENING_DURATION - Duration::from_nanos(1)));
     assert_eq!(c.phase, Phase::Opening);
-    assert_eq!(c.advance(Duration::from_nanos(1)), Some(4242));
+    assert!(c.advance(Duration::from_nanos(1)));
     assert_eq!(c.phase, Phase::Open);
-    assert!(!c.start(123));
+    assert!(!c.start());
     c.advance(Duration::ZERO);
     assert_eq!(c.elapsed, Duration::ZERO);
     c.advance(OPEN_DURATION - Duration::from_nanos(1));
@@ -261,7 +261,7 @@ fn ceiling_light_contract_equal_time_playback_with_fixed_aperture() {
 
 #[test]
 fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
-    use crate::grass::residents::{query_light, tissue_polygons};
+    use crate::grass::residents::{OpticalScene, tissue_polygons};
     use engine_core::lighting::{LightId, Receiver};
     let mut s = fixture();
     seconds(&mut s, 60);
@@ -283,16 +283,13 @@ fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
             surface: None,
         },
     ];
-    let samples = query_light(
-        s.simulation_tick(),
-        0,
-        Some(source),
-        &[],
-        polygons.clone(),
-        None,
-        &[],
-        &receivers,
-    )
+    let samples = OpticalScene {
+        footprints: &[],
+        polygons: &polygons,
+        geometry: None,
+        transparent: &[],
+    }
+    .query_light(s.simulation_tick(), 0, Some(source), &receivers)
     .unwrap();
     assert_eq!(
         samples[0].local, 950.0,
@@ -315,16 +312,13 @@ fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
         })
         .collect();
     assert_eq!(
-        query_light(
-            s.simulation_tick(),
-            0,
-            Some(source),
-            &[],
-            moved,
-            None,
-            &[],
-            &receivers
-        )
+        OpticalScene {
+            footprints: &[],
+            polygons: &moved,
+            geometry: None,
+            transparent: &[],
+        }
+        .query_light(s.simulation_tick(), 0, Some(source), &receivers)
         .unwrap()[1]
             .local,
         950.0
@@ -334,9 +328,19 @@ fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
 
 #[test]
 fn ceiling_light_contract_readings_fonts_and_layouts_keep_paid_growth() {
+    // The cheap geometry contract below proves the corridor clears every font,
+    // reading and aspect. This paid-growth sweep samples that matrix: every
+    // font and the seven ordinary hours at the default aspect, then the
+    // narrow/wide layouts with the default font and a leading-zero transition.
+    let default_font = crate::ClockFontSettings::default().selected;
     for aspect in [0.25, 0.6, 0.75, 4.0 / 3.0, 5.0 / 3.0, 4.0] {
-        for font in crate::ClockFont::ALL {
-            let hours: &[u8] = if aspect == 5.0 / 3.0 {
+        let fonts: &[crate::ClockFont] = if aspect == 5.0 / 3.0 {
+            &crate::ClockFont::ALL
+        } else {
+            std::slice::from_ref(&default_font)
+        };
+        for &font in fonts {
+            let hours: &[u8] = if aspect == 5.0 / 3.0 && font == default_font {
                 &[0, 8, 10, 12, 13, 20, 23]
             } else {
                 &[0, 12]
@@ -397,7 +401,7 @@ fn ceiling_light_contract_readings_fonts_and_layouts_keep_paid_growth() {
 
 #[test]
 fn ceiling_light_contract_margin_and_digit_occlusion_share_geometry() {
-    use crate::grass::residents::{optical_polygons, query_light};
+    use crate::grass::residents::{OpticalScene, optical_polygons};
     use engine_core::{Vec2, lighting::Receiver};
     for aspect in [0.25, 0.6, 0.75, 4.0 / 3.0, 5.0 / 3.0, 4.0] {
         for font in crate::ClockFont::ALL {
@@ -424,7 +428,7 @@ fn ceiling_light_contract_margin_and_digit_occlusion_share_geometry() {
                 );
                 let layout = Layout::new(aspect);
                 let mut ceiling = Ceiling::default();
-                ceiling.start(4242);
+                ceiling.start();
                 ceiling.advance(OPENING_DURATION);
                 let source = ceiling.source(layout).unwrap();
                 assert!(source.left < source.right && source.right < layout.face_origin.x);
@@ -446,17 +450,15 @@ fn ceiling_light_contract_margin_and_digit_occlusion_share_geometry() {
                     },
                 ];
                 let quads = optical_polygons(polygons);
-                let samples = query_light(
-                    0,
-                    50,
-                    Some(source),
-                    &[],
-                    quads.clone(),
-                    None,
-                    &[],
-                    &receivers,
-                )
-                .unwrap();
+                let occluded = OpticalScene {
+                    footprints: &[],
+                    polygons: &quads,
+                    geometry: None,
+                    transparent: &[],
+                };
+                let samples = occluded
+                    .query_light(0, 50, Some(source), &receivers)
+                    .unwrap();
                 assert_eq!(samples[0].local, 950.0, "margin {aspect} {font:?} {hour}");
                 assert_eq!(samples[0].directional, 50.0);
                 assert_eq!(samples[1].local, 0.0, "outside aperture");
@@ -466,12 +468,17 @@ fn ceiling_light_contract_margin_and_digit_occlusion_share_geometry() {
                     right: layout.bounds_max.x,
                     ..source
                 };
-                let shadow =
-                    query_light(0, 50, Some(wide), &[], quads, None, &[], &receivers).unwrap();
+                let shadow = occluded.query_light(0, 50, Some(wide), &receivers).unwrap();
                 assert_eq!(shadow[1].local, 0.0);
                 assert!(shadow[1].first_blocker.is_some());
-                let clear =
-                    query_light(0, 50, Some(wide), &[], vec![], None, &[], &receivers).unwrap();
+                let clear = OpticalScene {
+                    footprints: &[],
+                    polygons: &[],
+                    geometry: None,
+                    transparent: &[],
+                }
+                .query_light(0, 50, Some(wide), &receivers)
+                .unwrap();
                 assert_eq!(clear[1].local, 950.0);
             }
         }

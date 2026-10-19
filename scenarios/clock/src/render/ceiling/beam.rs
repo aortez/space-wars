@@ -166,10 +166,10 @@ pub(super) fn outline(pieces: &[Vec<RenderPoint>]) -> Vec<RenderPoint> {
         points.extend_from_slice(&piece[..2]);
         // A missing interval is fully blocked up to the source plane.
         // Connect across it along the ceiling, never across the hidden region.
-        if let Some(next) = pieces.get(index + 1) {
-            if piece[1].x < next[0].x {
-                points.extend([piece[2], next[3]]);
-            }
+        if let Some(next) = pieces.get(index + 1)
+            && piece[1].x < next[0].x
+        {
+            points.extend([piece[2], next[3]]);
         }
     }
     points.push(pieces.last().unwrap()[2]);

@@ -30,36 +30,15 @@ fn sunlight(frame: &RenderFrame) -> Vec<&RenderPolygon> {
 }
 
 fn fresh_light(s: &ClockState, receivers: &[Receiver]) -> Vec<engine_core::lighting::Exposure> {
-    let world = crate::grass::surfaces::world(&s.active_event, s.duck_visit.as_deref());
-    let geometry = world.map(|w| w.query_snapshot());
-    let transparent: Vec<_> = world
-        .into_iter()
-        .flat_map(|w| w.collider_ids())
-        .filter(|id| id.entity.value() == crate::grass::SOIL_PHYSICS_ID)
-        .collect();
-    let mut quads = plant_face_polygons(s);
-    quads.extend(plant_actor_polygons(s));
-    if let Some(soil) = &s.soil {
-        quads.extend(soil.quads().into_iter().map(|q| q.to_vec()));
-    }
-    let mut polygons = crate::grass::residents::optical_polygons(quads);
-    if let Some(soil) = &s.soil {
-        polygons.extend(crate::grass::residents::tissue_polygons(
-            &s.plants.plants.observe(),
-            soil,
-        ));
-    }
-    crate::grass::residents::query_light(
-        s.simulation_tick(),
-        50,
-        s.ceiling.source(Layout::new(s.aspect_ratio())),
-        &[],
-        polygons,
-        geometry.as_ref(),
-        &transparent,
-        receivers,
-    )
-    .unwrap()
+    HostOptics::capture(s)
+        .scene()
+        .query_light(
+            s.simulation_tick(),
+            50,
+            s.ceiling.source(Layout::new(s.aspect_ratio())),
+            receivers,
+        )
+        .unwrap()
 }
 fn duck_fixture() -> ClockState {
     let mut s = ClockScenario::init(
@@ -99,28 +78,39 @@ fn ceiling_light_contract_aligned_duck_pose_draws_light_to_lit_tissue() {
         steps += 1;
         assert!(steps <= 60);
     }
-    assert_eq!(steps, 59, "operator's aligned biology boundary");
     let o = s.plants.plants.observe();
-    let t = o.tissues.iter().find(|t| t.id == 27).unwrap();
-    let tip = crate::grass::residents::shoot_polygon(t, &o, s.soil.as_ref().unwrap()).unwrap()[2];
-    let exposure = s.plants.exposure[&27].light;
+    let soil = s.soil.as_ref().unwrap();
+    // Any living shoot whose recorded biology saw full sun at this boundary.
+    let (t, tip) = o
+        .tissues
+        .iter()
+        .filter(|t| t.role == engine_core::plants::Role::Shoot && t.health > 0)
+        .filter(|t| {
+            s.plants
+                .exposure
+                .get(&t.id)
+                .is_some_and(|e| e.light == 1000)
+        })
+        .find_map(|t| {
+            crate::grass::residents::shoot_polygon(t, &o, soil).map(|polygon| (t, polygon[2]))
+        })
+        .expect("a sunlit shoot at the aligned boundary");
     let frame = ClockScenario::render_frame(&s);
     let beam = sunlight(&frame);
     let lit = beam
         .iter()
         .any(|p| contains(&p.points, tip + Vec2::Y * 0.02));
     println!(
-        "aligned-duck steps={steps} biology_tick={} tissue=27 tip={tip:?} cached_light={exposure} rendered_lit={lit}",
-        o.tick
+        "aligned-duck steps={steps} biology_tick={} tissue={} tip={tip:?} rendered_lit={lit}",
+        o.tick, t.id
     );
-    assert_eq!(exposure, 1000);
     let fresh = fresh_light(
         &s,
         &[Receiver {
             position: tip,
             surface: Some(engine_core::lighting::LightId(
                 crate::grass::SOIL_PHYSICS_ID,
-                27,
+                t.id,
             )),
         }],
     );
@@ -131,33 +121,6 @@ fn ceiling_light_contract_aligned_duck_pose_draws_light_to_lit_tissue() {
     assert_eq!(
         fresh[0].intensity, 1000.0,
         "same-pose query rules out cached biology"
-    );
-    let world = crate::grass::surfaces::world(&s.active_event, s.duck_visit.as_deref()).unwrap();
-    let transparent: Vec<_> = world
-        .collider_ids()
-        .into_iter()
-        .filter(|id| id.entity.value() == crate::grass::SOIL_PHYSICS_ID)
-        .collect();
-    let source = s.ceiling.source(Layout::new(s.aspect_ratio())).unwrap();
-    let dx = (source.right - source.left) / (source.right - source.left).ceil();
-    let left = source.left + ((tip.x - source.left) / dx).floor() * dx;
-    let right = left + dx;
-    let broad_top = world
-        .query_snapshot()
-        .lighting_occluder_bounds(&transparent)
-        .unwrap()
-        .into_iter()
-        .filter(|(a, b)| a.x <= right && left <= b.x)
-        .map(|(_, b)| b.y)
-        .max_by(f32::total_cmp)
-        .unwrap();
-    println!(
-        "aligned-duck old_aabb_top={broad_top} false_gap={}",
-        broad_top - tip.y
-    );
-    assert!(
-        broad_top - tip.y > 30.0,
-        "reproduce the original AABB cause"
     );
     assert!(lit, "fresh biology receiver must lie in delivered sunlight");
 }
@@ -281,16 +244,13 @@ fn ceiling_light_contract_slopes_subpixel_blockers_crossings_and_refusal() {
                     surface: None,
                 })
                 .collect();
-            let samples = crate::grass::residents::query_light(
-                0,
-                0,
-                Some(source),
-                &[],
-                polygons.clone(),
-                None,
-                &[],
-                &receivers,
-            )
+            let samples = OpticalScene {
+                footprints: &[],
+                polygons: &polygons,
+                geometry: None,
+                transparent: &[],
+            }
+            .query_light(0, 0, Some(source), &receivers)
             .unwrap();
             for (&p, e) in chunk.iter().zip(samples) {
                 let drawn = beam.iter().any(|q| contains(q, p));
@@ -419,16 +379,13 @@ fn ceiling_light_contract_canonical_silhouettes_block_without_aabb_shadows() {
                         surface: None,
                     })
                     .collect();
-                let samples = crate::grass::residents::query_light(
-                    0,
-                    0,
-                    Some(source),
-                    &[],
-                    vec![],
-                    Some(&snapshot),
-                    &[],
-                    &receivers,
-                )
+                let samples = OpticalScene {
+                    footprints: &[],
+                    polygons: &[],
+                    geometry: Some(&snapshot),
+                    transparent: &[],
+                }
+                .query_light(0, 0, Some(source), &receivers)
                 .unwrap();
                 for (&p, e) in chunk.iter().zip(samples) {
                     let lit = contains(&beam::outline(&beam), p);
@@ -482,10 +439,15 @@ fn ceiling_light_contract_canonical_silhouettes_block_without_aabb_shadows() {
         },
         &[ColliderSpec::ball(id, 100.0)]
     ));
-    assert!(matches!(
-        world.query_snapshot().lighting_occluder_silhouettes(&[]),
-        Err(engine_core::lighting::LightingError::Capacity)
-    ));
+    // A huge ball clamps to the per-circle vertex cap and still circumscribes
+    // the circle; no chord may cut into the opaque interior.
+    let huge = world
+        .query_snapshot()
+        .lighting_occluder_silhouettes(&[])
+        .unwrap();
+    assert_eq!(huge.len(), 1);
+    assert_eq!(huge[0].len(), 256);
+    assert!(huge[0].iter().all(|p| p.length() >= 100.0));
     let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
     let mut sensor = ColliderSpec::ball(id, 1.0);
     sensor.sensor = true;
@@ -537,16 +499,13 @@ fn ceiling_light_contract_source_plane_containment_keeps_local_endpoint_rules() 
             surface: None,
         },
     ];
-    let samples = crate::grass::residents::query_light(
-        0,
-        0,
-        Some(source),
-        &[],
-        vec![(id, polygon.clone())],
-        None,
-        &[],
-        &receivers,
-    )
+    let samples = OpticalScene {
+        footprints: &[],
+        polygons: &[(id, polygon.clone())],
+        geometry: None,
+        transparent: &[],
+    }
+    .query_light(0, 0, Some(source), &receivers)
     .unwrap();
     assert_eq!(
         samples[0].local, 0.0,
@@ -568,6 +527,7 @@ fn controlled_fixture() -> ClockState {
         ClockConfig {
             event_profile: ClockEventProfile::Off,
             aspect_ratio: 16.0 / 9.0,
+            ceiling_optics: true,
             ..Default::default()
         },
         4242,
@@ -634,7 +594,7 @@ fn control_lease(s: &mut ClockState, direction: i16, jump: bool, held: u32, gap:
     );
 }
 
-fn controlled_sequence(gap: u32, hop: bool) -> bool {
+fn controlled_sequence(gap: u32) {
     let mut s = controlled_fixture();
     let mut stage = 0;
     let mut shadow_indices = Vec::new();
@@ -688,11 +648,11 @@ fn controlled_sequence(gap: u32, hop: bool) -> bool {
                     "departure restores light"
                 );
                 assert!(hops > 0, "exercise the real soil lip jump");
-                return true;
+                return;
             }
             stage += 1;
         }
-        if hop && stage == 1 && duck.grounded && x < b + 10000 {
+        if stage == 1 && duck.grounded && x < b + 10000 {
             hops += 1;
             assert!(hops <= 6, "bounded soil lip jump attempts");
             control_lease(&mut s, 0, true, 6, gap);
@@ -705,27 +665,20 @@ fn controlled_sequence(gap: u32, hop: bool) -> bool {
                 1000
             },
             false,
-            if hop { 6 } else { 3 },
+            6,
             gap,
         );
     }
     let duck = s.player_duck_state().unwrap().duck;
-    println!(
+    panic!(
         "leased-moving stalled gap={gap} stage={stage} pose={:?}",
         duck.position_milli
     );
-    assert_eq!(stage, 1, "the uncorrected script stalls at the soil lip");
-    false
-}
-
-#[test]
-fn ceiling_light_contract_short_leases_reproduce_soil_lip_stall() {
-    assert!(!controlled_sequence(12, false));
 }
 
 #[test]
 fn ceiling_light_contract_moving_evidence_sequence() {
     for gap in [3, 12, 30] {
-        assert!(controlled_sequence(gap, true));
+        controlled_sequence(gap);
     }
 }

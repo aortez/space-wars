@@ -6,7 +6,8 @@ use std::time::Duration;
 pub const OPENING_DURATION: Duration = Duration::from_secs(5);
 pub const OPEN_DURATION: Duration = Duration::from_secs(300);
 pub const CLOSING_DURATION: Duration = Duration::from_secs(60);
-pub const SUNLIGHT_ID: LightId = LightId(0x4345_494c_494e_4700, 1);
+/// Owner half of the sunlight identity; the opening sequence completes it.
+pub const SUNLIGHT_OWNER: u64 = 0x4345_494c_494e_4700;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Phase {
@@ -24,7 +25,7 @@ pub struct Ceiling {
     pub sequence: u64,
     pub deliveries: u64,
     pub cancellations: u64,
-    pending: Option<u64>,
+    pending: bool,
     pub(crate) material: Vec<crate::grass::SoilSite>,
     pub cancelled_material: u64,
     pub planned_material: u64,
@@ -41,14 +42,14 @@ pub(crate) fn compatible_event(kind: engine_common::ClockEventKind) -> bool {
     }
 }
 impl Ceiling {
-    pub fn start(&mut self, seed: u64) -> bool {
+    pub fn start(&mut self) -> bool {
         if self.phase != Phase::Closed {
             return false;
         }
         self.sequence += 1;
         self.phase = Phase::Opening;
         self.elapsed = Duration::ZERO;
-        self.pending = Some(seed);
+        self.pending = true;
         true
     }
     pub fn cancel(&mut self) {
@@ -57,18 +58,19 @@ impl Ceiling {
             self.phase = Phase::Closed;
             self.elapsed = Duration::ZERO;
         }
-        self.pending = None;
+        self.pending = false;
         self.cancelled_material += self.material.len() as u64;
         self.material.clear();
     }
     pub fn disable_delivery(&mut self) {
         self.cancelled_material += self.material.len() as u64;
         self.material.clear();
-        self.pending = None;
+        self.pending = false;
     }
     /// Normal simulation time only. Consume overshoot without shortening the hold.
-    pub fn advance(&mut self, mut dt: Duration) -> Option<u64> {
-        let mut delivery = None;
+    /// Reports whether the pending introduction was delivered at the open boundary.
+    pub fn advance(&mut self, mut dt: Duration) -> bool {
+        let mut delivered = false;
         while !dt.is_zero() && self.phase != Phase::Closed {
             let (duration, next) = match self.phase {
                 Phase::Opening => (OPENING_DURATION, Phase::Open),
@@ -82,13 +84,13 @@ impl Ceiling {
             if self.elapsed == duration {
                 self.phase = next;
                 self.elapsed = Duration::ZERO;
-                if next == Phase::Open {
-                    delivery = self.pending.take();
-                    self.deliveries += u64::from(delivery.is_some());
+                if next == Phase::Open && std::mem::take(&mut self.pending) {
+                    delivered = true;
+                    self.deliveries += 1;
                 }
             }
         }
-        delivery
+        delivered
     }
     pub fn fraction(&self) -> f32 {
         match self.phase {
@@ -118,7 +120,7 @@ impl Ceiling {
         let center = (left + right) * 0.5;
         let half = (right - left) * 0.5 * fraction;
         Some(ApertureSource {
-            id: LightId(SUNLIGHT_ID.0, self.sequence),
+            id: LightId(SUNLIGHT_OWNER, self.sequence),
             left: center - half,
             right: center + half,
             ceiling_y: layout.canopy_y,
@@ -168,9 +170,6 @@ impl ClockState {
             })
             .sites;
         self.ceiling.planned_material += self.ceiling.material.len() as u64;
-    }
-    pub fn ceiling(&self) -> &Ceiling {
-        &self.ceiling
     }
     pub fn cancel_ceiling(&mut self) {
         self.ceiling.cancel();
