@@ -16,11 +16,15 @@ pub enum ClockBenchmarkCase {
     DigitSlide,
     Rain,
     Aquarium,
+    /// Ceiling sunlight opening with retained soil and paid grass growth. The
+    /// beam and biology continue for the whole 365-second hold, so longer
+    /// measured windows sample a larger living patch.
+    Grass,
 }
 
 impl ClockBenchmarkCase {
     #[cfg(test)]
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Idle,
         Self::Falling,
         Self::ColorCycle,
@@ -30,6 +34,7 @@ impl ClockBenchmarkCase {
         Self::DigitSlide,
         Self::Rain,
         Self::Aquarium,
+        Self::Grass,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -47,6 +52,7 @@ impl ClockBenchmarkCase {
             Self::DigitSlide => ClockEventKind::DigitSlide,
             Self::Rain => ClockEventKind::Rain,
             Self::Aquarium => ClockEventKind::Aquarium,
+            Self::Grass => ClockEventKind::Grass,
         })
     }
 
@@ -150,14 +156,21 @@ mod tests {
                 }
             }
             assert_eq!(active > 0, case != ClockBenchmarkCase::Idle);
+            // The ceiling refuses a second Grass request during its hold, so
+            // that fixture starts one event and keeps its sunlight owner.
             assert_eq!(
                 a.event_id(),
-                if case == ClockBenchmarkCase::Idle {
-                    0
-                } else {
-                    2
+                match case {
+                    ClockBenchmarkCase::Idle => 0,
+                    ClockBenchmarkCase::Grass => 1,
+                    _ => 2,
                 }
             );
+            if case == ClockBenchmarkCase::Grass {
+                let grass = a.grass_state();
+                assert_eq!(grass.ceiling_phase, "open");
+                assert!(grass.living_tissues > 0 && grass.soil_retained > 0);
+            }
         }
     }
 }

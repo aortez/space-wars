@@ -47,8 +47,9 @@ source plane; existing local endpoint exemptions and boundary tolerance remain.
 Canonical export admits at most 8192 vertices. Beam construction admits 32768
 input vertices, 2048 relevant edges, 4096 breakpoints and one million edge-pair /
 envelope evaluations. Capacity or invalid-input refusal draws no unverified beam;
-it does not alter physiology or substitute a bounding box. Performance and final
-presentation still require registered host captures.
+it does not alter physiology or substitute a bounding box. The measured Pi 4
+cost of the opening is recorded in the
+[Clock performance lab](clock-performance-lab.md).
 
 Material is planned against actual support, occupancy, retained soil and the
 existing finite external-input budget. Ordinary introductions fill only missing
