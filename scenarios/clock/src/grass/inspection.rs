@@ -21,6 +21,7 @@ pub(crate) fn snapshot(state: &crate::ClockState) -> Option<ClockGrassInspection
                 engine_core::plants::Role::Root => "root",
                 engine_core::plants::Role::Runner => "runner",
                 engine_core::plants::Role::Shoot => "shoot",
+                engine_core::plants::Role::Moss => "moss",
             }
             .into(),
             size: t.size,

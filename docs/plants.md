@@ -415,3 +415,124 @@ and records all pre-cut shares before redistributing survivor stores. It makes
 cut losses independent of removal order. Surviving IDs, health, topology among
 survivors and investment are retained; canonical store rounding can redistribute
 individual survivor shares without altering their total.
+
+## Moss organism (#213)
+
+`Role::Moss` is a fourth runtime role: thin photosynthetic surface tissue with
+capped passive supply from an eligible surface instead of roots. The role-ordered
+`Config` tables now hold root, runner, shoot and moss entries. Moss stays in the
+ordinary ledger and tick order: intake, upkeep, local deficit, growth. Defaults,
+per size per fixed one-second tick, compared with the grass shoot baseline:
+
+| Quantity | Moss | Grass shoot |
+| --- | --- | --- |
+| Capacity, each resource | 24 | 20 |
+| Maintenance (N,W,E) | 1,1,1 | 1,2,2 |
+| Construction (N,W,E) | 20,20,20 | 4,4,4 |
+| Passive supply (N,W) at full availability | 2,2 from surface contact | none; roots supply 8,8 per size (profile v3) |
+| Energy at the dim room (50) | 2 | 0 |
+| Energy in full sun (1000) | 2 | 8 |
+| Local light threshold | 25 | 250 |
+
+Moss energy saturates: `floor(moss_energy_per_size × size × min(light, s) / s)`
+with saturation `s = 50`, so the dim room already yields its full two units and
+full sun yields no more. One dim-room moss cell therefore nets one unit of each
+resource per tick, while a dim shoot earns nothing and accumulates a shade
+deficit. Darkness remains fatal: light below 25 starts the same grace/damage
+counter as grass, even while connected lit moss holds plenty of energy, and
+restoring light before death allows recovery. These are tuning defaults, not
+measured biology. The profile values come from `Config::default()`, which
+`grass::physiology()` (identity 3) inherits, so one runtime can hold both.
+
+`Exposure::surface_contact` carries moss eligibility; `dirt_contact` remains
+root-only. `Ledger::surfaces` records each living moss tissue's contact supply
+(eligibility, offered, accepted, overflow and zero reasons) separately from
+`Ledger::roots`; the shared record type is now `ContactIntake`. Contact supply
+never includes energy. Dead, detached or out-of-contact moss receives none.
+
+### Surface contact and placement
+
+`engine_rapier::moss::contact` treats a moss cell as a point at its
+support-local cell center. It is in contact when that center lies outside
+canonical solid geometry and any of the eight neighboring cell centers lies
+inside it, of any material: dirt, rock or other solids. Corner contact lets a
+patch wrap convex edges; nothing bridges a wider air gap. One check per tissue
+supplies at most one intake, however many neighbors touch. A cell inside solid
+reports `Enclosed`, a cell with no solid neighbor `Air`. `RootUptake::contact`
+and `MaterialUptake::contact` are now role-aware: roots keep #209's dirt-only
+rule (rock stays `Ineligible`), shoots and runners report `NotAbsorbing`, and
+moss uses the surface rule. `moss::site` additionally requires the finite terrain
+domain; `GrassEnvironment`, `RootUptake` and `MaterialUptake` all use it for
+`Role::Moss` placement, so mixed grass/moss patches validate together.
+
+Cells are support-local, and the runtime's occupancy and `space_available`
+checks carry no support. Give each separately moving support its own `Plants`
+runtime, light publisher and namespace. Translation and rotation preserve
+contact; a terrain edit must be refreshed and synchronized before
+`detach_invalid`, which then removes moss whose surface or support is gone and
+discards its shares. Removing the support body detaches the whole patch. Dead
+moss keeps its cell until removed, as other dead tissue does.
+
+### Light
+
+Living moss samples light at its own cell center with no surface exemption and
+declares no opaque disk: a thin mat shades nothing, while shoots and runners keep
+their disks. Moss under its own support, an overhang or the lab shade is
+blocked like any receiver. `plant_light::footprints` returns the world-space disks
+a publication declares for a support's tissues, so a host can pass them to other
+supports' publications as `WorldOccluders`; roots and moss contribute none.
+
+### Policy
+
+`moss::POLICY` is `0x6d6f737300000001`. `Traits` identity 1 defaults to one growth
+opportunity per four ticks, a 24-cell patch limit (living and dead cells of this
+policy on its support) and finite placement reserves `[24,24,24]`. Every element
+is size one. `Moss::place` is the deliberate host action that seeds one cell with
+those reserves as a new organism; the policy never plants, and dead patches are
+never revived. `plan` walks living tissue in ID order. Shaded, short or damaged
+tissue records a `Shade`, `Shortage` or new `Damage` limit and waits for its own
+recovery instead of spending shared reserves. Healthy tissue inspects the four
+side neighbors in a fixed support-frame order (+x, -x, +y, -y) and records the
+first refusal: population, size, work, occupied, support, space (no free
+surface-contact cell) or resource. The first affordable site becomes the single
+`Grow` intent. At most four decisions per tissue are recorded. Growth and the
+runtime's Manhattan adjacency keep each addition connected and paid from that
+component's own pool; component pools are shared helpers with grass.
+`Plan`, `Decision` and `Limit` now live in `plants`; `grass` uses them unchanged.
+The grass trait population limit counts only that grass policy's tissue on its
+support, so another species in the same runtime only consumes the shared
+runtime ceiling.
+
+Fixed seeds, configurations and action sequences replay exactly. Pause and zero
+elapsed ticks charge nothing, as for every role.
+
+### Measured fixture timings
+
+`moss_surface_contract` fixtures use canonical terrain, `PlantLight`, the
+`grass::physiology()` profile and 1000 ms ticks. A dim-room patch placed on a
+16×8 dirt bed beside a two-by-two rock pillar fills all 18 eligible surface cells
+(dirt surface, pillar side, corner and top) by second **77**, paying 17 × 20 per
+resource. On the same bed with grass planted beside it, after 200 seconds:
+
+| Light | Living grass tissue | Living moss tissue |
+| --- | --- | --- |
+| Full sun | 32 | 8 |
+| Dim room (50) | 0 | 10 |
+| Darkness | 0 | 0 |
+
+In full sun grass claims most surface cells first; moss is space-limited, not
+light-limited.
+
+Non-ignored fixtures cover: contact reasons for dirt, rock, pillar sides and
+corners, air, enclosed and dead tissue, with rock still rejected for roots;
+dim-light contiguous paid spread and replay; the grass/moss light comparison;
+a round rock with a smoothed contour surface, whose patch follows the curve down
+both flanks;
+a free-standing rock translated and turned upside down, where moss keeps its
+contact while the old top face loses light to its own support and dies back;
+terrain breakage with stale-geometry refusal, detachment, conserved loss and
+paid recolonization of exposed rock; removal of the support body; and a killed
+bridge that splits a patch, damaged parents waiting, and paid reclamation of the
+cleared cell. `moss_policy_contract` covers the headless policy and runtime
+accounting. Clock moss on digits (#223), succession on the retained Clock floor
+(#518), spores, seeds and fragment dispersal remain separate work.

@@ -32,11 +32,15 @@ fn supply_fractions(rates: [u16; 2], availability: [u16; 2], tick_ms: u16) -> [u
 pub enum ContactReason {
     Eligible,
     Dead,
-    NotRoot,
+    /// Shoots and runners have no passive contact supply.
+    NotAbsorbing,
     Support,
     StaleGeometry,
+    /// A root point outside solid geometry, or moss with no solid neighbor.
     Air,
     Ineligible,
+    /// Moss whose own cell lies inside solid geometry rather than on it.
+    Enclosed,
 }
 
 /// Rebuild this borrowed view at each physiology boundary. It owns no cache,
@@ -56,12 +60,13 @@ pub struct RootUptake<'a> {
     pub tick_ms: u16,
 }
 impl RootUptake<'_> {
+    /// Roots need dirt at their point; moss needs a solid surface of any material.
     pub fn contact(&self, t: &Tissue) -> ContactReason {
         if t.health == 0 {
             return ContactReason::Dead;
         }
-        if t.role != Role::Root {
-            return ContactReason::NotRoot;
+        if !matches!(t.role, Role::Root | Role::Moss) {
+            return ContactReason::NotAbsorbing;
         }
         if t.support != Some(self.assembly.plant_support())
             || !self.world.contains_body(self.assembly.body())
@@ -73,6 +78,9 @@ impl RootUptake<'_> {
             .plant_current(self.world, self.terrain, self.geometry)
         {
             return ContactReason::StaleGeometry;
+        }
+        if t.role == Role::Moss {
+            return crate::moss::contact(self.terrain, self.geometry, t.cell);
         }
         // Roots are lightweight point absorbers at local cell centers. No
         // proximity tolerance or world-position cache admits air samples.
@@ -96,14 +104,19 @@ impl Environment for RootUptake<'_> {
             };
         }
         let fractions = supply_fractions(self.rates, self.availability, self.tick_ms);
+        let eligible = self.contact(t) == ContactReason::Eligible;
         Exposure {
-            dirt_contact: self.contact(t) == ContactReason::Eligible,
+            dirt_contact: eligible && t.role == Role::Root,
+            surface_contact: eligible && t.role == Role::Moss,
             nutrients: fractions[0],
             water: fractions[1],
             light: 0,
         }
     }
     fn space_available(&self, cell: [i32; 2], role: Role, _: u16) -> bool {
+        if role == Role::Moss {
+            return crate::moss::site(self.terrain, self.geometry, cell);
+        }
         let p = self.terrain.cell_center(CellCoord::new(cell[0], cell[1]));
         let solid = self.geometry.source_cell(self.terrain, p).is_some();
         role == Role::Root || !solid

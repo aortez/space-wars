@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks.",
+    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark.",
     create,
 };
 
@@ -88,15 +88,77 @@ impl ClientScenario for GardenLabClientScenario {
     }
 
     fn runtime_diagnostics(&self) -> String {
+        use engine_core::plants::{Exposure, Observation, Role, Tissue};
         let s = &self.state;
         let o = s.plants.observe();
-        let tissues: Vec<_> = o.tissues.iter().map(|t|serde_json::json!({
-            "id":t.id,"organism":t.organism,"role":format!("{:?}",t.role),
-            "cell":t.cell,"health":t.health,"shade":t.shade_ticks,"shortage":t.shortage_ticks,
-            "stores":t.stores,"size":t.size,"development":t.development,"invested":t.invested,
-            "next_cost":if t.role == engine_core::plants::Role::Shoot && t.size < 3 { std::array::from_fn::<_,3,_>(|i|u64::from(t.development[i] < o.config.development_per_size[i])) } else { [0;3] },"policy":t.policy,"allocation":t.allocation,"support":format!("{:?}",t.support),
-        })).collect();
-        let selected = tissues.get(s.selected % tissues.len().max(1)).cloned();
+        // Grass records keep their original fields; moss adds its last light
+        // sample, surface supply, current contact and, on the rock, world point.
+        let record = |o: &Observation,
+                      t: &Tissue,
+                      on_rock: bool,
+                      exposure: Option<&Exposure>,
+                      world: Option<[f32; 2]>| {
+            let mut v = serde_json::json!({
+                "id":t.id,"organism":t.organism,"role":format!("{:?}",t.role),
+                "cell":t.cell,"health":t.health,"shade":t.shade_ticks,"shortage":t.shortage_ticks,
+                "stores":t.stores,"size":t.size,"development":t.development,"invested":t.invested,
+                "next_cost":if t.role == Role::Shoot && t.size < 3 { std::array::from_fn::<_,3,_>(|i|u64::from(t.development[i] < o.config.development_per_size[i])) } else { [0;3] },"policy":t.policy,"allocation":t.allocation,"support":format!("{:?}",t.support),
+            });
+            if t.role == Role::Moss {
+                let surface = o.ledger.surfaces.get(&t.id).map(|r| {
+                    serde_json::json!({"eligible":r.eligible,"offered":r.offered,"accepted":r.accepted,"overflow":r.overflow})
+                });
+                v["light"] = serde_json::json!(exposure.map(|e| e.light));
+                v["surface"] = serde_json::json!(surface);
+                v["contact"] =
+                    serde_json::json!(s.surface_contact(on_rock, t).map(|c| format!("{c:?}")));
+                v["world"] = serde_json::json!(world);
+            }
+            v
+        };
+        let tissues: Vec<_> = o
+            .tissues
+            .iter()
+            .map(|t| record(&o, t, false, s.exposure.get(&t.id), None))
+            .collect();
+        let mut rock_tissues = Vec::new();
+        let rock = s.rock.as_ref().map(|r| {
+            let ro = r.plants.observe();
+            let motion = s.world().motion(r.body());
+            rock_tissues = ro
+                .tissues
+                .iter()
+                .map(|t| {
+                    let world = motion.map(|m| {
+                        let local = r
+                            .terrain()
+                            .cell_center(engine_terrain::CellCoord::new(t.cell[0], t.cell[1]));
+                        let v = m.position + local.rotate_radians(m.angle);
+                        [v.x, v.y]
+                    });
+                    record(&ro, t, true, r.exposure.get(&t.id), world)
+                })
+                .collect();
+            serde_json::json!({
+                "removed":r.removed,"broken":r.broken,"quarter_turns":r.quarter_turns,
+                "angle":motion.map(|m| m.angle),"position":motion.map(|m| [m.position.x, m.position.y]),
+                "tick":ro.tick,"tissues":rock_tissues,"connections":ro.connections,
+                "intake":ro.ledger.intake,"maintenance":ro.ledger.maintenance,
+                "growth":ro.ledger.growth,"loss":ro.ledger.loss,"unmet":ro.ledger.unmet,
+                "decisions":format!("{:?}",r.plan),
+                "work":[r.work.rays,r.work.footprint_tests,r.work.collider_records],
+            })
+        });
+        // Selection walks bed tissue, then standing rock tissue.
+        let standing = if s.standing_rock().is_some() {
+            &rock_tissues[..]
+        } else {
+            &[]
+        };
+        let combined: Vec<_> = tissues.iter().chain(standing).collect();
+        let selected = combined
+            .get(s.selected % combined.len().max(1))
+            .map(|v| (*v).clone());
         format!(
             "garden_lab={}",
             serde_json::json!({
@@ -110,6 +172,10 @@ impl ClientScenario for GardenLabClientScenario {
                 "tissues":tissues,"selected_tissue":selected,"connections":o.connections,
                 "intake":o.ledger.intake,"maintenance":o.ledger.maintenance,
                 "growth":o.ledger.growth,"loss":o.ledger.loss,"unmet":o.ledger.unmet,
+                "moss":{
+                    "placed":s.moss.is_some(),"summary":s.moss_summary(),
+                    "decisions":format!("{:?}",s.moss_plan),"rock":rock,
+                },
             })
         )
     }
@@ -145,8 +211,8 @@ mod tests {
                 held: std::cell::Cell::new([false; 5]),
             };
             client.state.paused = true;
-            // Up wraps through the new controls to the tissue-increase row.
-            for _ in 0..4 {
+            // Up wraps through the moss controls to the tissue-increase row.
+            for _ in 0..scenario_garden_lab::CONTROLS.len() - 14 {
                 if controller {
                     pads.borrow_mut().set_seat(
                         0,
@@ -185,6 +251,77 @@ mod tests {
             assert_eq!(client.state.grass.traits.max_tissues, 33);
             assert_eq!(client.state.plants, before);
             assert!(client.map_input(&mut input, false).is_empty());
+        }
+    }
+    #[test]
+    fn garden_render_contract_moss_patches_rock_and_lifecycle_colors() {
+        let output =
+            std::env::var_os("SPACEWARS_GARDEN_RENDER_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(dir) = &output {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let near = |p: &slint::Rgb8Pixel, c: [u8; 3]| {
+            (i16::from(p.r) - i16::from(c[0])).abs() < 12
+                && (i16::from(p.g) - i16::from(c[1])).abs() < 12
+                && (i16::from(p.b) - i16::from(c[2])).abs() < 12
+        };
+        let capture = |name: &str, s: &GardenLabState| -> Vec<[usize; 3]> {
+            let frame = GardenLabScenario::render_frame(s);
+            let mut counts = Vec::new();
+            for (w, h) in [(1280.0, 720.0), (800.0, 480.0)] {
+                let viewport = Viewport::new(w, h);
+                let pixels = raster(&frame, viewport);
+                let count = |c: [u8; 3]| pixels.as_slice().iter().filter(|p| near(p, c)).count();
+                counts.push([
+                    count([115, 184, 46]),
+                    count([92, 97, 107]),
+                    count([128, 102, 102]),
+                ]);
+                let export = svg(&frame, viewport);
+                assert!(!export.contains("NaN"));
+                if let Some(dir) = &output {
+                    let stem = format!("moss-{name}-{}x{}", w as u32, h as u32);
+                    write_png(&dir.join(format!("{stem}-raster.png")), &pixels);
+                    std::fs::write(dir.join(format!("{stem}-vector.svg")), &export).unwrap();
+                }
+                if name == "dim-growth" {
+                    assert!(export.contains("#73b82e"), "vector moss fill absent");
+                }
+            }
+            if let Some(dir) = &output {
+                let state = serde_json::json!({"simulation_seconds":s.plants.observe().tick,
+                    "summary":s.moss_summary(),"preview_only":true});
+                std::fs::write(
+                    dir.join(format!("moss-{name}-state.json")),
+                    serde_json::to_vec_pretty(&state).unwrap(),
+                )
+                .unwrap();
+            }
+            counts
+        };
+        let mut s = GardenLabScenario::init((), 42);
+        s.command(Command::PlaceMoss);
+        s.command(Command::Light);
+        for _ in 0..120 {
+            s.tick();
+        }
+        for [moss, rock, _] in capture("dim-growth", &s) {
+            assert!(moss > 20, "moss invisible: {moss}");
+            assert!(rock > 20, "rock invisible: {rock}");
+        }
+        s.command(Command::TurnRock);
+        s.command(Command::TurnRock);
+        let physiology = engine_core::plants::grass::physiology();
+        for _ in 0..physiology.grace_ticks + 100 / u32::from(physiology.damage_per_tick) + 2 {
+            s.tick();
+        }
+        for [moss, _, dead] in capture("inverted-dieback", &s) {
+            assert!(moss > 20, "surviving moss invisible");
+            assert!(dead > 20, "dead moss invisible: {dead}");
+        }
+        s.command(Command::RemoveRock);
+        for [_, rock, _] in capture("rock-removed", &s) {
+            assert_eq!(rock, 0, "removed rock still drawn");
         }
     }
     #[test]

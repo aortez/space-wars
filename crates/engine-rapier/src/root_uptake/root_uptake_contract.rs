@@ -68,7 +68,7 @@ fn env<'a>(
 fn plant(e: &RootUptake<'_>, cell: [i32; 2]) -> Plants {
     let mut p = Plants::new(
         Config {
-            capacity_per_size: [[20, 20, 2000], [10; 3], [20; 3]],
+            capacity_per_size: [[20, 20, 2000], [10; 3], [20; 3], [24; 3]],
             ..Config::default()
         },
         5,

@@ -51,37 +51,6 @@ pub struct Grass {
     pub up: [i32; 2],
     pub support: Support,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Limit {
-    Cadence,
-    Shade,
-    Shortage,
-    Occupied,
-    Size,
-    Spread,
-    Space,
-    Support,
-    Population,
-    Work,
-    Resource,
-    Proposed,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Decision {
-    pub available: Resources,
-    pub cost: Resources,
-    pub size: u16,
-    pub parent: TissueId,
-    pub role: Role,
-    pub cell: [i32; 2],
-    pub limit: Limit,
-}
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Plan {
-    pub waiting: Option<Limit>,
-    pub intents: Vec<Intent>,
-    pub decisions: Vec<Decision>,
-}
 impl Grass {
     pub fn new(
         traits: Traits,
@@ -130,40 +99,14 @@ impl Grass {
             return plan;
         }
         let side = [self.up[1], -self.up[0]];
-        // Build living component pools once, rather than walking the graph for
-        // every candidate. Severed components never share purchasing power.
-        let mut neighbors: BTreeMap<TissueId, Vec<TissueId>> = o
+        let pools = component_pools(o);
+        // The trait limit bounds this patch; other organisms count only toward
+        // the runtime's shared tissue ceiling.
+        let own = o
             .tissues
             .iter()
-            .filter(|t| t.health > 0)
-            .map(|t| (t.id, Vec::new()))
-            .collect();
-        for (a, b) in &o.connections {
-            if neighbors.contains_key(a) && neighbors.contains_key(b) {
-                neighbors.get_mut(a).unwrap().push(*b);
-                neighbors.get_mut(b).unwrap().push(*a);
-            }
-        }
-        let mut pools = BTreeMap::new();
-        for id in neighbors.keys() {
-            if pools.contains_key(id) {
-                continue;
-            }
-            let mut group = BTreeSet::new();
-            let mut pending = vec![*id];
-            while let Some(current) = pending.pop() {
-                if group.insert(current) {
-                    pending.extend(&neighbors[&current]);
-                }
-            }
-            let mut pool = [0; 3];
-            for t in o.tissues.iter().filter(|t| group.contains(&t.id)) {
-                add(&mut pool, t.stores);
-            }
-            for member in group {
-                pools.insert(member, pool);
-            }
-        }
+            .filter(|t| t.policy == POLICY && t.support == Some(self.support))
+            .count();
 
         for preferred in [Role::Root, Role::Shoot, Role::Runner] {
             for t in o
@@ -183,7 +126,7 @@ impl Grass {
                         (side, Role::Runner, self.traits.runner_size),
                         (side.map(|v| -v), Role::Runner, self.traits.runner_size),
                     ],
-                    Role::Shoot => vec![],
+                    Role::Shoot | Role::Moss => vec![],
                 };
                 for (delta, role, size) in candidates
                     .into_iter()
@@ -198,31 +141,32 @@ impl Grass {
                     let cell = [x, y];
                     let pool = pools[&t.id];
                     let cost = scaled(o.config.growth_per_size[role.index()], size);
-                    let limit =
-                        if o.tissues.len() >= self.traits.max_tissues.min(o.config.max_tissues) {
-                            Limit::Population
-                        } else if size > o.config.max_size {
-                            Limit::Size
-                        } else if o.config.max_intents == 0 {
-                            Limit::Work
-                        } else if (0..2).any(|i| {
-                            (i64::from(cell[i]) - i64::from(self.origin[i])).abs()
-                                > i64::from(self.traits.radius)
-                        }) {
-                            Limit::Spread
-                        } else if o.tissues.iter().any(|t| t.cell == cell) {
-                            Limit::Occupied
-                        } else if !env.support_valid(Some(self.support), cell) {
-                            Limit::Support
-                        } else if !env.space_available(cell, role, size) {
-                            Limit::Space
+                    let limit = if own >= self.traits.max_tissues
+                        || o.tissues.len() >= o.config.max_tissues
+                    {
+                        Limit::Population
+                    } else if size > o.config.max_size {
+                        Limit::Size
+                    } else if o.config.max_intents == 0 {
+                        Limit::Work
+                    } else if (0..2).any(|i| {
+                        (i64::from(cell[i]) - i64::from(self.origin[i])).abs()
+                            > i64::from(self.traits.radius)
+                    }) {
+                        Limit::Spread
+                    } else if o.tissues.iter().any(|t| t.cell == cell) {
+                        Limit::Occupied
+                    } else if !env.support_valid(Some(self.support), cell) {
+                        Limit::Support
+                    } else if !env.space_available(cell, role, size) {
+                        Limit::Space
+                    } else {
+                        if (0..3).any(|i| pool[i] < cost[i]) {
+                            Limit::Resource
                         } else {
-                            if (0..3).any(|i| pool[i] < cost[i]) {
-                                Limit::Resource
-                            } else {
-                                Limit::Proposed
-                            }
-                        };
+                            Limit::Proposed
+                        }
+                    };
                     plan.decisions.push(Decision {
                         available: pool,
                         cost,
@@ -310,6 +254,7 @@ mod grass_policy_contract {
                 nutrients: 1000,
                 water: 1000,
                 light: 1000,
+                ..Exposure::default()
             }
         }
         fn space_available(&self, cell: [i32; 2], role: Role, _: u16) -> bool {

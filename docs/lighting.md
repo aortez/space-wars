@@ -168,5 +168,7 @@ all samples before committing the `LightingPublisher` update. The adapter owns
 no additional physics world and leaves shared localized-source behavior intact.
 See [plant geometry and publication contract](plants.md#directional-light-adapter-210)
 for disk identities, support transforms, diagnostics, aggregate bounds and host
-publication responsibilities. Garden/Clock wiring remains later
+publication responsibilities. Living moss samples at its own cell center without
+declaring a disk, and `footprints` returns a publication's disks for other
+supports' `WorldOccluders`; see [the moss organism](plants.md#moss-organism-213). Garden/Clock wiring remains later
 work; the earlier generic-service descriptions above describe that shared layer.

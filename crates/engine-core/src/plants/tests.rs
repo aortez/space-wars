@@ -25,6 +25,7 @@ impl Environment for Env {
     fn exposure(&self, t: &Tissue) -> Exposure {
         Exposure {
             dirt_contact: true,
+            surface_contact: true,
             nutrients: self.nutrients,
             water: self.water,
             light: if self.shade == Some(t.cell) {

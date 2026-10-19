@@ -186,3 +186,59 @@ The retained deterministic run reconciles initial [30,30,30] plus offered intake
 [23732,30756,30756], construction/development [474,474,474] and recorded losses
 [64020,57020,23996]. Losses include discarded capacity overflow as well as cuts;
 o offered intake is silently omitted from this equation.
+
+## Moss on dirt and a movable rock
+
+Five controls follow the grass controls, so existing control positions are
+unchanged; Light now also cycles to dark (0) after 500.
+
+| Control | Effect |
+| --- | --- |
+| Place moss on dirt and rock | Deliberately places one moss cell with `[24,24,24]` reserves at bed cell [1,4], at the left end of the soil surface outside the grass spread, if no bed patch exists. If no rock stands, inserts a free-standing rock body and places a patch on its rounded top face. Repeating changes nothing; it never revives or tops up moss. |
+| Turn rock 90 degrees | Turns the rock about its frame origin. Its moss keeps its support-local cells, contact and reserves; only its light changes. |
+| Break rock edge | Removes the rock's right column, refreshes and synchronizes the body, then detaches moss that lost its surface and discards its shares. Exposed rock is ordinary surface for paid regrowth. |
+| Remove rock | Removes the rock body and detaches its whole patch. Placing moss again inserts a new body incarnation and a new organism. |
+| Scrape moss strip | Removes moss in bed column 2 and rock column 3, with their shares. Remnants may pay to grow back. |
+
+The rock is a separate support with its own runtime, light publisher and light
+namespace, because the runtime's occupancy and space checks carry no support.
+Each boundary ticks the bed (grass and dirt moss together) and then the rock;
+each publication receives the other support's opaque tissue as `WorldOccluders`.
+Moss declares no disks, so today this matters only for grass shoots. Grass-only
+runs publish exactly as before.
+
+Moss draws as low olive domes resting on the surface it touches, oriented by
+the actual solid neighbors, and turning with the rock. Stressed and dead moss
+share the amber and grey colors; the rock is slate. With inspection enabled,
+moss links run through the middle of its domes. Selection walks bed tissue,
+then standing rock tissue. Selected moss shows its last light sample, surface
+contact flag, current contact reason and offered/accepted surface supply. A
+moss line summarizes both patches and their current plan; once moss is placed,
+the grass line labels its intake, upkeep and growth as the shared bed ledger.
+The `status`
+`garden_lab=` record adds the same moss fields to moss tissue entries and a
+`moss` object with the bed plan and the rock's pose, turns, break/removal state,
+tissue (with world points), ledger, plan and light work.
+
+`garden_lab_contract_moss` covers deliberate placement that leaves the grass
+patch and its 32-tissue limit unchanged; dim-room growth on dirt and rock while
+the same light kills the grass, then total death in darkness; the nutrient and
+water toggles each cutting only that surface supply on both supports; the rock turned
+upside down, with the old top face measured at zero light and dying back while
+other moss lives; breakage, removal and a fresh placement on a new body; scraping
+with exact shares lost and only new, paid tissue refilling the strips; and replay,
+reset and equal-time playback at 1x, 4x and 16x with the rock. In those fixtures
+a patch placed at second 0 under the dim room has 8 living dirt cells and 17 of
+17 rock cells alive at second 200. The window-free `garden_render_contract_moss_*`
+check exports labelled preview-only PNG/SVG frames when
+`SPACEWARS_GARDEN_RENDER_ARTIFACTS` is set.
+
+The full-only functional case
+`garden_lab_moss_surfaces_light_motion_and_support_loss_in_both_renderers` drives
+the real launcher in vector and raster modes: placement, a 90-second dim run,
+the rock turned over and stepped once, then until the inverted face has died
+beside living moss while the dim room has killed the grass, breakage, removal and
+a scraped strip regrown by new tissue, retaining a PNG/JSON pair at each stage. Rock pixel checks
+count only the rock's own screen region, because anti-aliased HUD text produces
+the same slate grey. It took 258 seconds under local Xvfb; there is no hosted
+runner measurement yet.
