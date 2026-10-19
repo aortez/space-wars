@@ -279,7 +279,10 @@ stalls need improvement before PR #505 is ready.
    simulation worker with interpolated rendering. Track input latency, simulation
    progress and total process CPU use: smoother presentation alone does not
    establish cheaper physics. Any change to overload behavior or simulation
-   timing needs an explicit design decision.
+   timing needs an explicit design decision. The
+   [simulation worker](pizza-simulation-worker.md), now on by default, keeps
+   the host's catch-up rule and holds 60 Hz presentation through the Pi 4
+   gravity event.
 
 5. **Prototype a specialized Pizza physics backend.** If the preceding gains
    leave a large gap, compare a compact circle-and-wall engine inspired by

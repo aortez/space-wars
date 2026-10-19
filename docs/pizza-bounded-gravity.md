@@ -277,7 +277,8 @@ builds.
 This removes the CCD stall, not the Pi 4 frame-budget problem. With the field
 On, both laws keep the UI core above 80% busy, flip p95 is 83–100 ms, and
 contact-bound updates still take about 100 ms on the device. Frame scheduling
-and narrow-phase and solver cost are the next targets. The device comparison
+and narrow-phase and solver cost are the next targets; the
+[simulation worker](pizza-simulation-worker.md) addresses frame scheduling. The device comparison
 covers seed 7 only; a multi-seed device comparison needs a seed argument in the
 capture script. Pi 5 remains offline. The capacity fixture screenshots and
 [functional counts](pizza-capacity.md#local-functional-evidence) now record
