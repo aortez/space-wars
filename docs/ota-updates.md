@@ -39,26 +39,28 @@ for preservation, hardware evidence and the remaining rollout gates.
 
 ### Latest qualified state
 
-The latest image source is `0a32db244ea2d692da9588b133ae4c5f92092804` in
-[PR #510](https://github.com/aortez/space-wars/pull/510). These are supervised
-branch-candidate results, not a claim that the changes are merged or enabled
-for unattended rollout. [The retained record](data/ota-profile-image-20261018.json)
-binds the image, publication, installed checks and isolated controls. The
-[second-Picade record](data/ota-picade2-profile-image-20261018.json) adds its own
-signed trial, normal boot, service restart and installed radio/time/OTA cycles.
+The latest qualified image source is `bde737f96c82182ca908e544bc6f81b5252cac2b`
+in [PR #510](https://github.com/aortez/space-wars/pull/510), installed only on the
+owner-selected second Picade. The [review-fix record](data/ota-picade2-review-fixes-20261018.json)
+binds its exact build, signed generation 7, native controls and installed checks.
+These remain supervised branch results, not unattended rollout qualification.
+The [generation-6 Pi 5 record](data/ota-profile-image-20261018.json) and
+[earlier second-Picade record](data/ota-picade2-profile-image-20261018.json) retain
+their original source `0a32db2` and scope.
 
 | Device or feed | Latest recorded state | Next qualification |
 | --- | --- | --- |
-| `spacewars.local`, Pi 5 / HyperPixel | Signed Nightly generation 6 installed; healthy trial and normal boot; real radio off/reconnect and off/time-wake/automatic-feed-check/off passed | Actual daily timer, a new payload download under gameplay, and the integrated install policy |
-| `sw-picade.local`, primary Pi 4 / Picade | Source `5b420c9`, good generation 2; healthy game/recovery, update preparation failing; candidate NetworkManager and SSH helper passed isolated controls | Install the corrected image, then normal startup and real radio/time/OTA checks |
-| `sw-picade-2.local`, second Pi 4 / Picade | Signed Nightly generation 6 installed; healthy trial/default boot; service restart and real radio/time/automatic-feed-check cycles passed | Actual daily timer, payload/SSH/gameplay performance and the integrated install policy; remaining failure matrix |
-| Owner feed | Six supervised Nightly generations, metadata version 7; Release empty | Protected automated publishing, renewal and explicit Release promotion |
+| `spacewars.local`, Pi 5 / HyperPixel | Source `0a32db2`, signed Nightly generation 6; healthy trial/normal boot and radio/time/OTA cycles | Review-fix image rollout, actual daily timer, payload/gameplay checks, integrated install policy |
+| `sw-picade.local`, primary Pi 4 / Picade | Source `5b420c9`, good generation 2; healthy game/recovery, update preparation failing; candidate provider/SSH controls passed | Corrected-image rollout and installed startup/radio/time/OTA checks |
+| `sw-picade-2.local`, second Pi 4 / Picade | Source `bde737f`, signed Nightly generation 7; healthy trial/default boot, restart, native startup/SSH/provider controls and combined radio/time/OTA cycle | #511 readback correction; actual daily timer, payload/SSH/gameplay performance, integrated install policy and remaining failure matrix |
+| Owner feed | Seven supervised Nightly generations, metadata version 8; Release empty | Protected automated publishing, renewal and explicit Release promotion |
 
-The Pi 5 and second-Picade time-wake experiments used the real `sync-now` API
-and the OTA check joined automatically. Neither observed the daily timer; the
-already-current candidate was ineligible, so neither cycle downloaded or
-installed another image. Both installation automation and publication automation
-remain disabled. Devices were left on Release with partial offline disabled.
+The time-wake experiments used the real `sync-now` API, and OTA joined
+automatically. They did not observe the daily timer. The already-current image
+was ineligible, so those cycles downloaded or installed no new payload. Publication
+and installation automation remain disabled. The selected device was returned
+to Release with partial offline disabled; the other two units were not accessed
+or changed during this review-fix qualification.
 
 ### Review corrections and next network gate
 
@@ -77,9 +79,29 @@ and the three listener masks to their source contracts. SSH boot-ID lookup is
 limited to the stopped-service fallback; failure there does not prevent a later
 coordinator admission.
 
-These changes require a new image qualification. The generation-6 records above
-remain evidence for source `0a32db2`, not for the revised executable. The older
-delayed-rfkill-readback risk is tracked separately in
+The revised image passed qualification on the selected second Picade. Native
+startup checks kept the actual packaged daemon responsive for missing, invalid
+and valid handoffs; the negative cases emitted the default warning. The first
+observer failed because `nsenter` is absent on the image; its logs and the
+corrected mount-sandbox observer are retained. All four native SSH recovery
+controls and the hardened launcher/provider controls passed. Signed installation,
+normal boot, a single service restart and the combined radio/time/OTA check
+passed with durable saved-data preservation. Regenerated local Bluetooth GATT
+databases are reported separately. Local validation passed 209 Rust tests (five
+owner-only skips), four Python tests, formatting, Clippy and ShellCheck; exact-source
+hosted CI passed.
+
+The owner staging helper first rejected its native NTP receipt precondition,
+before opening trust/staging or starting a download. The general service still
+reported usable time; the exact rejected receipt predicate is unestablished.
+One real `sync-now` success permitted a separately recorded staging attempt.
+During installation on the previous generation-6 image, disk flushing was slow
+and two fresh SSH logins exceeded the five-second banner deadline. The existing
+channel and device service stayed responsive, with no kernel storage errors
+observed; trial health committed at 415.962 seconds. Keep this in #265/#267's
+performance work, rather than claiming an established cause or a fixed latency.
+
+The older delayed-rfkill-readback risk is tracked separately in
 [#511](https://github.com/aortez/space-wars/issues/511), with bounded transition,
 expiry and conflict tests required before unattended partial-offline rollout.
 
@@ -103,10 +125,10 @@ New image changes and previously untested failure cases still need qualification
 
 ### Next implementation sequence
 
-1. Network reliability: #510 has recorded Pi 5 and selected second-Picade
-   qualification for generation 6; its review corrections await revised-image
-   checks. #511 is the next bounded-readback correction before install-flow work.
-   The primary Picade's corrected-image rollout remains tracked in #267.
+1. Network reliability: #510 has generation-6 Pi 5 evidence and revised
+   generation-7 qualification on the selected second Picade. #511 is the next
+   bounded-readback correction before install-flow work. Per-device corrected-image
+   rollout remains tracked in #267.
 2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
    consent, app save/acknowledgement, fixed privileged install operation, progress,
    trial and confirmed outcome. Define their shared handoff together; the
@@ -142,7 +164,15 @@ review candidates, not authorization to delete evidence or recovery data:
 | Dated experiments in this document and the generation-zero commands in `ota-recovery-qualification.md` | Move historical detail into an archive if useful, preserving linked anchors, source identities and the active-plan pointer. Do not present old commands as today's next step. |
 | Revision-specific `canary*.py`, `publish.py`, `qualify-*.py` and `record-*.py` under local `target/idle-qualification/` | Separate obsolete executable entry points from retained proof. Archive any script whose hash is referenced by a qualification record; review unreferenced drafts for removal after the replacement workflow is recorded. Never rerun an old script merely because it exists. |
 | Repeated extracted root filesystems, build outputs and copied executables under local qualification directories | Inventory references and retain verified image/artifact hashes plus the evidence needed to reproduce a result. Review redundant copies only after archival and current-device recovery requirements are satisfied. |
+| Per-run qualification directories on the Pi, including copied binaries and isolated state | Verify local archives/hashes and ensure their transient services/timers have finished before reviewing removal. Keep live production state, holds and recovery history separate. |
 | Local flash/bootstrap/recovery helpers and saved `/data` archives from replaced media | Treat these as recovery records until device identity, restoration and replacement-drive checks are closed. Review independently of ordinary build-cache cleanup. |
+
+The review-fix inventory found four extracted rootfs copies using about 1.98 GiB;
+all still have their compressed candidate and verification record. These are
+concrete cleanup candidates after reference/recovery review. The local operator
+script inventory also distinguishes hash-referenced scripts from entries needing
+further review; absence of a found reference does not prove a file is unused.
+No recovery archive or historical evidence was deleted.
 
 Original failed comparisons and their subsequent reviews remain part of the
 qualification record. The serial-test requirement is also retained: shared-process

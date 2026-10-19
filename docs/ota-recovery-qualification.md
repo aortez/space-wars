@@ -10,6 +10,11 @@ device-specific coverage and rollout order. The
 successful signed trial/normal boot and installed radio/time/OTA qualification;
 it includes an explicitly reviewed additive settings migration, not a new
 deliberate-failure or power-loss trial.
+The [review-fix image record](data/ota-picade2-review-fixes-20261018.json) adds
+its subsequent generation-7 trial, default boot and installed service/network
+checks. Exact pre-update settings bytes were retained before installation;
+selected durable stores remained unchanged. Its deliberate-failure matrix is
+still outstanding.
 
 The missing-root commands immediately below are an **earlier generation-zero
 diagnostic**, not the next test for today's signed-update devices. Their

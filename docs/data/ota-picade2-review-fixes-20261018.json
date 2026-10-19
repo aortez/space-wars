@@ -1,0 +1,795 @@
+{
+  "automatic_installation_enabled": false,
+  "automatic_publication_enabled": false,
+  "cleanup_review": {
+    "extracted_images": {
+      "images": [
+        {
+          "allocated_bytes": 532680704,
+          "compressed_candidate_retained": true,
+          "logical_bytes": 532676608,
+          "path": "target/idle-qualification/profile-image-0a32db2/extracted/rootfs.ext4",
+          "review": "Review removal of the reproducible extracted copy only; retain signed compressed payload and verification evidence",
+          "verification_record_retained": true
+        },
+        {
+          "allocated_bytes": 532680704,
+          "compressed_candidate_retained": true,
+          "logical_bytes": 532676608,
+          "path": "target/idle-qualification/readiness-image-1d5c671/extracted/rootfs.ext4",
+          "review": "Review removal of the reproducible extracted copy only; retain signed compressed payload and verification evidence",
+          "verification_record_retained": true
+        },
+        {
+          "allocated_bytes": 532680704,
+          "compressed_candidate_retained": true,
+          "logical_bytes": 532676608,
+          "path": "target/idle-qualification/recovery-image-d77ac20/extracted/rootfs.ext4",
+          "review": "Review removal of the reproducible extracted copy only; retain signed compressed payload and verification evidence",
+          "verification_record_retained": true
+        },
+        {
+          "allocated_bytes": 532680704,
+          "compressed_candidate_retained": true,
+          "logical_bytes": 532676608,
+          "path": "target/idle-qualification/review-fixes-20261018/extracted/rootfs.ext4",
+          "review": "Review removal of the reproducible extracted copy only; retain signed compressed payload and verification evidence",
+          "verification_record_retained": true
+        }
+      ],
+      "scope": "Inventory for later deletion review; no files removed",
+      "total_allocated_bytes": 2130722816
+    },
+    "operator_script_inventory": 126,
+    "reference_review_counts": {
+      "evidence_records": 143,
+      "hash_referenced_old_scripts": 28,
+      "old_scripts_requiring_review": 85
+    }
+  },
+  "combined_cycle_result": {
+    "boot_id": "25b6c2bd-4e27-4c7a-83f3-fabd13e4665e",
+    "diagnostic_completed": true,
+    "emergency_radio_enable": false,
+    "fresh_ssh_passed": true,
+    "idle_cycle_passed": true,
+    "image_unchanged": true,
+    "kiosk_unchanged": true,
+    "off_at_seconds": 120,
+    "restored": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    },
+    "suspensions": []
+  },
+  "files": {
+    "build.json": {
+      "bytes": 3400,
+      "sha256": "faaa65fd4301f42825107f002891d891893fa5c78ea583ddaaaa097237cdb2b0"
+    },
+    "canary-fresh-time.py": {
+      "bytes": 16994,
+      "sha256": "0e0f5420c16081935fb3f2afc156c63dcdff2b2fc086a9be083e7bcc16cce562"
+    },
+    "canary-runner-review.json": {
+      "bytes": 810,
+      "sha256": "74a56a642acb4815349efff3b22cdc555fd5557a1a5bf9313cda40c57169d9bd"
+    },
+    "canary.py": {
+      "bytes": 16906,
+      "sha256": "518c1e3e49345b9f821b8b901513a1bc018cac55a0330cdcb763eaa4e8218e62"
+    },
+    "canary/install/normal-boot/result.json": {
+      "bytes": 639,
+      "sha256": "49684220adc2a4974bd828c9a1df0a26c41fa27ff19938098b37680bf6e45ee5"
+    },
+    "canary/install/normal-boot/startup-journal.log": {
+      "bytes": 252,
+      "sha256": "6f1c9e69a3d62a95aff88695e02614ae4733a1e5b756dda1b322f3137731fe26"
+    },
+    "canary/install/observations.jsonl": {
+      "bytes": 13881,
+      "sha256": "6a31452358f795b3a433893719c54c3dc09907106c5c293aef4196adaa05fba4"
+    },
+    "canary/install/result.json": {
+      "bytes": 729,
+      "sha256": "66b0ba0cbbc8139f25b859346ec74ebea13ad59077eda18e58d6a133e6fa5f6a"
+    },
+    "canary/install/settings-before.toml": {
+      "bytes": 1829,
+      "sha256": "d358d0c47bf5195d1594e2f7a21404236119dc6c422ad6cad54a75d8665ff0f9"
+    },
+    "canary/restart/observations.json": {
+      "bytes": 36455,
+      "sha256": "cdef265d8c647ba7a84fb184be17fbb07ad716195ae0e5b171e894f34aa9b28a"
+    },
+    "canary/restart/result.json": {
+      "bytes": 208,
+      "sha256": "d48b584505f562645ea0120c975d8b02a2d1f1dee361868b56337585d8a7e396"
+    },
+    "canary/stage-fresh-time/result.json": {
+      "bytes": 191,
+      "sha256": "800fced18e8cfb1f1db3c772b7dcfdaa06fbed455a546578e1b8bf8badd47875"
+    },
+    "canary/stage/stage-exit.json": {
+      "bytes": 22,
+      "sha256": "b9f87d4ceb14f54a8787da14c5985aa499e13197fe39c8f0f4ecf87e7a01957e"
+    },
+    "canary/stage/stage.err": {
+      "bytes": 61,
+      "sha256": "7e381775d309cb529dc0e5859f66682906b01684b82b7ca083d0d20c6db90bde"
+    },
+    "canary/time-refresh/result.json": {
+      "bytes": 69,
+      "sha256": "ed59bd76ffa8e57f5a0dd0a1da0482afd80ab6523f667a4f9b7c20b41e881681"
+    },
+    "cleanup-reference-review.json": {
+      "bytes": 32498,
+      "sha256": "79574444ed53a4ca5958268cdb993f3fb7d5c15c98b4a464d336ee0e17eb5c68"
+    },
+    "combined-cycle-review.json": {
+      "bytes": 650,
+      "sha256": "1db2d133277c7ce8865e456832e84258a4472ce3caacda369c917b1ea42d1701"
+    },
+    "detached-runner-review.json": {
+      "bytes": 4165,
+      "sha256": "994a367df2515cb51a7cdf354a2feaac21d08372f9db18b0128117f188c09b48"
+    },
+    "extracted-image-cleanup-review.json": {
+      "bytes": 1699,
+      "sha256": "905b252a5aa2fe81ccc4e8b960c81617cc1bc1416380d87bb6eebc64e43fb5d2"
+    },
+    "idle-cycle/analysis.json": {
+      "bytes": 2572,
+      "sha256": "ab4a4ac642f21aa2f09c6c04fc775c891d239cdcca425c80f0845cc50acddd17"
+    },
+    "idle-cycle/analyze.py": {
+      "bytes": 4975,
+      "sha256": "5461bd28bde71ea63933f9d88a1f1784cae72db11a801702ea9e00c3cd960634"
+    },
+    "idle-cycle/cycle.sh": {
+      "bytes": 7450,
+      "sha256": "26f93fe2c9684a287ad45011cfcb62f005b53682e5603365c9e604152dc95238"
+    },
+    "idle-cycle/profile-analysis-initial.py": {
+      "bytes": 3762,
+      "sha256": "92eb98b9c01eb105cba270978a7b5db9414faa8020d2222ada724639e20d97bb"
+    },
+    "idle-cycle/profile-analysis.json": {
+      "bytes": 2818,
+      "sha256": "b403cdc3fcdc6e035188f10ea3250d6330957785bd4ffa48579e3b309a5c2d16"
+    },
+    "idle-cycle/profile-analysis.py": {
+      "bytes": 3840,
+      "sha256": "6a59dd709945d67e09f42da4b68a4156358527eb18f0eeaa4252df5bb5d56168"
+    },
+    "idle-cycle/profiles.sh": {
+      "bytes": 1243,
+      "sha256": "b743bd80d11ad2d474274ae7821a4007b3f7f652e8105ea21014edb39602a0fe"
+    },
+    "idle-cycle/restore.sh": {
+      "bytes": 3817,
+      "sha256": "492aaa3373625e658ea83b3b434d04385e32e4d64020dedef76bcac854e64dcc"
+    },
+    "idle-cycle/run-combined.py": {
+      "bytes": 9016,
+      "sha256": "7c4691334b955439640f5c1a48a4a21404cab18fc7993bd9e3ef8ffddd64be9d"
+    },
+    "idle-cycle/run/device-evidence.tar.gz": {
+      "bytes": 55918,
+      "sha256": "0cbc81a88dee876d428b98cd7825d6397a34985381c6012e2752eab4a9d7718b"
+    },
+    "idle-cycle/run/intent.json": {
+      "bytes": 1039,
+      "sha256": "58b643ff2199bcc57dea15b54feda5d5a06e4cf6b65b9ac2fd01c3a8cfd8c274"
+    },
+    "idle-cycle/run/result.json": {
+      "bytes": 433,
+      "sha256": "9e0a679374f1939a0140281e42aa0e8ba57e0bc9675893e2da7dca98376e38c6"
+    },
+    "image-verification.json": {
+      "bytes": 5224,
+      "sha256": "1266839f62037ca6ee9ba15818b34b872c33253097abfa28471ff0774c466581"
+    },
+    "installation-performance-observation.json": {
+      "bytes": 1454,
+      "sha256": "c55fc8fa1e8fb66ede8449d0259fea6c8c1f34032cf96648cde7678a8a403a8e"
+    },
+    "namespace-harness-correction.json": {
+      "bytes": 539,
+      "sha256": "8fe2f06e4ff68a3ba1ca1963bc0f3af62d554335d60540fa616e8902505f040d"
+    },
+    "native-helper/result.json": {
+      "bytes": 2135,
+      "sha256": "22343c456cd47f1c9689696bf2c4786687071ec01cc18b85a3f15b16c5f97466"
+    },
+    "native-helper/run.log": {
+      "bytes": 897,
+      "sha256": "de69f0d9bbfec7c292a6c2bc6ed7a5327b812fcb20efd5fcce5c1d0386e3bf6b"
+    },
+    "native-namespace-attempt2/invalid-journal.log": {
+      "bytes": 447,
+      "sha256": "ecf252d27c43521b0f54eb809038129830094ce7680ecb8d922b518a752b2623"
+    },
+    "native-namespace-attempt2/missing-journal.log": {
+      "bytes": 513,
+      "sha256": "e6afd60f4d289dc455990c8993d2397915d252cc1153f2926283b0a3e3dea1fc"
+    },
+    "native-namespace-attempt2/result.json": {
+      "bytes": 807,
+      "sha256": "5ce10f6f9196c547ed2e2d56391570f98e805038a27f39452105b00e4dbdbf28"
+    },
+    "native-namespace-attempt2/valid-journal.log": {
+      "bytes": 345,
+      "sha256": "b24bf5978296fb3db91a603eceb8feb73e731651c5a4c624758c85e8cc67a7c7"
+    },
+    "native-namespace/initial-failure.json": {
+      "bytes": 206,
+      "sha256": "73f4614066b14b02036d8cb4cd056d4bbcd8406fa451e138b0d1604189bb8fc0"
+    },
+    "native-namespace/initial-missing-journal.log": {
+      "bytes": 740,
+      "sha256": "3b6e78ba6b4936f46698c4c14dd97decff52cc487bf7358a64e65d206c22fb3d"
+    },
+    "native-provider/preservation.json": {
+      "bytes": 292,
+      "sha256": "cb05b84b08a8f457298bfa3ba5f08de9d0af231f77fd0fac81074c88227145e8"
+    },
+    "native-provider/result.json": {
+      "bytes": 377,
+      "sha256": "cc00bdd34821ef5240293637d80fbf7eb87aa5c5f846aa335bc1d00ded7de72e"
+    },
+    "operator-script-inventory.json": {
+      "bytes": 13892,
+      "sha256": "5afafb4d4475b15098c2104d9a7ab403b579be5913d70ea0cf27de0f67c4da62"
+    },
+    "profile-analysis-correction.json": {
+      "bytes": 432,
+      "sha256": "00910d56ae9a116f78b6c7212ec204ae75f314a17b6e3d5bc2e35f4321401162"
+    },
+    "publication.json": {
+      "bytes": 883,
+      "sha256": "51f3012d8580cd7a3aa045827f39be4230fcafab35c0cc0104a18fe81d73d589"
+    },
+    "qualify-namespace-attempt2.py": {
+      "bytes": 6596,
+      "sha256": "d0ca00720728916a7e45a8ebfd0b3c3d5181fa00d6b5ffa0b5f6ba4c606da01b"
+    },
+    "qualify-namespace.py": {
+      "bytes": 6150,
+      "sha256": "2edcab77a7c3c73ba96761292ff946aa5de230033bd56b651951a98c0c6ae4af"
+    },
+    "record-combined.py": {
+      "bytes": 7187,
+      "sha256": "15e90f52625c66c310d0a7ba154e57891af252ce7ee62a5d92ced070004b0068"
+    },
+    "review.json": {
+      "bytes": 10254,
+      "sha256": "79c48523062b1801c1de0ed5ae2bba23e4a846e8ef15cfaa5a236a7fae8bf30d"
+    },
+    "source-ci.json": {
+      "bytes": 48677,
+      "sha256": "4664fbd858fef88334fbb49daccb18a6ad2c3d9794645ed2cf5b563ebcb0e431"
+    },
+    "staging-preflight-review.json": {
+      "bytes": 935,
+      "sha256": "9e3be986279455eeec238d8df23f144dd38737d47351c9376f36c76c9a9001c9"
+    }
+  },
+  "final_channel": "release",
+  "final_partial_offline": false,
+  "generation": 7,
+  "host": "sw-picade-2.local",
+  "idle_cycle": {
+    "accepted_sync_age_before_request_seconds": 305,
+    "attempts": {
+      "time_check": {
+        "deadline_ms": 559191,
+        "first_observed_seconds": 339,
+        "id": 3,
+        "last_observed_seconds": 346,
+        "started_ms": 439191,
+        "trigger": "manual"
+      },
+      "update": {
+        "deadline_ms": 2239772,
+        "first_observed_seconds": 340,
+        "id": 23,
+        "last_observed_seconds": 347,
+        "started_ms": 439772,
+        "trigger": "automatic"
+      }
+    },
+    "boot_id": "25b6c2bd-4e27-4c7a-83f3-fabd13e4665e",
+    "due_offline_from_seconds": 121,
+    "due_offline_samples": 186,
+    "due_offline_until_seconds": 339,
+    "emergency_radio_enable": false,
+    "files": {
+      "before-wake.json": {
+        "bytes": 1810,
+        "sha256": "83cc36c93a8b227a77d7329702efd4dc8c39926e9037a46492e44e1cb058222f"
+      },
+      "handoff-complete.json": {
+        "bytes": 1804,
+        "sha256": "35f0793022a1e5eb837ccf990adaab46c473a762c1ce0f1243fd584642c3ec6b"
+      },
+      "journal.jsonl": {
+        "bytes": 275073,
+        "sha256": "fdfad7be6c6d8eb77beb329942ea35d3a8f87af95885f6ddffc44841257b8b87"
+      },
+      "observations.jsonl": {
+        "bytes": 732462,
+        "sha256": "cc259ae88b7dc567536728125259575bd6020da3bf71d54d5583530b15992261"
+      },
+      "radio-signals.log": {
+        "bytes": 25156,
+        "sha256": "da99c8d80ce38429cd381e5c5713692c6d55962b719a6857a498ba46ff47501e"
+      },
+      "restore.log": {
+        "bytes": 1076,
+        "sha256": "ffeb25df3ca2f4c5c0641d2ad5bda93813eadd6c655de71b5e00b87bf9981826"
+      },
+      "sync-now.json": {
+        "bytes": 52,
+        "sha256": "5ad3d708d60a64d43b88268f60d858b034a8c9420f587786faaeabf7af2904fd"
+      }
+    },
+    "first_off_seconds": 120,
+    "fresh_ssh_passed": true,
+    "limits": [
+      "Manual time-sync request exercised the actual time worker; the daily timer was not advanced.",
+      "No update was installed during this cycle; the installed generation is already current.",
+      "Qualifies only this Pi 4 unit; other units and unattended rollout remain outside this test."
+    ],
+    "next_update_ms_after_handoff": 86839772,
+    "observed_hold_kinds": [
+      "download",
+      "time-check"
+    ],
+    "original_logging_restored": true,
+    "owner_resumes": 0,
+    "partial_offline_enabled": false,
+    "passed": true,
+    "restored_release": true,
+    "same_boot_image_kiosk": true,
+    "schema": 1,
+    "selected_durable_stores_unchanged": true,
+    "settled_seconds": 366,
+    "source": "bde737f96c82182ca908e544bc6f81b5252cac2b",
+    "success_generation_after": 48,
+    "success_generation_before": 47,
+    "time_completion": "synchronized",
+    "update_completion": "ineligible"
+  },
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 26567800,
+        "sha256": "6947232e59f399bc34c704f14731e8b2ed04f543013090daf63bde9f993120df"
+      },
+      "os_manager": {
+        "bytes": 11275008,
+        "sha256": "5bc544458dbf32ca09dea86d7159ed927dc465251a09e155651cb76fe25e56d5"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-bc4ff79efe6168432c6b370d6e17bd8cf0ae1205405ead6ca1b4153e7b4b1d95",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "bc4ff79efe6168432c6b370d6e17bd8cf0ae1205405ead6ca1b4153e7b4b1d95",
+    "schema": 1,
+    "source": {
+      "commit": "bde737f96c82182ca908e544bc6f81b5252cac2b",
+      "dirty": false,
+      "revision": "bde737f96c82",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "installation_performance_observation": {
+    "cause": "Unestablished; retain for #265/#267 payload/SSH/IO performance review",
+    "files": {
+      "io-during-flush.log": {
+        "bytes": 92,
+        "sha256": "655410d1d60f8510a8ede9ff07a68c6eb32c3b49454a7eab206f079cb4c8ab8c"
+      },
+      "io-existing-channel.log": {
+        "bytes": 2925,
+        "sha256": "12c41c7a4b26588816872c08699a3e71e79c24e8d286ff94bb69086e0b21854d"
+      },
+      "kernel-during-flush.log": {
+        "bytes": 92,
+        "sha256": "655410d1d60f8510a8ede9ff07a68c6eb32c3b49454a7eab206f079cb4c8ab8c"
+      },
+      "kernel-existing-channel.log": {
+        "bytes": 196,
+        "sha256": "917b5634792b01d882a53fcd19b6549a38258807c293ed84703d5b3e2fdaae4c"
+      },
+      "service-existing-channel.json": {
+        "bytes": 1805,
+        "sha256": "8c0b8dd050d2483c6a85e416cf6557bc6c771391bf2f26aa7ad172821c6aa9b3"
+      }
+    },
+    "flush_duration": "No timed progress stream was recorded; phase remained writing until prepared at 326.448 seconds, and log showed flushing before reading-back",
+    "fresh_logins": "Two fresh connections exceeded the five-second banner deadline during flushing; existing installer/control channel remained responsive",
+    "kernel_storage_errors_observed": false,
+    "scope": "Generation-7 installation while generation 6 was still running; diagnostic observations, not a performance qualification",
+    "service_healthy": true,
+    "source_before": "0a32db244ea2d692da9588b133ae4c5f92092804",
+    "trial_committed_at_seconds": 415.962
+  },
+  "isolated_namespace": {
+    "cases": {
+      "invalid": {
+        "passed": true,
+        "status_samples": 3,
+        "warning_visible_at_default": true
+      },
+      "missing": {
+        "passed": true,
+        "status_samples": 3,
+        "warning_visible_at_default": true
+      },
+      "valid": {
+        "passed": true,
+        "status_samples": 3,
+        "warning_visible_at_default": false
+      }
+    },
+    "executable": {
+      "bytes": 11275008,
+      "sha256": "5bc544458dbf32ca09dea86d7159ed927dc465251a09e155651cb76fe25e56d5"
+    },
+    "host": "swadmin@sw-picade-2.local",
+    "passed": true,
+    "production_image_services_stores_unchanged": true,
+    "scope": "Actual packaged daemon startup and diagnostics with private data/run mounts and inaccessible production buses; no radio writes or install",
+    "source": "bde737f96c82182ca908e544bc6f81b5252cac2b"
+  },
+  "isolated_provider": {
+    "cases": {
+      "baseline": {
+        "returncode": 101,
+        "seconds": 0.596
+      },
+      "candidate": {
+        "returncode": 0,
+        "seconds": 0.756
+      }
+    },
+    "host": "sw-picade-2.local",
+    "model": "Raspberry Pi 4 Model B Rev 1.2",
+    "network_and_mount_namespaces_private": true,
+    "passed": true,
+    "production_replaced": false,
+    "synthetic_credentials_only": true
+  },
+  "isolated_provider_preservation": {
+    "boot_unchanged": true,
+    "image_unchanged": true,
+    "kiosk_unchanged": true,
+    "passed": true,
+    "production_nm_unchanged": true,
+    "radio_clean": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    }
+  },
+  "isolated_ssh_helper": {
+    "cases": 4,
+    "elapsed_seconds": 95.14,
+    "files": {
+      "engine-os-manager": {
+        "bytes": 11275008,
+        "sha256": "5bc544458dbf32ca09dea86d7159ed927dc465251a09e155651cb76fe25e56d5"
+      },
+      "retained-state.json": {
+        "bytes": 735,
+        "sha256": "ad1fec4ae2529e40890a1e7be598646d09ad0327b71feda1feb195b79bce0b4f"
+      },
+      "tests": {
+        "bytes": 1839952,
+        "sha256": "23bcfc28a19d4115a7c34c694ab25f3fad59fd06864d742abbda7d1385896a40"
+      }
+    },
+    "fresh_login_passed": true,
+    "kiosk_instance_unchanged": true,
+    "live_radio_writes": false,
+    "passed": true,
+    "production_image_unchanged": true,
+    "production_nm_unchanged": true,
+    "production_radio_clean": true,
+    "production_services_unchanged": true,
+    "production_stores_unchanged": true,
+    "real_device_reboot": false
+  },
+  "local_validation": {
+    "clippy_warnings_denied": true,
+    "files": {
+      "clippy.log": {
+        "bytes": 6654,
+        "sha256": "e3b878aa2b8619450eb0f783c5d538ff6d317bdc17d1bb6d7f1b1ad0d78900aa"
+      },
+      "initial-parallel-test-result.json": {
+        "bytes": 449,
+        "sha256": "98c0f6338a4bb9c01cf27b9210208b0ec57563d1d083b01b973e6300fdcc349e"
+      },
+      "launcher-old-controls.json": {
+        "bytes": 234,
+        "sha256": "3321395ccb86755cd848ece7befafeea4231b5b714e5eaac3a29baaca05b3c79"
+      },
+      "rust-tests.log": {
+        "bytes": 24038,
+        "sha256": "282b1a818968ebf92f210908d1e81e3493ee1652c10c23e579d45271ffe05391"
+      }
+    },
+    "format_check": true,
+    "image_qualification": "pending new clean-source image",
+    "launcher_negative_scenarios": 10,
+    "local_documentation_targets": 99,
+    "old_launcher_regressions_reproduced": 3,
+    "python_tests": 4,
+    "readback_followup": 511,
+    "rust": {
+      "ignored_owner_only": 5,
+      "passed": 209,
+      "test_threads": 1
+    },
+    "shellcheck": true,
+    "source_base": "856bce47085e4bb7272b3eb2be8b0c17eb78460b"
+  },
+  "model": "Raspberry Pi 4 Model B Rev 1.2",
+  "namespace_observer_correction": {
+    "change": "Query private runtime sockets using a separate bounded systemd mount sandbox; preserve original failed observation; no production service restart",
+    "new_runner_sha256": "d0ca00720728916a7e45a8ebfd0b3c3d5181fa00d6b5ffa0b5f6ba4c606da01b",
+    "original_attempt": "native-namespace/initial-failure.json",
+    "original_runner_sha256": "2edcab77a7c3c73ba96761292ff946aa5de230033bd56b651951a98c0c6ae4af",
+    "reason": "nsenter executable is absent on the image; private status sockets existed and daemon emitted expected warning"
+  },
+  "normal_boot": {
+    "automatic_completion": "no-candidate",
+    "boot_id": "25b6c2bd-4e27-4c7a-83f3-fabd13e4665e",
+    "elapsed_seconds": 53.905,
+    "host": "sw-picade-2.local",
+    "maintenance_resume_logged": false,
+    "maintenance_wait_logged": false,
+    "passed": true,
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": [
+        {
+          "after": "afcfd2b7c7186ca76e68ce6a5071af2f7059cb0324cc27a1730c8429e4a32e49",
+          "before": "2308c3571a76aa461d82ed58bd197cc0ace9b7e146e2d171a15f06d15215a843",
+          "path": "/data/bluetooth/DC:A6:32:82:36:12/attributes"
+        }
+      ]
+    }
+  },
+  "prior_boot": "5281dd9a-d57c-4dbc-9943-d105d4008b48",
+  "prior_source": "0a32db244ea2d692da9588b133ae4c5f92092804",
+  "profile_diagnostic": {
+    "diagnostic_calls_get_secrets": false,
+    "journal_events": [
+      {
+        "marker": "manager: startup complete",
+        "monotonic_us": 13668763
+      }
+    ],
+    "original_logging_restored": true,
+    "owner_resumes": 0,
+    "raw_settings_published": false,
+    "schema": 1,
+    "snapshots": [
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "2",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "3",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "4",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-baseline-7jPUr8",
+        "uptime": 102.03
+      },
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [
+              "connection.timestamp"
+            ],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "2",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "3",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "4",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-settled-23CD1D",
+        "uptime": 466.14
+      }
+    ],
+    "wireless_notifications": [
+      {
+        "seconds_since_first": "0.000000",
+        "serial": 3152,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "219.550987",
+        "serial": 6733,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "219.554903",
+        "serial": 6736,
+        "wireless_enabled": true
+      },
+      {
+        "seconds_since_first": "240.142125",
+        "serial": 7600,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "246.854146",
+        "serial": 7817,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "246.858343",
+        "serial": 7820,
+        "wireless_enabled": true
+      }
+    ]
+  },
+  "publication": {
+    "automatic_installation_enabled": false,
+    "channel": "nightly",
+    "current": {
+      "manifest_sha256": "25b70430469f79db68056ee3aca113d019eeaf3dc3f270aa2eeb989e6619b06f",
+      "timestamp": {
+        "bytes": 469,
+        "sha256": "30b33ff7940c1877a969d880361bdffc972f10fd782482be59538fbffb175da3"
+      },
+      "version": 8
+    },
+    "generation": 7,
+    "intent_sha256": "0cf81095e574d78d1a8a2a83cd738c9ad1301f9ad1a8f188a74dd9551dd4e504",
+    "main_ci_admission_claimed": false,
+    "payload": {
+      "bytes": 132946301,
+      "sha256": "c98c6f684e4b14ae22e45c600ca076f13f84f93c13637c4c5dccee6fff1c6036"
+    },
+    "publication_scope": "Owner-supervised branch candidate",
+    "publisher": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+    "release_id": 416212208,
+    "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+    "result": "published",
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "source": "bde737f96c82182ca908e544bc6f81b5252cac2b"
+  },
+  "remaining": [
+    "Issue 511: bounded rfkill readback handling and conflict/expiry tests before unattended partial-offline use.",
+    "Other units were not accessed or updated in this qualification; their previous evidence remains source-specific.",
+    "Actual daily timer, new/resumed payload gameplay and fresh-SSH performance, failure matrix and integrated install UI/policy remain.",
+    "Protected automatic publishing, metadata renewal and exact-artifact Release promotion remain."
+  ],
+  "schema": 1,
+  "scope": "PR 510 review fixes: exact-source image, isolated native controls and signed/installed qualification on sw-picade-2.local only",
+  "service_restart": {
+    "boot_id": "25b6c2bd-4e27-4c7a-83f3-fabd13e4665e",
+    "daily_allowance_preserved": true,
+    "host": "sw-picade-2.local",
+    "kiosk_instance_unchanged": true,
+    "observed_seconds": 22.564,
+    "passed": true
+  },
+  "signed_trial": {
+    "automatic_installation_enabled": false,
+    "elapsed_seconds": 419.873,
+    "generation": 7,
+    "host": "sw-picade-2.local",
+    "original_boot": "5281dd9a-d57c-4dbc-9943-d105d4008b48",
+    "passed": true,
+    "payload": "c98c6f684e4b14ae22e45c600ca076f13f84f93c13637c4c5dccee6fff1c6036",
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": [
+        {
+          "after": "2308c3571a76aa461d82ed58bd197cc0ace9b7e146e2d171a15f06d15215a843",
+          "before": "784a53c62528491e089b6dc9098d33529df9d7043c4362840de3cf13afca515a",
+          "path": "/data/bluetooth/DC:A6:32:82:36:12/attributes"
+        }
+      ]
+    },
+    "trial_boot": "bcb1f45e-4cfb-4ac2-9bc7-c817989f48a8"
+  },
+  "source": "bde737f96c82182ca908e544bc6f81b5252cac2b",
+  "stage": {
+    "installed_image_unchanged": true,
+    "staged": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    }
+  },
+  "staging_preflight_review": {
+    "cause_limit": "The helper rejected its stricter native receipt predicate. General accepted time remained usable with sync age 3889s. Age alone is not the predicate and the rejected observation was not emitted; its exact failing condition is unestablished.",
+    "correction": "One real sync-now request completed successfully, followed by separately recorded staging; no time or trust history was reset.",
+    "error": "a current native successful NTP receipt is required",
+    "new_runner_sha256": "0e0f5420c16081935fb3f2afc156c63dcdff2b2fc086a9be083e7bcc16cce562",
+    "ordering": "Rejection occurs before TrustStore/StagingStore opening and before DownloadSession.run; no install or boot change was requested",
+    "original": "canary/stage/stage-exit.json",
+    "original_runner_sha256": "518c1e3e49345b9f821b8b901513a1bc018cac55a0330cdcb763eaa4e8218e62",
+    "stage_helper_source": "crates/engine-os-manager/examples/stage_update.rs:74"
+  },
+  "wireless_profile_revisions_preserved": true
+}
