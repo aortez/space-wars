@@ -357,7 +357,7 @@ cargo build --locked --release -p engine-client
 ./benchmark-clock.sh
 ```
 
-The wrapper runs all eight cases at 1024×768, raster scales 1 and 2, three
+The wrapper runs all ten cases at 1024×768, raster scales 1 and 2, three
 independent processes per combination. Each run warms up for two simulated
 seconds, resets the seeded scenario, then measures 15 simulated seconds.
 Each CSV row represents exactly 60 fixed steps and 60 rendered/prepared frames,
@@ -395,6 +395,11 @@ run were retained locally under `target/clock-benchmarks/run.zhYlok3O/`.
 # Heavy rain, including duck entry, drainage and cleanup (42-second event).
 # Short default runs sample the shower only; use 45+ seconds for the full cycle.
 ./benchmark-clock.sh --cases rain --seconds 45 --repeats 3
+
+# Ceiling sunlight opening: beam, retained soil and paid grass growth. The hold
+# lasts 365 seconds; 15-second runs sample the opening and a young patch, while
+# 60+ seconds measure the established lawn under the beam.
+./benchmark-clock.sh --cases idle,grass --seconds 60 --repeats 3
 
 # A single raw run, without the wrapper.
 target/release/engine-client --scenario clock --benchmark-headless --seed 7 \
@@ -449,6 +454,37 @@ Clock currently exposes these fixtures headlessly only. Its normal launcher,
 pause menu, local-time source and Preview controls are unchanged; `host benchmark`
 and the B shortcut remain unavailable for Clock. Pizza and Spacewars retain
 both visual and headless benchmarks and gain the shared viewport/warm-up metadata.
+
+## Ceiling sunlight opening (2026-10-19)
+
+The `grass` fixture requests Grass once at tick 0, so a 60-second window covers
+the five-second opening, soil arrival and paid growth to the 52-tissue patch
+under the beam; the ceiling refuses the fixture's later repeat requests. Pi 4
+`sw-picade-2` (Raspberry Pi 4 Model B Rev 1.2, Linux 6.6.63-v8, ondemand
+governor, about 64 °C, kiosk parked at its launcher), release `pi-kiosk-gpu`
+client `9fd416de…` built from `c557d47` plus this fixture with the Yocto SDK,
+headless 1024×768 raster, seed 7, two warm-up seconds, 60 measured seconds,
+three processes per combination. Values are medians of per-run means; p95 is
+the worst row of any run:
+
+| Case | Scale | Step ms | Scene ms | Prepare ms | Total ms/frame | Worst row p95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| idle | 1 | 0.007 | 0.141 | 6.857 | 7.010 | 7.934 |
+| duck | 1 | 0.123 | 0.150 | 7.087 | 7.360 | 8.744 |
+| grass | 1 | 0.298 | 0.367 | 7.370 | 8.041 | 9.452 |
+| idle | 2 | 0.009 | 0.150 | 21.703 | 21.868 | 24.889 |
+| duck | 2 | 0.121 | 0.152 | 22.127 | 22.401 | 25.239 |
+| grass | 2 | 0.302 | 0.369 | 22.793 | 23.470 | 26.620 |
+
+At the production 1× scale the opening adds about 1.0 ms per frame over idle:
+0.29 ms of simulation (retained soil and one-second biology), 0.23 ms of scene
+generation (silhouettes, the light query and the beam envelope) and 0.5 ms of
+raster preparation for the translucent beam and opening. That is roughly 6% of
+the 16.7 ms frame budget, and the worst p95 row stays under 10 ms. At 2× the
+same work adds 1.6 ms to a frame that is already above the budget when idle,
+matching the earlier idle 2× observation. These are CPU-only headless samples,
+not displayed FPS; raw reports are retained under
+`target/clock-benchmarks/run.lSUiHORH/`.
 
 ## Live CPU timings
 
