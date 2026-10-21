@@ -4,6 +4,7 @@ members = [
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-gravity",
+    "crates/engine-material",
     "crates/engine-nes",
     "crates/engine-rapier",
     "crates/engine-soil",
@@ -80,6 +81,7 @@ engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 engine-agent = { path = "crates/engine-agent" }
 engine-gravity = { path = "crates/engine-gravity" }
+engine-material = { path = "crates/engine-material" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
 engine-soil = { path = "crates/engine-soil" }
