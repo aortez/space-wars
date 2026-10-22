@@ -607,7 +607,7 @@ fn glancing() -> Case {
     let rows = [0.0_f32, 30.0, 60.0, 80.0]
         .iter()
         .map(|&angle| {
-            let closing = speed * angle.to_radians().cos();
+            let closing = speed * libm::cosf(angle.to_radians());
             one_strike(
                 &a,
                 &b,

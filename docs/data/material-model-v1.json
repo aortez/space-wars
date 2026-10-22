@@ -1337,18 +1337,18 @@
         },
         {
           "label": "1.08x moment on a connection at 30 Hz: fails after 2 ticks (0.067 s)",
-          "available": 74.00033,
+          "available": 74.000336,
           "peak_force": 0.0,
           "peak_stress": [
             3240.0,
             0.0
           ],
           "consumed": [
-            59.000328,
+            59.000336,
             0.0
           ],
           "integrity": [
-            0.5083306,
+            0.5083305,
             1.0
           ],
           "failed": [

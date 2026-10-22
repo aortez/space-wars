@@ -322,8 +322,11 @@ pub const LEDGER_TOLERANCE: f32 = 1.0e-4;
 ```
 
 Everything is `f32`, allocation free, deterministic for the same inputs,
-validates its inputs and returns only finite results. Single-region loads fill
-slot 0 of the per-side arrays.
+validates its inputs and returns only finite results. Transcendental
+functions come from the `libm` crate rather than the platform's math
+library, as with Rapier's `enhanced-determinism`, so every platform gets the
+same bits and the generated evidence matches everywhere. Single-region loads
+fill slot 0 of the per-side arrays.
 
 ## Reference materials
 

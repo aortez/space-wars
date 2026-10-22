@@ -73,8 +73,10 @@ fn fallback_work(region: &Region, stress: f32, volume: f32, duration: f32) -> f3
     // Safe stress lost per unit of absorbed work, and the growth rate it sets.
     let softening = material.strength * (1.0 - material.residual_strength) / region.capacity();
     let growth = softening * rate;
+    // `libm` rather than the platform's math library, so every platform gets
+    // the same bits, as Rapier's `enhanced-determinism` does.
     let exhaustion = if growth > 0.0 {
-        (softening * remaining / overstress).ln_1p() / growth
+        libm::log1pf(softening * remaining / overstress) / growth
     } else {
         remaining / (rate * overstress)
     };
@@ -83,7 +85,7 @@ fn fallback_work(region: &Region, stress: f32, volume: f32, duration: f32) -> f3
         let residual_overstress = stress - material.residual_strength * material.strength;
         remaining + rate * residual_overstress * (duration - exhaustion)
     } else if growth > 0.0 {
-        overstress / softening * (growth * duration).exp_m1()
+        overstress / softening * libm::expm1f(growth * duration)
     } else {
         rate * overstress * duration
     }

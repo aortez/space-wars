@@ -1669,6 +1669,7 @@ name = "engine-material"
 version = "0.1.0"
 dependencies = [
  "engine-core",
+ "libm",
  "serde",
  "serde_json",
 ]

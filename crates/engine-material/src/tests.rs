@@ -528,7 +528,7 @@ fn glancing_hits_do_strictly_less_damage() {
             &mut region_b,
             geometry(&a, &b),
             Impact {
-                closing_speed: speed * angle.to_radians().cos(),
+                closing_speed: speed * libm::cosf(angle.to_radians()),
                 effective_mass: mass,
             },
         );
@@ -874,8 +874,8 @@ fn exact_fallback(
     let overstress = stress - material.strength;
     let softening = material.strength * (1.0 - material.residual_strength) / capacity;
     let growth = softening * volume / CRUSH_TIME_CONSTANT;
-    let remaining = capacity - overstress / softening * (growth * time).exp_m1();
-    let failure = (softening * capacity / overstress).ln_1p() / growth;
+    let remaining = capacity - overstress / softening * libm::expm1f(growth * time);
+    let failure = libm::log1pf(softening * capacity / overstress) / growth;
     (remaining, failure)
 }
 
