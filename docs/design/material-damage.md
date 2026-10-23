@@ -1,6 +1,6 @@
 # Material damage: strength, deformation and integrity
 
-First delivery for the shared material damage epic #325: the bounded reference
+Revision of the first delivery for the shared material damage epic #325: the bounded reference
 model that #326 asked for, as the pure crate `engine-material`, with its
 calibration fixtures and evidence. Nothing is integrated into a host yet. The
 load adapter (#327), persistent region storage and failure lifecycle (#328),
@@ -8,8 +8,8 @@ weapon sources (#329) and the Spacewars and Scorched migrations (#330, #331)
 build on the contract below.
 
 The model replaces speed-times-scalar damage with one law: a material has a
-stiffness, a safe strength and a toughness; loads below the safe limit are
-fully recoverable; work beyond it is charged against a finite capacity that is
+stiffness, a safe strength and a toughness; loads below the safe limit cause
+zero permanent damage; work beyond it is charged against a finite capacity that is
 the material's toughness times its represented volume. Every event has one
 energy ledger, so bounce, harmless dissipation, permanent damage and motion
 cannot spend the same energy twice.
@@ -77,379 +77,310 @@ so one width is the stiff end of that range. The contact stiffness of a side
 is `E * area / depth`, so a pair's safe-limit speed scales with the square root
 of its depths.
 
-## The law
+## Revision decisions and identity
 
-A `Material` has `density`, `stiffness` (E), `strength`, `toughness`,
-`damping`, a `FailureMode` and `residual_strength`. All are validated: finite,
-within documented ranges, `strength <= stiffness`, and a `residual_strength` of
-at least 0.01, so exhausted material still carries load. Its `identity()` is an
-FNV-1a hash of the parameters, excluding the name, and `LAW_VERSION` names the
-law itself; records carry both.
+The original unmerged `material-law-v1` used an unlimited yield plateau: the
+weaker material could never damage the stronger one, at any speed. Review
+selected different behavior:
 
-- **Safe limit.** Stress at or below the effective strength is fully
-  recoverable. The charged work is exactly `0.0`, not merely small, so any
-  number of safe knocks or any length of safe rest leaves integrity untouched.
-  The stored elastic energy of an impact returns, less a `damping` fraction
-  that is lost harmlessly and reported separately.
-- **Capacity and integrity.** A `Region` is a quantity of one material with
-  `capacity = toughness * volume` of irreversible work. `integrity` is the
-  remaining fraction, `normalized_health` is a hundred times that, and
-  `failed` means nothing remains. Geometry and represented quantity set the
-  capacity; there is no per-target multiplier and no larger HP pool standing in
-  for armor.
-- **Softening.** Remaining integrity softens the effective strength linearly
-  down to `residual_strength * strength` at zero integrity. Stiffness does not
-  change. A dented plate therefore yields a little earlier on the next hit.
-- **Brittle and ductile.** `resilience()` is the elastic energy per volume at
-  the safe limit, `strength^2 / (2 E)`. Past the safe limit a brittle material
-  does not spring back: in an impact its stored elastic energy is charged as
-  fracture work too. A ductile material plateaus at yield, springs back and
-  accumulates plastic work. The mode on its own changes little, because the
-  extra brittle charge is only the energy stored at yield, a small fraction of
-  a region's capacity, so it matters mostly just past the safe limit. What makes
-  wood and rock behave brittle is the toughness that goes with the mode,
-  within a few times the resilience, so their capacity runs out fast; ductile
-  materials sit far above it.
+- Sufficiently energetic weaker objects can damage stronger material.
+- Gentle landings should settle with little bounce and no permanent damage.
+- Accumulated damage reduces capacity; strength stays constant. Progressive
+  fragility is deferred.
+- Hosts preserve existing gameplay destruction rules and explicitly account
+  for energy carried by surviving bodies/fragments or dissipated by destruction.
+  General penetration is outside this slice.
 
-## Loading modes
+This implementation is `material-law-v2`; its report is
+[`material-model-v2.md`](../data/material-model-v2.md) and
+[`material-model-v2.json`](../data/material-model-v2.json). The superseded report
+is available in Git history. `Material::identity()` hashes the material
+parameters; records also carry `LAW_VERSION` and the fixed post-yield fraction.
+No production scenario depends on this crate yet. Rapier is a test-only
+dependency used for the isolated response experiment.
 
-Every mode takes a physically attributable load: a closing speed and effective
-mass, a support force over a patch, or a moment and axial force on a
-connection. Nothing in the API accepts render overlap, so a soft-tissue query,
-a spaceling under a falling branch for example, has to come from a sweep, a
-contact force or measured work rather than from sprites touching.
+## The material law
 
-### Transient impact
+A `Material` has density, elastic stiffness, yield strength, toughness,
+damping and brittle/ductile mode. A region holds represented volume and a
+remaining work capacity, initially `toughness * volume`. Strength is independent
+of integrity, including while a failed region awaits host removal. `residual_strength`
+and integrity-dependent strength softening have been removed.
 
-`impact(a, b, contact, Impact { closing_speed, effective_mass })` evaluates one
-contact episode between two regions.
+Damping accepts the full range 0 through 1. It removes elastic energy harmlessly;
+it does not count as irreversible damage. Reference hull damping is 1 and rock
+damping is 0.95, so gentle hull/ground contact has little rebound. Reference
+material values are simulation calibration, not measured engineering or
+biological properties.
 
-1. The available energy is `E = 0.5 * m_eff * v^2`. It is energy, not health
-   loss. `effective_mass` comes from `effective_mass(ContactBody, ContactBody)`:
-   `1 / m_eff = sum(1 / m_i + lever_i^2 / I_i)` over the movable bodies, where
-   `lever` is the 2D cross product of the contact offset and the normal. An
-   immovable body contributes nothing; a locked rotation contributes no lever
-   term. `closing_speed(normal, v_a, v_b)` is the normal approach speed at the
-   contact point and is zero when separating, so a common velocity cancels.
-2. The two sides are springs in series, `k_i = E_i * area / depth_i`. The
-   fully elastic peak force is `F_el = sqrt(2 E k_series)`.
-3. Each side's safe force is `F_y,i = effective_strength_i * area`. If `F_el`
-   does not exceed the smaller `F_y`, the event is elastic: each side stores
-   `0.5 F_el^2 / k_i`, returns it less damping, and the charge is zero.
-4. Otherwise the smaller `F_y` caps the force. Force is continuous across the
-   patch, so the stronger side never carries more than the weaker side's safe
-   force and stays elastic however much energy arrives: a weaker material
-   cannot damage a stronger one in a single contact, and a penetrator damages
-   plate only because its strength is higher. The plateau work
-   `E - 0.5 F_y^2 / k_a - 0.5 F_y^2 / k_b` is charged to the weaker side, plus
-   its own stored energy when brittle, up to its remaining capacity. Equal safe
-   forces share the plateau work equally. The rule is exact, not graded: in the
-   strength sweep a striker at 0.999 times the plate's strength takes all the
-   plateau work, an equal one half, and one at 1.001 times none. That follows
-   from perfect plasticity. Once softening separates two same-material actors
-   after a shared hit, the weaker takes every later plateau alone, which
-   ship-on-ship rams in #330 should expect.
-5. Work the weaker side cannot absorb is reported as `excess`. It stays with
-   the motion: the snapped branch flies on, the exhausted plate is broken
-   through. Nothing is forwarded to the other side; the earlier idea of a
-   second pass was dropped because broken wood still cannot push harder than
-   wood.
+### Transient compression
 
-`yield_speed` gives the closing speed at which a given pair first reaches the
-safe limit, `min(F_y) / sqrt(m_eff k_series)`; slower impacts are recoverable.
+An impact uses the actual relative normal approach velocity at the contact and
+contact-effective mass, including rotational inertia:
 
-### Sustained load
-
-`sustained(region, SustainedLoad { force, width, section, duration,
-measured_plastic_displacement })` evaluates a normal load that acts for
-`duration`. Stress is `force / (width * thickness)`. At or below the safe
-limit the call reports the strain energy and the recoverable deflection and
-charges nothing, however many ticks the load rests. Above it the region
-yields. With a host measurement the charge is `F_y * plastic` for the plastic
-displacement measured during the call; without one it is the fallback below.
-The stress is the applied stress; the material carries `F_y`.
-
-### Connections
-
-`connection(joint, ConnectionLoad { moment, axial, duration,
-measured_plastic_rotation, measured_plastic_extension })` evaluates bending and
-axial load on a `Connection`, a `Beam` of one material with its own region.
-Stress is the conservative superposition `|F| / A + |M| / S`; elastic rotation
-is `M L / (E I)` and extension `F L / (E A)`. Above the safe limit the applied
-loads are scaled back to it along the same load path, and the charge is the
-scaled moment times the measured plastic rotation plus the scaled axial force
-times the measured plastic extension; an unmeasured component uses the
-fallback. A finite root attachment is the pure tension case. Shear is not
-modeled.
-
-### Fallback progression
-
-When the host supplies no measurement, plastic strain advances at
-`(r - 1) / CRUSH_TIME_CONSTANT` per second for an overload ratio
-`r = stress / strength`, with the constant at a quarter second, so intact
-material under twice its safe stress starts to flow at one unit of strain per
-quarter second. The strain is multiplied by the geometric scale of the mode,
-the section depth for contacts, the connection length for extension and
-`2 L / h` for rotation. In work terms, plastic work accrues at
-`volume * (stress - strength) / CRUSH_TIME_CONSTANT` per second, where the
-flowing volume is the loaded `area * depth` of a contact, a third of a beam in
-pure bending and all of it in tension.
-
-Softening lowers the strength by `strength * (1 - residual_strength) / capacity`
-per unit of work, so the overstress grows exponentially and damaged material
-crushes faster, never slower. Once the capacity is exhausted the material
-flows at its residual strength and the further work is excess. Each call
-integrates this exactly over its duration instead of taking one step, so a
-constant load reaches the same state at the same time whatever the fixed step
-or the substep count. One step per call is not enough: it would make the 60 Hz
-plank below fail at 0.067 s instead of the continuous 0.035 s. This is a
-bounded approximation with a named constant, not a raw impulse times frame
-time and not an open-ended timer.
-
-Sustained and connection ledgers are per call. A sustained call is not a
-loading cycle, so its strain energy is reported as recoverable with nothing
-damped, and again on every call while the load persists; only the
-irreversible work accumulates. Their `available` is that stored energy plus
-the charged work, so these ledgers close by construction, and closure is a
-real check only for impacts. The brittle loss of stored energy also applies to
-impacts only, where the event is evaluated once.
-
-## The ledger
-
-Every call returns an `Outcome { ledger, consumed, yielded, failed }`. The
-`WorkLedger` holds `available`, per-side `recoverable`, `dissipated` and
-`irreversible`, the `excess`, the `peak_force`, per-side `peak_stress` and
-`deformation`. `closes(tolerance)` checks
-`available = recoverable + dissipated + irreversible + excess` within a
-relative tolerance; every fixture row closes at `1e-4`. `restitution()` turns
-an impact's ledger into the rebound coefficient a host gives the physics
-engine, as the next section describes. `consumed` is what the host passes to
-`Region::absorb`; the model never mutates a region itself. `failed` is set
-only by the event that takes a region's last capacity, so a host starts its
-failure handling once; a region that had already failed reports `false`.
-`safe()` means neither region reached its safe limit. Every `Ok` outcome is
-finite: inputs inside their ranges whose magnitudes still overflow `f32`
-together return `MaterialError::Overflow`.
-
-## Energy ownership
-
-The material model owns each contact's energy budget, and the physics engine
-gets no second say. Today Rapier's restitution decides the rebound on its own,
-so a host that charged the model's damage and also let Rapier bounce would
-spend the bounce twice. Instead, the load adapter (#327) evaluates an impact
-when the contact begins, before the solver resolves it, and sets that
-contact's restitution to `WorkLedger::restitution()`,
-`sqrt(recoverable / available)`; Rapier's `PhysicsHooks::modify_solver_contacts`
-can set the `restitution` of each solver contact. The rebound then returns
-exactly the recoverable energy: an elastic knock bounces back, a dent hardly
-does, and a collider's tuned restitution adds nothing. Excess is not rebound
-either. It is the motion that carries on past a failed region, a projectile
-through a broken plate or a snapped branch falling on, and the failure
-lifecycle (#328) returns it to the motion.
-
-## Regions, connections and state
-
-`Region::new(material, volume)` validates both and starts at full capacity.
-`Region::with_remaining(material, volume, remaining)` restores a saved region
-for hosts that persist integrity and rejects a remainder outside the capacity.
-`absorb(work)` is the only path that lowers integrity and returns whatever
-could not be absorbed. `repair(fraction)` restores a fraction of the full
-capacity and exists only for explicit host authorization. `split(fraction)`
-partitions the material into two regions at the same integrity so a cut or a
-transfer creates no capacity. `mass()` is `density * volume` for hosts that
-derive inertia from represented quantity. `Connection::new(material, beam)`
-wraps a region sized by the beam's volume and exposes the same integrity,
-`absorb` and `repair`.
-
-Softening makes events on the same region order dependent, since each charge
-lowers the strength the next one meets. Hosts therefore evaluate one step's
-events in a deterministic order, for example sorted by collider handle pair
-and then contact index, and absorb each outcome before evaluating the next
-event on the same region. A region that fails mid-step meets later events at
-its residual strength, and only the event that exhausted it reports `failed`.
-
-## Partition, step and frame invariance
-
-`ContactGeometry::merge` sums the widths of equivalent sub-contacts whose
-sections agree, so an adapter that sees one episode through several colliders
-evaluates one contact. Because the default depth follows the patch width, the
-adapter derives both sections from the merged width of the patch, not from
-each part's. Charging each part with the whole event is the mistake the
-fixtures demonstrate: four parts overstate the plate's damage four times.
-Impacts are evaluated once per episode from the closing speed, so the fixed
-step and any substeps cannot change them. Sustained and connection loads
-integrate the fallback exactly over each call, so a constant load leaves the
-same state after the same time at any step rate. A failure is seen at the end
-of the tick that crosses it, within one tick of the continuous failure time.
-Common velocity shifts cancel in `closing_speed`.
-
-## API contract
-
-```rust
-pub const LAW_VERSION: &str;
-pub enum MaterialError { InvalidMaterial, InvalidGeometry, InvalidLoad, InvalidRegion, Overflow }
-pub enum FailureMode { Brittle = 0, Ductile = 1 }
-pub struct Material { name, density, stiffness, strength, toughness, damping, mode, residual_strength }
-impl Material { validate, yield_strain, resilience, effective_strength(integrity), identity, identity_hex }
-pub struct Section { thickness, depth }           // contact_stiffness(E, area)
-pub struct Beam { thickness, height, length }     // area, section_modulus, second_moment, volume
-pub struct ContactGeometry { width, a, b }        // area, merge(&[..])
-pub struct ContactBody { mass: Option<f32>, inertia: Option<f32>, lever }
-pub fn effective_mass(a, b) -> Result<f32, _>;
-pub fn lever(offset, normal) -> f32;
-pub fn point_velocity(linear, angular, offset) -> Vec2;
-pub fn closing_speed(normal, v_a, v_b) -> f32;
-pub fn patch_width_from_radii(r_a, Option<r_b>) -> Result<f32, _>;
-pub fn deformation_depth(width, Option<extent>) -> Result<f32, _>;
-pub struct Region;      // new, with_remaining, material, volume, mass, capacity, remaining,
-                        // integrity, normalized_health, failed, effective_strength, absorb,
-                        // repair, split
-pub struct Connection;  // new(material, beam), beam, region, integrity, failed, absorb, repair
-pub struct Impact { closing_speed, effective_mass }
-pub fn impact(a: &Region, b: &Region, ContactGeometry, Impact) -> Result<Outcome, _>;
-pub fn yield_speed(a, b, ContactGeometry, effective_mass) -> Result<f32, _>;
-pub struct SustainedLoad { force, width, section, duration, measured_plastic_displacement }
-pub fn sustained(&Region, SustainedLoad) -> Result<Outcome, _>;
-pub struct ConnectionLoad { moment, axial, duration, measured_plastic_rotation, measured_plastic_extension }
-pub fn connection(&Connection, ConnectionLoad) -> Result<Outcome, _>;
-pub struct WorkLedger { available, recoverable, dissipated, irreversible, excess, peak_force, peak_stress, deformation }
-                        // accounted, closes, restitution, finite
-pub struct Outcome { ledger, consumed: [f32; 2], yielded: [bool; 2], failed: [bool; 2] }  // safe()
-pub const CRUSH_TIME_CONSTANT: f32 = 0.25;
-pub const DEPTH_WIDTH_FRACTION: f32 = 1.0;
-pub const PATCH_WIDTH_FRACTION: f32 = 0.5;
-pub const LEDGER_TOLERANCE: f32 = 1.0e-4;
+```
+1 / m_eff = sum(1 / mass_i + lever_i^2 / inertia_i)
+energy = 0.5 * m_eff * closing_speed^2
+k_i = stiffness_i * area / depth_i
+Y_i = strength_i * area
+h = POST_YIELD_STIFFNESS_FRACTION = 0.01
 ```
 
-Everything is `f32`, allocation free, deterministic for the same inputs,
-validates its inputs and returns only finite results. Transcendental
-functions come from the `libm` crate rather than the platform's math
-library, as with Rapier's `enhanced-determinism`, so every platform gets the
-same bits and the generated evidence matches everywhere. Single-region loads
-fill slot 0 of the per-side arrays.
+Static and prescribed kinematic bodies contribute no inverse mass. Moving or
+rotating surfaces still contribute contact-point velocity. A common velocity
+shift cancels. Kinematic drivers require separate external-work accounting in
+the host; a relative-mode energy budget is not a complete world-frame balance.
 
-## Reference materials
+Each side uses an event-local bilinear compression curve. Up to its yield
+force `Y`, displacement is `F / k`. Beyond yield, additional displacement has
+slope `h * k`:
 
-Six reference materials live in `engine_material::ALL_REFERENCE`. Their values
-are calibration defaults in world units, not measured properties.
+```
+x(F) = F / k + max(F - Y, 0) * (1/h - 1) / k
+W(F) = F^2 / (2*k) + max(F^2 - Y^2, 0) * (1/h - 1) / (2*k)
+```
 
-| material | mode | stiffness | strength | toughness | toughness / resilience | role |
-| --- | --- | ---: | ---: | ---: | ---: | --- |
-| armor | ductile | 2.0e6 | 2.0e4 | 1.0e4 | 100 | thick vehicle plate |
-| hull | ductile | 7.0e5 | 6.0e3 | 2.0e3 | 78 | ship skin, weaker than rock so crashes hurt |
-| shell | ductile | 2.0e6 | 3.0e4 | 3.0e3 | 13 | hardened projectile, the one thing that dents plate |
-| wood | brittle | 2.0e5 | 3.0e3 | 60 | 2.7 | branches and trunks |
-| soft_tissue | ductile | 2.0e3 | 2.0e2 | 60 | 6 | spacelings |
-| rock | brittle | 5.0e6 | 1.0e4 | 15 | 1.5 | planets, asteroids, stones |
+Both sides carry the same force. Solve `W_a(F) + W_b(F) = energy`. Each curve
+is linear in force squared between its yield boundaries, so inversion crosses
+at most two boundaries. There is no iterative convergence loop or event-sized
+allocation. Intermediates use `f64` to avoid overflow and cancellation; public
+inputs and outputs remain `f32` and nonfinite outputs are rejected.
 
-The ordering of strengths decides who yields: tissue below wood below hull
-below rock below armor below shell. A ship crashing into a planet dents its
-hull; a tank driving into the same rock chips the rock; a branch falling on a
-tank snaps; a shell dents the plate.
+Bilinear post-yield stiffness is a standard approximation, with the second
+slope expressed relative to the elastic slope; see the
+[OpenSees Steel01 parameter definition](https://opensees.berkeley.edu/OpenSees/manuals/comparisonManual/180.htm).
+Our fixed 0.01 fraction, extension to wood/rock/tissue, event-local reset and
+post-failure compression are game approximations, not that constitutive model
+or measured material data. There is no persistent hardening or softening state.
 
-These values prove the law; they are not tuned to game feel, and against
-today's Spacewars they are harsh. A ship's hull starts to dent on a planet near
-0.9 wu/s and a 20 wu/s crash costs about half of it, while the game does no
-planet damage below 30 wu/s; a spaceling bumping a branch takes damage above
-about 0.4 wu/s. Calibrating against gameplay is #330's job, with today's
-30 wu/s gate and the game's landing and walking speeds as targets.
+The positive second slope matters: low-energy wood contact can remain below
+armor's yield force, but increasing energy eventually raises the common force
+above it. Work sharing follows both compression curves continuously, rather
+than switching all damage from one side to the other when strengths cross.
+
+### Elastic return and damage demand
+
+For each side at the solved peak force:
+
+```
+elastic = F^2 / (2*k)
+plastic = max(F^2 - Y^2, 0) * (1/h - 1) / (2*k)
+```
+
+A ductile side returns `(1 - damping) * elastic`, dissipates
+`damping * elastic`, and requests `plastic` irreversible work. A yielded brittle
+side requests `plastic + elastic` as fracture work and returns no elastic
+energy. An unyielded brittle side behaves elastically with damping. Brittle
+fracture therefore still has an onset discontinuity in recoverable energy;
+continuity of the force solution does not eliminate that documented choice.
+
+Each side's charge is capped by its own remaining capacity. Unabsorbed demand
+becomes `excess`; it is not automatically transferred to the other region.
+Yield and peak force are independent of remaining capacity. An exhausted region
+cannot absorb more work or report a new failure, but its mass may remain in
+contact until the host processes the consequences.
+
+This is a **compression-through-the-event approximation**: fractured/crushed
+material continues resisting compression for this event, allowing force to
+rise even after its damage capacity is exhausted. It does not model the timing
+of fragments escaping a contact, unloading after a cut, or penetration. The
+reported deformation is an effective loading displacement, not a promise to
+reshape or interpenetrate the rigid bodies. Cases where material escapes early
+need a later, different contact response; they must not be claimed as validated
+by this law.
+
+### Sustained and connection loads
+
+Sustained normal loads and connections remain distinct, force-driven modes.
+Safe loads charge exactly zero. With host-measured plastic displacement, a
+sustained load charges `yield_force * plastic_displacement`. Otherwise the
+constant-strength fallback is:
+
+```
+work = loaded_volume * (applied_stress - strength) * duration / CRUSH_TIME_CONSTANT
+CRUSH_TIME_CONSTANT = 0.25 seconds
+```
+
+The rate is constant for constant input, so one call and many substeps produce
+the same work within floating-point tolerance. Failure occurs when capacity
+runs out, within one tick plus rounding of `remaining_capacity / work_rate`.
+There is no exponential softening progression. Duration zero produces a zero
+outcome even when a measured displacement was supplied.
+
+Connections use the conservative combined stress `abs(axial)/area +
+abs(moment)/section_modulus`. Measured plastic extension/rotation is charged
+against the corresponding load scaled back to the safe limit. Missing
+components use the fallback over their contributing volume: all the beam in
+pure axial loading, one third in pure bending. Connections have their own
+capacity and can fail without deleting the assembly.
+
+These slow-load modes retain a yield plateau; the transient compression curve
+is not applied as a history-dependent constitutive model to them. The fallback
+is a named strain-rate convention, not a measured plastic displacement. The
+adapter must attribute external/support work, rather than treating an algebraic
+ledger closure as proof that the rigid-body solver supplied that work.
+
+## Energy ownership and failure disposition
+
+Every outcome carries a `WorkLedger`:
+
+```
+available = sum(recoverable + dissipated + irreversible)
+          + excess + failure_motion + failure_dissipated
+```
+
+`consumed` is what the host applies with `Region::absorb`. `failed` is true only
+for the event exhausting previously positive capacity. Both materials use the
+same event budget; neither receives the entire incoming energy independently.
+
+`excess` means **unallocated**, not automatically preserved motion. Before
+requesting restitution, the host calls `resolve_excess(motion)`:
+
+- `motion` must be finite and between zero and the outstanding excess.
+- It moves that amount into `failure_motion` and the rest into
+  `failure_dissipated`, clearing `excess` without changing the total.
+- Invalid requests leave the ledger unchanged. The same work cannot be
+  allocated twice.
+- Zero selects a blocking, dissipative failure response. A positive allocation
+  requires a separate, momentum-consistent motion/fragment response from the
+  host; this method does not apply velocities or create fragments.
+
+`restitution()` returns `Result<f32, MaterialError>` and rejects unresolved
+excess. Its coefficient is `sqrt(sum(recoverable) / available)`. The coefficient
+targets the elastic return of an isolated normal impact. It does not deliver
+`failure_motion`, prove a multi-contact assembly's balance, or override friction
+and solver stabilization. Hosts must avoid applying the same energy in both
+restitution and a later failure impulse.
+
+The initial real-solver fixture explicitly selects `resolve_excess(0)`, with
+no penetration or new fragment behavior. Production policy remains owned by
+#328 and the scenario migrations. Existing destruction/ejection/protection rules
+are unchanged by this reference crate.
+
+Sustained/connection ledgers describe a call, including persistent stored strain
+energy. Do not sum their recoverable fields as newly supplied energy every tick;
+only work increments accumulate. Restitution has no physical interpretation for
+these non-impact records.
+
+## Persistence and adapter contract
+
+`Region::new` starts at full capacity; `with_remaining` restores bounded saved
+state. `absorb` is the only lowering operation. `repair` requires explicit host
+authorization. `split` partitions volume, capacity and existing damage at the
+same integrity. Normalized health remains `100 * remaining / capacity`.
+
+Removing softening removes strength-driven event order dependence, but finite
+capacity and failure attribution still require a deterministic ordering. Hosts
+must apply each outcome before evaluating the next event sharing its region.
+Stable material/source/episode IDs, rather than backend handle traversal order,
+are the #327 contract. Later events cannot recharge an exhausted region.
+
+`ContactGeometry::merge` is only an arithmetic helper for disjoint, equivalent
+patch parts whose sections agree. The adapter must first recognize overlap and
+actual physical episodes. Derive deformation depths from the whole patch before
+splitting its width into parts; merging cannot infer missing physical geometry.
+The unit fixture proves arithmetic equivalence, not real collider-partition
+invariance. Multiple different contacts sharing one body's incoming motion
+also need a shared finite budget; merging duplicate points alone is insufficient.
+
+The existing post-solver `ContactEvent` stream cannot provide the initial
+response by itself. Rapier's `modify_solver_contacts` hook supplies a per-manifold
+modification point, but production aggregation, stable ordering, pre-solver
+state updates and CCD episode handling still need design in #327. A per-manifold
+hook is not by itself a globally ordered event phase. Pause must add no work,
+and resting/speculative/chattering contacts must not mint fresh impact budgets.
+Failure consequences must be queued outside contact iteration.
 
 ## Evidence
 
-`cargo run -p engine-material --example reference_cases` prints every table and
-writes [`docs/data/material-model-v1.md`](../data/material-model-v1.md) and
-[`docs/data/material-model-v1.json`](../data/material-model-v1.json). A test
-regenerates both and fails if the committed files differ, so the published
-numbers cannot drift from the code. Reference bodies: a 200 mu tank whose 20
-wu^3 plate region is 160 mu of armor, a 31.25 mu ship (the game's ship mass)
-with a 6 wu^3 hull, a 2 mu spaceling, a 5 mu branch, a 70 mu boulder of solid
-rock, a 2 mu stone, a 0.5 mu shell that is a solid steel slug of radius 0.1 wu,
-and an immovable planet. Size, mass and material quantity are separate inputs,
-but no body holds more material than it weighs, and a test checks that. Each
-body also says how far its material reaches behind a contact: the tank's
-0.2 wu armor plate, the ship's 0.1 wu hull, the diameter of each round body,
-and a half-space for the planet.
+The reference generator and drift test publish the exact configuration and
+results. JSON includes full elastic, dissipated and failure allocations; table
+rows keep per-event consumed work separate from cumulative work across calls.
+A closure test recomputes each displayed event's balance from those values.
 
-What the acceptance cases show:
+Representative v2 results:
 
-- **Safe bumps.** Five pairs at half their safe-limit speed, a thousand bumps
-  each: the summed irreversible work is exactly zero and integrity stays at one.
-  The safe-limit speeds range from 0.36 wu/s for a spaceling against a branch to
-  1.38 wu/s for a shell against a plate.
-- **Progressive hits.** A shell at 300 wu/s charges 22,443 of the plate's
-  200,000 capacity per hit; the plateau force falls from 976 to 363 as the
-  plate softens, and it fails on the ninth hit while the harder shell is never
-  marked. A rigid-strength variant fails after exactly the analytically
-  predicted count.
-- **Quantity and thickness.** Doubling the plate volume takes 18 hits instead
-  of 9. A hit at 1.2 times the thin plate's safe-limit speed charges 0.21 on
-  thickness 1 and exactly zero on thickness 2.
-- **Wood against plate.** A branch at 15, 40 or 120 wu/s snaps every time and
-  the plate's irreversible work is exactly zero; the broken wood carries the
-  excess away.
-- **Tissue against wood.** The same stone at 10 wu/s exhausts the spaceling's
-  10.8 capacity and takes 71 of the branch's 240.
-- **Equal strength.** Two hulls at 20 wu/s each take 1,561.
-- **Severe failure.** A shell at 1,200 wu/s brings 359,000, exhausts the plate's
-  200,000 and reports 159,000 excess; the ledger closes and nothing is infinite.
-- **Glancing.** A ship into a planet at 20 wu/s charges 6,238, 4,676, 1,551 and
-  177 at 0, 30, 60 and 80 degrees of incidence.
-- **Angular.** At 3 wu/s, a boulder's lever arm of 0, 1, 2 and 3 wu lowers the
-  effective mass from 51.9 to 44.5, 31.3 and 20.9 mu, and the boulder's damage
-  from 229 to 196, 136 and 90 of its 420 capacity; the plate takes nothing.
-- **Resting support.** The 200 mu tank resting on a wood plank for a thousand
-  ticks charges nothing. A press at 1.05 times the safe stress fails the plank
-  after three ticks and one at 1.5 times within one tick; a measured 0.02 wu
-  plastic displacement charges 120, half the plank, in one tick.
-- **Connections.** Of three wood connections under one tip load, only the root
-  exceeds its bending strength. The root fails after two ticks while the
-  others keep full integrity and the assembly keeps all three.
-- **Partition.** Four merged sub-contacts reproduce the single contact exactly;
-  charging each part with the whole event reports 89,775 instead of 22,443.
-- **Fixed step.** The 1.05 times press and a 1.08 times connection moment,
-  stepped at 30, 60, 120 and 240 Hz, consume the same work by 1/30 s: 200.9
-  of the plank's 240 and 59.0 of the connection's 120. Each fails within one
-  tick of its continuous failure time, 0.035 s and 0.045 s.
+- A 5 mu branch against the 200 mu tank at 15 or 40 wu/s exhausts its own
+  240 capacity and charges exactly zero to armor. At 80, 120 and 240 wu/s the
+  armor consumes about 881, 2,476 and 11,089 of its 200,000 capacity.
+- Fresh shells at 300 wu/s charge about 11,124 to a fresh plate and exhaust it
+  on hit 18. Projectiles have their own finite capacity and are fresh for each
+  shot; the plate's strength does not decay.
+- A severe shell hit at 1,800 wu/s exhausts both regions and reports finite
+  excess requiring explicit disposition.
+- The strength sweep near equal strength no longer switches all work between
+  sides. Symmetric materials/geometry split work equally; swapping sides swaps
+  their results.
+- Repeated safe contacts remain safe on fresh, half-damaged and nearly exhausted
+  hulls. Zero-time sustained or connection updates add no work.
+- The fallback reaches matching capacity at 30, 60, 120 and 240 Hz, with
+  failure time checked against a constant-rate analytical solution.
+- An independent displacement-space numerical integration checks the solved
+  force below yield, with one side yielded, and with both yielded. A parameter
+  grid checks closure and capacity limits over all six reference materials.
 
-The sweeps cover closing speed, striker mass, patch width, plate toughness and
-the striker-to-plate strength ratio. The strength ratio sweep is the clearest
-statement of the force-continuity rule: below one the striker alone yields,
-above one the plate alone yields, at one they share, and the rows at 0.999 and
-1.001 show the switch is immediate.
+### Real-solver experiment
 
-## Limitations
+`tests/rapier_response.rs` uses the workspace's vendored Rapier with a test-only
+contact hook. It measures actual contact-point velocity/mass/inertia before the
+solve, evaluates the law, resolves excess as dissipation, and sets restitution.
+The test compares actual kinetic-energy loss with irreversible work plus both
+forms of dissipation; dynamic pairs also conserve linear momentum.
 
-- No tangential or shear loading, and no friction work. Glancing hits use only
-  the normal component.
-- No penetration or hydrodynamic regime: a weaker material never damages a
-  stronger one in a single contact, however fast.
-- No fatigue below the safe limit, no heat, no shock waves, no anatomical
-  injury, no soil continuum.
-- The patch width and the deformation depth have documented defaults, not
-  solved contact mechanics; hosts can override both.
-- A coarse region credits its whole capacity to every contact. Splitting
-  actors into regions per area is #328's job.
-- The fallback progression is a strain-rate convention. Hosts that measure
-  plastic displacement should pass it.
-- Constrained supports and multi-contact assemblies are evaluated one contact
-  or connection at a time; load redistribution after a failure is the host's
-  structural model.
+It covers safe, damaging and capacity-exhausting contacts against static and
+dynamic supports, CCD configurations with one and four maximum substeps, an
+off-center contact that rotates the support, and a common velocity shift.
+Relative energy tolerance is 0.2% of initial energy with a small absolute floor;
+it is distinct from the pure ledger's `1e-4` closure tolerance. Collider
+restitution is deliberately 1 so the hook must replace it.
 
-## Verification
+This is an isolated-contact experiment without gravity, friction, initial
+penetration or simultaneous independent contacts. It is not the production
+adapter and does not prove partition invariance, fragment allocation, constrained
+assemblies, driven supports, or replay of authoritative episode state. Those
+remain #327/#328 acceptance work.
 
-```sh
+### Landing calibration
+
+The old readout only predicted damage alongside existing game physics. Its
+values are not evidence that v2 is playable. Keep its hull stiffness 35,000,
+strength 6,000 and toughness 96,000 as a candidate, now with hull damping 1 and
+reference rock damping 0.95:
+
+- At 1, 1.6 and 2.2 wu/s: zero damage, rebound coefficient about 0.069.
+- At 13.3 wu/s: about 0.46% hull loss.
+- At 43.2 wu/s: about 4.74% hull loss.
+- At 100 wu/s: about 24.5% hull loss.
+
+These are fixture predictions from fixed reference geometry. V2 can also damage
+the contacted rock at higher speeds; terrain-cell damage remains the separate
+#333 migration. The production adapter must make that compatibility boundary
+explicit and must not claim energy closure across unchanged legacy terrain
+chipping. Actual material lookup, contact geometry and rebound feel still need
+scenario testing under #330.
+
+## Limits and verification
+
+The pure evaluator has constant work and no per-event allocation. Fixtures and
+report generation allocate normally. The law does not provide tangential/shear
+loading, friction work, fatigue, shock waves, penetration, early fragment escape,
+heat, anatomical injury or a soil continuum. Capacity can represent a coarse
+whole region; local region resolution and failure geometry belong to #328.
+
+The default 1% post-yield slope is a calibration assumption and should be revised
+if future cases expose bad behavior. In particular it does not distinguish
+light/fast from heavy/slow impacts having identical normal energy, geometry and
+materials. No rate-sensitive continuum response is claimed.
+
+Arithmetic uses `libm` where nontrivial math functions are needed. Tests establish
+local deterministic results; neither this experiment nor the generated tables
+claim cross-machine lockstep. Geometry measurement, event admission, external
+work, clone/replay and bounded episode caches remain adapter responsibilities.
+
+```
 cargo fmt --all -- --check
-cargo clippy -p engine-material --all-targets -- -D warnings
+cargo clippy -p engine-material --all-targets --no-deps -- -D warnings
 cargo test -p engine-material
 cargo run -p engine-material --example reference_cases
+RUSTDOCFLAGS="-D warnings" cargo doc -p engine-material --no-deps
 ```
-
-Twenty-nine tests cover the acceptance list above, the analytic forms for
-available energy, the series-spring peak force and the effective mass, the
-deformation-depth rule, restitution that returns exactly the recoverable
-energy, the exact fallback solution at four step rates, ledger closure on
-every fixture row, reference bodies that hold no more material than they
-weigh, input validation, finite results for exhausted regions and overflowing
-magnitudes, failure reported once, repair, restore and split bounds, and the
-drift guard on both generated files. Clippy reports nothing and the workspace
-formatting passes.

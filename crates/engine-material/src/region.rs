@@ -81,9 +81,9 @@ impl Region {
         self.remaining <= 0.0
     }
 
-    /// Safe stress at the current integrity.
+    /// Safe stress is independent of accumulated damage.
     pub fn effective_strength(&self) -> f32 {
-        self.material.effective_strength(self.integrity())
+        self.material.strength
     }
 
     /// Charge irreversible work against the remaining capacity; the only path

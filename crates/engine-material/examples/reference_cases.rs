@@ -12,8 +12,8 @@ fn main() {
     let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/data");
     let json = serde_json::to_string_pretty(&report).expect("serializable report") + "\n";
     for (name, content) in [
-        ("material-model-v1.json", json),
-        ("material-model-v1.md", markdown),
+        ("material-model-v2.json", json),
+        ("material-model-v2.md", markdown),
     ] {
         let path = data.join(name);
         fs::write(&path, content).expect("write the report beside the other evidence files");

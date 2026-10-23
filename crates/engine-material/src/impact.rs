@@ -1,10 +1,16 @@
 //! Transient impacts: two regions meet with a closing speed and a
 //! contact-effective mass. The available energy loads two springs in series
-//! until the weaker safe limit caps the force; work beyond that plateau is
-//! irreversible and charged to the region that yielded.
+//! with a positive post-yield compression slope. A weaker material yields
+//! first, but cannot cap transmitted force forever. Both sides share one force
+//! and one energy budget; capacity limits damage, not contact resistance.
 
 use crate::{ContactGeometry, FailureMode, MaterialError, Outcome, Region, WorkLedger};
 use serde::Serialize;
+
+/// Transient post-yield compression stiffness relative to elastic stiffness.
+/// This fixed, versioned approximation permits energetic weak-on-strong hits.
+/// It is an event-local loading curve, not persistent strength hardening.
+pub const POST_YIELD_STIFFNESS_FRACTION: f32 = 0.01;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Impact {
@@ -53,13 +59,37 @@ fn sides(a: &Region, b: &Region, contact: ContactGeometry) -> [Side; 2] {
     })
 }
 
-fn series_stiffness(a: f32, b: f32) -> f32 {
-    1.0 / (1.0 / a + 1.0 / b)
+/// Invert the sum of two bilinear loading-work curves. Each yield point adds
+/// compliance in force-squared space; at most two boundaries are crossed.
+/// f64 intermediates avoid overflow/cancellation for validated f32 inputs.
+fn peak_force_squared(side: &[Side; 2], energy: f32) -> f64 {
+    let mut ordered = *side;
+    if ordered[0].yield_force > ordered[1].yield_force {
+        ordered.swap(0, 1);
+    }
+    let mut compliance = ordered
+        .iter()
+        .map(|s| 0.5 / f64::from(s.stiffness))
+        .sum::<f64>();
+    let plastic_ratio = 1.0 / f64::from(POST_YIELD_STIFFNESS_FRACTION) - 1.0;
+    let mut remaining = f64::from(energy);
+    let mut force_squared = 0.0;
+    for s in ordered {
+        let next = f64::from(s.yield_force).powi(2);
+        let work = (next - force_squared) * compliance;
+        if remaining <= work {
+            return force_squared + remaining / compliance;
+        }
+        remaining -= work;
+        force_squared = next;
+        compliance += 0.5 * plastic_ratio / f64::from(s.stiffness);
+    }
+    force_squared + remaining / compliance
 }
 
 /// Closing speed at which the weaker region reaches its safe limit for this
 /// contact: `min(F_y) / sqrt(m_eff * k_series)`. Slower impacts are fully
-/// recoverable.
+/// elastic (with harmless damping).
 pub fn yield_speed(
     a: &Region,
     b: &Region,
@@ -71,8 +101,9 @@ pub fn yield_speed(
         return Err(MaterialError::InvalidLoad);
     }
     let [first, second] = sides(a, b, contact);
-    let series = series_stiffness(first.stiffness, second.stiffness);
-    let speed = first.yield_force.min(second.yield_force) / (effective_mass * series).sqrt();
+    let compliance = 1.0 / f64::from(first.stiffness) + 1.0 / f64::from(second.stiffness);
+    let speed = (f64::from(first.yield_force.min(second.yield_force))
+        * libm::sqrt(compliance / f64::from(effective_mass))) as f32;
     if speed.is_finite() {
         Ok(speed)
     } else {
@@ -103,58 +134,32 @@ pub fn impact(
     if energy <= 0.0 {
         return outcome.checked();
     }
-    let series = series_stiffness(side[0].stiffness, side[1].stiffness);
-    let elastic_force = (2.0 * energy * series).sqrt();
-    let plateau = side[0].yield_force.min(side[1].yield_force);
+    let force_squared = peak_force_squared(&side, energy);
+    let force = libm::sqrt(force_squared);
+    let plastic_ratio = 1.0 / f64::from(POST_YIELD_STIFFNESS_FRACTION) - 1.0;
     let ledger = &mut outcome.ledger;
-    if elastic_force <= plateau {
-        // Both regions stay below their safe limits: nothing is permanent.
-        ledger.peak_force = elastic_force;
-        for (index, side) in side.iter().enumerate() {
-            store(
-                ledger,
-                index,
-                side,
-                0.5 * elastic_force * elastic_force / side.stiffness,
-            );
-            ledger.peak_stress[index] = elastic_force / area;
-            ledger.deformation[index] = elastic_force / side.stiffness;
-        }
-        return outcome.checked();
-    }
-    // The weaker safe limit caps the force. The stronger region never carries
-    // more than that force, so it stays elastic however much energy arrives;
-    // a weaker material cannot damage a stronger one in a single contact.
-    let weak = [
-        side[0].yield_force <= plateau,
-        side[1].yield_force <= plateau,
-    ];
-    let stored = side.map(|side| 0.5 * plateau * plateau / side.stiffness);
-    let plateau_work = (energy - stored[0] - stored[1]).max(0.0);
-    let share = if weak[0] && weak[1] { 0.5 } else { 1.0 };
-    ledger.peak_force = plateau;
+    ledger.peak_force = force as f32;
     for (index, side) in side.iter().enumerate() {
-        ledger.peak_stress[index] = plateau / area;
-        ledger.deformation[index] = plateau / side.stiffness;
-        if !weak[index] {
-            store(ledger, index, side, stored[index]);
-            continue;
-        }
-        outcome.yielded[index] = true;
-        let work = plateau_work * share;
-        let charge = match side.mode {
-            FailureMode::Brittle => work + stored[index],
-            FailureMode::Ductile => {
-                store(ledger, index, side, stored[index]);
-                work
-            }
+        let stiffness = f64::from(side.stiffness);
+        let yield_force = f64::from(side.yield_force);
+        let stored = (0.5 * force_squared / stiffness) as f32;
+        let work = (0.5 * (force_squared - yield_force * yield_force).max(0.0) * plastic_ratio
+            / stiffness) as f32;
+        outcome.yielded[index] = force_squared > yield_force * yield_force;
+        ledger.peak_stress[index] = (force / f64::from(area)) as f32;
+        ledger.deformation[index] =
+            ((force + (force - yield_force).max(0.0) * plastic_ratio) / stiffness) as f32;
+        let charge = if outcome.yielded[index] && side.mode == FailureMode::Brittle {
+            work + stored
+        } else {
+            store(ledger, index, side, stored);
+            work
         };
         let consumed = charge.min(side.remaining);
         outcome.consumed[index] = consumed;
         outcome.failed[index] = side.remaining > 0.0 && consumed >= side.remaining;
         ledger.irreversible[index] = consumed;
         ledger.excess += charge - consumed;
-        ledger.deformation[index] += work / plateau;
     }
     outcome.checked()
 }

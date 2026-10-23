@@ -28,7 +28,7 @@ pub use geometry::{
     closing_speed, deformation_depth, effective_mass, lever, patch_width_from_radii,
     point_velocity,
 };
-pub use impact::{Impact, impact, yield_speed};
+pub use impact::{Impact, POST_YIELD_STIFFNESS_FRACTION, impact, yield_speed};
 pub use ledger::{LEDGER_TOLERANCE, Outcome, WorkLedger};
 pub use material::{FailureMode, Material};
 pub use reference::{ALL_REFERENCE, ARMOR, HULL, ROCK, SHELL, SOFT_TISSUE, WOOD};
@@ -37,7 +37,7 @@ pub use sustained::{CRUSH_TIME_CONSTANT, ConnectionLoad, SustainedLoad, connecti
 
 /// Identity of the law implemented here. Records carry it beside each
 /// material's parameter identity so evidence names its configuration.
-pub const LAW_VERSION: &str = "material-law-v1";
+pub const LAW_VERSION: &str = "material-law-v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaterialError {
@@ -45,6 +45,8 @@ pub enum MaterialError {
     InvalidGeometry,
     InvalidLoad,
     InvalidRegion,
+    /// Excess work needs an explicit motion/dissipation allocation before rebound.
+    UnresolvedExcess,
     /// Every input is in range, but their magnitudes together overflow `f32`.
     Overflow,
 }
@@ -56,6 +58,7 @@ impl std::fmt::Display for MaterialError {
             Self::InvalidGeometry => "contact or beam geometry is not finite and positive",
             Self::InvalidLoad => "load is not finite, is negative, or has no movable body",
             Self::InvalidRegion => "region volume, work or repair fraction is invalid",
+            Self::UnresolvedExcess => "resolve excess work before requesting restitution",
             Self::Overflow => "inputs are in range but together overflow f32 arithmetic",
         })
     }

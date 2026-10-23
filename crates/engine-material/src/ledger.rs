@@ -1,6 +1,6 @@
 //! One energy ledger per event. Every unit of available energy ends up as
 //! recoverable elastic energy, harmless dissipation, irreversible work in a
-//! region, or excess that stays with the motion. Nothing is counted twice.
+//! region, or excess awaiting explicit failure-motion/dissipation allocation.
 
 use crate::MaterialError;
 use serde::Serialize;
@@ -18,8 +18,13 @@ pub struct WorkLedger {
     pub dissipated: [f32; 2],
     /// Work charged against each region's capacity.
     pub irreversible: [f32; 2],
-    /// Work no region could absorb; it remains with the motion.
+    /// Work no region could absorb. The host must resolve its disposition.
     pub excess: f32,
+    /// Excess allocated to surviving bodies/fragments. The host must apply it
+    /// with momentum accounting; it is not supplied by restitution.
+    pub failure_motion: f32,
+    /// Excess explicitly dissipated by the host's destruction policy.
+    pub failure_dissipated: f32,
     /// Largest force carried through the contact, or the axial force on a
     /// connection.
     pub peak_force: f32,
@@ -37,6 +42,8 @@ impl WorkLedger {
             .chain(&self.irreversible)
             .sum::<f32>()
             + self.excess
+            + self.failure_motion
+            + self.failure_dissipated
     }
 
     /// Whether available energy equals accounted energy within a relative
@@ -46,29 +53,59 @@ impl WorkLedger {
         difference <= relative_tolerance * self.available.abs() + 16.0 * f32::EPSILON
     }
 
-    /// Coefficient of restitution that returns exactly this impact's
+    /// Resolve excess once, assigning `motion` to surviving bodies/fragments
+    /// and the remainder to destruction dissipation. Zero means a blocking,
+    /// dissipative failure; this is a host choice, not a penetration model.
+    /// Invalid allocations leave the ledger unchanged.
+    pub fn resolve_excess(&mut self, motion: f32) -> Result<(), MaterialError> {
+        if !self.finite() || !motion.is_finite() || !(0.0..=self.excess).contains(&motion) {
+            return Err(MaterialError::InvalidLoad);
+        }
+        let carried = self.failure_motion + motion;
+        let dissipated = self.failure_dissipated + (self.excess - motion);
+        if !carried.is_finite() || !dissipated.is_finite() {
+            return Err(MaterialError::Overflow);
+        }
+        self.failure_motion = carried;
+        self.failure_dissipated = dissipated;
+        self.excess = 0.0;
+        Ok(())
+    }
+
+    /// Coefficient of restitution targeting this isolated impact's
     /// recoverable energy, `sqrt(recoverable / available)`. The host sets the
     /// contact's rebound from it so the physics engine does not spend the
-    /// bounce a second time. It means nothing for sustained loads.
-    pub fn restitution(&self) -> f32 {
+    /// bounce a second time. Excess must be resolved first; allocated failure
+    /// motion needs a separate host response. It means nothing for sustained loads.
+    pub fn restitution(&self) -> Result<f32, MaterialError> {
+        if !self.finite() {
+            return Err(MaterialError::InvalidLoad);
+        }
+        if self.excess != 0.0 {
+            return Err(MaterialError::UnresolvedExcess);
+        }
         if self.available > 0.0 {
-            (self.recoverable.iter().sum::<f32>() / self.available)
-                .sqrt()
-                .min(1.0)
+            Ok(libm::sqrtf(self.recoverable.iter().sum::<f32>() / self.available).min(1.0))
         } else {
-            0.0
+            Ok(0.0)
         }
     }
 
     pub fn finite(&self) -> bool {
-        [self.available, self.excess, self.peak_force]
-            .iter()
-            .chain(&self.recoverable)
-            .chain(&self.dissipated)
-            .chain(&self.irreversible)
-            .chain(&self.peak_stress)
-            .chain(&self.deformation)
-            .all(|value| value.is_finite())
+        [
+            self.available,
+            self.excess,
+            self.failure_motion,
+            self.failure_dissipated,
+            self.peak_force,
+        ]
+        .iter()
+        .chain(&self.recoverable)
+        .chain(&self.dissipated)
+        .chain(&self.irreversible)
+        .chain(&self.peak_stress)
+        .chain(&self.deformation)
+        .all(|value| value.is_finite() && *value >= 0.0)
     }
 }
 

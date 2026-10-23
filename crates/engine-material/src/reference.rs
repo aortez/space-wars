@@ -14,7 +14,6 @@ pub const ARMOR: Material = Material {
     toughness: 1.0e4,
     damping: 0.1,
     mode: FailureMode::Ductile,
-    residual_strength: 0.3,
 };
 
 /// Light ship skin: weaker than rock, so crashes hurt the ship.
@@ -24,12 +23,11 @@ pub const HULL: Material = Material {
     stiffness: 7.0e5,
     strength: 6.0e3,
     toughness: 2.0e3,
-    damping: 0.15,
+    damping: 1.0,
     mode: FailureMode::Ductile,
-    residual_strength: 0.25,
 };
 
-/// Hardened projectile: stronger than plate, so it is what damages plate.
+/// Hardened projectile: a concentrated source of impact energy.
 pub const SHELL: Material = Material {
     name: "shell",
     density: 8.0,
@@ -38,7 +36,6 @@ pub const SHELL: Material = Material {
     toughness: 3.0e3,
     damping: 0.1,
     mode: FailureMode::Ductile,
-    residual_strength: 0.5,
 };
 
 /// Living or dead wood: brittle, breaks before it dents plate.
@@ -50,7 +47,6 @@ pub const WOOD: Material = Material {
     toughness: 60.0,
     damping: 0.2,
     mode: FailureMode::Brittle,
-    residual_strength: 0.2,
 };
 
 /// Soft tissue: compliant, weak and heavily damped.
@@ -62,7 +58,6 @@ pub const SOFT_TISSUE: Material = Material {
     toughness: 60.0,
     damping: 0.5,
     mode: FailureMode::Ductile,
-    residual_strength: 0.1,
 };
 
 /// Planet and asteroid rock: stiff and brittle, chips rather than dents.
@@ -72,9 +67,8 @@ pub const ROCK: Material = Material {
     stiffness: 5.0e6,
     strength: 1.0e4,
     toughness: 15.0,
-    damping: 0.05,
+    damping: 0.95,
     mode: FailureMode::Brittle,
-    residual_strength: 0.1,
 };
 
 pub const ALL_REFERENCE: [Material; 6] = [ARMOR, HULL, ROCK, SHELL, SOFT_TISSUE, WOOD];

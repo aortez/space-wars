@@ -57,38 +57,10 @@ impl SustainedLoad {
     }
 }
 
-/// Plastic work the fallback progression charges while a constant `stress`
-/// above the safe limit acts on `region` for `duration`. `volume` is the
-/// material that flows at the fallback strain rate, so work accrues at
-/// `volume * overstress / CRUSH_TIME_CONSTANT`. Each unit of work softens the
-/// region and raises the overstress in proportion, so the overstress grows
-/// exponentially until the capacity is exhausted and stays constant after
-/// that. Integrating this exactly instead of stepping it once per call makes
-/// one long call and many short ones charge the same work.
+/// Constant-strength fallback: work accrues linearly with time and overstress.
+/// Remaining capacity limits the charge, not the load or the damage threshold.
 fn fallback_work(region: &Region, stress: f32, volume: f32, duration: f32) -> f32 {
-    let material = region.material();
-    let remaining = region.remaining();
-    let overstress = stress - region.effective_strength();
-    let rate = volume / CRUSH_TIME_CONSTANT;
-    // Safe stress lost per unit of absorbed work, and the growth rate it sets.
-    let softening = material.strength * (1.0 - material.residual_strength) / region.capacity();
-    let growth = softening * rate;
-    // `libm` rather than the platform's math library, so every platform gets
-    // the same bits, as Rapier's `enhanced-determinism` does.
-    let exhaustion = if growth > 0.0 {
-        libm::log1pf(softening * remaining / overstress) / growth
-    } else {
-        remaining / (rate * overstress)
-    };
-    if duration > exhaustion {
-        // Exhausted material keeps flowing at its residual strength.
-        let residual_overstress = stress - material.residual_strength * material.strength;
-        remaining + rate * residual_overstress * (duration - exhaustion)
-    } else if growth > 0.0 {
-        overstress / softening * libm::expm1f(growth * duration)
-    } else {
-        rate * overstress * duration
-    }
+    volume * (stress - region.effective_strength()) * (duration / CRUSH_TIME_CONSTANT)
 }
 
 /// Report strain energy with no charge. A sustained call is not a loading
@@ -125,6 +97,9 @@ fn overload_outcome(
 /// to `absorb`; the region is not mutated.
 pub fn sustained(region: &Region, load: SustainedLoad) -> Result<Outcome, MaterialError> {
     load.validate()?;
+    if load.duration == 0.0 {
+        return Ok(Outcome::default());
+    }
     let material = region.material();
     let area = load.width * load.section.thickness;
     let stiffness = load.section.contact_stiffness(material.stiffness, area);
@@ -195,6 +170,9 @@ impl ConnectionLoad {
 /// conservative superposition `|F| / A + |M| / S`; shear is not modeled.
 pub fn connection(joint: &Connection, load: ConnectionLoad) -> Result<Outcome, MaterialError> {
     load.validate()?;
+    if load.duration == 0.0 {
+        return Ok(Outcome::default());
+    }
     let region = joint.region();
     let material = region.material();
     let beam = joint.beam();

@@ -1670,6 +1670,7 @@ version = "0.1.0"
 dependencies = [
  "engine-core",
  "libm",
+ "rapier2d",
  "serde",
  "serde_json",
 ]

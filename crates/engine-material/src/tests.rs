@@ -12,13 +12,6 @@ fn fresh(a: &Body, b: &Body) -> (Region, Region) {
     (a.region(), b.region())
 }
 
-fn rigid_armor() -> Material {
-    Material {
-        residual_strength: 1.0,
-        ..ARMOR
-    }
-}
-
 #[test]
 fn reference_materials_validate_and_have_distinct_identities() {
     let mut identities = Vec::new();
@@ -100,7 +93,7 @@ fn invalid_inputs_are_rejected() {
     );
     assert_eq!(
         Material {
-            damping: 1.0,
+            damping: 1.01,
             ..WOOD
         }
         .validate(),
@@ -108,7 +101,7 @@ fn invalid_inputs_are_rejected() {
     );
     assert_eq!(
         Material {
-            residual_strength: -0.1,
+            strength: -0.1,
             ..WOOD
         }
         .validate(),
@@ -149,6 +142,11 @@ fn invalid_inputs_are_rejected() {
     );
     assert_eq!(
         ContactGeometry::merge(&[]),
+        Err(MaterialError::InvalidGeometry)
+    );
+    let largest = ContactGeometry::new(1.0e6, Section::new(1.0, 1.0), Section::new(1.0, 1.0));
+    assert_eq!(
+        ContactGeometry::merge(&[largest; 2]),
         Err(MaterialError::InvalidGeometry)
     );
     let region = Region::new(WOOD, 1.0).unwrap();
@@ -254,21 +252,22 @@ fn the_safe_limit_speed_separates_recoverable_from_damaging_hits() {
 
 #[test]
 fn progressive_hits_fail_after_the_predicted_count() {
-    // Without softening every hit charges the same plateau work.
+    // Every fresh projectile charges the same work until capacity runs out.
     let a = fixtures::shell();
-    let b = fixtures::tank().with_material(rigid_armor());
+    let b = fixtures::tank();
     let geometry = geometry(&a, &b);
     let load = head_on(&a, &b, 300.0);
     let (mut region_a, mut region_b) = fresh(&a, &b);
     let first = strike(&mut region_a, &mut region_b, geometry, load);
     let per_hit = first.consumed[1];
     assert!(per_hit > 0.0);
-    assert_eq!(first.consumed[0], 0.0);
+    assert!(first.consumed[0] > 0.0);
     assert!(!first.failed[1]);
     let predicted = (region_b.capacity() / per_hit).ceil() as usize;
     let mut hits = 1;
     let mut previous = region_b.integrity();
     while !region_b.failed() {
+        region_a = a.region();
         let outcome = strike(&mut region_a, &mut region_b, geometry, load);
         hits += 1;
         assert!(region_b.integrity() < previous);
@@ -279,26 +278,39 @@ fn progressive_hits_fail_after_the_predicted_count() {
         assert!(hits <= predicted + 1, "runaway");
     }
     assert_eq!(hits, predicted);
-    assert_eq!(region_a.integrity(), 1.0, "the harder shell stays elastic");
+    assert!(
+        region_a.failed(),
+        "each fresh shell spends its own finite capacity"
+    );
 }
 
 #[test]
-fn softening_cannot_increase_hits_to_failure() {
-    let a = fixtures::shell();
-    let (soft, ..) = fixtures::hits_to_failure(&a, &fixtures::tank(), 300.0, 1000);
-    let (rigid, ..) = fixtures::hits_to_failure(
-        &a,
-        &fixtures::tank().with_material(rigid_armor()),
-        300.0,
-        1000,
-    );
-    assert!(soft <= rigid && soft > 1);
+fn accumulated_damage_does_not_change_strength_or_safe_contact_threshold() {
+    let (a, b) = (fixtures::shell(), fixtures::tank());
+    let contact = geometry(&a, &b);
+    let safe = head_on(&a, &b, 0.5 * safe_limit_speed(&a, &b));
+    let damaging = head_on(&a, &b, 10.0);
+    let baseline = impact(&a.region(), &b.region(), contact, damaging).unwrap();
+    for fraction in [1.0, 0.5, 0.01] {
+        let mut target =
+            Region::with_remaining(ARMOR, b.volume, b.region().capacity() * fraction).unwrap();
+        assert_eq!(target.effective_strength(), ARMOR.strength);
+        for _ in 0..1000 {
+            assert_eq!(
+                strike(&mut a.region(), &mut target, contact, safe).consumed,
+                [0.0; 2]
+            );
+        }
+        let hit = impact(&a.region(), &target, contact, damaging).unwrap();
+        assert_eq!(hit.ledger.peak_force, baseline.ledger.peak_force);
+        assert_eq!(hit.consumed, baseline.consumed);
+    }
 }
 
 #[test]
 fn doubling_volume_doubles_hits_to_failure() {
     let a = fixtures::shell();
-    let single = fixtures::tank().with_material(rigid_armor());
+    let single = fixtures::tank();
     let double = single.with_volume(2.0 * single.volume);
     let (hits_single, ..) = fixtures::hits_to_failure(&a, &single, 300.0, 1000);
     let (hits_double, ..) = fixtures::hits_to_failure(&a, &double, 300.0, 1000);
@@ -341,7 +353,7 @@ fn doubling_thickness_can_make_a_hit_safe() {
 #[test]
 fn wood_breaks_on_armor_without_armor_loss() {
     let (a, b) = (fixtures::branch(), fixtures::tank());
-    for speed in [15.0, 40.0, 120.0] {
+    for speed in [15.0, 40.0] {
         let (mut region_a, mut region_b) = fresh(&a, &b);
         let outcome = strike(
             &mut region_a,
@@ -355,7 +367,7 @@ fn wood_breaks_on_armor_without_armor_loss() {
         assert!(outcome.failed[0] && region_a.failed());
         assert!(
             outcome.ledger.excess > 0.0,
-            "the broken wood carries energy away"
+            "failure energy requires a host disposition"
         );
         assert!(outcome.ledger.closes(LEDGER_TOLERANCE));
         // Brittle wood does not spring back; the plate does.
@@ -394,11 +406,11 @@ fn severe_armor_failure_is_finite() {
         &mut region_a,
         &mut region_b,
         geometry(&a, &b),
-        head_on(&a, &b, 1200.0),
+        head_on(&a, &b, 1800.0),
     );
     assert!(outcome.failed[1] && region_b.failed());
-    assert!(!outcome.yielded[0]);
-    assert_eq!(outcome.consumed[0], 0.0);
+    assert!(outcome.yielded[0]);
+    assert_eq!(outcome.consumed[0], a.region().capacity());
     assert!(outcome.ledger.excess > 0.0);
     assert!(outcome.ledger.finite());
     assert!(outcome.ledger.closes(LEDGER_TOLERANCE));
@@ -428,37 +440,22 @@ fn severe_armor_failure_is_finite() {
 }
 
 #[test]
-fn the_weakest_residual_strength_keeps_exhausted_regions_finite() {
-    // A failed region keeps a little strength, so it still carries load.
-    for residual in [0.0, 0.005] {
-        assert_eq!(
-            Material {
-                residual_strength: residual,
-                ..WOOD
-            }
-            .validate(),
-            Err(MaterialError::InvalidMaterial)
-        );
-    }
-    let weakest = Material {
-        residual_strength: 0.01,
-        ..WOOD
-    };
-    weakest.validate().unwrap();
-    let (stone, branch) = (fixtures::stone(), fixtures::branch().with_material(weakest));
-    let geometry = geometry(&stone, &branch);
+fn exhausted_regions_stay_finite_without_repeated_failure() {
+    let (stone, branch) = (fixtures::stone(), fixtures::branch());
+    let contact = geometry(&stone, &branch);
     let load = head_on(&stone, &branch, 30.0);
     let (mut striker, mut target) = fresh(&stone, &branch);
-    assert!(strike(&mut striker, &mut target, geometry, load).failed[1]);
+    assert!(strike(&mut striker, &mut target, contact, load).failed[1]);
+    striker.absorb(striker.remaining()).unwrap();
     for _ in 0..3 {
-        let again = strike(&mut striker, &mut target, geometry, load);
-        assert!(again.yielded[1] && !again.failed[1] && again.consumed == [0.0, 0.0]);
+        let again = strike(&mut striker, &mut target, contact, load);
+        assert!(again.yielded[1] && again.failed == [false; 2] && again.consumed == [0.0; 2]);
         assert!(again.ledger.finite() && again.ledger.closes(LEDGER_TOLERANCE));
     }
     let pressed = sustained(
         &target,
         SustainedLoad {
-            force: 1000.0,
+            force: 4000.0,
             width: 1.0,
             section: branch.section(1.0),
             duration: TICK,
@@ -466,12 +463,12 @@ fn the_weakest_residual_strength_keeps_exhausted_regions_finite() {
         },
     )
     .unwrap();
-    let mut joint = Connection::new(weakest, Beam::new(1.0, 1.0, 2.0)).unwrap();
+    let mut joint = Connection::new(WOOD, Beam::new(1.0, 1.0, 2.0)).unwrap();
     joint.absorb(joint.region().capacity()).unwrap();
     let bent = connection(
         &joint,
         ConnectionLoad {
-            moment: 100.0,
+            moment: 600.0,
             axial: 50.0,
             duration: TICK,
             measured_plastic_rotation: None,
@@ -486,30 +483,35 @@ fn the_weakest_residual_strength_keeps_exhausted_regions_finite() {
 }
 
 #[test]
-fn overflowing_magnitudes_return_an_error() {
-    // Every input is inside its range, but together they exceed f32.
-    let extreme = Material {
-        name: "extreme",
-        density: 1.0,
+fn wide_intermediates_stay_finite_and_overflowing_outputs_return_an_error() {
+    let material = Material {
         stiffness: 1.0e12,
         strength: 1.0e12,
-        toughness: 1.0e15,
-        damping: 0.0,
-        mode: FailureMode::Ductile,
-        residual_strength: 1.0,
+        ..ARMOR
     };
-    let region = Region::new(extreme, 1.0e6).unwrap();
+    let region = Region::new(material, 1.0e6).unwrap();
     let section = Section::new(1.0e6, 1.0e-6);
-    let load = Impact {
-        closing_speed: 1.0e6,
-        effective_mass: 1.0e12,
-    };
+    let hit = impact(
+        &region,
+        &region,
+        ContactGeometry::new(1.0e6, section, section),
+        Impact {
+            closing_speed: 1.0e6,
+            effective_mass: 1.0e12,
+        },
+    )
+    .unwrap();
+    assert!(hit.ledger.finite() && hit.ledger.closes(LEDGER_TOLERANCE));
     assert_eq!(
-        impact(
-            &region,
-            &region,
-            ContactGeometry::new(1.0e6, section, section),
-            load
+        sustained(
+            &Region::new(ARMOR, 1.0).unwrap(),
+            SustainedLoad {
+                force: 1.0e12,
+                width: 1.0,
+                section: Section::new(1.0, 1.0),
+                duration: 1.0,
+                measured_plastic_displacement: Some(f32::MAX),
+            }
         ),
         Err(MaterialError::Overflow)
     );
@@ -537,10 +539,7 @@ fn glancing_hits_do_strictly_less_damage() {
             damage > 0.0 && damage < previous,
             "angle {angle}: {damage} vs {previous}"
         );
-        assert!(
-            outcome.yielded[0] && !outcome.yielded[1],
-            "the hull yields on rock"
-        );
+        assert!(outcome.yielded[0], "the hull yields on rock");
         previous = damage;
     }
 }
@@ -692,8 +691,9 @@ fn restitution_returns_exactly_the_recoverable_energy() {
     let mut restitution = Vec::new();
     for speed in [0.5 * safe_limit_speed(&a, &b), 300.0] {
         let load = head_on(&a, &b, speed);
-        let ledger = impact(&region_a, &region_b, geometry, load).unwrap().ledger;
-        let coefficient = ledger.restitution();
+        let mut ledger = impact(&region_a, &region_b, geometry, load).unwrap().ledger;
+        ledger.resolve_excess(0.0).unwrap();
+        let coefficient = ledger.restitution().unwrap();
         // The rebound the host sets returns the recoverable energy, no more.
         let rebound = 0.5 * load.effective_mass * (coefficient * speed).powi(2);
         assert!(approx(
@@ -708,7 +708,7 @@ fn restitution_returns_exactly_the_recoverable_energy() {
         restitution[0] > 0.9 && restitution[1] < 0.1,
         "{restitution:?}"
     );
-    assert_eq!(WorkLedger::default().restitution(), 0.0);
+    assert_eq!(WorkLedger::default().restitution(), Ok(0.0));
 }
 
 #[test]
@@ -719,6 +719,21 @@ fn every_reference_row_closes_its_ledger() {
         assert!(!case.rows.is_empty(), "{}", case.name);
         for row in &case.rows {
             assert!(row.closes, "{}: {}", case.name, row.label);
+            let accounted = row
+                .recoverable
+                .iter()
+                .chain(&row.dissipated)
+                .chain(&row.consumed)
+                .sum::<f32>()
+                + row.excess
+                + row.failure_motion
+                + row.failure_dissipated;
+            assert!(
+                approx(row.available, accounted, LEDGER_TOLERANCE),
+                "{}: {}",
+                case.name,
+                row.label
+            );
         }
     }
 }
@@ -791,9 +806,8 @@ fn sustained_overloads_fail_in_bounded_time_and_safe_loads_never_charge() {
     )
     .unwrap();
     assert!(one.yielded[0] && one.consumed[0] > 0.0);
-    // Softening accelerates the overload, so a longer call charges more than
-    // in proportion.
-    assert!(two.consumed[0] > 2.0 * one.consumed[0]);
+    // Constant strength makes work proportional to duration.
+    assert!(approx(two.consumed[0], 2.0 * one.consumed[0], 1.0e-6));
     // The strain energy reported each call is the same persistent amount.
     assert!(approx(
         one.ledger.recoverable[0] + one.ledger.dissipated[0],
@@ -803,7 +817,7 @@ fn sustained_overloads_fail_in_bounded_time_and_safe_loads_never_charge() {
 
     // A real overload fails in bounded time, and the failure is reported once.
     let mut crushed = region;
-    let mut ticks = 0;
+    let mut ticks: usize = 0;
     while !crushed.failed() {
         let outcome = press(&mut crushed, overload);
         ticks += 1;
@@ -814,24 +828,8 @@ fn sustained_overloads_fail_in_bounded_time_and_safe_loads_never_charge() {
     assert!(after.yielded[0] && !after.failed[0] && after.consumed[0] == 0.0);
     assert!(after.ledger.finite() && after.ledger.closes(LEDGER_TOLERANCE));
 
-    // Softening can only shorten it. Without softening every tick charges the
-    // same work, so the tick count follows from the capacity.
-    let mut rigid = plank
-        .with_material(Material {
-            residual_strength: 1.0,
-            ..WOOD
-        })
-        .region();
-    let per_tick = sustained(&rigid, overload).unwrap().consumed[0];
-    let predicted = (rigid.capacity() / per_tick).ceil() as usize;
-    let mut rigid_ticks = 0;
-    while !rigid.failed() {
-        press(&mut rigid, overload);
-        rigid_ticks += 1;
-        assert!(rigid_ticks <= predicted + 1, "runaway");
-    }
-    assert!(rigid_ticks.abs_diff(predicted) <= 1);
-    assert!(ticks > 1 && ticks < rigid_ticks);
+    let predicted = (region.capacity() / one.consumed[0]).ceil() as usize;
+    assert!(ticks.abs_diff(predicted) <= 1 && ticks > 1);
 
     // A much larger overload fails sooner.
     let strong = SustainedLoad {
@@ -860,10 +858,7 @@ fn sustained_overloads_fail_in_bounded_time_and_safe_loads_never_charge() {
     assert!(approx(measured.consumed[0], yield_force * 0.02, 1.0e-5));
 }
 
-/// Exact fallback for a constant overload on intact material: the remaining
-/// capacity at `time` and the failure time. Each unit of work softens the
-/// material and raises the overstress in proportion, so the overstress grows
-/// as `exp(growth * t)`.
+/// Constant-strength analytic rate, independent of the production fallback.
 fn exact_fallback(
     material: Material,
     capacity: f32,
@@ -871,12 +866,8 @@ fn exact_fallback(
     volume: f32,
     time: f32,
 ) -> (f32, f32) {
-    let overstress = stress - material.strength;
-    let softening = material.strength * (1.0 - material.residual_strength) / capacity;
-    let growth = softening * volume / CRUSH_TIME_CONSTANT;
-    let remaining = capacity - overstress / softening * libm::expm1f(growth * time);
-    let failure = libm::log1pf(softening * capacity / overstress) / growth;
-    (remaining, failure)
+    let rate = volume * (stress - material.strength) / CRUSH_TIME_CONSTANT;
+    ((capacity - rate * time).max(0.0), capacity / rate)
 }
 
 /// Step a load at `rate` until the material fails. `tick` applies one tick
@@ -885,7 +876,7 @@ fn exact_fallback(
 fn step_until_failure(rate: f32, mut tick: impl FnMut() -> (f32, bool)) -> (f32, f32) {
     let common = (rate * fixtures::COMMON_TIME).round() as usize;
     let mut at_common = None;
-    let mut ticks = 0;
+    let mut ticks: usize = 0;
     loop {
         let (remaining, failed) = tick();
         ticks += 1;
@@ -933,7 +924,7 @@ fn the_fallback_progression_does_not_depend_on_the_step() {
             "{rate} Hz: {remaining} vs {expected}"
         );
         assert!(
-            time >= failure && time < failure + 1.0 / rate,
+            time >= failure - 1.0e-6 && time <= failure + 1.0 / rate + 1.0e-6,
             "{rate} Hz: {time} s vs {failure} s"
         );
     }
@@ -966,7 +957,7 @@ fn the_fallback_progression_does_not_depend_on_the_step() {
             "{rate} Hz: {remaining} vs {expected}"
         );
         assert!(
-            time >= failure && time < failure + 1.0 / rate,
+            time >= failure - 1.0e-6 && time <= failure + 1.0 / rate + 1.0e-6,
             "{rate} Hz: {time} s vs {failure} s"
         );
     }
@@ -982,11 +973,11 @@ fn the_fallback_progression_does_not_depend_on_the_step() {
     };
     let work = |outcome: Outcome| outcome.consumed[0] + outcome.ledger.excess;
     let mut split = plank.region();
-    let split_work: f32 = (0..3).map(|_| work(press(&mut split, tick_load))).sum();
+    let split_work: f32 = (0..12).map(|_| work(press(&mut split, tick_load))).sum();
     let whole = sustained(
         &plank.region(),
         SustainedLoad {
-            duration: 3.0 * TICK,
+            duration: 12.0 * TICK,
             ..tick_load
         },
     )
@@ -1065,20 +1056,12 @@ fn repair_split_and_absorb_stay_bounded() {
     assert_eq!(region.absorb(region.capacity() * 0.25).unwrap(), 0.0);
     assert!(approx(region.integrity(), 0.75, 1.0e-6));
     assert!(approx(region.normalized_health(), 75.0, 1.0e-5));
-    assert!(approx(
-        region.effective_strength(),
-        ARMOR.strength * (0.3 + 0.7 * 0.75),
-        1.0e-6
-    ));
+    assert!(approx(region.effective_strength(), ARMOR.strength, 1.0e-6));
     let excess = region.absorb(region.capacity()).unwrap();
     assert!(approx(excess, region.capacity() * 0.25, 1.0e-5));
     assert!(region.failed());
     assert_eq!(region.integrity(), 0.0);
-    assert!(approx(
-        region.effective_strength(),
-        ARMOR.strength * 0.3,
-        1.0e-6
-    ));
+    assert!(approx(region.effective_strength(), ARMOR.strength, 1.0e-6));
     region.repair(0.5).unwrap();
     assert!(approx(region.integrity(), 0.5, 1.0e-6));
     region.repair(1.0).unwrap();
@@ -1116,16 +1099,16 @@ fn repair_split_and_absorb_stay_bounded() {
 #[test]
 fn committed_report_matches_the_regenerated_report() {
     let regenerated = serde_json::to_string_pretty(&fixtures::report()).unwrap() + "\n";
-    let committed = include_str!("../../../docs/data/material-model-v1.json");
+    let committed = include_str!("../../../docs/data/material-model-v2.json");
     assert!(
         committed == regenerated,
-        "docs/data/material-model-v1.json is stale; run `cargo run -p engine-material --example reference_cases`"
+        "docs/data/material-model-v2.json is stale; run `cargo run -p engine-material --example reference_cases`"
     );
     let markdown = fixtures::render_markdown(&fixtures::report());
-    let committed_markdown = include_str!("../../../docs/data/material-model-v1.md");
+    let committed_markdown = include_str!("../../../docs/data/material-model-v2.md");
     assert!(
         committed_markdown == markdown,
-        "docs/data/material-model-v1.md is stale; run `cargo run -p engine-material --example reference_cases`"
+        "docs/data/material-model-v2.md is stale; run `cargo run -p engine-material --example reference_cases`"
     );
 }
 
@@ -1141,4 +1124,277 @@ fn markdown_render_lists_every_case_and_material() {
     }
     assert!(markdown.contains("| yes |"));
     assert!(!markdown.contains("| no |"));
+}
+
+#[test]
+fn energetic_wood_can_damage_armor_without_a_pair_exception() {
+    let (a, b) = (fixtures::branch(), fixtures::tank());
+    let mut previous = 0.0;
+    for speed in [15.0, 40.0, 80.0, 120.0, 240.0] {
+        let hit = impact(
+            &a.region(),
+            &b.region(),
+            geometry(&a, &b),
+            head_on(&a, &b, speed),
+        )
+        .unwrap();
+        assert!(hit.failed[0]);
+        if speed <= 40.0 {
+            assert_eq!(hit.consumed[1], 0.0);
+        } else {
+            assert!(hit.consumed[1] > previous && hit.yielded[1]);
+            assert!(hit.ledger.peak_stress[1] > ARMOR.strength);
+        }
+        previous = hit.consumed[1];
+        assert!(hit.ledger.closes(LEDGER_TOLERANCE));
+    }
+}
+
+#[test]
+fn force_matches_independent_numerical_integration_of_loading_curves() {
+    let (a, b) = (
+        Region::new(WOOD, 1000.0).unwrap(),
+        Region::new(ARMOR, 1000.0).unwrap(),
+    );
+    let contact = ContactGeometry::new(0.4, Section::new(1.0, 0.3), Section::new(1.0, 0.1));
+    // Integrate F dx directly in displacement space, independently of the
+    // production force-squared inversion. Cover neither, one and both yielding.
+    for force in [400.0_f64, 4000.0, 12000.0] {
+        let mut energy = 0.0;
+        for (material, section) in [(WOOD, contact.a), (ARMOR, contact.b)] {
+            let stiffness =
+                f64::from(section.contact_stiffness(material.stiffness, contact.area()));
+            let yield_force = f64::from(material.strength * contact.area());
+            let slope = stiffness * f64::from(POST_YIELD_STIFFNESS_FRACTION);
+            let yield_displacement = yield_force / stiffness;
+            let end = if force <= yield_force {
+                force / stiffness
+            } else {
+                yield_displacement + (force - yield_force) / slope
+            };
+            let dx = end / 10000.0;
+            for i in 0..10000 {
+                let x = (f64::from(i) + 0.5) * dx;
+                let f = if x <= yield_displacement {
+                    stiffness * x
+                } else {
+                    yield_force + slope * (x - yield_displacement)
+                };
+                energy += f * dx;
+            }
+        }
+        let hit = impact(
+            &a,
+            &b,
+            contact,
+            Impact {
+                closing_speed: libm::sqrt(2.0 * energy) as f32,
+                effective_mass: 1.0,
+            },
+        )
+        .unwrap();
+        assert!(approx(hit.ledger.peak_force, force as f32, 1.0e-4));
+        assert!(hit.ledger.closes(LEDGER_TOLERANCE));
+    }
+}
+
+#[test]
+fn strength_crossing_is_continuous_and_side_order_is_symmetric() {
+    let contact = ContactGeometry::new(1.0, Section::new(1.0, 1.0), Section::new(1.0, 1.0));
+    let load = Impact {
+        closing_speed: 20.0,
+        effective_mass: 10.0,
+    };
+    let target = Region::new(ARMOR, 1000.0).unwrap();
+    let mut work = Vec::new();
+    for ratio in [0.999, 1.0, 1.001] {
+        let striker = Region::new(
+            Material {
+                strength: ARMOR.strength * ratio,
+                ..ARMOR
+            },
+            1000.0,
+        )
+        .unwrap();
+        let hit = impact(&striker, &target, contact, load).unwrap();
+        let reverse = impact(&target, &striker, contact, load).unwrap();
+        assert_eq!(hit.consumed, [reverse.consumed[1], reverse.consumed[0]]);
+        assert!(hit.consumed.iter().all(|w| *w > 0.0));
+        work.push(hit.consumed);
+    }
+    assert_eq!(work[1][0], work[1][1]);
+    for ((low, high), middle) in work[0].iter().zip(work[2]).zip(work[1]) {
+        assert!((low - high).abs() < 0.03 * middle);
+    }
+}
+
+#[test]
+fn all_material_pairs_close_and_bound_work_across_loads_and_capacity() {
+    for a in ALL_REFERENCE {
+        for b in ALL_REFERENCE {
+            for width in [0.01, 1.0, 100.0] {
+                let contact =
+                    ContactGeometry::new(width, Section::new(0.5, width), Section::new(1.0, 0.2));
+                for fraction in [0.0, 0.01, 1.0] {
+                    let a = Region::with_remaining(a, 1.0, fraction * a.toughness).unwrap();
+                    let b = Region::with_remaining(b, 2.0, fraction * b.toughness * 2.0).unwrap();
+                    for speed in [0.0, 0.01, 1.0, 100.0, 10000.0] {
+                        let hit = impact(
+                            &a,
+                            &b,
+                            contact,
+                            Impact {
+                                closing_speed: speed,
+                                effective_mass: 3.0,
+                            },
+                        )
+                        .unwrap();
+                        assert!(
+                            hit.ledger.finite() && hit.ledger.closes(LEDGER_TOLERANCE),
+                            "{a:?} {b:?} {hit:?}"
+                        );
+                        assert!(
+                            hit.consumed[0] <= a.remaining() && hit.consumed[1] <= b.remaining()
+                        );
+                        assert_eq!(
+                            hit.failed[0],
+                            a.remaining() > 0.0 && hit.consumed[0] == a.remaining()
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn excess_requires_explicit_bounded_failure_allocation() {
+    let (a, b) = (fixtures::branch(), fixtures::tank());
+    let original = impact(
+        &a.region(),
+        &b.region(),
+        geometry(&a, &b),
+        head_on(&a, &b, 120.0),
+    )
+    .unwrap()
+    .ledger;
+    assert!(original.excess > 0.0);
+    assert_eq!(original.restitution(), Err(MaterialError::UnresolvedExcess));
+    for motion in [-1.0, f32::NAN, original.excess * 2.0] {
+        let mut ledger = original;
+        assert_eq!(
+            ledger.resolve_excess(motion),
+            Err(MaterialError::InvalidLoad)
+        );
+        assert_eq!(ledger, original);
+    }
+    for fraction in [0.0, 0.5, 1.0] {
+        let mut ledger = original;
+        ledger.resolve_excess(original.excess * fraction).unwrap();
+        assert_eq!(ledger.excess, 0.0);
+        assert_eq!(ledger.failure_motion, original.excess * fraction);
+        assert!(approx(
+            ledger.failure_motion + ledger.failure_dissipated,
+            original.excess,
+            1.0e-6
+        ));
+        assert!(ledger.closes(LEDGER_TOLERANCE));
+        assert!(ledger.restitution().is_ok());
+        let settled = ledger;
+        assert_eq!(ledger.resolve_excess(1.0), Err(MaterialError::InvalidLoad));
+        assert_eq!(ledger, settled);
+        ledger.resolve_excess(0.0).unwrap();
+        assert_eq!(ledger, settled);
+    }
+}
+
+#[test]
+fn gentle_contacts_can_dissipate_all_energy_without_damage() {
+    let material = Material {
+        damping: 1.0,
+        ..HULL
+    };
+    let region = Region::new(material, 1.0).unwrap();
+    let contact = ContactGeometry::new(1.0, Section::new(1.0, 0.1), Section::new(1.0, 0.1));
+    let hit = impact(
+        &region,
+        &region,
+        contact,
+        Impact {
+            closing_speed: 0.1,
+            effective_mass: 1.0,
+        },
+    )
+    .unwrap();
+    assert!(hit.safe());
+    assert_eq!(hit.consumed, [0.0; 2]);
+    assert_eq!(hit.ledger.restitution(), Ok(0.0));
+    assert!(approx(
+        hit.ledger.dissipated.iter().sum(),
+        hit.ledger.available,
+        1.0e-6
+    ));
+    let (a, b) = (fixtures::ship(), fixtures::planet());
+    let landing = impact(
+        &a.region(),
+        &b.region(),
+        geometry(&a, &b),
+        head_on(&a, &b, 0.5 * safe_limit_speed(&a, &b)),
+    )
+    .unwrap();
+    assert!(landing.safe() && landing.ledger.restitution().unwrap() < 0.2);
+    let candidate = fixtures::landing_ship();
+    for fraction in [1.0, 0.5, 0.01] {
+        let target = Region::with_remaining(
+            candidate.material,
+            candidate.volume,
+            candidate.region().capacity() * fraction,
+        )
+        .unwrap();
+        for speed in [1.0, 1.6, 2.2] {
+            let landing = impact(
+                &target,
+                &b.region(),
+                geometry(&candidate, &b),
+                head_on(&candidate, &b, speed),
+            )
+            .unwrap();
+            assert_eq!(landing.consumed, [0.0; 2]);
+            assert!(landing.ledger.restitution().unwrap() < 0.1);
+        }
+    }
+}
+
+#[test]
+fn zero_duration_adds_no_work_even_with_measured_displacement() {
+    let region = Region::new(WOOD, 1.0).unwrap();
+    assert_eq!(
+        sustained(
+            &region,
+            SustainedLoad {
+                force: 1.0e6,
+                width: 1.0,
+                section: Section::new(1.0, 1.0),
+                duration: 0.0,
+                measured_plastic_displacement: Some(1.0),
+            }
+        )
+        .unwrap(),
+        Outcome::default()
+    );
+    let joint = Connection::new(WOOD, Beam::new(1.0, 1.0, 1.0)).unwrap();
+    assert_eq!(
+        connection(
+            &joint,
+            ConnectionLoad {
+                moment: 1.0e6,
+                axial: 1.0e6,
+                duration: 0.0,
+                measured_plastic_rotation: Some(1.0),
+                measured_plastic_extension: Some(1.0),
+            }
+        )
+        .unwrap(),
+        Outcome::default()
+    );
 }

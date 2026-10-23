@@ -1,6 +1,6 @@
 //! Reference bodies, acceptance cases and parameter sweeps. Tests assert the
 //! acceptance behavior; the `reference_cases` example prints these tables and
-//! writes `docs/data/material-model-v1.json` and `docs/data/material-model-v1.md`,
+//! writes `docs/data/material-model-v2.json` and `docs/data/material-model-v2.md`,
 //! which a test compares against the regenerated report so the published
 //! evidence cannot drift from the code. The helpers panic on invalid input:
 //! this is evidence scaffolding, not host API.
@@ -244,7 +244,7 @@ pub fn bend(joint: &mut Connection, load: ConnectionLoad) -> Outcome {
     outcome
 }
 
-/// Strike `b` with `a` on fresh regions until `b` fails or `limit` hits pass.
+/// Strike persistent `b` with a fresh `a` each time until failure or `limit` hits.
 /// Returns the hit count, both regions and the last outcome.
 pub fn hits_to_failure(
     a: &Body,
@@ -258,6 +258,7 @@ pub fn hits_to_failure(
     let mut hits = 0;
     let mut last = Outcome::default();
     while !region_b.failed() && hits < limit {
+        region_a = a.region();
         last = strike(&mut region_a, &mut region_b, geometry, load);
         hits += 1;
     }
@@ -296,7 +297,6 @@ pub struct MaterialRecord {
     pub toughness: f32,
     pub damping: f32,
     pub mode: FailureMode,
-    pub residual_strength: f32,
     pub resilience: f32,
     pub toughness_over_resilience: f32,
 }
@@ -311,7 +311,6 @@ fn material_record(material: &Material) -> MaterialRecord {
         toughness: material.toughness,
         damping: material.damping,
         mode: material.mode,
-        residual_strength: material.residual_strength,
         resilience: material.resilience(),
         toughness_over_resilience: material.toughness / material.resilience(),
     }
@@ -325,9 +324,16 @@ pub struct Row {
     pub peak_force: f32,
     pub peak_stress: [f32; 2],
     pub consumed: [f32; 2],
+    /// Accumulated work across calls, separate from the displayed event ledger.
+    pub cumulative_consumed: Option<[f32; 2]>,
     pub integrity: [f32; 2],
     pub failed: [bool; 2],
+    pub recoverable: [f32; 2],
+    pub dissipated: [f32; 2],
     pub excess: f32,
+    pub failure_motion: f32,
+    pub failure_dissipated: f32,
+    pub restitution: Option<f32>,
     pub closes: bool,
     /// Regions the event loads: 2 for a contact, 1 for a single region, whose
     /// slot `b` is unused.
@@ -342,9 +348,17 @@ impl Row {
             peak_force: outcome.ledger.peak_force,
             peak_stress: outcome.ledger.peak_stress,
             consumed: outcome.consumed,
+            cumulative_consumed: None,
             integrity,
             failed: outcome.failed,
+            recoverable: outcome.ledger.recoverable,
+            dissipated: outcome.ledger.dissipated,
             excess: outcome.ledger.excess,
+            failure_motion: outcome.ledger.failure_motion,
+            failure_dissipated: outcome.ledger.failure_dissipated,
+            restitution: (regions == 2)
+                .then(|| outcome.ledger.restitution().ok())
+                .flatten(),
             closes: outcome.ledger.closes(LEDGER_TOLERANCE) && outcome.ledger.finite(),
             regions,
         }
@@ -369,6 +383,7 @@ pub struct Case {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Report {
     pub law_version: &'static str,
+    pub post_yield_stiffness_fraction: f32,
     pub tick: f32,
     pub gravity: f32,
     pub materials: Vec<MaterialRecord>,
@@ -379,11 +394,14 @@ pub struct Report {
 pub fn report() -> Report {
     Report {
         law_version: LAW_VERSION,
+        post_yield_stiffness_fraction: crate::POST_YIELD_STIFFNESS_FRACTION,
         tick: TICK,
         gravity: GRAVITY,
         materials: crate::ALL_REFERENCE.iter().map(material_record).collect(),
         cases: vec![
             safe_bumps(),
+            gentle_landings(),
+            failure_allocation(),
             progressive_hits(),
             quantity_and_thickness(),
             wood_vs_armor(),
@@ -446,7 +464,7 @@ fn safe_bumps() -> Case {
                 &region_a,
                 &region_b,
             );
-            row.consumed = consumed;
+            row.cumulative_consumed = Some(consumed);
             row
         })
         .collect();
@@ -459,12 +477,13 @@ fn safe_bumps() -> Case {
 
 fn progressive_hits() -> Case {
     let (a, b) = (shell(), tank());
-    let (mut region_a, mut region_b) = (a.region(), b.region());
+    let mut region_b = b.region();
     let geometry = geometry(&a, &b);
     let speed = 300.0;
     let load = head_on(&a, &b, speed);
     let mut rows = Vec::new();
     for hit in 1..=40 {
+        let mut region_a = a.region();
         let outcome = strike(&mut region_a, &mut region_b, geometry, load);
         rows.push(Row::pair(
             format!("hit {hit}: shell vs tank at {} wu/s", num(speed)),
@@ -478,7 +497,7 @@ fn progressive_hits() -> Case {
     }
     Case {
         name: "progressive_hits",
-        description: "Identical over-limit hits from a hardened shell. The plate loses integrity every hit, its softening strength lowers the plateau so later hits charge slightly more, and it fails after a finite count while the harder shell stays elastic.",
+        description: "Fresh identical shells hit a persistent plate. Both may yield. Damage per hit and strength stay constant until remaining capacity caps the final charge; each projectile has its own finite capacity.",
         rows,
     }
 }
@@ -522,7 +541,7 @@ fn quantity_and_thickness() -> Case {
 
 fn wood_vs_armor() -> Case {
     let (a, b) = (branch(), tank());
-    let rows = [15.0, 40.0, 120.0]
+    let rows = [15.0, 40.0, 80.0, 120.0, 240.0]
         .iter()
         .map(|&speed| {
             one_strike(
@@ -535,7 +554,7 @@ fn wood_vs_armor() -> Case {
         .collect();
     Case {
         name: "wood_vs_armor",
-        description: "A falling branch against plate. Wood is the weaker material, so it carries the whole plateau and snaps, while the plate's irreversible work is exactly zero at any speed. The excess is energy the broken wood carries away.",
+        description: "A branch at ordinary speeds breaks without damaging armor. At high speed its rising compression resistance also yields the armor. Excess remains unallocated until the host explicitly selects failure motion or destruction dissipation.",
         rows,
     }
 }
@@ -575,14 +594,14 @@ fn equal_strength_tie() -> Case {
         .collect();
     Case {
         name: "equal_strength_tie",
-        description: "Two hulls of the same material: both reach the safe limit together and share the plateau work equally.",
+        description: "Two hulls of the same material: both reach the safe limit together and share the deformation work equally.",
         rows,
     }
 }
 
 fn severe_armor_failure() -> Case {
     let (a, b) = (shell(), tank());
-    let rows = [600.0, 1200.0]
+    let rows = [600.0, 1800.0]
         .iter()
         .map(|&speed| {
             one_strike(
@@ -595,7 +614,7 @@ fn severe_armor_failure() -> Case {
         .collect();
     Case {
         name: "severe_armor_failure",
-        description: "A hardened shell with more energy than the plate can absorb. The plate's capacity is exhausted in one hit, the remainder is reported as excess that stays with the motion, the ledger still closes and nothing is infinite.",
+        description: "A hardened shell with more energy than the plate can absorb. The plate's capacity is exhausted in one hit, the remainder is reported as excess requiring explicit host allocation, the ledger still closes and nothing is infinite.",
         rows,
     }
 }
@@ -693,7 +712,7 @@ fn resting_support() -> Case {
             &last,
             &region,
         );
-        row.consumed[0] = total;
+        row.cumulative_consumed = Some([total, 0.0]);
         rows.push(row);
     }
     for (force, ratio) in [(6300.0, "1.05x"), (9000.0, "1.5x")] {
@@ -833,7 +852,7 @@ fn partition() -> Case {
             &region_a,
             &region_b,
         );
-        row.consumed = total;
+        row.cumulative_consumed = Some(total);
         rows.push(row);
     }
     Case {
@@ -877,7 +896,7 @@ fn stepped(rate: f32, load: &str, mut tick: impl FnMut() -> (Outcome, f32, bool)
         tick_count(ticks),
         num(ticks as f32 / rate)
     );
-    row.consumed[0] = consumed;
+    row.cumulative_consumed = Some([consumed, 0.0]);
     row
 }
 
@@ -915,7 +934,7 @@ fn fixed_step() -> Case {
     }
     Case {
         name: "fixed_step",
-        description: "The plank press and a connection moment just past their safe limits, stepped at 30, 60, 120 and 240 Hz, where 240 Hz is the 60 Hz tick with four substeps. The fallback is integrated exactly over each call, so the work consumed and the integrity after 1/30 s, in column a, match at every rate, and each failure lands within one tick of the continuous failure time. The other columns describe the tick that ends at 1/30 s, which shrinks as the rate rises.",
+        description: "The plank press and a connection moment just past their safe limits, stepped at 30, 60, 120 and 240 Hz, where 240 Hz is the 60 Hz tick with four substeps. Constant-strength fallback work integrates linearly. Cumulative work and integrity after 1/30 s match at every rate; failure lands within one tick (plus f32 rounding) of the analytic time. Event columns describe only the tick ending at 1/30 s; cumulative work is explicitly separate.",
         rows,
     }
 }
@@ -981,7 +1000,7 @@ fn patch_width_sweep() -> Case {
     let default = geometry(&a, &b).width;
     sweep(
         "patch_width",
-        "Shell into a fresh plate at 300 wu/s with the patch width scaled around its default and the depth that follows from it. A wider patch raises the plateau force; the plateau stress stays at the plate's strength.",
+        "Shell into a fresh plate at 300 wu/s with the patch width scaled around its default and the depth that follows from it. A wider patch changes compliance and peak stress, which may exceed either material's yield strength.",
         &[0.25, 0.5, 1.0, 2.0, 4.0],
         |factor| {
             let width = factor * default;
@@ -1032,7 +1051,7 @@ fn strength_ratio_sweep() -> Case {
     let b = tank();
     sweep(
         "strength_ratio",
-        "Striker strength relative to the plate at 300 wu/s: the weaker material yields, the stronger stays elastic, equal strengths share the work.",
+        "Striker strength relative to the plate at 300 wu/s: both can yield, and work allocation changes continuously as their strengths cross. Identical geometry and material properties share equally.",
         &[0.5, 0.75, 0.999, 1.0, 1.001, 1.25, 1.5, 2.0],
         |ratio| {
             let a = shell().with_material(Material {
@@ -1067,24 +1086,25 @@ pub fn render_markdown(report: &Report) -> String {
     );
     let _ = writeln!(
         out,
-        "Law `{}`. Tick {} s, gravity {} wu/s^2.\n",
+        "Law `{}`. Post-yield stiffness fraction {}. Tick {} s, gravity {} wu/s^2.\n",
         report.law_version,
+        num(report.post_yield_stiffness_fraction),
         num(report.tick),
         num(report.gravity)
     );
     let _ = writeln!(out, "## Reference materials\n");
     let _ = writeln!(
         out,
-        "| material | mode | density | stiffness | strength | toughness | toughness / resilience | damping | residual strength | identity |"
+        "| material | mode | density | stiffness | strength | toughness | toughness / resilience | damping | identity |"
     );
     let _ = writeln!(
         out,
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
     );
     for material in &report.materials {
         let _ = writeln!(
             out,
-            "| {} | {:?} | {} | {} | {} | {} | {} | {} | {} | `{}` |",
+            "| {} | {:?} | {} | {} | {} | {} | {} | {} | `{}` |",
             material.name,
             material.mode,
             num(material.density),
@@ -1093,7 +1113,6 @@ pub fn render_markdown(report: &Report) -> String {
             num(material.toughness),
             num(material.toughness_over_resilience),
             num(material.damping),
-            num(material.residual_strength),
             material.identity
         );
     }
@@ -1106,11 +1125,11 @@ pub fn render_markdown(report: &Report) -> String {
             let _ = writeln!(out, "\n### {}\n\n{}\n", case.name, case.description);
             let _ = writeln!(
                 out,
-                "| case | available | peak force | stress a | stress b | consumed a | consumed b | integrity a | integrity b | failed | excess | closes |"
+                "| case | available | peak force | stress a | stress b | consumed a | consumed b | integrity a | integrity b | failed | excess | failure motion | failure dissipation | rebound | cumulative work a / b | closes |"
             );
             let _ = writeln!(
                 out,
-                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |"
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |"
             );
             for row in &case.rows {
                 // A single-region row has no side b.
@@ -1123,7 +1142,7 @@ pub fn render_markdown(report: &Report) -> String {
                 };
                 let _ = writeln!(
                     out,
-                    "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                    "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
                     row.label,
                     num(row.available),
                     num(row.peak_force),
@@ -1135,10 +1154,70 @@ pub fn render_markdown(report: &Report) -> String {
                     b(row.integrity[1]),
                     failed_label(row.failed),
                     num(row.excess),
+                    num(row.failure_motion),
+                    num(row.failure_dissipated),
+                    row.restitution.map(num).unwrap_or_else(|| "-".into()),
+                    row.cumulative_consumed
+                        .map(|work| format!("{} / {}", num(work[0]), b(work[1])))
+                        .unwrap_or_else(|| "-".into()),
                     if row.closes { "yes" } else { "no" }
                 );
             }
         }
     }
     out
+}
+
+/// Candidate from the earlier playtest, now fully damping the hull's elastic
+/// share. This is reference evidence, not a live scenario configuration.
+pub fn landing_ship() -> Body {
+    ship().with_material(Material {
+        stiffness: 3.5e4,
+        toughness: 9.6e4,
+        damping: 1.0,
+        ..HULL
+    })
+}
+
+fn gentle_landings() -> Case {
+    let (a, b) = (landing_ship(), planet());
+    let rows = [1.0, 1.6, 2.2, 13.3, 43.2, 100.0]
+        .into_iter()
+        .map(|speed| {
+            one_strike(
+                &a,
+                &b,
+                head_on(&a, &b, speed),
+                format!("candidate hull at {} wu/s", num(speed)),
+            )
+        })
+        .collect();
+    Case {
+        name: "gentle_landings",
+        description: "Provisional playtest hull (stiffness 35000, strength 6000, toughness 96000, damping 1) against reference rock (damping 0.95). Gentle contacts cost exactly zero; harder impacts accumulate damage. Rebound is a target for the solver, not a completed gameplay playtest.",
+        rows,
+    }
+}
+
+fn failure_allocation() -> Case {
+    let (a, b) = (branch(), tank());
+    let mut rows = Vec::new();
+    for fraction in [0.0, 0.5, 1.0] {
+        let (mut ra, mut rb) = (a.region(), b.region());
+        let mut hit = strike(&mut ra, &mut rb, geometry(&a, &b), head_on(&a, &b, 120.0));
+        hit.ledger
+            .resolve_excess(hit.ledger.excess * fraction)
+            .unwrap();
+        rows.push(Row::pair(
+            format!("{}% of excess assigned to motion", num(100.0 * fraction)),
+            &hit,
+            &ra,
+            &rb,
+        ));
+    }
+    Case {
+        name: "failure_allocation",
+        description: "Explicit allocations of one failed branch impact: carry none, half or all of the excess, dissipating the rest. These are alternative host policies; the carry cases only prove accounting, not fragment velocities. The real-solver fixture tests the fully dissipative blocking policy.",
+        rows,
+    }
 }

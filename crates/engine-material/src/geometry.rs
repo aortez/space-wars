@@ -138,7 +138,9 @@ impl ContactGeometry {
             }
             width += part.width;
         }
-        Ok(Self { width, ..first })
+        let merged = Self { width, ..first };
+        merged.validate()?;
+        Ok(merged)
     }
 }
 
