@@ -306,6 +306,13 @@ The first [#327 contact-batch experiment](material-contact-batch.md) adds a
 global pre-solve backend phase and verifies real planar split/duplicate contacts
 and shared capacity ordering. Its restricted test consumer is not the completed
 production loading adapter.
+The follow-up [canonical record stream](material-contact-records.md) supplies
+read-only pre-solve observations and explicit source episodes inside the engine;
+it does not yet spend material work or apply response.
+The [shared normal energy experiment](material-shared-energy.md) extends the
+compression budget to coupled contacts, with a versioned pulse-allocation
+approximation and checked direct response. Its fixtures close at default solver
+settings; general admission and production integration remain unfinished.
 
 ## Evidence
 

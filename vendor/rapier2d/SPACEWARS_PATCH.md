@@ -100,13 +100,29 @@ re-exported by `src/pipeline/mod.rs`. `physics_pipeline.rs` invokes it once per
 actual solver substep, after kinematic velocity interpolation and before island
 construction/velocity solving. The context reads the complete retained contact
 set and can set bounded restitution on an existing manifold through a private,
-generation-checked `NarrowPhase::contact_pair_mut` accessor. It cannot change
-contact topology or body state. Existing local contact modifiers run first;
+generation-checked `NarrowPhase::contact_pair_mut` accessor. Existing local contact modifiers run first;
 their tangent commands are preserved. The default does no work and introduces
 no persistent state or snapshot changes. External forces are not yet integrated
 at this phase. See `docs/design/material-contact-batch.md` and the real-contact
 regressions in `crates/engine-material/tests/contact_batch.rs` for scope and
 remaining adapter work.
+
+The shared-energy follow-up adds the 2D-only `ContactImpulse` and checked
+`SolverContactBatchContext::apply_contact_impulses` in
+`src/pipeline/normal_response.rs`. The context now holds the mutable body set
+privately and exposes read-only `bodies()`. The operation stages bounded velocity
+records, rejects the whole request on invalid/stale/duplicate targets or
+remaining approach, then applies paired normal impulses and wakes dynamic bodies.
+It admits only touching frictionless contacts without tangent drives. It clears
+targeted restitution and warmstarts, including tracked contact data, to avoid
+reapplying the old response; contact topology and solver constraints stay active.
+Default hook behavior, global solver settings and snapshot schemas are unchanged.
+Injected impulses are not reported as part of the subsequent solver force events.
+The host must retain its own work records and prove complete contact/constraint
+admission. `tests/shared_response.rs` covers actual default-solver energy,
+momentum, reversed insertion, moving supports, timestep changes, stale warmstarts
+and atomic rejection. See `docs/design/material-shared-energy.md` for the pulse
+allocation hypothesis and remaining production limits.
 
 These twelve Rust files and the diagnostic feature in `Cargo.toml` are the
 complete source/configuration differences from the published crate. See

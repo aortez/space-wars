@@ -5,6 +5,12 @@ and tests finite impact accounting on real, partitioned Rapier contacts. It
 builds on the [material law](material-damage.md). It is a foundation for #327,
 not the completed engine-facing loading adapter or a gameplay migration.
 
+The follow-up [engine contact records and episodes](material-contact-records.md)
+adds opt-in canonical capture, incarnation tokens, bounded episode tracking and
+serialized continuation. The [shared normal energy experiment](material-shared-energy.md)
+then tests coupled compression budgets, an explicit pulse-allocation
+approximation and checked paired impulses under default solver settings.
+
 ## Backend boundary
 
 Rapier's existing `modify_solver_contacts` callback runs independently for each
@@ -28,9 +34,10 @@ step, persistent backend state or snapshot field is introduced. Existing
 per-manifold tangent commands remain intact. External forces have **not** been
 integrated at this boundary; the adapter must account for those separately.
 
-The context exposes read-only contact/body/collider data and a checked
-restitution setter for an existing manifold. It cannot change contact topology,
-normals, body velocities or collision graph membership. Pair iteration order
+The original context exposes read-only contact/body/collider data and a checked
+restitution setter for an existing manifold. The follow-up also adds a checked
+paired normal-impulse operation, documented in the shared-energy note. It cannot
+change contact topology, normals or collision graph membership. Pair iteration order
 is unspecified. Raw handles are valid for this synchronous phase; they are not
 the stable event/material identities required by the eventual engine API.
 

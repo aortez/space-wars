@@ -18,6 +18,7 @@ mod ledger;
 mod material;
 mod reference;
 mod region;
+pub mod shared_impact;
 mod sustained;
 
 #[cfg(test)]

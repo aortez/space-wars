@@ -16,12 +16,13 @@ use na::ComplexField;
 /// have been interpolated. External forces have not yet been integrated.
 ///
 /// Pair traversal order is unspecified. Collect and order records using host
-/// identities before allocating shared budgets. This context only permits
-/// changing restitution: contact topology and graph membership stay intact.
+/// identities before allocating shared budgets. Contact topology and graph
+/// membership stay intact. A checked paired-impulse operation is available for
+/// explicitly admitted frictionless impacts; it does not disable constraints.
 #[cfg(feature = "alloc")]
 pub struct SolverContactBatchContext<'a> {
     /// Current body state, before this substep's velocity solve.
-    pub bodies: &'a RigidBodySet,
+    pub(crate) bodies: &'a mut RigidBodySet,
     /// Current collider state.
     pub colliders: &'a ColliderSet,
     /// Duration of this solver substep, not necessarily the full outer step.
@@ -31,6 +32,10 @@ pub struct SolverContactBatchContext<'a> {
 
 #[cfg(feature = "alloc")]
 impl SolverContactBatchContext<'_> {
+    /// Read-only body view. Response mutations go through checked operations.
+    pub fn bodies(&self) -> &RigidBodySet {
+        self.bodies
+    }
     /// All retained pairs, including empty, sleeping and speculative contacts.
     /// The caller must distinguish these from new physical impacts.
     pub fn contact_pairs(&self) -> impl Iterator<Item = &ContactPair> {
@@ -63,6 +68,12 @@ impl SolverContactBatchContext<'_> {
         true
     }
 }
+
+#[cfg(all(feature = "alloc", feature = "dim2"))]
+#[path = "normal_response.rs"]
+mod normal_response;
+#[cfg(all(feature = "alloc", feature = "dim2"))]
+pub use normal_response::ContactImpulse;
 
 /// Context given to custom collision filters to filter-out collisions.
 #[cfg(feature = "alloc")]

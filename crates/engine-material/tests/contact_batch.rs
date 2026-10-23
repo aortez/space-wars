@@ -66,7 +66,8 @@ impl PhysicsHooks for PlanarLaw {
                 continue;
             }
             let colliders = [pair.collider1, pair.collider2];
-            let bodies = colliders.map(|h| &context.bodies[context.colliders[h].parent().unwrap()]);
+            let bodies =
+                colliders.map(|h| &context.bodies()[context.colliders[h].parent().unwrap()]);
             let striker_side = usize::from(bodies[0].user_data != 1);
             let support_side = 1 - striker_side;
             assert_eq!(bodies[striker_side].user_data, 1);
@@ -520,7 +521,7 @@ impl PhysicsHooks for BatchProbe {
         // Velocity-based supports expose the prescribed velocity even during
         // CCD. Position-based interpolation is checked separately below.
         let support = context
-            .bodies
+            .bodies()
             .iter()
             .find(|(_, b)| b.user_data == 2)
             .unwrap()
