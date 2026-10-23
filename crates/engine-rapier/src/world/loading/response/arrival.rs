@@ -184,10 +184,7 @@ impl PhysicsWorld {
         let loading = self.loading.as_ref().unwrap();
         let mut sources = pair.sources;
         sources.sort();
-        if gap <= 1.0e-6
-            && approach > f64::from(loading.config.min_approach_speed)
-            && loading.episodes.contains_key(&sources)
-        {
+        if gap <= 1.0e-6 && approach > 0.0 && loading.episodes.contains_key(&sources) {
             return Err(R::ExistingApproach);
         }
         let a = v[0] * v[0] + v[1] * v[1];
@@ -276,9 +273,9 @@ impl PhysicsWorld {
         }) {
             return Err(R::NumericalArrival);
         }
-        // A predicted hit with remaining time must actually produce a material
-        // response; numerical drift or stale episode ownership cannot hide it.
-        if toi.is_some()
+        // Every approach reaching contact needs accounting, including one that
+        // starts touching below capture's configurable Impact speed threshold.
+        if (toi.is_some() || (gap <= 1.0e-6 && approach > 0.0))
             && flight < dt
             && staged.material_response_diagnostics().applied_batches == 0
         {

@@ -96,8 +96,20 @@ At the pre-solve callback:
    charges to a shared region. Resolve excess as blocking failure dissipation.
 5. Prepare all output records and paired impulses. Derive a common rebound
    coefficient per coupled component from its recoverable energy.
-6. Ask the backend to apply the complete response. Only after acceptance commit
+6. Ask the backend to stage the complete response and validate its rounded
+   velocities against the material energy budget. Only after acceptance commit
    staged balances and publish the successful response batch.
+
+The backend's checked application callback runs before changing velocities,
+wake state, restitution or warmstarts. The adapter verifies kinetic-energy loss
+plus signed prescribed work against available minus recoverable energy, within
+`1e-5` of the available budget. Each connected body set is checked separately;
+normal-mode components sharing a body are combined to avoid counting that
+body's energy twice. Computation uses f64 and a local translation frame, preferring
+a prescribed support's velocity, otherwise the first canonical body's incoming
+velocity. Common transport energy does not enlarge the tolerance. Unrepresentable
+f32 responses report `Backend` before any material or backend commit; ordinary
+stepping retains its documented physics-only fallback.
 
 The backend operation leaves ordinary constraints enabled and clears the
 targeted restitution/warmstarts. The pre-applied impulse is not included in

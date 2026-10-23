@@ -11,6 +11,83 @@ fn locked_scene(parts: u16, reverse: bool, shift: f32) -> (PhysicsWorld, Vec<Reg
 }
 
 #[test]
+fn touching_subthreshold_approaches_require_accounting() {
+    for speed in [0.00005, 0.0001] {
+        let (mut world, tokens) = locked_scene(1, false, 0.0);
+        let h = world.collider_handle(collider(1, 0)).unwrap();
+        world.raw.colliders[h].set_mass(1.0e12);
+        world.refresh_mass_properties(body(1));
+        world.set_velocity(body(1), Vec2::X * speed, 0.0, true);
+        let before = world.snapshot_bytes().unwrap();
+        let capacities = balances(&world, &tokens);
+        let initial = energy(&world, 0.0);
+        assert!(initial > 1200.0);
+        assert_eq!(
+            world.step_material_ball_arrivals(DT).unwrap_err(),
+            ArrivalRejection::NumericalArrival
+        );
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+        assert_eq!(balances(&world, &tokens), capacities);
+        assert!(world.material_response_batches().is_empty());
+        assert!(world.loading_batches().is_empty());
+
+        // The same physical motion is representable when capture admits it.
+        world.loading.as_mut().unwrap().config.min_approach_speed = 0.0;
+        world.step_material_ball_arrivals(DT).unwrap();
+        assert_ne!(balances(&world, &tokens), capacities);
+        assert!((initial - energy(&world, 0.0) - loss(applied(&world))).abs() < 1.0e-5 * initial);
+    }
+    // Rest and separation need no new impact; a later subthreshold kick into
+    // the retained support episode must refuse rather than spend solver work.
+    for speed in [0.0, -0.00005] {
+        let (mut world, _) = locked_scene(1, false, 0.0);
+        world.set_velocity(body(1), Vec2::X * speed, 0.0, true);
+        world.step_material_ball_arrivals(DT).unwrap();
+        assert_eq!(world.material_response_diagnostics().applied_batches, 0);
+        world.set_pose(body(1), Vec2::ZERO, 0.0, true);
+        world.set_velocity(body(1), Vec2::X * 0.00005, 0.0, true);
+        let before = world.snapshot_bytes().unwrap();
+        let outputs = world.loading_batches().to_vec();
+        assert_eq!(
+            world.step_material_ball_arrivals(DT).unwrap_err(),
+            ArrivalRejection::ExistingApproach
+        );
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+        assert_eq!(world.loading_batches(), outputs);
+    }
+}
+
+#[test]
+fn unrepresentable_rebound_refuses_before_material_commit() {
+    for shift in [-1_000_000.0, 1_000_000.0] {
+        for parts in [1, 2, 4] {
+            let (mut world, tokens) = locked_scene(parts, false, shift);
+            world.set_velocity(body(1), Vec2::X * (shift + 0.25), 0.0, true);
+            let before = world.snapshot_bytes().unwrap();
+            let capacities = balances(&world, &tokens);
+            assert_eq!(
+                world.step_material_ball_arrivals(DT).unwrap_err(),
+                ArrivalRejection::Response(ResponseRejection::Backend)
+            );
+            assert_eq!(world.snapshot_bytes().unwrap(), before);
+            assert_eq!(balances(&world, &tokens), capacities);
+            assert!(world.material_response_batches().is_empty());
+            assert!(world.loading_batches().is_empty());
+
+            // Ordinary stepping also refuses material accounting, while its
+            // documented physics-only fallback remains the caller's choice.
+            world.step(DT);
+            assert_eq!(
+                world.material_response_diagnostics().last_rejection,
+                Some(ResponseRejection::Backend)
+            );
+            assert_eq!(world.material_response_diagnostics().applied_batches, 0);
+            assert_eq!(balances(&world, &tokens), capacities);
+        }
+    }
+}
+
+#[test]
 fn native_arrivals_preserve_work_capture_time_and_replay() {
     for hz in [30.0, 60.0, 120.0, 240.0] {
         for (speed, gap) in [(0.25, 0.001), (40.0, 0.01), (400.0, 2.0), (120.0, 1.0)] {

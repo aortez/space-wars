@@ -131,6 +131,15 @@ rebound on moving supports. Limits, atomic rejection, contact tolerances and
 warmstart clearing are unchanged. The native arrival regressions compare exact
 velocities across one/two/four representations without loosening energy checks.
 
+`apply_contact_impulses_checked` additionally lets the host validate the final
+rounded dynamic-body velocities against its work budget before any velocity,
+wake state or contact-cache mutation. A false validation result is atomic.
+The native material adapter uses this callback to reject numerically
+unrepresentable energy responses. The original `apply_contact_impulses` remains
+the low-level operation without host energy validation; its caller owns that
+accounting. Shared-response tests serialize bodies and contacts around a host
+veto, and native regressions cover low relative speeds at large common velocity.
+
 These twelve Rust files and the diagnostic feature in `Cargo.toml` are the
 complete source/configuration differences from the published crate. See
 `docs/picade-late-match-physics.md` for the retained inputs and qualification.

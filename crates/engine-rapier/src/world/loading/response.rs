@@ -6,7 +6,9 @@ use engine_material::{ContactGeometry, Material, Outcome, Region, Section, share
 use rapier2d::prelude::{ContactImpulse, SolverFlags};
 
 pub mod arrival;
+mod energy;
 mod geometry;
+use energy::EnergyCheck;
 use geometry::Footprint;
 
 pub const MAX_RESPONSE_BATCHES: usize = 16;
@@ -142,6 +144,7 @@ struct PreparedResponse {
     output: AppliedResponse,
     materials: BTreeMap<RegionToken, Region>,
     impulses: Vec<ContactImpulse>,
+    energy_checks: Vec<EnergyCheck>,
 }
 
 impl ResponseState {
@@ -209,7 +212,12 @@ impl ResponseState {
         substep: usize,
         prepared: PreparedResponse,
     ) {
-        if !context.apply_contact_impulses(&prepared.impulses) {
+        if !context.apply_contact_impulses_checked(&prepared.impulses, |bodies, velocities| {
+            prepared
+                .energy_checks
+                .iter()
+                .all(|check| check.accepts(bodies, velocities))
+        }) {
             self.reject(substep, ResponseRejection::Backend);
             return;
         }
@@ -492,7 +500,7 @@ impl ResponseState {
             });
         }
         let mut coefficients = Vec::new();
-        for (component, recovered) in budget.components.iter().zip(recoverable) {
+        for (component, &recovered) in budget.components.iter().zip(&recoverable) {
             if recovered > component.available * (1.0 + 1.0e-6) {
                 return Err(R::Material);
             }
@@ -527,7 +535,16 @@ impl ResponseState {
             .filter(|e| e.transition == EpisodeTransition::Impact)
             .map(|e| e.id)
             .collect();
+        let energy_checks = EnergyCheck::prepare(
+            &ordered_bodies.iter().map(|(_, h)| *h).collect::<Vec<_>>(),
+            &motions,
+            &contacts,
+            &budget,
+            &recoverable,
+            &coefficients,
+        );
         Ok(PreparedResponse {
+            energy_checks,
             output: AppliedResponse {
                 law: engine_material::LAW_VERSION,
                 allocation: shared_impact::PULSE_MODEL_VERSION,

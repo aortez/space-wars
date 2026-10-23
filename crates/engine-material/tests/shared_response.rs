@@ -238,6 +238,25 @@ fn assert_rejections_are_atomic(
         serde_json::to_vec(&(c.bodies(), c.contact_pairs().collect::<Vec<_>>())).unwrap()
     };
     let before = snapshot(context);
+    let mut validated = false;
+    assert!(
+        !context.apply_contact_impulses_checked(requests, |bodies, staged| {
+            validated = true;
+            assert!(!staged.is_empty());
+            assert!(
+                staged.iter().any(
+                    |(h, v)| v.linvel != bodies[*h].linvel() || v.angvel != bodies[*h].angvel()
+                )
+            );
+            false
+        })
+    );
+    assert!(validated);
+    assert_eq!(
+        snapshot(context),
+        before,
+        "host veto mutated bodies or contact caches"
+    );
     let mut invalid = Vec::new();
     for impulse in [f32::NAN, f32::INFINITY, -1.0] {
         let mut batch = requests.to_vec();

@@ -1,7 +1,7 @@
 //! Checked, transient paired normal impulses for the batch hook (2D).
 use super::SolverContactBatchContext;
 use crate::alloc_prelude::*;
-use crate::dynamics::{RigidBodyHandle, RigidBodyVelocity};
+use crate::dynamics::{RigidBodyHandle, RigidBodySet, RigidBodyVelocity};
 use crate::geometry::{ColliderHandle, SolverFlags};
 use crate::math::Real;
 
@@ -33,6 +33,20 @@ impl SolverContactBatchContext<'_> {
     /// Injected impulses are not included in Rapier's subsequent force-event
     /// impulse totals: hosts must retain their own response records.
     pub fn apply_contact_impulses(&mut self, requests: &[ContactImpulse]) -> bool {
+        self.apply_contact_impulses_checked(requests, |_, _| true)
+    }
+
+    /// Apply impulses only if the host accepts the final, rounded velocities.
+    /// The validator sees immutable original bodies and all staged dynamic-body
+    /// velocities, after backend checks and before any velocity, wake state or
+    /// contact cache changes. Returning false leaves all backend state intact.
+    /// Use this to verify the host's work budget in a suitable inertial frame;
+    /// finite separating velocities alone do not establish energy accounting.
+    pub fn apply_contact_impulses_checked(
+        &mut self,
+        requests: &[ContactImpulse],
+        validate: impl FnOnce(&RigidBodySet, &[(RigidBodyHandle, RigidBodyVelocity<Real>)]) -> bool,
+    ) -> bool {
         if requests.len() > 256 {
             return false;
         }
@@ -158,6 +172,9 @@ impl SolverContactBatchContext<'_> {
             if !approach.is_finite() || approach > 1.0e-4 {
                 return false;
             }
+        }
+        if !validate(self.bodies, &staged) {
+            return false;
         }
         for (handle, velocity) in staged {
             self.bodies[handle].set_vels(velocity, true);

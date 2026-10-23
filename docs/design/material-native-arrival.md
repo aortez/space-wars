@@ -36,6 +36,13 @@ arrival times and invalid final geometry refuse explicitly. A new approaching
 kick into an already-spent touching episode is `ExistingApproach`; ordinary
 separation grace must rearm that episode first.
 
+Every positive approach that starts touching must produce an accepted material
+response, even below capture's `min_approach_speed`. If that threshold classifies
+the contact as support and no response applies, the operation returns
+`NumericalArrival` and rolls back. A low speed is not proof of negligible energy:
+a sufficiently massive body can carry substantial work. Resting and separating
+touching pairs do not require a new impact response.
+
 ## Stepping and transaction
 
 The operation uses at most two Rapier advances. Analytic relative ball motion
@@ -97,6 +104,13 @@ was split over duplicate contacts on a moving support. The checked backend
 impulse operation now accumulates each body's response in f64 and rounds once
 before validating and committing it. One/two/four representations produce the
 same final velocity, and the existing energy tolerance remains unchanged.
+
+The native response also validates the rounded velocities against its energy
+budget before backend or material commit. A mass-20 impact at relative speed
+0.25 on a support translating at 1,000,000 cannot represent the required rebound
+accurately in f32. It now returns `Response(Backend)` with the original world
+unchanged. Tests cover both transport directions and one/two/four duplicates,
+plus massive subthreshold touching impacts and host-validation veto atomicity.
 
 ```sh
 RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib native_arrival
