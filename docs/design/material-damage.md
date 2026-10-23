@@ -313,6 +313,10 @@ The [shared normal energy experiment](material-shared-energy.md) extends the
 compression budget to coupled contacts, with a versioned pulse-allocation
 approximation and checked direct response. Its fixtures close at default solver
 settings; general admission and production integration remain unfinished.
+The opt-in [native adapter](material-native-response.md) now applies that response
+and persists capacity for restricted complete ball and rotation-locked flat-face
+contact batches. It explicitly refuses unsupported loading; scenarios continue
+to use their existing paths.
 
 ## Evidence
 

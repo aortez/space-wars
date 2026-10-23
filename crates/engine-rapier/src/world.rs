@@ -45,6 +45,7 @@ pub use surface_drive::SurfaceDrive;
 
 const SNAPSHOT_VERSION: u32 = 1;
 const LOADING_SNAPSHOT_VERSION: u32 = 2;
+const RESPONSE_SNAPSHOT_VERSION: u32 = 3;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -1293,6 +1294,9 @@ impl PhysicsWorld {
         let hooks = loading::Hooks {
             drives: surface_drive::DriveHooks(drives),
             loading: self.loading.as_mut().map(Mutex::new),
+            external_constraints: self.raw.gravity != Vector::ZERO
+                || !self.raw.impulse_joints.is_empty()
+                || self.raw.multibody_joints.iter().next().is_some(),
         };
         let restored_hooks =
             hooks
@@ -2149,7 +2153,9 @@ impl PhysicsWorld {
     /// Serialize authoritative Rapier state and all stable handle mappings.
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, PhysicsWorldError> {
         let mut bytes = bincode::serialize(&PhysicsSnapshotRef {
-            version: if self.loading.is_some() {
+            version: if self.loading.as_ref().is_some_and(|s| s.response_enabled()) {
+                RESPONSE_SNAPSHOT_VERSION
+            } else if self.loading.is_some() {
                 LOADING_SNAPSHOT_VERSION
             } else {
                 SNAPSHOT_VERSION
@@ -2174,6 +2180,7 @@ impl PhysicsWorld {
         if let Some(loading) = &self.loading {
             bincode::serialize_into(&mut bytes, loading)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            loading.serialize_response(&mut bytes)?;
         }
         Ok(bytes)
     }
@@ -2182,20 +2189,33 @@ impl PhysicsWorld {
         let mut reader = std::io::Cursor::new(bytes);
         let mut snapshot: PhysicsSnapshot = bincode::deserialize_from(&mut reader)
             .map_err(|error| PhysicsWorldError(error.to_string()))?;
-        if ![SNAPSHOT_VERSION, LOADING_SNAPSHOT_VERSION].contains(&snapshot.version) {
+        if ![
+            SNAPSHOT_VERSION,
+            LOADING_SNAPSHOT_VERSION,
+            RESPONSE_SNAPSHOT_VERSION,
+        ]
+        .contains(&snapshot.version)
+        {
             return Err(PhysicsWorldError(format!(
                 "unsupported physics snapshot version {}",
                 snapshot.version
             )));
         }
-        let loading = if snapshot.version == LOADING_SNAPSHOT_VERSION {
-            Some(
-                bincode::deserialize_from(&mut reader)
-                    .map_err(|error| PhysicsWorldError(error.to_string()))?,
-            )
-        } else {
-            None
-        };
+        let mut loading: Option<loading::LoadingState> =
+            if snapshot.version >= LOADING_SNAPSHOT_VERSION {
+                Some(
+                    bincode::deserialize_from(&mut reader)
+                        .map_err(|error| PhysicsWorldError(error.to_string()))?,
+                )
+            } else {
+                None
+            };
+        if snapshot.version == RESPONSE_SNAPSHOT_VERSION {
+            loading
+                .as_mut()
+                .unwrap()
+                .deserialize_response(&mut reader)?;
+        }
         if reader.position() != bytes.len() as u64 {
             return Err(PhysicsWorldError("trailing physics snapshot data".into()));
         }

@@ -1,9 +1,11 @@
-//! Opt-in, read-only pre-solve contact capture. No material work or solver
-//! response is applied here. Sources are host-declared physical surface patches;
+//! Opt-in pre-solve contact capture, with a separately enabled experimental
+//! material response. Capture alone is read-only. Sources are physical surface patches;
 //! independent patches must have different source IDs even on the same region.
 
 use super::*;
 use rapier2d::prelude::{ContactModificationContext, PhysicsHooks, SolverContactBatchContext};
+
+pub mod response;
 
 /// A logical material region, independent of collider partitioning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -171,6 +173,9 @@ pub enum LoadingError {
     InvalidBinding,
     Capacity,
     IdentityExhausted,
+    ResponseDisabled,
+    MaterialExists,
+    InvalidMaterial,
 }
 
 impl std::fmt::Display for LoadingError {
@@ -212,6 +217,9 @@ pub(super) struct LoadingState {
     diagnostics: CaptureDiagnostics,
     #[serde(skip)]
     records: usize,
+    // Stored separately in snapshot v3, keeping the capture-only v2 layout.
+    #[serde(skip)]
+    response: Option<response::ResponseState>,
 }
 
 impl LoadingState {
@@ -226,6 +234,7 @@ impl LoadingState {
             batches: Vec::new(),
             diagnostics: CaptureDiagnostics::default(),
             records: 0,
+            response: None,
         }
     }
 
@@ -233,6 +242,9 @@ impl LoadingState {
         self.batches.clear();
         self.diagnostics = CaptureDiagnostics::default();
         self.records = 0;
+        if let Some(response) = &mut self.response {
+            response.begin_step();
+        }
     }
 
     pub(super) fn unbind(&mut self, collider: ColliderId) {
@@ -262,6 +274,9 @@ impl LoadingState {
             return false;
         }
         self.regions.remove(&token.id);
+        if let Some(response) = &mut self.response {
+            response.retire(token);
+        }
         self.bindings.retain(|_, source| source.region != token);
         self.episodes
             .retain(|sources, _| sources.iter().all(|s| s.region != token));
@@ -270,6 +285,7 @@ impl LoadingState {
 
     pub(super) fn valid_for(&self, world: &PhysicsWorld) -> bool {
         self.config.valid()
+            && self.response.as_ref().is_none_or(|r| r.valid_for(self))
             && self.next_region > 0
             && self.next_episode > 0
             && self.regions.len() <= self.config.max_regions
@@ -298,7 +314,7 @@ impl LoadingState {
             })
     }
 
-    fn capture(&mut self, context: &SolverContactBatchContext<'_>) {
+    fn capture(&mut self, context: &mut SolverContactBatchContext<'_>, external_constraints: bool) {
         let substep = self.diagnostics.batches_seen;
         self.diagnostics.batches_seen = substep.saturating_add(1);
         let result = if substep >= self.config.max_batches_per_step {
@@ -316,11 +332,18 @@ impl LoadingState {
                 self.episodes = episodes;
                 self.next_episode = next_episode;
                 self.batches.push(batch);
+                if let Some(mut response) = self.response.take() {
+                    response.respond(context, self, external_constraints);
+                    self.response = Some(response);
+                }
             }
             Err(reason) => {
                 self.diagnostics.rejected_batches =
                     self.diagnostics.rejected_batches.saturating_add(1);
                 self.diagnostics.last_rejection = Some(reason);
+                if let Some(response) = &mut self.response {
+                    response.reject(substep, response::ResponseRejection::Capture(reason));
+                }
             }
         }
     }
@@ -536,6 +559,7 @@ fn finite_record(r: &ContactRecord) -> bool {
 pub(super) struct Hooks<'a> {
     pub drives: surface_drive::DriveHooks<'a>,
     pub loading: Option<Mutex<&'a mut LoadingState>>,
+    pub external_constraints: bool,
 }
 
 impl PhysicsHooks for Hooks<'_> {
@@ -547,7 +571,7 @@ impl PhysicsHooks for Hooks<'_> {
             state
                 .lock()
                 .unwrap_or_else(|p| p.into_inner())
-                .capture(context);
+                .capture(context, self.external_constraints);
         }
     }
 }

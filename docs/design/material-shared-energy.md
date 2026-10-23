@@ -3,8 +3,9 @@
 `engine_material::shared_impact` computes a bounded, frictionless compression
 projection for a complete set of touching contacts. It extends the earlier
 [planar experiment](material-contact-batch.md) to differing normals, rotation
-and dynamic supports. It is experimental arithmetic, with no scenario consumer
-and no connection to the [engine contact stream](material-contact-records.md).
+and dynamic supports. It is experimental arithmetic, now connected to the
+[engine contact stream](material-contact-records.md) through a restricted,
+opt-in [native adapter](material-native-response.md). No scenario enables it yet.
 
 The initial-work split and restitution-only response remain as comparison
 models with explicit counterexamples. The follow-up adds a versioned elastic
@@ -209,12 +210,12 @@ experiment has no persistent region mutations outside its test fixtures.
 
 ## Next integration boundary
 
-The next step is a bounded opt-in adapter that joins canonical records, physical
-patch aggregation, episode ownership, staged material changes and the checked
-response. It needs explicit admission for complete contact sets and a defined
-fallback when a set is unsupported or refused. The fixture's one-shot latch is
-not a production episode policy. Pulse-allocation calibration and admission of
-friction, joints, penetration correction and external work remain open.
+The [native adapter](material-native-response.md) now joins canonical records,
+duplicate ball patches, unioned rotation-locked face intervals, episode ownership,
+staged material changes and checked response. It defines explicit refusal and
+ordinary-physics fallback.
+General footprint aggregation, pulse-allocation calibration and admission of
+friction, joints, CCD arrivals, penetration correction and external work remain open.
 
 Patch geometry/admission, sustained and connection loads, other external work,
 soft queries and failure consequences remain unfinished #327/#328 work. This

@@ -2,8 +2,9 @@
 
 `engine_rapier::world::loading` turns the
 [pre-solve batch hook](material-contact-batch.md) into an opt-in, engine-owned
-record stream. It captures motion and tracks contact episodes; it does not yet
-allocate material work, change restitution or apply failure consequences.
+record stream. Capture alone records motion and tracks episodes without changing
+physics. The separately enabled [native response adapter](material-native-response.md)
+now connects restricted admitted impacts to material balances and paired impulses.
 
 This keeps the physical observation and lifecycle contracts testable before
 adding generalized shared-energy accounting. Existing scenarios continue to
@@ -163,8 +164,10 @@ The [shared normal energy experiment](material-shared-energy.md) tests coupled
 compression beyond the earlier planar fixture: differing normals, angular
 motion and dynamic supports. A follow-up pulse allocation and checked direct
 response now close the restricted real-solver fixtures at default settings.
-The next integration must establish physical patch geometry, complete-contact
-admission, staged material changes and episode-owned response. The pulse split
-is an explicit approximation that still needs calibration.
+The [native response adapter](material-native-response.md) supplies a restricted
+first integration with explicit admission, duplicate ball contacts, unioned
+rotation-locked face intervals and staged material changes. General footprints
+and contact-set admission remain unfinished.
+The pulse split is an explicit approximation that still needs calibration.
 Sustained/connection loads, attributable external work, nonblocking soft queries
 and gameplay consequences remain separate unfinished parts of #327/#328.
