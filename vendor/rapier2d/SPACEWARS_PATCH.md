@@ -94,7 +94,21 @@ ground, impact, compound, snapshot and filtering regressions cover the remaining
 CCD paths. See `docs/pizza-reference-comparison.md` for measured work and replay
 equivalence; instrumentation timings are separate from uninstrumented runs.
 
-These ten Rust files and the diagnostic feature in `Cargo.toml` are the
+The #327 contact-batch experiment adds a default no-op
+`PhysicsHooks::modify_solver_contacts_batch` in `src/pipeline/physics_hooks.rs`,
+re-exported by `src/pipeline/mod.rs`. `physics_pipeline.rs` invokes it once per
+actual solver substep, after kinematic velocity interpolation and before island
+construction/velocity solving. The context reads the complete retained contact
+set and can set bounded restitution on an existing manifold through a private,
+generation-checked `NarrowPhase::contact_pair_mut` accessor. It cannot change
+contact topology or body state. Existing local contact modifiers run first;
+their tangent commands are preserved. The default does no work and introduces
+no persistent state or snapshot changes. External forces are not yet integrated
+at this phase. See `docs/design/material-contact-batch.md` and the real-contact
+regressions in `crates/engine-material/tests/contact_batch.rs` for scope and
+remaining adapter work.
+
+These twelve Rust files and the diagnostic feature in `Cargo.toml` are the
 complete source/configuration differences from the published crate. See
 `docs/picade-late-match-physics.md` for the retained inputs and qualification.
 

@@ -302,6 +302,11 @@ hook is not by itself a globally ordered event phase. Pause must add no work,
 and resting/speculative/chattering contacts must not mint fresh impact budgets.
 Failure consequences must be queued outside contact iteration.
 
+The first [#327 contact-batch experiment](material-contact-batch.md) adds a
+global pre-solve backend phase and verifies real planar split/duplicate contacts
+and shared capacity ordering. Its restricted test consumer is not the completed
+production loading adapter.
+
 ## Evidence
 
 The reference generator and drift test publish the exact configuration and

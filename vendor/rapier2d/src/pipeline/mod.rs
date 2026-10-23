@@ -9,7 +9,9 @@ pub use event_handler::ChannelEventCollector;
 pub use event_handler::EventHandler;
 pub use physics_hooks::ActiveHooks;
 #[cfg(feature = "alloc")]
-pub use physics_hooks::{ContactModificationContext, PairFilterContext, PhysicsHooks};
+pub use physics_hooks::{
+    ContactModificationContext, PairFilterContext, PhysicsHooks, SolverContactBatchContext,
+};
 #[cfg(feature = "alloc")]
 pub use physics_pipeline::PhysicsPipeline;
 #[cfg(feature = "alloc")]
