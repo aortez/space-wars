@@ -1,0 +1,835 @@
+{
+  "acceptance_decision": {
+    "basis": "Deterministic delayed-provider/conflict/deadline tests on the selected Pi, with source-tree and binary identity to the installed merge, plus successful installed radio/time/OTA cycles and measured CPU load.",
+    "live_deferral_branch_execution_claimed": false,
+    "live_stale_readback_observed": false,
+    "met": true,
+    "unattended_rollout_qualified": false
+  },
+  "deterministic_delay_tests": {
+    "binary": {
+      "max_glibc": "2.39",
+      "profile": "ci",
+      "stripped": {
+        "bytes": 13050144,
+        "sha256": "61413ebb30afedf242262b6793ae58c5cce3aea4c950010547ebeb5bf336c1eb"
+      },
+      "target": "aarch64-unknown-linux-gnu",
+      "unstripped_sha256": "73e2dd0a2779d9a628b42e6a174465bac0a53382e7ea85f49190ec1145894b94"
+    },
+    "binary_identical": true,
+    "load": {
+      "disk_busy_fraction": 0.996,
+      "seconds": 91.86,
+      "sectors_written": 138070,
+      "user_cpu_cores": 3.68
+    },
+    "note": "PR 519 head and its squash merge have the same tree; cargo produced the same test binary for both",
+    "passed": true,
+    "runs": {
+      "idle": [
+        {
+          "failed": 0,
+          "name": "idle-0",
+          "passed": 42,
+          "returncode": 0,
+          "test_seconds": 9.26,
+          "wall_seconds": 9.42
+        },
+        {
+          "failed": 0,
+          "name": "idle-1",
+          "passed": 42,
+          "returncode": 0,
+          "test_seconds": 9.35,
+          "wall_seconds": 9.52
+        },
+        {
+          "failed": 0,
+          "name": "idle-2",
+          "passed": 42,
+          "returncode": 0,
+          "test_seconds": 9.37,
+          "wall_seconds": 9.54
+        }
+      ],
+      "loaded": [
+        {
+          "failed": 0,
+          "name": "loaded-0",
+          "passed": 42,
+          "returncode": 0,
+          "test_seconds": 10.37,
+          "wall_seconds": 37.78
+        },
+        {
+          "failed": 0,
+          "name": "loaded-1",
+          "passed": 42,
+          "returncode": 0,
+          "test_seconds": 10.39,
+          "wall_seconds": 23.44
+        },
+        {
+          "failed": 0,
+          "name": "loaded-2",
+          "passed": 42,
+          "returncode": 0,
+          "test_seconds": 11.44,
+          "wall_seconds": 30.43
+        }
+      ]
+    },
+    "source_tree": "00bb88099ffd13b0dfaa85e1244895fe316bbe68",
+    "tested_commit": "f35f0eb0c504ac6a64bc74123cc178ac479020bd"
+  },
+  "final_state": {
+    "as_observed": "2026-10-22 after loaded-cycle collection",
+    "channel": "release",
+    "load_workers_gone": true,
+    "network_suspension": null,
+    "partial_offline": false,
+    "pending_radio_command": null,
+    "same_boot_and_game_process": true,
+    "service_healthy": true,
+    "transient_units_gone": true
+  },
+  "host": "sw-picade-2.local",
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 27046520,
+        "sha256": "b382ffd5086f9de72686e7487aaaea1402770e48654415428bb05dba38649477"
+      },
+      "os_manager": {
+        "bytes": 11276032,
+        "sha256": "115b33c5edb230139fef7cb2f35619bef3fb29c0c7ca32827fa6ee65ab88cd3f"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-6258f2d525ed113d13a8bf083e23990e8b882b3214dabbfa94298acd6b2d55e8",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "6258f2d525ed113d13a8bf083e23990e8b882b3214dabbfa94298acd6b2d55e8",
+    "schema": 1,
+    "source": {
+      "commit": "d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d",
+      "dirty": false,
+      "revision": "d7987f6e781d",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "issue_511_acceptance": [
+    {
+      "basis": "Same-source Pi private-bus/controller cases completed without repeating Set or extending the transition.",
+      "item": 1,
+      "met": true,
+      "requirement": "Delayed completion and duplicate old-value notifications",
+      "tests": [
+        "network_controller::tests::delayed_readback_completes_within_the_original_transition_without_another_write",
+        "network_observation::tests::continuous_monitor_keeps_a_delayed_transition_until_signal_and_readback_agree",
+        "network_observation::tests::coordinator_waits_for_a_delayed_readback_from_the_real_monitor"
+      ]
+    },
+    {
+      "basis": "Saved faults remained faults; no new monitor allowance was invented on restart.",
+      "item": 2,
+      "met": true,
+      "requirement": "Expiry, queued or late completion, and restart while pending",
+      "tests": [
+        "network_controller::tests::delayed_readback_expiry_remains_a_fault_after_late_completion_and_restart",
+        "network_controller::tests::restart_during_a_deferred_readback_does_not_reconstruct_its_allowance",
+        "network_observation::tests::continuous_monitor_judges_a_delayed_transition_at_its_original_deadline"
+      ]
+    },
+    {
+      "basis": "Manager/PID/profile/networking/hardware changes, conflicts, lost observations and wrong targets were rejected.",
+      "item": 3,
+      "met": true,
+      "requirement": "Unrelated witness changes and monitor conflicts",
+      "tests": [
+        "network_controller::tests::readback_deferral_never_accepts_witness_changes_or_monitor_conflicts"
+      ]
+    },
+    {
+      "basis": "Deterministic completion/expiry/unresolved cases passed. Installed fresh logins passed after restart and both cycles; repeated-login storage stalls remain #523.",
+      "item": 4,
+      "met": true,
+      "requirement": "Bounded SSH admission without repeated writes or implicit resume",
+      "tests": [
+        "network_controller::tests::ssh_admission_waits_for_delayed_restoration_and_failure_never_rewrites_or_resumes",
+        "network_observation::tests::coordinator_waits_for_a_delayed_readback_from_the_real_monitor"
+      ]
+    },
+    {
+      "basis": "Generation-8 installed normal and loaded cycles passed; exact-source delayed-provider tests passed on the same Pi. Live stale readback was not observed. Original worker identities and deadlines are retained.",
+      "item": 5,
+      "met": true,
+      "requirement": "Selected-Pi radio/time/OTA and delayed-provider/load evidence",
+      "tests": [
+        "network_controller::tests::delayed_readback_completes_within_the_original_transition_without_another_write",
+        "network_controller::tests::delayed_readback_expiry_remains_a_fault_after_late_completion_and_restart",
+        "network_controller::tests::restart_during_a_deferred_readback_does_not_reconstruct_its_allowance",
+        "network_controller::tests::readback_deferral_never_accepts_witness_changes_or_monitor_conflicts",
+        "network_controller::tests::ssh_admission_waits_for_delayed_restoration_and_failure_never_rewrites_or_resumes",
+        "network_observation::tests::continuous_monitor_keeps_a_delayed_transition_until_signal_and_readback_agree",
+        "network_observation::tests::continuous_monitor_judges_a_delayed_transition_at_its_original_deadline",
+        "network_observation::tests::coordinator_waits_for_a_delayed_readback_from_the_real_monitor"
+      ]
+    }
+  ],
+  "limits": [
+    "No stale readback or readback-pending state was observed in the installed service; delayed-readback behavior is established by the deterministic Pi fixtures.",
+    "CPU load covered wake, automatic Release check and return to idle; the initial radio-off phase was unloaded.",
+    "D-Bus timings start at Set dispatch and use wall-clock timestamps; the production deadline starts earlier and uses a monotonic clock.",
+    "The normal boot was an owner power cycle, not a controlled warm reboot; boot-to-health duration was not measured.",
+    "A manual sync-now request exercised the native time worker; the daily timer was not advanced.",
+    "An offline Nightly/Release channel round trip made Release due through the public API; no Nightly request ran during either cycle.",
+    "No new payload was downloaded or installed in the radio cycles, and automatic publishing/installation remain disabled.",
+    "No other Pi was accessed or qualified in these generation-8 installed runs."
+  ],
+  "loaded_cycle": {
+    "attempts": {
+      "time_check": {
+        "deadline_ms": 21184979,
+        "first_observed_seconds": 314,
+        "id": 10,
+        "last_observed_seconds": 320,
+        "started_ms": 21064979,
+        "trigger": "manual"
+      },
+      "update": {
+        "deadline_ms": 22865696,
+        "first_observed_seconds": 315,
+        "id": 32,
+        "last_observed_seconds": 322,
+        "started_ms": 21065696,
+        "trigger": "automatic"
+      }
+    },
+    "boot_id": "7098f609-0d93-4c2a-886a-c810e174b0e7",
+    "cpu": {
+      "busy_fraction": 0.9781,
+      "load_seconds": 31.5,
+      "measured_window_seconds": 28.63,
+      "peak_temperature_celsius": 79.367,
+      "wake_and_settle_inside_load": true,
+      "worker_count": 4,
+      "worker_fraction_of_total_cpu": 0.7574
+    },
+    "deterministic_delay_tests": {
+      "idle_runs": 3,
+      "loaded_runs": 3,
+      "passed": true,
+      "reference": "prior-delay-tests/provenance-verification.json",
+      "same_source_tree_and_test_binary_verified": true,
+      "tests_per_run": 42
+    },
+    "emergency_radio_enable": false,
+    "final_channel": "release",
+    "fresh_ssh_seconds": 0.44,
+    "host": "sw-picade-2.local",
+    "limits": [
+      "Release was made due by an offline Nightly/Release channel round trip through the public API.",
+      "Manual time-sync request exercised the actual time worker; the daily timer was not advanced.",
+      "Release returned no-candidate; no new payload was downloaded or installed during this cycle.",
+      "Qualifies only this Pi 4 unit; other units and unattended rollout remain outside this test.",
+      "Set-to-readback timing starts at D-Bus dispatch, after the production monitor prepared its original five-second deadline.",
+      "CPU load covered time wake, automatic Release check, and return to idle; the initial radio-off phase was unloaded.",
+      "Stale readback responses and controller deferral are reported separately; fast matching readbacks do not prove the deferral branch ran.",
+      "No stale readback or readback-pending state was observed in the installed service. This live run does not demonstrate that the deferral branch executed.",
+      "Recorded D-Bus timestamps are wall-clock timestamps; the production monitor enforces its deadline using a monotonic clock."
+    ],
+    "live_readback_pending_samples": 0,
+    "live_stale_readback_observed": false,
+    "load_workers_gone": true,
+    "loaded_cycle_passed": true,
+    "network_faults": [],
+    "network_profile_revisions_unchanged": true,
+    "original_attempts_and_deadlines_preserved": true,
+    "owner_resumes": 0,
+    "partial_offline": false,
+    "presented_frames_advanced": 56165,
+    "radio_transitions": [
+      {
+        "first_matching_readback_seconds": "0.137149",
+        "first_matching_signal_seconds": "0.034888",
+        "old_getall_replies_after_ack": 0,
+        "old_getall_reply_pairs": [],
+        "purpose": "time_wake_under_load",
+        "set_reply_seconds": "0.032002",
+        "set_sender": ":1.21223",
+        "set_serial": "80006",
+        "target_enabled": true
+      },
+      {
+        "first_matching_readback_seconds": "0.758337",
+        "first_matching_signal_seconds": "0.649791",
+        "old_getall_replies_after_ack": 0,
+        "old_getall_reply_pairs": [],
+        "purpose": "idle_under_load",
+        "set_reply_seconds": "0.650972",
+        "set_sender": ":1.21279",
+        "set_serial": "81546",
+        "target_enabled": false
+      },
+      {
+        "first_matching_readback_seconds": "0.135845",
+        "first_matching_signal_seconds": "0.035586",
+        "old_getall_replies_after_ack": 0,
+        "old_getall_reply_pairs": [],
+        "purpose": "cleanup",
+        "set_reply_seconds": "0.030174",
+        "set_sender": ":1.21311",
+        "set_serial": "82057",
+        "target_enabled": true
+      }
+    ],
+    "recovery_unchanged": true,
+    "repeated_radio_commands": false,
+    "same_kiosk": true,
+    "saved_data_unchanged": true,
+    "schema": 1,
+    "source": "d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d",
+    "temperature_after_celsius": 64.757,
+    "time_completion": "synchronized",
+    "transient_units_gone": true,
+    "update_completion": "no-candidate"
+  },
+  "logging_515": {
+    "ansi_or_blob_data": false,
+    "installed_refusal_lines_in_sshd_journal": 7,
+    "message_is_generic": true,
+    "passed": true,
+    "plain_namespace_warnings_verified": true,
+    "refusal_message": "SSH network protection is unavailable",
+    "specific_admission_reason_followup": 523
+  },
+  "model": "Raspberry Pi 4 Model B Rev 1.2",
+  "native_controls": {
+    "packaged_namespace_handoff": {
+      "cases": {
+        "invalid": {
+          "escape_codes": 0,
+          "journal_default_format_readable": true,
+          "passed": true,
+          "status_samples": 3,
+          "warning_visible_at_default": true
+        },
+        "missing": {
+          "escape_codes": 0,
+          "journal_default_format_readable": true,
+          "passed": true,
+          "status_samples": 3,
+          "warning_visible_at_default": true
+        },
+        "valid": {
+          "escape_codes": 0,
+          "journal_default_format_readable": true,
+          "passed": true,
+          "status_samples": 3,
+          "warning_visible_at_default": false
+        }
+      },
+      "executable": {
+        "bytes": 11276032,
+        "sha256": "115b33c5edb230139fef7cb2f35619bef3fb29c0c7ca32827fa6ee65ab88cd3f"
+      },
+      "host": "swadmin@sw-picade-2.local",
+      "issue_515_log_check": "Default journalctl output shows each handoff message as plain text; no blob data or escape codes",
+      "kiosk_frames": {
+        "after": 1242684,
+        "before": 1218483
+      },
+      "kiosk_instance_unchanged": true,
+      "passed": true,
+      "production_image_services_stores_unchanged": true,
+      "scope": "Actual packaged daemon startup and diagnostics with private data/run mounts and inaccessible production buses; no radio writes or install",
+      "source": "d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d"
+    },
+    "packaged_ssh_helper": {
+      "cases": 4,
+      "elapsed_seconds": 90.25,
+      "executable_sha256": "115b33c5edb230139fef7cb2f35619bef3fb29c0c7ca32827fa6ee65ab88cd3f",
+      "passed": true
+    },
+    "provider": {
+      "basis": "identical-binary",
+      "note": "NetworkManager is byte-identical to the generation-7 provider qualified in its isolated comparison",
+      "passed": true,
+      "provider": {
+        "bytes": 3546496,
+        "sha256": "1fe0567c304db390f2665a179fadb5d5b6fc3f484cfd899ed64037428303ca44"
+      },
+      "reference": {
+        "bytes": 377,
+        "path": "prior generation-7 native-provider/result.json (hash retained)",
+        "sha256": "cc00bdd34821ef5240293637d80fbf7eb87aa5c5f846aa335bc1d00ded7de72e"
+      }
+    }
+  },
+  "normal_boot": {
+    "automatic_check_started_ms": 8201,
+    "automatic_completion": "no-candidate",
+    "boot_fat_dirty_flag": true,
+    "boot_id": "7098f609-0d93-4c2a-886a-c810e174b0e7",
+    "booted": "2026-10-22T11:31:22-07:00",
+    "ext4_journal_recovery": false,
+    "host": "sw-picade-2.local",
+    "image_matches_candidate": true,
+    "kiosk_healthy": true,
+    "limits": [
+      "Owner power cycle, not a controlled warm reboot; time from power-on to health was not observed.",
+      "The previous boot journal after 2026-10-20 23:15 PDT is lost because the journal is kept in RAM (#521)."
+    ],
+    "network_manager_unchanged": true,
+    "partial_offline": false,
+    "passed": true,
+    "previous_boot_id": "08243c9f-d2bc-4385-8bc5-ce2e907e8b44",
+    "previous_boot_stopped_about": "2026-10-21T23:39:12-07:00 (systemd-timesyncd restored timestamp; saved every 60 s)",
+    "recovery_record_unchanged": true,
+    "reset_register": "0x00001000 (power-on reset)",
+    "service_healthy": true,
+    "slots": {
+      "actual": "b",
+      "default": "b",
+      "good": "b"
+    },
+    "stores": {
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_database_count": 1
+    },
+    "trigger": "Owner nightly power-off and daytime power-on; the planned controlled reboot was not run",
+    "tryboot": false
+  },
+  "normal_cycle": {
+    "attempts": {
+      "time_check": {
+        "deadline_ms": 19558826,
+        "first_observed_seconds": 308,
+        "id": 8,
+        "last_observed_seconds": 313,
+        "started_ms": 19438826,
+        "trigger": "manual"
+      },
+      "update": {
+        "deadline_ms": 21239357,
+        "first_observed_seconds": 308,
+        "id": 31,
+        "last_observed_seconds": 318,
+        "started_ms": 19439357,
+        "trigger": "automatic"
+      }
+    },
+    "boot_id": "7098f609-0d93-4c2a-886a-c810e174b0e7",
+    "emergency_radio_enable": false,
+    "faults": [],
+    "final_channel": "release",
+    "fresh_ssh_seconds": 0.515,
+    "host": "sw-picade-2.local",
+    "limits": [
+      "Release was made due by an offline Nightly/Release channel round trip through the public API.",
+      "Manual time-sync request exercised the actual time worker; the daily timer was not advanced.",
+      "Release returned no-candidate; no new payload was downloaded or installed during this cycle.",
+      "Qualifies only this Pi 4 unit; other units and unattended rollout remain outside this test.",
+      "Normal cycle had no observed readback-pending samples; delay and load qualification is recorded separately in deterministic_delay_tests and loaded_cycle."
+    ],
+    "network_profile_revisions_unchanged": true,
+    "nightly_attempts": 0,
+    "owner_resumes": 0,
+    "partial_offline": false,
+    "passed": true,
+    "presented_frames_advanced": 56583,
+    "quiet_period_correction": {
+      "configured_ms": 10000,
+      "initial_explanation_incorrect": "Two-minute quiet period",
+      "observed": "Initial automatic time sync completed around 4 seconds; radio was first observed off at 15 seconds. The post-handoff shutdown was first observed at 330 seconds after completion at 318 seconds.",
+      "source": "d7987f6e:crates/engine-os-manager/src/network_policy.rs:21"
+    },
+    "recovery_unchanged": true,
+    "release_check": "no-candidate",
+    "same_kiosk": true,
+    "saved_data_unchanged": true,
+    "schema": 1,
+    "scope": "Normal off/time-sync wake/automatic Release check/off cycle only",
+    "source": "d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d",
+    "timeline_seconds": {
+      "first_off": 15,
+      "manual_time_attempt_started": 308,
+      "release_no_candidate": 318,
+      "second_off": 330,
+      "settled": 336,
+      "time_synchronized": 313
+    },
+    "validation_notes": [
+      "The initial local analyzer rejected a Nightly sample during asynchronous selection back to Release. The validator was corrected to allow both offline selection phases while still requiring no active request and Wi-Fi off; the device run was not repeated."
+    ]
+  },
+  "private_evidence": {
+    "files": {
+      "canary/idle-cycle/analysis.json": {
+        "bytes": 2776,
+        "sha256": "5d24defa232d4fd83a87f743ed2aa4cb346d3d602c2f1d41486d5fffdd31a7b4"
+      },
+      "canary/idle-cycle/profile-analysis.json": {
+        "bytes": 2833,
+        "sha256": "314807d6f7096f5f9e962fcf367df9688b468c3508e79cae7b4ba360e727f87b"
+      },
+      "canary/idle-cycle/review.json": {
+        "bytes": 2617,
+        "sha256": "66dedb2c22705bcc7d2ed85aca9a2c46b5bbe71d4f0013afdf7894f4f73fc753"
+      },
+      "canary/idle-cycle/run/after.json": {
+        "bytes": 18003,
+        "sha256": "fd67a98b6b5d4062f4d06b6f6f52646716c5d9e9a6c9d0023cc992bd1fd53579"
+      },
+      "canary/idle-cycle/run/before.json": {
+        "bytes": 17930,
+        "sha256": "b46b3019c26ad298e80989703f198fe1ed930c649bb1df57ede517800af98c89"
+      },
+      "canary/idle-cycle/run/device-evidence.tar.gz": {
+        "bytes": 55638,
+        "sha256": "8c026978eabfac4b65cc101666fb65b7de507100538e972439d9216a3c7dff0a"
+      },
+      "canary/idle-cycle/run/device/cycle.sh": {
+        "bytes": 7807,
+        "sha256": "9c637f66b6b65e42638be05b99c8a3105b95c88e80c7c9601d86ab7bd66a3c43"
+      },
+      "canary/idle-cycle/run/device/journal.jsonl": {
+        "bytes": 278626,
+        "sha256": "2fe5c2b7a474f771355f6384500ffab27a3aee405fe3c9eb7469295599803e0c"
+      },
+      "canary/idle-cycle/run/device/observations.jsonl": {
+        "bytes": 678668,
+        "sha256": "718f3a42a77dd3dd7dae7f4bfa3699d02026153cf2b17c6bf3df70f35af608d1"
+      },
+      "canary/idle-cycle/run/device/radio-signals.log": {
+        "bytes": 25268,
+        "sha256": "9c31c1a4419085070087eea5e5f2e044899f3c98c6bf42369c84858db7a0540b"
+      },
+      "canary/idle-cycle/run/device/restore.log": {
+        "bytes": 1079,
+        "sha256": "40d8ec50815c1929b3a056bbb8a692e820314a5c8b88dad441fb49a0be6c564f"
+      },
+      "canary/idle-cycle/run/device/restore.sh": {
+        "bytes": 3879,
+        "sha256": "44ca6f2d3657957179ee90fe6b6969ee503376ca7427efa2302a304cf210a7cf"
+      },
+      "canary/idle-cycle/run/harness-journal.log": {
+        "bytes": 1100,
+        "sha256": "524ef16231806081973dd5628fe8c528355b1c040bf0f652cc2e06952b1a9d43"
+      },
+      "canary/idle-cycle/run/intent.json": {
+        "bytes": 1277,
+        "sha256": "404838578d7ca8d10759a4474a51d8f13660dc747c7c18d96765a8cbfad226c3"
+      },
+      "canary/idle-cycle/run/result.json": {
+        "bytes": 536,
+        "sha256": "c05769b0de36897d4a702df42b81af47ce7820ddb0f104cbbe6e641be840b5fc"
+      },
+      "canary/install/after.json": {
+        "bytes": 20162,
+        "sha256": "e58aad890dc074777f3f3798004f2a174d2aa57ab4b7f0aac69ccb31d4a0e8c6"
+      },
+      "canary/install/before.json": {
+        "bytes": 17802,
+        "sha256": "aadc0468e8fbad14bea5d7fa7d066b026140bb21444622bb79ba16da3e4e0de7"
+      },
+      "canary/install/normal-boot/after.json": {
+        "bytes": 17798,
+        "sha256": "d3bab849c0651ba3fa66753806f8fe28b4d8a4536acb86c062f25acf454481ce"
+      },
+      "canary/install/normal-boot/result.json": {
+        "bytes": 1299,
+        "sha256": "fe01cd6fea7ad911790bcf745444914a9064d85da73ec1ed9da3b10915b7ef8a"
+      },
+      "canary/install/result.json": {
+        "bytes": 4123,
+        "sha256": "d30cb82074add146f19cb3d7535fdde5b45f2ce3c7366ed5c152e69ee93e4fd0"
+      },
+      "canary/install/settings-after.toml": {
+        "bytes": 1888,
+        "sha256": "ef68a34eb106638d0f602d4e3e88e207f59147e8a7d82774fd3c40ae403cc413"
+      },
+      "canary/install/settings-before.toml": {
+        "bytes": 1829,
+        "sha256": "d358d0c47bf5195d1594e2f7a21404236119dc6c422ad6cad54a75d8665ff0f9"
+      },
+      "canary/load-cycle/analysis.json": {
+        "bytes": 2777,
+        "sha256": "8bd93a741e0f698c73c4c03729aee7bf0bff001bcaeecd776210a3e269ecd4ed"
+      },
+      "canary/load-cycle/load-analysis.json": {
+        "bytes": 2220,
+        "sha256": "35063bb7d39c01a0be25e07c433c84469450646c4af1a2f87267014288d83442"
+      },
+      "canary/load-cycle/prior-delay-tests/dryrun-f35f0eb_logs.tar.gz": {
+        "bytes": 1890,
+        "sha256": "b80548dc0f179083dd0f1f81ce5e5691e50bfee770013920e41336af988b12a3"
+      },
+      "canary/load-cycle/prior-delay-tests/dryrun-f35f0eb_result.json": {
+        "bytes": 4976,
+        "sha256": "9227788fb3c691ba49533e3fafeb9b0f77bb6af34faa60a6ab97618ad6976d47"
+      },
+      "canary/load-cycle/prior-delay-tests/provenance-verification.json": {
+        "bytes": 1157,
+        "sha256": "4503f8af0918a058be1f90eba39fd91abd70b6be09e74da9386514dccc3d47dc"
+      },
+      "canary/load-cycle/profile-analysis.json": {
+        "bytes": 2834,
+        "sha256": "91b114fb260b713af5ab925caabd90e0e7475e809bc639713f50d606e4cb4ce2"
+      },
+      "canary/load-cycle/review.json": {
+        "bytes": 4146,
+        "sha256": "1c0f4b40e74368ccf55efaffb0e17803bdd1e391f95a281dc46dd6e9d135dd4d"
+      },
+      "canary/load-cycle/run/after.json": {
+        "bytes": 18005,
+        "sha256": "a6565ea3d5112bee7eb695d2b2483513a386dd516f087f8657c755c8cdc61b89"
+      },
+      "canary/load-cycle/run/before.json": {
+        "bytes": 17998,
+        "sha256": "f3db8e6bd4ddde6e99a8627045d04cfb419b80be894697361b39294d467f4ed5"
+      },
+      "canary/load-cycle/run/cleanup-verification.txt": {
+        "bytes": 6,
+        "sha256": "65cd58d27476c98ce977c705c10fb3f6c12a51db8fe97f139ca2fe71e8fe7282"
+      },
+      "canary/load-cycle/run/device-evidence.tar.gz": {
+        "bytes": 98583,
+        "sha256": "c55a1af18a4827fd0bb4c1d2c7db740114e9b6445ff5fde0004d46d69c817055"
+      },
+      "canary/load-cycle/run/device/cycle.sh": {
+        "bytes": 9547,
+        "sha256": "b86d491860e8188be7d4715514ba96e5e7654dc6648c857566baa1cb58e554f9"
+      },
+      "canary/load-cycle/run/device/journal.jsonl": {
+        "bytes": 439246,
+        "sha256": "4694539f1e355ec4691999c5f2f90b9af5946aa6e51ced307eb3d67cd58ff299"
+      },
+      "canary/load-cycle/run/device/load-observations.jsonl": {
+        "bytes": 5272,
+        "sha256": "fc13580ba3bbdb5f7b92b64bcfe9f3322f259861cc1f1239f89e34abf1d88427"
+      },
+      "canary/load-cycle/run/device/load.sh": {
+        "bytes": 1481,
+        "sha256": "f46ae201e4f40331c798341b158c839fbb77da958ba8c4feb81a4f6f1be6a445"
+      },
+      "canary/load-cycle/run/device/observations.jsonl": {
+        "bytes": 663652,
+        "sha256": "f62599e45a2ed3543eaef20b159f6fd7e8a0d034950045bbf977eb5263e9ad9e"
+      },
+      "canary/load-cycle/run/device/radio-methods.log": {
+        "bytes": 755586,
+        "sha256": "0f2b9fa1594d20f537661fccfd2c087ecb48c0fc07ae206bc427798552423ff8"
+      },
+      "canary/load-cycle/run/device/radio-signals.log": {
+        "bytes": 25268,
+        "sha256": "a7cee05992745cc7b0867c07fed0b0c6352cbbfa8bf385b437bb651b9cc29f9e"
+      },
+      "canary/load-cycle/run/device/restore.log": {
+        "bytes": 1374,
+        "sha256": "c444c9fc508d96671892e8d9b47e46620684a1bd267a89e900c6a916bb1f410f"
+      },
+      "canary/load-cycle/run/device/restore.sh": {
+        "bytes": 4171,
+        "sha256": "d84ec811c6988cf3ba531be07baf933fbe7f25dc9764ff09cbb9c8e14962674e"
+      },
+      "canary/load-cycle/run/harness-journal.log": {
+        "bytes": 1961,
+        "sha256": "93323bf9f635a70b89dff54b1b85eb48311268d40c543ce945cadd2db7d61675"
+      },
+      "canary/load-cycle/run/intent.json": {
+        "bytes": 1389,
+        "sha256": "ff01cc452e00a7c6213616f595a886fa8bcfcb7a4c16e9ca54ee49e9bcbaf5a4"
+      },
+      "canary/load-cycle/run/result.json": {
+        "bytes": 535,
+        "sha256": "8cfad2fd01bff236e87d1c905330fc32e753bcf4f96ae636e4a90c14e13fefdf"
+      },
+      "canary/restart/after.json": {
+        "bytes": 17564,
+        "sha256": "c0bcb4d1f7f0e83ea4a99d527ef15e1801101cbb96dd61749319c4f5ca73c898"
+      },
+      "canary/restart/before.json": {
+        "bytes": 17798,
+        "sha256": "d2c2db21f10385896a6f7e9d8177e70dab8cdd8bd6a82325f4f027b812fada67"
+      },
+      "canary/restart/journal.json": {
+        "bytes": 595,
+        "sha256": "eb6950445c4bf4edf34500eea177cf057997ad81283ac930bc5eeb4c09f53f11"
+      },
+      "canary/restart/observations.json": {
+        "bytes": 39337,
+        "sha256": "824c20e2c3c37ed5b9195c44f7c292121ebcc4e2eb2f499e2ebde2af9e7d553d"
+      },
+      "canary/restart/result.json": {
+        "bytes": 719,
+        "sha256": "5760a2f5fc8d9afb80323a70fd2b287bed630ab6c62c069d72d189bf1e61fe19"
+      },
+      "canary/restart/runner.json": {
+        "bytes": 295,
+        "sha256": "2c846f7285ea9c8095c436c92a73a6da293835c559d8bd1143cf54ac4e3599a0"
+      },
+      "canary/ssh-515/journalctl-sshd-units.txt": {
+        "bytes": 2800,
+        "sha256": "ef32e782cadc5e68d885dd466ef03581027cf84f89ee0868d633ea1d456c9eba"
+      },
+      "candidate/qualification.json": {
+        "bytes": 4314,
+        "sha256": "af27fbd61ef121eed1b4c6e257c62e40b7557335445518bed926f45126be6510"
+      },
+      "closeout/pre-install-review.json": {
+        "bytes": 12808,
+        "sha256": "8eeb52409cc3e79a45524bba00c6f4342711559f19208b6223b604bc086fbf67"
+      },
+      "closeout/publication.json": {
+        "bytes": 881,
+        "sha256": "e9f602f9aad2662f8ebb3e32987f319b63447190c175720143fa233507e55778"
+      },
+      "closeout/ssh-lockout-findings.json": {
+        "bytes": 3318,
+        "sha256": "81b3572c632ec651a60ed2cf5f0bcd9f9f7b93416e8fe5554a71851647e9229f"
+      }
+    },
+    "raw_snapshots_settings_and_journals_published": false,
+    "root": "target/rfkill-qualification/d7987f6e (standalone checkout)"
+  },
+  "publication": {
+    "automatic_installation_enabled": false,
+    "channel": "nightly",
+    "current": {
+      "manifest_sha256": "633928fbfda68e2992a496cf3384367e933de7ab9fcde4fdc785aff5d335457f",
+      "timestamp": {
+        "bytes": 469,
+        "sha256": "5dde66b678c7313bcde548e9fabb8a88f79b16082aaaacccaedd6c2dd89aaa34"
+      },
+      "version": 9
+    },
+    "generation": 8,
+    "intent_sha256": "12eb34137fc59f7942c7edc4beae15a6fcb1666ef8b5a646812f2bc26af933c1",
+    "main_ci_admission_claimed": false,
+    "payload": {
+      "bytes": 133183584,
+      "sha256": "4a5234a6886120633bc0a2df82f56aa4bfad9eceef96462e90016f8b6de87cac"
+    },
+    "publication_scope": "Owner-supervised main candidate",
+    "publisher": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+    "release_id": 416212208,
+    "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+    "result": "published",
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "source": "d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d"
+  },
+  "quiet_period_ms": 10000,
+  "remaining": {
+    "262": "Protected publishing, metadata renewal and explicit Release promotion.",
+    "264/266": "Integrated owner-consented Install and restart flow and saved installation policy.",
+    "265": "Actual daily opportunity, new/resumed payload and SSH/gameplay performance.",
+    "267": "Other-device rollout, remaining interruption/failure/channel/mode matrix and unattended operation.",
+    "521": "Persistent bounded journal, including previous-boot evidence; this qualification used retained host/device captures.",
+    "523": "SSH admission/storage stalls under repeated fresh logins; these single fresh-login checks do not resolve that issue."
+  },
+  "reviewed": "2026-10-22",
+  "schema": 1,
+  "scope": "Supervised generation-8 qualification of #511/#519 and #515 on the selected second Picade only",
+  "service_restart": {
+    "boot_id": "7098f609-0d93-4c2a-886a-c810e174b0e7",
+    "daily_allowance_preserved": true,
+    "final_channel": "release",
+    "fresh_ssh": {
+      "passed": true,
+      "seconds": 0.603
+    },
+    "host": "sw-picade-2.local",
+    "kiosk_instance_unchanged": true,
+    "network_manager_unchanged": true,
+    "network_policy_unchanged": true,
+    "observed_seconds": 23.325,
+    "partial_offline": false,
+    "passed": true,
+    "presented_frames_advanced": 1366,
+    "ready_samples": 19,
+    "recovery_record_unchanged": true,
+    "restart_command_seconds": 0.075,
+    "source": "d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d",
+    "stores": {
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    },
+    "unavailable_samples": 1
+  },
+  "signed_install": {
+    "attempt": 1,
+    "attempts": [
+      {
+        "directory": "attempt-1-expired",
+        "result": "Install ran after the selection expired and was refused; nothing changed"
+      },
+      {
+        "directory": "attempt-2-expired",
+        "result": "Selection expired before the install ran"
+      },
+      {
+        "directory": "attempt-3-unstaged",
+        "result": "Inspect failed NotFound: the first Release check after staging (2026-10-19T10:08-07:00) cleared the hand-staged Nightly payload, as designed; a later inspect also needed a fresh NTP receipt"
+      },
+      {
+        "directory": ".",
+        "result": "Re-staged in canary/stage-2 (same bundle, candidate and payload), synced time, selected and installed; committed"
+      }
+    ],
+    "automatic_installation_enabled": false,
+    "build_id": "rootfs-6258f2d525ed113d13a8bf083e23990e8b882b3214dabbfa94298acd6b2d55e8",
+    "generation": 8,
+    "install_helper": {
+      "exit": 255,
+      "last_stages": [
+        "reading-back",
+        "prepared"
+      ],
+      "note": "The reboot closed the SSH session after prepared; no Error lines",
+      "stdout": ""
+    },
+    "monitor_seconds": {
+      "committed": 535,
+      "prepared": 447,
+      "promoting": 531,
+      "transaction_observed": 44,
+      "trial_observing": 475,
+      "unreachable": 451
+    },
+    "original_boot": "ced8b01e-3b43-4963-b590-6e576c949414",
+    "passed": true,
+    "payload": "4a5234a6886120633bc0a2df82f56aa4bfad9eceef96462e90016f8b6de87cac",
+    "preservation": {
+      "added_default_settings": [
+        "grass = true",
+        "[pizza] automatic_events = true",
+        "[pizza] live_ball_limit = 500"
+      ],
+      "all_bytes_unchanged": false,
+      "existing_metadata_unchanged": true,
+      "existing_settings_values_unchanged": true,
+      "other_selected_durable_bytes_unchanged": true,
+      "regenerated_local_gatt_database_count": 1
+    },
+    "selection_sha256": "ee8099983fce554c63731125343a1457632d01665ee8375dadbd6b8cd6ffb42a",
+    "slot": "b",
+    "source": "d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d",
+    "transaction": "77781eda179200675395af030afafd8cc37d15c6172e0791fc83df5d2192ae4e",
+    "trial_boot": "08243c9f-d2bc-4385-8bc5-ce2e907e8b44"
+  },
+  "source": "d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d"
+}
