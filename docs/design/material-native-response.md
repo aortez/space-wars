@@ -216,8 +216,13 @@ outside an explicitly admitted material path.
 The [timed ball-arrival experiment](material-timed-arrival.md) now demonstrates
 that sequence for an isolated pair: drift to physical contact without speculative
 braking, then use the existing native material response. It preserves incoming
-work and matches touching-reference damage across tested timesteps, but remains
-fixture-only pending complete-scene admission and event-lifetime integration.
+work and matches touching-reference damage across tested timesteps. The fixture
+remains independent evidence for the native follow-up.
+
+An explicit [native isolated-ball operation](material-native-arrival.md) now
+integrates that sequence with complete two-body admission, at most two advances,
+preserved capture time and whole-step rollback. This is a separate stepping API;
+ordinary CCD remains refused by the general response adapter.
 
 Next work is contact-set admission, especially CCD arrivals, then additional
 geometry and loading classes. Freely rotating faces, mixed curved/flat contact,

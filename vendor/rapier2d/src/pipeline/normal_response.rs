@@ -36,7 +36,7 @@ impl SolverContactBatchContext<'_> {
         if requests.len() > 256 {
             return false;
         }
-        let mut staged: Vec<(RigidBodyHandle, RigidBodyVelocity<Real>)> = Vec::new();
+        let mut accumulated: Vec<(RigidBodyHandle, [f64; 3])> = Vec::new();
         for (i, request) in requests.iter().enumerate() {
             if !request.impulse.is_finite()
                 || request.impulse < 0.0
@@ -94,23 +94,44 @@ impl SolverContactBatchContext<'_> {
                 if !body.is_dynamic() {
                     continue;
                 }
-                let index = match staged.iter().position(|(h, _)| *h == handle) {
+                let index = match accumulated.iter().position(|(h, _)| *h == handle) {
                     Some(index) => index,
                     None => {
-                        staged.push((handle, *body.vels()));
-                        staged.len() - 1
+                        accumulated.push((
+                            handle,
+                            [
+                                f64::from(body.linvel().x),
+                                f64::from(body.linvel().y),
+                                f64::from(body.angvel()),
+                            ],
+                        ));
+                        accumulated.len() - 1
                     }
                 };
-                let velocity = &mut staged[index].1;
-                let impulse = manifold.data.normal * (sign * request.impulse);
+                let velocity = &mut accumulated[index].1;
+                let impulse = [
+                    f64::from(manifold.data.normal.x) * sign * f64::from(request.impulse),
+                    f64::from(manifold.data.normal.y) * sign * f64::from(request.impulse),
+                ];
                 let arm = contact.point - body.center_of_mass();
-                velocity.linvel += impulse * body.mass_properties().effective_inv_mass;
-                velocity.angvel += (arm.x * impulse.y - arm.y * impulse.x)
-                    * body.mass_properties().effective_world_inv_inertia;
-                if !velocity.linvel.is_finite() || !velocity.angvel.is_finite() {
-                    return false;
-                }
+                velocity[0] += impulse[0] * f64::from(body.mass_properties().effective_inv_mass.x);
+                velocity[1] += impulse[1] * f64::from(body.mass_properties().effective_inv_mass.y);
+                velocity[2] += (f64::from(arm.x) * impulse[1] - f64::from(arm.y) * impulse[0])
+                    * f64::from(body.mass_properties().effective_world_inv_inertia);
             }
+        }
+        // Round once per body. Repeated f32 updates let duplicate collider
+        // representations change low-energy response on fast moving supports.
+        let mut staged: Vec<(RigidBodyHandle, RigidBodyVelocity<Real>)> = Vec::new();
+        for (handle, v) in accumulated {
+            let velocity: RigidBodyVelocity<Real> = RigidBodyVelocity {
+                linvel: crate::math::Vector::new(v[0] as Real, v[1] as Real),
+                angvel: v[2] as Real,
+            };
+            if !velocity.linvel.is_finite() || !velocity.angvel.is_finite() {
+                return false;
+            }
+            staged.push((handle, velocity));
         }
         // Validate the combined response, never intermediate per-contact motion.
         for request in requests {

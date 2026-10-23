@@ -5,6 +5,7 @@ use super::*;
 use engine_material::{ContactGeometry, Material, Outcome, Region, Section, shared_impact};
 use rapier2d::prelude::{ContactImpulse, SolverFlags};
 
+pub mod arrival;
 mod geometry;
 use geometry::Footprint;
 

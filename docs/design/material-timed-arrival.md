@@ -12,6 +12,10 @@ without speculative braking, then run the existing native material response.
 It is fixture code with asserted assumptions, not a runtime step API or general
 CCD replacement. No vendor code, solver settings or scenario behavior changes.
 
+The follow-up [native isolated-ball operation](material-native-arrival.md) now
+provides bounded admission and transactional stepping for this restricted case.
+The fixture below remains independent evidence for the arrival sequence.
+
 ## Sequence and scope
 
 The fixture contains exactly two nonrotating balls, represented by two to eight
@@ -81,15 +85,17 @@ of timestep independence for arbitrary scenes or calibration of the pulse model.
 RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib response::tests::arrival
 ```
 
-## Native integration boundary
+## Integration beyond the isolated pair
 
-A native path must validate the complete scene before suppressing any solver
+The native follow-up supplies admission and transaction semantics for two balls.
+A broader path must validate the complete scene before suppressing any solver
 contact, find the earliest arrival across all supported collider pairs, and
 recompute the schedule after each response. Simultaneous arrivals must enter one
 coupled batch. It also needs bounded work/subdivision counts, explicit fallback
 when admission or numerical arrival checks fail, and no lost capture time,
-episode transitions or output records across internal advances. Snapshot and
-frame-end event behavior must be specified at that same boundary.
+episode transitions or output records across internal advances. The isolated
+native path defines snapshot and frame-end behavior; broader scheduling must
+preserve that contract across multiple physical arrivals.
 
 The fixture resets transient capture output between its drift and response;
 the drift has no material episodes by construction. That shortcut does not

@@ -124,6 +124,13 @@ momentum, reversed insertion, moving supports, timestep changes, stale warmstart
 and atomic rejection. See `docs/design/material-shared-energy.md` for the pulse
 allocation hypothesis and remaining production limits.
 
+The native arrival follow-up accumulates each body's paired-impulse response in
+f64 and converts to backend velocity once, before combined-response validation.
+Repeated f32 updates made duplicate collider representations change low-energy
+rebound on moving supports. Limits, atomic rejection, contact tolerances and
+warmstart clearing are unchanged. The native arrival regressions compare exact
+velocities across one/two/four representations without loosening energy checks.
+
 These twelve Rust files and the diagnostic feature in `Cargo.toml` are the
 complete source/configuration differences from the published crate. See
 `docs/picade-late-match-physics.md` for the retained inputs and qualification.

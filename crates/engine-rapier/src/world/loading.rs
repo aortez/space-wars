@@ -557,6 +557,7 @@ fn finite_record(r: &ContactRecord) -> bool {
 }
 
 pub(super) struct Hooks<'a> {
+    pub flight: Option<&'a std::sync::atomic::AtomicBool>,
     pub drives: surface_drive::DriveHooks<'a>,
     pub loading: Option<Mutex<&'a mut LoadingState>>,
     pub external_constraints: bool,
@@ -564,6 +565,17 @@ pub(super) struct Hooks<'a> {
 
 impl PhysicsHooks for Hooks<'_> {
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
+        if let Some(failed) = self.flight {
+            if context
+                .solver_contacts
+                .iter()
+                .any(|c| !c.dist.is_finite() || c.dist <= 0.0)
+            {
+                failed.store(true, std::sync::atomic::Ordering::Relaxed);
+            } else {
+                context.solver_contacts.clear();
+            }
+        }
         self.drives.modify_solver_contacts(context);
     }
     fn modify_solver_contacts_batch(&self, context: &mut SolverContactBatchContext) {

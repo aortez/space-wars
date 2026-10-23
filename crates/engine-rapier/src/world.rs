@@ -1246,8 +1246,18 @@ impl PhysicsWorld {
         dt_seconds: f32,
         drives: &[SurfaceDrive],
     ) -> PhysicsStepMetrics {
+        self.step_internal(dt_seconds, drives, true, None)
+    }
+
+    fn step_internal(
+        &mut self,
+        dt_seconds: f32,
+        drives: &[SurfaceDrive],
+        reset_loading: bool,
+        flight: Option<&std::sync::atomic::AtomicBool>,
+    ) -> PhysicsStepMetrics {
         let _span = crate::profile::span("world_step");
-        if let Some(loading) = &mut self.loading {
+        if reset_loading && let Some(loading) = &mut self.loading {
             loading.begin_step();
         }
         if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
@@ -1292,6 +1302,7 @@ impl PhysicsWorld {
 
         let capture_loading = self.loading.is_some();
         let hooks = loading::Hooks {
+            flight,
             drives: surface_drive::DriveHooks(drives),
             loading: self.loading.as_mut().map(Mutex::new),
             external_constraints: self.raw.gravity != Vector::ZERO
