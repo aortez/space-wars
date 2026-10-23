@@ -66,6 +66,9 @@ pub trait Backend {
 #[serde(rename_all = "kebab-case")]
 pub enum Deferred {
     ObservationUnavailable,
+    CoordinatorBusy,
+    CoordinatorUnavailable,
+    StorageUnavailable,
     ProtectionUnavailable,
     RadioUnavailable,
     Suspended,
@@ -118,6 +121,7 @@ pub struct Admission {
 
 pub struct Controller<B: Backend> {
     policy: NetworkPolicy,
+    access: crate::network_access::Access,
     backend: B,
     actual: Option<Observation>,
     observed_clock: Option<Clock>,
@@ -127,15 +131,38 @@ pub struct Controller<B: Backend> {
 
 impl<B: Backend> Controller<B> {
     pub fn open(directory: &Path, mut backend: B) -> Result<Self> {
-        let policy = NetworkPolicy::open(directory, backend.clock()?)?;
+        let clock = backend.clock()?;
+        let mut policy = NetworkPolicy::open(directory, clock.clone())?;
+        let access = crate::network_access::Access::default();
+        access.initialize(policy.radio(&clock)?.blocks_ssh(&clock.boot_id));
+        policy.attach_access(access.clone());
         Ok(Self {
             policy,
+            access,
             backend,
             actual: None,
             observed_clock: None,
             activity: None,
             deferred: None,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pause_save_at(
+        &mut self,
+        point: &'static str,
+        entered: std::sync::mpsc::SyncSender<()>,
+        resume: std::sync::mpsc::Receiver<()>,
+    ) {
+        self.policy.pause_save_at(point, entered, resume);
+    }
+
+    pub(crate) fn access(&self) -> crate::network_access::Access {
+        self.access.clone()
+    }
+
+    pub(crate) fn ssh_blocked(&self) -> bool {
+        self.policy.ssh_blocked()
     }
 
     /// Refresh actual state without requesting a radio change.
@@ -361,6 +388,9 @@ impl<B: Backend> Controller<B> {
                 }
             }
         };
+        // An admission during the final observation (including a slow disk
+        // integrity read) invalidates it even if the ten-second bridge expires.
+        let admission_epoch = self.access.epoch();
         // Observations before obtaining protection cannot authorize this write.
         let Some(fresh) = self.refresh()? else {
             return self.report();
@@ -373,6 +403,11 @@ impl<B: Backend> Controller<B> {
             || snapshot.radio.startup
             || snapshot.radio.checkpoint_count != 0
         {
+            return self.report();
+        }
+        if !self.access.begin_radio(enabled, admission_epoch) {
+            self.policy.reset_quiet();
+            self.deferred = Some(Deferred::ProtectionUnavailable);
             return self.report();
         }
         let mut state = self.policy.radio(&snapshot.clock)?;
@@ -518,6 +553,7 @@ impl<B: Backend> Controller<B> {
             return Ok(state.owned_off.then_some(true));
         }
         if status.policy.stay_connected
+            || self.access.protected()
             || status.holds.iter().any(|hold| {
                 hold.expires_in_ms > 0
                     && (hold.wireless_required

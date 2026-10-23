@@ -1,5 +1,6 @@
 //! Bounded, authenticated network requests handled by one radio coordinator.
 //! The independent time/status service does not wait for these operations.
+use crate::network_access::Access;
 use crate::network_controller::{Availability, Backend, Controller, Status};
 use crate::network_policy::{Caller, Clock, DownloadReservation, HoldKind, HoldToken, Policy};
 use crate::network_watch::Watch;
@@ -11,7 +12,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -29,6 +30,10 @@ const TICK: Duration = Duration::from_secs(2);
 #[serde(tag = "command", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Request {
     Status {
+        schema: u32,
+    },
+    /// Root socket-activation helper: accepted connection protection, no lease.
+    ProtectSsh {
         schema: u32,
     },
     SetPolicy {
@@ -80,6 +85,7 @@ pub enum Request {
 impl Request {
     fn supported(&self) -> bool {
         let (Self::Status { schema }
+        | Self::ProtectSsh { schema }
         | Self::SetPolicy { schema, .. }
         | Self::Resume { schema, .. }
         | Self::Admit { schema, .. }
@@ -177,6 +183,8 @@ impl NetworkServer {
         listener.set_nonblocking(true)?;
         let stop = Arc::new(AtomicBool::new(false));
         let (tx, rx) = mpsc::sync_channel(CLIENTS);
+        let access = controller.access();
+        let waiting = Arc::new(AtomicUsize::new(0));
         let stopped = stop.clone();
         watch.reset();
         let coordinator = thread::spawn(move || coordinate(controller, rx, &stopped, watch));
@@ -201,8 +209,10 @@ impl NetworkServer {
                             continue;
                         };
                         let tx = tx.clone();
+                        let access = access.clone();
+                        let waiting = waiting.clone();
                         workers.push(thread::spawn(move || {
-                            let _ = handle(stream, caller, tx);
+                            let _ = handle(stream, caller, tx, access, waiting);
                         }));
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -249,22 +259,35 @@ fn peer(stream: &UnixStream, kiosk_uid: u32) -> Result<Caller> {
     })
 }
 
+struct CoordinatorGuard(Access);
+impl Drop for CoordinatorGuard {
+    fn drop(&mut self) {
+        self.0.stop();
+    }
+}
+
 fn coordinate<B: Backend>(
     mut controller: Controller<B>,
     rx: Receiver<Work>,
     stop: &AtomicBool,
     watch: Watch,
 ) {
+    let access = controller.access();
+    let _owner = CoordinatorGuard(access.clone());
     let mut next_tick = Instant::now();
     while !stop.load(Ordering::Relaxed) {
         if Instant::now() >= next_tick {
             // A failed observation is retried; the controller never treats it
             // as idle. Storage uncertainty remains poisoned inside the store.
-            watch.publish(controller.tick().ok());
+            access.begin();
+            let status = controller.tick().ok();
+            access.finish(status.clone(), controller.ssh_blocked());
+            watch.publish(status);
             next_tick = Instant::now() + TICK;
         }
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(work) => {
+                access.begin();
                 let reply = if stop.load(Ordering::Relaxed) {
                     Reply::reject(Rejection::Unavailable)
                 } else if Instant::now() >= work.deadline {
@@ -284,6 +307,7 @@ fn coordinate<B: Backend>(
                     }
                     perform(&mut controller, work.caller, work.request)
                 };
+                access.finish(reply.status.clone(), controller.ssh_blocked());
                 if let Some(status) = &reply.status {
                     watch.publish(Some(status.clone()));
                 }
@@ -299,6 +323,7 @@ fn coordinate<B: Backend>(
 fn perform<B: Backend>(controller: &mut Controller<B>, caller: Caller, request: Request) -> Reply {
     let result = (|| -> Result<Reply> {
         Ok(match request {
+            Request::ProtectSsh { .. } => Reply::reject(Rejection::InvalidRequest),
             Request::Status { .. } => controller
                 .status()
                 .map(Reply::status)
@@ -397,7 +422,22 @@ fn perform<B: Backend>(controller: &mut Controller<B>, caller: Caller, request: 
     }
 }
 
-fn handle(mut stream: UnixStream, caller: Caller, tx: SyncSender<Work>) -> Result<()> {
+// Leave socket-worker capacity for diagnostics and admission while durable
+// operations wait. Dropping a connection does not cancel an accepted mutation.
+struct Waiting(Arc<AtomicUsize>);
+impl Drop for Waiting {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+fn handle(
+    mut stream: UnixStream,
+    caller: Caller,
+    tx: SyncSender<Work>,
+    access: Access,
+    waiting: Arc<AtomicUsize>,
+) -> Result<()> {
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
     let request = service::read_frame(&mut stream, FRAME_LIMIT, FRAME_DEADLINE)
         .and_then(|bytes| serde_json::from_slice::<Request>(&bytes).map_err(Error::from));
@@ -405,6 +445,37 @@ fn handle(mut stream: UnixStream, caller: Caller, tx: SyncSender<Work>) -> Resul
         Ok(request) if request.supported() => request,
         _ => return service::write_json(&mut stream, &Reply::reject(Rejection::InvalidRequest)),
     };
+    if matches!(request, Request::ProtectSsh { .. }) {
+        let reply = if caller.uid != 0 {
+            Reply::reject(Rejection::Rejected)
+        } else if access.protect_ssh() {
+            Reply {
+                schema: 1,
+                status: access.status(),
+                availability: Some(Availability::SessionProtected),
+                error: None,
+            }
+        } else {
+            Reply::reject(Rejection::Unavailable)
+        };
+        return service::write_json(&mut stream, &reply);
+    }
+    let diagnostic = matches!(request, Request::Status { .. });
+    if diagnostic
+        && access.busy()
+        && let Some(status) = access.status()
+    {
+        return service::write_json(&mut stream, &Reply::status(status));
+    }
+    if waiting
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+            (count < CLIENTS / 2).then_some(count + 1)
+        })
+        .is_err()
+    {
+        return service::write_json(&mut stream, &Reply::reject(Rejection::Busy));
+    }
+    let _waiting = Waiting(waiting);
     let (reply_tx, reply_rx) = mpsc::sync_channel(1);
     let deadline = Instant::now() + OPERATION_DEADLINE;
     match tx.try_send(Work {
@@ -421,10 +492,29 @@ fn handle(mut stream: UnixStream, caller: Caller, tx: SyncSender<Work>) -> Resul
             return service::write_json(&mut stream, &Reply::reject(Rejection::Unavailable));
         }
     }
-    let reply = reply_rx
-        .recv_timeout(OPERATION_DEADLINE)
-        .unwrap_or_else(|_| Reply::reject(Rejection::Unavailable));
-    service::write_json(&mut stream, &reply)
+    loop {
+        let reply = match reply_rx.recv_timeout(Duration::from_millis(50)) {
+            Ok(reply) => reply,
+            Err(mpsc::RecvTimeoutError::Timeout) if Instant::now() < deadline => {
+                if diagnostic && access.busy() {
+                    if let Some(status) = access.status() {
+                        return service::write_json(&mut stream, &Reply::status(status));
+                    }
+                    if deadline.saturating_duration_since(Instant::now())
+                        < OPERATION_DEADLINE - Duration::from_millis(250)
+                    {
+                        return service::write_json(
+                            &mut stream,
+                            &Reply::reject(Rejection::Unavailable),
+                        );
+                    }
+                }
+                continue;
+            }
+            Err(_) => Reply::reject(Rejection::Unavailable),
+        };
+        return service::write_json(&mut stream, &reply);
+    }
 }
 
 /// A lost response does not cancel a reservation. Retry Admit with the same

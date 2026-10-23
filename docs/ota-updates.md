@@ -573,11 +573,15 @@ account from `SO_PEERCRED`, captures the kernel process start time and rechecks
 the identity before dispatch; request JSON cannot supply identity. The client
 verifies a root peer before sending a capability. Temporary holds cannot be
 released by a different process, while deployment capabilities retain their
-account ownership across command gaps. Replies never echo capabilities.
+account ownership across command gaps. Replies never echo capabilities. The
+root-only `protect-ssh` request is a separate, capability-free admission bridge
+for the socket-activation helper.
 
 One coordinator owns the controller and queues commands behind in-flight radio
-work. It has a bounded eight-command queue and eight socket workers, 1 KiB request
-frames, a five-second absolute frame deadline and a thirty-second operation wait.
+work, including durable writes. It has a bounded eight-command queue and eight
+socket workers, with at most four waiting for coordinator replies so diagnostics
+and SSH admission retain worker capacity. Requests have 1 KiB frames, a five-second
+absolute frame deadline and a thirty-second operation wait.
 Expired queued work and changed process identities cannot mutate state. A lost
 reply does not undo a reservation; retry with the same capability. Status failures
 and a stopped coordinator report unavailability, while queue pressure is distinct.
@@ -673,32 +677,69 @@ passes the accepted socket to these commands when `StandardInput=socket` is set.
 The bootstrap access checker permits this exact helper for the per-connection
 service, while continuing to accept the legacy configuration without it.
 
-SSH admission reserves a root-only 120-second hold through the same coordinator
-queue as radio transitions. `session-protected` permits the accepted connection
-to continue; it does not claim Wi-Fi or Internet readiness. An independently off
-radio in mode Off stays off, preserving Ethernet logins. A policy-owned off state
-or pending command from the current boot must be reconciled first. Restoring
-Wi-Fi for an admission completes in the same coordinator request, including a
-delayed readback within its deadline. Failure or expiry neither repeats the
-write nor resumes automatic control. After a real
-reboot, the saved command cannot execute, so an accepted TCP connection can gain
-SSH protection and reach owner recovery. Admission retains the pending command,
-suspension and old ownership; it does not silently resume automatic radio control.
-The stopped-service fallback applies the same boot-identity rule under the
-exclusive policy lock without rewriting saved state. A service restart does not
-qualify as a reboot. Expired holds remain protective while live sessions or unknown activity
-remain. A new root SSH admission or Wi-Fi setup admission can replace expired
-SSH holds with its fresh 120-second hold, maintaining protection without needing
-to prove idle first. Otherwise an active session or an incomplete observer could
-keep all 32 slots occupied indefinitely and prevent new logins before the SSH
-banner or prevent the Wi-Fi setup screen from opening.
-Replacement happens only after the policy commit succeeds; unexpired holds and
-all other hold kinds retain their existing limits and recovery grace. Without a
-replacement admission, reaping still requires a quiet, complete observation.
+SSH admission uses root-only `protect-ssh` without allocating a hold or reading
+`/data`. A shared ten-second bridge covers handover to the kernel TCP/systemd
+observer, which accounts for authenticating, established and closing connections.
+The bridge occupies constant memory regardless of connection count. Once the
+connection ends, the ordinary observed-idle and quiet-grace checks govern shutdown.
+`session-protected` permits the accepted connection to continue; it does not claim
+Wi-Fi or Internet readiness. An independently off radio in mode Off stays off,
+preserving Ethernet logins.
 
-Regression tests reproduce this exhaustion with both busy and unknown activity,
-preserve other reservations and the live-hold capacity limit, and cover failed
-durable commits. The manager suite passes 158 tests with one existing root-only
+Admission and the preparation of a radio command share one short in-memory lock.
+A previously admitted connection prevents shutdown. An admission epoch also
+invalidates an observation if a new connection was admitted while a storage read
+stalled, even when the bridge has since expired. After command preparation,
+admission waits for durable reconciliation. No lock is held during a store save
+or D-Bus call. A policy-owned off state or pending current-boot command must be
+reconciled first. The bridge requests restoration by the existing coordinator;
+helper retries do not resend `Set` or resume a saved fault. After a real reboot,
+the saved command cannot execute, so an accepted TCP connection can reach owner
+recovery without clearing old ownership or suspension. A service restart is not
+a reboot. Only an absent coordinator socket permits the read-only offline fallback,
+which applies the same boot rule under the exclusive policy lock. Final refusal
+logs name a fixed reason such as busy, unavailable, rejected, timeout or connection
+reset, without echoing peer-controlled text or capabilities.
+
+The #523 correction also removes policy saves for all temporary hold changes:
+reserve, renew, release, wireless escalation and expiry. Deployment holds, policy
+settings and radio state remain durable. Startup durably reserves a range of
+2^32 runtime revisions before publishing any status. The saved generation is the
+upper bound; subsequent durable commits advance it normally, while runtime
+changes advance within the reserved range. Restart, including an older-schema
+binary reopening the record, starts beyond all previously exposed revisions.
+Exhaustion fails before changing state. The schema and numeric CLI generation
+format stay unchanged; callers must obtain the generation from live status,
+not the private file.
+
+The socket handlers can serve SSH admission and diagnostic status while the
+single controller/storage worker is blocked. Cached diagnostics retain their
+original observation clock and committed policy generation; busy or stale
+snapshots omit actual radio/activity evidence and report `coordinator-busy`,
+`storage-unavailable` or `observation-unavailable` (`coordinator-unavailable`
+if the owner exits). They are not fresh radio or download authorization. A durable mutation is acknowledged only after its save
+completes. Save/integrity failures revoke fast admission until the owner is
+reopened; an unresolved radio command always retains its admission fence.
+Other control operations still serialize behind the worker. This is not a
+claim that arbitrary USB operations have become bounded.
+
+Local tests pause saves at all four durability stages, verify prompt diagnostic
+and root-admission replies without premature mutation acknowledgement, retain
+the radio-intent fence, and cover restoration, revision exhaustion/restart,
+connection churn, storage failures and refusal reasons. The generation-8 device
+still has the previous implementation. The #523 fifteen-minute fresh-login run,
+three-second status bound and installed refusal logs remain to be qualified on
+a separately reviewed image; no device deployment is implied by these tests.
+
+The earlier 120-second SSH reservation implementation could retain all 32 slots
+while sessions were active or observation was incomplete. It allowed new SSH and
+setup admissions to replace expired SSH reservations; legacy hold requests still
+retain that behavior in memory. The following evidence describes that earlier
+fix, not qualification of the new admission bridge.
+
+Regression tests reproduced this exhaustion with both busy and unknown activity,
+preserved other reservations and the live-hold capacity limit, and covered failed
+durable commits. That manager suite passed 158 tests with one existing root-only
 integration test skipped; Clippy reports no warnings. On the second Picade, a
 read-only status sample showed 18 retained SSH holds, 17 expired, while SSH was
 active. A controlled Pi 5 comparison then reproduced the pre-banner stall on

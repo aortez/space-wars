@@ -1,6 +1,6 @@
 //! Admission before the socket-activated sshd authenticates a connection.
 //! No shell, unit, endpoint, path or identity is accepted from the caller.
-use crate::network_policy::{HoldKind, HoldToken, protect_ssh_without_service};
+use crate::network_policy::protect_ssh_without_service;
 use crate::network_service::{self, Request};
 use crate::{Error, Result};
 use std::fs;
@@ -18,19 +18,7 @@ pub fn admit() -> Result<()> {
         return Err(unavailable());
     }
     accepted_socket(libc::STDIN_FILENO, 22)?;
-    // The state parent must have the same ownership as the daemon requires.
-    // A missing parent is permitted on an image that has never run the service.
-    match fs::symlink_metadata("/data/spacewars-system") {
-        Ok(meta) if meta.is_dir() && meta.uid() == 0 && meta.mode() & 0o077 == 0 => {}
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        _ => return Err(unavailable()),
-    }
-    let token = HoldToken::generate()?;
-    let request = Request::Admit {
-        schema: 1,
-        token: token.expose().to_owned(),
-        kind: HoldKind::Ssh,
-    };
+    let request = Request::ProtectSsh { schema: 1 };
     let deadline = Instant::now() + DEADLINE;
     admit_before(
         deadline,
@@ -43,6 +31,13 @@ pub fn admit() -> Result<()> {
             )
         },
         || {
+            // Only offline recovery reads /data. A responsive coordinator is
+            // authenticated through its root-owned socket, not USB metadata.
+            match fs::symlink_metadata("/data/spacewars-system") {
+                Ok(meta) if meta.is_dir() && meta.uid() == 0 && meta.mode() & 0o077 == 0 => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                _ => return Err(unavailable()),
+            }
             let boot_id = crate::linux::boot_id()?;
             protect_ssh_without_service(Path::new(network_service::STATE_DIRECTORY), &boot_id)
                 .map(|_guard| ())
@@ -63,13 +58,48 @@ fn admit_before(
         // A stopped/uninstalled service must not unnecessarily disable SSH.
         // Taking its exclusive policy lock excludes a live coordinator. This
         // never initializes state, writes radio settings or clears uncertainty.
-        if fallback().is_ok() {
+        let absent = matches!(&reply, Err(Error::Io(error)) if matches!(error.kind(),
+            std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused));
+        if absent && fallback().is_ok() {
             return Ok(());
         }
         let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-            return Err(unavailable());
+            return Err(Error::Invalid(format!(
+                "SSH network protection refused: {}; no safe offline admission",
+                refusal_reason(&reply),
+            )));
         };
         std::thread::sleep(remaining.min(Duration::from_millis(200)));
+    }
+}
+
+// Only fixed categories reach the journal. Never format a peer's payload,
+// capability, filesystem path or arbitrary transport error.
+fn refusal_reason(reply: &Result<serde_json::Value>) -> &'static str {
+    match reply {
+        Ok(value) if value.get("schema") == Some(&serde_json::json!(1)) => {
+            match value.get("error").and_then(|value| value.as_str()) {
+                Some("busy") => "coordinator busy",
+                Some("unavailable") => "coordinator unavailable",
+                Some("rejected") => "coordinator rejected admission",
+                Some("expired") => "request expired",
+                Some("owner-gone") => "request owner gone",
+                Some("invalid-request") => "invalid request",
+                _ => "invalid admission reply",
+            }
+        }
+        Ok(_) | Err(Error::Json(_)) => "invalid admission reply",
+        Err(Error::Io(error)) => match error.kind() {
+            std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::UnexpectedEof => {
+                "connection reset"
+            }
+            std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock => "coordinator timeout",
+            std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused => {
+                "coordinator absent"
+            }
+            _ => "coordinator transport failure",
+        },
+        Err(_) => "coordinator request failed",
     }
 }
 
@@ -147,7 +177,7 @@ mod tests {
             || {
                 attempts += 1;
                 if attempts == 1 {
-                    Err(unavailable())
+                    Err(std::io::Error::from(std::io::ErrorKind::NotFound).into())
                 } else {
                     Ok(session_protected())
                 }
@@ -182,6 +212,44 @@ mod tests {
         let (unix, _peer) = UnixStream::pair().unwrap();
         assert!(accepted_socket(unix.as_raw_fd(), 22).is_err());
         assert!(accepted_socket(-1, 22).is_err());
+    }
+
+    #[test]
+    fn final_refusal_names_the_reason_without_echoing_peer_data() {
+        for (wire, expected) in [
+            ("busy", "coordinator busy"),
+            ("unavailable", "coordinator unavailable"),
+            ("rejected", "coordinator rejected admission"),
+            ("expired", "request expired"),
+            ("owner-gone", "request owner gone"),
+            ("invalid-request", "invalid request"),
+            ("secret capability", "invalid admission reply"),
+        ] {
+            let error = admit_before(
+                Instant::now(),
+                || Ok(serde_json::json!({"schema": 1, "error": wire})),
+                || panic!("responsive coordinator refusal must not read offline storage"),
+            )
+            .unwrap_err()
+            .to_string();
+            assert!(error.contains(expected), "{error}");
+            assert!(!error.contains("secret capability"));
+        }
+        for (kind, expected) in [
+            (std::io::ErrorKind::ConnectionReset, "connection reset"),
+            (std::io::ErrorKind::TimedOut, "coordinator timeout"),
+        ] {
+            assert!(
+                admit_before(
+                    Instant::now(),
+                    || Err(std::io::Error::from(kind).into()),
+                    || Err(unavailable())
+                )
+                .unwrap_err()
+                .to_string()
+                .contains(expected)
+            );
+        }
     }
 
     #[test]

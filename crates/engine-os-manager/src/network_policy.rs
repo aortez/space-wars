@@ -261,6 +261,8 @@ pub struct HoldStatus {
 pub struct NetworkPolicy {
     store: store::Store,
     record: Record,
+    revision: u64,
+    revision_limit: u64,
     temporary: BTreeMap<Sha256, Temporary>,
     boot_id: String,
     last_ms: u64,
@@ -319,11 +321,24 @@ impl NetworkPolicy {
                 hold.reboot_grace_used = true;
             }
         }
-        record.advance()?;
-        store.save(&record)?;
+        // Reserve a disjoint range before publishing any runtime revisions.
+        // The on-disk generation is the upper bound, so even an older daemon
+        // reopening this schema cannot reuse a revision exposed by this one.
+        let revision = record
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| invalid("network policy generation exhausted"))?;
+        record.generation = record
+            .generation
+            .checked_add(1 << 32)
+            .ok_or_else(|| invalid("network policy generation exhausted"))?;
+        store.reserve_revisions(&record)?;
+        let revision_limit = record.generation;
         Ok(Self {
             store,
             record,
+            revision,
+            revision_limit,
             temporary: BTreeMap::new(),
             boot_id: clock.boot_id,
             last_ms: clock.ms,
@@ -337,6 +352,14 @@ impl NetworkPolicy {
         })
     }
 
+    pub(crate) fn attach_access(&mut self, access: crate::network_access::Access) {
+        self.store.access = Some(access);
+    }
+
+    pub(crate) fn ssh_blocked(&self) -> bool {
+        self.record.radio.blocks_ssh(&self.boot_id)
+    }
+
     fn check(&mut self, clock: &Clock) -> Result<()> {
         self.store.check()?;
         if clock.boot_id != self.boot_id || clock.ms < self.last_ms {
@@ -346,10 +369,24 @@ impl NetworkPolicy {
         Ok(())
     }
 
+    fn next_revision(&self) -> Result<u64> {
+        self.revision
+            .checked_add(1)
+            .filter(|next| *next < self.revision_limit)
+            .ok_or_else(|| invalid("network runtime revisions exhausted; reopen before acting"))
+    }
+
+    fn advance_runtime(&mut self) -> Result<()> {
+        self.revision = self.next_revision()?;
+        Ok(())
+    }
+
     fn commit(&mut self, mut next: Record) -> Result<()> {
+        let revision = self.next_revision()?;
         next.advance()?;
         self.store.save(&next)?;
         self.record = next;
+        self.revision = revision;
         Ok(())
     }
 
@@ -370,6 +407,20 @@ impl NetworkPolicy {
 
     pub(crate) fn reset_quiet(&mut self) {
         self.quiet_since_ms = None;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pause_save_at(
+        &mut self,
+        point: &'static str,
+        entered: std::sync::mpsc::SyncSender<()>,
+        resume: std::sync::mpsc::Receiver<()>,
+    ) {
+        *self.store.pause.lock().unwrap() = Some(store::SavePause {
+            point,
+            entered,
+            resume,
+        });
     }
 
     #[cfg(test)]
@@ -400,7 +451,7 @@ impl NetworkPolicy {
 
     pub fn set_policy(&mut self, generation: u64, policy: Policy, clock: &Clock) -> Result<()> {
         self.check(clock)?;
-        if generation != self.record.generation {
+        if generation != self.revision {
             return Err(invalid("stale network policy generation"));
         }
         if policy != self.record.policy {
@@ -590,7 +641,7 @@ impl NetworkPolicy {
                 _ => None,
             };
             let expires_ms = clock.after(SETUP_MS)?.min(absolute_ms.unwrap_or(u64::MAX));
-            self.commit(next)?;
+            self.advance_runtime()?;
             for id in replaced {
                 self.temporary.remove(&id);
             }
@@ -623,7 +674,7 @@ impl NetworkPolicy {
             renewed.expires_ms = clock
                 .after(SETUP_MS)?
                 .min(old.absolute_ms.unwrap_or(u64::MAX));
-            self.commit(self.record.clone())?;
+            self.advance_runtime()?;
             self.temporary.insert(id, renewed);
         } else {
             let mut next = self.record.clone();
@@ -658,7 +709,7 @@ impl NetworkPolicy {
         }
         let id = token.id();
         if !self.temporary[&id].wireless_required {
-            self.commit(self.record.clone())?;
+            self.advance_runtime()?;
             self.temporary
                 .get_mut(&id)
                 .expect("live time hold")
@@ -687,7 +738,7 @@ impl NetworkPolicy {
             if old.caller != caller {
                 return Err(invalid("network hold belongs to another process"));
             }
-            self.commit(self.record.clone())?;
+            self.advance_runtime()?;
             self.temporary.remove(&id);
         } else if let Some(old) = self.record.deployments.iter().find(|h| h.id == id) {
             if old.uid != caller.uid {
@@ -739,7 +790,11 @@ impl NetworkPolicy {
         let mut next = self.record.clone();
         next.deployments.retain(|h| h.expires_ms > clock.ms);
         if !expired.is_empty() || next.deployments != self.record.deployments {
-            self.commit(next)?;
+            if next.deployments != self.record.deployments {
+                self.commit(next)?;
+            } else {
+                self.advance_runtime()?;
+            }
             for id in expired {
                 self.temporary.remove(&id);
             }
@@ -786,7 +841,7 @@ impl NetworkPolicy {
             Intent::MayDisable
         };
         Ok(Status {
-            generation: self.record.generation,
+            generation: self.revision,
             mode_generation: self.record.mode_generation,
             policy: self.record.policy,
             intent,
