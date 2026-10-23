@@ -405,7 +405,7 @@
           ],
           "cumulative_consumed": null,
           "integrity": [
-            0.99540085,
+            0.9954009,
             1.0
           ],
           "failed": [
@@ -442,7 +442,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.9525588,
-            0.9012851
+            0.90128505
           ],
           "failed": [
             false,
@@ -706,7 +706,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.83313906
+            0.833139
           ],
           "failed": [
             true,
@@ -742,7 +742,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.77751875
+            0.7775187
           ],
           "failed": [
             true,
@@ -778,7 +778,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.72189844
+            0.7218984
           ],
           "failed": [
             true,
@@ -814,7 +814,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.6662781
+            0.66627806
           ],
           "failed": [
             true,
@@ -850,7 +850,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.6106578
+            0.6106577
           ],
           "failed": [
             true,
@@ -886,7 +886,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.5550375
+            0.5550374
           ],
           "failed": [
             true,
@@ -922,7 +922,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.4994172
+            0.49941707
           ],
           "failed": [
             true,
@@ -958,7 +958,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.44379687
+            0.44379672
           ],
           "failed": [
             true,
@@ -994,7 +994,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.38817656
+            0.3881764
           ],
           "failed": [
             true,
@@ -1030,7 +1030,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.33255625
+            0.33255607
           ],
           "failed": [
             true,
@@ -1066,7 +1066,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.2769359
+            0.27693576
           ],
           "failed": [
             true,
@@ -1102,7 +1102,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.22131559
+            0.22131541
           ],
           "failed": [
             true,
@@ -1138,7 +1138,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.16569525
+            0.16569509
           ],
           "failed": [
             true,
@@ -1174,7 +1174,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.11007492
+            0.110074766
           ],
           "failed": [
             true,
@@ -1210,7 +1210,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.054454595
+            0.05445444
           ],
           "failed": [
             true,
@@ -1241,7 +1241,7 @@
           ],
           "consumed": [
             187.5,
-            10890.919
+            10890.888
           ],
           "cumulative_consumed": null,
           "integrity": [
@@ -1260,7 +1260,7 @@
             11.260225,
             11.260225
           ],
-          "excess": 11140.266,
+          "excess": 11140.297,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -1283,7 +1283,7 @@
           ],
           "consumed": [
             187.5,
-            10890.919
+            10890.888
           ],
           "cumulative_consumed": null,
           "integrity": [
@@ -1302,7 +1302,7 @@
             11.260225,
             11.260225
           ],
-          "excess": 11140.266,
+          "excess": 11140.297,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -1319,7 +1319,7 @@
           ],
           "consumed": [
             187.5,
-            10657.794
+            10657.71
           ],
           "cumulative_consumed": null,
           "integrity": [
@@ -1338,7 +1338,7 @@
             11.260225,
             11.260225
           ],
-          "excess": 11373.391,
+          "excess": 11373.475,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -1510,7 +1510,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.9955952
+            0.9955953
           ],
           "failed": [
             true,
@@ -1701,8 +1701,8 @@
           ],
           "cumulative_consumed": null,
           "integrity": [
-            0.87125283,
-            0.87125283
+            0.8712529,
+            0.8712529
           ],
           "failed": [
             false,
@@ -1857,8 +1857,8 @@
           ],
           "cumulative_consumed": null,
           "integrity": [
-            0.79604816,
-            0.7484
+            0.7960482,
+            0.74840003
           ],
           "failed": [
             false,
@@ -1893,8 +1893,8 @@
           ],
           "cumulative_consumed": null,
           "integrity": [
-            0.83763087,
-            0.8189646
+            0.8376309,
+            0.81896454
           ],
           "failed": [
             false,
@@ -2191,7 +2191,7 @@
             0.0
           ],
           "consumed": [
-            19.999998,
+            19.999979,
             0.0
           ],
           "cumulative_consumed": null,
@@ -2211,7 +2211,7 @@
             0.0,
             0.0
           ],
-          "excess": 0.0000038146973,
+          "excess": 0.000022888184,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -2305,7 +2305,7 @@
             0.0
           ],
           "consumed": [
-            13.333321,
+            13.333328,
             0.0
           ],
           "cumulative_consumed": null,
@@ -2325,7 +2325,7 @@
             0.0,
             0.0
           ],
-          "excess": 13.333347,
+          "excess": 13.33334,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -2500,7 +2500,7 @@
           ],
           "integrity": [
             0.0,
-            0.77773374
+            0.7777338
           ],
           "failed": [
             false,
@@ -2700,7 +2700,7 @@
             0.0
           ],
           "integrity": [
-            0.8222222,
+            0.82222223,
             1.0
           ],
           "failed": [
@@ -2739,7 +2739,7 @@
             0.0
           ],
           "integrity": [
-            0.8222223,
+            0.82222223,
             1.0
           ],
           "failed": [
@@ -2778,7 +2778,7 @@
             0.0
           ],
           "integrity": [
-            0.8222221,
+            0.82222223,
             1.0
           ],
           "failed": [
@@ -2801,7 +2801,7 @@
           "regions": 1
         },
         {
-          "label": "1.08x moment on a connection at 240 Hz: fails after 46 ticks (0.192 s)",
+          "label": "1.08x moment on a connection at 240 Hz: fails after 45 ticks (0.188 s)",
           "available": 17.666664,
           "peak_force": 0.0,
           "peak_stress": [
@@ -2817,7 +2817,7 @@
             0.0
           ],
           "integrity": [
-            0.8222224,
+            0.82222223,
             1.0
           ],
           "failed": [
@@ -2862,7 +2862,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.9983853
+            0.99838525
           ],
           "failed": [
             true,
@@ -2934,7 +2934,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.9860412
+            0.9860411
           ],
           "failed": [
             true,
@@ -3228,7 +3228,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.9721193
+            0.97211933
           ],
           "failed": [
             true,
@@ -3450,7 +3450,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.94444686
+            0.9444469
           ],
           "failed": [
             true,
@@ -3558,7 +3558,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.9441645
+            0.9441646
           ],
           "failed": [
             true,
@@ -3631,7 +3631,7 @@
           ],
           "consumed": [
             187.5,
-            5503.7354
+            5503.7383
           ],
           "cumulative_consumed": null,
           "integrity": [
@@ -3650,7 +3650,7 @@
             11.260225,
             11.260225
           ],
-          "excess": 16527.45,
+          "excess": 16527.445,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -3667,7 +3667,7 @@
           ],
           "consumed": [
             187.5,
-            11007.481
+            11007.477
           ],
           "cumulative_consumed": null,
           "integrity": [
@@ -3686,7 +3686,7 @@
             11.260225,
             11.260225
           ],
-          "excess": 11023.703,
+          "excess": 11023.708,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -3703,7 +3703,7 @@
           ],
           "consumed": [
             187.5,
-            10890.919
+            10890.888
           ],
           "cumulative_consumed": null,
           "integrity": [
@@ -3722,7 +3722,7 @@
             11.260225,
             11.260225
           ],
-          "excess": 11140.266,
+          "excess": 11140.297,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -3739,7 +3739,7 @@
           ],
           "consumed": [
             187.5,
-            10657.794
+            10657.71
           ],
           "cumulative_consumed": null,
           "integrity": [
@@ -3758,7 +3758,7 @@
             11.260225,
             11.260225
           ],
-          "excess": 11373.391,
+          "excess": 11373.475,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -3775,7 +3775,7 @@
           ],
           "consumed": [
             187.5,
-            10191.544
+            10191.3545
           ],
           "cumulative_consumed": null,
           "integrity": [
@@ -3794,7 +3794,7 @@
             11.260225,
             11.260225
           ],
-          "excess": 11839.641,
+          "excess": 11839.83,
           "failure_motion": 0.0,
           "failure_dissipated": 0.0,
           "restitution": null,
@@ -3930,7 +3930,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.9444526
+            0.9444525
           ],
           "failed": [
             true,
@@ -3966,7 +3966,7 @@
           "cumulative_consumed": null,
           "integrity": [
             0.0,
-            0.9444524
+            0.94445246
           ],
           "failed": [
             true,

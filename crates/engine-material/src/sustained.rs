@@ -195,34 +195,30 @@ pub fn connection(joint: &Connection, load: ConnectionLoad) -> Result<Outcome, M
     // Scale the applied loads back to the safe limit along the same load path.
     let scale = strength / stress;
     let rotation_arm = 2.0 * beam.length / beam.height;
-    // Measured components are charged at the safe limit. The fallback covers
-    // the rest over the volume each sets flowing: a third of the beam in pure
-    // bending, all of it in pure tension.
-    let mut work = 0.0;
-    let mut volume = 0.0;
-    match load.measured_plastic_rotation {
-        Some(plastic) => work += scale * moment * plastic,
-        None => volume += moment * rotation_arm / stress,
-    }
-    match load.measured_plastic_extension {
-        Some(plastic) => work += scale * axial * plastic,
-        None => volume += axial * beam.length / stress,
-    }
-    let mut strain = 0.0;
-    if volume > 0.0 {
-        let fallback = fallback_work(region, stress, volume, load.duration);
-        work += fallback;
-        // Work-equivalent plastic strain at the safe limit the call began at.
-        strain = fallback / (strength * volume);
-    }
-    let plastic_rotation = load
-        .measured_plastic_rotation
-        .unwrap_or(strain * rotation_arm);
+    // Keep the two deformation modes separate. Axial work cannot supply a
+    // bending rotation when the bending moment is zero.
+    let (bending_work, plastic_rotation) = match load.measured_plastic_rotation {
+        Some(plastic) => (scale * moment * plastic, plastic),
+        None if moment > 0.0 => {
+            let volume = moment * rotation_arm / stress;
+            let work = fallback_work(region, stress, volume, load.duration);
+            (work, work / (scale * moment))
+        }
+        None => (0.0, 0.0),
+    };
+    let axial_work = match load.measured_plastic_extension {
+        Some(plastic) => scale * axial * plastic,
+        None if axial > 0.0 => {
+            let volume = axial * beam.length / stress;
+            fallback_work(region, stress, volume, load.duration)
+        }
+        None => 0.0,
+    };
     overload_outcome(
         &mut outcome,
         region,
         scale * scale * stored,
-        work,
+        bending_work + axial_work,
         scale * rotation + plastic_rotation,
     );
     outcome.checked()

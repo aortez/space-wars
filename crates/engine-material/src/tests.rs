@@ -1398,3 +1398,200 @@ fn zero_duration_adds_no_work_even_with_measured_displacement() {
         Outcome::default()
     );
 }
+
+#[test]
+fn small_sustained_charges_accumulate_at_every_tick_rate() {
+    for hz in [1_u32, 30, 120, 240] {
+        let mut region = Region::new(ARMOR, 20.0).unwrap();
+        let load = SustainedLoad {
+            force: 20000.25,
+            width: 1.0,
+            section: Section::new(1.0, 1.0),
+            duration: 1.0 / hz as f32,
+            measured_plastic_displacement: None,
+        };
+        let mut charged = 0.0_f64;
+        for _ in 0..600 * hz {
+            let outcome = sustained(&region, load).unwrap();
+            charged += f64::from(outcome.consumed[0]);
+            assert_eq!(region.absorb(outcome.consumed[0]).unwrap(), 0.0);
+        }
+        let loss = region.capacity() - region.remaining();
+        assert!(
+            (f64::from(loss) - charged).abs() < 0.02,
+            "{hz} Hz: lost {loss}, charged {charged}"
+        );
+        assert!((loss - 600.0).abs() < 0.02, "{hz} Hz: {loss}");
+        let precise_loss = f64::from(region.capacity()) - region.remaining_precise();
+        assert!(
+            (precise_loss - charged).abs() < 1.0e-7,
+            "{hz} Hz: lost {precise_loss}, charged {charged}"
+        );
+
+        // Continue the same small load through exhaustion of a saved balance.
+        let mut finishing = Region::with_remaining(ARMOR, 20.0, 600.0_f64).unwrap();
+        let mut ticks = 0;
+        while !finishing.failed() {
+            let outcome = sustained(&finishing, load).unwrap();
+            finishing.absorb(outcome.consumed[0]).unwrap();
+            ticks += 1;
+            assert_eq!(outcome.failed[0], finishing.failed());
+            assert!(ticks <= 600 * hz + 1, "{hz} Hz never exhausted the balance");
+        }
+        assert!((f64::from(ticks) / f64::from(hz) - 600.0).abs() <= 1.0 / f64::from(hz));
+    }
+}
+
+#[test]
+fn pure_axial_fallback_does_not_report_bending_rotation() {
+    let joint = Connection::new(WOOD, Beam::new(1.0, 1.0, 2.0)).unwrap();
+    for axial in [-3100.0, 3100.0] {
+        let load = ConnectionLoad {
+            moment: 0.0,
+            axial,
+            duration: 1.0 / 60.0,
+            measured_plastic_rotation: None,
+            measured_plastic_extension: None,
+        };
+        let inferred = connection(&joint, load).unwrap();
+        let measured_zero = connection(
+            &joint,
+            ConnectionLoad {
+                measured_plastic_rotation: Some(0.0),
+                ..load
+            },
+        )
+        .unwrap();
+        assert_eq!(inferred.ledger.deformation, [0.0; 2]);
+        assert_eq!(inferred, measured_zero);
+        assert!(approx(inferred.consumed[0], 13.333333, 1.0e-6));
+    }
+}
+
+#[test]
+fn small_charges_survive_clone_restore_split_and_repair() {
+    let mut region = Region::new(ARMOR, 20.0).unwrap();
+    let charge = 1.0 / 256.0;
+    region.absorb(charge).unwrap();
+    // The f32 budget cannot show this loss yet; authoritative state must.
+    assert_eq!(region.remaining(), region.capacity());
+    assert_eq!(region.remaining_precise(), 200000.0 - f64::from(charge));
+
+    let serialized = serde_json::to_string(&region).unwrap();
+    let snapshot: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+    let mut restored =
+        Region::with_remaining(ARMOR, 20.0, snapshot["remaining"].as_f64().unwrap()).unwrap();
+    assert_eq!(restored, region);
+    let mut cloned = region;
+    for _ in 0..1000 {
+        cloned.absorb(charge).unwrap();
+        restored.absorb(charge).unwrap();
+    }
+    assert_eq!(cloned, restored);
+    assert_eq!(
+        cloned.remaining_precise(),
+        200000.0 - 1001.0 * f64::from(charge)
+    );
+
+    let (mut first, mut second) = region.split(0.25).unwrap();
+    assert_eq!(first.remaining_precise(), 0.25 * region.remaining_precise());
+    assert_eq!(
+        first.remaining_precise() + second.remaining_precise(),
+        region.remaining_precise()
+    );
+    let before = region;
+    region.repair(0.0).unwrap();
+    assert_eq!(region, before);
+    let repair_fraction = 1.0 / 67108864.0;
+    region.repair(repair_fraction).unwrap();
+    first.repair(repair_fraction).unwrap();
+    second.repair(repair_fraction).unwrap();
+    assert_eq!(
+        region.remaining_precise(),
+        before.remaining_precise() + f64::from(repair_fraction) * 200000.0
+    );
+    assert_eq!(
+        first.remaining_precise() + second.remaining_precise(),
+        region.remaining_precise()
+    );
+    region.repair(1.0).unwrap();
+    assert_eq!(region.remaining_precise(), f64::from(region.capacity()));
+}
+
+#[test]
+fn final_rounded_charges_exhaust_precise_state_and_report_failure_once() {
+    // This balance rounds down to 1.0 in f32; the event budget must round up
+    // so consuming it really retires the region instead of leaving a sliver.
+    let balance = 1.0 + 1.0 / 33554432.0;
+    let region = Region::with_remaining(ARMOR, 20.0, balance).unwrap();
+    assert!(f64::from(region.remaining()) >= balance);
+    assert!(f64::from(region.remaining()) - balance < f64::from(f32::EPSILON));
+    let load = SustainedLoad {
+        force: 20000.25,
+        width: 1.0,
+        section: Section::new(1.0, 1.0),
+        duration: 2.0,
+        measured_plastic_displacement: None,
+    };
+    let other = Region::new(ARMOR, 20.0).unwrap();
+    let contact = ContactGeometry::new(1.0, Section::new(1.0, 1.0), Section::new(1.0, 1.0));
+    let hit = Impact {
+        closing_speed: 100.0,
+        effective_mass: 1.0,
+    };
+    for outcome in [
+        sustained(&region, load).unwrap(),
+        impact(&region, &other, contact, hit).unwrap(),
+    ] {
+        let mut target = region;
+        assert!(outcome.failed[0]);
+        let returned = target.absorb(outcome.consumed[0]).unwrap();
+        assert!(target.failed());
+        assert_eq!(target.remaining_precise(), 0.0);
+        assert!((f64::from(outcome.consumed[0]) - f64::from(returned) - balance).abs() < 1.0e-15);
+        assert!(!sustained(&target, load).unwrap().failed[0]);
+        assert!(!impact(&target, &other, contact, hit).unwrap().failed[0]);
+    }
+}
+
+#[test]
+fn bending_and_axial_work_stay_separate_with_measured_or_inferred_motion() {
+    let beam = Beam::new(1.0, 1.0, 2.0);
+    let joint = Connection::new(WOOD, beam).unwrap();
+    // Pure bending, then combined loading: the latter must still use the
+    // combined stress, without axial work contaminating reported rotation.
+    for (moment, axial) in [(550.0, 0.0), (300.0, 1500.0)] {
+        for measured_rotation in [None, Some(0.01)] {
+            for measured_extension in [None, Some(0.02)] {
+                let duration = 1.0 / 60.0;
+                let stress = axial / beam.area() + moment / beam.section_modulus();
+                let scale = WOOD.strength / stress;
+                let strain = (stress / WOOD.strength - 1.0) * duration / CRUSH_TIME_CONSTANT;
+                let rotation =
+                    measured_rotation.unwrap_or(strain * 2.0 * beam.length / beam.height);
+                let extension = measured_extension.unwrap_or(strain * beam.length);
+                let expected_work = scale * (moment * rotation + axial * extension);
+                let elastic_rotation =
+                    scale * moment * beam.length / (WOOD.stiffness * beam.second_moment());
+                let result = connection(
+                    &joint,
+                    ConnectionLoad {
+                        moment,
+                        axial,
+                        duration,
+                        measured_plastic_rotation: measured_rotation,
+                        measured_plastic_extension: measured_extension,
+                    },
+                )
+                .unwrap();
+                assert!(approx(result.consumed[0], expected_work, 2.0e-6));
+                assert!(approx(
+                    result.ledger.deformation[0],
+                    elastic_rotation + rotation,
+                    2.0e-6
+                ));
+                assert!(result.ledger.closes(LEDGER_TOLERANCE));
+            }
+        }
+    }
+}

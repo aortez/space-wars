@@ -9,7 +9,9 @@ pub struct Region {
     material: Material,
     volume: f32,
     capacity: f32,
-    remaining: f32,
+    // Persistent accounting must retain charges smaller than one f32 capacity
+    // ulp. Load records stay f32; clone/serialization retain this f64 state.
+    remaining: f64,
 }
 
 impl Region {
@@ -27,19 +29,21 @@ impl Region {
             material,
             volume,
             capacity,
-            remaining: capacity,
+            remaining: f64::from(capacity),
         })
     }
 
     /// Restore a saved region: full capacity from `material` and `volume`,
-    /// with `remaining` of it left, for hosts that persist integrity.
+    /// with `remaining` of it left, for hosts that persist integrity. Save
+    /// [`Self::remaining_precise`], not the rounded per-event budget.
     pub fn with_remaining(
         material: Material,
         volume: f32,
-        remaining: f32,
+        remaining: impl Into<f64>,
     ) -> Result<Self, MaterialError> {
         let mut region = Self::new(material, volume)?;
-        if !(remaining.is_finite() && (0.0..=region.capacity).contains(&remaining)) {
+        let remaining = remaining.into();
+        if !(remaining.is_finite() && (0.0..=f64::from(region.capacity)).contains(&remaining)) {
             return Err(MaterialError::InvalidRegion);
         }
         region.remaining = remaining;
@@ -63,12 +67,25 @@ impl Region {
         self.capacity
     }
 
+    /// Representable per-event work budget. Round upward by less than one f32
+    /// ulp so a final charge exhausts the precise state and failure is reported
+    /// consistently. `absorb` returns any unspent rounding remainder.
     pub fn remaining(&self) -> f32 {
+        let rounded = self.remaining as f32;
+        if f64::from(rounded) < self.remaining {
+            rounded.next_up()
+        } else {
+            rounded
+        }
+    }
+
+    /// Authoritative remaining capacity for persistence and accounting checks.
+    pub fn remaining_precise(&self) -> f64 {
         self.remaining
     }
 
     pub fn integrity(&self) -> f32 {
-        (self.remaining / self.capacity).clamp(0.0, 1.0)
+        (self.remaining / f64::from(self.capacity)).clamp(0.0, 1.0) as f32
     }
 
     /// Remaining integrity on the 0 to 100 scale hosts display. It describes
@@ -92,9 +109,10 @@ impl Region {
         if !(work.is_finite() && work >= 0.0) {
             return Err(MaterialError::InvalidRegion);
         }
+        let work = f64::from(work);
         let taken = work.min(self.remaining);
         self.remaining -= taken;
-        Ok(work - taken)
+        Ok((work - taken) as f32)
     }
 
     /// Explicit, host-authorized repair of a fraction of the full capacity.
@@ -102,7 +120,8 @@ impl Region {
         if !(fraction.is_finite() && (0.0..=1.0).contains(&fraction)) {
             return Err(MaterialError::InvalidRegion);
         }
-        self.remaining = (self.remaining + fraction * self.capacity).min(self.capacity);
+        let capacity = f64::from(self.capacity);
+        self.remaining = (self.remaining + f64::from(fraction) * capacity).min(capacity);
         Ok(())
     }
 
@@ -112,10 +131,10 @@ impl Region {
         if !(fraction.is_finite() && fraction > 0.0 && fraction < 1.0) {
             return Err(MaterialError::InvalidRegion);
         }
-        let integrity = self.integrity();
+        let integrity = self.remaining / f64::from(self.capacity);
         let part = |volume: f32| -> Result<Self, MaterialError> {
             let mut region = Self::new(self.material, volume)?;
-            region.remaining = region.capacity * integrity;
+            region.remaining = f64::from(region.capacity) * integrity;
             Ok(region)
         };
         Ok((

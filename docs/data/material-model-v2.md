@@ -73,7 +73,7 @@ Fresh identical shells hit a persistent plate. Both may yield. Damage per hit an
 | hit 15: shell vs tank at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11124.065 | 0 | 0.166 | a | 10907.119 | 0 | 0 | - | - | yes |
 | hit 16: shell vs tank at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11124.065 | 0 | 0.110 | a | 10907.119 | 0 | 0 | - | - | yes |
 | hit 17: shell vs tank at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11124.065 | 0 | 0.054 | a | 10907.119 | 0 | 0 | - | - | yes |
-| hit 18: shell vs tank at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10890.919 | 0 | 0 | a, b | 11140.266 | 0 | 0 | - | - | yes |
+| hit 18: shell vs tank at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10890.888 | 0 | 0 | a, b | 11140.297 | 0 | 0 | - | - | yes |
 
 ### quantity_and_thickness
 
@@ -81,8 +81,8 @@ Capacity scales with represented volume, so twice the plate takes about twice th
 
 | case | available | peak force | stress a | stress b | consumed a | consumed b | integrity a | integrity b | failed | excess | failure motion | failure dissipation | rebound | cumulative work a / b | closes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |
-| plate volume 20 wu^3: fails after 18 hits at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10890.919 | 0 | 0 | a, b | 11140.266 | 0 | 0 | - | - | yes |
-| plate volume 40 wu^3: fails after 36 hits at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10657.794 | 0 | 0 | a, b | 11373.391 | 0 | 0 | - | - | yes |
+| plate volume 20 wu^3: fails after 18 hits at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10890.888 | 0 | 0 | a, b | 11140.297 | 0 | 0 | - | - | yes |
+| plate volume 40 wu^3: fails after 36 hits at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10657.710 | 0 | 0 | a, b | 11373.475 | 0 | 0 | - | - | yes |
 | plate thickness 1 wu: one hit at 1.658 wu/s, 1.2x the thin plate's safe-limit speed | 0.685 | 979.851 | 20086.939 | 20086.939 | 0 | 0.205 | 1 | 1.000 | - | 0 | 0 | 0 | 0.794 | - | yes |
 | plate thickness 2 wu: one hit at 1.658 wu/s, 1.2x the thin plate's safe-limit speed | 0.685 | 1655.665 | 16970.562 | 16970.562 | 0 | 0 | 1 | 1 | - | 0 | 0 | 0 | 0.949 | - | yes |
 
@@ -154,7 +154,7 @@ A safe resting load charges nothing however long it rests. An overload yields an
 | case | available | peak force | stress a | stress b | consumed a | consumed b | integrity a | integrity b | failed | excess | failure motion | failure dissipation | rebound | cumulative work a / b | closes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |
 | tank resting on a wood plank: force 2000 over 2 wu^2 for 1000 ticks | 5 | 2000 | 1000 | - | 0 | - | 1 | - | - | 0 | 0 | 0 | - | 0 / - | yes |
-| press of force 6300, 1.05x the safe stress, fallback progression: fails after 12 ticks (0.200 s) | 65 | 6300 | 3150 | - | 20.000 | - | 0 | - | a | 3.815e-6 | 0 | 0 | - | - | yes |
+| press of force 6300, 1.05x the safe stress, fallback progression: fails after 12 ticks (0.200 s) | 65 | 6300 | 3150 | - | 20.000 | - | 0 | - | a | 2.289e-5 | 0 | 0 | - | - | yes |
 | press of force 9000, 1.5x the safe stress, fallback progression: fails after 2 ticks (0.033 s) | 245.000 | 9000 | 4500 | - | 40.000 | - | 0 | - | a | 160.000 | 0 | 0 | - | - | yes |
 | the 1.5x press with a measured 0.02 wu plastic displacement in one tick | 165 | 9000 | 4500 | - | 120 | - | 0.500 | - | - | 0 | 0 | 0 | - | - | yes |
 
@@ -191,7 +191,7 @@ The plank press and a connection moment just past their safe limits, stepped at 
 | 1.08x moment on a connection at 30 Hz: fails after 6 ticks (0.200 s) | 36.333 | 0 | 3240 | - | 21.333 | - | 0.822 | - | - | 0 | 0 | 0 | - | 21.333 / - | yes |
 | 1.08x moment on a connection at 60 Hz: fails after 12 ticks (0.200 s) | 25.667 | 0 | 3240 | - | 10.667 | - | 0.822 | - | - | 0 | 0 | 0 | - | 21.333 / - | yes |
 | 1.08x moment on a connection at 120 Hz: fails after 23 ticks (0.192 s) | 20.333 | 0 | 3240 | - | 5.333 | - | 0.822 | - | - | 0 | 0 | 0 | - | 21.333 / - | yes |
-| 1.08x moment on a connection at 240 Hz: fails after 46 ticks (0.192 s) | 17.667 | 0 | 3240 | - | 2.667 | - | 0.822 | - | - | 0 | 0 | 0 | - | 21.333 / - | yes |
+| 1.08x moment on a connection at 240 Hz: fails after 45 ticks (0.188 s) | 17.667 | 0 | 3240 | - | 2.667 | - | 0.822 | - | - | 0 | 0 | 0 | - | 21.333 / - | yes |
 
 ## Parameter sweeps
 
@@ -243,11 +243,11 @@ Plate toughness scaled around the reference value: hits to failure at 300 wu/s.
 
 | case | available | peak force | stress a | stress b | consumed a | consumed b | integrity a | integrity b | failed | excess | failure motion | failure dissipation | rebound | cumulative work a / b | closes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |
-| toughness x0.250: fails after 5 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 5503.735 | 0 | 0 | a, b | 16527.449 | 0 | 0 | - | - | yes |
-| toughness x0.500: fails after 9 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11007.481 | 0 | 0 | a, b | 11023.703 | 0 | 0 | - | - | yes |
-| toughness x1: fails after 18 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10890.919 | 0 | 0 | a, b | 11140.266 | 0 | 0 | - | - | yes |
-| toughness x2: fails after 36 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10657.794 | 0 | 0 | a, b | 11373.391 | 0 | 0 | - | - | yes |
-| toughness x4: fails after 72 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10191.544 | 0 | 0 | a, b | 11839.641 | 0 | 0 | - | - | yes |
+| toughness x0.250: fails after 5 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 5503.738 | 0 | 0 | a, b | 16527.445 | 0 | 0 | - | - | yes |
+| toughness x0.500: fails after 9 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11007.477 | 0 | 0 | a, b | 11023.708 | 0 | 0 | - | - | yes |
+| toughness x1: fails after 18 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10890.888 | 0 | 0 | a, b | 11140.297 | 0 | 0 | - | - | yes |
+| toughness x2: fails after 36 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10657.710 | 0 | 0 | a, b | 11373.475 | 0 | 0 | - | - | yes |
+| toughness x4: fails after 72 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10191.354 | 0 | 0 | a, b | 11839.830 | 0 | 0 | - | - | yes |
 
 ### strength_ratio
 

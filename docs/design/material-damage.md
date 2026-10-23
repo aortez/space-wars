@@ -143,7 +143,7 @@ W(F) = F^2 / (2*k) + max(F^2 - Y^2, 0) * (1/h - 1) / (2*k)
 Both sides carry the same force. Solve `W_a(F) + W_b(F) = energy`. Each curve
 is linear in force squared between its yield boundaries, so inversion crosses
 at most two boundaries. There is no iterative convergence loop or event-sized
-allocation. Intermediates use `f64` to avoid overflow and cancellation; public
+allocation. Intermediates use `f64` to avoid overflow and cancellation; impact
 inputs and outputs remain `f32` and nonfinite outputs are rejected.
 
 Bilinear post-yield stiffness is a standard approximation, with the second
@@ -211,8 +211,10 @@ Connections use the conservative combined stress `abs(axial)/area +
 abs(moment)/section_modulus`. Measured plastic extension/rotation is charged
 against the corresponding load scaled back to the safe limit. Missing
 components use the fallback over their contributing volume: all the beam in
-pure axial loading, one third in pure bending. Connections have their own
-capacity and can fail without deleting the assembly.
+pure axial loading, one third in pure bending. Bending and axial work are
+calculated separately; only the bending contribution supplies inferred plastic
+rotation. Pure axial loading therefore reports zero rotation. Connections have
+their own capacity and can fail without deleting the assembly.
 
 These slow-load modes retain a yield plateau; the transient compression curve
 is not applied as a history-dependent constitutive model to them. The fallback
@@ -269,6 +271,15 @@ state. `absorb` is the only lowering operation. `repair` requires explicit host
 authorization. `split` partitions volume, capacity and existing damage at the
 same integrity. Normalized health remains `100 * remaining / capacity`.
 
+Remaining capacity is accumulated in `f64`, including repair and split
+calculations, so small per-tick charges survive subtraction from large balances.
+Save `remaining_precise()` and restore that value with `with_remaining`;
+serialization and cloning also preserve this authoritative balance. The `f32`
+`remaining()` accessor supplies an event budget rounded upward by less than one
+`f32` ulp. This ensures that a final charge actually exhausts the region when
+the outcome reports failure. `absorb` returns any unspent rounding remainder;
+accounting comparisons must allow that bounded difference from `consumed`.
+
 Removing softening removes strength-driven event order dependence, but finite
 capacity and failure attribution still require a deterministic ordering. Hosts
 must apply each outcome before evaluating the next event sharing its region.
@@ -315,6 +326,11 @@ Representative v2 results:
   hulls. Zero-time sustained or connection updates add no work.
 - The fallback reaches matching capacity at 30, 60, 120 and 240 Hz, with
   failure time checked against a constant-rate analytical solution.
+- Small-charge regressions apply force 20000.25 to ARMOR volume 20 for 600
+  seconds at 1, 30, 120 and 240 Hz: all lose 600 capacity at displayed precision.
+  Tests also cover precise saved balances, repair, splitting and final failure.
+- Pure axial overload reports zero rotation while retaining its damage work;
+  pure bending and combined loads cover measured and inferred movement.
 - An independent displacement-space numerical integration checks the solved
   force below yield, with one side yielded, and with both yielded. A parameter
   grid checks closure and capacity limits over all six reference materials.
