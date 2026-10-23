@@ -22,6 +22,8 @@ pub mod linux;
 #[cfg(target_os = "linux")]
 pub mod maintenance;
 #[cfg(target_os = "linux")]
+mod network_access;
+#[cfg(target_os = "linux")]
 pub mod network_controller;
 #[cfg(target_os = "linux")]
 pub mod network_deployment;

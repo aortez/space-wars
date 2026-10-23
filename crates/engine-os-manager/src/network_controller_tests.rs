@@ -1452,3 +1452,39 @@ fn unmanaged_deployments_preserve_ethernet_and_block_on_an_unresolved_radio_comm
             .is_err()
     );
 }
+
+#[test]
+fn durable_failures_revoke_fast_admission_until_the_owner_is_reopened() {
+    for point in ["written", "file-synced", "renamed", "directory-synced"] {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("state");
+        let fake = Fake::new();
+        let mut controller = Controller::open(&path, fake.clone()).unwrap();
+        let initial = controller.status().unwrap();
+        let access = controller.access();
+        access.finish(Some(initial.clone()), controller.ssh_blocked());
+        assert!(access.protect_ssh());
+        controller.policy.fail_save_at(point);
+        assert!(
+            controller
+                .set_policy(
+                    initial.policy.generation,
+                    Policy {
+                        partial_offline: false,
+                        stay_connected: true
+                    }
+                )
+                .is_err()
+        );
+        assert!(!access.protect_ssh());
+        assert_eq!(
+            access.status().unwrap().deferred,
+            Some(Deferred::StorageUnavailable)
+        );
+        assert!(fake.calls().is_empty());
+        drop(controller);
+        let reopened = Controller::open(&path, fake).unwrap();
+        assert!(reopened.access().protect_ssh());
+        assert!(!access.protect_ssh()); // the old owner cannot recover by retry
+    }
+}

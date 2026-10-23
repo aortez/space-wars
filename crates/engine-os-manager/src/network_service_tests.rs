@@ -12,6 +12,8 @@ struct World {
     activity: Activity,
     writes: Vec<bool>,
     barrier: Option<(SyncSender<()>, Receiver<()>)>,
+    snapshot_delay: Duration,
+    snapshots: usize,
 }
 #[derive(Clone)]
 struct Fake(Arc<Mutex<World>>);
@@ -42,6 +44,8 @@ impl Fake {
             },
             writes: Vec::new(),
             barrier: None,
+            snapshot_delay: Duration::ZERO,
+            snapshots: 0,
         })))
     }
 }
@@ -54,6 +58,12 @@ impl Backend for Fake {
         })
     }
     fn snapshot(&mut self) -> Result<Snapshot> {
+        let delay = {
+            let mut world = self.0.lock().unwrap();
+            world.snapshots += 1;
+            world.snapshot_delay
+        };
+        thread::sleep(delay);
         let clock = self.clock()?;
         let world = self.0.lock().unwrap();
         Ok(Snapshot {
@@ -88,6 +98,33 @@ fn request(path: &Path, operation: &Request) -> Result<serde_json::Value> {
 }
 fn status(path: &Path) -> serde_json::Value {
     request(path, &Request::Status { schema: 1 }).unwrap()
+}
+
+#[test]
+fn diagnostic_reads_do_not_start_slow_refreshes_or_report_themselves_busy() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let fake = Fake::new();
+    let controller = Controller::open(&temp.path().join("state"), fake.clone()).unwrap();
+    let access = controller.access();
+    let _server = NetworkServer::bind(&path, uid(), controller).unwrap();
+    let until = Instant::now() + Duration::from_secs(1);
+    while access.status().is_none_or(|s| s.actual.is_none()) {
+        assert!(Instant::now() < until);
+        thread::sleep(Duration::from_millis(2));
+    }
+    let snapshots = {
+        let mut world = fake.0.lock().unwrap();
+        world.snapshot_delay = Duration::from_millis(150);
+        world.snapshots
+    };
+    for _ in 0..3 {
+        let observed = status(&path);
+        assert!(observed["error"].is_null());
+        assert!(observed["status"]["deferred"].is_null(), "{observed}");
+        assert_eq!(observed["status"]["actual"]["wireless_enabled"], true);
+    }
+    assert_eq!(fake.0.lock().unwrap().snapshots, snapshots);
 }
 
 #[test]
@@ -620,8 +657,13 @@ fn narrow_protocol_rejects_spoofed_identity_arbitrary_operations_and_stale_polic
     );
     assert!(fake.0.lock().unwrap().writes.is_empty());
     fs::write(temp.path().join("state/state.json"), b"{}").unwrap();
-    assert_eq!(status(&path)["error"], "unavailable");
+    // Mutations still check storage even when diagnostics use a completed
+    // snapshot. Once detected, corruption invalidates cached radio evidence.
     assert_eq!(request(&path, &change).unwrap()["error"], "rejected");
+    let failed = status(&path);
+    assert_eq!(failed["status"]["deferred"], "storage-unavailable");
+    assert!(failed["status"]["actual"].is_null());
+    assert!(failed["status"]["activity"].is_null());
     assert!(fake.0.lock().unwrap().writes.is_empty());
 }
 
@@ -705,6 +747,7 @@ fn a_socket_hold_during_shutdown_waits_for_restoration() {
 fn expired_queue_work_and_changed_process_identity_cannot_mutate_policy() {
     let temp = tempfile::tempdir().unwrap();
     let controller = Controller::open(&temp.path().join("state"), Fake::new()).unwrap();
+    let access = controller.access();
     let (tx, rx) = mpsc::sync_channel(4);
     let stop = Arc::new(AtomicBool::new(false));
     let stopping = stop.clone();
@@ -740,24 +783,7 @@ fn expired_queue_work_and_changed_process_identity_cannot_mutate_policy() {
             if expired { "expired" } else { "owner-gone" }
         );
     }
-    let (reply_tx, reply_rx) = mpsc::sync_channel(1);
-    tx.send(Work {
-        request: Request::Status { schema: 1 },
-        caller: identity,
-        deadline: Instant::now() + Duration::from_secs(2),
-        reply: reply_tx,
-    })
-    .unwrap();
-    assert!(
-        reply_rx
-            .recv_timeout(Duration::from_secs(2))
-            .unwrap()
-            .status
-            .unwrap()
-            .policy
-            .holds
-            .is_empty()
-    );
+    assert!(access.status().unwrap().policy.holds.is_empty());
     stop.store(true, Ordering::Relaxed);
     worker.join().unwrap();
 }
@@ -806,7 +832,16 @@ fn a_dead_coordinator_is_unavailable_rather_than_temporary_queue_pressure() {
     let caller = peer(&server, uid()).unwrap();
     let (tx, rx) = mpsc::sync_channel(1);
     drop(rx);
-    let worker = thread::spawn(move || handle(server, caller, tx).unwrap());
+    let worker = thread::spawn(move || {
+        handle(
+            server,
+            caller,
+            tx,
+            Access::default(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap()
+    });
     client
         .write_all(b"{\"schema\":1,\"command\":\"status\"}\n")
         .unwrap();
@@ -817,4 +852,230 @@ fn a_dead_coordinator_is_unavailable_rather_than_temporary_queue_pressure() {
         "unavailable"
     );
     worker.join().unwrap();
+}
+
+// Exercise the root-only handler without requiring the test runner to be root.
+// Production supplies Caller exclusively from SO_PEERCRED; the real listener's
+// non-root rejection is tested separately below.
+fn root_protection(access: Access) -> serde_json::Value {
+    unqueued_request(access, b"{\"command\":\"protect-ssh\",\"schema\":1}\n")
+}
+
+fn unqueued_request(access: Access, request: &[u8]) -> serde_json::Value {
+    let (mut client, server) = UnixStream::pair().unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .unwrap();
+    let (tx, rx) = mpsc::sync_channel(1);
+    let worker = thread::spawn(move || {
+        handle(
+            server,
+            Caller {
+                uid: 0,
+                pid: std::process::id(),
+                process_start_ticks: 1,
+            },
+            tx,
+            access,
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap()
+    });
+    client.write_all(request).unwrap();
+    let mut line = String::new();
+    BufReader::new(client).read_line(&mut line).unwrap();
+    worker.join().unwrap();
+    assert!(rx.try_recv().is_err()); // no work queued behind the stalled save
+    serde_json::from_str(&line).unwrap()
+}
+
+#[test]
+fn diagnostic_cache_bounds_startup_and_preserves_staleness_and_failure() {
+    let request = b"{\"command\":\"status\",\"schema\":1}\n";
+    let started = Instant::now();
+    assert_eq!(
+        unqueued_request(Access::default(), request)["error"],
+        "unavailable"
+    );
+    assert!(started.elapsed() < Duration::from_secs(1));
+
+    let temp = tempfile::tempdir().unwrap();
+    let mut controller = Controller::open(&temp.path().join("state"), Fake::new()).unwrap();
+    let initial = controller.status().unwrap();
+    let observed = serde_json::to_value(&initial.observed).unwrap();
+    let access = controller.access();
+    access.finish(Some(initial), controller.ssh_blocked());
+    thread::sleep(Duration::from_millis(5_100));
+    let stale = unqueued_request(access.clone(), request);
+    assert_eq!(stale["status"]["observed"], observed);
+    assert_eq!(stale["status"]["deferred"], "observation-unavailable");
+    assert!(stale["status"]["actual"].is_null());
+    assert!(stale["status"]["activity"].is_null());
+    access.stop();
+    let stopped = unqueued_request(access, request);
+    assert_eq!(stopped["status"]["deferred"], "coordinator-unavailable");
+    assert!(stopped["status"]["actual"].is_null());
+}
+
+#[test]
+fn stalled_saves_leave_status_and_root_admission_responsive_without_early_ack() {
+    for point in ["written", "file-synced", "renamed", "directory-synced"] {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("network.sock");
+        let fake = Fake::new();
+        let mut controller = Controller::open(&temp.path().join("state"), fake.clone()).unwrap();
+        let initial = controller.status().unwrap();
+        let access = controller.access();
+        access.finish(Some(initial.clone()), controller.ssh_blocked());
+        let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+        let (resume_tx, resume_rx) = mpsc::sync_channel(1);
+        controller.pause_save_at(point, entered_tx, resume_rx);
+        let _server = NetworkServer::bind(&path, uid(), controller).unwrap();
+        let client_path = path.clone();
+        let writer = thread::spawn(move || {
+            request(
+                &client_path,
+                &Request::SetPolicy {
+                    schema: 1,
+                    generation: initial.policy.generation,
+                    policy: Policy {
+                        partial_offline: false,
+                        stay_connected: true,
+                    },
+                },
+            )
+            .unwrap()
+        });
+        entered_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+        let started = Instant::now();
+        let observed = status(&path);
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert!(observed["error"].is_null());
+        assert_eq!(observed["status"]["deferred"], "coordinator-busy");
+        assert!(observed["status"]["actual"].is_null());
+        assert_eq!(
+            observed["status"]["policy"]["policy"]["stay_connected"],
+            false
+        );
+        let live_admission = request(&path, &Request::ProtectSsh { schema: 1 }).unwrap();
+        if uid() == 0 {
+            assert_eq!(live_admission["availability"], "session-protected");
+            assert!(live_admission["error"].is_null());
+        } else {
+            assert_eq!(live_admission["error"], "rejected");
+        }
+        for _ in 0..40 {
+            let admitted = root_protection(access.clone());
+            assert_eq!(admitted["availability"], "session-protected");
+            assert!(admitted["error"].is_null());
+        }
+        assert!(!writer.is_finished());
+        assert!(fake.0.lock().unwrap().writes.is_empty());
+        resume_tx.send(()).unwrap();
+        let committed = writer.join().unwrap();
+        assert!(committed["error"].is_null());
+        assert_eq!(
+            committed["status"]["policy"]["policy"]["stay_connected"],
+            true
+        );
+        assert!(
+            committed["status"]["policy"]["holds"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        if uid() != 0 {
+            assert_eq!(
+                request(&path, &Request::ProtectSsh { schema: 1 }).unwrap()["error"],
+                "rejected"
+            );
+        }
+    }
+}
+
+#[test]
+fn ssh_bridge_waits_for_owned_off_restoration_without_allocating_a_hold() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("state"), fake.clone()).unwrap();
+    let generation = controller.status().unwrap().policy.generation;
+    controller
+        .set_policy(
+            generation,
+            Policy {
+                partial_offline: true,
+                stay_connected: false,
+            },
+        )
+        .unwrap();
+    for ms in (200_000..=210_000).step_by(1_000) {
+        fake.0.lock().unwrap().ms = ms;
+        controller.tick().unwrap();
+    }
+    assert_eq!(fake.0.lock().unwrap().writes, vec![false]);
+    let access = controller.access();
+    access.finish(Some(controller.status().unwrap()), controller.ssh_blocked());
+    let _server = NetworkServer::bind(&path, uid(), controller).unwrap();
+    let first = root_protection(access.clone());
+    assert_eq!(first["error"], "unavailable");
+    let until = Instant::now() + Duration::from_secs(4);
+    loop {
+        let reply = root_protection(access.clone());
+        if reply["error"].is_null() {
+            assert_eq!(reply["availability"], "session-protected");
+            assert!(
+                reply["status"]["policy"]["holds"]
+                    .as_array()
+                    .unwrap()
+                    .is_empty()
+            );
+            break;
+        }
+        assert!(Instant::now() < until);
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(fake.0.lock().unwrap().writes, vec![false, true]);
+}
+
+#[test]
+fn slow_radio_intent_save_fences_admission_and_never_submits_an_early_set() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("state"), fake.clone()).unwrap();
+    let generation = controller.status().unwrap().policy.generation;
+    controller
+        .set_policy(
+            generation,
+            Policy {
+                partial_offline: true,
+                stay_connected: false,
+            },
+        )
+        .unwrap();
+    for ms in (200_000..210_000).step_by(1_000) {
+        fake.0.lock().unwrap().ms = ms;
+        controller.tick().unwrap();
+    }
+    let access = controller.access();
+    access.finish(Some(controller.status().unwrap()), controller.ssh_blocked());
+    let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+    let (resume_tx, resume_rx) = mpsc::sync_channel(1);
+    controller.pause_save_at("written", entered_tx, resume_rx);
+    fake.0.lock().unwrap().ms = 210_000;
+    let _server = NetworkServer::bind(&path, uid(), controller).unwrap();
+    entered_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let started = Instant::now();
+    assert_eq!(root_protection(access.clone())["error"], "unavailable");
+    assert_eq!(status(&path)["status"]["deferred"], "coordinator-busy");
+    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(fake.0.lock().unwrap().writes.is_empty());
+    resume_tx.send(()).unwrap();
+    let until = Instant::now() + Duration::from_secs(4);
+    while !root_protection(access.clone())["error"].is_null() {
+        assert!(Instant::now() < until);
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(fake.0.lock().unwrap().writes, vec![false, true]);
 }

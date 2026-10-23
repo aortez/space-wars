@@ -58,6 +58,7 @@ enum Work {
     Finish,
     Fail,
     Wait,
+    Flush,
 }
 struct World {
     ms: u64,
@@ -66,6 +67,7 @@ struct World {
     partial: bool,
     route: bool,
     radio_observed: bool,
+    network_stale: bool,
     radio_startup: bool,
     time: bool,
     work: Work,
@@ -80,6 +82,7 @@ struct World {
     renewals: usize,
     holds: BTreeMap<String, u64>,
     trace: Vec<&'static str>,
+    flush: Option<(mpsc::SyncSender<()>, mpsc::Receiver<()>)>,
 }
 #[derive(Clone)]
 struct Fake(Arc<Mutex<World>>);
@@ -92,6 +95,7 @@ impl Fake {
             partial: true,
             route: true,
             radio_observed: true,
+            network_stale: false,
             radio_startup: false,
             time: true,
             work: Work::Finish,
@@ -106,6 +110,7 @@ impl Fake {
             renewals: 0,
             holds: BTreeMap::from([("other-owner".into(), u64::MAX)]),
             trace: Vec::new(),
+            flush: None,
         })))
     }
     fn edit(&self, change: impl FnOnce(&mut World)) {
@@ -124,6 +129,9 @@ impl Inputs for Fake {
     }
     fn network(&self, _clock: &Clock) -> Option<Snapshot> {
         let w = self.0.lock().unwrap();
+        if w.network_stale {
+            return None;
+        }
         Some(Snapshot {
             epoch: w.epoch,
             status: network_controller::Status {
@@ -244,6 +252,23 @@ impl Backend for Fake {
                     thread::sleep(Duration::from_millis(2));
                 }
                 Err(interrupted())
+            }
+            Work::Flush => {
+                control.progress(Progress {
+                    phase: download::Phase::Downloading,
+                    candidate_id: None,
+                    bytes: 10,
+                    total: 10,
+                });
+                // A storage syscall cannot poll cancellation until it returns.
+                let (entered, resume) = fake.0.lock().unwrap().flush.take().unwrap();
+                entered.send(()).unwrap();
+                resume.recv_timeout(Duration::from_secs(5)).unwrap();
+                Ok(Finished {
+                    outcome: download::Outcome::NoCandidate,
+                    proof: None,
+                    time: control.checkpoint()?.unwrap(),
+                })
             }
         }
     }
@@ -800,6 +825,78 @@ fn runtime_channel_change_and_network_epoch_loss_cancel_before_releasing() {
         f.until(|f| f.runner.job.is_none());
         assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1, "{change}");
         assert_eq!(f.fake.0.lock().unwrap().sessions, 1, "{change}");
+    }
+}
+
+#[test]
+fn runtime_blocked_payload_flush_retains_ownership_and_settles_without_restart() {
+    for failure in ["none", "stale-observation", "renewal"] {
+        let mut f = Fixture::new();
+        let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+        let (resume_tx, resume_rx) = mpsc::sync_channel(1);
+        f.fake.edit(|w| {
+            w.work = Work::Flush;
+            w.flush = Some((entered_tx, resume_rx));
+        });
+        f.step();
+        entered_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+        f.step(); // Publish full payload receipt before the storage stall.
+        let next_ms = f.handle.status().unwrap().schedule.unwrap().next_ms;
+        f.fake.edit(|w| {
+            w.ms += 30_000;
+            w.network_stale = failure == "stale-observation";
+            w.fail_renew = failure == "renewal";
+        });
+        f.step();
+        let during = f.handle.status().unwrap();
+        assert_eq!(during.progress.unwrap().bytes, 10);
+        assert_eq!(
+            during.phase,
+            if failure == "none" {
+                Phase::Downloading
+            } else {
+                Phase::Stopping
+            },
+            "{failure}"
+        );
+        assert!(f.fake.0.lock().unwrap().running);
+        assert_eq!(f.fake.0.lock().unwrap().holds.len(), 2);
+        assert!(!f.fake.0.lock().unwrap().trace.contains(&"released"));
+
+        // Restored observations cannot revive a cancelled attempt while its
+        // original storage write is still outstanding.
+        f.fake.edit(|w| {
+            w.ms += 30_000;
+            w.network_stale = false;
+            w.fail_renew = false;
+        });
+        f.step();
+        resume_tx.send(()).unwrap();
+        f.until(|f| f.runner.job.is_none());
+        let after = f.handle.status().unwrap();
+        assert_eq!(after.phase, Phase::Idle, "{failure}");
+        assert!(after.ready.is_none());
+        let schedule = after.schedule.unwrap();
+        assert!(schedule.active.is_none());
+        assert_eq!(schedule.next_ms, next_ms);
+        assert_eq!(
+            schedule.completion,
+            Some(if failure == "none" {
+                Completion::NoCandidate
+            } else {
+                Completion::Cancelled
+            }),
+            "{failure}"
+        );
+        f.step();
+        let world = f.fake.0.lock().unwrap();
+        assert_eq!(world.sessions, 1);
+        assert_eq!(world.holds.len(), 1);
+        assert!(world.holds.contains_key("other-owner"));
+        assert_eq!(
+            &world.trace[world.trace.len() - 2..],
+            &["io-finished", "released"]
+        );
     }
 }
 
