@@ -207,11 +207,17 @@ zero friction/gravity/damping and one or four configured CCD substeps:
   that the body flag is not the only obstacle.
 
 CCD remains refused. Widening the penetration tolerance alone would admit
-position-correction work that the ledger does not own. The next experiment
-must preserve incoming work before speculative solving, establish an arrival
+position-correction work that the ledger does not own. Arrival handling must
+preserve incoming work before speculative solving, establish an arrival
 point/time suitable for the checked response, and prove that subsequent solve
 and correction cannot spend that work twice. Keep default physics unchanged
 outside an explicitly admitted material path.
+
+The [timed ball-arrival experiment](material-timed-arrival.md) now demonstrates
+that sequence for an isolated pair: drift to physical contact without speculative
+braking, then use the existing native material response. It preserves incoming
+work and matches touching-reference damage across tested timesteps, but remains
+fixture-only pending complete-scene admission and event-lifetime integration.
 
 Next work is contact-set admission, especially CCD arrivals, then additional
 geometry and loading classes. Freely rotating faces, mixed curved/flat contact,

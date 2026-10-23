@@ -1,6 +1,8 @@
 use super::*;
 use engine_material::{ARMOR, WOOD};
 
+mod arrival;
+
 const DT: f32 = 1.0 / 120.0;
 fn body(n: u64) -> BodyId {
     BodyId::new(PhysicsId::new(n), BodyRole::PRIMARY)
