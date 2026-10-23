@@ -4,6 +4,7 @@ members = [
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-gravity",
+    "crates/engine-material",
     "crates/engine-nes",
     "crates/engine-rapier",
     "crates/engine-soil",
@@ -53,6 +54,7 @@ clap = { version = "4", features = ["derive"] }
 cpal = "0.18.2"
 directories = "6"
 gilrs = { version = "0.11.2", default-features = false, features = ["xinput"] }
+libm = "0.2"
 rand = { version = "0.9", features = ["std_rng"] }
 png = "0.17"
 rapier2d = { version = "=0.34.0", default-features = false, features = [
@@ -80,6 +82,7 @@ engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 engine-agent = { path = "crates/engine-agent" }
 engine-gravity = { path = "crates/engine-gravity" }
+engine-material = { path = "crates/engine-material" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
 engine-soil = { path = "crates/engine-soil" }

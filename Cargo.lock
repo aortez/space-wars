@@ -1665,6 +1665,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine-material"
+version = "0.1.0"
+dependencies = [
+ "engine-core",
+ "libm",
+ "rapier2d",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "engine-nes"
 version = "0.1.0"
 dependencies = [
