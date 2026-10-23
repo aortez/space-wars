@@ -145,6 +145,144 @@ fn loss(response: &AppliedResponse) -> f64 {
         .sum()
 }
 
+#[test]
+fn speculative_arrivals_report_unmodeled_work_before_any_impact_episode() {
+    for ccd in [false, true] {
+        for substeps in [1, 4] {
+            for hz in [30.0, 60.0, 120.0, 240.0] {
+                for shift in [0.0, 17.0] {
+                    for reverse in [false, true] {
+                        let (mut world, tokens) = scene(1, reverse, shift, false);
+                        world.raw.integration_parameters.max_ccd_substeps = substeps;
+                        let h = world.body_handle(body(1)).unwrap();
+                        world.raw.bodies[h].enable_ccd(ccd);
+                        world.set_pose(body(1), -Vec2::X * 0.001, 0.0, true);
+                        world.set_velocity(body(1), Vec2::X * (400.0 + shift), 0.0, true);
+                        let before = balances(&world, &tokens);
+                        let initial = energy(&world, shift);
+                        let mut ordinary = world.clone();
+                        ordinary.loading.as_mut().unwrap().response = None;
+                        world.step(1.0 / hz);
+                        ordinary.step(1.0 / hz);
+                        assert!(world.loading_batches().iter().all(|b| b.events.is_empty()));
+                        assert!(
+                            world
+                                .loading_batches()
+                                .iter()
+                                .flat_map(|b| &b.contacts)
+                                .any(|c| c.separation > 1.0e-5 && c.closing_speed == 400.0)
+                        );
+                        assert_eq!(
+                            world.material_response_batches()[0].result,
+                            Err(ResponseRejection::SpeculativeArrival)
+                        );
+                        assert_eq!(world.material_response_diagnostics().applied_batches, 0);
+                        assert_eq!(world.motion(body(1)), ordinary.motion(body(1)));
+                        assert_eq!(world.motion(body(2)), ordinary.motion(body(2)));
+                        assert_eq!(before, balances(&world, &tokens));
+                        // Ordinary speculative solving spends almost all incoming
+                        // energy before there is a physical Impact to own it.
+                        assert!(initial - energy(&world, shift) > 0.99 * initial);
+                        for _ in 0..3 {
+                            world.step(1.0 / hz);
+                        }
+                        assert_eq!(before, balances(&world, &tokens));
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn speculative_admission_distinguishes_unbound_arrival_from_departure() {
+    for bound in [false, true] {
+        for speed in [-40.0, 0.0, 40.0] {
+            let (mut world, tokens) = scene(1, false, 0.0, false);
+            world.set_pose(body(1), -Vec2::X * 0.001, 0.0, true);
+            world.set_velocity(body(1), Vec2::X * speed, 0.0, true);
+            if !bound {
+                world.loading.as_mut().unwrap().unbind(collider(2, 0));
+            }
+            let before = balances(&world, &tokens);
+            world.step(DT);
+            if speed > 0.0 {
+                assert_eq!(
+                    world.material_response_batches()[0].result,
+                    Err(if bound {
+                        ResponseRejection::SpeculativeArrival
+                    } else {
+                        ResponseRejection::UnboundContact
+                    })
+                );
+            } else {
+                assert!(world.material_response_batches().is_empty());
+                assert_eq!(world.material_response_diagnostics().refused_batches, 0);
+            }
+            assert_eq!(before, balances(&world, &tokens));
+        }
+    }
+}
+
+#[test]
+fn ccd_clamped_arrivals_need_more_than_removing_the_body_guard() {
+    for substeps in [1, 4] {
+        for shift in [0.0, 17.0] {
+            for gap in [0.01, 0.1, 2.0] {
+                let (mut world, tokens) = scene(1, false, shift, false);
+                world.raw.integration_parameters.max_ccd_substeps = substeps;
+                let handle = world.body_handle(body(1)).unwrap();
+                world.raw.bodies[handle].enable_ccd(true);
+                world.set_pose(body(1), -Vec2::X * gap, 0.0, true);
+                world.set_velocity(body(1), Vec2::X * (400.0 + shift), 0.0, true);
+                let before = balances(&world, &tokens);
+                let initial = energy(&world, shift);
+                world.step(1.0 / 60.0);
+                assert!(world.material_response_batches().is_empty());
+                assert_eq!(energy(&world, shift), initial);
+                let snapshot = world.snapshot_bytes().unwrap();
+                let mut replay = PhysicsWorld::from_snapshot_bytes(&snapshot).unwrap();
+                // Disable CCD after the actual clamp to expose the independent
+                // geometry refusal at the backend's real arrival pose.
+                let mut geometry_probe = world.clone();
+                geometry_probe.raw.bodies[handle].enable_ccd(false);
+                let mut ordinary = world.clone();
+                ordinary.loading.as_mut().unwrap().response = None;
+                world.step(1.0 / 60.0);
+                replay.step(1.0 / 60.0);
+                geometry_probe.step(1.0 / 60.0);
+                ordinary.step(1.0 / 60.0);
+                assert_eq!(
+                    world.material_response_batches()[0].result,
+                    Err(ResponseRejection::UnsupportedBody)
+                );
+                assert_eq!(
+                    geometry_probe.material_response_batches()[0].result,
+                    Err(ResponseRejection::UnsupportedContact)
+                );
+                assert!(
+                    world
+                        .loading_batches()
+                        .iter()
+                        .flat_map(|b| &b.contacts)
+                        .any(|c| c.separation < -1.0e-5 && c.closing_speed == 400.0)
+                );
+                assert_eq!(
+                    world.material_response_batches(),
+                    replay.material_response_batches()
+                );
+                assert_eq!(
+                    world.snapshot_bytes().unwrap(),
+                    replay.snapshot_bytes().unwrap()
+                );
+                assert_eq!(world.motion(body(1)), ordinary.motion(body(1)));
+                assert_eq!(before, balances(&world, &tokens));
+                assert_eq!(before, balances(&geometry_probe, &tokens));
+            }
+        }
+    }
+}
+
 fn flat_scene(
     partitions: [u16; 2],
     copies: u16,

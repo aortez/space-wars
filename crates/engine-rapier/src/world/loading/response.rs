@@ -21,6 +21,9 @@ pub enum ResponseRejection {
     UnboundContact,
     MissingMaterial,
     UnsupportedContact,
+    /// Approaching separated solver contact. Ordinary solving can spend work
+    /// before capture observes a physical impact; that work is not modeled.
+    SpeculativeArrival,
     AmbiguousPatch,
     UnownedMotion,
     Budget(shared_impact::BudgetError),
@@ -180,10 +183,10 @@ impl ResponseState {
             .iter()
             .any(|e| e.transition == EpisodeTransition::Impact)
         {
-            // Capture cannot create a source episode for an unbound collision.
-            // Still expose touching unbound arrivals instead of silently
-            // presenting the missing data as a valid zero-damage observation.
-            if let Err(reason) = unbound_arrival(context, loading) {
+            // Neither an unbound collision nor a separated speculative contact
+            // necessarily creates an Impact event. Expose their fallback before
+            // ordinary solving can silently spend the incoming work.
+            if let Err(reason) = unhandled_arrival(context, loading) {
                 self.reject(batch.substep, reason);
             }
             return;
@@ -544,7 +547,7 @@ impl ResponseState {
     }
 }
 
-fn unbound_arrival(
+fn unhandled_arrival(
     context: &SolverContactBatchContext,
     loading: &LoadingState,
 ) -> Result<(), ResponseRejection> {
@@ -560,12 +563,10 @@ fn unbound_arrival(
     for pair in context.contact_pairs() {
         visit()?;
         let raw = [pair.collider1, pair.collider2];
-        if raw.iter().all(|h| {
+        let bound = raw.iter().all(|h| {
             decode_collider(context.colliders[*h].user_data)
                 .is_some_and(|id| loading.bindings.contains_key(&id))
-        }) {
-            continue;
-        }
+        });
         for manifold in &pair.manifolds {
             visit()?;
             for contact in &manifold.data.solver_contacts {
@@ -575,11 +576,17 @@ fn unbound_arrival(
                         context.bodies()[b].velocity_at_point(contact.point)
                     })
                 });
-                if contact.dist.abs() <= loading.config.touch_tolerance
-                    && (velocities[0] - velocities[1]).dot(manifold.data.normal)
-                        > loading.config.min_approach_speed
-                {
-                    return Err(ResponseRejection::UnboundContact);
+                let approach = (velocities[0] - velocities[1]).dot(manifold.data.normal);
+                if !contact.dist.is_finite() || !approach.is_finite() {
+                    return Err(ResponseRejection::UnsupportedContact);
+                }
+                if approach > loading.config.min_approach_speed {
+                    if !bound {
+                        return Err(ResponseRejection::UnboundContact);
+                    }
+                    if contact.dist > loading.config.touch_tolerance {
+                        return Err(ResponseRejection::SpeculativeArrival);
+                    }
                 }
             }
         }

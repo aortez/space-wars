@@ -47,8 +47,9 @@ The first adapter admits complete retained solver-contact batches with:
   comes from the law's `patch_width_from_radii`; flat width comes from the union
   of actual contact intervals. Thickness and depth come from registered sections.
 - Bound colliders and registered materials on both sides of every solver point.
-  Unbound touching arrivals are reported even when capture cannot assign an
-  episode to them.
+  Unbound approaching contacts are reported even when capture cannot assign an
+  episode to them. Approaching speculative contacts are also reported before
+  a physical impact exists; see the arrival evidence below.
 - No world gravity, joints, user forces/torques or damping. Sleeping bodies,
   CCD-enabled bodies, nondefault dominance, position-driven kinematics and
   rotating prescribed supports are refused. Constant translating supports are
@@ -124,6 +125,16 @@ the ordinary solver's residual velocity on the next frame. A new episode after
 separation can be evaluated normally. Earlier accepted substep batches remain
 committed if a later batch is refused.
 
+When no physical `Impact` exists, a bounded scan still checks approaching solver
+contacts. Bound contacts separated beyond capture's touching tolerance report
+`SpeculativeArrival`; unbound contacts report `UnboundContact`. This is a
+conservative warning of unmodeled solver work, even if a speculative point is
+too far away to collide this substep. Separating/resting points do not trigger
+it. No material evaluation, impulse or synthetic physical episode is created.
+If a physical impact later starts, its ordinary admission checks still apply;
+this does not recover work already spent during the speculative fallback.
+Hosts must retain refusals across steps when assessing complete accounting.
+
 At most 16 response batches are retained per outer step. If output is full,
 response is refused before material or backend mutation and the diagnostic
 reports `OutputLimit`. Earlier records remain intact. Each applied record is
@@ -155,6 +166,12 @@ Native regressions cover:
 - Flat-face refusal for rotational freedom, zero-width corner contact,
   disconnected footprints and noncoplanar intervals, with unchanged capacity
   and exact ordinary fallback motion.
+- Speculative arrivals with/without CCD at 30/60/120/240 Hz, reversed insertion
+  and moving supports; explicit fallback before any physical episode, unchanged
+  capacity and exact ordinary motion. Unbound arrivals and separating/resting
+  speculative contacts are distinguished.
+- Real CCD-clamped arrival poses, geometric refusal even after disabling the
+  CCD body guard, and exact snapshot continuation across the clamp.
 - Transmission through a resting dynamic chain, stable shared-region charging,
   an existing support episode receiving a later impact, and failure exactly once.
 - Unbound contacts, forces, gravity, friction, damping, unsupported geometry,
@@ -168,6 +185,33 @@ Native regressions cover:
 RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib world::loading::response
 RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib
 ```
+
+## Arrival evidence and next boundary
+
+Removing the CCD body guard does not yield a complete impact path. Native
+regressions use a mass-20 ball, relative speed 400, radius 0.5 against radius 0.5,
+zero friction/gravity/damping and one or four configured CCD substeps:
+
+- At an initial gap of 0.001, the retained solver point is speculative. The
+  solver spends over 99% of the incoming 1,600,000 energy units before capture
+  reports a physical `Impact`. This also occurs with CCD disabled. Previously
+  the native response produced no refusal at this boundary; it now reports
+  `SpeculativeArrival`. The test preserves this negative evidence instead of
+  calling the unchanged material balance a successful zero-damage result.
+- Starting farther away preserves incoming velocity through the CCD clamp,
+  but the next physical contact can be outside the response's `1e-5` touching
+  tolerance. In the fixed-support 60 Hz probe, gap 0.01 produced penetration
+  0.065; gap 0.1 produced about 0.000098. Rapier's clamp enforces minimum motion
+  of 15% of body CCD thickness, and shape-cast tolerances also affect arrival.
+  Disabling CCD after the clamp still leaves the geometry refusal, proving
+  that the body flag is not the only obstacle.
+
+CCD remains refused. Widening the penetration tolerance alone would admit
+position-correction work that the ledger does not own. The next experiment
+must preserve incoming work before speculative solving, establish an arrival
+point/time suitable for the checked response, and prove that subsequent solve
+and correction cannot spend that work twice. Keep default physics unchanged
+outside an explicitly admitted material path.
 
 Next work is contact-set admission, especially CCD arrivals, then additional
 geometry and loading classes. Freely rotating faces, mixed curved/flat contact,
