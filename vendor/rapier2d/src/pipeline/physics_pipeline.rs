@@ -16,7 +16,7 @@ use crate::geometry::{
     ContactManifoldIndex, ModifiedColliders, NarrowPhase, TemporaryInteractionIndex,
 };
 use crate::math::{Real, Vector};
-use crate::pipeline::{EventHandler, PhysicsHooks};
+use crate::pipeline::{EventHandler, PhysicsHooks, SolverContactBatchContext};
 use crate::prelude::ModifiedRigidBodies;
 use {crate::dynamics::RigidBodySet, crate::geometry::ColliderSet};
 
@@ -692,6 +692,12 @@ impl PhysicsPipeline {
             self.counters.custom.resume();
             self.interpolate_kinematic_velocities(&integration_parameters, islands, bodies);
             self.counters.custom.pause();
+            hooks.modify_solver_contacts_batch(&mut SolverContactBatchContext {
+                bodies,
+                colliders,
+                dt: integration_parameters.dt,
+                narrow_phase,
+            });
             self.build_islands_and_solve_velocity_constraints(
                 gravity,
                 &integration_parameters,

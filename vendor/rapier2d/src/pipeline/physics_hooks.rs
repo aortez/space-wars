@@ -5,9 +5,75 @@ use crate::dynamics::{RigidBodyHandle, RigidBodySet};
 #[cfg(feature = "alloc")]
 use crate::geometry::{ColliderHandle, ColliderSet, ContactManifold, SolverContact, SolverFlags};
 #[cfg(feature = "alloc")]
+use crate::geometry::{ContactPair, NarrowPhase};
+#[cfg(feature = "alloc")]
 use crate::math::{Real, Vector};
 #[cfg(feature = "alloc")]
 use na::ComplexField;
+
+/// Global contact view immediately before each velocity solve, including CCD
+/// substeps. Local contact modifiers have already run, and kinematic velocities
+/// have been interpolated. External forces have not yet been integrated.
+///
+/// Pair traversal order is unspecified. Collect and order records using host
+/// identities before allocating shared budgets. Contact topology and graph
+/// membership stay intact. A checked paired-impulse operation is available for
+/// explicitly admitted frictionless impacts; it does not disable constraints.
+#[cfg(feature = "alloc")]
+pub struct SolverContactBatchContext<'a> {
+    /// Current body state, before this substep's velocity solve.
+    pub(crate) bodies: &'a mut RigidBodySet,
+    /// Current collider state.
+    pub colliders: &'a ColliderSet,
+    /// Duration of this solver substep, not necessarily the full outer step.
+    pub dt: Real,
+    pub(crate) narrow_phase: &'a mut NarrowPhase,
+}
+
+#[cfg(feature = "alloc")]
+impl SolverContactBatchContext<'_> {
+    /// Read-only body view. Response mutations go through checked operations.
+    pub fn bodies(&self) -> &RigidBodySet {
+        self.bodies
+    }
+    /// All retained pairs, including empty, sleeping and speculative contacts.
+    /// The caller must distinguish these from new physical impacts.
+    pub fn contact_pairs(&self) -> impl Iterator<Item = &ContactPair> {
+        self.narrow_phase.contact_pairs()
+    }
+
+    /// Set restitution on every solver contact of an existing manifold.
+    /// Returns false for stale handles, a missing manifold, or a coefficient
+    /// outside the finite interval [0, 1]. Other contact properties are untouched.
+    pub fn set_restitution(
+        &mut self,
+        collider1: ColliderHandle,
+        collider2: ColliderHandle,
+        manifold: usize,
+        coefficient: Real,
+    ) -> bool {
+        if !coefficient.is_finite() || !(0.0..=1.0).contains(&coefficient) {
+            return false;
+        }
+        let Some(manifold) = self
+            .narrow_phase
+            .contact_pair_mut(collider1, collider2)
+            .and_then(|pair| pair.manifolds.get_mut(manifold))
+        else {
+            return false;
+        };
+        for contact in &mut manifold.data.solver_contacts {
+            contact.restitution = coefficient;
+        }
+        true
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "dim2"))]
+#[path = "normal_response.rs"]
+mod normal_response;
+#[cfg(all(feature = "alloc", feature = "dim2"))]
+pub use normal_response::ContactImpulse;
 
 /// Context given to custom collision filters to filter-out collisions.
 #[cfg(feature = "alloc")]
@@ -169,6 +235,10 @@ impl Default for ActiveHooks {
 /// User-defined functions called by the physics engines during one timestep in order to customize its behavior.
 #[cfg(all(target_arch = "wasm32", feature = "alloc"))]
 pub trait PhysicsHooks {
+    /// Global pre-solve contact batch; see [`SolverContactBatchContext`].
+    /// Called once per solver substep, independently of collider hook flags.
+    fn modify_solver_contacts_batch(&self, _context: &mut SolverContactBatchContext) {}
+
     /// Applies the contact pair filter.
     fn filter_contact_pair(&self, _context: &PairFilterContext) -> Option<SolverFlags> {
         Some(SolverFlags::COMPUTE_IMPULSES)
@@ -186,6 +256,11 @@ pub trait PhysicsHooks {
 /// User-defined functions called by the physics engines during one timestep in order to customize its behavior.
 #[cfg(all(not(target_arch = "wasm32"), feature = "alloc"))]
 pub trait PhysicsHooks: Send + Sync {
+    /// Global pre-solve contact batch; see [`SolverContactBatchContext`].
+    /// Called once per solver substep, independently of collider hook flags.
+    /// The default is a no-op, preserving existing solver behavior.
+    fn modify_solver_contacts_batch(&self, _context: &mut SolverContactBatchContext) {}
+
     /// Applies the contact pair filter.
     ///
     /// Note that this method will only be called if at least one of the colliders

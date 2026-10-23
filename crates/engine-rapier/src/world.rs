@@ -33,6 +33,7 @@ mod connectivity;
 #[cfg(feature = "query-diagnostics")]
 pub use connectivity::{CapsuleConnectivity, ConnectivityGrid};
 mod forecast_body;
+pub mod loading;
 mod query_snapshot;
 mod surface_drive;
 pub use query_snapshot::{
@@ -43,6 +44,8 @@ pub use query_snapshot::{
 pub use surface_drive::SurfaceDrive;
 
 const SNAPSHOT_VERSION: u32 = 1;
+const LOADING_SNAPSHOT_VERSION: u32 = 2;
+const RESPONSE_SNAPSHOT_VERSION: u32 = 3;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -655,6 +658,7 @@ pub struct PhysicsWorld {
     contact_event_collector: ContactEventCollector,
     sensor_intersections: Vec<SensorIntersection>,
     collect_events: bool,
+    loading: Option<loading::LoadingState>,
 }
 
 impl Clone for PhysicsWorld {
@@ -772,6 +776,7 @@ impl PhysicsWorld {
             contact_event_collector: ContactEventCollector::default(),
             sensor_intersections: Vec::new(),
             collect_events: config.collect_events,
+            loading: None,
         }
     }
 
@@ -928,6 +933,9 @@ impl PhysicsWorld {
         let Some(record) = self.entities.get(&entity).cloned() else {
             return false;
         };
+        if let Some(loading) = &mut self.loading {
+            loading.retire_entity(entity);
+        }
 
         for joint in record.joints {
             self.remove_joint(joint);
@@ -1238,7 +1246,20 @@ impl PhysicsWorld {
         dt_seconds: f32,
         drives: &[SurfaceDrive],
     ) -> PhysicsStepMetrics {
+        self.step_internal(dt_seconds, drives, true, None)
+    }
+
+    fn step_internal(
+        &mut self,
+        dt_seconds: f32,
+        drives: &[SurfaceDrive],
+        reset_loading: bool,
+        flight: Option<&std::sync::atomic::AtomicBool>,
+    ) -> PhysicsStepMetrics {
         let _span = crate::profile::span("world_step");
+        if reset_loading && let Some(loading) = &mut self.loading {
+            loading.begin_step();
+        }
         if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
             self.contact_events.clear();
             self.contact_event_collector.clear();
@@ -1279,14 +1300,25 @@ impl PhysicsWorld {
             }
         }
 
-        let hooks = surface_drive::DriveHooks(drives);
-        let restored_hooks = hooks.enable(&mut self.raw, &self.collider_indices, &self.colliders);
+        let capture_loading = self.loading.is_some();
+        let hooks = loading::Hooks {
+            flight,
+            drives: surface_drive::DriveHooks(drives),
+            loading: self.loading.as_mut().map(Mutex::new),
+            external_constraints: self.raw.gravity != Vector::ZERO
+                || !self.raw.impulse_joints.is_empty()
+                || self.raw.multibody_joints.iter().next().is_some(),
+        };
+        let restored_hooks =
+            hooks
+                .drives
+                .enable(&mut self.raw, &self.collider_indices, &self.colliders);
         let started = Instant::now();
         if self.collect_events {
             self.contact_event_collector.clear();
             self.raw
                 .step_with_events(&hooks, &self.contact_event_collector);
-        } else if !drives.is_empty() {
+        } else if !drives.is_empty() || capture_loading {
             self.raw.step_with_events(&hooks, &());
         } else {
             self.raw.step();
@@ -2131,8 +2163,14 @@ impl PhysicsWorld {
 
     /// Serialize authoritative Rapier state and all stable handle mappings.
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, PhysicsWorldError> {
-        bincode::serialize(&PhysicsSnapshotRef {
-            version: SNAPSHOT_VERSION,
+        let mut bytes = bincode::serialize(&PhysicsSnapshotRef {
+            version: if self.loading.as_ref().is_some_and(|s| s.response_enabled()) {
+                RESPONSE_SNAPSHOT_VERSION
+            } else if self.loading.is_some() {
+                LOADING_SNAPSHOT_VERSION
+            } else {
+                SNAPSHOT_VERSION
+            },
             gravity: &self.raw.gravity,
             integration_parameters: &self.raw.integration_parameters,
             islands: &self.raw.islands,
@@ -2149,17 +2187,48 @@ impl PhysicsWorld {
             entities: &self.entities,
             collect_events: self.collect_events,
         })
-        .map_err(|error| PhysicsWorldError(error.to_string()))
+        .map_err(|error| PhysicsWorldError(error.to_string()))?;
+        if let Some(loading) = &self.loading {
+            bincode::serialize_into(&mut bytes, loading)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            loading.serialize_response(&mut bytes)?;
+        }
+        Ok(bytes)
     }
 
     pub fn from_snapshot_bytes(bytes: &[u8]) -> Result<Self, PhysicsWorldError> {
-        let mut snapshot: PhysicsSnapshot =
-            bincode::deserialize(bytes).map_err(|error| PhysicsWorldError(error.to_string()))?;
-        if snapshot.version != SNAPSHOT_VERSION {
+        let mut reader = std::io::Cursor::new(bytes);
+        let mut snapshot: PhysicsSnapshot = bincode::deserialize_from(&mut reader)
+            .map_err(|error| PhysicsWorldError(error.to_string()))?;
+        if ![
+            SNAPSHOT_VERSION,
+            LOADING_SNAPSHOT_VERSION,
+            RESPONSE_SNAPSHOT_VERSION,
+        ]
+        .contains(&snapshot.version)
+        {
             return Err(PhysicsWorldError(format!(
                 "unsupported physics snapshot version {}",
                 snapshot.version
             )));
+        }
+        let mut loading: Option<loading::LoadingState> =
+            if snapshot.version >= LOADING_SNAPSHOT_VERSION {
+                Some(
+                    bincode::deserialize_from(&mut reader)
+                        .map_err(|error| PhysicsWorldError(error.to_string()))?,
+                )
+            } else {
+                None
+            };
+        if snapshot.version == RESPONSE_SNAPSHOT_VERSION {
+            loading
+                .as_mut()
+                .unwrap()
+                .deserialize_response(&mut reader)?;
+        }
+        if reader.position() != bytes.len() as u64 {
+            return Err(PhysicsWorldError("trailing physics snapshot data".into()));
         }
 
         // Rapier omits dispatchers from serialization. Restore our stateless
@@ -2187,7 +2256,7 @@ impl PhysicsWorld {
             .map(|(index, entry)| (entry.id, index))
             .collect();
 
-        Ok(Self {
+        let world = Self {
             raw: RapierWorld {
                 gravity: snapshot.gravity,
                 integration_parameters: snapshot.integration_parameters,
@@ -2212,7 +2281,16 @@ impl PhysicsWorld {
             contact_event_collector: ContactEventCollector::default(),
             sensor_intersections: Vec::new(),
             collect_events: snapshot.collect_events,
-        })
+            loading,
+        };
+        if world
+            .loading
+            .as_ref()
+            .is_some_and(|state| !state.valid_for(&world))
+        {
+            return Err(PhysicsWorldError("invalid loading capture snapshot".into()));
+        }
+        Ok(world)
     }
 
     pub(crate) fn body_handle(&self, id: BodyId) -> Option<RigidBodyHandle> {
@@ -2313,6 +2391,9 @@ impl PhysicsWorld {
     }
 
     fn remove_collider_mapping(&mut self, id: ColliderId) {
+        if let Some(loading) = &mut self.loading {
+            loading.unbind(id);
+        }
         let Some(index) = self.collider_indices.remove(&id) else {
             return;
         };
