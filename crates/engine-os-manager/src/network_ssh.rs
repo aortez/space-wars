@@ -63,13 +63,18 @@ fn admit_before(
         if absent && fallback().is_ok() {
             return Ok(());
         }
-        let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-            return Err(Error::Invalid(format!(
-                "SSH network protection refused: {}; no safe offline admission",
-                refusal_reason(&reply),
-            )));
-        };
-        std::thread::sleep(remaining.min(Duration::from_millis(200)));
+        if let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
+            std::thread::sleep(remaining.min(Duration::from_millis(200)));
+            if Instant::now() < deadline {
+                continue;
+            }
+        }
+        // Keep the last refusal: a request after expiry would replace it with
+        // a local deadline error before contacting the coordinator.
+        return Err(Error::Invalid(format!(
+            "SSH network protection refused: {}; no safe offline admission",
+            refusal_reason(&reply),
+        )));
     }
 }
 
@@ -249,6 +254,33 @@ mod tests {
                 .to_string()
                 .contains(expected)
             );
+        }
+    }
+
+    #[test]
+    fn retry_deadline_preserves_the_last_coordinator_refusal() {
+        for (wire, expected) in [
+            ("busy", "coordinator busy"),
+            ("unavailable", "coordinator unavailable"),
+            ("rejected", "coordinator rejected admission"),
+        ] {
+            let mut attempts = 0;
+            let error = admit_before(
+                Instant::now() + Duration::from_millis(50),
+                || {
+                    attempts += 1;
+                    if attempts == 1 {
+                        Ok(serde_json::json!({"schema": 1, "error": wire}))
+                    } else {
+                        Err(Error::Invalid("network request deadline exceeded".into()))
+                    }
+                },
+                || panic!("responsive coordinator refusal must not read offline storage"),
+            )
+            .unwrap_err()
+            .to_string();
+            assert_eq!(attempts, 1, "must not retry after sleeping to the deadline");
+            assert!(error.contains(expected), "{error}");
         }
     }
 
