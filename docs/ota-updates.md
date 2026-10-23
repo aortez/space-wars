@@ -712,8 +712,12 @@ Exhaustion fails before changing state. The schema and numeric CLI generation
 format stay unchanged; callers must obtain the generation from live status,
 not the private file.
 
-The socket handlers can serve SSH admission and diagnostic status while the
-single controller/storage worker is blocked. Cached diagnostics retain their
+The socket handlers serve diagnostic status from the latest completed coordinator
+snapshot without queuing another refresh or touching storage. This prevents a
+status request from reporting its own slow refresh as `coordinator-busy`. Before
+the first snapshot, status waits at most 250 ms for publication and otherwise
+reports unavailable. SSH admission and diagnostic status remain responsive while
+the single controller/storage worker is blocked. Cached diagnostics retain their
 original observation clock and committed policy generation; busy or stale
 snapshots omit actual radio/activity evidence and report `coordinator-busy`,
 `storage-unavailable` or `observation-unavailable` (`coordinator-unavailable`
@@ -726,10 +730,27 @@ claim that arbitrary USB operations have become bounded.
 Local tests pause saves at all four durability stages, verify prompt diagnostic
 and root-admission replies without premature mutation acknowledgement, retain
 the radio-intent fence, and cover restoration, revision exhaustion/restart,
-connection churn, storage failures and refusal reasons. The generation-8 device
-still has the previous implementation. The #523 fifteen-minute fresh-login run,
+connection churn, storage failures and refusal reasons. A 150 ms observation
+reproduced self-induced busy diagnostics before the snapshot-only correction;
+repeated diagnostic reads now return the completed observation without starting
+more work. Startup, stale-cache and stopped-owner controls retain explicit
+unavailability. A blocked-download-write fixture verifies ownership until I/O
+ends, cancellation on lost observations or failed renewal, eventual idle without
+restart, and preservation of the daily allowance.
+
+Generation 9 (`f64831ca2e16`) was installed on the Picade and committed a healthy
+trial on slot A, with Release restored and partial offline disabled. Saved data
+was preserved except for the Bluetooth attribute cache rebuilt at boot. That
+image predates the diagnostic correction above. During staging on generation 8,
+the automatic download was cancelled after receiving the full payload. It returned
+to idle after 288 seconds, about 104 seconds before the operator restarted the
+service; the earlier claim that it required a restart was incorrect. The native
+signed staging helper subsequently verified the payload. Slow-storage fixtures
+explain possible cancellation paths but do not identify the device's exact cause.
+[Follow-up evidence](data/ota-ssh-storage-followup-20261022.json) separates the
+installation from local tests. The #523 fifteen-minute fresh-login run,
 three-second status bound and installed refusal logs remain to be qualified on
-a separately reviewed image; no device deployment is implied by these tests.
+an image containing the diagnostic correction.
 
 The earlier 120-second SSH reservation implementation could retain all 32 slots
 while sessions were active or observation was incomplete. It allowed new SSH and

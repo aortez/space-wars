@@ -23,6 +23,7 @@ const CLIENTS: usize = 8;
 const FRAME_LIMIT: usize = 1024;
 const FRAME_DEADLINE: Duration = Duration::from_secs(5);
 const OPERATION_DEADLINE: Duration = Duration::from_secs(30);
+const INITIAL_STATUS_DEADLINE: Duration = Duration::from_millis(250);
 const TICK: Duration = Duration::from_secs(2);
 
 // Do not derive Debug: these requests contain the caller's secret capability.
@@ -323,11 +324,9 @@ fn coordinate<B: Backend>(
 fn perform<B: Backend>(controller: &mut Controller<B>, caller: Caller, request: Request) -> Reply {
     let result = (|| -> Result<Reply> {
         Ok(match request {
-            Request::ProtectSsh { .. } => Reply::reject(Rejection::InvalidRequest),
-            Request::Status { .. } => controller
-                .status()
-                .map(Reply::status)
-                .unwrap_or_else(|_| Reply::reject(Rejection::Unavailable)),
+            Request::ProtectSsh { .. } | Request::Status { .. } => {
+                Reply::reject(Rejection::InvalidRequest)
+            }
             Request::SetPolicy {
                 generation, policy, ..
             } => Reply::status(controller.set_policy(generation, policy)?),
@@ -460,12 +459,20 @@ fn handle(
         };
         return service::write_json(&mut stream, &reply);
     }
-    let diagnostic = matches!(request, Request::Status { .. });
-    if diagnostic
-        && access.busy()
-        && let Some(status) = access.status()
-    {
-        return service::write_json(&mut stream, &Reply::status(status));
+    if matches!(request, Request::Status { .. }) {
+        // Diagnostics consume completed observations; queuing a refresh here
+        // makes an otherwise idle request report its own work as "busy".
+        // Startup may briefly have no snapshot, but must not wait on IO.
+        let deadline = Instant::now() + INITIAL_STATUS_DEADLINE;
+        loop {
+            if let Some(status) = access.status() {
+                return service::write_json(&mut stream, &Reply::status(status));
+            }
+            if Instant::now() >= deadline {
+                return service::write_json(&mut stream, &Reply::reject(Rejection::Unavailable));
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
     }
     if waiting
         .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
@@ -492,29 +499,10 @@ fn handle(
             return service::write_json(&mut stream, &Reply::reject(Rejection::Unavailable));
         }
     }
-    loop {
-        let reply = match reply_rx.recv_timeout(Duration::from_millis(50)) {
-            Ok(reply) => reply,
-            Err(mpsc::RecvTimeoutError::Timeout) if Instant::now() < deadline => {
-                if diagnostic && access.busy() {
-                    if let Some(status) = access.status() {
-                        return service::write_json(&mut stream, &Reply::status(status));
-                    }
-                    if deadline.saturating_duration_since(Instant::now())
-                        < OPERATION_DEADLINE - Duration::from_millis(250)
-                    {
-                        return service::write_json(
-                            &mut stream,
-                            &Reply::reject(Rejection::Unavailable),
-                        );
-                    }
-                }
-                continue;
-            }
-            Err(_) => Reply::reject(Rejection::Unavailable),
-        };
-        return service::write_json(&mut stream, &reply);
-    }
+    let reply = reply_rx
+        .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+        .unwrap_or_else(|_| Reply::reject(Rejection::Unavailable));
+    service::write_json(&mut stream, &reply)
 }
 
 /// A lost response does not cancel a reservation. Retry Admit with the same

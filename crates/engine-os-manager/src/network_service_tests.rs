@@ -12,6 +12,8 @@ struct World {
     activity: Activity,
     writes: Vec<bool>,
     barrier: Option<(SyncSender<()>, Receiver<()>)>,
+    snapshot_delay: Duration,
+    snapshots: usize,
 }
 #[derive(Clone)]
 struct Fake(Arc<Mutex<World>>);
@@ -42,6 +44,8 @@ impl Fake {
             },
             writes: Vec::new(),
             barrier: None,
+            snapshot_delay: Duration::ZERO,
+            snapshots: 0,
         })))
     }
 }
@@ -54,6 +58,12 @@ impl Backend for Fake {
         })
     }
     fn snapshot(&mut self) -> Result<Snapshot> {
+        let delay = {
+            let mut world = self.0.lock().unwrap();
+            world.snapshots += 1;
+            world.snapshot_delay
+        };
+        thread::sleep(delay);
         let clock = self.clock()?;
         let world = self.0.lock().unwrap();
         Ok(Snapshot {
@@ -88,6 +98,33 @@ fn request(path: &Path, operation: &Request) -> Result<serde_json::Value> {
 }
 fn status(path: &Path) -> serde_json::Value {
     request(path, &Request::Status { schema: 1 }).unwrap()
+}
+
+#[test]
+fn diagnostic_reads_do_not_start_slow_refreshes_or_report_themselves_busy() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let fake = Fake::new();
+    let controller = Controller::open(&temp.path().join("state"), fake.clone()).unwrap();
+    let access = controller.access();
+    let _server = NetworkServer::bind(&path, uid(), controller).unwrap();
+    let until = Instant::now() + Duration::from_secs(1);
+    while access.status().is_none_or(|s| s.actual.is_none()) {
+        assert!(Instant::now() < until);
+        thread::sleep(Duration::from_millis(2));
+    }
+    let snapshots = {
+        let mut world = fake.0.lock().unwrap();
+        world.snapshot_delay = Duration::from_millis(150);
+        world.snapshots
+    };
+    for _ in 0..3 {
+        let observed = status(&path);
+        assert!(observed["error"].is_null());
+        assert!(observed["status"]["deferred"].is_null(), "{observed}");
+        assert_eq!(observed["status"]["actual"]["wireless_enabled"], true);
+    }
+    assert_eq!(fake.0.lock().unwrap().snapshots, snapshots);
 }
 
 #[test]
@@ -620,8 +657,13 @@ fn narrow_protocol_rejects_spoofed_identity_arbitrary_operations_and_stale_polic
     );
     assert!(fake.0.lock().unwrap().writes.is_empty());
     fs::write(temp.path().join("state/state.json"), b"{}").unwrap();
-    assert_eq!(status(&path)["error"], "unavailable");
+    // Mutations still check storage even when diagnostics use a completed
+    // snapshot. Once detected, corruption invalidates cached radio evidence.
     assert_eq!(request(&path, &change).unwrap()["error"], "rejected");
+    let failed = status(&path);
+    assert_eq!(failed["status"]["deferred"], "storage-unavailable");
+    assert!(failed["status"]["actual"].is_null());
+    assert!(failed["status"]["activity"].is_null());
     assert!(fake.0.lock().unwrap().writes.is_empty());
 }
 
@@ -705,6 +747,7 @@ fn a_socket_hold_during_shutdown_waits_for_restoration() {
 fn expired_queue_work_and_changed_process_identity_cannot_mutate_policy() {
     let temp = tempfile::tempdir().unwrap();
     let controller = Controller::open(&temp.path().join("state"), Fake::new()).unwrap();
+    let access = controller.access();
     let (tx, rx) = mpsc::sync_channel(4);
     let stop = Arc::new(AtomicBool::new(false));
     let stopping = stop.clone();
@@ -740,24 +783,7 @@ fn expired_queue_work_and_changed_process_identity_cannot_mutate_policy() {
             if expired { "expired" } else { "owner-gone" }
         );
     }
-    let (reply_tx, reply_rx) = mpsc::sync_channel(1);
-    tx.send(Work {
-        request: Request::Status { schema: 1 },
-        caller: identity,
-        deadline: Instant::now() + Duration::from_secs(2),
-        reply: reply_tx,
-    })
-    .unwrap();
-    assert!(
-        reply_rx
-            .recv_timeout(Duration::from_secs(2))
-            .unwrap()
-            .status
-            .unwrap()
-            .policy
-            .holds
-            .is_empty()
-    );
+    assert!(access.status().unwrap().policy.holds.is_empty());
     stop.store(true, Ordering::Relaxed);
     worker.join().unwrap();
 }
@@ -832,6 +858,10 @@ fn a_dead_coordinator_is_unavailable_rather_than_temporary_queue_pressure() {
 // Production supplies Caller exclusively from SO_PEERCRED; the real listener's
 // non-root rejection is tested separately below.
 fn root_protection(access: Access) -> serde_json::Value {
+    unqueued_request(access, b"{\"command\":\"protect-ssh\",\"schema\":1}\n")
+}
+
+fn unqueued_request(access: Access, request: &[u8]) -> serde_json::Value {
     let (mut client, server) = UnixStream::pair().unwrap();
     client
         .set_read_timeout(Some(Duration::from_secs(1)))
@@ -851,14 +881,40 @@ fn root_protection(access: Access) -> serde_json::Value {
         )
         .unwrap()
     });
-    client
-        .write_all(b"{\"command\":\"protect-ssh\",\"schema\":1}\n")
-        .unwrap();
+    client.write_all(request).unwrap();
     let mut line = String::new();
     BufReader::new(client).read_line(&mut line).unwrap();
     worker.join().unwrap();
     assert!(rx.try_recv().is_err()); // no work queued behind the stalled save
     serde_json::from_str(&line).unwrap()
+}
+
+#[test]
+fn diagnostic_cache_bounds_startup_and_preserves_staleness_and_failure() {
+    let request = b"{\"command\":\"status\",\"schema\":1}\n";
+    let started = Instant::now();
+    assert_eq!(
+        unqueued_request(Access::default(), request)["error"],
+        "unavailable"
+    );
+    assert!(started.elapsed() < Duration::from_secs(1));
+
+    let temp = tempfile::tempdir().unwrap();
+    let mut controller = Controller::open(&temp.path().join("state"), Fake::new()).unwrap();
+    let initial = controller.status().unwrap();
+    let observed = serde_json::to_value(&initial.observed).unwrap();
+    let access = controller.access();
+    access.finish(Some(initial), controller.ssh_blocked());
+    thread::sleep(Duration::from_millis(5_100));
+    let stale = unqueued_request(access.clone(), request);
+    assert_eq!(stale["status"]["observed"], observed);
+    assert_eq!(stale["status"]["deferred"], "observation-unavailable");
+    assert!(stale["status"]["actual"].is_null());
+    assert!(stale["status"]["activity"].is_null());
+    access.stop();
+    let stopped = unqueued_request(access, request);
+    assert_eq!(stopped["status"]["deferred"], "coordinator-unavailable");
+    assert!(stopped["status"]["actual"].is_null());
 }
 
 #[test]

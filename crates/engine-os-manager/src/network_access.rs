@@ -51,10 +51,6 @@ impl Access {
             Some(Deferred::CoordinatorUnavailable);
     }
 
-    pub fn busy(&self) -> bool {
-        self.0.lock().expect("network access mutex").busy
-    }
-
     /// The accepted TCP connection and activating sshd unit are already visible
     /// to the OS observer. One short bridge protects that handoff; it allocates
     /// no per-connection lease and cannot exhaust the general hold table.
