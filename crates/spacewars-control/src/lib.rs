@@ -8,6 +8,7 @@ mod client;
 mod clock;
 mod health;
 mod input;
+pub mod install;
 #[cfg(target_os = "linux")]
 pub mod network;
 pub use health::{

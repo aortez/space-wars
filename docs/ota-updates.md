@@ -7,7 +7,7 @@ outside this update path; incompatible boot assets require a supervised upgrade.
 
 ## Current implementation
 
-Status reviewed **2026-10-18**. This section is the active OTA plan; the detailed
+Status reviewed **2026-10-23**. This section is the active OTA plan; the detailed
 implementation and dated experiments below retain their original source and
 device scope. A past experiment's “not installed” or “remaining” statement is
 not the current fleet status. Do not replay a retained operator script without
@@ -40,11 +40,20 @@ for preservation, hardware evidence and the remaining rollout gates.
 
 ### Latest qualified state
 
-The latest qualified image source is `bde737f96c82182ca908e544bc6f81b5252cac2b`
-in [PR #510](https://github.com/aortez/space-wars/pull/510), installed only on the
-owner-selected second Picade. The [review-fix record](data/ota-picade2-review-fixes-20261018.json)
-binds its exact build, signed generation 7, native controls and installed checks.
-These remain supervised branch results, not unattended rollout qualification.
+The latest qualified image source on the owner-selected second Picade is
+`44c3647657964600fdd7e21195a5d9356466b8be`, signed generation 10. The
+[SSH qualification record](data/ota-ssh-storage-qualification-20261023.json)
+binds its committed slot-B trial, installed binaries, 384 fresh logins over
+fifteen minutes, forty unauthenticated connections and installed refusal logs.
+Implementation #526 and evidence #529 are merged; #523 is closed. A normal
+generation-10 boot and automatic payload staging were not tested in that run.
+These remain supervised results, not unattended rollout qualification.
+
+The earlier [generation-7 review-fix record](data/ota-picade2-review-fixes-20261018.json)
+and the [generation-8 rfkill evidence PR #525](https://github.com/aortez/space-wars/pull/525)
+retain their exact sources and separate restart/radio/time/OTA scope. #511 is
+closed after the generation-8 qualification; #525 remains an open documentation
+PR at this checkpoint.
 The [generation-6 Pi 5 record](data/ota-profile-image-20261018.json) and
 [earlier second-Picade record](data/ota-picade2-profile-image-20261018.json) retain
 their original source `0a32db2` and scope.
@@ -53,15 +62,15 @@ their original source `0a32db2` and scope.
 | --- | --- | --- |
 | `spacewars.local`, Pi 5 / HyperPixel | Source `0a32db2`, signed Nightly generation 6; healthy trial/normal boot and radio/time/OTA cycles | Review-fix image rollout, actual daily timer, payload/gameplay checks, integrated install policy |
 | `sw-picade.local`, primary Pi 4 / Picade | Source `5b420c9`, good generation 2; healthy game/recovery, update preparation failing; candidate provider/SSH controls passed | Corrected-image rollout and installed startup/radio/time/OTA checks |
-| `sw-picade-2.local`, second Pi 4 / Picade | Source `bde737f`, signed Nightly generation 7; healthy trial/default boot, restart, native startup/SSH/provider controls and combined radio/time/OTA cycle | #511 readback correction; actual daily timer, payload/SSH/gameplay performance, integrated install policy and remaining failure matrix |
-| Owner feed | Seven supervised Nightly generations, metadata version 8; Release empty | Protected automated publishing, renewal and explicit Release promotion |
+| `sw-picade-2.local`, second Pi 4 / Picade | Source `44c36476`, signed Nightly generation 10; healthy committed trial on slot B and passed SSH storage/refusal qualification; currently selected Release, partial offline off | Normal generation-10 boot, actual daily timer, new/resumed payload and gameplay performance, integrated install policy and remaining failure matrix |
+| Owner feed | Ten supervised Nightly generations, metadata version 11; Release empty in the generation-10 publication | Protected automated publishing, renewal and explicit Release promotion |
 
-The time-wake experiments used the real `sync-now` API, and OTA joined
+The earlier time-wake experiments used the real `sync-now` API, and OTA joined
 automatically. They did not observe the daily timer. The already-current image
 was ineligible, so those cycles downloaded or installed no new payload. Publication
 and installation automation remain disabled. The selected device was returned
 to Release with partial offline disabled; the other two units were not accessed
-or changed during this review-fix qualification.
+or changed during the generation-10 qualification.
 
 ### Review corrections and next network gate
 
@@ -96,9 +105,11 @@ A follow-up review of #510 found two logging problems. Log lines carried
 terminal color codes, which `journalctl` shows as blob data, and SSH admission
 errors went to the client connection. Logs are now plain text unless stderr is a
 terminal, and the `sshd@` drop-in sends helper errors to the journal. CI
-ShellCheck now covers the NM launcher. These changes are not yet device-qualified.
-Qualify them with #511: SSH logins must still work, and a rejected admission's
-reason must appear in `journalctl -u 'sshd@*'`.
+ShellCheck now covers the NM launcher. Generation 8 verified packaged warnings,
+real SSH refusal routing to the journal and successful fresh logins afterwards
+([#511 close-out](https://github.com/aortez/space-wars/issues/511#issuecomment-6354677073)).
+Generation 10 additionally verified the installed helper's busy, unavailable
+and rejected reasons at their full deadlines in an isolated journalled unit.
 
 The owner staging helper first rejected its native NTP receipt precondition,
 before opening trust/staging or starting a download. The general service still
@@ -116,9 +127,11 @@ The older delayed-rfkill-readback risk from
 tests cover a delayed signal and readback, duplicate old-value notifications,
 expiry with late or queued completion, service restart, witness changes, monitor
 conflicts and SSH restoration. The monitor tests, and one coordinator test,
-use the real monitor on a private bus. The change is not yet device-qualified;
-keep partial offline disabled outside supervised tests until it passes on the
-selected Pi.
+use the real monitor on a private bus. Same-source native tests on the selected
+Pi and installed generation-8 normal/loaded radio cycles completed qualification
+for #511. The live cycles did not exhibit stale readback; delayed-provider
+behavior is established by the deterministic Pi fixtures. Keep unattended
+partial-offline rollout behind the remaining #267 gates.
 
 ### Remaining work and ownership
 
@@ -140,15 +153,16 @@ New image changes and previously untested failure cases still need qualification
 
 ### Next implementation sequence
 
-1. Network reliability: #510 has generation-6 Pi 5 evidence and revised
-   generation-7 qualification on the selected second Picade. #511's
-   bounded-readback correction has local deterministic tests. Before install-flow
-   work, qualify it and #510's logging follow-up together, on one image on the
-   selected Pi. Per-device corrected-image rollout remains tracked in #267.
+1. The selected-Pi network gate is complete: #511's readback qualification and
+   #523's SSH/storage qualification passed. Land the retained #525 evidence PR;
+   per-device corrected-image rollout remains tracked in #267.
 2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
    consent, app save/acknowledgement, fixed privileged install operation, progress,
    trial and confirmed outcome. Define their shared handoff together; the
    installer transaction belongs to #264 and user/host consent to #266.
+   The [manual handoff contract](ota-install-handoff.md) now has shared messages,
+   service/app state machines and deterministic race tests. Socket, UI, actual
+   save-receipt and native writer integration remain; no install API is enabled.
 3. Add saved Ask/Automatic settings and the overnight/idle/countdown/postponement
    policy to that same install flow. Automatic must not be a second installer.
 4. Finish #262's protected publisher and daily metadata renewal. Tag-triggered
