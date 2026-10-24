@@ -127,5 +127,7 @@ The follow-up [three-body arrival experiment](material-multi-arrival.md) proves
 bounded sequential, simultaneous and supported arrivals in collinear fixtures.
 It retains a timer-only rapid-reimpact refusal; the optional
 [verified-departure fixture](material-verified-departure.md) now demonstrates
-fresh episode ownership after proven separation. Native integration still needs
-complete admission and endpoint-event semantics. Runtime admission is unchanged.
+fresh episode ownership after proven separation. The separate
+[native three-ball operation](material-native-line-arrival.md) now supplies
+complete admission, persistent departure evidence and explicit endpoint events
+for that restricted scene. This two-ball operation's admission is unchanged.

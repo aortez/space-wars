@@ -1,11 +1,14 @@
 # Three-body arrival experiment (#327)
 
-The native arrival operation still admits only two balls. This experiment in
+The original native arrival operation admits two balls. This experiment in
 `world/loading/response/tests/multi_arrival.rs` establishes scheduling evidence
 for exactly three collinear, centered, rotation-locked balls of radius 0.5.
 Fixture construction supplies full registration, collider bindings, equal
 radius duplicates, zero friction, no gravity, forces, joints, damping or CCD,
 and disabled sleeping. It is not a runtime admission checker or public API.
+The separate [native three-ball operation](material-native-line-arrival.md) now
+implements this restricted scheduler; these fixtures remain an independent
+reference, including the timer-only refusal below.
 
 ## Response before choosing the next duration
 
@@ -105,17 +108,17 @@ that contract.
 The optional [verified-departure follow-up](material-verified-departure.md)
 now admits this sequence in the fixture by recording physical departure during
 accepted drift, then letting the return acquire a fresh episode. The timer-only
-counterexample above remains unchanged, and native behavior is still unchanged.
+counterexample above remains unchanged. The native three-ball follow-up uses
+verified departures, while the original two-ball operation keeps its contract.
 
 ## Remaining work
 
-These fixtures do not change native admission, introduce a scenario, establish
-general 2D/rotating/flat geometry scheduling, or complete #327. A runtime path
-needs whole-scene admission, complete contact filtering proofs, numerical
-simultaneity policy, persistent reimpact ownership and ordinary output/metric
-semantics. The preview/capture mechanism is test-only and is not a promised
-production architecture. Pulse-allocation calibration remains unresolved;
-conservation and replay evidence do not establish physical accuracy.
+These fixtures do not introduce a scenario, establish general 2D/rotating/flat
+geometry scheduling, or complete #327. The native follow-up supplies whole-scene
+admission, persistent reimpact ownership and output/metric semantics only for
+three horizontal radius-0.5 balls. The preview/capture architecture remains
+experimental. Pulse-allocation calibration remains unresolved; conservation
+and replay evidence do not establish physical accuracy.
 
 ```sh
 RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib three_body_

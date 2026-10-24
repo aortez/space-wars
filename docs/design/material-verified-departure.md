@@ -4,8 +4,10 @@ The [three-body arrival fixture](material-multi-arrival.md) now has an optional
 departure policy. It allows a new impact after verified physical separation,
 without waiting for the ordinary contact-absence grace timer. This remains a
 test-only experiment for three collinear, centered, rotation-locked balls.
-Native admission, production snapshot schemas and default episode behavior are
-unchanged. Fixture snapshots also preserve pending departure evidence.
+Fixture snapshots preserve pending departure evidence. The separate
+[native three-ball follow-up](material-native-line-arrival.md) now implements
+this rule with snapshot version 4 and explicit endpoint events. The fixture
+remains independent; default episode behavior is unchanged.
 
 ## Departure evidence
 
@@ -81,9 +83,8 @@ bundles a `DepartureTracker` with its physics snapshot and stages both together.
 There is at most one witness per retained pair (at most three in these fixtures).
 Restoring only the physics snapshot would lose eligibility at a rounded boundary;
 clone/replay therefore round-trip the complete fixture snapshot. Pause preserves
-the tracker. A future native implementation must persist this evidence or supply
-an equivalent ownership rule. End observations remain transient and need an
-explicit endpoint-event contract in the runtime API.
+the tracker. The native follow-up persists this evidence in the physics snapshot
+and provides a public event stream for transient endpoint observations.
 
 ## Evidence
 
@@ -132,10 +133,10 @@ still refused.
 ## Next integration boundary
 
 This establishes evidence for the departure rule in the admitted fixtures.
-Promoting it requires complete native scene admission, actual geometry/source
+The native follow-up supplies complete scene admission, actual geometry/source
 coverage for every departure, bounded scheduling, and a public output contract
-for endpoint End observations alongside pre-solve Impact/Support events. The
-fixture's preview-clone mechanism is not a promised runtime architecture.
+for endpoint End observations alongside pre-solve Impact/Support events within
+the same restricted geometry. The preview-clone architecture is experimental.
 General 2D/rotating/flat geometry, other loading classes, physical pulse
 calibration and #328 failure consequences remain outside this experiment.
 

@@ -161,7 +161,10 @@ capture state, followed by numeric material/section parameters, precise balances
 and law/allocation version identifiers. Restore validates token liveness,
 registry bounds, material/section ranges, finite balances and model versions.
 Capture-only worlds retain version 2; capture-disabled worlds retain version 1.
-Existing versions 1 and 2 remain readable.
+Existing versions 1 and 2 remain readable. The opt-in
+[three-ball arrival operation](material-native-line-arrival.md) uses version 4
+after its first successful positive step, appending pending departure evidence
+without changing these capture/response payloads. Versions 1–3 remain readable.
 
 Response output and diagnostics are transient. Same-build continuation restores
 capacities and episodes exactly and does not replay an already spent impact.
