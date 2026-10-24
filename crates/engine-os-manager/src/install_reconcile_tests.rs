@@ -29,6 +29,24 @@ fn uid() -> u32 {
 }
 
 #[test]
+fn maintenance_runs_without_a_kiosk_request() {
+    let dir = tempfile::tempdir().unwrap();
+    let (send, receive) = mpsc::sync_channel(1);
+    let runtime = Runtime::bind_with_background(
+        &dir.path().join("reconcile.sock"),
+        uid(),
+        id(9),
+        Arc::new(|_| panic!("no kiosk request was sent")),
+        Some(Box::new(move || {
+            let _ = send.try_send(());
+        })),
+    )
+    .unwrap();
+    receive.recv_timeout(Duration::from_secs(4)).unwrap();
+    drop(runtime);
+}
+
+#[test]
 fn native_decision_mapping_never_clears_an_unknown_held_ticket() {
     let held = ticket();
     assert_eq!(

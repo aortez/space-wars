@@ -6,14 +6,70 @@ use spacewars_control::install::{Candidate, Channel, Consent, HostGate, HostInst
 use std::fs;
 use std::os::unix::fs::{PermissionsExt, symlink};
 
-#[allow(dead_code)]
-#[path = "../../engine-ota/tests/support/mod.rs"]
-mod feed;
+use crate::test_feed as feed;
 
 const BOOT: &str = "11111111-2222-3333-4444-555555555555";
 
 fn hash(name: &str) -> Sha256 {
     Sha256::digest(name.as_bytes())
+}
+
+#[test]
+fn deployment_capability_survives_restart_and_is_retained_until_terminal_release() {
+    use crate::network_policy::HoldToken;
+    let mut f = Fixture::new();
+    let token = HoldToken::generate().unwrap();
+    f.journal
+        .as_mut()
+        .unwrap()
+        .prepare_inner(&f.prepare, BOOT, 4, &f.before, Some(token.clone()))
+        .unwrap();
+    f.reopen();
+    let journal = f.journal.as_mut().unwrap();
+    assert_eq!(journal.deployment().unwrap().as_ref(), Some(&token));
+    assert!(!format!("{:?}", journal.record).contains(token.expose()));
+    assert!(matches!(
+        journal.reconcile_inner(&f.before).unwrap(),
+        Resolution::Aborted(_)
+    ));
+    let mut host = f.context.host.clone().unwrap();
+    host.fenced = true;
+    assert!(
+        journal
+            .release_inner(&f.before, &f.prepare.ticket, &host, 100, 100)
+            .is_err()
+    );
+    f.reopen();
+    assert_eq!(
+        f.journal.as_ref().unwrap().deployment().unwrap().as_ref(),
+        Some(&token)
+    );
+    host.fenced = false;
+    f.journal
+        .as_mut()
+        .unwrap()
+        .release_inner(&f.before, &f.prepare.ticket, &host, 100, 100)
+        .unwrap();
+    f.reopen();
+    assert!(f.journal.as_ref().unwrap().deployment().unwrap().is_none());
+}
+
+#[test]
+fn prior_journals_remain_readable_but_malformed_hold_capabilities_do_not() {
+    let mut f = Fixture::new();
+    f.prepare();
+    let mut value = serde_json::to_value(&f.journal.as_ref().unwrap().record).unwrap();
+    assert!(value["handoff"].get("deployment").is_none());
+    assert!(
+        serde_json::from_value::<Record>(value.clone())
+            .unwrap()
+            .handoff
+            .unwrap()
+            .deployment
+            .is_none()
+    );
+    value["handoff"]["deployment"] = "invalid-token".into();
+    assert!(serde_json::from_value::<Record>(value).is_err());
 }
 
 struct Fixture {
@@ -122,7 +178,7 @@ impl Fixture {
         self.journal
             .as_mut()
             .unwrap()
-            .prepare_inner(&self.prepare, BOOT, 4, &self.before)
+            .prepare_inner(&self.prepare, BOOT, 4, &self.before, None)
             .unwrap();
         self.host
             .prepare(
@@ -214,7 +270,7 @@ fn restart_before_preparation_or_after_acknowledgement_never_replays_consent() {
             f.journal
                 .as_mut()
                 .unwrap()
-                .prepare_inner(&f.prepare, BOOT, 4, &f.before)
+                .prepare_inner(&f.prepare, BOOT, 4, &f.before, None)
                 .is_err()
         );
     }
@@ -366,7 +422,7 @@ fn changed_or_unassociated_recovery_never_releases_the_host() {
         f.journal
             .as_mut()
             .unwrap()
-            .prepare_inner(&f.prepare, BOOT, 4, &current)
+            .prepare_inner(&f.prepare, BOOT, 4, &current, None)
             .is_err()
     );
 }
@@ -483,7 +539,7 @@ fn lost_terminal_reply_is_retained_until_a_fresh_unfenced_host_is_observed() {
     f.journal
         .as_mut()
         .unwrap()
-        .prepare_inner(&f.prepare, BOOT, 4, &f.before)
+        .prepare_inner(&f.prepare, BOOT, 4, &f.before, None)
         .unwrap();
 }
 
@@ -552,7 +608,7 @@ fn every_persistence_failure_poisoned_handle_requires_reopen_before_a_decision()
                     .journal
                     .as_mut()
                     .unwrap()
-                    .prepare_inner(&f.prepare, BOOT, 4, &f.before),
+                    .prepare_inner(&f.prepare, BOOT, 4, &f.before, None),
                 "arm" => {
                     let authorization = f.acknowledge();
                     f.journal.as_mut().unwrap().arm_inner(

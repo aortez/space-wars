@@ -462,6 +462,8 @@ fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack
     .unwrap();
     let accepted = Arc::new(AtomicUsize::new(0));
     let count = accepted.clone();
+    let progress = Arc::new(Mutex::new(None::<Phase>));
+    let reported = progress.clone();
     let host_path = socket.clone();
     let exchange = Arc::new(
         move |request: &ServiceRequest| -> Result<ServiceReply, String> {
@@ -516,6 +518,11 @@ fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack
                     // Simulate a lost service reply after the app has acknowledged.
                     Err("lost reply".into())
                 }
+                ServiceRequest::Status { .. } => reported
+                    .lock()
+                    .unwrap()
+                    .map(response)
+                    .ok_or("service offline".into()),
                 _ => Err("service offline".into()),
             }
         },
@@ -596,6 +603,25 @@ fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack
     );
     assert!(!h.window.get_updates_can_cancel());
     let path = socket.clone();
+    for phase in [
+        Phase::Writing,
+        Phase::Flushing,
+        Phase::ReadingBack,
+        Phase::CheckingFilesystem,
+        Phase::RebootRequested,
+        Phase::RecoveryRequired,
+    ] {
+        *progress.lock().unwrap() = Some(phase);
+        let message = progress_message(phase).unwrap();
+        h.until(true, |w| w.get_updates_message() == message);
+        // Reconciliation continues independently while writing owns the lock.
+        for _ in 0..105 {
+            h.pump(true);
+        }
+        assert_eq!(h.window.get_updates_message(), message);
+        assert!(h.window.get_install_fenced());
+        assert!(!h.window.get_updates_can_cancel());
+    }
     let worker = thread::spawn(move || {
         host_request(
             &path,

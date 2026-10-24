@@ -50,7 +50,7 @@ unchanged baseline. Do not count this cleanup as automatic OTA recovery.
 ## Ordinary native admission
 
 **2026-10-24 implementation:** `BootController::plan_install` now provides the
-ordinary native qualification gate for the future manual-install worker. It
+ordinary native qualification gate used by the manual-install worker. It
 requires the existing shared installation lock, no active bootstrap, a confirmed
 normal boot and a consistent durable recovery journal. It then reads a fixed
 root-owned approval and retained physical reports, observes the boot again and
@@ -61,8 +61,8 @@ Signature/time/payload revalidation, consent and maintenance holds remain the
 caller's final-admission responsibilities.
 
 This adds no approval-writing API, device command or service enable switch. No
-approval has been installed on any Pi, and the live installation backend remains
-unavailable. Existing healthy trials, generation-zero diagnostics and host test
+approval has been installed on any Pi, so the connected live writer remains
+unavailable on those devices. Existing healthy trials, generation-zero diagnostics and host test
 fixtures do not satisfy the complete physical matrix.
 
 The fixed directory is

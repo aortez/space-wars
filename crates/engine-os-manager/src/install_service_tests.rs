@@ -8,6 +8,20 @@ struct TestBackend {
     ready: Ready,
     accepted: AtomicUsize,
     revision: Arc<AtomicU64>,
+    delay: Mutex<Option<Delay>>,
+    parked: Mutex<Option<std::sync::Weak<()>>>,
+    safe_shutdown: AtomicBool,
+}
+struct Delay {
+    after_consumption: bool,
+    entered: mpsc::SyncSender<()>,
+    release: mpsc::Receiver<()>,
+}
+impl Delay {
+    fn wait(&self) {
+        self.entered.send(()).unwrap();
+        self.release.recv_timeout(Duration::from_secs(3)).unwrap();
+    }
 }
 impl Backend for TestBackend {
     fn context(&self) -> Result<Context, Failure> {
@@ -75,16 +89,34 @@ impl Backend for TestBackend {
     }
     fn accept(
         &self,
-        state: &mut Coordinator,
+        admission: &Admission,
         ack: &Acknowledgement,
         peer: &HostInstance,
     ) -> Result<(), Failure> {
+        let delay = self.delay.lock().unwrap().take();
+        if let Some(delay) = &delay
+            && !delay.after_consumption
+        {
+            delay.wait();
+        }
         let context = self.context()?;
-        let authorization = state
-            .consume(ack, peer, &context, transport::boot_ms().unwrap())
-            .map_err(Failure::from)?;
+        let authorization = admission.consume(ack, peer, &context)?;
         assert_eq!(authorization.selection_generation(), 4);
         self.accepted.fetch_add(1, Ordering::SeqCst);
+        if let Some(delay) = &delay
+            && delay.after_consumption
+        {
+            admission.phase(Phase::Writing);
+            delay.wait();
+        }
+        if let Some(recovery) = self.parked.lock().unwrap().take() {
+            admission.phase(Phase::RebootRequested);
+            while !admission.stopped() {
+                thread::sleep(Duration::from_millis(1));
+            }
+            self.safe_shutdown
+                .store(recovery.upgrade().is_none(), Ordering::SeqCst);
+        }
         Ok(())
     }
 }
@@ -177,6 +209,9 @@ impl Fixture {
             },
             accepted: AtomicUsize::new(0),
             revision,
+            delay: Mutex::new(None),
+            parked: Mutex::new(None),
+            safe_shutdown: AtomicBool::new(false),
         });
         let service = Runtime::bind(&path, "boot".into(), uid(), backend.clone(), true).unwrap();
         Self {
@@ -302,10 +337,11 @@ fn changed_host_aborts_and_service_restart_cannot_reuse_consent() {
     );
 }
 #[test]
-fn production_backend_exposes_no_install_path() {
+fn disabled_backend_exposes_no_install_path() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("native.sock");
-    let _runtime = Runtime::bind(&path, "boot".into(), uid(), Arc::new(Native), false).unwrap();
+    let _runtime =
+        Runtime::bind(&path, "boot".into(), uid(), Arc::new(Unavailable), false).unwrap();
     for request in [
         ServiceRequest::Status { schema: SCHEMA },
         ServiceRequest::Offer { schema: SCHEMA },
@@ -321,7 +357,8 @@ fn production_backend_exposes_no_install_path() {
 fn slow_reconciliation_does_not_block_live_install_status() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("install.sock");
-    let _service = Runtime::bind(&path, "boot".into(), uid(), Arc::new(Native), false).unwrap();
+    let _service =
+        Runtime::bind(&path, "boot".into(), uid(), Arc::new(Unavailable), false).unwrap();
     let recovery_path = dir.path().join("reconcile.sock");
     let (entered, entries) = mpsc::sync_channel(1);
     let (release, released) = mpsc::sync_channel(1);
@@ -399,4 +436,86 @@ fn a_failed_observation_retires_the_offer_even_after_the_host_recovers() {
     f.backend.revision.store(1, Ordering::SeqCst);
     assert_eq!(f.request(request).error, Some(Failure::Stale));
     assert_eq!(f.backend.accepted.load(Ordering::SeqCst), 0);
+}
+
+struct Unavailable;
+impl Backend for Unavailable {
+    fn context(&self) -> Result<Context, Failure> {
+        panic!("disabled backend was called")
+    }
+    fn prepare(&self, _: &Prepare) -> Result<(Acknowledgement, HostInstance), Failure> {
+        panic!("disabled backend was called")
+    }
+    fn abort(&self, _: &Aborted) {
+        panic!("disabled backend was called")
+    }
+    fn accept(&self, _: &Admission, _: &Acknowledgement, _: &HostInstance) -> Result<(), Failure> {
+        panic!("disabled backend was called")
+    }
+}
+
+#[test]
+fn shutdown_stops_reconciliation_before_releasing_a_queued_reboot() {
+    let mut f = Fixture::new();
+    let alive = Arc::new(());
+    *f.backend.parked.lock().unwrap() = Some(Arc::downgrade(&alive));
+    f.service.recovery = Some(
+        super::super::reconciliation::Runtime::bind(
+            &f._dir.path().join("recovery.sock"),
+            uid(),
+            Id::from_bytes([8; 32]).unwrap(),
+            Arc::new(move |_| {
+                assert_eq!(Arc::strong_count(&alive), 1);
+                Ok(RecoveryDecision::Waiting {})
+            }),
+        )
+        .unwrap(),
+    );
+    f.prepare();
+    f.release.send(()).unwrap();
+    f.wait(Phase::RebootRequested);
+    drop(f.service);
+    assert!(f.backend.safe_shutdown.load(Ordering::SeqCst));
+}
+
+#[test]
+fn final_admission_and_writing_do_not_block_status_or_cancellation() {
+    for after_consumption in [false, true] {
+        let f = Fixture::new();
+        let (entered, entries) = mpsc::sync_channel(1);
+        let (release, released) = mpsc::sync_channel(1);
+        *f.backend.delay.lock().unwrap() = Some(Delay {
+            after_consumption,
+            entered,
+            release: released,
+        });
+        let offer = f.prepare();
+        f.release.send(()).unwrap();
+        entries.recv_timeout(Duration::from_secs(2)).unwrap();
+        let before = Instant::now();
+        let status = f.request(ServiceRequest::Status { schema: SCHEMA });
+        assert_eq!(
+            status.status.phase,
+            if after_consumption {
+                Phase::Writing
+            } else {
+                Phase::Preparing
+            }
+        );
+        assert_eq!(status.status.ticket.as_ref(), Some(&offer.ticket));
+        let cancel = f.request(ServiceRequest::Cancel {
+            schema: SCHEMA,
+            ticket: offer.ticket,
+        });
+        assert!(before.elapsed() < Duration::from_secs(1));
+        assert_eq!(cancel.error, after_consumption.then_some(Failure::TooLate));
+        release.send(()).unwrap();
+        if !after_consumption {
+            f.wait(Phase::Aborted);
+        }
+        assert_eq!(
+            f.backend.accepted.load(Ordering::SeqCst),
+            usize::from(after_consumption)
+        );
+    }
 }

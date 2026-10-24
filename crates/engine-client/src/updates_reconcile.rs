@@ -60,7 +60,10 @@ impl Client {
                 RecoveryDecision::Aborted { ticket }
                 | RecoveryDecision::Finished { ticket, .. } => Some(ticket),
                 RecoveryDecision::Waiting {} => {
-                    if needs_message {
+                    // A live writer holds the installation lock. Its status
+                    // reports progress; this independent waiter only settles
+                    // abandoned work or a terminal boot outcome.
+                    if needs_message && (host.startup_blocked || panel.opening || !panel.awaiting) {
                         window.set_updates_message(
                             "Waiting for device maintenance or installation recovery…".into(),
                         );

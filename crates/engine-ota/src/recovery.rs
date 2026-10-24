@@ -620,8 +620,8 @@ impl RecoveryRecord {
         next.plan(self, Action::RebootTrial { transaction: id })
     }
 
-    #[cfg(all(target_os = "linux", any(test, feature = "recovery-qualification")))]
-    pub(crate) fn supervised_reboot(
+    #[cfg(target_os = "linux")]
+    pub(crate) fn trial_reboot(
         &self,
         id: Sha256,
         boot: &BootObservation,
@@ -638,6 +638,16 @@ impl RecoveryRecord {
             return Err(RecoveryError::BootMismatch);
         }
         Ok(tx.candidate.slot)
+    }
+
+    /// Settle an abandoned writer only on the confirmed normal root. Candidate
+    /// trial health and promotion remain owned by the recovery service.
+    #[cfg(target_os = "linux")]
+    pub(crate) fn interrupted_normal(&self, boot: &BootObservation) -> Result<Plan> {
+        if !boot.normal(&self.good) {
+            return Err(RecoveryError::BootMismatch);
+        }
+        self.reconcile(boot)
     }
 
     /// Reconcile after every service start. A fresh observer must establish a

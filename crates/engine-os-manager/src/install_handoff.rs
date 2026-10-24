@@ -14,6 +14,11 @@ pub mod service;
 #[path = "install_journal.rs"]
 pub mod journal;
 
+#[path = "install_hold.rs"]
+mod hold;
+#[path = "install_native.rs"]
+mod native;
+
 #[path = "install_reconcile.rs"]
 mod reconciliation;
 
@@ -98,9 +103,10 @@ pub struct Coordinator {
     sequence: u64,
     observed_ms: u64,
     state: State,
+    progress: Option<spacewars_control::install::wire::Phase>,
 }
 
-/// One-use local value for the future installer adapter; deliberately neither
+/// One-use local value for the installer adapter; deliberately neither
 /// Clone nor serializable. Only the durable recovery journal authorizes writes.
 pub struct ManualAuthorization {
     ticket: Ticket,
@@ -124,7 +130,10 @@ impl Coordinator {
             State::Offered(s) => (Phase::Offered, Some(s.offer.ticket.clone())),
             State::Preparing(_, p) => (Phase::Preparing, Some(p.ticket.clone())),
             State::Aborted(t) => (Phase::Aborted, Some(t.clone())),
-            State::Consumed(t) => (Phase::Acknowledged, Some(t.clone())),
+            State::Consumed(t) => (
+                self.progress.unwrap_or(Phase::Acknowledged),
+                Some(t.clone()),
+            ),
         };
         Status { phase, ticket }
     }
@@ -144,6 +153,7 @@ impl Coordinator {
             sequence: 0,
             observed_ms: 0,
             state: State::Idle,
+            progress: None,
         })
     }
 

@@ -5,10 +5,10 @@ coordinator, bounded Unix sockets, the running-app adapter and an Updates panel
 in App Settings. Preparation uses the real ordered settings writer and completed
 kiosk page flips. Startup and lost-acknowledgement recovery now consult the
 durable handoff and recovery journals through an authenticated root worker.
-The production install operation still reports **unavailable**: the native
-writer and final admission gates are not connected. Native recovery admission
-now requires retained, owner-approved physical evidence; no device approval has
-been provisioned. There is no runtime switch to bypass that gate.
+The native manual writer is connected to these gates. Installation remains
+**unavailable on unqualified devices**: ordinary recovery admission requires
+retained, owner-approved physical evidence, and no device approval has been
+provisioned. There is no runtime switch to bypass that gate.
 
 The contract lives in
 [`spacewars-control::install`](../crates/spacewars-control/src/install.rs) and
@@ -37,13 +37,13 @@ sequenceDiagram
     H->>H: Fence launches, save settings, present updater
     H-->>S: Acknowledge exact ticket and saved revision
     S->>S: Revalidate current context and consume consent once
-    Note over S,W: Native adapter still required: locks, holds, trust and recovery gates
+    Note over S,W: Retain locks, deployment hold, trust and recovery gates
     S->>W: Begin durable transaction, write inactive root, request trial
     W-->>S: Confirmed commit or rollback after recovery
 ```
 
-The last two steps remain existing backend responsibilities and future adapter
-work. `ManualAuthorization` is a non-cloneable, non-serializable consent value;
+The native adapter connects the existing writer and trial protocol to the two
+durable journals. `ManualAuthorization` is a non-cloneable, non-serializable consent value;
 it is **not** a write permit or a `RecoveryCapability`. It cannot enable the
 owner-only supervised admission bypass. Normal service installation must retain
 the qualified boot/watchdog capability gate and all signed-image checks.
@@ -97,7 +97,7 @@ outcome. Reboot requested, SSH lost and write finished are not success signals.
 
 After service or app restart, the app reconciles the durable recovery journal
 and any acknowledged fence before admitting launcher/autostart gameplay or
-requesting a new offer. The native writer's final admission must use the same
+requesting a new offer. The native writer's final admission uses the same
 journal. A fresh in-memory gate does not
 prove that a previously acknowledged installation ended.
 Unknown old tickets are not evidence of cancellation. The in-memory coordinator
@@ -191,8 +191,12 @@ reconciliation. Desktop builds keep their existing startup behavior.
 The worker acquires the shared install lock, opens both journals and checks
 native boot/maintenance evidence before releasing a provisioned kiosk. Busy
 locks wait, including locks held by downloads or operator maintenance. An active
-or unmatched transaction remains held until recovery resolves it; this endpoint
-does not itself finish an abandoned write or replay a reboot. An unprovisioned
+or unmatched transaction remains held until recovery resolves it. When the lock
+proves no writer survives and the current boot is the normal known-good root,
+the worker settles an associated abandoned transaction through the ordinary
+recovery state machine, including quarantine. Candidate trial health and
+promotion remain with the independent recovery service. Neither path replays
+a write or trial reboot. An unprovisioned
 device can start only when both recovery and handoff directories are absent and
 the app holds no ticket. Missing contents in an existing directory fail closed.
 
@@ -207,27 +211,32 @@ decision. Opening Updates also reconciles before requesting an offer.
 
 [`install_journal.rs`](../crates/engine-os-manager/src/install_journal.rs)
 implements a separate root-owned journal at
-`/data/spacewars-system/install-handoff`. Startup reconciliation uses it; the
-native writer's prepare/begin path is still pending. It does not change the
+`/data/spacewars-system/install-handoff`. Both startup reconciliation and native
+writer admission use it. It does not change the
 existing recovery journal format, so fallback images retain their current
 recovery protocol.
 
-The native worker must retain the shared installation lock through these steps:
+The native worker retains the shared installation lock through these steps:
 
-1. Persist the exact Prepare message, boot, channel-selection generation and
-   recovery-record fingerprint before asking the app to fence and acknowledge.
-2. Revalidate the candidate and native admission gates, consume the one-use
-   authorization, and obtain an ordinary qualified recovery plan using
+1. Persist the exact Prepare message, boot, channel-selection generation,
+   recovery-record fingerprint and deployment hold capability before requesting
+   that hold or asking the app to fence and acknowledge. A lost admission reply
+   cannot leave an unidentified hold.
+2. Revalidate the candidate and obtain an ordinary qualified recovery plan using
    `BootController::plan_install`. This reads the fixed physical-qualification
    approval and retained reports under the shared lock; it writes nothing and
-   cannot substitute supervised admission when evidence is missing.
+   cannot substitute supervised admission when evidence is missing. Recheck the
+   selected candidate, live app and original deadline, then consume the one-use
+   authorization under the short coordinator lock.
 3. Call `Journal::begin`. It first persists the exact planned transaction ID,
    then commits the existing recovery plan. Only a successful recovery commit
    returns a write action. The read-only `Plan::installation` association does
    not itself authorize a write.
 4. Retain the lock and all native guards while the existing writer and trial
-   protocol execute. Status handling must not take this worker's journal locks
-   or hold the in-memory coordinator mutex across filesystem or host I/O.
+   protocol execute. After the reboot request is acknowledged, retain the lock
+   until service shutdown so reconciliation cannot mistake a queued reboot for
+   an abandoned writer. Status handling takes no journal lock and filesystem or
+   host I/O never holds the in-memory coordinator mutex.
 
 After a crash, the replacement worker must acquire the same installation lock,
 open both journals, and validate native boot evidence before reconciling. A
@@ -236,8 +245,9 @@ An unchanged recovery fingerprint proves a prepared or armed handoff never
 started its recovery transaction; the journal durably records an exact-ticket
 abort. This also covers consumed consent lost before recovery commit. A matching
 active transaction remains in progress. Only its recorded Committed or RolledBack
-phase produces a finished result; the existing recovery worker resolves an
-interrupted write, including quarantine. No write or reboot is retried here.
+phase produces a finished result. On the normal known-good root, reconciliation
+can quarantine an interrupted transaction; candidate trial recovery remains
+independent. No write or reboot is retried here.
 
 Missing/corrupt state in an existing directory, a different transaction, changed
 candidate/origin boot, regressed outcome or uncertain persistence blocks a
@@ -250,26 +260,55 @@ is gone; stale tickets and cached pre-decision observations cannot clear them.
 The [native recovery admission contract](ota-recovery-qualification.md#ordinary-native-admission)
 binds owner-approved physical reports to the exact board/firmware/media, layout,
 boot assets, profile, kernel and recovery protocol. It returns an ordinary plan
-only after fresh boot and file checks. It is not yet called by the live install
-worker. The supervised owner's separate admission path must not be used to
+only after fresh boot and file checks. The live install worker calls it before
+app preparation and again before consuming consent. The supervised owner's
+separate admission path cannot be used to
 manufacture tryboot/watchdog qualification for this service.
+
+## Native worker and deployment lifetime
+
+The update runtime lends the exact verified candidate and channel-selection
+revision to one install session. The claim is serialized with scheduler decisions
+and queued channel/check commands. New checks and channel changes are refused
+until the session drops its claim; the update worker continues publishing its
+heartbeat. Final admission still checks usable time, expiry and that exact claim.
+
+`engine-ota::native_install::Session` holds the native boot, recovery, trust and
+staging guards. It revalidates signed metadata and the full staged payload before
+app preparation, then rechecks boot/layout/data, qualification and metadata after
+the acknowledgement. The existing fixed-target writer checks the opened payload
+again, writes and flushes the inactive root, reads it back and verifies its ext4
+identity. Metadata/time and boot/data are checked again before trial preparation.
+The shared sealed trial permit consumes the durable reboot allowance before the
+bounded logind/PID 1 request. Missing or uncertain replies cannot be replayed.
+
+The root-owned handoff journal retains the deployment capability; public status
+and Debug output never expose it. The writer renews it during progress and before
+reboot. Independent reconciliation renews it after service restart, including
+while the recovery service holds the install lock or the kiosk is unavailable.
+Renewal restores bounded reconnect protection for a possible rollback boot.
+The capability is released only after a terminal decision and a fresh unfenced
+host observation, before clearing the journal. Failed release or journal writes
+retain the decision for retry. Old journals without a hold remain readable.
+
+The Updates panel reports payload checking, writing, flushing, readback,
+filesystem checking, reboot requested and recovery required. These messages do
+not release the app fence. Only the exact durable abort or confirmed recovery
+outcome can do that. Independent recovery polling preserves live writer progress.
+
+The system service unit permits `/boot` writes, USB SCSI block access and
+`CAP_SYS_ADMIN` for block flushing and logind's fixed reboot parameter. It retains
+RTC access and `CAP_SYS_TIME`; device policy is closed, namespaces are restricted
+and mount syscalls are denied. This requires a coordinated device-service/app/unit
+image update, not copying just the service executable onto an older image.
 
 ## Integration still required
 
-1. Connect verified-ready/channel invalidation and the final handoff to the
-   native worker. Hold the shared install lock and reboot-capable maintenance
-   protection, recheck signatures/expiry, staged file identity and hashes,
-   boot/layout, generation, recovery capability and data compatibility. Begin
-   the existing durable journal transaction before disk mutation; keep slow
-   I/O outside the coordinator lock and status/UI handling.
-2. Connect prepare/begin to the native worker and expose writing/trial progress.
-   Ensure interrupted-worker recovery resolves the retained transaction using
-   the existing recovery service. Startup/outcome messages and app fencing are
-   connected; unknown old tickets still cannot release a fence.
-3. Add the equally explicit candidate-bound install CLI. The current diagnostic
+1. Add the equally explicit candidate-bound install CLI. The current diagnostic
    UI interface can navigate Updates, but is not a privileged install shortcut.
-4. Qualify real systemd permissions and renderer presentation, worker failure,
-   service/app restart and a supervised native installation on the device.
+2. Complete the physical recovery matrix and owner approval, then qualify the
+   coordinated image's systemd permissions, actual DRM presentation, write/readback,
+   trial commit/rollback, worker failure and service/app restart on the device.
    Local socket/Slint tests do not replace those checks.
 
 Ask/Automatic preferences and overnight admission follow this manual path; they
@@ -307,3 +346,12 @@ fields even on empty decision variants. A stalled reconciliation worker leaves
 the separate live install status socket responsive. Native systemd identity,
 boot evidence, shared-lock wait time and DRM health during the startup fence
 still require physical qualification.
+
+Native-writer integration coverage adds a signed-candidate selection lease,
+scheduler/command exclusion, stale-time/expiry refusal, final-admission cancellation,
+responsive writing status, progress rendering while reconciliation waits, durable
+hold retention/redaction, request-independent maintenance and abandoned-write
+quarantine on the normal good root. The existing signed ext4 writer, reboot request
+failure and recovery fixtures remain the lower-level evidence. These workstation
+tests do not execute the fixed native path against a Pi block device or establish
+physical recovery qualification. No approval was provisioned or device changed.

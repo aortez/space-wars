@@ -5,6 +5,114 @@ use crate::network_policy::{self, Activity, HoldKind, Intent, Policy};
 use engine_ota::Sha256;
 use std::collections::BTreeMap;
 
+use crate::test_feed as feed;
+
+impl Fixture {
+    async fn install_ready(&mut self) -> InstallCandidate {
+        let signed = feed::Fixture::new().await;
+        let mut trust = engine_ota::TrustStore::initialize(
+            &self._temp.path().join("trust"),
+            &signed.root_bytes,
+            feed::location(),
+        )
+        .unwrap();
+        let transport = signed
+            .publish(
+                1,
+                &[feed::descriptor(Channel::Release, 2)],
+                "2027-08-01T00:00:00Z".parse().unwrap(),
+                feed::Fault::None,
+            )
+            .await;
+        let candidate = feed::candidate(
+            trust
+                .refresh(
+                    Arc::new(transport),
+                    self.fake.time(),
+                    Channel::Release,
+                    &feed::device(),
+                    &engine_ota::ImageHistory::default(),
+                )
+                .await
+                .unwrap(),
+        );
+        self.runner.ready = Some(Ready {
+            candidate,
+            proof: (),
+            time: self.fake.time().unwrap(),
+        });
+        self.runner.publish(&self.handle).unwrap();
+        self.handle.install_candidate().unwrap()
+    }
+}
+
+#[tokio::test]
+async fn installation_selection_excludes_channel_changes_and_checks_until_release() {
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    let selection = f.handle.claim_install(&candidate).unwrap();
+    assert!(f.handle.check_now().is_err());
+    assert!(f.handle.select_channel(Channel::Nightly).is_err());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    // Cross the automatic-check threshold. Only the heartbeat may advance.
+    f.fake.edit(|w| {
+        w.ms = 60_000;
+        w.partial = false;
+    });
+    f.step();
+    selection.check().unwrap();
+    assert_eq!(f.fake.0.lock().unwrap().prepares, 0);
+    assert!(
+        f.handle
+            .status()
+            .unwrap()
+            .schedule
+            .unwrap()
+            .active
+            .is_none()
+    );
+    drop(selection);
+    assert!(f.handle.select_channel(Channel::Nightly).is_ok());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    f.step();
+    assert_eq!(
+        f.handle.status().unwrap().schedule.unwrap().channel,
+        Channel::Nightly
+    );
+}
+
+#[tokio::test]
+async fn installation_selection_rejects_unpublished_scheduling_and_stale_evidence() {
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    f.handle.shared.lock().unwrap().selecting = true;
+    let guard = Selecting(f.handle.shared.clone());
+    assert!(f.handle.install_candidate().is_err());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    drop(guard);
+    let mut changed = candidate.clone();
+    changed.generation += 1;
+    assert!(f.handle.claim_install(&changed).is_err());
+    f.fake.edit(|w| w.ms += 15_001);
+    assert!(f.handle.claim_install(&candidate).is_err());
+    f.runner.publish(&f.handle).unwrap();
+    let selection = f.handle.claim_install(&candidate).unwrap();
+    f.fake.edit(|w| w.time = false);
+    assert!(selection.check().is_err());
+    f.fake.edit(|w| {
+        w.time = true;
+        w.ms =
+            (candidate.candidate.expires().as_microsecond() as u64 - 1_800_000_000_000_000) / 1000;
+    });
+    f.step();
+    assert!(selection.check().is_err());
+    drop(selection);
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    assert!(f.handle.check_now().is_ok());
+    assert!(f.handle.claim_install(&candidate).is_err());
+}
+
 const BOOT: &str = "11111111-2222-3333-4444-555555555555";
 
 #[test]
@@ -327,6 +435,8 @@ impl Fixture {
             requests: tx,
             stop: Arc::new(AtomicBool::new(false)),
             shared: Arc::new(Mutex::new(Shared {
+                installation: None,
+                selecting: false,
                 status: Status {
                     phase: Phase::Idle,
                     reason: None,

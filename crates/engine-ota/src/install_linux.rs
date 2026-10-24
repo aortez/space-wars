@@ -94,7 +94,7 @@ impl StagedPayload {
         Ok(&mut self.file)
     }
 
-    fn check(&self) -> Result<()> {
+    pub(crate) fn check(&self) -> Result<()> {
         owned(&self.directory.metadata()?, true, self.owner, true)?;
         let named = open_at(&self.directory, &self.name, libc::O_RDONLY, 0)?;
         let current = self.file.metadata()?;
