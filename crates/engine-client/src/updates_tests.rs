@@ -1,0 +1,432 @@
+use super::*;
+use slint::Rgb8Pixel;
+use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+use slint::platform::{Platform, PlatformError, WindowAdapter};
+use std::{
+    cell::Cell,
+    sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
+    thread,
+};
+
+struct TestPlatform(Rc<MinimalSoftwareWindow>);
+impl Platform for TestPlatform {
+    fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+        Ok(self.0.clone())
+    }
+}
+struct Harness {
+    window: MainWindow,
+    adapter: Rc<MinimalSoftwareWindow>,
+    frames: Rc<Cell<u64>>,
+    pixels: Vec<Rgb8Pixel>,
+    input: input::SharedInput,
+}
+impl Harness {
+    fn new() -> Self {
+        let adapter = MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer);
+        slint::platform::set_platform(Box::new(TestPlatform(adapter.clone()))).unwrap();
+        let window = MainWindow::new().unwrap();
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(800., 480.));
+        // A paused scenario has a real current session and doesn't need a
+        // launcher draft. Its settings document still must reach disk.
+        window.set_launcher_visible(false);
+        window.set_ingame_menu_visible(true);
+        window.set_sound_visible(true);
+        window.set_scenario_instance("42".into());
+        let (input, _) = input::new_shared_input();
+        crate::install_ui_navigation(&window);
+        crate::install_keyboard_navigation(&window, input.clone());
+        window.show().unwrap();
+        Self {
+            window,
+            adapter,
+            frames: Rc::new(Cell::new(0)),
+            pixels: vec![Rgb8Pixel::default(); 800 * 480],
+            input,
+        }
+    }
+    fn pump(&mut self, render: bool) {
+        slint::platform::update_timers_and_animations();
+        if render {
+            self.adapter.draw_if_needed(|renderer| {
+                renderer.render(&mut self.pixels, 800);
+                self.frames.set(self.frames.get() + 1);
+            });
+        }
+        thread::sleep(Duration::from_millis(5));
+    }
+    fn until(&mut self, render: bool, mut done: impl FnMut(&MainWindow) -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !done(&self.window) {
+            assert!(
+                Instant::now() < deadline,
+                "UI wait timed out: {}",
+                self.window.get_updates_message()
+            );
+            self.pump(render);
+        }
+    }
+}
+fn host_identity() -> HostInstance {
+    HostInstance {
+        pid: std::process::id(),
+        start_ticks: 10,
+        invocation: "b".repeat(32),
+    }
+}
+fn ticket() -> Ticket {
+    Ticket {
+        service: Id::from_bytes([1; 32]).unwrap(),
+        sequence: 1,
+        candidate: Id::from_bytes([2; 32]).unwrap(),
+    }
+}
+fn uid() -> u32 {
+    unsafe { nix::libc::geteuid() }
+}
+fn response(phase: Phase) -> ServiceReply {
+    ServiceReply {
+        schema: SCHEMA,
+        error: None,
+        status: Status {
+            phase,
+            ticket: Some(ticket()),
+        },
+        offer: None,
+        aborted: None,
+    }
+}
+fn host_request(path: &Path, request: HostRequest) -> HostReply {
+    transport::exchange(
+        path,
+        uid(),
+        Some(std::process::id()),
+        &request,
+        Duration::from_secs(4),
+    )
+    .unwrap()
+}
+
+#[test]
+fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack_fence() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let settings_path = dir.path().join("settings.toml");
+    let settings = Arc::new(RwLock::new(Settings::default()));
+    settings.write().unwrap().audio.muted = true;
+    let (entered, entries) = mpsc::sync_channel(1);
+    let (release, released) = mpsc::sync_channel(1);
+    let released = Mutex::new(released);
+    let save_path = settings_path.clone();
+    let writer = SettingsWriter::with_writer(Arc::new(move |snapshot| {
+        entered.send(()).unwrap();
+        released
+            .lock()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap();
+        crate::settings::save_settings(snapshot, &save_path).map_err(|e| e.to_string())
+    }))
+    .unwrap();
+    let accepted = Arc::new(AtomicUsize::new(0));
+    let count = accepted.clone();
+    let host_path = socket.clone();
+    let exchange = Arc::new(
+        move |request: &ServiceRequest| -> Result<ServiceReply, String> {
+            match request {
+                ServiceRequest::Offer { .. } => {
+                    let mut reply = response(Phase::Offered);
+                    reply.offer = Some(Offer {
+                        schema: SCHEMA,
+                        ticket: ticket(),
+                        candidate: Candidate {
+                            id: ticket().candidate,
+                            channel: Channel::Release,
+                            generation: 11,
+                            build_id: "test-image".into(),
+                        },
+                        ends_game: true,
+                        expires_ms: transport::boot_ms().unwrap() + 300_000,
+                    });
+                    Ok(reply)
+                }
+                ServiceRequest::Confirm { consent, .. } => {
+                    assert!(consent.end_game);
+                    assert_eq!(consent.ticket, ticket());
+                    let view = host_request(
+                        &host_path,
+                        HostRequest::Observe {
+                            schema: SCHEMA,
+                            nonce: 7,
+                        },
+                    )
+                    .view
+                    .unwrap();
+                    assert!(view.available);
+                    assert!(view.game);
+                    let ack = host_request(
+                        &host_path,
+                        HostRequest::Prepare {
+                            schema: SCHEMA,
+                            prepare: Prepare {
+                                schema: SCHEMA,
+                                ticket: ticket(),
+                                host: view.host,
+                                host_revision: view.revision,
+                                settings_revision: view.settings_revision,
+                                expires_ms: transport::boot_ms().unwrap() + PREPARE_MS,
+                            },
+                        },
+                    );
+                    assert!(ack.error.is_none());
+                    assert!(ack.acknowledgement.is_some());
+                    count.fetch_add(1, Ordering::SeqCst);
+                    // Simulate a lost service reply after the app has acknowledged.
+                    Err("lost reply".into())
+                }
+                _ => Err("service offline".into()),
+            }
+        },
+    );
+    let frames = h.frames.clone();
+    let _runtime = start(
+        &h.window,
+        settings,
+        writer,
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        socket.clone(),
+        exchange,
+        Rc::new(move || Some(frames.get())),
+        uid(),
+    );
+    h.window.invoke_updates_open();
+    h.until(true, |w| w.get_updates_can_confirm());
+    h.pump(true);
+    if let Some(path) = std::env::var_os("SPACEWARS_UPDATE_SCREENSHOT") {
+        let mut encoder = png::Encoder::new(std::fs::File::create(path).unwrap(), 800, 480);
+        encoder.set_color(png::ColorType::Rgb);
+        encoder.set_depth(png::BitDepth::Eight);
+        let bytes: Vec<_> = h.pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+        encoder
+            .write_header()
+            .unwrap()
+            .write_image_data(&bytes)
+            .unwrap();
+    }
+    assert!(h.window.get_updates_confirm_label().contains("End game"));
+    crate::ui_activation::activate(&h.window, "updates.confirm");
+    h.until(false, |w| w.get_install_fenced());
+    entries.recv_timeout(Duration::from_secs(1)).unwrap();
+    assert!(!crate::ui_activation::activate(&h.window, "pause.resume"));
+    assert!(!crate::ui_activation::activate(
+        &h.window,
+        "launcher.start-game"
+    ));
+    for _ in 0..8 {
+        h.pump(true);
+    }
+    assert_eq!(
+        accepted.load(Ordering::SeqCst),
+        0,
+        "rendering cannot acknowledge an unfinished save"
+    );
+    release.send(()).unwrap();
+    h.until(true, |w| !w.get_updates_can_cancel());
+    assert!(
+        crate::settings::load_settings(&settings_path)
+            .unwrap()
+            .settings
+            .audio
+            .muted
+    );
+    h.until(true, |_| accepted.load(Ordering::SeqCst) == 1);
+    for _ in 0..55 {
+        h.pump(true);
+    }
+    assert!(
+        h.window.get_install_fenced(),
+        "lost reply never releases the fence"
+    );
+    assert!(!h.window.get_updates_can_cancel());
+    let path = socket.clone();
+    let worker = thread::spawn(move || {
+        host_request(
+            &path,
+            HostRequest::Abort {
+                schema: SCHEMA,
+                aborted: Aborted {
+                    schema: SCHEMA,
+                    ticket: ticket(),
+                },
+            },
+        )
+    });
+    h.until(true, |w| !w.get_install_fenced());
+    assert!(worker.join().unwrap().error.is_none());
+    assert!(h.window.get_updates_can_cancel());
+    // Rendered evidence comes from the real Slint panel.
+    assert!(h.pixels.iter().any(|p| p.r > 150 && p.g > 150));
+}
+
+#[test]
+fn saved_settings_without_a_presented_updater_never_acknowledge_and_expire() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    h.window.set_updates_visible(true);
+    let mut host = Host::new(host_identity());
+    let settings = Settings::default();
+    let writer = SettingsWriter::new(dir.path().join("settings.toml")).unwrap();
+    host.observe(&h.window, &settings);
+    let prepare = Prepare {
+        schema: SCHEMA,
+        ticket: ticket(),
+        host: host.identity.clone(),
+        host_revision: host.revision,
+        settings_revision: host.settings_revision,
+        expires_ms: 1000,
+    };
+    let (tx, rx) = mpsc::sync_channel(1);
+    host.request(
+        &h.window,
+        &settings,
+        &writer,
+        Incoming {
+            request: HostRequest::Prepare {
+                schema: SCHEMA,
+                prepare,
+            },
+            reply: tx,
+        },
+        0,
+        Some(10),
+    );
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while writer.status().pending {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    }
+    host.tick(&h.window, &settings, &writer, 5, Some(10));
+    assert!(rx.try_recv().is_err());
+    host.tick(&h.window, &settings, &writer, 6, Some(11));
+    assert!(rx.try_recv().is_err());
+    host.tick(&h.window, &settings, &writer, 1000, Some(11));
+    assert_eq!(rx.recv().unwrap().error, Some(Failure::Expired));
+    assert!(!h.window.get_install_fenced());
+    h.pump(true);
+}
+
+#[test]
+fn save_failure_and_changed_settings_revoke_preparation() {
+    let h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    h.window.set_updates_visible(true);
+    // Opening a directory as a settings file fails even under root.
+    let writer = SettingsWriter::new(dir.path().into()).unwrap();
+    let mut settings = Settings::default();
+    let mut host = Host::new(host_identity());
+    host.observe(&h.window, &settings);
+    let make = |host: &Host, sequence| Prepare {
+        schema: SCHEMA,
+        ticket: Ticket {
+            sequence,
+            ..ticket()
+        },
+        host: host.identity.clone(),
+        host_revision: host.revision,
+        settings_revision: host.settings_revision,
+        expires_ms: 1000,
+    };
+    let (tx, rx) = mpsc::sync_channel(1);
+    let prepare = make(&host, 1);
+    host.request(
+        &h.window,
+        &settings,
+        &writer,
+        Incoming {
+            request: HostRequest::Prepare {
+                schema: SCHEMA,
+                prepare,
+            },
+            reply: tx,
+        },
+        0,
+        Some(1),
+    );
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while writer.status().pending {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    }
+    host.tick(&h.window, &settings, &writer, 1, Some(3));
+    assert_eq!(rx.recv().unwrap().error, Some(Failure::SaveFailed));
+    assert!(!h.window.get_install_fenced());
+    host.abort(
+        &h.window,
+        &Aborted {
+            schema: SCHEMA,
+            ticket: ticket(),
+        },
+    );
+    assert!(
+        h.window
+            .get_updates_message()
+            .contains("could not be saved")
+    );
+    let writer = SettingsWriter::new(dir.path().join("ok.toml")).unwrap();
+    let prepare = make(&host, 2);
+    let (tx, rx) = mpsc::sync_channel(1);
+    host.request(
+        &h.window,
+        &settings,
+        &writer,
+        Incoming {
+            request: HostRequest::Prepare {
+                schema: SCHEMA,
+                prepare,
+            },
+            reply: tx,
+        },
+        2,
+        Some(3),
+    );
+    settings.audio.muted = true;
+    host.tick(&h.window, &settings, &writer, 3, Some(5));
+    assert_eq!(rx.recv().unwrap().error, Some(Failure::Stale));
+    assert!(!h.window.get_install_fenced());
+}
+
+#[test]
+fn desktop_updates_are_visible_but_installation_is_unavailable() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let settings = Arc::new(RwLock::new(Settings::default()));
+    let writer = SettingsWriter::new(dir.path().join("settings.toml")).unwrap();
+    crate::sound_controls::install(
+        &h.window,
+        crate::host::new_scenario_controls(),
+        settings.clone(),
+        writer.clone(),
+    );
+    let _runtime = install(&h.window, false, settings, writer, h.input.clone());
+    assert!(crate::ui_activation::activate(
+        &h.window,
+        "settings.updates"
+    ));
+    h.until(true, |w| w.get_updates_message().contains("not available"));
+    assert!(h.window.get_updates_visible());
+    assert!(!h.window.get_updates_can_confirm());
+    assert!(!h.window.get_install_fenced());
+    assert!(!crate::ui_activation::activate(
+        &h.window,
+        "updates.confirm"
+    ));
+    h.window.invoke_keyboard_action(5, false);
+    assert!(!h.window.get_updates_visible());
+}

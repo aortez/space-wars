@@ -611,6 +611,18 @@ export component MainWindow inherits Window {
     callback autostart-adjust(int, int);
     callback autostart-start-now();
     callback autostart-return();
+    in property <bool> install-fenced: false;
+    in-out property <bool> updates-visible: false;
+    in property <string> updates-message;
+    in property <string> updates-confirm-label: "Install & restart";
+    in property <bool> updates-can-confirm: false;
+    in property <bool> updates-can-cancel: true;
+    in-out property <int> updates-focus: 1;
+    callback updates-open();
+    callback updates-confirm();
+    callback updates-cancel();
+    callback updates-activity();
+    callback updates-interrupted();
     in-out property <bool> sound-visible: false;
     in-out property <bool> network-visible: false;
     in-out property <int> network-focus-index: 0;
@@ -1756,6 +1768,15 @@ export component MainWindow inherits Window {
         }
         capture-key-pressed(event) => {
             if (UserActivity.key-event(event.text, true)) { return accept; }
+            if (root.updates-visible || root.install-fenced) {
+                if (event.text == Key.UpArrow) { root.keyboard-action(0, event.repeat); }
+                if (event.text == Key.DownArrow) { root.keyboard-action(1, event.repeat); }
+                if (event.text == Key.LeftArrow) { root.keyboard-action(2, event.repeat); }
+                if (event.text == Key.RightArrow) { root.keyboard-action(3, event.repeat); }
+                if (event.text == Key.Return) { root.keyboard-action(4, event.repeat); }
+                if (event.text == Key.Escape) { root.keyboard-action(5, event.repeat); }
+                return accept;
+            }
             if (root.launcher-busy) { return accept; }
             if (root.network-visible && root.network-password-visible) {
                 if (event.text == Key.Backspace) { root.network-command("network.erase"); return accept; }
@@ -3258,7 +3279,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.sound-visible && !root.network-visible && !root.controllers-visible && !root.device-info-visible && !root.autostart-settings-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
+    if root.sound-visible && !root.updates-visible && !root.network-visible && !root.controllers-visible && !root.device-info-visible && !root.autostart-settings-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
         width: parent.width;
         height: parent.height;
         background: #050514;
@@ -3275,11 +3296,11 @@ export component MainWindow inherits Window {
                 x: 24px; y: 82px; width: parent.width - 48px; height: parent.height - 214px;
                 viewport-width: self.width;
                 viewport-height: settings-body.height;
-                property <int> focused-item: root.sound-focus-index == 8 ? 6 : root.sound-focus-index == 7 ? 5 : root.sound-focus-index == 5 || root.sound-focus-index == 6 ? -1 : root.sound-focus-index;
+                property <int> focused-item: root.sound-focus-index == 9 ? 7 : root.sound-focus-index == 8 ? 6 : root.sound-focus-index == 7 ? 5 : root.sound-focus-index == 5 || root.sound-focus-index == 6 ? -1 : root.sound-focus-index;
                 property <length> row-height: parent.row-height;
                 property <length> scroll-limit: Math.max(0px, self.viewport-height - self.height);
                 function reveal-focus() {
-                    if self.focused-item >= 0 && self.focused-item < 7 {
+                    if self.focused-item >= 0 && self.focused-item < 8 {
                         let top = self.focused-item * (self.row-height + 10px);
                         let bottom = top + self.row-height;
                         if -self.viewport-y > top { self.viewport-y = -top; }
@@ -3292,7 +3313,7 @@ export component MainWindow inherits Window {
                 init => { self.reveal-focus(); }
                 settings-body := Rectangle {
                     x: 0px; y: 0px;
-                    width: settings-scroll.width; height: 7 * settings-scroll.row-height + 60px;
+                    width: settings-scroll.width; height: 8 * settings-scroll.row-height + 70px;
                     VolumeRow {
                         x: 0px; y: 0px;
                         width: parent.width; height: settings-scroll.row-height;
@@ -3335,6 +3356,12 @@ export component MainWindow inherits Window {
                         width: parent.width; height: settings-scroll.row-height;
                         label: "Network"; navigation: true; selected: root.sound-focus-index == 8;
                         activated => { root.network-open(); }
+                    }
+                    SettingsRow {
+                        y: 7 * (settings-scroll.row-height + 10px);
+                        width: parent.width; height: settings-scroll.row-height;
+                        label: "Updates"; navigation: true; selected: root.sound-focus-index == 9;
+                        activated => { root.updates-open(); }
                     }
                 }
             }
@@ -3763,6 +3790,32 @@ export component MainWindow inherits Window {
                 selected: root.clock-font-focus == 9;
                 enabled: !root.clock-controls-pending;
                 activated => { root.clock-font-activate(9); }
+            }
+        }
+    }
+
+    if root.updates-visible || root.install-fenced: Rectangle {
+        width: parent.width; height: parent.height; background: #050514;
+        TouchArea { width: parent.width; height: parent.height; }
+        MenuPage {
+            available-width: parent.width; available-height: parent.height;
+            heading: "Updates";
+            subtitle: root.install-fenced ? "Preparing installation" : "Device software";
+            hint: root.updates-can-cancel ? "A / Enter select · B / Esc back" : "Waiting for the device service";
+            Text {
+                x: 24px; y: 88px; width: parent.width - 48px; height: parent.height - 240px;
+                text: root.updates-message; color: #d7efff; font-size: parent.width < 600px ? 16px : 20px;
+                wrap: word-wrap;
+            }
+            MenuButton {
+                x: 24px; y: parent.height - 140px; width: parent.width - 48px; height: 48px;
+                text: root.updates-confirm-label; selected: root.updates-focus == 0; enabled: root.updates-can-confirm;
+                activated => { root.updates-confirm(); }
+            }
+            MenuButton {
+                x: 24px; y: parent.height - 84px; width: parent.width - 48px; height: 48px;
+                text: root.install-fenced ? "Cancel" : "Back"; selected: root.updates-focus == 1; enabled: root.updates-can-cancel;
+                activated => { root.updates-cancel(); }
             }
         }
     }

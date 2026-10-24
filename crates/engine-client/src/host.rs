@@ -752,6 +752,12 @@ pub fn start_scenario_loop(
         let now = Instant::now();
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
+        if window.get_install_fenced() {
+            input.borrow_mut().clear();
+            controls.borrow_mut().clear();
+            accumulator = Duration::ZERO;
+            return;
+        }
         if let Some(audio) = controls.borrow().audio
             && settings.audio != audio
         {

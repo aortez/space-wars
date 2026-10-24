@@ -13,12 +13,13 @@ type WriteSettings = Arc<dyn Fn(&Settings) -> Result<(), String> + Send + Sync>;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct SaveStatus {
-    revision: u64,
+    pub revision: u64,
     pub pending: bool,
     pub error: Option<String>,
 }
 
 struct SaveRequest {
+    exact: bool,
     revision: u64,
     settings: Settings,
     response: mpsc::Sender<Result<(), String>>,
@@ -37,18 +38,26 @@ impl SettingsWriter {
         }))
     }
 
-    fn with_writer(write: WriteSettings) -> std::io::Result<Self> {
+    pub(super) fn with_writer(write: WriteSettings) -> std::io::Result<Self> {
         let (sender, receiver) = mpsc::channel::<SaveRequest>();
         let status = Arc::new(Mutex::new(SaveStatus::default()));
         let worker_status = Arc::clone(&status);
         std::thread::Builder::new()
             .name("spacewars-settings".into())
             .spawn(move || {
-                while let Ok(mut request) = receiver.recv() {
+                let mut deferred = None;
+                while let Some(mut request) = deferred.take().or_else(|| receiver.recv().ok()) {
                     let mut responses = Vec::new();
                     // Only snapshots queued before this write can be coalesced.
                     // A later request is handled after the in-flight write ends.
-                    while let Ok(newer) = receiver.try_recv() {
+                    while !request.exact {
+                        let Ok(newer) = receiver.try_recv() else {
+                            break;
+                        };
+                        if newer.exact {
+                            deferred = Some(newer);
+                            break;
+                        }
                         responses.push(request.response);
                         request = newer;
                     }
@@ -80,12 +89,22 @@ impl SettingsWriter {
     }
 
     pub(crate) fn save(&self, settings: Settings) -> SaveReceipt {
+        self.enqueue(settings, false)
+    }
+
+    /// Barrier receipt: this exact document reaches disk, never a coalesced replacement.
+    pub(crate) fn save_exact(&self, settings: Settings) -> SaveReceipt {
+        self.enqueue(settings, true)
+    }
+
+    fn enqueue(&self, settings: Settings, exact: bool) -> SaveReceipt {
         let (response, receipt) = mpsc::channel();
         let mut status = self.status.lock().unwrap();
         status.revision += 1;
         status.pending = true;
         status.error = None;
         let request = SaveRequest {
+            exact,
             revision: status.revision,
             settings,
             response,
@@ -135,6 +154,40 @@ mod tests {
     use std::time::Duration;
 
     const DEADLOCK_GUARD: Duration = Duration::from_secs(5);
+
+    #[test]
+    fn exact_snapshot_is_a_barrier_between_coalesced_writes() {
+        let (entered, entries) = mpsc::channel();
+        let (release, releases) = mpsc::channel();
+        let releases = Mutex::new(releases);
+        let writer = SettingsWriter::with_writer(Arc::new(move |settings| {
+            entered.send(settings.audio.master_volume).unwrap();
+            releases
+                .lock()
+                .unwrap()
+                .recv_timeout(DEADLOCK_GUARD)
+                .unwrap();
+            Ok(())
+        }))
+        .unwrap();
+        let mut settings = Settings::default();
+        settings.audio.master_volume = 0.1;
+        let first = writer.save(settings.clone());
+        entries.recv_timeout(DEADLOCK_GUARD).unwrap();
+        settings.audio.master_volume = 0.2;
+        let exact = writer.save_exact(settings.clone());
+        settings.audio.master_volume = 0.3;
+        let last = writer.save(settings);
+        release.send(()).unwrap();
+        first.recv_timeout(DEADLOCK_GUARD).unwrap().unwrap();
+        assert_eq!(entries.recv_timeout(DEADLOCK_GUARD).unwrap(), 0.2);
+        assert!(exact.try_recv().is_err());
+        release.send(()).unwrap();
+        exact.recv_timeout(DEADLOCK_GUARD).unwrap().unwrap();
+        assert_eq!(entries.recv_timeout(DEADLOCK_GUARD).unwrap(), 0.3);
+        release.send(()).unwrap();
+        last.recv_timeout(DEADLOCK_GUARD).unwrap().unwrap();
+    }
 
     #[test]
     fn blocked_write_leaves_callers_free_and_coalesces_newer_complete_snapshots() {

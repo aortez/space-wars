@@ -3,6 +3,12 @@
 //! authenticate the root service and the actual kiosk process before using them.
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_os = "linux")]
+#[path = "install_transport.rs"]
+pub mod transport;
+#[path = "install_wire.rs"]
+pub mod wire;
+
 pub const SCHEMA: u32 = 1;
 pub const MAX_MESSAGE_BYTES: usize = 4096;
 pub const PREPARE_MS: u64 = 30_000;

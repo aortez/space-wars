@@ -8,6 +8,9 @@ use spacewars_control::install::{
 };
 use std::io::Read;
 
+#[path = "install_service.rs"]
+pub mod service;
+
 const OFFER_MS: u64 = 5 * 60_000;
 const HOST_FRESH_MS: u64 = 2_000;
 
@@ -108,6 +111,18 @@ impl ManualAuthorization {
 }
 
 impl Coordinator {
+    pub fn status(&self) -> spacewars_control::install::wire::Status {
+        use spacewars_control::install::wire::{Phase, Status};
+        let (phase, ticket) = match &self.state {
+            State::Idle => (Phase::Idle, None),
+            State::Offered(s) => (Phase::Offered, Some(s.offer.ticket.clone())),
+            State::Preparing(_, p) => (Phase::Preparing, Some(p.ticket.clone())),
+            State::Aborted(t) => (Phase::Aborted, Some(t.clone())),
+            State::Consumed(t) => (Phase::Acknowledged, Some(t.clone())),
+        };
+        Status { phase, ticket }
+    }
+
     pub fn new(boot_id: String) -> crate::Result<Self> {
         if boot_id.is_empty() || boot_id.len() > 128 || boot_id.chars().any(char::is_control) {
             return Err(crate::Error::Invalid(

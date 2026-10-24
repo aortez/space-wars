@@ -1,16 +1,18 @@
 # Manual installation handoff
 
-This is the first implementation slice for #264/#266: shared wire types, the
-service consent coordinator and the app-side handoff state machine, with
-deterministic cross-component tests. The live socket operations, settings-writer
-adapter, Updates screen and privileged install worker are **not connected yet**.
-No new install command or runtime privilege is enabled by this change.
+The manual handoff for #264/#266 now includes shared messages, the service
+coordinator, bounded Unix sockets, the running-app adapter and an Updates panel
+in App Settings. Preparation uses the real ordered settings writer and completed
+kiosk page flips. The production service deliberately reports **unavailable**:
+the native verified installer, final admission gates and durable reconciliation
+are the next integration slice. There is no runtime switch to bypass that gate.
 
 The contract lives in
 [`spacewars-control::install`](../crates/spacewars-control/src/install.rs) and
 [`engine-os-manager::install_handoff`](../crates/engine-os-manager/src/install_handoff.rs).
-It does not depend on Slint or make HTTP, filesystem-write, radio or reboot calls.
-The coordinator reads random bytes once to identify its service incarnation.
+The model does not perform disk writes, HTTP, radio or reboot operations. Its
+adapters live in `install_service.rs`, `install_transport.rs` and the client's
+`updates_linux.rs`. The coordinator reads random bytes once for its incarnation.
 
 ## Transaction and authority
 
@@ -21,7 +23,7 @@ create that consent.
 
 ```mermaid
 sequenceDiagram
-    participant U as User / explicit CLI
+    participant U as User / Updates panel
     participant S as Device service
     participant H as App UI thread
     participant W as Verified installer
@@ -99,35 +101,89 @@ Each `HostGate` is bound to one service incarnation. Replace it for a new servic
 only after reconciling and releasing any old fence; reconnecting alone cannot
 discard retired-ticket history or an uncertain acknowledged handoff.
 
+## Connected service and app adapters
+
+The service creates `/run/spacewars-system/install.sock` beside its status socket
+under the existing exclusive service lock. The kiosk creates
+`/run/spacewars-kiosk/install.sock` in its systemd runtime directory. No new
+privileged helper, owner-only installation bypass or device path is exposed.
+
+Frames are newline-delimited JSON, capped at 4 KiB, with strict schemas and a
+two-second request-frame deadline. Each listener admits at most four clients;
+the UI and service work queues are bounded. Clients authenticate `SO_PEERCRED`
+before sending command bytes and bound the complete exchange, including connect.
+The app accepts root only. The service accepts root and the kiosk UID. Its host
+adapter samples the active systemd PID/invocation and `/proc` start ticks before
+and after the exchange, and requires the connected peer to be that PID/UID.
+Test fixtures inject private temporary sockets and their test-process identity;
+production paths and credentials are fixed.
+
+Offer/confirmation work runs off the request handler. A confirmation returns
+`preparing` before waiting for the app. Status and cancellation can run during
+that wait. The coordinator retains the exact abort decision for a lost reply;
+the worker delivers it to the host after an unsuccessful preparation. Consumed
+consent cannot be cancelled or consumed again. The production backend currently
+returns unavailable without issuing an offer or preparing the app.
+
+Updates is reachable from launcher and paused-game App Settings using touch,
+keyboard, gamepad or the existing guarded UI control interface. It displays the
+exact channel, generation, build and image identity, with an explicit
+**Install & restart** or **End game, install & restart** confirmation. Desktop
+installation remains unavailable. The UI does not claim write progress or
+success from an in-memory acknowledgement.
+
+The app listener hands requests to the UI thread. It records the full settings
+snapshot, scene and input revisions, establishes a launch/input fence, and asks
+`SettingsWriter::save_exact` for an ordered barrier receipt. Ordinary saves may
+still coalesce; this exact document cannot be replaced by a newer queued save.
+A valid launcher draft is included and retained in memory when preparation
+starts. Settings changes, other queued saves, scene changes, focus loss and
+preparation expiry revoke an unacknowledged handoff. A failed save cannot ack.
+
+Acknowledgement additionally requires two completed DRM page flips after the
+updater screen was published. This excludes a frame already in flight at
+publication. UI timers and redraw requests alone do not satisfy presentation;
+a renderer without that observation reports the host unavailable. During the
+fence the scenario loop discards pending controls/input, manual and automatic
+launches are rejected, and diagnostic mutation routes are blocked. The Updates
+controls and read-only health/status/screenshot routes remain available.
+
+After acknowledgement, a lost reply or service disconnect leaves the updater
+and fence in place. Only the authenticated exact-ticket abort can release it.
+The existing standalone app starts are not yet recovery-journal aware, so the
+native writer must remain disabled until restart reconciliation is connected.
+
 ## Integration still required
 
-1. Add bounded fixed socket operations for offer, confirm, cancel and status.
-   Authenticate the service as root, and acknowledgements against the actual
-   systemd kiosk PID, start time and invocation. A caller-provided PID or UID is
-   not evidence. Messages reject unknown fields and exceed no 4 KiB frame;
-   no command accepts a path, URL, device, executable or systemd-unit name.
-2. Connect the UI-thread gate to every launch/input route, the real settings-save
-   receipt and updater presentation. Add the manual confirmation and progress
-   UI, plus an equally explicit candidate-bound CLI operation. Desktop clients
-   keep device installation unavailable.
-3. Serialize channel/ready invalidation and final handoff with the worker. Hold
-   the shared install lock and reboot-capable maintenance protection, recheck
-   signatures/expiry, staged file identity and hashes, boot/layout, generation,
-   recovery capability and data compatibility, then begin the existing durable
-   journal transaction before disk mutation. Slow work stays outside status and
-   UI handling. Record the handoff-to-transaction association for reconciliation.
-4. Expose durable progress and confirmed commit/rollback. Qualify socket peer
-   rejection, actual host races, worker failure/restart and installed kiosk
-   permissions before a supervised device trial. Keep the owner helper separate.
+1. Connect verified-ready/channel invalidation and the final handoff to the
+   native worker. Hold the shared install lock and reboot-capable maintenance
+   protection, recheck signatures/expiry, staged file identity and hashes,
+   boot/layout, generation, recovery capability and data compatibility. Begin
+   the existing durable journal transaction before disk mutation; keep slow
+   I/O outside the coordinator lock and status/UI handling.
+2. Persist the handoff-to-transaction association and reconcile it before app
+   launch/autostart or a new service offer after restart. Expose durable progress
+   and confirmed commit/rollback. Unknown old tickets cannot release a fence.
+3. Add the equally explicit candidate-bound install CLI. The current diagnostic
+   UI interface can navigate Updates, but is not a privileged install shortcut.
+4. Qualify real systemd permissions and renderer presentation, worker failure,
+   service/app restart and a supervised native installation on the device.
+   Local socket/Slint tests do not replace those checks.
 
 Ask/Automatic preferences and overnight admission follow this manual path; they
 must reuse the same writer, locks, recovery and final app handoff.
 
 ## Validation scope
 
-The contract tests cover exact consent, games, both save/presentation gates,
-failed/old save receipts, cancellation, candidate/channel/host/maintenance
-changes, one-use consumption, lost replies, abandoned offers, deadline boundaries,
-clock discontinuities and service restart. They use in-memory state and fake
-authenticated observations. They do not establish socket authorization, Slint
-presentation, native installation or physical-device qualification.
+Contract tests cover exact consent, games, save/presentation gates, cancellation,
+candidate/channel/host/maintenance changes, one-use consumption, lost replies,
+deadlines, clock discontinuities and service restart.
+
+Socket tests exercise actual Unix listeners and peer credentials, rejection
+before request disclosure, bounded frames/exchanges, delayed acknowledgement,
+responsive cancellation, lost abort replies and stale consent after restart.
+The client tests run the actual Slint panel and app socket with the real ordered
+settings writer, a temporary settings file, blocked/failed saves, rendered
+software frames, changed settings, expiry and a lost service reply. The software
+renderer supplies the test presentation counter; physical DRM flips and native
+installation are not claimed by those tests.
