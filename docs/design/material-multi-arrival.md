@@ -102,6 +102,11 @@ letting arbitrary scheduler subdivisions mint impact roots. Simply lowering
 the grace time or clearing episodes after each response would not establish
 that contract.
 
+The optional [verified-departure follow-up](material-verified-departure.md)
+now admits this sequence in the fixture by recording physical departure during
+accepted drift, then letting the return acquire a fresh episode. The timer-only
+counterexample above remains unchanged, and native behavior is still unchanged.
+
 ## Remaining work
 
 These fixtures do not change native admission, introduce a scenario, establish

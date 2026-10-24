@@ -22,7 +22,11 @@ enum Refusal {
 struct Trace {
     durations: Vec<f32>,
     responses_at: Vec<f64>,
+    departures: Vec<Departure>,
 }
+
+mod departure;
+use departure::{Departure, DepartureTracker, retire_departures};
 
 struct Hooks<'a> {
     loading: Mutex<&'a mut LoadingState>,
@@ -130,12 +134,22 @@ fn next_time(world: &PhysicsWorld, speed: [f32; 3]) -> Result<Option<f64>, Refus
 }
 
 fn step(world: &mut PhysicsWorld, dt: f32, limit: usize) -> Result<Trace, Refusal> {
+    step_with_departures(world, dt, limit, None)
+}
+
+fn step_with_departures(
+    world: &mut PhysicsWorld,
+    dt: f32,
+    limit: usize,
+    tracker: Option<&mut DepartureTracker>,
+) -> Result<Trace, Refusal> {
     if !dt.is_finite() || dt < 0.0 {
         return Err(Refusal::InvalidTime);
     }
     let mut trace = Trace {
         durations: Vec::new(),
         responses_at: Vec::new(),
+        departures: Vec::new(),
     };
     if dt == 0.0 {
         world.step(0.0);
@@ -148,6 +162,7 @@ fn step(world: &mut PhysicsWorld, dt: f32, limit: usize) -> Result<Trace, Refusa
     assert_eq!(world.raw.bodies.len(), 3);
     assert!((3..=12).contains(&world.raw.colliders.len()));
     let mut staged = world.clone();
+    let mut staged_tracker = tracker.as_deref().cloned();
     staged.loading.as_mut().unwrap().begin_step();
     let mut elapsed = 0.0_f64;
     while elapsed < f64::from(dt) {
@@ -167,6 +182,7 @@ fn step(world: &mut PhysicsWorld, dt: f32, limit: usize) -> Result<Trace, Refusa
             return Err(Refusal::Numerical);
         }
         let count = staged.material_response_batches().len();
+        let start = handles(&staged).map(|h| staged.raw.bodies[h].translation().x);
         let actual_velocity = advance(&mut staged, duration, false)?;
         if actual_velocity != velocity
             || staged.material_response_batches()[count..]
@@ -195,12 +211,25 @@ fn step(world: &mut PhysicsWorld, dt: f32, limit: usize) -> Result<Trace, Refusa
         {
             return Err(Refusal::Numerical);
         }
+        if let Some(tracker) = &mut staged_tracker {
+            trace.departures.extend(retire_departures(
+                &mut staged,
+                tracker,
+                start,
+                actual_velocity,
+                duration,
+                elapsed,
+            )?);
+        }
         // Consume the rounded f32 remainder without a sub-ULP extra solve.
         if duration == remaining {
             break;
         }
     }
     *world = staged;
+    if let (Some(tracker), Some(staged)) = (tracker, staged_tracker) {
+        *tracker = staged;
+    }
     Ok(trace)
 }
 

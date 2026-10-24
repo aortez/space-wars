@@ -125,5 +125,7 @@ and #328 owns failure consequences. This does not complete #327.
 
 The follow-up [three-body arrival experiment](material-multi-arrival.md) proves
 bounded sequential, simultaneous and supported arrivals in collinear fixtures.
-It also retains a rapid-reimpact refusal that needs stronger episode ownership
-before native multi-body integration. Runtime admission remains unchanged.
+It retains a timer-only rapid-reimpact refusal; the optional
+[verified-departure fixture](material-verified-departure.md) now demonstrates
+fresh episode ownership after proven separation. Native integration still needs
+complete admission and endpoint-event semantics. Runtime admission is unchanged.
