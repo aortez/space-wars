@@ -36,6 +36,7 @@ struct Host {
     document: Vec<u8>,
     scene: String,
     failure: Option<Failure>,
+    startup_blocked: bool,
 }
 impl Host {
     fn new(identity: HostInstance) -> Self {
@@ -48,6 +49,7 @@ impl Host {
             document: Vec::new(),
             scene: String::new(),
             failure: None,
+            startup_blocked: false,
         }
     }
     fn observe(&mut self, window: &MainWindow, settings: &Settings) {
@@ -81,8 +83,8 @@ impl Host {
     fn abort(&mut self, window: &MainWindow, aborted: &Aborted) {
         if self.gate.aborted(aborted).is_ok() {
             self.finish(Err(Failure::Stale));
-            window.set_install_fenced(false);
-            window.set_updates_can_cancel(true);
+            window.set_install_fenced(self.startup_blocked);
+            window.set_updates_can_cancel(!self.startup_blocked);
             window.set_updates_message(
                 self.failure
                     .map(failure_message)
@@ -129,8 +131,10 @@ impl Host {
                         revision: self.revision,
                         settings_revision: self.settings_revision,
                         game: !window.get_launcher_visible(),
-                        fenced: self.gate.fenced(),
-                        available: Self::available(window) && frames.is_some(),
+                        fenced: window.get_install_fenced(),
+                        available: !self.startup_blocked
+                            && Self::available(window)
+                            && frames.is_some(),
                     }),
                 });
                 return;
@@ -143,6 +147,10 @@ impl Host {
                 result
             }
             HostRequest::Prepare { prepare, .. } => {
+                if self.startup_blocked {
+                    let _ = incoming.reply.try_send(failed(Failure::NotReady));
+                    return;
+                }
                 if let Some(frame) = frames.filter(|_| Self::available(window)) {
                     let result = self
                         .gate
@@ -276,7 +284,7 @@ impl Host {
                 }
             }
         }
-        window.set_install_fenced(self.gate.fenced());
+        window.set_install_fenced(self.startup_blocked || self.gate.fenced());
         if !self.gate.fenced() {
             window.set_updates_can_cancel(true);
         }
@@ -322,6 +330,7 @@ pub(crate) struct Runtime {
     _server: Option<transport::Server>,
 }
 struct Panel {
+    opening: bool,
     offer: Option<Offer>,
     busy: bool,
     awaiting: bool,
@@ -329,6 +338,9 @@ struct Panel {
     generation: u64,
 }
 type Exchange = Arc<dyn Fn(&ServiceRequest) -> Result<ServiceReply, String> + Send + Sync>;
+
+#[path = "updates_reconcile.rs"]
+mod reconciliation;
 
 pub(crate) fn install(
     window: &MainWindow,
@@ -369,6 +381,18 @@ pub(crate) fn install(
         }),
         Rc::new(presented_frames),
         0,
+        super::startup_required().then(|| {
+            Arc::new(|request: &ReconcileRequest| {
+                transport::exchange(
+                    Path::new(RECONCILE_SOCKET),
+                    0,
+                    None,
+                    request,
+                    Duration::from_secs(6),
+                )
+                .map_err(|e| e.to_string())
+            }) as reconciliation::Exchange
+        }),
     )
 }
 
@@ -383,7 +407,21 @@ fn start(
     exchange: Exchange,
     frames: Rc<dyn Fn() -> Option<u64>>,
     service_uid: u32,
+    recovery_exchange: Option<reconciliation::Exchange>,
 ) -> Runtime {
+    let startup_required = recovery_exchange.is_some();
+    let mut recovery = recovery_exchange.map(reconciliation::Client::new);
+    let mut host = host;
+    if startup_required {
+        if let Some(host) = &mut host {
+            host.startup_blocked = true;
+        }
+        window.set_install_fenced(true);
+        window.set_updates_visible(true);
+        window.set_updates_can_confirm(false);
+        window.set_updates_can_cancel(false);
+        window.set_updates_message("Checking unfinished installation…".into());
+    }
     let host = Rc::new(RefCell::new(host));
     let activity_host = host.clone();
     let activity_window = window.as_weak();
@@ -442,6 +480,7 @@ fn start(
         }
     });
     let panel = Rc::new(RefCell::new(Panel {
+        opening: false,
         offer: None,
         busy: false,
         awaiting: false,
@@ -468,12 +507,14 @@ fn start(
         p.generation += 1;
         p.offer = None;
         p.awaiting = false;
-        p.busy = submit(
-            &w,
-            &sender,
-            p.generation,
-            ServiceRequest::Offer { schema: SCHEMA },
-        );
+        p.opening = startup_required;
+        p.busy = !startup_required
+            && submit(
+                &w,
+                &sender,
+                p.generation,
+                ServiceRequest::Offer { schema: SCHEMA },
+            );
     });
     let weak = window.as_weak();
     let state = panel.clone();
@@ -528,6 +569,7 @@ fn start(
             }
         } else if !w.get_install_fenced() {
             w.set_updates_visible(false);
+            p.opening = false;
             p.generation += 1;
             p.busy = false;
         }
@@ -539,7 +581,9 @@ fn start(
         let now = transport::boot_ms().unwrap_or(u64::MAX);
         let batch: Vec<_> = requests.try_iter().take(4).collect();
         if let Some(host) = host.borrow_mut().as_mut()
-            && (w.get_updates_visible() || host.pending.is_some() || !batch.is_empty())
+            && ((w.get_updates_visible() && !host.startup_blocked)
+                || host.pending.is_some()
+                || !batch.is_empty())
         {
             let mut snapshot = settings.read().unwrap().clone();
             let draft_valid = if w.get_launcher_visible() {
@@ -576,9 +620,9 @@ fn start(
                 now,
                 if draft_valid { frames() } else { None },
             );
-            if host.gate.fenced() {
-                input.borrow_mut().clear();
-            }
+        }
+        if w.get_install_fenced() {
+            input.borrow_mut().clear();
         }
         let mut p = panel.borrow_mut();
         while let Ok((generation, reply)) = results.try_recv() {
@@ -654,6 +698,9 @@ fn start(
         {
             w.set_updates_can_confirm(false);
             w.set_updates_message(failure_message(Failure::Expired).into());
+        }
+        if let Some(recovery) = &mut recovery {
+            recovery.tick(&w, host.borrow_mut().as_mut(), &mut p, &commands);
         }
         if w.get_updates_visible()
             && !p.busy

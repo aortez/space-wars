@@ -3,6 +3,42 @@ use crate::MainWindow;
 use slint::ComponentHandle;
 use spacewars_control::{UiAction, UiControl};
 
+pub(crate) fn startup_required() -> bool {
+    cfg!(all(target_os = "linux", feature = "pi-kiosk"))
+}
+
+/// Keep initial scenario/settings work behind the same fence as manual and
+/// automatic launches. The UI event loop and health endpoint remain responsive.
+pub(crate) fn after_startup(
+    window: &MainWindow,
+    action: impl FnOnce(&MainWindow) + 'static,
+) -> Option<std::rc::Rc<slint::Timer>> {
+    if !window.get_install_fenced() {
+        action(window);
+        return None;
+    }
+    let weak = window.as_weak();
+    let mut action = Some(action);
+    let timer = std::rc::Rc::new(slint::Timer::default());
+    let control = std::rc::Rc::downgrade(&timer);
+    timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(20),
+        move || {
+            if let Some(window) = weak.upgrade()
+                && !window.get_install_fenced()
+                && let Some(action) = action.take()
+            {
+                if let Some(timer) = control.upgrade() {
+                    timer.stop();
+                }
+                action(&window);
+            }
+        },
+    );
+    Some(timer)
+}
+
 #[cfg(target_os = "linux")]
 #[path = "updates_linux.rs"]
 mod linux;

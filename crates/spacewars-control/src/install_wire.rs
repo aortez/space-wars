@@ -3,6 +3,78 @@ use super::*;
 
 pub const SERVICE_SOCKET: &str = "/run/spacewars-system/install.sock";
 pub const HOST_SOCKET: &str = "/run/spacewars-kiosk/install.sock";
+pub const RECONCILE_SOCKET: &str = "/run/spacewars-system/install-reconcile.sock";
+
+/// Fixed reconciliation request from the live kiosk. The service authenticates its PID and
+/// systemd instance independently; the claimed host is only correlation data.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReconcileRequest {
+    pub schema: u32,
+    pub nonce: u64,
+    pub host: HostInstance,
+    pub held: Option<Ticket>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum InstallOutcome {
+    Committed,
+    RolledBack,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "decision", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum RecoveryDecision {
+    Clear {},
+    Aborted {
+        ticket: Ticket,
+    },
+    Finished {
+        ticket: Ticket,
+        transaction: Id,
+        outcome: InstallOutcome,
+    },
+    Waiting {},
+    Blocked {},
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReconcileReply {
+    pub schema: u32,
+    pub nonce: u64,
+    pub host: HostInstance,
+    pub service: Id,
+    pub result: RecoveryDecision,
+}
+
+impl Message for ReconcileRequest {
+    fn validate(&self) -> Result<(), Error> {
+        if self.schema != SCHEMA || self.nonce == 0 {
+            return Err(Error::Invalid);
+        }
+        self.host.validate()?;
+        if let Some(ticket) = &self.held {
+            ticket.validate()?;
+        }
+        Ok(())
+    }
+}
+impl Message for ReconcileReply {
+    fn validate(&self) -> Result<(), Error> {
+        if self.schema != SCHEMA || self.nonce == 0 {
+            return Err(Error::Invalid);
+        }
+        self.host.validate()?;
+        if let RecoveryDecision::Aborted { ticket } | RecoveryDecision::Finished { ticket, .. } =
+            &self.result
+        {
+            ticket.validate()?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "kebab-case", deny_unknown_fields)]

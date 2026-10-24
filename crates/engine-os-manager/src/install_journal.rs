@@ -3,8 +3,8 @@
 //!
 //! The future native worker must retain InstallLock across prepare, begin and
 //! the writer. Restart reconciliation takes the same lock, so a
-//! surviving worker cannot race an abort decision. App startup and the service
-//! adapter are not wired to this journal yet; production installs stay disabled.
+//! surviving worker cannot race an abort decision. The startup worker reconciles
+//! this journal; writer admission is not connected and installs stay disabled.
 use super::{HOST_FRESH_MS, HostObservation, ManualAuthorization};
 use crate::schedule_store::{StateRecord, Store};
 use crate::{Error, Result};
@@ -132,6 +132,16 @@ impl Journal {
     /// Production callers cannot select a different journal path. Missing state
     /// inside an existing directory is corruption, never a fresh installation.
     pub fn open_native() -> Result<Self> {
+        Self::check_parent()?;
+        Self::open(Path::new(DIRECTORY))
+    }
+
+    pub fn existing_native() -> Result<Option<Self>> {
+        Self::check_parent()?;
+        Ok(Store::existing(Path::new(DIRECTORY))?.map(|(store, record)| Self { store, record }))
+    }
+
+    fn check_parent() -> Result<()> {
         use std::os::unix::fs::MetadataExt;
         let parent = std::fs::symlink_metadata("/data/spacewars-system")?;
         if unsafe { libc::geteuid() } != 0
@@ -141,7 +151,7 @@ impl Journal {
         {
             return Err(invalid("unsafe handoff parent directory"));
         }
-        Self::open(Path::new(DIRECTORY))
+        Ok(())
     }
 
     fn open(path: &Path) -> Result<Self> {

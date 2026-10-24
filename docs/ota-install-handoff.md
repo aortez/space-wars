@@ -3,10 +3,11 @@
 The manual handoff for #264/#266 now includes shared messages, the service
 coordinator, bounded Unix sockets, the running-app adapter and an Updates panel
 in App Settings. Preparation uses the real ordered settings writer and completed
-kiosk page flips. The production service deliberately reports **unavailable**:
-the native verified installer, final admission gates and startup reconciliation
-are not connected. A durable handoff journal and recovery-association library
-now support that integration. There is no runtime switch to bypass the gate.
+kiosk page flips. Startup and lost-acknowledgement recovery now consult the
+durable handoff and recovery journals through an authenticated root worker.
+The production install operation still reports **unavailable**: the native
+writer, qualified recovery-capability provider and final admission gates are
+not connected. There is no runtime switch to bypass that gate.
 
 The contract lives in
 [`spacewars-control::install`](../crates/spacewars-control/src/install.rs) and
@@ -93,9 +94,10 @@ produce a durable abort when the unchanged recovery baseline proves no
 transaction began; otherwise the existing recovery transaction determines the
 outcome. Reboot requested, SSH lost and write finished are not success signals.
 
-After service or app restart, the future native adapter must reconcile the
-durable recovery journal and any acknowledged app fence before accepting new
-work or admitting launcher/autostart gameplay. A fresh in-memory gate does not
+After service or app restart, the app reconciles the durable recovery journal
+and any acknowledged fence before admitting launcher/autostart gameplay or
+requesting a new offer. The native writer's final admission must use the same
+journal. A fresh in-memory gate does not
 prove that a previously acknowledged installation ended.
 Unknown old tickets are not evidence of cancellation. The in-memory coordinator
 does not persist, replay, resume or retry an installation. The separate journal
@@ -118,8 +120,9 @@ Frames are newline-delimited JSON, capped at 4 KiB, with strict schemas and a
 two-second request-frame deadline. Each listener admits at most four clients;
 the UI and service work queues are bounded. Clients authenticate `SO_PEERCRED`
 before sending command bytes and bound the complete exchange, including connect.
-The app accepts root only. The service accepts root and the kiosk UID. Its host
-adapter samples the active systemd PID/invocation and `/proc` start ticks before
+The app accepts root only. The install-command socket accepts root and the kiosk
+UID; reconciliation accepts the live kiosk only. The service's host adapter
+samples the active systemd PID/invocation and `/proc` start ticks before
 and after the exchange, and requires the connected peer to be that PID/UID.
 Test fixtures inject private temporary sockets and their test-process identity;
 production paths and credentials are fixed.
@@ -155,17 +158,58 @@ launches are rejected, and diagnostic mutation routes are blocked. The Updates
 controls and read-only health/status/screenshot routes remain available.
 
 After acknowledgement, a lost reply or service disconnect leaves the updater
-and fence in place. Only the authenticated exact-ticket abort can release it.
-The existing standalone app starts are not yet recovery-journal aware, so the
-native writer must remain disabled until restart reconciliation is connected.
+and fence in place. Only an authenticated exact-ticket abort or confirmed
+terminal recovery result can release it.
+
+## Startup and outcome reconciliation
+
+The service additionally exposes
+`/run/spacewars-system/install-reconcile.sock`. Its separate bounded worker owns
+the installation/recovery/handoff locks and filesystem work; a delayed check
+does not take the live handoff coordinator mutex or block status/time handling.
+There is one queued request and at most four socket clients. Each client exchange
+is bounded by six seconds, with a five-second handler wait. Request/reply frames
+remain limited to 4 KiB. The worker does not start another writer or restart the
+recovery service when a request times out.
+
+The app authenticates root before sending its process identity, a nonce and any
+held ticket. The service checks the caller's kernel PID/UID and the actual kiosk
+systemd invocation/start ticks. It repeats the instance observation after its
+decision. Replies bind the nonce, host and current service epoch. Extra fields,
+wrong identities/nonces, disconnects and errors cannot release a fence.
+
+Pi kiosk builds fence launch/input immediately, defer initial launch and startup
+settings writeback, and render Updates while querying the root worker. Missing
+runtime identity or an unavailable host listener keeps that fence. The existing
+health challenge and presentation redraw continue, allowing the independent
+trial recovery service to observe the app before permitting gameplay. This
+requires the matching device-service binary and a valid systemd kiosk invocation;
+an older service or a standalone Pi launch cannot silently bypass startup
+reconciliation. Desktop builds keep their existing startup behavior.
+
+The worker acquires the shared install lock, opens both journals and checks
+native boot/maintenance evidence before releasing a provisioned kiosk. Busy
+locks wait, including locks held by downloads or operator maintenance. An active
+or unmatched transaction remains held until recovery resolves it; this endpoint
+does not itself finish an abandoned write or replay a reboot. An unprovisioned
+device can start only when both recovery and handoff directories are absent and
+the app holds no ticket. Missing contents in an existing directory fail closed.
+
+The UI accepts Clear only with no held preparation. An acknowledged fence needs
+its exact abort/finished ticket. A successful decision binds the gate to the new
+service epoch while preserving retired history within the same epoch, so delayed
+old Prepare messages cannot revive it. Confirmed outcomes remain visible while a
+follow-up query lets the service observe the unfenced host and retire the durable
+decision. Opening Updates also reconciles before requesting an offer.
 
 ## Durable association library
 
 [`install_journal.rs`](../crates/engine-os-manager/src/install_journal.rs)
 implements a separate root-owned journal at
-`/data/spacewars-system/install-handoff`. It is not yet called by the running
-service or app. It does not change the existing recovery journal format, so
-fallback images retain their current recovery protocol.
+`/data/spacewars-system/install-handoff`. Startup reconciliation uses it; the
+native writer's prepare/begin path is still pending. It does not change the
+existing recovery journal format, so fallback images retain their current
+recovery protocol.
 
 The native worker must retain the shared installation lock through these steps:
 
@@ -211,10 +255,10 @@ tryboot/watchdog qualification for this service.
    boot/layout, generation, recovery capability and data compatibility. Begin
    the existing durable journal transaction before disk mutation; keep slow
    I/O outside the coordinator lock and status/UI handling.
-2. Connect the durable association library to the worker and reconcile it before
-   app launch/autostart or a new service offer after restart. Add authenticated
-   startup/outcome messages and expose durable progress and confirmed
-   commit/rollback. Unknown old tickets cannot release a fence.
+2. Connect prepare/begin to the native worker and expose writing/trial progress.
+   Ensure interrupted-worker recovery resolves the retained transaction using
+   the existing recovery service. Startup/outcome messages and app fencing are
+   connected; unknown old tickets still cannot release a fence.
 3. Add the equally explicit candidate-bound install CLI. The current diagnostic
    UI interface can navigate Updates, but is not a privileged install shortcut.
 4. Qualify real systemd permissions and renderer presentation, worker failure,
@@ -247,3 +291,12 @@ committed admission is quarantined by the existing recovery protocol. Synthetic
 recovery views cover each nonterminal/terminal phase and mismatched identities.
 These tests do not open native block devices, change boot selection or qualify
 tryboot/watchdog hardware.
+
+Startup tests use real local sockets and the rendered Slint UI to cover late
+service availability, wrong nonce/host responses, busy/blocked decisions, deferred
+initial launch, failed host binding, a lost acknowledgement, service-epoch change
+and a confirmed rollback followed by cleanup. Protocol tests reject unknown
+fields even on empty decision variants. A stalled reconciliation worker leaves
+the separate live install status socket responsive. Native systemd identity,
+boot evidence, shared-lock wait time and DRM health during the startup fence
+still require physical qualification.

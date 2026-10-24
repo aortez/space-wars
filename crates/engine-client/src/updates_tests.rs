@@ -112,6 +112,332 @@ fn host_request(path: &Path, request: HostRequest) -> HostReply {
     .unwrap()
 }
 
+fn pumping_exchange(h: &mut Harness, path: &Path, request: HostRequest) -> HostReply {
+    let path = path.to_owned();
+    let (send, receive) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        let _ = send.send(host_request(&path, request));
+    });
+    let end = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Ok(reply) = receive.try_recv() {
+            return reply;
+        }
+        assert!(Instant::now() < end);
+        h.pump(true);
+    }
+}
+
+#[test]
+fn startup_waits_for_authenticated_matching_recovery_and_defers_launch_exactly_once() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let service_path = dir.path().join("reconcile.sock");
+    let path = service_path.clone();
+    let host_path = dir.path().join("host.sock");
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        host_path.clone(),
+        Arc::new(|_| Err("unused".into())),
+        Rc::new(|| Some(0)),
+        uid(),
+        Some(Arc::new(move |request| {
+            transport::exchange(&path, uid(), None, request, Duration::from_millis(100))
+                .map_err(|e| e.to_string())
+        })),
+    );
+    let launched = Rc::new(Cell::new(0));
+    let count = launched.clone();
+    let _deferred = crate::updates::after_startup(&h.window, move |_| count.set(count.get() + 1));
+    h.until(true, |w| {
+        w.get_updates_message().contains("Waiting for the device")
+    });
+    assert!(h.window.get_install_fenced());
+    assert_eq!(launched.get(), 0);
+    let observed = pumping_exchange(
+        &mut h,
+        &host_path,
+        HostRequest::Observe {
+            schema: SCHEMA,
+            nonce: 9,
+        },
+    )
+    .view
+    .unwrap();
+    assert!(observed.fenced);
+    assert!(!observed.available);
+    let refused = pumping_exchange(
+        &mut h,
+        &host_path,
+        HostRequest::Prepare {
+            schema: SCHEMA,
+            prepare: Prepare {
+                schema: SCHEMA,
+                ticket: ticket(),
+                host: observed.host,
+                host_revision: observed.revision,
+                settings_revision: observed.settings_revision,
+                expires_ms: transport::boot_ms().unwrap() + PREPARE_MS,
+            },
+        },
+    );
+    assert_eq!(refused.error, Some(Failure::NotReady));
+
+    let mode = Arc::new(AtomicUsize::new(0));
+    let responses = Arc::new(AtomicUsize::new(0));
+    let selected = mode.clone();
+    let calls = responses.clone();
+    let _service = transport::Server::bind(
+        &service_path,
+        Arc::new(|p| p.uid == uid()),
+        Arc::new(move |bytes, _| {
+            let request = ReconcileRequest::from_json(bytes).unwrap();
+            let choice = selected.load(Ordering::SeqCst);
+            let mut reply = ReconcileReply {
+                schema: SCHEMA,
+                nonce: request.nonce,
+                host: request.host,
+                service: Id::from_bytes([7; 32]).unwrap(),
+                result: match choice {
+                    2 => RecoveryDecision::Waiting {},
+                    3 => RecoveryDecision::Blocked {},
+                    _ => RecoveryDecision::Clear {},
+                },
+            };
+            if choice == 0 {
+                reply.nonce += 1;
+            }
+            if choice == 1 {
+                reply.host.start_ticks += 1;
+            }
+            calls.fetch_add(1, Ordering::SeqCst);
+            serde_json::to_vec(&reply).unwrap()
+        }),
+    )
+    .unwrap();
+    for choice in 0..4 {
+        mode.store(choice, Ordering::SeqCst);
+        let previous = responses.load(Ordering::SeqCst);
+        h.until(true, |_| responses.load(Ordering::SeqCst) > previous);
+        for _ in 0..5 {
+            h.pump(true);
+        }
+        h.window.invoke_updates_cancel();
+        crate::handle_ui_action(&h.window, UiAction::Start);
+        assert!(h.window.get_install_fenced());
+        assert!(!h.window.get_updates_can_cancel());
+        assert_eq!(launched.get(), 0);
+    }
+    mode.store(4, Ordering::SeqCst);
+    h.until(true, |_| launched.get() == 1);
+    assert!(!h.window.get_install_fenced());
+    assert!(!h.window.get_updates_visible());
+    for _ in 0..5 {
+        h.pump(true);
+    }
+    assert_eq!(launched.get(), 1);
+    assert!(
+        h.frames.get() > 0,
+        "health presentation continues while startup is held"
+    );
+}
+
+#[test]
+fn acknowledged_host_rejects_stale_clear_and_wrong_ticket_before_new_service_abort() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let mode = Arc::new(AtomicUsize::new(0));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let selected = mode.clone();
+    let observed = calls.clone();
+    let frames = h.frames.clone();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        socket.clone(),
+        Arc::new(|_| Err("lost service reply".into())),
+        Rc::new(move || Some(frames.get())),
+        uid(),
+        Some(Arc::new(move |request| {
+            let mut result = RecoveryDecision::Clear {};
+            if let Some(held) = &request.held {
+                observed.fetch_add(1, Ordering::SeqCst);
+                result = match selected.load(Ordering::SeqCst) {
+                    0 => RecoveryDecision::Waiting {},
+                    1 => RecoveryDecision::Clear {},
+                    2 => {
+                        let mut wrong = held.clone();
+                        wrong.sequence += 1;
+                        RecoveryDecision::Aborted { ticket: wrong }
+                    }
+                    _ => RecoveryDecision::Aborted {
+                        ticket: held.clone(),
+                    },
+                };
+            }
+            Ok(ReconcileReply {
+                schema: SCHEMA,
+                nonce: request.nonce,
+                host: request.host.clone(),
+                service: if request.held.is_none() && selected.load(Ordering::SeqCst) == 0 {
+                    ticket().service
+                } else {
+                    Id::from_bytes([8; 32]).unwrap()
+                },
+                result,
+            })
+        })),
+    );
+    h.until(true, |w| !w.get_install_fenced());
+    h.window.set_updates_visible(true);
+    let view = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Observe {
+            schema: SCHEMA,
+            nonce: 1,
+        },
+    )
+    .view
+    .unwrap();
+    let ack = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Prepare {
+            schema: SCHEMA,
+            prepare: Prepare {
+                schema: SCHEMA,
+                ticket: ticket(),
+                host: view.host,
+                host_revision: view.revision,
+                settings_revision: view.settings_revision,
+                expires_ms: transport::boot_ms().unwrap() + PREPARE_MS,
+            },
+        },
+    );
+    assert!(ack.acknowledgement.is_some());
+    for choice in 0..3 {
+        mode.store(choice, Ordering::SeqCst);
+        let previous = calls.load(Ordering::SeqCst);
+        h.until(true, |_| calls.load(Ordering::SeqCst) > previous);
+        for _ in 0..5 {
+            h.pump(true);
+        }
+        assert!(h.window.get_install_fenced());
+        assert!(!h.window.get_updates_can_cancel());
+    }
+    mode.store(3, Ordering::SeqCst);
+    h.until(true, |w| !w.get_install_fenced());
+    assert!(h.window.get_updates_message().contains("did not start"));
+    assert!(h.window.get_updates_can_cancel());
+    let view = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Observe {
+            schema: SCHEMA,
+            nonce: 2,
+        },
+    )
+    .view
+    .unwrap();
+    let old = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Prepare {
+            schema: SCHEMA,
+            prepare: Prepare {
+                schema: SCHEMA,
+                ticket: ticket(),
+                host: view.host,
+                host_revision: view.revision,
+                settings_revision: view.settings_revision,
+                expires_ms: transport::boot_ms().unwrap() + PREPARE_MS,
+            },
+        },
+    );
+    assert_eq!(old.error, Some(Failure::Stale));
+}
+
+#[test]
+fn restarted_app_displays_confirmed_outcome_and_keeps_it_through_cleanup() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let observed = calls.clone();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        dir.path().join("host.sock"),
+        Arc::new(|_| Err("unused".into())),
+        Rc::new(|| Some(0)),
+        uid(),
+        Some(Arc::new(move |request| {
+            let count = observed.fetch_add(1, Ordering::SeqCst);
+            Ok(ReconcileReply {
+                schema: SCHEMA,
+                nonce: request.nonce,
+                host: request.host.clone(),
+                service: Id::from_bytes([8; 32]).unwrap(),
+                result: if count == 0 {
+                    RecoveryDecision::Finished {
+                        ticket: ticket(),
+                        transaction: Id::from_bytes([4; 32]).unwrap(),
+                        outcome: InstallOutcome::RolledBack,
+                    }
+                } else {
+                    RecoveryDecision::Clear {}
+                },
+            })
+        })),
+    );
+    h.until(true, |_| calls.load(Ordering::SeqCst) >= 2);
+    for _ in 0..5 {
+        h.pump(true);
+    }
+    assert!(!h.window.get_install_fenced());
+    assert!(h.window.get_updates_visible());
+    assert!(h.window.get_updates_message().contains("rolled back"));
+    assert!(h.window.get_updates_can_cancel());
+}
+
+#[test]
+fn failed_host_listener_cannot_bypass_startup_reconciliation() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    std::fs::write(&socket, "occupied").unwrap();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        socket,
+        Arc::new(|_| Err("unused".into())),
+        Rc::new(|| Some(0)),
+        uid(),
+        Some(Arc::new(|_| panic!("missing host cannot request release"))),
+    );
+    let _deferred = crate::updates::after_startup(&h.window, |_| panic!("startup must stay held"));
+    for _ in 0..10 {
+        h.pump(true);
+    }
+    h.window.invoke_updates_cancel();
+    assert!(h.window.get_install_fenced());
+    assert!(!h.window.get_updates_can_cancel());
+}
+
 #[test]
 fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack_fence() {
     let mut h = Harness::new();
@@ -205,7 +531,21 @@ fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack
         exchange,
         Rc::new(move || Some(frames.get())),
         uid(),
+        Some(Arc::new(|request| {
+            Ok(ReconcileReply {
+                schema: SCHEMA,
+                nonce: request.nonce,
+                host: request.host.clone(),
+                service: ticket().service,
+                result: if request.held.is_some() {
+                    RecoveryDecision::Waiting {}
+                } else {
+                    RecoveryDecision::Clear {}
+                },
+            })
+        })),
     );
+    h.until(true, |w| !w.get_install_fenced());
     h.window.invoke_updates_open();
     h.until(true, |w| w.get_updates_can_confirm());
     h.pump(true);
@@ -482,6 +822,7 @@ fn reopening_updates_with_a_full_queue_reports_failure_and_can_recover() {
         exchange,
         Rc::new(|| Some(0)),
         uid(),
+        None,
     );
     h.window.invoke_updates_open();
     entries.recv_timeout(Duration::from_secs(2)).unwrap();
@@ -550,6 +891,7 @@ fn shipped_kiosk_launch_uses_runtime_identity_without_enabling_direct_launch() {
         Arc::new(|_| Err("installation unavailable".into())),
         Rc::new(|| Some(0)),
         uid(),
+        None,
     );
     assert_eq!(socket.exists(), cfg!(feature = "pi-kiosk"));
     if let Some(identity) = identity {
