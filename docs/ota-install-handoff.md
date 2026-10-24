@@ -6,8 +6,9 @@ in App Settings. Preparation uses the real ordered settings writer and completed
 kiosk page flips. Startup and lost-acknowledgement recovery now consult the
 durable handoff and recovery journals through an authenticated root worker.
 The production install operation still reports **unavailable**: the native
-writer, qualified recovery-capability provider and final admission gates are
-not connected. There is no runtime switch to bypass that gate.
+writer and final admission gates are not connected. Native recovery admission
+now requires retained, owner-approved physical evidence; no device approval has
+been provisioned. There is no runtime switch to bypass that gate.
 
 The contract lives in
 [`spacewars-control::install`](../crates/spacewars-control/src/install.rs) and
@@ -216,7 +217,10 @@ The native worker must retain the shared installation lock through these steps:
 1. Persist the exact Prepare message, boot, channel-selection generation and
    recovery-record fingerprint before asking the app to fence and acknowledge.
 2. Revalidate the candidate and native admission gates, consume the one-use
-   authorization, and obtain an ordinary qualified recovery plan.
+   authorization, and obtain an ordinary qualified recovery plan using
+   `BootController::plan_install`. This reads the fixed physical-qualification
+   approval and retained reports under the shared lock; it writes nothing and
+   cannot substitute supervised admission when evidence is missing.
 3. Call `Journal::begin`. It first persists the exact planned transaction ID,
    then commits the existing recovery plan. Only a successful recovery commit
    returns a write action. The read-only `Plan::installation` association does
@@ -243,9 +247,12 @@ and uses file sync, rename and directory sync. Terminal decisions remain until
 a new authenticated host observation made after the decision proves the fence
 is gone; stale tickets and cached pre-decision observations cannot clear them.
 
-The ordinary native recovery-capability provider is also still absent. The
-supervised owner's separate admission path must not be used to manufacture
-tryboot/watchdog qualification for this service.
+The [native recovery admission contract](ota-recovery-qualification.md#ordinary-native-admission)
+binds owner-approved physical reports to the exact board/firmware/media, layout,
+boot assets, profile, kernel and recovery protocol. It returns an ordinary plan
+only after fresh boot and file checks. It is not yet called by the live install
+worker. The supervised owner's separate admission path must not be used to
+manufacture tryboot/watchdog qualification for this service.
 
 ## Integration still required
 
