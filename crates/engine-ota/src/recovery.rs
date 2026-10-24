@@ -209,6 +209,24 @@ pub struct Plan {
     pub(crate) action: Action,
 }
 
+impl Plan {
+    /// Read-only association for a separate durable handoff journal. This does
+    /// not publish the action or authorize writes: only RecoveryStore::advance
+    /// may return the action after committing this plan. Persist the association
+    /// first, while retaining the shared installation lock across both stores.
+    pub fn installation(&self) -> Option<(Sha256, &Transaction)> {
+        let transaction = self.record.transaction.as_ref()?;
+        match self.action {
+            Action::WriteInactive {
+                transaction: id, ..
+            } if id == transaction.id && transaction.phase == Phase::Writing => {
+                Some((self.previous, transaction))
+            }
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error, Eq, PartialEq)]
 pub enum RecoveryError {
     #[error("missing, inconsistent or unsupported recovery state")]
@@ -802,7 +820,8 @@ impl RecoveryRecord {
         next.plan(self, action)
     }
 
-    pub(crate) fn fingerprint(&self) -> Sha256 {
+    /// Correlates an exact journal revision; it is not installation authority.
+    pub fn fingerprint(&self) -> Sha256 {
         Sha256::digest(&serde_json::to_vec(self).expect("recovery state serializes"))
     }
 

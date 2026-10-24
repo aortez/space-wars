@@ -1688,9 +1688,14 @@ name = "engine-os-manager"
 version = "0.1.0"
 dependencies = [
  "async-io",
+ "async-trait",
+ "aws-lc-rs",
+ "bytes",
  "clap",
  "engine-ota",
+ "futures",
  "futures-lite",
+ "jiff",
  "libc",
  "nix 0.30.1",
  "serde",
@@ -1700,8 +1705,10 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tough",
  "tracing",
  "tracing-subscriber",
+ "url",
  "zbus",
 ]
 

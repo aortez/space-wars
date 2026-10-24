@@ -4,8 +4,9 @@ The manual handoff for #264/#266 now includes shared messages, the service
 coordinator, bounded Unix sockets, the running-app adapter and an Updates panel
 in App Settings. Preparation uses the real ordered settings writer and completed
 kiosk page flips. The production service deliberately reports **unavailable**:
-the native verified installer, final admission gates and durable reconciliation
-are the next integration slice. There is no runtime switch to bypass that gate.
+the native verified installer, final admission gates and startup reconciliation
+are not connected. A durable handoff journal and recovery-association library
+now support that integration. There is no runtime switch to bypass the gate.
 
 The contract lives in
 [`spacewars-control::install`](../crates/spacewars-control/src/install.rs) and
@@ -85,18 +86,20 @@ cannot be revived by delayed prepare messages.
 
 Acknowledgement is the app-side handoff boundary. From then on, a lost response,
 timeout or service disconnect cannot release the fence: the service may already
-have consumed consent and started a transaction. Only an authenticated abort
-decision for that exact ticket, made before consumption, can release it. After
-consumption, cancellation returns too-late and the existing recovery transaction
-determines the outcome. Reboot requested, SSH lost and write finished are not
-success signals.
+have consumed consent and started a transaction. Live cancellation can release
+it only through an authenticated exact-ticket abort before consumption. After
+consumption, cancellation returns too-late. Restart reconciliation can also
+produce a durable abort when the unchanged recovery baseline proves no
+transaction began; otherwise the existing recovery transaction determines the
+outcome. Reboot requested, SSH lost and write finished are not success signals.
 
 After service or app restart, the future native adapter must reconcile the
 durable recovery journal and any acknowledged app fence before accepting new
 work or admitting launcher/autostart gameplay. A fresh in-memory gate does not
 prove that a previously acknowledged installation ended.
-Unknown old tickets are not evidence of cancellation. This module deliberately
-does not persist, replay, resume or retry an installation.
+Unknown old tickets are not evidence of cancellation. The in-memory coordinator
+does not persist, replay, resume or retry an installation. The separate journal
+below records an association and decisions, never replayable consent.
 Each `HostGate` is bound to one service incarnation. Replace it for a new service
 only after reconciling and releasing any old fence; reconnecting alone cannot
 discard retired-ticket history or an uncertain acknowledged handoff.
@@ -156,6 +159,50 @@ and fence in place. Only the authenticated exact-ticket abort can release it.
 The existing standalone app starts are not yet recovery-journal aware, so the
 native writer must remain disabled until restart reconciliation is connected.
 
+## Durable association library
+
+[`install_journal.rs`](../crates/engine-os-manager/src/install_journal.rs)
+implements a separate root-owned journal at
+`/data/spacewars-system/install-handoff`. It is not yet called by the running
+service or app. It does not change the existing recovery journal format, so
+fallback images retain their current recovery protocol.
+
+The native worker must retain the shared installation lock through these steps:
+
+1. Persist the exact Prepare message, boot, channel-selection generation and
+   recovery-record fingerprint before asking the app to fence and acknowledge.
+2. Revalidate the candidate and native admission gates, consume the one-use
+   authorization, and obtain an ordinary qualified recovery plan.
+3. Call `Journal::begin`. It first persists the exact planned transaction ID,
+   then commits the existing recovery plan. Only a successful recovery commit
+   returns a write action. The read-only `Plan::installation` association does
+   not itself authorize a write.
+4. Retain the lock and all native guards while the existing writer and trial
+   protocol execute. Status handling must not take this worker's journal locks
+   or hold the in-memory coordinator mutex across filesystem or host I/O.
+
+After a crash, the replacement worker must acquire the same installation lock,
+open both journals, and validate native boot evidence before reconciling. A
+surviving worker that still holds the lock prevents a conflicting abort decision.
+An unchanged recovery fingerprint proves a prepared or armed handoff never
+started its recovery transaction; the journal durably records an exact-ticket
+abort. This also covers consumed consent lost before recovery commit. A matching
+active transaction remains in progress. Only its recorded Committed or RolledBack
+phase produces a finished result; the existing recovery worker resolves an
+interrupted write, including quarantine. No write or reboot is retried here.
+
+Missing/corrupt state in an existing directory, a different transaction, changed
+candidate/origin boot, regressed outcome or uncertain persistence blocks a
+decision. Both journals must be reopened after a failed commit. The shared
+bounded store checks ownership, permissions, lock/file identity and checksum,
+and uses file sync, rename and directory sync. Terminal decisions remain until
+a new authenticated host observation made after the decision proves the fence
+is gone; stale tickets and cached pre-decision observations cannot clear them.
+
+The ordinary native recovery-capability provider is also still absent. The
+supervised owner's separate admission path must not be used to manufacture
+tryboot/watchdog qualification for this service.
+
 ## Integration still required
 
 1. Connect verified-ready/channel invalidation and the final handoff to the
@@ -164,9 +211,10 @@ native writer must remain disabled until restart reconciliation is connected.
    boot/layout, generation, recovery capability and data compatibility. Begin
    the existing durable journal transaction before disk mutation; keep slow
    I/O outside the coordinator lock and status/UI handling.
-2. Persist the handoff-to-transaction association and reconcile it before app
-   launch/autostart or a new service offer after restart. Expose durable progress
-   and confirmed commit/rollback. Unknown old tickets cannot release a fence.
+2. Connect the durable association library to the worker and reconcile it before
+   app launch/autostart or a new service offer after restart. Add authenticated
+   startup/outcome messages and expose durable progress and confirmed
+   commit/rollback. Unknown old tickets cannot release a fence.
 3. Add the equally explicit candidate-bound install CLI. The current diagnostic
    UI interface can navigate Updates, but is not a privileged install shortcut.
 4. Qualify real systemd permissions and renderer presentation, worker failure,
@@ -190,3 +238,12 @@ settings writer, a temporary settings file, blocked/failed saves, rendered
 software frames, changed settings, expiry and a lost service reply. The software
 renderer supplies the test presentation counter; physical DRM flips and native
 installation are not claimed by those tests.
+
+Journal tests reopen real files at prepare/acknowledgement/admission/outcome
+boundaries and inject failures before and after rename/directory sync. A signed
+feed fixture exercises real verification and both durable journals: association
+or recovery persistence failure returns no write action, while an interrupted
+committed admission is quarantined by the existing recovery protocol. Synthetic
+recovery views cover each nonterminal/terminal phase and mismatched identities.
+These tests do not open native block devices, change boot selection or qualify
+tryboot/watchdog hardware.

@@ -11,6 +11,9 @@ use std::io::Read;
 #[path = "install_service.rs"]
 pub mod service;
 
+#[path = "install_journal.rs"]
+pub mod journal;
+
 const OFFER_MS: u64 = 5 * 60_000;
 const HOST_FRESH_MS: u64 = 2_000;
 
