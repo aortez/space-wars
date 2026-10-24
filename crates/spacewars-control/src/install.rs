@@ -175,8 +175,8 @@ pub struct Acknowledgement {
     pub settings_revision: u64,
 }
 
-/// Only an authenticated service decision made before consuming authorization
-/// may release an acknowledged host fence. A timeout/disconnect is not an abort.
+/// Authenticated live cancellation or durable proof that no transaction began.
+/// A timeout/disconnect is not an abort.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Aborted {
@@ -285,6 +285,38 @@ pub struct HostGate {
 }
 
 impl HostGate {
+    pub fn held(&self) -> Option<&Ticket> {
+        self.pending.as_ref().map(|pending| &pending.request.ticket)
+    }
+
+    /// Apply only an authenticated, nonce/host-matched recovery response. Clear
+    /// cannot release an unknown acknowledged fence. Same-epoch retirement is
+    /// retained; a reconciled service restart rejects delayed old preparations.
+    pub fn reconciled(&mut self, service: &Id, resolved: Option<&Ticket>) -> Result<(), Error> {
+        if let Some(held) = self.held()
+            && resolved != Some(held)
+        {
+            return Err(Error::Stale);
+        }
+        if let Some(ticket) = resolved {
+            ticket.validate()?;
+        }
+        self.retire();
+        if self.service.as_ref() != Some(service) {
+            self.service = Some(service.clone());
+            self.retired = None;
+        }
+        if let Some(ticket) = resolved.filter(|ticket| &ticket.service == service)
+            && self
+                .retired
+                .as_ref()
+                .is_none_or(|old| old.sequence <= ticket.sequence)
+        {
+            self.retired = Some(ticket.clone());
+        }
+        Ok(())
+    }
+
     fn service(&mut self, ticket: &Ticket) -> Result<(), Error> {
         if let Some(service) = &self.service {
             if service != &ticket.service {

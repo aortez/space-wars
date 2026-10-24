@@ -42,7 +42,6 @@ impl<R: StateRecord> Store<R> {
 
     /// Inspect under the same exclusive owner lock without creating state or
     /// advancing its generation. Only an absent directory means uninitialized.
-    #[cfg(test)]
     pub fn existing(path: &Path) -> Result<Option<(Self, R)>> {
         Self::open_inner(path, false)
     }

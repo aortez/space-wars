@@ -60,7 +60,7 @@ impl Backend for Native {
     }
 }
 
-fn host_exchange(
+pub(super) fn host_exchange(
     request: &HostRequest,
     timeout: Duration,
 ) -> Result<(HostReply, HostInstance), Failure> {
@@ -86,6 +86,8 @@ enum Work {
 }
 
 pub struct Runtime {
+    recovery: Option<super::reconciliation::Runtime>,
+    epoch: Id,
     // Drop listener before closing the worker queue.
     server: Option<transport::Server>,
     sender: Option<mpsc::SyncSender<Work>>,
@@ -102,7 +104,11 @@ impl Runtime {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(e.into()),
         }
-        Self::bind(path, boot_id, 1000, Arc::new(Native), false)
+        let mut runtime = Self::bind(path, boot_id, 1000, Arc::new(Native), false)?;
+        runtime.recovery = Some(super::reconciliation::Runtime::bind_native(
+            runtime.epoch.clone(),
+        )?);
+        Ok(runtime)
     }
 
     fn bind(
@@ -113,6 +119,7 @@ impl Runtime {
         enabled: bool,
     ) -> crate::Result<Self> {
         let coordinator = Arc::new(Mutex::new(Coordinator::new(boot_id)?));
+        let epoch = coordinator.lock().unwrap().epoch.clone();
         let (sender, receiver) = mpsc::sync_channel::<Work>(4);
         let shared = coordinator.clone();
         let submit = sender.clone();
@@ -207,6 +214,8 @@ impl Runtime {
             }
         });
         Ok(Self {
+            recovery: None,
+            epoch,
             server: Some(server),
             sender: Some(sender),
             worker: Some(worker),

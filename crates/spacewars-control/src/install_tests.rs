@@ -26,6 +26,70 @@ fn begin(gate: &mut HostGate, request: &Prepare) {
 }
 
 #[test]
+fn recovery_requires_the_held_ticket_and_rebinds_only_after_resolution() {
+    let old = request();
+    let mut gate = HostGate::default();
+    begin(&mut gate, &old);
+    gate.saved(&old.ticket, 20, true).unwrap();
+    gate.presented(&old.ticket).unwrap();
+    gate.acknowledge(&old.ticket, 101).unwrap();
+    let next = Id::from_bytes([9; 32]).unwrap();
+    assert_eq!(gate.reconciled(&next, None), Err(Error::Stale));
+    let mut wrong = old.ticket.clone();
+    wrong.sequence += 1;
+    assert_eq!(gate.reconciled(&next, Some(&wrong)), Err(Error::Stale));
+    gate.expire(u64::MAX);
+    assert!(gate.fenced());
+    gate.reconciled(&next, Some(&old.ticket)).unwrap();
+    assert!(!gate.fenced());
+    assert_eq!(
+        gate.prepare(old.clone(), &old.host, 10, 20, 102),
+        Err(Error::Stale)
+    );
+    let mut new = old.clone();
+    new.ticket.service = next.clone();
+    begin(&mut gate, &new);
+    gate.reconciled(&next, Some(&new.ticket)).unwrap();
+    gate.reconciled(&next, None).unwrap();
+    assert_eq!(
+        gate.prepare(new.clone(), &new.host, 10, 20, 102),
+        Err(Error::Stale)
+    );
+}
+
+#[test]
+fn recovery_wire_rejects_ambiguous_or_uncorrelated_shapes() {
+    use super::wire::*;
+    let request = ReconcileRequest {
+        schema: SCHEMA,
+        nonce: 1,
+        host: request().host,
+        held: None,
+    };
+    let value = serde_json::to_value(&request).unwrap();
+    for (field, replacement) in [
+        ("nonce", serde_json::json!(0)),
+        ("schema", serde_json::json!(2)),
+        ("path", serde_json::json!("/data/other")),
+    ] {
+        let mut bad = value.clone();
+        bad[field] = replacement;
+        assert!(ReconcileRequest::from_json(&serde_json::to_vec(&bad).unwrap()).is_err());
+    }
+    let reply = ReconcileReply {
+        schema: SCHEMA,
+        nonce: 1,
+        host: request.host,
+        service: Id::from_bytes([3; 32]).unwrap(),
+        result: RecoveryDecision::Clear {},
+    };
+    let mut bad = serde_json::to_value(&reply).unwrap();
+    bad["result"]["ticket"] = serde_json::json!(null);
+    assert!(ReconcileReply::from_json(&serde_json::to_vec(&bad).unwrap()).is_err());
+    assert!(ReconcileReply::from_json(&vec![b' '; MAX_MESSAGE_BYTES + 1]).is_err());
+}
+
+#[test]
 fn protocol_rejects_extra_fields_versions_bad_identity_and_oversized_messages() {
     let request = request();
     let value = serde_json::to_value(&request).unwrap();

@@ -466,12 +466,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Headless conversion returned above and never opens a graphics device.
     let raster_only = select_slint_backend(&args)?;
     let window = MainWindow::new()?;
+    let startup_required = updates::startup_required();
+    window.set_install_fenced(startup_required);
+    if startup_required {
+        window.set_launcher_visible(true);
+    }
     renderer_policy::initialize(&window)?;
     needs_writeback |= renderer_policy::normalize_settings(&mut loaded, raster_only);
     effective_launch.renderer =
         renderer_policy::resolve(effective_launch.renderer, raster_only, "startup_options");
     let settings = Arc::new(RwLock::new(loaded));
-    save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)?;
+    if !startup_required {
+        save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)?;
+    }
 
     window.set_raster_only(raster_only);
     let settings_writer = settings_writer::SettingsWriter::new(settings_path.clone())?;
@@ -558,71 +565,94 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.ignore_physical_controllers,
     );
 
-    if args.touch_test {
-        show_launcher(
-            &window,
-            &effective_launch,
-            &settings,
-            &settings_writer,
-            &rom_catalog,
-        );
-        window.set_touch_test_visible(true);
-    } else if args.uses_debug_render() {
-        *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
-            &window,
-            args.debug_triangles,
-            effective_launch.renderer,
-        ));
-    } else if launch_directly {
-        let scenario_settings = settings.read().unwrap().clone();
-        let launch_result = resolve_launch_asset(
-            &effective_launch,
-            args.rom.as_deref(),
-            &scenario_settings,
-            &rom_catalog.borrow(),
-        )
-        .and_then(|asset| {
-            let asset = pizza_lab
-                .clone()
-                .map(client_scenarios::ScenarioAsset::PizzaLab)
-                .unwrap_or(asset);
-            start_scenario_from_launch(
-                &window,
-                &effective_launch,
-                args.benchmark,
-                args.benchmark_configuration(),
-                Rc::clone(&scenario_controls),
-                Rc::clone(&input),
-                scenario_settings.clone(),
-                asset,
-            )
-            .map_err(|error| error.to_string())
-        });
-        match launch_result {
-            Ok(timer) => *render_timer.borrow_mut() = Some(timer),
-            Err(error) => {
-                tracing::error!(%error, "direct scenario launch failed; showing launcher.");
+    let startup_error = Rc::new(RefCell::new(None::<String>));
+    let _initial_launch = {
+        let settings = Arc::clone(&settings);
+        let settings_writer = settings_writer.clone();
+        let render_timer = Rc::clone(&render_timer);
+        let scenario_controls = Rc::clone(&scenario_controls);
+        let input = Rc::clone(&input);
+        let rom_catalog = Rc::clone(&rom_catalog);
+        let startup_error = startup_error.clone();
+        updates::after_startup(&window, move |window| {
+            if startup_required
+                && let Err(error) =
+                    save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)
+            {
+                *startup_error.borrow_mut() = Some(error.to_string());
+                let _ = slint::quit_event_loop();
+                return;
+            }
+            if args.touch_test {
                 show_launcher(
-                    &window,
+                    window,
                     &effective_launch,
                     &settings,
                     &settings_writer,
                     &rom_catalog,
                 );
-                window.set_launcher_error_text(SharedString::from(error));
+                window.set_touch_test_visible(true);
+            } else if args.uses_debug_render() {
+                *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
+                    window,
+                    args.debug_triangles,
+                    effective_launch.renderer,
+                ));
+            } else if launch_directly {
+                let scenario_settings = settings.read().unwrap().clone();
+                let launch_result = resolve_launch_asset(
+                    &effective_launch,
+                    args.rom.as_deref(),
+                    &scenario_settings,
+                    &rom_catalog.borrow(),
+                )
+                .and_then(|asset| {
+                    let asset = pizza_lab
+                        .clone()
+                        .map(client_scenarios::ScenarioAsset::PizzaLab)
+                        .unwrap_or(asset);
+                    start_scenario_from_launch(
+                        window,
+                        &effective_launch,
+                        args.benchmark,
+                        args.benchmark_configuration(),
+                        Rc::clone(&scenario_controls),
+                        Rc::clone(&input),
+                        scenario_settings.clone(),
+                        asset,
+                    )
+                    .map_err(|error| error.to_string())
+                });
+                match launch_result {
+                    Ok(timer) => *render_timer.borrow_mut() = Some(timer),
+                    Err(error) => {
+                        tracing::error!(%error, "direct scenario launch failed; showing launcher.");
+                        show_launcher(
+                            window,
+                            &effective_launch,
+                            &settings,
+                            &settings_writer,
+                            &rom_catalog,
+                        );
+                        window.set_launcher_error_text(SharedString::from(error));
+                    }
+                }
+            } else {
+                show_launcher(
+                    window,
+                    &effective_launch,
+                    &settings,
+                    &settings_writer,
+                    &rom_catalog,
+                );
             }
-        }
-    } else {
-        show_launcher(
-            &window,
-            &effective_launch,
-            &settings,
-            &settings_writer,
-            &rom_catalog,
-        );
-    }
+        })
+    };
 
     window.run()?;
+    if let Some(error) = startup_error.borrow_mut().take() {
+        return Err(error.into());
+    }
     // The window is closed: finish queued preference changes before a normal
     // application exit, without making the visible UI wait on storage.
     if settings_writer.status().pending {

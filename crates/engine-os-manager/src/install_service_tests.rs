@@ -318,6 +318,66 @@ fn production_backend_exposes_no_install_path() {
 }
 
 #[test]
+fn slow_reconciliation_does_not_block_live_install_status() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("install.sock");
+    let _service = Runtime::bind(&path, "boot".into(), uid(), Arc::new(Native), false).unwrap();
+    let recovery_path = dir.path().join("reconcile.sock");
+    let (entered, entries) = mpsc::sync_channel(1);
+    let (release, released) = mpsc::sync_channel(1);
+    let released = Mutex::new(released);
+    let _recovery = super::super::reconciliation::Runtime::bind(
+        &recovery_path,
+        uid(),
+        Id::from_bytes([3; 32]).unwrap(),
+        Arc::new(move |_| {
+            entered.send(()).unwrap();
+            released
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(3))
+                .unwrap();
+            Ok(RecoveryDecision::Clear {})
+        }),
+    )
+    .unwrap();
+    let request = ReconcileRequest {
+        schema: SCHEMA,
+        nonce: 1,
+        host: HostInstance {
+            pid: std::process::id(),
+            start_ticks: 12,
+            invocation: "a".repeat(32),
+        },
+        held: None,
+    };
+    let pending = thread::spawn(move || {
+        transport::exchange::<_, ReconcileReply>(
+            &recovery_path,
+            uid(),
+            None,
+            &request,
+            Duration::from_secs(4),
+        )
+        .unwrap()
+    });
+    entries.recv_timeout(Duration::from_secs(2)).unwrap();
+    let start = Instant::now();
+    let response: ServiceReply = transport::exchange(
+        &path,
+        uid(),
+        None,
+        &ServiceRequest::Status { schema: SCHEMA },
+        Duration::from_millis(500),
+    )
+    .unwrap();
+    assert_eq!(response.status.phase, Phase::Unavailable);
+    assert!(start.elapsed() < Duration::from_millis(500));
+    release.send(()).unwrap();
+    assert_eq!(pending.join().unwrap().result, RecoveryDecision::Clear {});
+}
+
+#[test]
 fn a_failed_observation_retires_the_offer_even_after_the_host_recovers() {
     let f = Fixture::new();
     let offer = f

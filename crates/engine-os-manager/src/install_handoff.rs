@@ -14,6 +14,9 @@ pub mod service;
 #[path = "install_journal.rs"]
 pub mod journal;
 
+#[path = "install_reconcile.rs"]
+mod reconciliation;
+
 const OFFER_MS: u64 = 5 * 60_000;
 const HOST_FRESH_MS: u64 = 2_000;
 
