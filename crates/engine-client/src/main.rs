@@ -522,7 +522,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     network_controls::install(&window);
     let _updates = updates::install(
         &window,
-        args.kiosk,
         Arc::clone(&settings),
         settings_writer.clone(),
         Rc::clone(&input),

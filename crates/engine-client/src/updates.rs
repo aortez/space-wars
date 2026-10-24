@@ -12,7 +12,6 @@ pub(crate) use linux::install;
 #[cfg(not(target_os = "linux"))]
 pub(crate) fn install(
     window: &MainWindow,
-    _: bool,
     _: std::sync::Arc<std::sync::RwLock<engine_common::Settings>>,
     _: crate::settings_writer::SettingsWriter,
     _: crate::input::SharedInput,

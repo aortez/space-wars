@@ -105,8 +105,11 @@ discard retired-ticket history or an uncertain acknowledged handoff.
 
 The service creates `/run/spacewars-system/install.sock` beside its status socket
 under the existing exclusive service lock. The kiosk creates
-`/run/spacewars-kiosk/install.sock` in its systemd runtime directory. No new
-privileged helper, owner-only installation bypass or device path is exposed.
+`/run/spacewars-kiosk/install.sock` in its systemd runtime directory. Host eligibility
+uses the `pi-kiosk` build feature and a valid process/systemd invocation identity;
+it is independent of the direct-launch `--kiosk` CLI flag. A full UI request
+queue reports a visible busy result so reopening Updates cannot wait forever.
+No new privileged helper, owner-only installation bypass or device path is exposed.
 
 Frames are newline-delimited JSON, capped at 4 KiB, with strict schemas and a
 two-second request-frame deadline. Each listener admits at most four clients;

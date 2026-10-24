@@ -300,13 +300,18 @@ fn presented_frames() -> Option<u64> {
         None
     }
 }
-fn identity() -> Option<HostInstance> {
+fn runtime_identity(invocation: Option<String>) -> Option<HostInstance> {
+    // The shipped systemd unit uses --fullscreen. The --kiosk CLI flag also
+    // requests direct launch, so it cannot determine install-host eligibility.
+    if !cfg!(feature = "pi-kiosk") {
+        return None;
+    }
     let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
     let end = stat.rfind(')')?;
     let value = HostInstance {
         pid: std::process::id(),
         start_ticks: stat[end + 1..].split_whitespace().nth(19)?.parse().ok()?,
-        invocation: std::env::var("INVOCATION_ID").ok()?,
+        invocation: invocation?,
     };
     value.validate().ok()?;
     Some(value)
@@ -327,16 +332,11 @@ type Exchange = Arc<dyn Fn(&ServiceRequest) -> Result<ServiceReply, String> + Se
 
 pub(crate) fn install(
     window: &MainWindow,
-    kiosk: bool,
     settings: Arc<RwLock<Settings>>,
     writer: SettingsWriter,
     input: input::SharedInput,
 ) -> Runtime {
-    let host = if kiosk {
-        identity().map(Host::new)
-    } else {
-        None
-    };
+    let host = runtime_identity(std::env::var("INVOCATION_ID").ok()).map(Host::new);
     let available = host.is_some();
     start(
         window,
@@ -468,9 +468,12 @@ fn start(
         p.generation += 1;
         p.offer = None;
         p.awaiting = false;
-        p.busy = sender
-            .try_send((p.generation, ServiceRequest::Offer { schema: SCHEMA }))
-            .is_ok();
+        p.busy = submit(
+            &w,
+            &sender,
+            p.generation,
+            ServiceRequest::Offer { schema: SCHEMA },
+        );
     });
     let weak = window.as_weak();
     let state = panel.clone();
@@ -489,18 +492,20 @@ fn start(
             ticket: offer.ticket.clone(),
             end_game: offer.ends_game,
         };
-        p.busy = sender
-            .try_send((
-                p.generation,
-                ServiceRequest::Confirm {
-                    schema: SCHEMA,
-                    consent,
-                },
-            ))
-            .is_ok();
+        p.busy = submit(
+            &w,
+            &sender,
+            p.generation,
+            ServiceRequest::Confirm {
+                schema: SCHEMA,
+                consent,
+            },
+        );
         p.awaiting = p.busy;
-        w.set_updates_can_confirm(false);
-        w.set_updates_message("Preparing installation…".into());
+        if p.busy {
+            w.set_updates_can_confirm(false);
+            w.set_updates_message("Preparing installation…".into());
+        }
     });
     let weak = window.as_weak();
     let state = panel.clone();
@@ -516,7 +521,7 @@ fn start(
                 schema: SCHEMA,
                 ticket: offer.ticket.clone(),
             };
-            if sender.try_send((p.generation, command)).is_ok() {
+            if submit(&w, &sender, p.generation, command) {
                 p.busy = true;
                 p.awaiting = true;
                 w.set_updates_message("Cancelling installation…".into());
@@ -665,6 +670,26 @@ fn start(
     Runtime {
         _timer: timer,
         _server: server,
+    }
+}
+
+fn submit(
+    window: &MainWindow,
+    sender: &mpsc::SyncSender<(u64, ServiceRequest)>,
+    generation: u64,
+    request: ServiceRequest,
+) -> bool {
+    match sender.try_send((generation, request)) {
+        Ok(()) => true,
+        Err(error) => {
+            window.set_updates_message(match error {
+                mpsc::TrySendError::Full(_) => "Updates is busy. Please try again.".into(),
+                mpsc::TrySendError::Disconnected(_) => {
+                    "The device installation service is unavailable.".into()
+                }
+            });
+            false
+        }
     }
 }
 

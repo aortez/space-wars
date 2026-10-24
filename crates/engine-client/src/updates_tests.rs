@@ -403,6 +403,7 @@ fn save_failure_and_changed_settings_revoke_preparation() {
 }
 
 #[test]
+#[cfg(not(feature = "pi-kiosk"))]
 fn desktop_updates_are_visible_but_installation_is_unavailable() {
     let mut h = Harness::new();
     let dir = tempfile::tempdir().unwrap();
@@ -414,7 +415,7 @@ fn desktop_updates_are_visible_but_installation_is_unavailable() {
         settings.clone(),
         writer.clone(),
     );
-    let _runtime = install(&h.window, false, settings, writer, h.input.clone());
+    let _runtime = install(&h.window, settings, writer, h.input.clone());
     assert!(crate::ui_activation::activate(
         &h.window,
         "settings.updates"
@@ -429,4 +430,145 @@ fn desktop_updates_are_visible_but_installation_is_unavailable() {
     ));
     h.window.invoke_keyboard_action(5, false);
     assert!(!h.window.get_updates_visible());
+}
+
+#[test]
+fn reopening_updates_with_a_full_queue_reports_failure_and_can_recover() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let (entered, entries) = mpsc::channel();
+    let (release, released) = mpsc::channel();
+    let released = Mutex::new(released);
+    let completed = Arc::new(AtomicUsize::new(0));
+    let finished = completed.clone();
+    let exchange = Arc::new(move |request: &ServiceRequest| {
+        assert!(matches!(request, ServiceRequest::Offer { .. }));
+        entered.send(()).unwrap();
+        released
+            .lock()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap();
+        let sequence = finished.fetch_add(1, Ordering::SeqCst) as u64 + 1;
+        let mut reply = response(Phase::Offered);
+        let offered_ticket = Ticket {
+            sequence,
+            ..ticket()
+        };
+        reply.status.ticket = Some(offered_ticket.clone());
+        reply.offer = Some(Offer {
+            schema: SCHEMA,
+            ticket: offered_ticket,
+            candidate: Candidate {
+                id: ticket().candidate,
+                channel: Channel::Release,
+                generation: 11,
+                build_id: format!("offer-{sequence}"),
+            },
+            ends_game: true,
+            expires_ms: transport::boot_ms().unwrap() + 300_000,
+        });
+        Ok(reply)
+    });
+    let settings = Arc::new(RwLock::new(Settings::default()));
+    let writer = SettingsWriter::new(dir.path().join("settings.toml")).unwrap();
+    let _runtime = start(
+        &h.window,
+        settings,
+        writer,
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        dir.path().join("host.sock"),
+        exchange,
+        Rc::new(|| Some(0)),
+        uid(),
+    );
+    h.window.invoke_updates_open();
+    entries.recv_timeout(Duration::from_secs(2)).unwrap();
+    // The first exchange is blocked. The second opening fills the only queue
+    // slot; the third opening must report that its request was not accepted.
+    for _ in 0..2 {
+        h.window.invoke_updates_cancel();
+        assert!(!h.window.get_updates_visible());
+        h.window.invoke_updates_open();
+    }
+    let saturated_message = h.window.get_updates_message().to_string();
+    release.send(()).unwrap();
+    entries.recv_timeout(Duration::from_secs(2)).unwrap();
+    release.send(()).unwrap();
+    h.until(false, |_| completed.load(Ordering::SeqCst) == 2);
+    // Wait through a UI poll after both stale exchanges have completed.
+    let drained = Instant::now();
+    h.until(false, |_| drained.elapsed() >= Duration::from_millis(60));
+    assert!(saturated_message.contains("busy"), "{saturated_message}");
+    assert_eq!(h.window.get_updates_message().as_str(), saturated_message);
+    assert!(!h.window.get_updates_can_confirm());
+    assert!(h.window.get_updates_can_cancel());
+
+    h.window.invoke_updates_cancel();
+    h.window.invoke_updates_open();
+    entries.recv_timeout(Duration::from_secs(2)).unwrap();
+    release.send(()).unwrap();
+    h.until(false, |w| w.get_updates_can_confirm());
+    assert!(h.window.get_updates_message().contains("offer-3"));
+}
+
+#[test]
+fn shipped_kiosk_launch_uses_runtime_identity_without_enabling_direct_launch() {
+    use clap::Parser;
+    let unit = include_str!(
+        "../../../yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-kiosk.service"
+    );
+    let command = unit
+        .lines()
+        .find_map(|line| line.strip_prefix("ExecStart="))
+        .unwrap();
+    let args = crate::Args::try_parse_from(command.split_whitespace()).unwrap();
+    assert!(args.fullscreen);
+    assert!(!args.kiosk);
+    assert!(
+        !crate::should_launch_directly(&args),
+        "the shipped launcher/autostart policy must be preserved"
+    );
+
+    assert!(runtime_identity(None).is_none());
+    assert!(runtime_identity(Some("invalid".into())).is_none());
+    let identity = runtime_identity(Some("b".repeat(32)));
+    assert_eq!(identity.is_some(), cfg!(feature = "pi-kiosk"));
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let settings = Arc::new(RwLock::new(Settings::default()));
+    let writer = SettingsWriter::new(dir.path().join("settings.toml")).unwrap();
+    let _runtime = start(
+        &h.window,
+        settings,
+        writer,
+        h.input.clone(),
+        identity.clone().map(Host::new),
+        socket.clone(),
+        Arc::new(|_| Err("installation unavailable".into())),
+        Rc::new(|| Some(0)),
+        uid(),
+    );
+    assert_eq!(socket.exists(), cfg!(feature = "pi-kiosk"));
+    if let Some(identity) = identity {
+        h.window.invoke_updates_open();
+        let worker = thread::spawn(move || {
+            host_request(
+                &socket,
+                HostRequest::Observe {
+                    schema: SCHEMA,
+                    nonce: 42,
+                },
+            )
+        });
+        h.until(false, |_| worker.is_finished());
+        let view = worker.join().unwrap().view.unwrap();
+        assert_eq!(view.host, identity);
+        assert_eq!(view.host.pid, std::process::id());
+        assert!(view.host.start_ticks > 0);
+        assert_eq!(view.nonce, 42);
+        assert!(view.available);
+    }
 }
