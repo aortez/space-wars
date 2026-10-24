@@ -132,8 +132,8 @@ Offer/confirmation work runs off the request handler. A confirmation returns
 `preparing` before waiting for the app. Status and cancellation can run during
 that wait. The coordinator retains the exact abort decision for a lost reply;
 the worker delivers it to the host after an unsuccessful preparation. Consumed
-consent cannot be cancelled or consumed again. The production backend currently
-returns unavailable without issuing an offer or preparing the app.
+consent cannot be cancelled or consumed again. The production backend offers only
+a currently verified candidate on a device with qualified recovery admission.
 
 Updates is reachable from launcher and paused-game App Settings using touch,
 keyboard, gamepad or the existing guarded UI control interface. It displays the
@@ -205,7 +205,11 @@ its exact abort/finished ticket. A successful decision binds the gate to the new
 service epoch while preserving retired history within the same epoch, so delayed
 old Prepare messages cannot revive it. Confirmed outcomes remain visible while a
 follow-up query lets the service observe the unfenced host and retire the durable
-decision. Opening Updates also reconciles before requesting an offer.
+decision. Opening Updates also reconciles before requesting an offer. Pending
+confirmations keep polling even before the app receives Prepare. A matching Clear
+from a new service incarnation retires the old unheld offer so Back and reopening
+Updates work after an early service restart. A delayed Clear for an earlier offer
+cannot discard a newer offer, and Clear never releases a held preparation.
 
 ## Durable association library
 
@@ -272,6 +276,14 @@ revision to one install session. The claim is serialized with scheduler decision
 and queued channel/check commands. New checks and channel changes are refused
 until the session drops its claim; the update worker continues publishing its
 heartbeat. Final admission still checks usable time, expiry and that exact claim.
+
+Dropping the claim blocks new offers until the update worker revalidates retained
+trust locally under the installation lock. This preserves a staged candidate
+after cancellation even though installer preflight rewrote the trust store.
+Boot/data, recovery and staging evidence must remain unchanged, and the retained
+signed feed must still authorize the same image at the current usable time.
+Changed or expired evidence drops readiness. Lock contention waits for maintenance
+to finish; this revalidation makes no network request and consumes no update check.
 
 `engine-ota::native_install::Session` holds the native boot, recovery, trust and
 staging guards. It revalidates signed metadata and the full staged payload before
@@ -355,3 +367,10 @@ quarantine on the normal good root. The existing signed ext4 writer, reboot requ
 failure and recovery fixtures remain the lower-level evidence. These workstation
 tests do not execute the fixed native path against a Pi block device or establish
 physical recovery qualification. No approval was provisioned or device changed.
+
+Regression coverage also exercises a service restart before Host Prepare, stale
+cancellation, rejection of a mismatched recovery nonce and delayed old Prepare,
+then Back and reopening Updates. Signed-feed tests reproduce the installer's trust
+rewrite and restore readiness while rejecting payload/recovery replacement,
+candidate revocation and expiry. Runtime tests cover maintenance contention and
+reoffering after cancellation without another scheduled check or network hold.

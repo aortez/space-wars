@@ -189,7 +189,42 @@ impl Context {
 
 /// A read-only readiness snapshot, not installation authority. Atomic changes
 /// to trust, history, data identity or staged bytes invalidate the UI snapshot.
-pub(super) struct ReadyProof(Vec<Stamp>);
+pub(super) struct ReadyProof {
+    unchanged: Vec<Stamp>,
+    trust: Stamp,
+}
+impl ReadyProof {
+    fn valid(&self) -> bool {
+        self.trust.matches() && self.unchanged.iter().all(Stamp::matches)
+    }
+
+    async fn refresh(
+        &mut self,
+        trust: &mut TrustStore,
+        expected: &VerifiedCandidate,
+        time: UsableTime,
+        device: &DeviceIdentity,
+        history: &ImageHistory,
+    ) -> Result<VerifiedCandidate> {
+        if !self.unchanged.iter().all(Stamp::matches) {
+            return Err(unavailable());
+        }
+        // Only retained metadata may have changed during an abandoned install.
+        // Reverify it instead of accepting a new stamp on faith. The unchanged
+        // payload identity retains the downloader's full hash verification.
+        let Selection::Available { candidate } = trust
+            .cached(Some(time), expected.image().channel, device, history)
+            .await?
+        else {
+            return Err(unavailable());
+        };
+        if candidate.id() != expected.id() || !self.unchanged.iter().all(Stamp::matches) {
+            return Err(unavailable());
+        }
+        self.trust = Stamp::capture_owned(self.trust.path.clone(), self.trust.owner)?;
+        Ok(candidate)
+    }
+}
 struct Stamp {
     path: PathBuf,
     owner: u32,
@@ -329,7 +364,6 @@ impl Backend for Native {
                 PathBuf::from(DATA_SCHEMA),
                 PathBuf::from(RECEIPT_PATH),
                 Path::new(crate::recovery_service::RECOVERY_DIRECTORY).join("state.json"),
-                Path::new(TRUST).join("state.json"),
                 Path::new(STAGING).join("candidate.json"),
                 Path::new(STAGING)
                     .join(format!("{}.ext4.zst", candidate.image().compressed.sha256)),
@@ -339,7 +373,11 @@ impl Backend for Native {
                 .map(Stamp::capture)
                 .collect::<Result<Vec<_>>>()
                 .map_err(|_| interrupted())?;
-            Some(ReadyProof(stamps))
+            Some(ReadyProof {
+                unchanged: stamps,
+                trust: Stamp::capture(Path::new(TRUST).join("state.json"))
+                    .map_err(|_| interrupted())?,
+            })
         } else {
             None
         };
@@ -355,7 +393,36 @@ impl Backend for Native {
         })
     }
     fn ready_valid(&mut self, proof: &ReadyProof) -> bool {
-        proof.0.iter().all(Stamp::matches)
+        proof.valid()
+    }
+    fn refresh_ready(
+        &mut self,
+        ready: &mut Ready<ReadyProof>,
+    ) -> std::result::Result<(), PreparationError> {
+        let lock = InstallLock::acquire().map_err(prepare_lock_error)?;
+        let result = (|| -> Result<()> {
+            let context = Context::open(lock)?;
+            let mut trust = TrustStore::open(TRUST.as_ref())?;
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?;
+            let time = self.time().ok_or_else(unavailable)?;
+            if time.0 < ready.time.0 {
+                return Err(unavailable());
+            }
+            let candidate = runtime.block_on(ready.proof.refresh(
+                &mut trust,
+                &ready.candidate,
+                time,
+                &context.device,
+                &context.history,
+            ))?;
+            context.check()?;
+            ready.candidate = candidate;
+            ready.time = time;
+            Ok(())
+        })();
+        result.map_err(|e| PreparationError::failed("ready-refresh", e))
     }
     fn admit(&mut self, token: &HoldToken, request: &DownloadReservation) -> Result<()> {
         self.operation(
@@ -419,7 +486,114 @@ fn lower_priority() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_feed as feed;
     use std::os::unix::fs::PermissionsExt;
+
+    #[tokio::test]
+    async fn abandoned_install_refreshes_trust_but_rejects_changed_evidence() {
+        for fault in ["none", "payload", "recovery", "revoked", "expired"] {
+            let temp = tempfile::tempdir().unwrap();
+            let signed = feed::Fixture::new().await;
+            let trust_path = temp.path().join("trust");
+            let mut trust =
+                TrustStore::initialize(&trust_path, &signed.root_bytes, feed::location()).unwrap();
+            let transport = signed
+                .publish(
+                    1,
+                    &[feed::descriptor(Channel::Release, 2)],
+                    feed::EXPIRES.parse().unwrap(),
+                    feed::Fault::None,
+                )
+                .await;
+            let candidate = feed::candidate(
+                trust
+                    .refresh(
+                        Arc::new(transport),
+                        feed::time(),
+                        Channel::Release,
+                        &feed::device(),
+                        &ImageHistory::default(),
+                    )
+                    .await
+                    .unwrap(),
+            );
+            let owner = unsafe { libc::geteuid() };
+            let mut unchanged = Vec::new();
+            for name in ["payload", "recovery"] {
+                let path = temp.path().join(name);
+                fs::write(&path, b"verified evidence").unwrap();
+                fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+                unchanged.push(Stamp::capture_owned(path, owner).unwrap());
+            }
+            let mut proof = ReadyProof {
+                unchanged,
+                trust: Stamp::capture_owned(trust_path.join("state.json"), owner).unwrap(),
+            };
+            assert!(proof.valid());
+            // This is the real trust operation used by native Session::open,
+            // before cancellation or a failed app/settings acknowledgement.
+            trust
+                .revalidate_image(
+                    candidate.id(),
+                    &mut std::io::Cursor::new(feed::payload(2)),
+                    feed::time(),
+                    Channel::Release,
+                    &feed::device(),
+                    &ImageHistory::default(),
+                )
+                .await
+                .unwrap();
+            assert!(!proof.valid());
+            if matches!(fault, "payload" | "recovery") {
+                let replacement = temp.path().join("replacement");
+                fs::write(&replacement, b"verified evidence").unwrap();
+                fs::rename(replacement, temp.path().join(fault)).unwrap();
+            }
+            if fault == "revoked" {
+                let transport = signed
+                    .publish(
+                        2,
+                        &[feed::descriptor(Channel::Release, 3)],
+                        feed::EXPIRES.parse().unwrap(),
+                        feed::Fault::None,
+                    )
+                    .await;
+                trust
+                    .refresh(
+                        Arc::new(transport),
+                        feed::time(),
+                        Channel::Release,
+                        &feed::device(),
+                        &ImageHistory::default(),
+                    )
+                    .await
+                    .unwrap();
+            }
+            drop(trust);
+            let mut trust = TrustStore::open(&trust_path).unwrap();
+            let time = if fault == "expired" {
+                UsableTime(feed::EXPIRES.parse().unwrap())
+            } else {
+                feed::time().unwrap()
+            };
+            let result = proof
+                .refresh(
+                    &mut trust,
+                    &candidate,
+                    time,
+                    &feed::device(),
+                    &ImageHistory::default(),
+                )
+                .await;
+            if fault == "none" {
+                assert_eq!(result.unwrap().id(), candidate.id());
+                assert!(proof.valid());
+            } else {
+                assert!(result.is_err(), "{fault}");
+                assert!(!proof.valid(), "{fault}");
+            }
+        }
+    }
 
     // Explicit owner diagnostic for an idle, already provisioned device. This
     // opens existing stores but never runs HTTP, admits a hold, installs or

@@ -80,6 +80,7 @@ struct Shared {
     control: Weak<Control>,
     ready: Option<(VerifiedCandidate, UsableTime)>,
     installation: Option<Arc<()>>,
+    refresh_ready: bool,
     selecting: bool,
 }
 
@@ -130,6 +131,7 @@ impl Handle {
     pub(crate) fn install_candidate(&self) -> Result<InstallCandidate> {
         let shared = self.shared.lock().map_err(|_| unavailable())?;
         if shared.installation.is_some()
+            || shared.refresh_ready
             || shared.selecting
             || shared.control.strong_count() != 0
             || shared.manual_pending.is_some()
@@ -174,6 +176,7 @@ impl Handle {
         let mut shared = self.shared.lock().map_err(|_| unavailable())?;
         let current = self.install_snapshot(&shared)?;
         if shared.installation.is_some()
+            || shared.refresh_ready
             || shared.selecting
             || shared.control.strong_count() != 0
             || shared.manual_pending.is_some()
@@ -394,6 +397,9 @@ impl Drop for InstallSelection {
                 .is_some_and(|m| Arc::ptr_eq(m, &self.marker))
         {
             shared.installation = None;
+            // The installer may have advanced retained trust before consent
+            // was consumed. Revalidate locally before offering it again.
+            shared.refresh_ready = true;
         }
     }
 }
@@ -448,6 +454,7 @@ fn spawn_with<B: Backend>(path: PathBuf, backend: B) -> Result<Runtime> {
             control: Weak::new(),
             ready: None,
             installation: None,
+            refresh_ready: false,
             selecting: false,
         })),
         inputs,
@@ -665,6 +672,10 @@ trait Backend: Inputs + Clone + Send + Sync + 'static {
         control: Arc<Control>,
     ) -> engine_ota::Result<Finished<Self::Ready>>;
     fn ready_valid(&mut self, proof: &Self::Ready) -> bool;
+    fn refresh_ready(
+        &mut self,
+        ready: &mut Ready<Self::Ready>,
+    ) -> std::result::Result<(), PreparationError>;
     fn admit(&mut self, token: &HoldToken, request: &DownloadReservation) -> Result<()>;
     fn renew(&mut self, token: &HoldToken, deadline_ms: u64) -> Result<()>;
     fn release(&mut self, token: &HoldToken) -> Result<()>;
@@ -729,7 +740,7 @@ impl<B: Backend> Runner<B> {
         })
     }
     fn step(&mut self, requests: &mpsc::Receiver<Command>, handle: &Handle) -> Result<()> {
-        {
+        let refresh_ready = {
             let mut shared = handle.shared.lock().map_err(|_| unavailable())?;
             if shared.installation.is_some() {
                 // Preserve the claimed snapshot while continuing the heartbeat.
@@ -738,8 +749,32 @@ impl<B: Backend> Runner<B> {
                 return Ok(());
             }
             shared.selecting = true;
-        }
+            shared.refresh_ready
+        };
         let _selection = Selecting(handle.shared.clone());
+        if refresh_ready {
+            if let Some(ready) = &mut self.ready {
+                match self.backend.refresh_ready(ready) {
+                    Ok(()) => {}
+                    Err(PreparationError::MaintenanceBusy) => {
+                        // Reconciliation briefly owns this same lock. Keep the
+                        // claim unavailable and retry without consuming a check.
+                        handle.shared.lock().map_err(|_| unavailable())?.observed =
+                            self.backend.clock()?;
+                        return Ok(());
+                    }
+                    Err(_) => {
+                        self.ready = None;
+                        self.reason = Some(Reason::StaleReady);
+                    }
+                }
+            }
+            handle
+                .shared
+                .lock()
+                .map_err(|_| unavailable())?
+                .refresh_ready = false;
+        }
         let mut offer = None;
         let mut manual = None;
         for _ in 0..8 {

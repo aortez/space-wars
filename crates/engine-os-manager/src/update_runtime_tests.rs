@@ -115,6 +115,69 @@ async fn installation_selection_rejects_unpublished_scheduling_and_stale_evidenc
 
 const BOOT: &str = "11111111-2222-3333-4444-555555555555";
 
+#[tokio::test]
+async fn abandoned_install_revalidates_before_reoffering_without_another_update_check() {
+    for invalid in [false, true] {
+        let mut f = Fixture::new();
+        let now = f.fake.clock().unwrap();
+        let completed = f
+            .runner
+            .schedule
+            .automatic(&now, false, Opportunity::Connected)
+            .unwrap()
+            .active
+            .unwrap();
+        assert!(f.runner.schedule.admitted(&now, completed.id).unwrap());
+        assert!(
+            f.runner
+                .schedule
+                .payload_started(&now, completed.id, &now)
+                .unwrap()
+        );
+        f.runner
+            .schedule
+            .finish(&now, completed.id, Completion::Ready)
+            .unwrap();
+        let candidate = f.install_ready().await;
+        let before = f.handle.status().unwrap().schedule;
+        let selection = f.handle.claim_install(&candidate).unwrap();
+        f.fake.edit(|w| {
+            w.ready_valid = false; // The installer replaced retained trust.
+            w.busy_ready_refresh = true; // Reconciliation still owns maintenance.
+            w.fail_ready_refresh = invalid;
+        });
+        f.step();
+        selection.check().unwrap();
+        assert_eq!(f.fake.0.lock().unwrap().ready_refreshes, 0);
+        drop(selection);
+        assert!(f.handle.install_candidate().is_err());
+        assert!(f.handle.claim_install(&candidate).is_err());
+        f.step();
+        assert!(f.handle.install_candidate().is_err());
+        assert!(f.runner.ready.is_some());
+        f.fake.edit(|w| w.busy_ready_refresh = false);
+        f.step();
+        let after = f.handle.status().unwrap();
+        assert_eq!(after.schedule, before);
+        if invalid {
+            assert_eq!(after.reason, Some(Reason::StaleReady));
+            assert!(f.handle.install_candidate().is_err());
+        } else {
+            assert_eq!(after.phase, Phase::Ready);
+            assert_eq!(
+                f.handle.install_candidate().unwrap().candidate.id(),
+                candidate.candidate.id()
+            );
+            assert!(f.handle.claim_install(&candidate).is_ok());
+        }
+        let world = f.fake.0.lock().unwrap();
+        assert_eq!(world.ready_refreshes, 2);
+        assert_eq!(world.prepares, 0);
+        assert_eq!(world.sessions, 0);
+        assert_eq!(world.holds.len(), 1); // Only the unrelated owner's hold.
+    }
+}
+
 #[test]
 fn native_network_read_accepts_publication_after_the_callers_clock_sample() {
     use crate::linux;
@@ -181,6 +244,10 @@ struct World {
     work: Work,
     fail_prepare: bool,
     busy_prepare: bool,
+    ready_valid: bool,
+    busy_ready_refresh: bool,
+    fail_ready_refresh: bool,
+    ready_refreshes: usize,
     fail_admit: bool,
     fail_renew: bool,
     admit_delay: u64,
@@ -209,6 +276,10 @@ impl Fake {
             work: Work::Finish,
             fail_prepare: false,
             busy_prepare: false,
+            ready_valid: true,
+            busy_ready_refresh: false,
+            fail_ready_refresh: false,
+            ready_refreshes: 0,
             fail_admit: false,
             fail_renew: false,
             admit_delay: 0,
@@ -381,7 +452,22 @@ impl Backend for Fake {
         }
     }
     fn ready_valid(&mut self, _proof: &()) -> bool {
-        true
+        self.0.lock().unwrap().ready_valid
+    }
+    fn refresh_ready(
+        &mut self,
+        _ready: &mut Ready<()>,
+    ) -> std::result::Result<(), PreparationError> {
+        let mut w = self.0.lock().unwrap();
+        w.ready_refreshes += 1;
+        if w.busy_ready_refresh {
+            return Err(PreparationError::MaintenanceBusy);
+        }
+        if w.fail_ready_refresh {
+            return Err(PreparationError::failed("ready-refresh", unavailable()));
+        }
+        w.ready_valid = true;
+        Ok(())
     }
     fn admit(&mut self, token: &HoldToken, request: &DownloadReservation) -> Result<()> {
         let mut w = self.0.lock().unwrap();
@@ -436,6 +522,7 @@ impl Fixture {
             stop: Arc::new(AtomicBool::new(false)),
             shared: Arc::new(Mutex::new(Shared {
                 installation: None,
+                refresh_ready: false,
                 selecting: false,
                 status: Status {
                     phase: Phase::Idle,
