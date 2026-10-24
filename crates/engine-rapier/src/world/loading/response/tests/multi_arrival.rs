@@ -27,6 +27,7 @@ struct Trace {
 
 mod departure;
 mod native;
+mod oblique;
 use departure::{Departure, DepartureTracker, retire_departures};
 
 struct Hooks<'a> {

@@ -222,7 +222,7 @@ pub(super) struct LoadingState {
     response: Option<response::ResponseState>,
     // Snapshot v4 appends this after the unchanged v2/v3 payloads.
     #[serde(skip)]
-    pub(in crate::world) line_arrival: Option<response::line_arrival::DepartureTracker>,
+    pub(in crate::world) arrival_departures: Option<response::ball_arrival::DepartureTracker>,
 }
 
 impl LoadingState {
@@ -238,7 +238,7 @@ impl LoadingState {
             diagnostics: CaptureDiagnostics::default(),
             records: 0,
             response: None,
-            line_arrival: None,
+            arrival_departures: None,
         }
     }
 
@@ -257,7 +257,7 @@ impl LoadingState {
     }
 
     pub(in crate::world) fn invalidate_arrival_proofs(&mut self) {
-        if let Some(tracker) = &mut self.line_arrival {
+        if let Some(tracker) = &mut self.arrival_departures {
             tracker.clear();
         }
     }
@@ -299,7 +299,7 @@ impl LoadingState {
         self.config.valid()
             && self.response.as_ref().is_none_or(|r| r.valid_for(self))
             && self
-                .line_arrival
+                .arrival_departures
                 .as_ref()
                 .is_none_or(|s| self.response.is_some() && s.valid_for(self))
             && self.next_region > 0
@@ -573,7 +573,7 @@ fn finite_record(r: &ContactRecord) -> bool {
 }
 
 pub(super) struct Hooks<'a> {
-    pub line: Option<&'a response::line_arrival::Control>,
+    pub line: Option<&'a response::ball_arrival::Control>,
     pub flight: Option<&'a std::sync::atomic::AtomicBool>,
     pub drives: surface_drive::DriveHooks<'a>,
     pub loading: Option<Mutex<&'a mut LoadingState>>,
