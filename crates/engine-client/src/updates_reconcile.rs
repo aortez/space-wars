@@ -6,7 +6,7 @@ pub(super) type Exchange =
 pub(super) struct Client {
     requests: mpsc::SyncSender<ReconcileRequest>,
     replies: mpsc::Receiver<Result<ReconcileReply, String>>,
-    inflight: Option<u64>,
+    inflight: Option<(u64, Option<Ticket>)>,
     sequence: u64,
     last_poll: Option<Instant>,
     cleanup: bool,
@@ -41,10 +41,10 @@ impl Client {
     ) {
         let Some(host) = host else { return }; // Invalid identity/listener keeps the startup fence.
         while let Ok(response) = self.replies.try_recv() {
-            let nonce = self.inflight.take();
+            let inflight = self.inflight.take();
             let reply = response.ok().filter(|reply| {
                 reply.validate().is_ok()
-                    && Some(reply.nonce) == nonce
+                    && Some(reply.nonce) == inflight.as_ref().map(|(nonce, _)| *nonce)
                     && reply.host == host.identity
             });
             let needs_message = host.startup_blocked || host.gate.fenced() || panel.opening;
@@ -55,12 +55,23 @@ impl Client {
                 }
                 continue;
             };
+            let offered = inflight.and_then(|(_, offered)| offered);
+            // A Clear requested before a new offer cannot retire that offer or
+            // move the host back to an older service instance.
+            if matches!(reply.result, RecoveryDecision::Clear {})
+                && offered.as_ref() != panel.offer.as_ref().map(|offer| &offer.ticket)
+            {
+                continue;
+            }
             let resolved = match &reply.result {
                 RecoveryDecision::Clear {} => None,
                 RecoveryDecision::Aborted { ticket }
                 | RecoveryDecision::Finished { ticket, .. } => Some(ticket),
                 RecoveryDecision::Waiting {} => {
-                    if needs_message {
+                    // A live writer holds the installation lock. Its status
+                    // reports progress; this independent waiter only settles
+                    // abandoned work or a terminal boot outcome.
+                    if needs_message && (host.startup_blocked || panel.opening || !panel.awaiting) {
                         window.set_updates_message(
                             "Waiting for device maintenance or installation recovery…".into(),
                         );
@@ -87,8 +98,10 @@ impl Client {
             host.finish(Err(Failure::Stale));
             window.set_install_fenced(false);
             window.set_updates_can_cancel(true);
-            if resolved.is_some() {
-                self.cleanup = true;
+            let abandoned_offer =
+                resolved.is_none() && offered.is_some_and(|ticket| ticket.service != reply.service);
+            if resolved.is_some() || abandoned_offer {
+                self.cleanup = resolved.is_some();
                 panel.generation += 1;
                 panel.busy = false;
                 panel.awaiting = false;
@@ -98,6 +111,9 @@ impl Client {
                 window.set_updates_can_confirm(false);
                 window.set_updates_message(
                     match reply.result {
+                        RecoveryDecision::Clear {} => {
+                            "The device service restarted before installation began. Return to Updates to check again."
+                        }
                         RecoveryDecision::Aborted { .. } => {
                             "The interrupted installation did not start. You can return to the app."
                         }
@@ -127,6 +143,7 @@ impl Client {
         }
         let needed = host.startup_blocked
             || panel.opening
+            || panel.awaiting
             || self.cleanup
             || host
                 .pending
@@ -150,7 +167,10 @@ impl Client {
             };
             if self.requests.try_send(request).is_ok() {
                 self.sequence = nonce;
-                self.inflight = Some(nonce);
+                self.inflight = Some((
+                    nonce,
+                    panel.offer.as_ref().map(|offer| offer.ticket.clone()),
+                ));
             }
         }
     }

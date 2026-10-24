@@ -275,11 +275,16 @@ impl Host {
                     window.window().request_redraw();
                 }
                 if let Ok(ack) = self.gate.acknowledge(&ticket, now) {
-                    self.pending.as_mut().unwrap().acknowledged = true;
-                    window.set_updates_can_cancel(false);
-                    window.set_updates_message(
-                        "Ready to install. Waiting for the device service…".into(),
-                    );
+                    let pending = self.pending.as_mut().unwrap();
+                    if !pending.acknowledged {
+                        pending.acknowledged = true;
+                        window.set_updates_can_cancel(false);
+                        window.set_updates_message(
+                            "Ready to install. Waiting for the device service…".into(),
+                        );
+                    }
+                    // Retried Prepare requests still receive the exact ack,
+                    // without replacing later writer progress every UI tick.
                     self.finish(Ok(ack));
                 }
             }
@@ -676,6 +681,14 @@ fn start(
                         } else {
                             failure_message(error).into()
                         });
+                    } else if p
+                        .offer
+                        .as_ref()
+                        .is_some_and(|offer| reply.status.ticket.as_ref() == Some(&offer.ticket))
+                        && let Some(message) = progress_message(reply.status.phase)
+                    {
+                        w.set_updates_message(message.into());
+                        w.set_updates_can_confirm(false);
                     }
                 }
                 Err(_) => {
@@ -744,9 +757,23 @@ fn submit(
 #[path = "updates_tests.rs"]
 mod tests;
 
+fn progress_message(phase: Phase) -> Option<&'static str> {
+    Some(match phase {
+        Phase::Preparing | Phase::Acknowledged => "Preparing installation…",
+        Phase::CheckingPayload => "Checking the update before installation…",
+        Phase::Writing => "Installing the update. Keep the device powered on.",
+        Phase::Flushing => "Saving the update to storage. Keep the device powered on.",
+        Phase::ReadingBack => "Verifying the installed update…",
+        Phase::CheckingFilesystem => "Checking the installed filesystem…",
+        Phase::RebootRequested => "Restart requested. Waiting for the device to restart…",
+        Phase::RecoveryRequired => "Installation stopped. Waiting for a recovery decision…",
+        _ => return None,
+    })
+}
+
 fn failure_message(error: Failure) -> &'static str {
     match error {
-        Failure::Unavailable => "Installation is not available in this software build.",
+        Failure::Unavailable => "Installation is not available on this device yet.",
         Failure::NotReady => "No verified update is ready to install.",
         Failure::Busy => "The device is busy. Return to Updates to try again.",
         Failure::Expired | Failure::Stale => {

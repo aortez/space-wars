@@ -367,6 +367,152 @@ fn acknowledged_host_rejects_stale_clear_and_wrong_ticket_before_new_service_abo
 }
 
 #[test]
+fn restart_before_host_prepare_retires_old_offer_and_allows_back_and_reopen() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let mode = Arc::new(AtomicUsize::new(0));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let confirmations = Arc::new(AtomicUsize::new(0));
+    let service_mode = mode.clone();
+    let confirmed = confirmations.clone();
+    let recovery_mode = mode.clone();
+    let observed = calls.clone();
+    let frames = h.frames.clone();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        socket.clone(),
+        Arc::new(move |request| {
+            let restarted = service_mode.load(Ordering::SeqCst) != 0;
+            let mut reply = response(Phase::Preparing);
+            match request {
+                ServiceRequest::Offer { .. } => {
+                    let mut ticket = ticket();
+                    if restarted {
+                        ticket.service = Id::from_bytes([8; 32]).unwrap();
+                    }
+                    reply.status = Status {
+                        phase: Phase::Offered,
+                        ticket: Some(ticket.clone()),
+                    };
+                    reply.offer = Some(Offer {
+                        schema: SCHEMA,
+                        candidate: Candidate {
+                            id: ticket.candidate.clone(),
+                            channel: Channel::Release,
+                            generation: 11,
+                            build_id: "test-image".into(),
+                        },
+                        ticket,
+                        ends_game: true,
+                        expires_ms: transport::boot_ms().unwrap() + 300_000,
+                    });
+                }
+                ServiceRequest::Confirm { .. } => {
+                    confirmed.fetch_add(1, Ordering::SeqCst);
+                    // Native trust/payload preflight has not sent Host::Prepare.
+                }
+                ServiceRequest::Cancel { .. } => {
+                    assert!(restarted);
+                    reply.error = Some(Failure::Stale);
+                }
+                ServiceRequest::Status { .. } => {}
+            }
+            if restarted && reply.offer.is_none() {
+                reply.status = Status {
+                    phase: Phase::Idle,
+                    ticket: None,
+                };
+            }
+            Ok(reply)
+        }),
+        Rc::new(move || Some(frames.get())),
+        uid(),
+        Some(Arc::new(move |request| {
+            observed.fetch_add(1, Ordering::SeqCst);
+            let mode = recovery_mode.load(Ordering::SeqCst);
+            Ok(ReconcileReply {
+                schema: SCHEMA,
+                nonce: request.nonce + u64::from(mode == 1),
+                host: request.host.clone(),
+                service: if mode == 0 {
+                    ticket().service
+                } else {
+                    Id::from_bytes([8; 32]).unwrap()
+                },
+                result: RecoveryDecision::Clear {},
+            })
+        })),
+    );
+    h.until(true, |w| !w.get_install_fenced());
+    h.window.invoke_updates_open();
+    h.until(true, |w| w.get_updates_can_confirm());
+    h.window.invoke_updates_confirm();
+    h.until(true, |_| confirmations.load(Ordering::SeqCst) == 1);
+    let before = calls.load(Ordering::SeqCst);
+    h.until(true, |_| calls.load(Ordering::SeqCst) > before);
+    for _ in 0..10 {
+        h.pump(true);
+    }
+    assert!(h.window.get_updates_visible());
+    assert!(!h.window.get_updates_message().contains("restarted"));
+    assert!(!h.window.get_install_fenced());
+
+    mode.store(1, Ordering::SeqCst);
+    h.window.invoke_updates_cancel();
+    h.until(true, |w| {
+        w.get_updates_message().contains("expired or changed")
+    });
+    let before = calls.load(Ordering::SeqCst);
+    h.until(true, |_| calls.load(Ordering::SeqCst) > before);
+    for _ in 0..10 {
+        h.pump(true);
+    }
+    assert!(!h.window.get_updates_message().contains("restarted"));
+    mode.store(2, Ordering::SeqCst);
+    h.until(true, |w| {
+        w.get_updates_message().contains("service restarted")
+    });
+    assert!(h.window.get_updates_can_cancel());
+    assert!(!h.window.get_install_fenced());
+    // Reconciliation also fences out a delayed preparation from the old daemon.
+    let view = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Observe {
+            schema: SCHEMA,
+            nonce: 1,
+        },
+    )
+    .view
+    .unwrap();
+    let late = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Prepare {
+            schema: SCHEMA,
+            prepare: Prepare {
+                schema: SCHEMA,
+                ticket: ticket(),
+                host: view.host,
+                host_revision: view.revision,
+                settings_revision: view.settings_revision,
+                expires_ms: transport::boot_ms().unwrap() + PREPARE_MS,
+            },
+        },
+    );
+    assert_eq!(late.error, Some(Failure::Stale));
+    h.window.invoke_updates_cancel();
+    assert!(!h.window.get_updates_visible());
+    h.window.invoke_updates_open();
+    h.until(true, |w| w.get_updates_can_confirm());
+}
+
+#[test]
 fn restarted_app_displays_confirmed_outcome_and_keeps_it_through_cleanup() {
     let mut h = Harness::new();
     let dir = tempfile::tempdir().unwrap();
@@ -462,6 +608,8 @@ fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack
     .unwrap();
     let accepted = Arc::new(AtomicUsize::new(0));
     let count = accepted.clone();
+    let progress = Arc::new(Mutex::new(None::<Phase>));
+    let reported = progress.clone();
     let host_path = socket.clone();
     let exchange = Arc::new(
         move |request: &ServiceRequest| -> Result<ServiceReply, String> {
@@ -516,6 +664,11 @@ fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack
                     // Simulate a lost service reply after the app has acknowledged.
                     Err("lost reply".into())
                 }
+                ServiceRequest::Status { .. } => reported
+                    .lock()
+                    .unwrap()
+                    .map(response)
+                    .ok_or("service offline".into()),
                 _ => Err("service offline".into()),
             }
         },
@@ -596,6 +749,25 @@ fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack
     );
     assert!(!h.window.get_updates_can_cancel());
     let path = socket.clone();
+    for phase in [
+        Phase::Writing,
+        Phase::Flushing,
+        Phase::ReadingBack,
+        Phase::CheckingFilesystem,
+        Phase::RebootRequested,
+        Phase::RecoveryRequired,
+    ] {
+        *progress.lock().unwrap() = Some(phase);
+        let message = progress_message(phase).unwrap();
+        h.until(true, |w| w.get_updates_message() == message);
+        // Reconciliation continues independently while writing owns the lock.
+        for _ in 0..105 {
+            h.pump(true);
+        }
+        assert_eq!(h.window.get_updates_message(), message);
+        assert!(h.window.get_install_fenced());
+        assert!(!h.window.get_updates_can_cancel());
+    }
     let worker = thread::spawn(move || {
         host_request(
             &path,

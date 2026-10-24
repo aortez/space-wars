@@ -1,10 +1,10 @@
 //! Durable handoff-to-recovery association. No state here authorizes a write,
 //! resumes an installation, or supplies boot/watchdog qualification.
 //!
-//! The future native worker must retain InstallLock across prepare, begin and
-//! the writer. Restart reconciliation takes the same lock, so a
+//! The native worker retains InstallLock across prepare, begin, the writer and
+//! the acknowledged reboot handoff. Restart reconciliation takes the same lock, so a
 //! surviving worker cannot race an abort decision. The startup worker reconciles
-//! this journal; writer admission is not connected and installs stay disabled.
+//! this journal and renews its durable deployment hold until the host is released.
 use super::{HOST_FRESH_MS, HostObservation, ManualAuthorization};
 use crate::schedule_store::{StateRecord, Store};
 use crate::{Error, Result};
@@ -64,6 +64,8 @@ struct Handoff {
     selection_generation: u64,
     recovery_before: Sha256,
     state: State,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    deployment: Option<crate::network_policy::HoldToken>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -175,7 +177,39 @@ impl Journal {
             boot_id,
             selection_generation,
             &RecoveryView::read(recovery)?,
+            None,
         )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn prepare_with_hold(
+        &mut self,
+        lock: &InstallLock,
+        prepare: &Prepare,
+        boot_id: &str,
+        generation: u64,
+        recovery: &RecoveryStore,
+        token: crate::network_policy::HoldToken,
+    ) -> Result<()> {
+        lock.check()?;
+        self.prepare_inner(
+            prepare,
+            boot_id,
+            generation,
+            &RecoveryView::read(recovery)?,
+            Some(token),
+        )
+    }
+
+    /// Read-only maintenance renewal also runs while independent recovery holds
+    /// InstallLock. It never releases a hold or changes the handoff decision.
+    pub(crate) fn deployment(&self) -> Result<Option<crate::network_policy::HoldToken>> {
+        self.store.check()?;
+        Ok(self
+            .record
+            .handoff
+            .as_ref()
+            .and_then(|h| h.deployment.clone()))
     }
 
     fn prepare_inner(
@@ -184,6 +218,7 @@ impl Journal {
         boot_id: &str,
         selection_generation: u64,
         recovery: &RecoveryView,
+        deployment: Option<crate::network_policy::HoldToken>,
     ) -> Result<()> {
         self.store.check()?;
         if self.record.handoff.is_some() || recovery.active() {
@@ -195,6 +230,7 @@ impl Journal {
             selection_generation,
             recovery_before: recovery.fingerprint,
             state: State::Preparing,
+            deployment,
         }))
     }
 

@@ -4,6 +4,7 @@
 use crate::boot_linux::{BootController, BootEvidence};
 use crate::install_linux::{StagedPayload, WriteProgress, write_inactive};
 use crate::install_lock::InstallLock;
+pub use crate::native_install::TrialPermit;
 use crate::provision_linux::{self, Status};
 use crate::recovery::{Action, BootBinding, FailureReason, RecoveryRecord};
 use crate::{
@@ -303,18 +304,16 @@ pub async fn install(
             return Err(invalid("provisioned data changed during installation"));
         }
         context.boot.apply(&context.recovery, &action)?;
-        let mut permit = TrialPermit {
-            boot: &context.boot,
-            recovery: &mut context.recovery,
-            trust: &mut context.trust,
-            time: &mut time,
-            expires: candidate.expires(),
+        let mut permit = TrialPermit::new(
+            &context.boot,
+            &mut context.recovery,
+            &mut context.trust,
+            &mut time,
+            candidate.expires(),
             transaction,
-            consumed: false,
-            queued: false,
-        };
+        );
         reboot(&mut permit)?;
-        if !permit.queued {
+        if !permit.is_queued() {
             return Err(invalid("supervised trial reboot was not acknowledged"));
         }
         Ok(transaction)
@@ -335,71 +334,6 @@ pub async fn install(
             .advance(|record| record.fail(FailureReason::InstallationFailed, &boot.observation))?;
     }
     outcome
-}
-
-/// Only created while the native installation, staging, trust and recovery
-/// locks are held. The service adapter cannot forge this or choose a reboot slot.
-pub struct TrialPermit<'a, 'b> {
-    boot: &'a BootController<'b>,
-    recovery: &'a mut RecoveryStore,
-    trust: &'a mut TrustStore,
-    time: &'a mut dyn FnMut() -> Result<UsableTime>,
-    expires: jiff::Timestamp,
-    transaction: Sha256,
-    consumed: bool,
-    queued: bool,
-}
-
-impl TrialPermit<'_, '_> {
-    fn check_time(&mut self) -> Result<()> {
-        admit_reboot_time(self.trust, (self.time)(), self.expires)
-    }
-    pub fn begin(&mut self) -> Result<()> {
-        if self.consumed {
-            return Err(invalid("trial request already consumed"));
-        }
-        self.check_time()?;
-        let boot = self
-            .boot
-            .authorize_supervised_reboot(self.recovery, self.transaction, false)?;
-        self.recovery
-            .advance(|record| record.trial_prepared(self.transaction, &boot))?;
-        self.consumed = true;
-        Ok(())
-    }
-    pub fn authorize(&mut self) -> Result<()> {
-        if !self.consumed || self.queued {
-            return Err(invalid("trial request is not pending"));
-        }
-        self.check_time()?;
-        self.boot
-            .authorize_supervised_reboot(self.recovery, self.transaction, true)?;
-        Ok(())
-    }
-    pub fn queued(&mut self) -> Result<()> {
-        self.authorize()?;
-        self.queued = true;
-        Ok(())
-    }
-    pub fn fail(&mut self) -> Result<()> {
-        let boot = self.boot.observe()?;
-        self.recovery
-            .advance(|record| record.fail(FailureReason::InstallationFailed, &boot.observation))?;
-        Ok(())
-    }
-}
-
-fn admit_reboot_time(
-    trust: &mut TrustStore,
-    time: Result<UsableTime>,
-    expires: jiff::Timestamp,
-) -> Result<()> {
-    let time = time?;
-    trust.admit_time(time)?;
-    if time.0 >= expires {
-        return Err(invalid("metadata expired before trial reboot"));
-    }
-    Ok(())
 }
 
 fn invalid(message: &str) -> Error {

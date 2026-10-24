@@ -79,6 +79,20 @@ struct Shared {
     selections_pending: usize,
     control: Weak<Control>,
     ready: Option<(VerifiedCandidate, UsableTime)>,
+    installation: Option<Arc<()>>,
+    refresh_ready: bool,
+    selecting: bool,
+}
+
+// Admission cannot race a scheduler decision whose result is not published yet.
+// Only this flag is held during work; status and cancellation keep their lock.
+struct Selecting(Arc<Mutex<Shared>>);
+impl Drop for Selecting {
+    fn drop(&mut self) {
+        if let Ok(mut shared) = self.0.lock() {
+            shared.selecting = false;
+        }
+    }
 }
 
 enum Command {
@@ -113,6 +127,83 @@ pub struct Handle {
     stop: Arc<AtomicBool>,
 }
 impl Handle {
+    /// Read-only verifier output. Socket callers cannot manufacture this value.
+    pub(crate) fn install_candidate(&self) -> Result<InstallCandidate> {
+        let shared = self.shared.lock().map_err(|_| unavailable())?;
+        if shared.installation.is_some()
+            || shared.refresh_ready
+            || shared.selecting
+            || shared.control.strong_count() != 0
+            || shared.manual_pending.is_some()
+            || shared.selections_pending != 0
+            || shared.status.phase != Phase::Ready
+            || shared
+                .status
+                .schedule
+                .as_ref()
+                .is_none_or(|s| s.active.is_some())
+        {
+            return Err(unavailable());
+        }
+        self.install_snapshot(&shared)
+    }
+
+    fn install_snapshot(&self, shared: &Shared) -> Result<InstallCandidate> {
+        let now = self.inputs.clock()?;
+        let time = self.inputs.time().ok_or_else(unavailable)?;
+        let (candidate, floor) = shared.ready.as_ref().ok_or_else(unavailable)?;
+        let selected = shared.status.schedule.as_ref().ok_or_else(unavailable)?;
+        if self.stop.load(Ordering::Relaxed)
+            || now.boot_id != shared.observed.boot_id
+            || now
+                .ms
+                .checked_sub(shared.observed.ms)
+                .is_none_or(|age| age > 15_000)
+            || time.0 < floor.0
+            || time.0 >= candidate.expires()
+            || candidate.image().channel != selected.channel
+            || shared.selections_pending != 0
+        {
+            return Err(unavailable());
+        }
+        Ok(InstallCandidate {
+            candidate: candidate.clone(),
+            generation: selected.selection_generation,
+        })
+    }
+
+    pub(crate) fn claim_install(&self, expected: &InstallCandidate) -> Result<InstallSelection> {
+        let mut shared = self.shared.lock().map_err(|_| unavailable())?;
+        let current = self.install_snapshot(&shared)?;
+        if shared.installation.is_some()
+            || shared.refresh_ready
+            || shared.selecting
+            || shared.control.strong_count() != 0
+            || shared.manual_pending.is_some()
+            || shared.status.phase != Phase::Ready
+            || shared
+                .status
+                .schedule
+                .as_ref()
+                .is_none_or(|s| s.active.is_some())
+            || current.candidate.id() != expected.candidate.id()
+            || current.generation != expected.generation
+        {
+            return Err(unavailable());
+        }
+        let marker = Arc::new(());
+        shared.installation = Some(marker.clone());
+        Ok(InstallSelection {
+            handle: self.clone(),
+            marker,
+            selected: current,
+        })
+    }
+
+    pub(crate) fn install_time(&self) -> engine_ota::Result<UsableTime> {
+        self.inputs.time().ok_or(engine_ota::Error::WaitingForTime)
+    }
+
     pub fn status(&self) -> Result<Status> {
         let now = self.inputs.clock()?;
         let shared = self.shared.lock().map_err(|_| unavailable())?;
@@ -147,6 +238,9 @@ impl Handle {
             return Err(unavailable());
         }
         let mut shared = self.shared.lock().map_err(|_| unavailable())?;
+        if shared.installation.is_some() {
+            return Err(unavailable());
+        }
         if shared.selections_pending > 0 {
             return Err(unavailable());
         }
@@ -184,6 +278,9 @@ impl Handle {
             return Err(unavailable());
         }
         let mut shared = self.shared.lock().map_err(|_| unavailable())?;
+        if shared.installation.is_some() {
+            return Err(unavailable());
+        }
         if shared.selections_pending == 0
             && shared
                 .status
@@ -265,6 +362,48 @@ impl Handle {
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct InstallCandidate {
+    pub candidate: VerifiedCandidate,
+    pub generation: u64,
+}
+pub(crate) struct InstallSelection {
+    handle: Handle,
+    marker: Arc<()>,
+    selected: InstallCandidate,
+}
+impl InstallSelection {
+    pub fn check(&self) -> Result<()> {
+        let shared = self.handle.shared.lock().map_err(|_| unavailable())?;
+        let current = self.handle.install_snapshot(&shared)?;
+        if !shared
+            .installation
+            .as_ref()
+            .is_some_and(|m| Arc::ptr_eq(m, &self.marker))
+            || current.candidate.id() != self.selected.candidate.id()
+            || current.generation != self.selected.generation
+        {
+            return Err(unavailable());
+        }
+        Ok(())
+    }
+}
+impl Drop for InstallSelection {
+    fn drop(&mut self) {
+        if let Ok(mut shared) = self.handle.shared.lock()
+            && shared
+                .installation
+                .as_ref()
+                .is_some_and(|m| Arc::ptr_eq(m, &self.marker))
+        {
+            shared.installation = None;
+            // The installer may have advanced retained trust before consent
+            // was consumed. Revalidate locally before offering it again.
+            shared.refresh_ready = true;
+        }
+    }
+}
+
 pub struct Runtime {
     handle: Handle,
     worker: Option<JoinHandle<()>>,
@@ -314,6 +453,9 @@ fn spawn_with<B: Backend>(path: PathBuf, backend: B) -> Result<Runtime> {
             selections_pending: 0,
             control: Weak::new(),
             ready: None,
+            installation: None,
+            refresh_ready: false,
+            selecting: false,
         })),
         inputs,
         requests: tx,
@@ -530,6 +672,10 @@ trait Backend: Inputs + Clone + Send + Sync + 'static {
         control: Arc<Control>,
     ) -> engine_ota::Result<Finished<Self::Ready>>;
     fn ready_valid(&mut self, proof: &Self::Ready) -> bool;
+    fn refresh_ready(
+        &mut self,
+        ready: &mut Ready<Self::Ready>,
+    ) -> std::result::Result<(), PreparationError>;
     fn admit(&mut self, token: &HoldToken, request: &DownloadReservation) -> Result<()>;
     fn renew(&mut self, token: &HoldToken, deadline_ms: u64) -> Result<()>;
     fn release(&mut self, token: &HoldToken) -> Result<()>;
@@ -594,6 +740,41 @@ impl<B: Backend> Runner<B> {
         })
     }
     fn step(&mut self, requests: &mpsc::Receiver<Command>, handle: &Handle) -> Result<()> {
+        let refresh_ready = {
+            let mut shared = handle.shared.lock().map_err(|_| unavailable())?;
+            if shared.installation.is_some() {
+                // Preserve the claimed snapshot while continuing the heartbeat.
+                // Expiry and trusted time are checked by the install session.
+                shared.observed = self.backend.clock()?;
+                return Ok(());
+            }
+            shared.selecting = true;
+            shared.refresh_ready
+        };
+        let _selection = Selecting(handle.shared.clone());
+        if refresh_ready {
+            if let Some(ready) = &mut self.ready {
+                match self.backend.refresh_ready(ready) {
+                    Ok(()) => {}
+                    Err(PreparationError::MaintenanceBusy) => {
+                        // Reconciliation briefly owns this same lock. Keep the
+                        // claim unavailable and retry without consuming a check.
+                        handle.shared.lock().map_err(|_| unavailable())?.observed =
+                            self.backend.clock()?;
+                        return Ok(());
+                    }
+                    Err(_) => {
+                        self.ready = None;
+                        self.reason = Some(Reason::StaleReady);
+                    }
+                }
+            }
+            handle
+                .shared
+                .lock()
+                .map_err(|_| unavailable())?
+                .refresh_ready = false;
+        }
         let mut offer = None;
         let mut manual = None;
         for _ in 0..8 {

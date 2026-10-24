@@ -39,6 +39,8 @@ pub mod install_linux;
 #[cfg(target_os = "linux")]
 pub mod install_lock;
 #[cfg(target_os = "linux")]
+pub mod native_install;
+#[cfg(target_os = "linux")]
 pub mod network_linux;
 #[cfg(target_os = "linux")]
 mod owned_fs;

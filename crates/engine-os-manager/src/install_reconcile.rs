@@ -12,7 +12,7 @@ use std::{
     path::Path,
     sync::{Arc, mpsc},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 type Decide = Arc<dyn Fn(&ReconcileRequest) -> Result<RecoveryDecision> + Send + Sync>;
@@ -34,10 +34,49 @@ impl Runtime {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(e.into()),
         }
-        Self::bind(path, 1000, epoch, Arc::new(native_decision))
+        let mut renewed = None::<Instant>;
+        Self::bind_with_background(
+            path,
+            1000,
+            epoch,
+            Arc::new(native_decision),
+            Some(Box::new(move || {
+                // Journal reads need no install authority and remain possible while
+                // the independent recovery service holds the installation lock.
+                let token = Journal::existing_native()
+                    .ok()
+                    .flatten()
+                    .and_then(|j| j.deployment().ok().flatten());
+                if let Some(token) = token {
+                    if renewed.is_none_or(|last| last.elapsed() >= Duration::from_secs(30)) {
+                        renewed = Some(Instant::now());
+                        let _ = super::hold::renew(&token);
+                    }
+                    if let Ok(host) = crate::kiosk_health::install_instance() {
+                        let _ = native_decision(&ReconcileRequest {
+                            schema: SCHEMA,
+                            nonce: transport::boot_ms().unwrap_or(1).max(1),
+                            host,
+                            held: None,
+                        });
+                    }
+                }
+            })),
+        )
     }
 
+    #[cfg(test)]
     pub(super) fn bind(path: &Path, uid: u32, epoch: Id, decide: Decide) -> Result<Self> {
+        Self::bind_with_background(path, uid, epoch, decide, None)
+    }
+
+    fn bind_with_background(
+        path: &Path,
+        uid: u32,
+        epoch: Id,
+        decide: Decide,
+        mut background: Option<Box<dyn FnMut() + Send>>,
+    ) -> Result<Self> {
         let (send, receive) =
             mpsc::sync_channel::<(ReconcileRequest, mpsc::SyncSender<ReconcileReply>)>(1);
         let response_epoch = epoch.clone();
@@ -69,7 +108,19 @@ impl Runtime {
         )?;
         let worker = thread::spawn(move || {
             let mut last_error = None;
-            while let Ok((request, reply)) = receive.recv() {
+            let mut maintained = Instant::now();
+            loop {
+                if maintained.elapsed() >= Duration::from_secs(2) {
+                    if let Some(background) = &mut background {
+                        background();
+                    }
+                    maintained = Instant::now();
+                }
+                let (request, reply) = match receive.recv_timeout(Duration::from_secs(2)) {
+                    Ok(request) => request,
+                    Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                };
                 let result = match decide(&request) {
                     Ok(result) => {
                         last_error = None;
@@ -141,11 +192,14 @@ fn native_locked(request: &ReconcileRequest) -> Result<RecoveryDecision> {
     }
     engine_ota::bootstrap::require_no_active_bootstrap(&lock)?;
     let boot = BootController::open(&lock)?;
-    let recovery = RecoveryStore::open(recovery_path)?;
+    let mut recovery = RecoveryStore::open(recovery_path)?;
     let mut journal = Journal::open_native()?;
-    let resolution = journal.reconcile(&lock, &recovery)?;
+    let mut resolution = journal.reconcile(&lock, &recovery)?;
     if matches!(resolution, Resolution::InProgress { .. }) {
-        return Ok(RecoveryDecision::Waiting {});
+        if !boot.settle_interrupted_install(&mut recovery)? {
+            return Ok(RecoveryDecision::Waiting {});
+        }
+        resolution = journal.reconcile(&lock, &recovery)?;
     }
     // A terminal file alone cannot approve a mismatched boot or an unfinished
     // watchdog completion. Recovery continues independently while the UI waits.
@@ -162,6 +216,9 @@ fn native_locked(request: &ReconcileRequest) -> Result<RecoveryDecision> {
                 Resolution::Finished { ticket, .. } => ticket,
                 _ => unreachable!(),
             };
+            if let Some(token) = journal.deployment()? {
+                super::hold::release(&token)?;
+            }
             journal.release(&lock, &recovery, ticket, || observe_host(request))?;
             return Ok(RecoveryDecision::Clear {});
         }

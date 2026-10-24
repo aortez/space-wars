@@ -7,6 +7,16 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class NetworkServiceContractTest(unittest.TestCase):
+    def test_native_install_privileges_preserve_rtc_without_mount_authority(self):
+        unit = (ROOT / "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-system.service").read_text()
+        self.assertIn("ReadWritePaths=/boot /data/spacewars-system", unit)
+        self.assertIn("CapabilityBoundingSet=CAP_SYS_TIME CAP_SYS_ADMIN", unit)
+        self.assertIn("DevicePolicy=closed", unit)
+        self.assertIn("DeviceAllow=block-sd rw", unit)
+        self.assertIn("DeviceAllow=/dev/rtc0 rw", unit)
+        self.assertIn("SystemCallFilter=~@mount", unit)
+        self.assertIn("RestrictNamespaces=yes", unit)
+
     def test_namespace_name_and_graceful_read_only_handoff(self):
         rust = (ROOT / "crates/engine-os-manager/src/network_sessions.rs").read_text()
         name = re.search(r'const HOST_NAMESPACE_NAME: &str = "([^"]+)";', rust).group(1)

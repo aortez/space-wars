@@ -110,6 +110,13 @@ pub enum Phase {
     Offered,
     Preparing,
     Acknowledged,
+    CheckingPayload,
+    Writing,
+    Flushing,
+    ReadingBack,
+    CheckingFilesystem,
+    RebootRequested,
+    RecoveryRequired,
     Aborted,
 }
 

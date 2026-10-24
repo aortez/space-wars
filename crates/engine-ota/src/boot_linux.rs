@@ -354,6 +354,22 @@ impl<'a> BootController<'a> {
         qualification.plan_native(journal.durable_record()?, &self.observe()?, candidate)
     }
 
+    /// Shared-lock ownership proves no writer remains. On the normal good
+    /// image, quarantine its abandoned transaction using ordinary recovery.
+    /// Candidate trials remain owned by the independent recovery service.
+    pub fn settle_interrupted_install(&self, journal: &mut RecoveryStore) -> Result<bool> {
+        let boot = self.observe()?.observation;
+        if boot.tryboot {
+            return Ok(false);
+        }
+        let plan = journal.durable_record()?.interrupted_normal(&boot)?;
+        if !matches!(plan.action, Action::None) {
+            return Err(invalid("normal recovery requested a device action"));
+        }
+        journal.advance(|_| Ok(plan))?;
+        Ok(true)
+    }
+
     /// Recheck immediately before requesting a normal systemd reboot. This
     /// operation cannot authorize another tryboot or select an arbitrary root.
     pub fn authorize_rollback_reboot(&self, journal: &RecoveryStore, id: Sha256) -> Result<()> {
@@ -363,8 +379,7 @@ impl<'a> BootController<'a> {
         Ok(())
     }
 
-    #[cfg(any(test, feature = "recovery-qualification"))]
-    pub(crate) fn authorize_supervised_reboot(
+    pub(crate) fn authorize_trial_reboot(
         &self,
         journal: &RecoveryStore,
         id: Sha256,
@@ -373,7 +388,7 @@ impl<'a> BootController<'a> {
         let boot = self.observe()?.observation;
         let slot = journal
             .durable_record()?
-            .supervised_reboot(id, &boot, consumed)?;
+            .trial_reboot(id, &boot, consumed)?;
         let selections = self.boot.files.selections(&self.boot.runtime.roots()?)?;
         if selections.trial
             != Some(crate::boot::TrialSelection {
@@ -382,7 +397,7 @@ impl<'a> BootController<'a> {
             })
         {
             return Err(invalid(
-                "selected trial differs from the supervised transaction",
+                "selected trial differs from the admitted transaction",
             ));
         }
         Ok(boot)

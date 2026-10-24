@@ -163,6 +163,44 @@ fn requested() -> (RecoveryRecord, BootObservation) {
     (plan.record, boot)
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn abandoned_manual_writer_settles_only_on_the_normal_good_boot() {
+    for (record, boot) in [writing(&descriptor(2)), prepared(), requested()] {
+        let id = record.transaction().unwrap().id;
+        let settled = record.interrupted_normal(&boot).unwrap();
+        assert_eq!(settled.action, Action::None);
+        let tx = settled.record.transaction().unwrap();
+        assert_eq!(tx.id, id);
+        assert_eq!(tx.phase, Phase::RolledBack);
+        assert_eq!(tx.failure, Some(FailureReason::InterruptedBeforeTrial));
+        assert!(
+            settled
+                .record
+                .image_history()
+                .failed_images
+                .contains(&tx.candidate.payload)
+        );
+        assert_eq!(settled.record.good(), record.good());
+        assert_eq!(
+            settled.record.interrupted_normal(&boot).unwrap().record,
+            settled.record
+        );
+        let mut wrong = boot.clone();
+        wrong.actual_slot = Some(Slot::B);
+        assert!(record.interrupted_normal(&wrong).is_err());
+        wrong = boot.clone();
+        wrong.default_slot = Some(Slot::B);
+        assert!(record.interrupted_normal(&wrong).is_err());
+        wrong = boot.clone();
+        wrong.tryboot = true;
+        assert!(record.interrupted_normal(&wrong).is_err());
+    }
+    let (record, boot) = trial();
+    assert!(record.interrupted_normal(&boot).is_err());
+    assert_eq!(record.transaction().unwrap().phase, Phase::Observing);
+}
+
 pub(crate) fn trial() -> (RecoveryRecord, BootObservation) {
     let (record, mut boot) = requested();
     boot.boot_id = TRIAL_BOOT.into();

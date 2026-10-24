@@ -1,9 +1,10 @@
-//! Live bounded service endpoint. The production backend stays unavailable until
-//! the native journal/locks/writer adapter can atomically accept authorization.
+//! Live bounded service endpoint. The native worker owns disk/host I/O while
+//! the coordinator remains available for status and pre-admission cancellation.
 use super::*;
 use spacewars_control::install::{transport, wire::*};
 use std::{
     path::Path,
+    sync::atomic::{AtomicBool, Ordering},
     sync::{Arc, Mutex, mpsc},
     thread,
     time::Duration,
@@ -11,52 +12,69 @@ use std::{
 
 // Kept private: an adapter cannot enable production installation without also
 // implementing the final serialized native gates here.
-trait Backend: Send + Sync + 'static {
+pub(super) trait Backend: Send + Sync + 'static {
     fn context(&self) -> Result<Context, Failure>;
     fn prepare(&self, request: &Prepare) -> Result<(Acknowledgement, HostInstance), Failure>;
     fn abort(&self, aborted: &Aborted);
     fn accept(
         &self,
-        coordinator: &mut Coordinator,
+        admission: &Admission,
         ack: &Acknowledgement,
         peer: &HostInstance,
     ) -> Result<(), Failure>;
+    fn execute(&self, prepare: &Prepare, admission: &Admission) -> Result<(), Failure> {
+        let (ack, peer) = self.prepare(prepare)?;
+        self.accept(admission, &ack, &peer)
+    }
+    fn settled(&self) -> bool {
+        false
+    }
 }
 
-struct Native;
-impl Backend for Native {
-    fn context(&self) -> Result<Context, Failure> {
-        Err(Failure::Unavailable)
-    }
-    fn prepare(&self, request: &Prepare) -> Result<(Acknowledgement, HostInstance), Failure> {
-        let (reply, peer) = host_exchange(
-            &HostRequest::Prepare {
-                schema: SCHEMA,
-                prepare: request.clone(),
-            },
-            Duration::from_secs(31),
-        )?;
-        if let Some(error) = reply.error {
-            return Err(error);
-        }
-        Ok((reply.acknowledgement.ok_or(Failure::Invalid)?, peer))
-    }
-    fn abort(&self, aborted: &Aborted) {
-        let _ = host_exchange(
-            &HostRequest::Abort {
-                schema: SCHEMA,
-                aborted: aborted.clone(),
-            },
-            Duration::from_secs(2),
-        );
-    }
-    fn accept(
+pub(super) struct Admission {
+    state: Arc<Mutex<Coordinator>>,
+    ticket: Ticket,
+    stop: Arc<AtomicBool>,
+}
+impl Admission {
+    pub fn consume(
         &self,
-        _: &mut Coordinator,
-        _: &Acknowledgement,
-        _: &HostInstance,
-    ) -> Result<(), Failure> {
-        Err(Failure::Unavailable)
+        ack: &Acknowledgement,
+        peer: &HostInstance,
+        context: &Context,
+    ) -> Result<ManualAuthorization, Failure> {
+        if self.stopped() {
+            return Err(Failure::NotReady);
+        }
+        self.state
+            .lock()
+            .unwrap()
+            .consume(
+                ack,
+                peer,
+                context,
+                transport::boot_ms().map_err(|_| Failure::NotReady)?,
+            )
+            .map_err(Failure::from)
+    }
+    pub fn pending(&self) -> Result<(), Failure> {
+        let state = self.state.lock().unwrap();
+        let (_, prepare) = state.selected(&self.ticket).map_err(Failure::from)?;
+        if self.stopped()
+            || prepare.is_none_or(|p| !transport::boot_ms().is_ok_and(|now| now < p.expires_ms))
+        {
+            return Err(Failure::Expired);
+        }
+        Ok(())
+    }
+    pub fn phase(&self, phase: Phase) {
+        let mut state = self.state.lock().unwrap();
+        if matches!(&state.state, State::Consumed(t) if t == &self.ticket) {
+            state.progress = Some(phase);
+        }
+    }
+    pub fn stopped(&self) -> bool {
+        self.stop.load(Ordering::Relaxed)
     }
 }
 
@@ -86,6 +104,7 @@ enum Work {
 }
 
 pub struct Runtime {
+    stop: Arc<AtomicBool>,
     recovery: Option<super::reconciliation::Runtime>,
     epoch: Id,
     // Drop listener before closing the worker queue.
@@ -95,7 +114,10 @@ pub struct Runtime {
 }
 impl Runtime {
     /// The caller holds the service's exclusive store lock and owns this path.
-    pub fn bind_native(boot_id: String) -> crate::Result<Self> {
+    pub fn bind_native(
+        boot_id: String,
+        updates: crate::update_runtime::Handle,
+    ) -> crate::Result<Self> {
         use std::os::unix::fs::{FileTypeExt, MetadataExt};
         let path = Path::new(SERVICE_SOCKET);
         match std::fs::symlink_metadata(path) {
@@ -104,7 +126,13 @@ impl Runtime {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(e.into()),
         }
-        let mut runtime = Self::bind(path, boot_id, 1000, Arc::new(Native), false)?;
+        let mut runtime = Self::bind(
+            path,
+            boot_id.clone(),
+            1000,
+            Arc::new(super::native::Native::new(boot_id.clone(), updates)),
+            true,
+        )?;
         runtime.recovery = Some(super::reconciliation::Runtime::bind_native(
             runtime.epoch.clone(),
         )?);
@@ -156,13 +184,23 @@ impl Runtime {
                 serde_json::to_vec(&response).unwrap()
             }),
         )?;
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopping = stop.clone();
         let worker = thread::spawn(move || {
             while let Ok(work) = receiver.recv() {
                 let mut prepare = None;
                 if let Work::Request(request, response) = work {
                     // Confirmation is idempotent; retries never refresh deadlines.
                     let context = backend.context();
+                    let settled = context
+                        .as_ref()
+                        .is_ok_and(|c| c.host.as_ref().is_some_and(|h| !h.fenced))
+                        && backend.settled();
                     let mut state = coordinator.lock().unwrap();
+                    if settled && matches!(state.state, State::Consumed(_)) {
+                        state.state = State::Idle;
+                        state.progress = None;
+                    }
                     let mut offer = None;
                     if context.is_err() {
                         // Failed observation cannot leave an old offer revivable
@@ -199,12 +237,18 @@ impl Runtime {
                     let _ = response.send(value);
                 }
                 if let Some(prepare) = prepare {
-                    let accepted = backend.prepare(&prepare);
-                    let mut state = coordinator.lock().unwrap();
-                    let result =
-                        accepted.and_then(|(ack, peer)| backend.accept(&mut state, &ack, &peer));
-                    if result.is_err() {
-                        let _ = state.cancel(&prepare.ticket);
+                    let admission = Admission {
+                        state: coordinator.clone(),
+                        ticket: prepare.ticket.clone(),
+                        stop: stopping.clone(),
+                    };
+                    if backend.execute(&prepare, &admission).is_err() {
+                        let mut state = coordinator.lock().unwrap();
+                        if state.cancel(&prepare.ticket).is_err()
+                            && matches!(state.state, State::Consumed(_))
+                        {
+                            state.progress = Some(Phase::RecoveryRequired);
+                        }
                     }
                 }
                 let aborted = reply(&coordinator.lock().unwrap(), None, true).aborted;
@@ -214,6 +258,7 @@ impl Runtime {
             }
         });
         Ok(Self {
+            stop,
             recovery: None,
             epoch,
             server: Some(server),
@@ -224,6 +269,10 @@ impl Runtime {
 }
 impl Drop for Runtime {
     fn drop(&mut self) {
+        // Stop reconciliation before allowing a parked writer to release its
+        // install lock. A queued reboot is still live during service teardown.
+        self.recovery.take();
+        self.stop.store(true, Ordering::Relaxed);
         self.server.take();
         self.sender.take();
         if let Some(worker) = self.worker.take() {

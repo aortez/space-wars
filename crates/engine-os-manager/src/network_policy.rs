@@ -62,8 +62,21 @@ pub struct DownloadReservation {
 
 /// A caller-retained capability, generated before admission so a lost response
 /// can be retried without allocating another hold. Never publish it in status.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct HoldToken(String);
+
+impl TryFrom<String> for HoldToken {
+    type Error = Error;
+    fn try_from(value: String) -> Result<Self> {
+        Self::parse(value)
+    }
+}
+impl From<HoldToken> for String {
+    fn from(value: HoldToken) -> Self {
+        value.0
+    }
+}
 
 impl std::fmt::Debug for HoldToken {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

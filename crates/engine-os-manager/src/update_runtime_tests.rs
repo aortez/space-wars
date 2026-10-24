@@ -5,7 +5,178 @@ use crate::network_policy::{self, Activity, HoldKind, Intent, Policy};
 use engine_ota::Sha256;
 use std::collections::BTreeMap;
 
+use crate::test_feed as feed;
+
+impl Fixture {
+    async fn install_ready(&mut self) -> InstallCandidate {
+        let signed = feed::Fixture::new().await;
+        let mut trust = engine_ota::TrustStore::initialize(
+            &self._temp.path().join("trust"),
+            &signed.root_bytes,
+            feed::location(),
+        )
+        .unwrap();
+        let transport = signed
+            .publish(
+                1,
+                &[feed::descriptor(Channel::Release, 2)],
+                "2027-08-01T00:00:00Z".parse().unwrap(),
+                feed::Fault::None,
+            )
+            .await;
+        let candidate = feed::candidate(
+            trust
+                .refresh(
+                    Arc::new(transport),
+                    self.fake.time(),
+                    Channel::Release,
+                    &feed::device(),
+                    &engine_ota::ImageHistory::default(),
+                )
+                .await
+                .unwrap(),
+        );
+        self.runner.ready = Some(Ready {
+            candidate,
+            proof: (),
+            time: self.fake.time().unwrap(),
+        });
+        self.runner.publish(&self.handle).unwrap();
+        self.handle.install_candidate().unwrap()
+    }
+}
+
+#[tokio::test]
+async fn installation_selection_excludes_channel_changes_and_checks_until_release() {
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    let selection = f.handle.claim_install(&candidate).unwrap();
+    assert!(f.handle.check_now().is_err());
+    assert!(f.handle.select_channel(Channel::Nightly).is_err());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    // Cross the automatic-check threshold. Only the heartbeat may advance.
+    f.fake.edit(|w| {
+        w.ms = 60_000;
+        w.partial = false;
+    });
+    f.step();
+    selection.check().unwrap();
+    assert_eq!(f.fake.0.lock().unwrap().prepares, 0);
+    assert!(
+        f.handle
+            .status()
+            .unwrap()
+            .schedule
+            .unwrap()
+            .active
+            .is_none()
+    );
+    drop(selection);
+    assert!(f.handle.select_channel(Channel::Nightly).is_ok());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    f.step();
+    assert_eq!(
+        f.handle.status().unwrap().schedule.unwrap().channel,
+        Channel::Nightly
+    );
+}
+
+#[tokio::test]
+async fn installation_selection_rejects_unpublished_scheduling_and_stale_evidence() {
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    f.handle.shared.lock().unwrap().selecting = true;
+    let guard = Selecting(f.handle.shared.clone());
+    assert!(f.handle.install_candidate().is_err());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    drop(guard);
+    let mut changed = candidate.clone();
+    changed.generation += 1;
+    assert!(f.handle.claim_install(&changed).is_err());
+    f.fake.edit(|w| w.ms += 15_001);
+    assert!(f.handle.claim_install(&candidate).is_err());
+    f.runner.publish(&f.handle).unwrap();
+    let selection = f.handle.claim_install(&candidate).unwrap();
+    f.fake.edit(|w| w.time = false);
+    assert!(selection.check().is_err());
+    f.fake.edit(|w| {
+        w.time = true;
+        w.ms =
+            (candidate.candidate.expires().as_microsecond() as u64 - 1_800_000_000_000_000) / 1000;
+    });
+    f.step();
+    assert!(selection.check().is_err());
+    drop(selection);
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    assert!(f.handle.check_now().is_ok());
+    assert!(f.handle.claim_install(&candidate).is_err());
+}
+
 const BOOT: &str = "11111111-2222-3333-4444-555555555555";
+
+#[tokio::test]
+async fn abandoned_install_revalidates_before_reoffering_without_another_update_check() {
+    for invalid in [false, true] {
+        let mut f = Fixture::new();
+        let now = f.fake.clock().unwrap();
+        let completed = f
+            .runner
+            .schedule
+            .automatic(&now, false, Opportunity::Connected)
+            .unwrap()
+            .active
+            .unwrap();
+        assert!(f.runner.schedule.admitted(&now, completed.id).unwrap());
+        assert!(
+            f.runner
+                .schedule
+                .payload_started(&now, completed.id, &now)
+                .unwrap()
+        );
+        f.runner
+            .schedule
+            .finish(&now, completed.id, Completion::Ready)
+            .unwrap();
+        let candidate = f.install_ready().await;
+        let before = f.handle.status().unwrap().schedule;
+        let selection = f.handle.claim_install(&candidate).unwrap();
+        f.fake.edit(|w| {
+            w.ready_valid = false; // The installer replaced retained trust.
+            w.busy_ready_refresh = true; // Reconciliation still owns maintenance.
+            w.fail_ready_refresh = invalid;
+        });
+        f.step();
+        selection.check().unwrap();
+        assert_eq!(f.fake.0.lock().unwrap().ready_refreshes, 0);
+        drop(selection);
+        assert!(f.handle.install_candidate().is_err());
+        assert!(f.handle.claim_install(&candidate).is_err());
+        f.step();
+        assert!(f.handle.install_candidate().is_err());
+        assert!(f.runner.ready.is_some());
+        f.fake.edit(|w| w.busy_ready_refresh = false);
+        f.step();
+        let after = f.handle.status().unwrap();
+        assert_eq!(after.schedule, before);
+        if invalid {
+            assert_eq!(after.reason, Some(Reason::StaleReady));
+            assert!(f.handle.install_candidate().is_err());
+        } else {
+            assert_eq!(after.phase, Phase::Ready);
+            assert_eq!(
+                f.handle.install_candidate().unwrap().candidate.id(),
+                candidate.candidate.id()
+            );
+            assert!(f.handle.claim_install(&candidate).is_ok());
+        }
+        let world = f.fake.0.lock().unwrap();
+        assert_eq!(world.ready_refreshes, 2);
+        assert_eq!(world.prepares, 0);
+        assert_eq!(world.sessions, 0);
+        assert_eq!(world.holds.len(), 1); // Only the unrelated owner's hold.
+    }
+}
 
 #[test]
 fn native_network_read_accepts_publication_after_the_callers_clock_sample() {
@@ -73,6 +244,10 @@ struct World {
     work: Work,
     fail_prepare: bool,
     busy_prepare: bool,
+    ready_valid: bool,
+    busy_ready_refresh: bool,
+    fail_ready_refresh: bool,
+    ready_refreshes: usize,
     fail_admit: bool,
     fail_renew: bool,
     admit_delay: u64,
@@ -101,6 +276,10 @@ impl Fake {
             work: Work::Finish,
             fail_prepare: false,
             busy_prepare: false,
+            ready_valid: true,
+            busy_ready_refresh: false,
+            fail_ready_refresh: false,
+            ready_refreshes: 0,
             fail_admit: false,
             fail_renew: false,
             admit_delay: 0,
@@ -273,7 +452,22 @@ impl Backend for Fake {
         }
     }
     fn ready_valid(&mut self, _proof: &()) -> bool {
-        true
+        self.0.lock().unwrap().ready_valid
+    }
+    fn refresh_ready(
+        &mut self,
+        _ready: &mut Ready<()>,
+    ) -> std::result::Result<(), PreparationError> {
+        let mut w = self.0.lock().unwrap();
+        w.ready_refreshes += 1;
+        if w.busy_ready_refresh {
+            return Err(PreparationError::MaintenanceBusy);
+        }
+        if w.fail_ready_refresh {
+            return Err(PreparationError::failed("ready-refresh", unavailable()));
+        }
+        w.ready_valid = true;
+        Ok(())
     }
     fn admit(&mut self, token: &HoldToken, request: &DownloadReservation) -> Result<()> {
         let mut w = self.0.lock().unwrap();
@@ -327,6 +521,9 @@ impl Fixture {
             requests: tx,
             stop: Arc::new(AtomicBool::new(false)),
             shared: Arc::new(Mutex::new(Shared {
+                installation: None,
+                refresh_ready: false,
+                selecting: false,
                 status: Status {
                     phase: Phase::Idle,
                     reason: None,
