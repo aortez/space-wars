@@ -1,0 +1,318 @@
+{
+  "schema": 1,
+  "date": "2026-10-23",
+  "issue": 523,
+  "implementation_pull_request": 526,
+  "passed": true,
+  "scope": "Generation 10 physical SSH admission qualification on the second Picade",
+  "source_commit": "44c3647657964600fdd7e21195a5d9356466b8be",
+  "generation": 10,
+  "build_id": "rootfs-5a8e2b895d854de3ef6526c1a2bf5941cf6a72160c95c6c8e67af2a7a53c3176",
+  "ci": {
+    "url": "https://github.com/aortez/space-wars/actions/runs/39910261500",
+    "conclusion": "success"
+  },
+  "installed_binary_sha256": {
+    "client": "5d5c187b295153dd9910895daaf9d3d07116177e13b017d395d455156864b101",
+    "os_manager": "6f3382ed6eca139e72f402f2e778d9eef8a7afaad3112879d367ca5dca7bbb06"
+  },
+  "installation": {
+    "boot_id": "20cd6800-eb2f-4247-8b6b-f1a79fe24983",
+    "actual_slot": "b",
+    "default_slot": "b",
+    "good_slot": "b",
+    "tryboot": true,
+    "transaction": "c267c737d6ac30cf70cfab2ce3602977eb71a21d8131d1969ba2e977ddc3190e",
+    "trial_committed": true,
+    "normal_boot_tested": false,
+    "release_restored": true,
+    "partial_offline": false,
+    "saved_data_preserved": true,
+    "game_frames_advanced": true,
+    "installed_binary_hashes_verified": true,
+    "network_manager_unchanged": true,
+    "staging_method": "owner-run native stage_update",
+    "normal_updater_staging_tested": false
+  },
+  "sequential_fresh_logins": {
+    "passed": true,
+    "failure": null,
+    "mode": "logins",
+    "completed_logins": 384,
+    "complete_network_observations": 367,
+    "measured_seconds": 901.6118988569979,
+    "elapsed_seconds": 907.1640824589995,
+    "fresh_login_latency": {
+      "minimum_seconds": 0.31166998999833595,
+      "p50_seconds": 0.3396479500006535,
+      "p95_seconds": 0.37659980400349014,
+      "maximum_seconds": 0.5773991619971639
+    },
+    "status_latency": {
+      "minimum_seconds": 0.008052216,
+      "p50_seconds": 0.021830601,
+      "p95_seconds": 0.029778353,
+      "maximum_seconds": 0.032231949
+    },
+    "status_observations": {
+      "complete": 367,
+      "coordinator-busy": 17
+    },
+    "unauthenticated_connections": 0,
+    "unauthenticated_banner_latency": null,
+    "policy_mutation_events": 0,
+    "policy_inode_timestamps_and_hash_unchanged": true,
+    "saved_data_and_recovery_unchanged": true,
+    "service_and_game_not_restarted": true,
+    "game_frames_advanced": 54150,
+    "disk_context": {
+      "interval_seconds": 900.616531498,
+      "writes_completed": 168,
+      "sectors_written": 1666,
+      "io_busy_ms": 312,
+      "note": "Whole-device counters include unrelated writes; policy inotify is the scoped write check."
+    }
+  },
+  "unauthenticated_connections": {
+    "passed": true,
+    "failure": null,
+    "mode": "unauthenticated",
+    "completed_logins": 40,
+    "complete_network_observations": 39,
+    "measured_seconds": 98.32575018600255,
+    "elapsed_seconds": 105.93854880300205,
+    "fresh_login_latency": {
+      "minimum_seconds": 0.2882812809984898,
+      "p50_seconds": 0.32695075099763926,
+      "p95_seconds": 0.35075748699819087,
+      "maximum_seconds": 0.38799039500008803
+    },
+    "status_latency": {
+      "minimum_seconds": 0.01017911,
+      "p50_seconds": 0.018960682,
+      "p95_seconds": 0.029898401,
+      "maximum_seconds": 0.030953451
+    },
+    "status_observations": {
+      "complete": 39,
+      "coordinator-busy": 1
+    },
+    "unauthenticated_connections": 40,
+    "unauthenticated_banner_latency": {
+      "minimum_seconds": 0.10852663499827031,
+      "p50_seconds": 0.11825447299997904,
+      "p95_seconds": 0.1472755690010672,
+      "maximum_seconds": 0.31374358799803304
+    },
+    "policy_mutation_events": 0,
+    "policy_inode_timestamps_and_hash_unchanged": true,
+    "saved_data_and_recovery_unchanged": true,
+    "service_and_game_not_restarted": true,
+    "game_frames_advanced": 5948,
+    "disk_context": {
+      "interval_seconds": 97.33016063599999,
+      "writes_completed": 33,
+      "sectors_written": 478,
+      "io_busy_ms": 72,
+      "note": "Whole-device counters include unrelated writes; policy inotify is the scoped write check."
+    }
+  },
+  "installed_refusals": {
+    "passed": true,
+    "failure": null,
+    "installed_journal_verified": true,
+    "unit": "spacewars-ssh523-refusal-ae7fe388c193.service",
+    "fixture": {
+      "binary": "/usr/bin/engine-os-manager",
+      "cases": [
+        {
+          "connection_bytes_preserved": true,
+          "expected_journal_reason": null,
+          "reason": null,
+          "requests": 1,
+          "returncode": 0,
+          "seconds": 0.011453909
+        },
+        {
+          "connection_bytes_preserved": true,
+          "expected_journal_reason": "coordinator busy",
+          "reason": "busy",
+          "requests": 222,
+          "returncode": 1,
+          "seconds": 45.008048318
+        },
+        {
+          "connection_bytes_preserved": true,
+          "expected_journal_reason": "coordinator unavailable",
+          "reason": "unavailable",
+          "requests": 222,
+          "returncode": 1,
+          "seconds": 45.006903862
+        },
+        {
+          "connection_bytes_preserved": true,
+          "expected_journal_reason": "coordinator rejected admission",
+          "reason": "rejected",
+          "requests": 222,
+          "returncode": 1,
+          "seconds": 45.008337084
+        }
+      ],
+      "data_masked": true,
+      "passed": true,
+      "private_mount": true,
+      "private_network": true,
+      "sha256": "6f3382ed6eca139e72f402f2e778d9eef8a7afaad3112879d367ca5dca7bbb06"
+    },
+    "method": "Actual installed helper in a bounded transient unit with private mount/network namespaces and masked /data; stderr captured by journald",
+    "expected_reasons": [
+      "coordinator busy",
+      "coordinator unavailable",
+      "coordinator rejected admission"
+    ],
+    "generic_deadline_error_absent": true
+  },
+  "local_evidence": "ota-ssh-storage-followup-20261022.json",
+  "acceptance": {
+    "memory_only_holds": {
+      "passed": true,
+      "method": "Local temporary_lifecycle_never_saves_and_restart_never_reuses_its_revisions regression, plus zero policy mutation events in both physical connection runs"
+    },
+    "slow_store_responsiveness": {
+      "passed": true,
+      "method": "Local stalled_saves_leave_status_and_root_admission_responsive_without_early_ack regression at written, file-synced, renamed and directory-synced barriers"
+    },
+    "fifteen_minute_fresh_logins": {
+      "passed": true,
+      "evidence": "sequential_fresh_logins"
+    },
+    "reason_in_journal": {
+      "passed": true,
+      "evidence": "installed_refusals"
+    },
+    "unauthenticated_connections": {
+      "passed": true,
+      "evidence": "unauthenticated_connections"
+    }
+  },
+  "qualification_tools": {
+    "runner_tests": 9,
+    "local_native_refusal_cases": 4,
+    "native_helper_sha256": "b16a810194d929a21ab88b2e68382f0d6f3065dd7c803788eedafcaa4146679c"
+  },
+  "limitations": [
+    "Injected slow-store tests are local; the live policy store was not deliberately stalled.",
+    "Native signed staging was used; automatic OTA payload staging was not qualified.",
+    "The committed trial remains this boot; a normal generation 10 boot was not tested.",
+    "The cause of the earlier generation 8 download cancellation remains unknown.",
+    "Forty sequential unauthenticated connections bound the tested workload; this is not a general denial-of-service claim."
+  ],
+  "final_state": {
+    "passed": true,
+    "temporary_helper_removed": true,
+    "channel": "release",
+    "update_phase": "idle",
+    "partial_offline": false,
+    "wireless_enabled": true,
+    "service_healthy": true,
+    "game_healthy": true,
+    "game_and_service_unchanged_since_preflight": true,
+    "saved_data_policy_and_recovery_unchanged_since_preflight": true,
+    "boot_id": "20cd6800-eb2f-4247-8b6b-f1a79fe24983"
+  },
+  "raw_evidence_directory": "target/ssh-storage-523/44c36476/",
+  "raw_evidence": {
+    "candidate/qualification.json": {
+      "bytes": 4314,
+      "sha256": "18be3cb0b13b36027f88833a321fe271c1d2d7a0c4407a91b4e9245c6283abd4"
+    },
+    "image-verification.json": {
+      "bytes": 3820,
+      "sha256": "fc2fbc0ff84b64ba3c61a884148433446b0e3d10cfed99ab43de8eb5db4975f5"
+    },
+    "publication/publication-result.json": {
+      "bytes": 924,
+      "sha256": "892b1b6ee84085aec11969dfb8ab58117d3a57311a9c1da3218a5d0301f3ce88"
+    },
+    "install/result.json": {
+      "bytes": 1400,
+      "sha256": "68e696b83d0f72dcdd0a3ea28c426693c7999c3687e6c2f7ba5c2528b80f2192"
+    },
+    "install/installed-binary-sha256sum.txt": {
+      "bytes": 273,
+      "sha256": "60176ca1b821f54268463be29543c786ee5b1e6b43d03709c7727b56c49ed59c"
+    },
+    "native-preparation.json": {
+      "bytes": 1319,
+      "sha256": "e9fc34eb4da373e261a93b4b845ee76ce3b1c9517f9e41be70272b2bdfa87cb3"
+    },
+    "device-preflight/result.json": {
+      "bytes": 71,
+      "sha256": "c0bd5d5cc003d844aac24b360232dbc4068fc7818644a956d18d5ae697eedb50"
+    },
+    "cleanup-result.json": {
+      "bytes": 389,
+      "sha256": "26ef81bf59daceb07c0911aad83f93bcae0ca73da8d94dcaf5ead9069e0de63e"
+    },
+    "device-logins/result.json": {
+      "bytes": 208,
+      "sha256": "cba23888ac9486c56497434593f9b1801956a568219e2f9ba9de127796b6b0a4"
+    },
+    "device-logins/samples.jsonl": {
+      "bytes": 393948,
+      "sha256": "eea29f69108890fca0f249ddd4e7a68e5cfa6ffd8b1978158dfc64498e3ed51e"
+    },
+    "device-logins/observer.json": {
+      "bytes": 189605,
+      "sha256": "a38eabc1a45373fc6aa63de7497cdfb4e32451e3a2ac355de9b8801dee420de7"
+    },
+    "device-logins/before.json": {
+      "bytes": 16015,
+      "sha256": "c3fd8d3f96e934b30d00b6d8ea2b14f8c40003a4a7c4d9b64cf70ad428de1376"
+    },
+    "device-logins/after.json": {
+      "bytes": 16021,
+      "sha256": "1c3c1d161fb4e2470e9be5baf00395e96dfcbc47d56b83e962498931d5777e45"
+    },
+    "device-unauthenticated/result.json": {
+      "bytes": 216,
+      "sha256": "ad5aa63886ffaf5d0f046fd37924e9c3566b5b865018bcfbf29d31af100bd7e0"
+    },
+    "device-unauthenticated/samples.jsonl": {
+      "bytes": 46922,
+      "sha256": "9bc0264c066c700133da026d4aeda7c6e0363d29ed20eed59169c4138f8cf12b"
+    },
+    "device-unauthenticated/observer.json": {
+      "bytes": 21269,
+      "sha256": "64af4b9080c78bba9494d29cf2ebb4c9b3bea4cb32fa82227392111cd6ea215c"
+    },
+    "device-unauthenticated/before.json": {
+      "bytes": 16021,
+      "sha256": "c48d47fc8bec0d81a4db1b71540a061d7843140af8137226dc1efcccdbfe9145"
+    },
+    "device-unauthenticated/after.json": {
+      "bytes": 16020,
+      "sha256": "6e8598c837a41d61e9ed0ab639cb67dfd97860c61d13fbc5cd879db1e2fe50bb"
+    },
+    "device-refusals/result.json": {
+      "bytes": 137,
+      "sha256": "8425be6a168f1c616b70bbb169a846d9c7c336a22affc72dcf132b594d5ce0f4"
+    },
+    "device-refusals/fixture-result.json": {
+      "bytes": 1120,
+      "sha256": "abd99bb6b7ce2465e31404a6aaf657d90afa178bf32c6745f1c2818e78cbf0ab"
+    },
+    "device-refusals/journal.json": {
+      "bytes": 14477,
+      "sha256": "4b717932c8131b387a15d3a448e3fa041a1555da886e72c7961e01f2d0f5318a"
+    },
+    "device-refusals/before.json": {
+      "bytes": 16020,
+      "sha256": "cb29e8a271fbe44f7ca006fcd8c21477bea733a42999355eed6671fc0db23fa7"
+    },
+    "device-refusals/after.json": {
+      "bytes": 16020,
+      "sha256": "95cbc729d8929dda5ba902c2b256972de4660b20b886e3ddc3e1127bc5674dad"
+    }
+  }
+}

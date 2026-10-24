@@ -748,9 +748,37 @@ service; the earlier claim that it required a restart was incorrect. The native
 signed staging helper subsequently verified the payload. Slow-storage fixtures
 explain possible cancellation paths but do not identify the device's exact cause.
 [Follow-up evidence](data/ota-ssh-storage-followup-20261022.json) separates the
-installation from local tests. The #523 fifteen-minute fresh-login run,
-three-second status bound and installed refusal logs remain to be qualified on
-an image containing the diagnostic correction.
+generation 9 installation from local tests.
+
+Generation 10 (`44c364765796`) includes the diagnostic correction and passed
+physical qualification on the second Picade on 2026-10-23. Its signed trial
+committed healthy on slot B; the installed binaries matched the qualified image,
+and NetworkManager was unchanged. Settings and saved data survived installation,
+apart from the Bluetooth attribute cache rebuilt at boot. Release remained
+selected and partial offline remained disabled. Native signed staging supplied
+the image; this run did not qualify automatic payload staging or a normal
+generation 10 boot after the committed trial.
+
+The sequential fresh-login test completed 384 successful logins over 901.6 seconds,
+sleeping two seconds after each login. Every complete login finished within
+578 ms, and every network-status command finished within 32.3 ms. Of those replies,
+367 contained complete radio observations and 17 promptly reported a busy
+snapshot. Forty sequential unauthenticated banner connections each allowed an
+immediate legitimate login afterwards; their status commands took at most
+31.0 ms. Both runs recorded zero policy-directory mutation events and unchanged
+policy inode, timestamps and hash. Saved data and recovery were unchanged, and
+the same service and game processes remained healthy while frames advanced.
+
+The actual installed admission helper also passed a positive control and three
+refusal cases in private mount/network namespaces, with production data masked.
+After each full 45-second deadline, journald retained the specific busy,
+unavailable or rejected reason; no generic deadline error replaced it. The
+temporary helper was removed, and final checks confirmed healthy idle Release,
+Wi-Fi enabled and partial offline disabled. The slow-store barriers described
+above remain local regression tests, and the unauthenticated workload was bounded
+to those forty sequential connections.
+[Generation 10 qualification evidence](data/ota-ssh-storage-qualification-20261023.json)
+records the measurements, acceptance checks and hashes of the retained raw evidence.
 
 The earlier 120-second SSH reservation implementation could retain all 32 slots
 while sessions were active or observation was incomplete. It allowed new SSH and
