@@ -128,6 +128,217 @@ fn pumping_exchange(h: &mut Harness, path: &Path, request: HostRequest) -> HostR
     }
 }
 
+fn external_confirmation(launcher: bool) {
+    let mut h = Harness::new();
+    h.window.set_launcher_visible(launcher);
+    h.window.set_ingame_menu_visible(false);
+    h.window.set_sound_visible(false);
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let mode = Arc::new(AtomicUsize::new(0));
+    let progress_mode = mode.clone();
+    let recovery_mode = mode.clone();
+    let frames = h.frames.clone();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        socket.clone(),
+        Arc::new(move |request| {
+            assert!(matches!(request, ServiceRequest::Status { .. }));
+            let mut reply = response(Phase::Writing);
+            if progress_mode.load(Ordering::SeqCst) == 1 {
+                reply.status.ticket.as_mut().unwrap().sequence += 1;
+                reply.status.phase = Phase::ReadingBack;
+            }
+            Ok(reply)
+        }),
+        Rc::new(move || Some(frames.get())),
+        uid(),
+        Some(Arc::new(move |request| {
+            Ok(ReconcileReply {
+                schema: SCHEMA,
+                nonce: request.nonce,
+                host: request.host.clone(),
+                service: ticket().service,
+                result: if let Some(held) = &request.held {
+                    if recovery_mode.load(Ordering::SeqCst) == 2 {
+                        RecoveryDecision::Aborted {
+                            ticket: held.clone(),
+                        }
+                    } else {
+                        RecoveryDecision::Waiting {}
+                    }
+                } else {
+                    RecoveryDecision::Clear {}
+                },
+            })
+        })),
+    );
+    h.until(true, |w| !w.get_install_fenced());
+    assert!(!h.window.get_updates_visible());
+    let view = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Observe {
+            schema: SCHEMA,
+            nonce: 1,
+        },
+    )
+    .view
+    .unwrap();
+    assert!(view.available);
+    assert_eq!(view.game, !launcher);
+    assert!(
+        !h.window.get_updates_visible(),
+        "offer observation must not interrupt the app"
+    );
+    let ack = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Prepare {
+            schema: SCHEMA,
+            prepare: Prepare {
+                schema: SCHEMA,
+                ticket: ticket(),
+                host: view.host,
+                host_revision: view.revision,
+                settings_revision: view.settings_revision,
+                expires_ms: transport::boot_ms().unwrap() + PREPARE_MS,
+            },
+        },
+    );
+    assert!(ack.acknowledgement.is_some(), "{ack:?}");
+    let after = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Observe {
+            schema: SCHEMA,
+            nonce: 2,
+        },
+    )
+    .view
+    .unwrap();
+    assert!(after.available);
+    assert_eq!(after.revision, view.revision);
+    assert_eq!(after.settings_revision, view.settings_revision);
+    assert_eq!(after.game, view.game);
+    assert!(h.window.get_updates_visible());
+    assert!(h.window.get_install_fenced());
+    assert!(!h.window.get_updates_can_cancel());
+    h.until(true, |w| {
+        w.get_updates_message().contains("Installing the update")
+    });
+    mode.store(1, Ordering::SeqCst);
+    let until = Instant::now() + Duration::from_millis(700);
+    while Instant::now() < until {
+        h.pump(true);
+    }
+    assert!(
+        h.window
+            .get_updates_message()
+            .contains("Installing the update")
+    );
+    mode.store(2, Ordering::SeqCst);
+    h.until(true, |w| !w.get_install_fenced());
+    h.window.invoke_updates_cancel();
+    assert!(!h.window.get_updates_visible());
+    assert_eq!(h.window.get_launcher_visible(), launcher);
+}
+
+#[test]
+fn external_confirmation_can_open_updates_from_a_running_game() {
+    external_confirmation(false);
+}
+
+#[test]
+fn external_confirmation_can_open_updates_from_the_launcher() {
+    external_confirmation(true);
+}
+
+#[test]
+fn external_preparation_can_be_cancelled_before_presenting_the_updater() {
+    let mut h = Harness::new();
+    h.window.set_ingame_menu_visible(false);
+    h.window.set_updates_visible(false);
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let frames = h.frames.clone();
+    let cancelled = Arc::new(AtomicUsize::new(0));
+    let calls = cancelled.clone();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        socket.clone(),
+        Arc::new(move |request| match request {
+            ServiceRequest::Cancel {
+                ticket: selected, ..
+            } => {
+                assert_eq!(selected, &ticket());
+                calls.fetch_add(1, Ordering::SeqCst);
+                let mut reply = response(Phase::Aborted);
+                reply.aborted = Some(Aborted {
+                    schema: SCHEMA,
+                    ticket: ticket(),
+                });
+                Ok(reply)
+            }
+            ServiceRequest::Status { .. } => Ok(response(Phase::Preparing)),
+            _ => panic!("external preparation cannot create local consent"),
+        }),
+        Rc::new(move || Some(frames.get())),
+        uid(),
+        None,
+    );
+    let view = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Observe {
+            schema: SCHEMA,
+            nonce: 1,
+        },
+    )
+    .view
+    .unwrap();
+    let (send, received) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        send.send(host_request(
+            &socket,
+            HostRequest::Prepare {
+                schema: SCHEMA,
+                prepare: Prepare {
+                    schema: SCHEMA,
+                    ticket: ticket(),
+                    host: view.host,
+                    host_revision: view.revision,
+                    settings_revision: view.settings_revision,
+                    expires_ms: transport::boot_ms().unwrap() + PREPARE_MS,
+                },
+            },
+        ))
+        .unwrap();
+    });
+    h.until(false, |w| w.get_install_fenced());
+    assert!(
+        received.try_recv().is_err(),
+        "no acknowledgement without presented frames"
+    );
+    assert!(h.window.get_updates_can_cancel());
+    h.window.invoke_updates_cancel();
+    h.until(false, |w| !w.get_install_fenced());
+    let result = received.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert!(result.acknowledgement.is_none());
+    assert_eq!(result.error, Some(Failure::Stale));
+    assert_eq!(cancelled.load(Ordering::SeqCst), 1);
+    h.window.invoke_updates_cancel();
+    assert!(!h.window.get_updates_visible());
+}
+
 #[test]
 fn startup_waits_for_authenticated_matching_recovery_and_defers_launch_exactly_once() {
     let mut h = Harness::new();

@@ -59,7 +59,7 @@ impl Client {
             // A Clear requested before a new offer cannot retire that offer or
             // move the host back to an older service instance.
             if matches!(reply.result, RecoveryDecision::Clear {})
-                && offered.as_ref() != panel.offer.as_ref().map(|offer| &offer.ticket)
+                && offered.as_ref() != panel.ticket()
             {
                 continue;
             }
@@ -107,6 +107,7 @@ impl Client {
                 panel.awaiting = false;
                 panel.opening = false;
                 panel.offer = None;
+                panel.active = None;
                 window.set_updates_visible(true);
                 window.set_updates_can_confirm(false);
                 window.set_updates_message(
@@ -167,10 +168,7 @@ impl Client {
             };
             if self.requests.try_send(request).is_ok() {
                 self.sequence = nonce;
-                self.inflight = Some((
-                    nonce,
-                    panel.offer.as_ref().map(|offer| offer.ticket.clone()),
-                ));
+                self.inflight = Some((nonce, panel.ticket().cloned()));
             }
         }
     }

@@ -52,16 +52,19 @@ impl Host {
             startup_blocked: false,
         }
     }
-    fn observe(&mut self, window: &MainWindow, settings: &Settings) {
-        let document = serde_json::to_vec(settings).expect("settings serialize");
-        let scene = format!(
+    fn scene(window: &MainWindow) -> String {
+        format!(
             "{}:{}:{}:{}:{}",
             window.get_scenario_instance(),
             window.get_launcher_visible(),
             window.get_ingame_menu_visible(),
             window.get_launcher_busy(),
             window.get_updates_visible()
-        );
+        )
+    }
+    fn observe(&mut self, window: &MainWindow, settings: &Settings) {
+        let document = serde_json::to_vec(settings).expect("settings serialize");
+        let scene = Self::scene(window);
         if document != self.document {
             self.document = document;
             self.settings_revision += 1;
@@ -73,12 +76,10 @@ impl Host {
         }
     }
     fn available(window: &MainWindow) -> bool {
-        window.get_updates_visible()
-            && !window.get_launcher_busy()
+        !window.get_launcher_busy()
             && !window.get_clock_controls_pending()
             && !window.get_training_active()
             && !window.get_genomes_busy()
-            && (window.get_launcher_visible() || window.get_ingame_menu_visible())
     }
     fn abort(&mut self, window: &MainWindow, aborted: &Aborted) {
         if self.gate.aborted(aborted).is_ok() {
@@ -182,6 +183,12 @@ impl Host {
                             });
                             window.set_install_fenced(true);
                             window.set_updates_visible(true);
+                            // A CLI-confirmed Prepare opens the updater itself.
+                            // This owned transition preserves the observed scene
+                            // revision; later user/scene changes still revoke it.
+                            self.scene = Self::scene(window);
+                            window.set_updates_focus(1);
+                            window.set_updates_can_cancel(true);
                             window.set_updates_can_confirm(false);
                             window.set_updates_message(
                                 "Saving settings and preparing to install…".into(),
@@ -337,10 +344,18 @@ pub(crate) struct Runtime {
 struct Panel {
     opening: bool,
     offer: Option<Offer>,
+    active: Option<Ticket>,
     busy: bool,
     awaiting: bool,
     last_poll: Instant,
     generation: u64,
+}
+impl Panel {
+    fn ticket(&self) -> Option<&Ticket> {
+        self.active
+            .as_ref()
+            .or_else(|| self.offer.as_ref().map(|offer| &offer.ticket))
+    }
 }
 type Exchange = Arc<dyn Fn(&ServiceRequest) -> Result<ServiceReply, String> + Send + Sync>;
 
@@ -487,6 +502,7 @@ fn start(
     let panel = Rc::new(RefCell::new(Panel {
         opening: false,
         offer: None,
+        active: None,
         busy: false,
         awaiting: false,
         last_poll: Instant::now(),
@@ -511,6 +527,7 @@ fn start(
         let mut p = state.borrow_mut();
         p.generation += 1;
         p.offer = None;
+        p.active = None;
         p.awaiting = false;
         p.opening = startup_required;
         p.busy = !startup_required
@@ -562,10 +579,10 @@ fn start(
         if !w.get_updates_can_cancel() {
             return;
         }
-        if let Some(offer) = p.offer.as_ref() {
+        if let Some(ticket) = p.ticket() {
             let command = ServiceRequest::Cancel {
                 schema: SCHEMA,
-                ticket: offer.ticket.clone(),
+                ticket: ticket.clone(),
             };
             if submit(&w, &sender, p.generation, command) {
                 p.busy = true;
@@ -616,6 +633,18 @@ fn start(
                     // Preserve the saved launcher draft in memory too, so a
                     // later ordinary save after cancellation cannot undo it.
                     *settings.write().unwrap() = snapshot.clone();
+                    let ticket = host.pending.as_ref().unwrap().request.ticket.clone();
+                    let mut p = panel.borrow_mut();
+                    if p.ticket() != Some(&ticket) {
+                        // External confirmation supersedes old panel requests.
+                        // Their delayed replies cannot replace live progress.
+                        p.generation += 1;
+                        p.offer = None;
+                        p.opening = false;
+                        p.busy = false;
+                    }
+                    p.active = Some(ticket);
+                    p.awaiting = true;
                 }
             }
             host.tick(
@@ -641,8 +670,9 @@ fn start(
                         if let Some(host) = host.borrow_mut().as_mut() {
                             host.abort(&w, aborted);
                         }
-                        if p.offer.as_ref().is_some_and(|o| o.ticket == aborted.ticket) {
+                        if p.ticket() == Some(&aborted.ticket) {
                             p.offer = None;
+                            p.active = None;
                             p.awaiting = false;
                         }
                         w.set_updates_can_confirm(false);
@@ -681,10 +711,8 @@ fn start(
                         } else {
                             failure_message(error).into()
                         });
-                    } else if p
-                        .offer
-                        .as_ref()
-                        .is_some_and(|offer| reply.status.ticket.as_ref() == Some(&offer.ticket))
+                    } else if p.ticket().is_some()
+                        && reply.status.ticket.as_ref() == p.ticket()
                         && let Some(message) = progress_message(reply.status.phase)
                     {
                         w.set_updates_message(message.into());
@@ -718,7 +746,7 @@ fn start(
         if w.get_updates_visible()
             && !p.busy
             && p.awaiting
-            && p.offer.is_some()
+            && p.ticket().is_some()
             && p.last_poll.elapsed() >= Duration::from_millis(250)
         {
             p.last_poll = Instant::now();
