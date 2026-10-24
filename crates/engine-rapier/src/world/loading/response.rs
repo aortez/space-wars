@@ -8,6 +8,7 @@ use rapier2d::prelude::{ContactImpulse, SolverFlags};
 pub mod arrival;
 mod energy;
 mod geometry;
+pub mod line_arrival;
 use energy::EnergyCheck;
 use geometry::Footprint;
 

@@ -122,3 +122,12 @@ batch ownership; flat, offset and rotating geometry need their own arrival
 proofs. Friction, joints, external/sustained/connection work and soft queries
 remain unfinished. The pulse allocation model still needs physical calibration,
 and #328 owns failure consequences. This does not complete #327.
+
+The follow-up [three-body arrival experiment](material-multi-arrival.md) proves
+bounded sequential, simultaneous and supported arrivals in collinear fixtures.
+It retains a timer-only rapid-reimpact refusal; the optional
+[verified-departure fixture](material-verified-departure.md) now demonstrates
+fresh episode ownership after proven separation. The separate
+[native three-ball operation](material-native-line-arrival.md) now supplies
+complete admission, persistent departure evidence and explicit endpoint events
+for that restricted scene. This two-ball operation's admission is unchanged.

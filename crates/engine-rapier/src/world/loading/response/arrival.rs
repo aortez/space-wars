@@ -23,27 +23,29 @@ pub struct ArrivalStep {
     pub advances: Vec<PhysicsStepMetrics>,
 }
 
-struct Pair {
-    bodies: [RigidBodyHandle; 2],
-    radii: [f32; 2],
-    sources: [ContactSource; 2],
+pub(super) struct BallScene<const N: usize> {
+    pub(super) bodies: [RigidBodyHandle; N],
+    pub(super) radii: [f32; N],
+    pub(super) sources: [ContactSource; N],
 }
 
-impl Pair {
-    fn admit(world: &PhysicsWorld) -> Result<Self, ArrivalRejection> {
+type Pair = BallScene<2>;
+
+impl<const N: usize> BallScene<N> {
+    pub(super) fn admit(world: &PhysicsWorld) -> Result<Self, ArrivalRejection> {
         use ArrivalRejection as R;
         let loading = world.loading.as_ref().ok_or(R::ResponseDisabled)?;
         let response = loading.response.as_ref().ok_or(R::ResponseDisabled)?;
-        if world.raw.bodies.len() != 2
-            || !(2..=8).contains(&world.raw.colliders.len())
-            || loading.regions.len() != 2
-            || response.materials.len() != 2
+        if world.raw.bodies.len() != N
+            || !(N..=4 * N).contains(&world.raw.colliders.len())
+            || loading.regions.len() != N
+            || response.materials.len() != N
             || loading.bindings.len() != world.raw.colliders.len()
             || world.raw.gravity != Vector::ZERO
             || !world.raw.impulse_joints.is_empty()
             || world.raw.multibody_joints.iter().next().is_some()
             || loading.config.touch_tolerance != 1.0e-5
-            || loading.episodes.len() > 1
+            || loading.episodes.len() > N * (N - 1) / 2
         {
             return Err(R::UnsupportedScene);
         }
@@ -54,7 +56,7 @@ impl Pair {
             .map(|(h, b)| (b.user_data, h))
             .collect();
         handles.sort_by_key(|(id, _)| *id);
-        let bodies = [handles[0].1, handles[1].1];
+        let bodies: [_; N] = std::array::from_fn(|i| handles[i].1);
         let mut dynamic = false;
         for h in bodies {
             let b = &world.raw.bodies[h];
@@ -86,8 +88,8 @@ impl Pair {
         if !dynamic {
             return Err(R::UnsupportedScene);
         }
-        let mut radii = [0.0; 2];
-        let mut sources = [None; 2];
+        let mut radii = [0.0; N];
+        let mut sources = [None; N];
         for (_, c) in world.raw.colliders.iter() {
             let index = bodies
                 .iter()
@@ -121,11 +123,15 @@ impl Pair {
             radii[index] = radius;
             sources[index] = Some(source);
         }
-        let sources = [
-            sources[0].ok_or(R::UnsupportedScene)?,
-            sources[1].ok_or(R::UnsupportedScene)?,
-        ];
-        if sources[0].region == sources[1].region {
+        if sources.iter().any(Option::is_none) {
+            return Err(R::UnsupportedScene);
+        }
+        let sources = sources.map(Option::unwrap);
+        if sources
+            .iter()
+            .enumerate()
+            .any(|(i, a)| sources[..i].iter().any(|b| a.region == b.region))
+        {
             return Err(R::UnsupportedScene);
         }
         Ok(Self {
@@ -134,7 +140,9 @@ impl Pair {
             sources,
         })
     }
+}
 
+impl BallScene<2> {
     fn motion(&self, world: &PhysicsWorld) -> ([f64; 2], [f64; 2], f64) {
         let [a, b] = self.bodies.map(|h| &world.raw.bodies[h]);
         let d = [

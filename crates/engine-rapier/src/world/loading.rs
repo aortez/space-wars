@@ -220,6 +220,9 @@ pub(super) struct LoadingState {
     // Stored separately in snapshot v3, keeping the capture-only v2 layout.
     #[serde(skip)]
     response: Option<response::ResponseState>,
+    // Snapshot v4 appends this after the unchanged v2/v3 payloads.
+    #[serde(skip)]
+    pub(in crate::world) line_arrival: Option<response::line_arrival::DepartureTracker>,
 }
 
 impl LoadingState {
@@ -235,6 +238,7 @@ impl LoadingState {
             diagnostics: CaptureDiagnostics::default(),
             records: 0,
             response: None,
+            line_arrival: None,
         }
     }
 
@@ -248,7 +252,14 @@ impl LoadingState {
     }
 
     pub(super) fn unbind(&mut self, collider: ColliderId) {
+        self.invalidate_arrival_proofs();
         self.bindings.remove(&collider);
+    }
+
+    pub(in crate::world) fn invalidate_arrival_proofs(&mut self) {
+        if let Some(tracker) = &mut self.line_arrival {
+            tracker.clear();
+        }
     }
 
     pub(super) fn retire_entity(&mut self, entity: PhysicsId) {
@@ -274,6 +285,7 @@ impl LoadingState {
             return false;
         }
         self.regions.remove(&token.id);
+        self.invalidate_arrival_proofs();
         if let Some(response) = &mut self.response {
             response.retire(token);
         }
@@ -286,6 +298,10 @@ impl LoadingState {
     pub(super) fn valid_for(&self, world: &PhysicsWorld) -> bool {
         self.config.valid()
             && self.response.as_ref().is_none_or(|r| r.valid_for(self))
+            && self
+                .line_arrival
+                .as_ref()
+                .is_none_or(|s| self.response.is_some() && s.valid_for(self))
             && self.next_region > 0
             && self.next_episode > 0
             && self.regions.len() <= self.config.max_regions
@@ -557,6 +573,7 @@ fn finite_record(r: &ContactRecord) -> bool {
 }
 
 pub(super) struct Hooks<'a> {
+    pub line: Option<&'a response::line_arrival::Control>,
     pub flight: Option<&'a std::sync::atomic::AtomicBool>,
     pub drives: surface_drive::DriveHooks<'a>,
     pub loading: Option<Mutex<&'a mut LoadingState>>,
@@ -565,6 +582,9 @@ pub(super) struct Hooks<'a> {
 
 impl PhysicsHooks for Hooks<'_> {
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
+        if let Some(line) = self.line {
+            line.filter(context);
+        }
         if let Some(failed) = self.flight {
             if context
                 .solver_contacts
@@ -579,11 +599,17 @@ impl PhysicsHooks for Hooks<'_> {
         self.drives.modify_solver_contacts(context);
     }
     fn modify_solver_contacts_batch(&self, context: &mut SolverContactBatchContext) {
+        if self.line.is_some_and(|line| line.preview) {
+            context.dt = 0.0;
+        }
         if let Some(state) = &self.loading {
             state
                 .lock()
                 .unwrap_or_else(|p| p.into_inner())
                 .capture(context, self.external_constraints);
+        }
+        if let Some(line) = self.line {
+            line.observe(context);
         }
     }
 }
@@ -662,7 +688,9 @@ impl PhysicsWorld {
         {
             return Err(LoadingError::Capacity);
         }
-        state.bindings.insert(collider, source);
+        if state.bindings.insert(collider, source).is_none() {
+            state.invalidate_arrival_proofs();
+        }
         Ok(())
     }
 

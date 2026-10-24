@@ -2,6 +2,7 @@ use super::*;
 use engine_material::{ARMOR, WOOD};
 
 mod arrival;
+mod multi_arrival;
 mod native_arrival;
 
 const DT: f32 = 1.0 / 120.0;
