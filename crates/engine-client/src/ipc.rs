@@ -678,6 +678,22 @@ fn handle_request(
     scenario_controls: &host::SharedScenarioControls,
     input_automation: &mut InputAutomation,
 ) {
+    if (window.get_install_fenced() || window.get_updates_visible())
+        && !matches!(
+            &request.command,
+            ControlCommand::Health(_)
+                | ControlCommand::UiState
+                | ControlCommand::Status
+                | ControlCommand::Screenshot { .. }
+                | ControlCommand::UiPress(_)
+                | ControlCommand::UiActivate(_)
+        )
+    {
+        request
+            .response
+            .error("Install handoff blocks app mutations.");
+        return;
+    }
     match request.command {
         ControlCommand::InputPress(press) => {
             input_automation.press(window, press, request.response, ui_state_tracker)
@@ -1464,6 +1480,7 @@ fn validate_ui_preconditions(
 #[cfg(unix)]
 fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState, ProtocolError> {
     let screen = classify_screen(ScreenVisibility {
+        updates: window.get_updates_visible() || window.get_install_fenced(),
         launcher_busy: window.get_launcher_busy(),
         sound: window.get_sound_visible(),
         device_info: window.get_device_info_visible(),
@@ -1487,6 +1504,9 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            updates_controls: crate::updates::inventory(window),
+            updates_focus: window.get_updates_focus(),
+            updates_message: window.get_updates_message().to_string(),
             genome_controls: if window.get_genomes_visible() {
                 crate::genome_controls::inventory(window)
             } else {

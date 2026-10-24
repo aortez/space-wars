@@ -146,9 +146,9 @@ New image changes and previously untested failure cases still need qualification
 | #261 | Shared metadata/image contract and verification fixtures implemented and used by the supervised path; retain those checks through normal service integration |
 | #262 | Owner-local publication, admission checks and durable journal/readback implemented; daily CI builds unsigned candidates; protected automatic signing/publication, renewal and Release promotion remain |
 | #263 | Signed install, stopped-app rollback/quarantine, bounded retry and normal-boot success verified on the replacement Pi 5 and primary Picade; remaining startup/service failures, interrupted promotion and physical power loss need qualification |
-| #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; fixed install-service operations, candidate-bound app handoff and remaining physical maintenance/data checks remain |
+| #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; bounded install-service sockets and candidate-bound app handoff implemented with the writer disabled; native writer integration and remaining physical maintenance/data checks remain |
 | #265 | Signed delivery verified; corrected startup/time-wake feed checks passed on Pi 5 and the second Picade; actual daily opportunity, new/resumed payload performance and fresh-SSH latency remain |
-| #266 | Updates UI/CLI, saved Ask/Automatic policy, manual consent, overnight admission, countdown and serialized cancellable app handoff |
+| #266 | Manual Updates panel, consent, exact settings-save receipt and cancellable app handoff implemented; native progress/reconciliation, install CLI, saved Ask/Automatic policy and overnight admission/countdown remain |
 | #267 | Complete the Pi 4/5 failure/channel/mode/performance matrix, primary-Picade corrected-image rollout and operator documentation; retain exact pre-update settings for migration comparisons |
 
 ### Next implementation sequence
@@ -160,9 +160,10 @@ New image changes and previously untested failure cases still need qualification
    consent, app save/acknowledgement, fixed privileged install operation, progress,
    trial and confirmed outcome. Define their shared handoff together; the
    installer transaction belongs to #264 and user/host consent to #266.
-   The [manual handoff contract](ota-install-handoff.md) now has shared messages,
-   service/app state machines and deterministic race tests. Socket, UI, actual
-   save-receipt and native writer integration remain; no install API is enabled.
+   The [manual handoff integration](ota-install-handoff.md) now connects bounded
+   service/app sockets, the Updates panel, exact save receipts and presentation
+   gates. Production installation remains unavailable until the native writer,
+   final admission gates and durable restart reconciliation are connected.
 3. Add saved Ask/Automatic settings and the overnight/idle/countdown/postponement
    policy to that same install flow. Automatic must not be a second installer.
 4. Finish #262's protected publisher and daily metadata renewal. Tag-triggered

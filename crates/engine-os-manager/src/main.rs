@@ -567,6 +567,8 @@ mod daemon {
             boot_id.clone(),
         )?;
         let update_status = updates.handle();
+        let _install =
+            engine_os_manager::install_handoff::service::Runtime::bind_native(boot_id.clone())?;
         let update_action = update_status.clone();
         let time_checks = engine_os_manager::time_runtime::spawn(
             shared.clone(),

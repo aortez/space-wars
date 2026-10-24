@@ -436,6 +436,9 @@ impl Controllers {
     }
 
     fn command(&mut self, window: &MainWindow, command: &str, now: Instant) {
+        if window.get_install_fenced() {
+            return;
+        }
         // Expire before processing commands, even if the UI timer is delayed.
         self.expire(now);
         if !self.rows().iter().any(|row| row.id == command) {

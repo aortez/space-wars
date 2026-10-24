@@ -37,6 +37,10 @@ pub const NO_ACTIVE_SCENARIO_DIAGNOSTICS: &str = "No active scenario diagnostics
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UiScreen {
+    #[serde(rename = "launcher.updates")]
+    LauncherUpdates,
+    #[serde(rename = "pause.updates")]
+    PauseUpdates,
     #[serde(rename = "launcher.busy")]
     LauncherBusy,
     #[serde(rename = "launcher.main")]
@@ -90,6 +94,8 @@ pub enum UiScreen {
 impl UiScreen {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::LauncherUpdates => "launcher.updates",
+            Self::PauseUpdates => "pause.updates",
             Self::LauncherBusy => "launcher.busy",
             Self::LauncherMain => "launcher.main",
             Self::LauncherGenomes => "launcher.genomes",
@@ -120,7 +126,8 @@ impl UiScreen {
     pub const fn is_launcher(self) -> bool {
         matches!(
             self,
-            Self::LauncherBusy
+            Self::LauncherUpdates
+                | Self::LauncherBusy
                 | Self::LauncherMain
                 | Self::LauncherGenomes
                 | Self::LauncherTraining

@@ -20,12 +20,17 @@ fn controllers_are_reachable_from_launcher_and_pause_without_resuming() {
         let settings = h.activate_guarded("controllers.back", &controllers);
         assert_eq!(settings.screen, UiScreen::LauncherSound);
         assert_eq!(selected_control(&settings), "settings.controllers");
-        // New row participates in controller-only navigation and scrolling.
+        // Settings rows participate in controller-only navigation and scrolling.
         let network = h.press_guarded(UiAction::Down, &settings);
         assert_eq!(selected_control(&network), "settings.network");
-        let back = h.press_guarded(UiAction::Down, &network);
+        let updates = h.press_guarded(UiAction::Down, &network);
+        assert_eq!(selected_control(&updates), "settings.updates");
+        let back = h.press_guarded(UiAction::Down, &updates);
         assert_eq!(selected_control(&back), "sound.back");
-        let network = h.press_guarded(UiAction::Up, &back);
+        let updates = h.press_guarded(UiAction::Up, &back);
+        assert_eq!(selected_control(&updates), "settings.updates");
+        let network = h.press_guarded(UiAction::Up, &updates);
+        assert_eq!(selected_control(&network), "settings.network");
         let settings = h.press_guarded(UiAction::Up, &network);
         assert_eq!(selected_control(&settings), "settings.controllers");
         let launcher = h.activate_guarded("sound.back", &settings);

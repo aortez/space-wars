@@ -140,6 +140,30 @@ async fn instance(connection: &zbus::Connection) -> Result<Instance> {
     })
 }
 
+/// Fresh systemd and /proc identity for authenticated install exchanges.
+pub(crate) fn install_instance() -> Result<spacewars_control::install::HostInstance> {
+    futures_lite::future::block_on(futures_lite::future::or(
+        async {
+            let connection = zbus::Connection::system().await.map_err(dbus_error)?;
+            let first = instance(&connection).await?;
+            let start_ticks = process(first.pid, KIOSK_UID)?;
+            let second = instance(&connection).await?;
+            if first != second || process(first.pid, KIOSK_UID)? != start_ticks {
+                return invalid("kiosk instance changed");
+            }
+            Ok(spacewars_control::install::HostInstance {
+                pid: first.pid,
+                start_ticks,
+                invocation: first.invocation_id,
+            })
+        },
+        async {
+            async_io::Timer::after(Duration::from_secs(1)).await;
+            invalid("kiosk identity observation timed out")
+        },
+    ))
+}
+
 fn missing(name: &str) -> Error {
     Error::Invalid(format!("systemd omitted kiosk {name}"))
 }

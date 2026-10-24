@@ -58,6 +58,7 @@ mod ui_inventory;
 mod ui_navigation;
 #[cfg(test)]
 mod ui_render_tests;
+mod updates;
 #[cfg(test)]
 mod water_visual_tests;
 
@@ -519,6 +520,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings_writer.clone(),
     );
     network_controls::install(&window);
+    let _updates = updates::install(
+        &window,
+        Arc::clone(&settings),
+        settings_writer.clone(),
+        Rc::clone(&input),
+    );
     let _training = training_controls::install(&window, config_directory.join("training"))?;
     let _genomes = genome_controls::install(&window, config_directory.join("training"))?;
     device_info::install(
@@ -1114,22 +1121,38 @@ fn install_ingame_menu_callbacks(
     rom_catalog: SharedNesRomCatalog,
 ) {
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_pizza_gravity(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_pizza_gravity();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_resume(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_resume();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_restart(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_restart();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_new_match(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_new_match();
     });
 
@@ -1156,27 +1179,47 @@ fn install_ingame_menu_callbacks(
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_start_benchmark(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_benchmark();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p1_zoom_in(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_in(0);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p1_zoom_out(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_out(0);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p2_zoom_in(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_in(1);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p2_zoom_out(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_out(1);
     });
 
@@ -1209,7 +1252,14 @@ fn install_ui_navigation(window: &MainWindow) {
 
 fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
     let clock_input = Rc::clone(&input);
+    let input_window = window.as_weak();
     window.on_clock_input_key(move |code, pressed| {
+        if input_window
+            .upgrade()
+            .is_none_or(|w| w.get_install_fenced() || w.get_updates_visible())
+        {
+            return;
+        }
         let key = match code {
             0 => input::GameKey::NesLeft,
             1 => input::GameKey::NesRight,
@@ -1229,6 +1279,12 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
     let weak = window.as_weak();
     window.on_keyboard_action(move |code, repeat| {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_updates_visible() || window.get_install_fenced() {
+            if !repeat && let Some(action) = UiAction::from_code(code) {
+                updates::handle_action(&window, action);
+            }
+            return;
+        }
         if window.get_launcher_busy() {
             return;
         }
@@ -1281,6 +1337,10 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
 }
 
 fn handle_ui_action(window: &MainWindow, action: UiAction) {
+    if window.get_updates_visible() || window.get_install_fenced() {
+        updates::handle_action(window, action);
+        return;
+    }
     if window.global::<UserActivity>().invoke_notify() {
         return;
     }
@@ -2008,6 +2068,9 @@ fn handle_return_to_launcher(
         return;
     };
 
+    if window.get_install_fenced() {
+        return;
+    }
     if window.get_autostart_running() {
         window.invoke_autostart_return();
         return;

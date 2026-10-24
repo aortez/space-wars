@@ -4,6 +4,7 @@ use spacewars_control::{UiAction, UiControl, UiScreen};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct ScreenVisibility {
+    pub(crate) updates: bool,
     pub(crate) autostart: bool,
     pub(crate) launcher_busy: bool,
     pub(crate) sound: bool,
@@ -24,7 +25,13 @@ pub(crate) struct ScreenVisibility {
 }
 
 pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
-    if visibility.launcher_busy {
+    if visibility.updates {
+        if visibility.launcher {
+            UiScreen::LauncherUpdates
+        } else {
+            UiScreen::PauseUpdates
+        }
+    } else if visibility.launcher_busy {
         UiScreen::LauncherBusy
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
@@ -79,6 +86,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) updates_controls: Vec<UiControl>,
+    pub(crate) updates_focus: i32,
+    pub(crate) updates_message: String,
     pub(crate) genome_controls: Vec<UiControl>,
     pub(crate) genome_selected: String,
     pub(crate) genome_error: Option<String>,
@@ -175,6 +185,27 @@ pub(crate) struct UiInventory {
 
 pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContext) -> UiInventory {
     let mut inventory = match screen {
+        UiScreen::LauncherUpdates | UiScreen::PauseUpdates => UiInventory {
+            selected_control: context
+                .updates_controls
+                .get(context.updates_focus as usize)
+                .map(|c| c.id.clone()),
+            controls: {
+                let mut c = context.updates_controls.clone();
+                c.push(
+                    UiControl::new("updates.status", "Status", false)
+                        .with_value(context.updates_message.clone()),
+                );
+                c
+            },
+            actions: vec![
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Confirm,
+                UiAction::Back,
+            ],
+            error: None,
+        },
         UiScreen::LauncherBusy => UiInventory {
             selected_control: None,
             controls: vec![
@@ -1023,6 +1054,7 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     controls.push(UiControl::new("settings.autostart", "Auto-start", true));
     controls.push(UiControl::new("settings.controllers", "Controllers", true));
     controls.push(UiControl::new("settings.network", "Network", true));
+    controls.push(UiControl::new("settings.updates", "Updates", true));
     controls.push(UiControl::new("sound.back", "Back", true));
     let mut ids = vec![
         "sound.volume",
@@ -1048,7 +1080,9 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
         ),
     );
     UiInventory {
-        selected_control: if context.sound_focus_index == 7 {
+        selected_control: if context.sound_focus_index == 9 {
+            Some("settings.updates".into())
+        } else if context.sound_focus_index == 7 {
             Some("settings.controllers".into())
         } else if context.sound_focus_index == 8 {
             Some("settings.network".into())
@@ -1428,6 +1462,7 @@ mod tests {
         assert_eq!(
             classify_screen(ScreenVisibility {
                 launcher_busy: false,
+                updates: false,
                 sound: false,
                 device_info: false,
                 controllers: false,

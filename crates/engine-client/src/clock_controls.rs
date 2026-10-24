@@ -54,6 +54,9 @@ pub(crate) fn install(
     let open_controls = Rc::clone(&controls);
     window.on_ingame_clock_open(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         if window.get_launcher_visible() || window.get_launcher_scenario() != "clock" {
             return;
         }
@@ -67,6 +70,9 @@ pub(crate) fn install(
     let adjust_controls = Rc::clone(&controls);
     window.on_ingame_clock_adjust(move |index, delta| {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         if !window.get_ingame_clock_visible() || window.get_clock_controls_pending() {
             return;
         }
@@ -94,6 +100,9 @@ pub(crate) fn install(
     let weak = window.as_weak();
     window.on_ingame_clock_preview(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         if !window.get_ingame_clock_visible() || window.get_clock_controls_pending() {
             return;
         }
@@ -112,6 +121,9 @@ pub(crate) fn install(
     let weak = window.as_weak();
     window.on_clock_settings_applied(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         let Ok(clock) = crate::clock_setup_from_window(&window) else {
             return;
         };

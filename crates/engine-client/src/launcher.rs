@@ -137,7 +137,10 @@ impl Launcher {
         let Some(window) = self.window.upgrade() else {
             return;
         };
-        if window.get_launcher_busy() || !window.get_launcher_visible() {
+        if window.get_install_fenced()
+            || window.get_launcher_busy()
+            || !window.get_launcher_visible()
+        {
             return;
         }
         window.set_launcher_error_text("".into());
@@ -179,7 +182,10 @@ impl Launcher {
         let Some(window) = self.window.upgrade() else {
             return;
         };
-        if window.get_launcher_busy() || !window.get_launcher_visible() {
+        if window.get_install_fenced()
+            || window.get_launcher_busy()
+            || !window.get_launcher_visible()
+        {
             return;
         }
         window.set_launcher_error_text("".into());
