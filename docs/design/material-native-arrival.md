@@ -122,3 +122,8 @@ batch ownership; flat, offset and rotating geometry need their own arrival
 proofs. Friction, joints, external/sustained/connection work and soft queries
 remain unfinished. The pulse allocation model still needs physical calibration,
 and #328 owns failure consequences. This does not complete #327.
+
+The follow-up [three-body arrival experiment](material-multi-arrival.md) proves
+bounded sequential, simultaneous and supported arrivals in collinear fixtures.
+It also retains a rapid-reimpact refusal that needs stronger episode ownership
+before native multi-body integration. Runtime admission remains unchanged.
