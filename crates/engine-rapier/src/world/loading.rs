@@ -223,6 +223,9 @@ pub(super) struct LoadingState {
     // Snapshot v4 appends this after the unchanged v2/v3 payloads.
     #[serde(skip)]
     pub(in crate::world) arrival_departures: Option<response::ball_arrival::DepartureTracker>,
+    // Snapshot v5 has a separate tail for optional ball and flat evidence.
+    #[serde(skip)]
+    pub(in crate::world) flat_departures: Option<response::flat_arrival::DepartureTracker>,
 }
 
 impl LoadingState {
@@ -239,6 +242,7 @@ impl LoadingState {
             records: 0,
             response: None,
             arrival_departures: None,
+            flat_departures: None,
         }
     }
 
@@ -258,6 +262,9 @@ impl LoadingState {
 
     pub(in crate::world) fn invalidate_arrival_proofs(&mut self) {
         if let Some(tracker) = &mut self.arrival_departures {
+            tracker.clear();
+        }
+        if let Some(tracker) = &mut self.flat_departures {
             tracker.clear();
         }
     }
@@ -302,6 +309,15 @@ impl LoadingState {
                 .arrival_departures
                 .as_ref()
                 .is_none_or(|s| self.response.is_some() && s.valid_for(self))
+            && self
+                .flat_departures
+                .as_ref()
+                .is_none_or(|s| self.response.is_some() && s.valid_for(self))
+            && (self
+                .arrival_departures
+                .as_ref()
+                .is_none_or(|s| s.is_empty())
+                || self.flat_departures.as_ref().is_none_or(|s| s.is_empty()))
             && self.next_region > 0
             && self.next_episode > 0
             && self.regions.len() <= self.config.max_regions
@@ -572,8 +588,15 @@ fn finite_record(r: &ContactRecord) -> bool {
         })
 }
 
+/// Temporary controls supplied only by a fully admitted arrival operation.
+pub(super) trait ArrivalControl: Sync {
+    fn preview(&self) -> bool;
+    fn filter(&self, context: &mut ContactModificationContext);
+    fn observe(&self, context: &SolverContactBatchContext);
+}
+
 pub(super) struct Hooks<'a> {
-    pub line: Option<&'a response::ball_arrival::Control>,
+    pub arrival: Option<&'a dyn ArrivalControl>,
     pub flight: Option<&'a std::sync::atomic::AtomicBool>,
     pub drives: surface_drive::DriveHooks<'a>,
     pub loading: Option<Mutex<&'a mut LoadingState>>,
@@ -582,8 +605,8 @@ pub(super) struct Hooks<'a> {
 
 impl PhysicsHooks for Hooks<'_> {
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
-        if let Some(line) = self.line {
-            line.filter(context);
+        if let Some(arrival) = self.arrival {
+            arrival.filter(context);
         }
         if let Some(failed) = self.flight {
             if context
@@ -599,7 +622,7 @@ impl PhysicsHooks for Hooks<'_> {
         self.drives.modify_solver_contacts(context);
     }
     fn modify_solver_contacts_batch(&self, context: &mut SolverContactBatchContext) {
-        if self.line.is_some_and(|line| line.preview) {
+        if self.arrival.is_some_and(ArrivalControl::preview) {
             context.dt = 0.0;
         }
         if let Some(state) = &self.loading {
@@ -608,8 +631,8 @@ impl PhysicsHooks for Hooks<'_> {
                 .unwrap_or_else(|p| p.into_inner())
                 .capture(context, self.external_constraints);
         }
-        if let Some(line) = self.line {
-            line.observe(context);
+        if let Some(arrival) = self.arrival {
+            arrival.observe(context);
         }
     }
 }

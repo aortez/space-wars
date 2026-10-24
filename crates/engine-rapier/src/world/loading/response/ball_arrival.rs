@@ -193,17 +193,21 @@ impl Scene {
     }
 }
 
-/// Temporary hooks used only after complete line-scene admission.
+/// Temporary hooks used only after complete ball-scene admission.
 pub(in crate::world) struct Control {
     bodies: [RigidBodyHandle; 3],
-    pub(in crate::world) preview: bool,
+    preview: bool,
     line_only: bool,
     after: Mutex<Option<[Vector; 3]>>,
     invalid: AtomicBool,
 }
 
-impl Control {
-    pub(in crate::world) fn filter(&self, context: &mut ContactModificationContext) {
+impl ArrivalControl for Control {
+    fn preview(&self) -> bool {
+        self.preview
+    }
+
+    fn filter(&self, context: &mut ContactModificationContext) {
         context.solver_contacts.retain(|contact| {
             let velocities = [context.rigid_body1, context.rigid_body2].map(|h| {
                 h.map_or(Vector::ZERO, |h| {
@@ -224,7 +228,7 @@ impl Control {
         });
     }
 
-    pub(in crate::world) fn observe(&self, context: &SolverContactBatchContext) {
+    fn observe(&self, context: &SolverContactBatchContext) {
         let mut after = self.after.lock().unwrap();
         if after.is_some() {
             self.invalid.store(true, Ordering::Relaxed);
@@ -240,8 +244,8 @@ impl PhysicsWorld {
     /// Rotation remains locked. Near-grazing trajectories refuse explicitly.
     ///
     /// At most eight advances and eight previews. Any refusal preserves the
-    /// original world and outputs. Pending departure evidence uses snapshot v4;
-    /// callers must select this operation again after restoring.
+    /// original world and outputs. Pending departure evidence uses snapshot v4
+    /// (v5 after flat stepping); select this operation again after restoring.
     pub fn step_material_three_ball_arrivals(
         &mut self,
         dt: f32,
@@ -258,8 +262,9 @@ impl PhysicsWorld {
     ///
     /// At most eight advances and eight disposable previews. Any refusal keeps
     /// the original state and outputs; no automatic ordinary-step fallback.
-    /// Pending departure evidence persists in snapshot v4. Call this operation
-    /// again for replay; positive ordinary steps invalidate that evidence.
+    /// Pending departure evidence persists in snapshot v4 (v5 after flat
+    /// stepping). Call this operation again for replay; positive ordinary or
+    /// flat steps invalidate that evidence.
     pub fn step_material_line_arrivals(
         &mut self,
         dt: f32,
@@ -320,7 +325,11 @@ impl PhysicsWorld {
             .unwrap()
             .arrival_departures
             .get_or_insert_with(DepartureTracker::default);
-        staged.loading.as_mut().unwrap().begin_step();
+        let loading = staged.loading.as_mut().unwrap();
+        if let Some(tracker) = &mut loading.flat_departures {
+            tracker.clear();
+        }
+        loading.begin_step();
         let mut elapsed = 0.0;
         while elapsed < f64::from(dt) {
             let substep = result.advances.len();

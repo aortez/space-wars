@@ -107,6 +107,12 @@ can remain in version 4; it does not select a stepping mode. Replay must call
 `step_material_line_arrivals` again explicitly. Retirement changes episode
 ownership only, not material capacity or region identity.
 
+After a world has used [native flat stepping](material-native-flat-arrival.md),
+it retains snapshot version 5, which stores the trackers separately. Successful
+ball stepping clears flat evidence, and successful flat stepping clears ball
+evidence. Refusals preserve the original tracker; snapshot restoration never
+automatically selects either operation.
+
 ## Time, events and cost
 
 `LineArrivalStep::events` is the complete material episode stream for the call.

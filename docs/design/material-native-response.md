@@ -78,11 +78,15 @@ against nonparallel faces, and flat contacts with rotational freedom are also
 unsupported. Independent surfaces need distinct host patch identities.
 
 Each patch receives one material evaluation and budget share. The flat patch's
-representative point is its union centroid. Response is split equally over
-solver points in canonical collider order. With rotation locked, each point has
-the same active normal Jacobian, so this split preserves the modeled velocity
-response. It does not model pressure distribution or support reaction moments;
-freely rotating faces need a richer response representation.
+representative point for the budget is its union centroid. Apply its total
+impulse once, at the first solver point in canonical collider/manifold/contact
+order. Every admitted point has the same active normal Jacobian: flat faces
+have rotation locked, and duplicate ball contacts have identical points and
+normals. All other points still receive zero-impulse requests, so backend
+validation and restitution/warmstart clearing cover the complete contact set.
+This avoids partition-dependent rounding when dividing an impulse into shares
+and repeatedly accumulating those shares. It does not model pressure distribution
+or support reaction moments; freely rotating faces need a richer representation.
 
 ## Transaction and response
 
@@ -165,6 +169,9 @@ Existing versions 1 and 2 remain readable. The opt-in
 [three-ball arrival operation](material-native-line-arrival.md) uses version 4
 after its first successful positive step, appending pending departure evidence
 without changing these capture/response payloads. Versions 1–3 remain readable.
+The [flat-face operation](material-native-flat-arrival.md) uses version 5 with
+separate flat and optional ball trackers; it preserves the older formats for
+worlds that have not entered flat stepping and reads versions 1–4 unchanged.
 
 Response output and diagnostics are transient. Same-build continuation restores
 capacities and episodes exactly and does not replay an already spent impact.
@@ -242,6 +249,14 @@ ordinary CCD remains refused by the general response adapter.
 The bounded [oblique three-ball operation](material-oblique-arrival.md) now
 qualifies multi-arrival scheduling and verified departure in two dimensions for
 centered radius-0.5 balls, including a retained unproved-return refusal.
+
+The [flat-face arrival fixture](material-flat-arrival.md) now qualifies separated
+plates and supported chains. Applying each patch impulse once resolves the
+representation-sensitive closing residuals it exposed at supports. Internal
+collider seams still require certified exterior-boundary filtering, currently
+supplied by the [native flat-face operation](material-native-flat-arrival.md)
+after complete scene admission. That separate transactional operation qualifies
+the fixture's two/three-plate cases without changing ordinary stepping.
 
 Further work is contact-set admission, especially CCD arrivals, then additional
 geometry and loading classes. Freely rotating faces, mixed curved/flat contact,
