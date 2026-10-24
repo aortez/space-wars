@@ -171,6 +171,10 @@ impl From<UiActionArg> for UiAction {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum UiScreenArg {
+    #[value(name = "launcher.updates")]
+    LauncherUpdates,
+    #[value(name = "pause.updates")]
+    PauseUpdates,
     #[value(name = "launcher.busy")]
     LauncherBusy,
     #[value(name = "launcher.main")]
@@ -224,6 +228,8 @@ enum UiScreenArg {
 impl From<UiScreenArg> for UiScreen {
     fn from(screen: UiScreenArg) -> Self {
         match screen {
+            UiScreenArg::LauncherUpdates => Self::LauncherUpdates,
+            UiScreenArg::PauseUpdates => Self::PauseUpdates,
             UiScreenArg::LauncherBusy => Self::LauncherBusy,
             UiScreenArg::LauncherMain => Self::LauncherMain,
             UiScreenArg::LauncherGenomes => Self::LauncherGenomes,
@@ -1317,6 +1323,35 @@ mod tests {
                 }
             } if control_id == "launcher.settings"
         ));
+    }
+
+    #[test]
+    fn parses_updates_screens_for_press_activate_and_wait() {
+        for (name, expected) in [
+            ("launcher.updates", UiScreen::LauncherUpdates),
+            ("pause.updates", UiScreen::PauseUpdates),
+        ] {
+            for command in [
+                vec!["ui", "press", "back", "--expect-screen", name],
+                vec!["ui", "activate", "updates.back", "--expect-screen", name],
+                vec!["ui", "wait", "--screen", name],
+            ] {
+                let args =
+                    Args::try_parse_from(std::iter::once("spacewars-cli").chain(command)).unwrap();
+                let screen = match args.command {
+                    Command::Ui {
+                        command:
+                            UiCommand::Press { expect_screen, .. }
+                            | UiCommand::Activate { expect_screen, .. },
+                    } => expect_screen,
+                    Command::Ui {
+                        command: UiCommand::Wait { screen, .. },
+                    } => screen,
+                    _ => panic!("expected a UI command with a screen"),
+                };
+                assert_eq!(screen.map(UiScreen::from), Some(expected));
+            }
+        }
     }
 
     #[test]
