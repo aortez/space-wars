@@ -337,6 +337,23 @@ impl<'a> BootController<'a> {
         Ok(())
     }
 
+    /// Ordinary native admission, under this controller's shared install lock.
+    /// Reads separately approved physical evidence at a fixed root-owned path;
+    /// missing or changed qualification never falls back to supervised admission.
+    /// Call at final admission after metadata/payload revalidation and app consent.
+    /// The returned plan must still be committed through the handoff/recovery
+    /// journals before the writer receives its action. This method writes nothing.
+    pub fn plan_install(
+        &self,
+        journal: &RecoveryStore,
+        candidate: &crate::VerifiedCandidate,
+    ) -> Result<crate::recovery::Plan> {
+        crate::bootstrap::require_no_active_bootstrap(self.lock)?;
+        self.authorize_maintenance(journal)?;
+        let qualification = crate::recovery_admission::Qualification::open(&self.observe()?)?;
+        qualification.plan_native(journal.durable_record()?, &self.observe()?, candidate)
+    }
+
     /// Recheck immediately before requesting a normal systemd reboot. This
     /// operation cannot authorize another tryboot or select an arbitrary root.
     pub fn authorize_rollback_reboot(&self, journal: &RecoveryStore, id: Sha256) -> Result<()> {

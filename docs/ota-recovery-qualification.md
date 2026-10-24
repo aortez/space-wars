@@ -47,6 +47,86 @@ that selector until the operator restores it. Cleanup below restores the exact
 original selector and restarts the production recovery service against its
 unchanged baseline. Do not count this cleanup as automatic OTA recovery.
 
+## Ordinary native admission
+
+**2026-10-24 implementation:** `BootController::plan_install` now provides the
+ordinary native qualification gate for the future manual-install worker. It
+requires the existing shared installation lock, no active bootstrap, a confirmed
+normal boot and a consistent durable recovery journal. It then reads a fixed
+root-owned approval and retained physical reports, observes the boot again and
+rechecks the files before producing the ordinary recovery plan. The plan alone
+does not authorize disk writes: manual installation must persist the exact
+handoff association and recovery transaction before receiving its write action.
+Signature/time/payload revalidation, consent and maintenance holds remain the
+caller's final-admission responsibilities.
+
+This adds no approval-writing API, device command or service enable switch. No
+approval has been installed on any Pi, and the live installation backend remains
+unavailable. Existing healthy trials, generation-zero diagnostics and host test
+fixtures do not satisfy the complete physical matrix.
+
+The fixed directory is
+`/data/spacewars-system/recovery-qualification`, on the validated data partition.
+Its `approval.json` is a separately authenticated owner's attestation that the
+listed physical cases passed and their retained reports were reviewed. The
+reader verifies that attestation's binding, completeness and file integrity;
+it cannot infer physical success from a hash or inspect an opaque report's
+claims. Root/operator control remains the authority boundary. Ordinary kiosk
+requests cannot supply this record or select another path.
+
+The directory and its system parent must be private and root-owned; every file
+must be a private, singly linked regular file on the same filesystem. The reader
+pins and checks the inode type before opening it for data, so a mistaken device
+node is rejected without activating it. It uses descriptor-relative, no-follow
+opens, bounded reads and fresh inode/content-metadata comparisons. Missing files,
+malformed records, extra fields, duplicate/unknown cases, bad hashes, unsafe permissions, symlinks,
+special files, or replacement/removal after reading all block admission.
+
+The strict approval schema contains:
+
+| Field | Required value |
+| --- | --- |
+| `schema` | `1` |
+| `purpose` | `physical-recovery-admission` |
+| `binding` | Exact `BootBinding`: device/firmware/USB-medium fingerprint, layout, immutable boot assets and selected hardware profile |
+| `kernel_build_id` | Exact 40-character lowercase hexadecimal ID observed from the loaded kernel and checked against immutable boot assets |
+| `recovery_protocol` | Exactly the implemented protocol (`2`) |
+| `passed` | One entry per case below, each with `case` and a `report` containing `bytes` and `sha256` |
+
+The approval is limited to 16 KiB. Each report is limited to 256 KiB and is read
+from the fixed `<case>.json` name; no record field can supply a filename. Reports
+should summarize the physical procedure, observations, boot IDs, timing bounds,
+outcome and exact retained raw-evidence hashes. Approval must establish that all
+reports apply to this same binding and kernel. Failure cases must demonstrate
+local recovery without Internet or operator cleanup being counted as recovery.
+
+| Required case | Evidence the owner must review |
+| --- | --- |
+| `healthy-trial` | Signed trial reaches durable promotion after the continuous health window |
+| `normal-boot` | Subsequent normal boot runs the promoted image with consistent selectors/journal |
+| `root-startup-failure` | Failed root/userspace startup returns to the known-good image within the recovery bound |
+| `recovery-service-failure` | Missing or failed recovery service cannot leave an indefinite failed trial |
+| `kiosk-crash` | App crash produces bounded fallback and quarantine |
+| `kiosk-hang` | Stalled app/control/render progress produces bounded fallback and quarantine |
+| `trial-reset` | Reset during the trial returns to a known-good state without an automatic retry loop |
+| `watchdog-handoff` | Actual hardware ownership/handoff, expiry/reset and successful completion behave as required |
+| `repeated-failure` | Retained failure/attempt history and bounded explicit retry survive reboot |
+| `interrupted-promotion` | Interruptions at record and selector transitions resolve to a bootable known-good choice |
+| `power-loss` | Physical power interruption across write/trial/promotion boundaries preserves recovery and required persistent data |
+
+A normal reboot or root-slot change does not by itself change the hardware
+approval. Board, firmware, USB medium/capacity, layout, boot set, profile, loaded
+kernel or recovery-protocol changes require matching reviewed evidence. This is
+hardware recovery qualification, not a replacement for signed-image software
+validation. Publish or revoke approvals only through the separate owner
+boundary while holding the shared installation lock; keep that lock through
+the installer's final checks, journal admission and write. Do not copy another
+device's approval or manufacture one from the synthetic test reports.
+
+Local tests cover the strict record and filesystem boundary, evidence revocation,
+hardware/protocol mismatch and signed-candidate admission through a real durable
+recovery journal. They do not run physical failure tests or qualify hardware.
+
 ## Build and tests
 
 The native helper is an explicit opt-in example, excluded from ordinary device

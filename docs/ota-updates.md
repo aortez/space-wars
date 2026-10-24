@@ -7,7 +7,7 @@ outside this update path; incompatible boot assets require a supervised upgrade.
 
 ## Current implementation
 
-Status reviewed **2026-10-23**. This section is the active OTA plan; the detailed
+Status reviewed **2026-10-24**. This section is the active OTA plan; the detailed
 implementation and dated experiments below retain their original source and
 device scope. A past experiment's “not installed” or “remaining” statement is
 not the current fleet status. Do not replay a retained operator script without
@@ -166,9 +166,12 @@ New image changes and previously untested failure cases still need qualification
    existing recovery transaction and reconciles crash boundaries in fixtures.
    Service/app startup and outcome reconciliation now use that journal and keep
    gameplay fenced while a decision is unavailable. Production installation
-   remains unavailable until the native writer, qualified recovery-capability
-   provider and final admission gates are connected; startup still needs device
-   qualification with the matching service and app binaries.
+   remains unavailable until the native writer and final admission gates are
+   connected. `BootController::plan_install` now checks retained, owner-approved
+   physical recovery evidence against the actual device/boot/kernel before
+   producing an ordinary recovery plan; no device approval has been provisioned.
+   Startup still needs device qualification with the matching service and app
+   binaries, and the remaining physical failure matrix must precede approval.
 3. Add saved Ask/Automatic settings and the overnight/idle/countdown/postponement
    policy to that same install flow. Automatic must not be a second installer.
 4. Finish #262's protected publisher and daily metadata renewal. Tag-triggered
