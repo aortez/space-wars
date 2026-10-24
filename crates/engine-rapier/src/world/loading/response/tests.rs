@@ -2,6 +2,7 @@ use super::*;
 use engine_material::{ARMOR, WOOD};
 
 mod arrival;
+mod flat_arrival;
 mod multi_arrival;
 mod native_arrival;
 

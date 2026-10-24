@@ -8,6 +8,7 @@ use rapier2d::prelude::{ContactImpulse, SolverFlags};
 pub mod arrival;
 pub mod ball_arrival;
 mod energy;
+pub mod flat_arrival;
 mod geometry;
 pub mod line_arrival;
 use energy::EnergyCheck;
@@ -522,9 +523,13 @@ impl ResponseState {
             }
             let mut targets = patch.targets.clone();
             targets.sort_by_key(|t| (t.ids, t.request.manifold, t.request.contact));
-            let count = targets.len() as f32;
-            impulses.extend(targets.into_iter().map(|mut t| {
-                t.request.impulse = impulse / count;
+            // Every admitted target has the same active normal Jacobian:
+            // ball duplicates have identical points; flat patches cannot rotate.
+            // Apply the physical impulse once, avoiding partition-dependent
+            // division and accumulation. Keep zero requests for every other
+            // target so the backend still validates them and clears their caches.
+            impulses.extend(targets.into_iter().enumerate().map(|(index, mut t)| {
+                t.request.impulse = if index == 0 { impulse } else { 0.0 };
                 t.request
             }));
         }

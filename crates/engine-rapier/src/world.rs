@@ -47,6 +47,7 @@ const SNAPSHOT_VERSION: u32 = 1;
 const LOADING_SNAPSHOT_VERSION: u32 = 2;
 const RESPONSE_SNAPSHOT_VERSION: u32 = 3;
 const ARRIVAL_SNAPSHOT_VERSION: u32 = 4;
+const FLAT_ARRIVAL_SNAPSHOT_VERSION: u32 = 5;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -1272,7 +1273,7 @@ impl PhysicsWorld {
         drives: &[SurfaceDrive],
         reset_loading: bool,
         flight: Option<&std::sync::atomic::AtomicBool>,
-        line: Option<&loading::response::ball_arrival::Control>,
+        arrival: Option<&dyn loading::ArrivalControl>,
     ) -> PhysicsStepMetrics {
         let _span = crate::profile::span("world_step");
         if reset_loading && let Some(loading) = &mut self.loading {
@@ -1320,7 +1321,7 @@ impl PhysicsWorld {
 
         let capture_loading = self.loading.is_some();
         let hooks = loading::Hooks {
-            line,
+            arrival,
             flight,
             drives: surface_drive::DriveHooks(drives),
             loading: self.loading.as_mut().map(Mutex::new),
@@ -2186,6 +2187,12 @@ impl PhysicsWorld {
             version: if self
                 .loading
                 .as_ref()
+                .is_some_and(|s| s.flat_departures.is_some())
+            {
+                FLAT_ARRIVAL_SNAPSHOT_VERSION
+            } else if self
+                .loading
+                .as_ref()
                 .is_some_and(|s| s.arrival_departures.is_some())
             {
                 ARRIVAL_SNAPSHOT_VERSION
@@ -2217,7 +2224,12 @@ impl PhysicsWorld {
             bincode::serialize_into(&mut bytes, loading)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
             loading.serialize_response(&mut bytes)?;
-            if let Some(tracker) = &loading.arrival_departures {
+            if let Some(tracker) = &loading.flat_departures {
+                bincode::serialize_into(&mut bytes, &loading.arrival_departures)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+                bincode::serialize_into(&mut bytes, tracker)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            } else if let Some(tracker) = &loading.arrival_departures {
                 bincode::serialize_into(&mut bytes, tracker)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
             }
@@ -2234,6 +2246,7 @@ impl PhysicsWorld {
             LOADING_SNAPSHOT_VERSION,
             RESPONSE_SNAPSHOT_VERSION,
             ARRIVAL_SNAPSHOT_VERSION,
+            FLAT_ARRIVAL_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -2259,6 +2272,15 @@ impl PhysicsWorld {
         }
         if snapshot.version == ARRIVAL_SNAPSHOT_VERSION {
             loading.as_mut().unwrap().arrival_departures = Some(
+                bincode::deserialize_from(&mut reader)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?,
+            );
+        }
+        if snapshot.version == FLAT_ARRIVAL_SNAPSHOT_VERSION {
+            let state = loading.as_mut().unwrap();
+            state.arrival_departures = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            state.flat_departures = Some(
                 bincode::deserialize_from(&mut reader)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?,
             );
