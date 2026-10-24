@@ -162,8 +162,11 @@ New image changes and previously untested failure cases still need qualification
    installer transaction belongs to #264 and user/host consent to #266.
    The [manual handoff integration](ota-install-handoff.md) now connects bounded
    service/app sockets, the Updates panel, exact save receipts and presentation
-   gates. Production installation remains unavailable until the native writer,
-   final admission gates and durable restart reconciliation are connected.
+   gates. The durable handoff journal now associates one-use consent with the
+   existing recovery transaction and reconciles crash boundaries in fixtures.
+   Production installation remains unavailable until the native writer,
+   qualified recovery-capability provider, final admission gates and service/app
+   startup reconciliation are connected.
 3. Add saved Ask/Automatic settings and the overnight/idle/countdown/postponement
    policy to that same install flow. Automatic must not be a second installer.
 4. Finish #262's protected publisher and daily metadata renewal. Tag-triggered

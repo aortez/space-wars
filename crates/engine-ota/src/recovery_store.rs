@@ -89,7 +89,9 @@ impl RecoveryStore {
     }
 
     #[cfg(any(target_os = "linux", test))]
-    pub(crate) fn durable_record(&self) -> Result<&RecoveryRecord> {
+    /// Use for cross-journal reconciliation. Unlike diagnostic `record()`, this
+    /// rejects a handle whose last commit may have reached disk despite failure.
+    pub fn durable_record(&self) -> Result<&RecoveryRecord> {
         if self.uncertain {
             return Err(Error::Store(
                 "recovery persistence is uncertain; reopen required".into(),
