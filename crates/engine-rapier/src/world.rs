@@ -2892,6 +2892,7 @@ pub(crate) fn from_rapier(value: Vector) -> Vec2 {
 mod tests {
     use super::*;
     mod compound;
+    mod contact_impulses;
 
     const BALL_ROLE: BodyRole = BodyRole::new(1);
     const BALL_COLLIDER: ColliderRole = ColliderRole::new(1);

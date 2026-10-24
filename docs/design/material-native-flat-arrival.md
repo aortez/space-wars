@@ -170,3 +170,7 @@ Arbitrary compound geometry, mixed curved/flat shapes, free rotation, other
 loading classes, pulse calibration and #328 failure consequences remain
 unfinished. This operation is still an opt-in bounded scene, not general
 contact-set admission.
+
+The separate [gravity/support fixture](material-gravity-loading.md) documents
+the force-integration, impulse-reporting and deformation-work boundaries that
+must be resolved before admitting a gravity-driven landing and resting support.

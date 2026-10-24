@@ -318,7 +318,7 @@ impl GenericContactConstraintBuilder {
     pub fn update(
         &self,
         params: &IntegrationParameters,
-        solved_dt: Real,
+        small_step_id: usize,
         bodies: &SolverBodies,
         multibodies: &MultibodyJointSet,
         constraint: &mut GenericContactConstraint,
@@ -326,6 +326,7 @@ impl GenericContactConstraintBuilder {
         let cfm_factor = params.contact_softness.cfm_factor(params.dt);
         let inv_dt = params.inv_dt();
         let erp_inv_dt = params.contact_softness.erp_inv_dt(params.dt);
+        let solved_dt = small_step_id as Real * params.dt;
 
         // We don't update jacobians so the update is mostly identical to the non-generic velocity constraint.
         let pose1 = multibodies
@@ -368,13 +369,19 @@ impl GenericContactConstraintBuilder {
 
                 normal_part.rhs_wo_bias = rhs_wo_bias;
                 normal_part.rhs = new_rhs;
-                normal_part.impulse_accumulator += normal_part.impulse;
+                // The first update holds the previous frame's warm-start cache.
+                // Only completed substeps belong in this frame's total.
+                if small_step_id != 0 {
+                    normal_part.impulse_accumulator += normal_part.impulse;
+                }
                 normal_part.impulse *= params.warmstart_coefficient;
             }
 
             // Tangent part.
             {
-                tangent_part.impulse_accumulator += tangent_part.impulse;
+                if small_step_id != 0 {
+                    tangent_part.impulse_accumulator += tangent_part.impulse;
+                }
                 tangent_part.impulse *= params.warmstart_coefficient;
 
                 for j in 0..DIM - 1 {

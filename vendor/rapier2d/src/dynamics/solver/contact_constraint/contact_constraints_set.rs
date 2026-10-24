@@ -12,7 +12,7 @@ use crate::dynamics::{
     RigidBodySet,
 };
 use crate::geometry::{ContactManifold, ContactManifoldIndex};
-use crate::math::{DVector, Real, SIMD_WIDTH};
+use crate::math::{DVector, SIMD_WIDTH};
 use parry::math::SimdReal;
 
 use crate::dynamics::solver::contact_constraint::any_contact_constraint::AnyContactConstraintMut;
@@ -535,7 +535,7 @@ impl ContactConstraintsSet {
                 for (builder, constraint) in self.$builders.iter().zip(self.$constraints.iter_mut()) {
                     builder.update(
                         &params,
-                        small_step_id as Real * params.dt,
+                        small_step_id,
                         solver_bodies,
                         multibodies,
                         constraint,
