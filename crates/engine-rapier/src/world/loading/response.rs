@@ -6,6 +6,7 @@ use engine_material::{ContactGeometry, Material, Outcome, Region, Section, share
 use rapier2d::prelude::{ContactImpulse, SolverFlags};
 
 pub mod arrival;
+pub mod ball_arrival;
 mod energy;
 mod geometry;
 pub mod line_arrival;

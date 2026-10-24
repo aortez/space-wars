@@ -42,23 +42,36 @@ pub(super) fn retire(
     start: [Vector; 3],
     speed: [Vector; 3],
     dt: f32,
-) -> Result<Vec<EpisodeEvent>, LineArrivalRejection> {
+) -> Result<Vec<EpisodeEvent>, BallArrivalRejection> {
     let end = scene.positions(world);
-    let predicted: [f64; 3] =
-        std::array::from_fn(|i| f64::from(start[i].x) + f64::from(speed[i].x) * f64::from(dt));
-    let error: [f64; 3] = std::array::from_fn(|i| {
-        8.0 * f64::from(f32::EPSILON)
-            * (f64::from(start[i].x).abs() + (f64::from(speed[i].x) * f64::from(dt)).abs() + 1.0)
+    let planar = scene.line_y.is_none();
+    let predicted: [[f64; 2]; 3] = std::array::from_fn(|i| {
+        [
+            f64::from(start[i].x) + f64::from(speed[i].x) * f64::from(dt),
+            f64::from(start[i].y) + f64::from(speed[i].y) * f64::from(dt),
+        ]
+    });
+    let error: [[f64; 2]; 3] = std::array::from_fn(|i| {
+        let p = [start[i].x, start[i].y];
+        let v = [speed[i].x, speed[i].y];
+        std::array::from_fn(|axis| {
+            if !planar && axis == 1 {
+                return 0.0;
+            }
+            8.0 * f64::from(f32::EPSILON)
+                * (f64::from(p[axis]).abs() + (f64::from(v[axis]) * f64::from(dt)).abs() + 1.0)
+        })
     });
     if (0..3).any(|i| {
         !end[i].is_finite()
-            || end[i].y != start[i].y
-            || (f64::from(end[i].x) - predicted[i]).abs() > error[i]
+            || (0..2).any(|axis| {
+                (f64::from([end[i].x, end[i].y][axis]) - predicted[i][axis]).abs() > error[i][axis]
+            })
     }) {
-        return Err(LineArrivalRejection::Numerical);
+        return Err(BallArrivalRejection::Numerical);
     }
     let loading = world.loading.as_mut().unwrap();
-    let mut pending = loading.line_arrival.as_ref().unwrap().pending.clone();
+    let mut pending = loading.arrival_departures.as_ref().unwrap().pending.clone();
     pending.retain(|pair, witness| {
         loading
             .episodes
@@ -69,10 +82,20 @@ pub(super) fn retire(
     let mut events = Vec::new();
     for i in 0..3 {
         for j in i + 1..3 {
-            let gap_start = f64::from(start[j].x) - f64::from(start[i].x) - 1.0;
-            let gap_end = f64::from(end[j].x) - f64::from(end[i].x) - 1.0;
-            let uncertainty = error[i] + error[j];
-            let lower = gap_end.min(predicted[j] - predicted[i] - 1.0) - uncertainty;
+            let d = geometry::delta(start[j], start[i]);
+            let v = geometry::delta(speed[j], speed[i]);
+            let distance = |d: [f64; 2]| if planar { geometry::length(d) } else { d[0] };
+            let gap_start = distance(d) - 1.0;
+            let gap_end = distance(geometry::delta(end[j], end[i])) - 1.0;
+            let predicted_gap = distance([
+                predicted[j][0] - predicted[i][0],
+                predicted[j][1] - predicted[i][1],
+            ]) - 1.0;
+            // Reverse triangle inequality: the distance error is bounded by
+            // the sum of the two endpoint error-vector lengths. For the line
+            // API the zero vertical allowance preserves its existing bound.
+            let uncertainty = geometry::length(error[i]) + geometry::length(error[j]);
+            let lower = gap_end.min(predicted_gap) - uncertainty;
             let order = if scene.sources[i] < scene.sources[j] {
                 [i, j]
             } else {
@@ -86,7 +109,14 @@ pub(super) fn retire(
                 witness.episode == episode.id
                     && witness.endpoints == order.map(|k| from_rapier(start[k]))
             });
-            if speed[j].x <= speed[i].x || (!continued && gap_start > exit + uncertainty) {
+            // d(t).v = d(0).v + |v|^2*t. A strictly positive initial
+            // radial motion proves increasing distance throughout the drift.
+            let outward = if planar {
+                geometry::dot(d, v) > 0.0
+            } else {
+                v[0] > 0.0
+            };
+            if !outward || (!continued && gap_start > exit + uncertainty) {
                 continue;
             }
             if lower > exit {
@@ -108,7 +138,7 @@ pub(super) fn retire(
         }
     }
     if loading.records + events.len() > loading.config.max_records_per_step {
-        return Err(LineArrivalRejection::Response(ResponseRejection::Capture(
+        return Err(BallArrivalRejection::Response(ResponseRejection::Capture(
             CaptureRejection::StepLimit,
         )));
     }
@@ -117,6 +147,6 @@ pub(super) fn retire(
     for event in &events {
         loading.episodes.remove(&event.sources);
     }
-    loading.line_arrival.as_mut().unwrap().pending = pending;
+    loading.arrival_departures.as_mut().unwrap().pending = pending;
     Ok(events)
 }

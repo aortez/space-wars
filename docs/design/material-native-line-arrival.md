@@ -8,6 +8,11 @@ resting supports and rapid reimpacts within its admitted scene. No scenario
 enables it automatically. The separate [two-ball API](material-native-arrival.md)
 retains its existing contract.
 
+The [oblique three-ball operation](material-oblique-arrival.md) now shares this
+scheduler for two-dimensional translations. This line operation keeps its
+horizontal admission and original numerical bounds; its public type names
+remain available as aliases of the shared ball-arrival result types.
+
 ## Admission
 
 Enable capture and material response and register/bind all materials as described

@@ -239,7 +239,11 @@ integrates that sequence with complete two-body admission, at most two advances,
 preserved capture time and whole-step rollback. This is a separate stepping API;
 ordinary CCD remains refused by the general response adapter.
 
-Next work is contact-set admission, especially CCD arrivals, then additional
+The bounded [oblique three-ball operation](material-oblique-arrival.md) now
+qualifies multi-arrival scheduling and verified departure in two dimensions for
+centered radius-0.5 balls, including a retained unproved-return refusal.
+
+Further work is contact-set admission, especially CCD arrivals, then additional
 geometry and loading classes. Freely rotating faces, mixed curved/flat contact,
 friction/constraints and supported external work remain unsupported. The pulse
 split still needs physical calibration. Sustained loads, connections, soft
