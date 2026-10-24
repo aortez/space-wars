@@ -2,6 +2,8 @@ use clap::{Parser, Subcommand};
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
+mod install_cli;
+
 #[derive(Parser)]
 #[command(about = "Space-Wars independent device service")]
 struct Args {
@@ -57,6 +59,11 @@ enum Command {
     SyncNow,
     /// Queue a bounded update check/download; never installs or reboots.
     CheckUpdates,
+    /// Inspect or explicitly confirm a candidate-bound manual installation.
+    Install {
+        #[command(subcommand)]
+        operation: install_cli::Command,
+    },
     /// Select a signed update channel; this does not change the installed image.
     UpdateChannel {
         #[arg(value_parser = ["release", "nightly"])]
@@ -193,6 +200,7 @@ fn run(_args: Args) -> engine_os_manager::Result<()> {
 fn run(args: Args) -> engine_os_manager::Result<()> {
     use engine_os_manager::{RTC_BOOT_PATH, SOCKET_PATH, linux, service};
     match args.command {
+        Command::Install { operation } => install_cli::run(operation)?,
         Command::CheckUpdates => println!(
             "{}",
             serde_json::to_string(&service::update_request(

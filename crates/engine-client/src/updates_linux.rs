@@ -52,16 +52,19 @@ impl Host {
             startup_blocked: false,
         }
     }
-    fn observe(&mut self, window: &MainWindow, settings: &Settings) {
-        let document = serde_json::to_vec(settings).expect("settings serialize");
-        let scene = format!(
+    fn scene(window: &MainWindow) -> String {
+        format!(
             "{}:{}:{}:{}:{}",
             window.get_scenario_instance(),
             window.get_launcher_visible(),
             window.get_ingame_menu_visible(),
             window.get_launcher_busy(),
             window.get_updates_visible()
-        );
+        )
+    }
+    fn observe(&mut self, window: &MainWindow, settings: &Settings) {
+        let document = serde_json::to_vec(settings).expect("settings serialize");
+        let scene = Self::scene(window);
         if document != self.document {
             self.document = document;
             self.settings_revision += 1;
@@ -73,25 +76,23 @@ impl Host {
         }
     }
     fn available(window: &MainWindow) -> bool {
-        window.get_updates_visible()
-            && !window.get_launcher_busy()
+        !window.get_launcher_busy()
             && !window.get_clock_controls_pending()
             && !window.get_training_active()
             && !window.get_genomes_busy()
-            && (window.get_launcher_visible() || window.get_ingame_menu_visible())
     }
-    fn abort(&mut self, window: &MainWindow, aborted: &Aborted) {
-        if self.gate.aborted(aborted).is_ok() {
-            self.finish(Err(Failure::Stale));
-            window.set_install_fenced(self.startup_blocked);
-            window.set_updates_can_cancel(!self.startup_blocked);
-            window.set_updates_message(
-                self.failure
-                    .map(failure_message)
-                    .unwrap_or("Installation cancelled. You can return to the app.")
-                    .into(),
-            );
-        }
+    fn abort(&mut self, window: &MainWindow, aborted: &Aborted) -> Result<(), Failure> {
+        self.gate.aborted(aborted).map_err(Failure::from)?;
+        self.finish(Err(Failure::Stale));
+        window.set_install_fenced(self.startup_blocked);
+        window.set_updates_can_cancel(!self.startup_blocked);
+        window.set_updates_message(
+            self.failure
+                .map(failure_message)
+                .unwrap_or("Installation cancelled. You can return to the app.")
+                .into(),
+        );
+        Ok(())
     }
     fn finish(&mut self, result: Result<Acknowledgement, Failure>) {
         if let Some(pending) = self.pending.as_mut() {
@@ -109,6 +110,8 @@ impl Host {
             self.pending = None;
         }
     }
+    // Return an accepted abort so the panel retires the same ticket even when
+    // the CLI advances the service before its terminal status is polled.
     fn request(
         &mut self,
         window: &MainWindow,
@@ -117,8 +120,9 @@ impl Host {
         incoming: Incoming,
         now: u64,
         frames: Option<u64>,
-    ) {
+    ) -> Option<Ticket> {
         self.observe(window, settings);
+        let mut retired = None;
         let result = match incoming.request {
             HostRequest::Observe { nonce, .. } => {
                 let _ = incoming.reply.try_send(HostReply {
@@ -137,19 +141,19 @@ impl Host {
                             && frames.is_some(),
                     }),
                 });
-                return;
+                return None;
             }
             HostRequest::Abort { aborted, .. } => {
-                let result = self.gate.aborted(&aborted).map_err(Failure::from);
+                let result = self.abort(window, &aborted);
                 if result.is_ok() {
-                    self.abort(window, &aborted);
+                    retired = Some(aborted.ticket);
                 }
                 result
             }
             HostRequest::Prepare { prepare, .. } => {
                 if self.startup_blocked {
                     let _ = incoming.reply.try_send(failed(Failure::NotReady));
-                    return;
+                    return None;
                 }
                 if let Some(frame) = frames.filter(|_| Self::available(window)) {
                     let result = self
@@ -182,13 +186,19 @@ impl Host {
                             });
                             window.set_install_fenced(true);
                             window.set_updates_visible(true);
+                            // A CLI-confirmed Prepare opens the updater itself.
+                            // This owned transition preserves the observed scene
+                            // revision; later user/scene changes still revoke it.
+                            self.scene = Self::scene(window);
+                            window.set_updates_focus(1);
+                            window.set_updates_can_cancel(true);
                             window.set_updates_can_confirm(false);
                             window.set_updates_message(
                                 "Saving settings and preparing to install…".into(),
                             );
                             window.window().request_redraw();
                         }
-                        return;
+                        return None;
                     }
                     result
                 } else {
@@ -202,6 +212,7 @@ impl Host {
             view: None,
             acknowledgement: None,
         });
+        retired
     }
     fn tick(
         &mut self,
@@ -337,10 +348,32 @@ pub(crate) struct Runtime {
 struct Panel {
     opening: bool,
     offer: Option<Offer>,
+    active: Option<Ticket>,
     busy: bool,
     awaiting: bool,
     last_poll: Instant,
     generation: u64,
+}
+impl Panel {
+    fn ticket(&self) -> Option<&Ticket> {
+        self.active
+            .as_ref()
+            .or_else(|| self.offer.as_ref().map(|offer| &offer.ticket))
+    }
+    fn retire(&mut self, ticket: &Ticket) -> bool {
+        if self.ticket() != Some(ticket) {
+            return false;
+        }
+        // An accepted abort settles this panel generation. Delayed replies
+        // must not restore its offer or overwrite the terminal message.
+        self.generation += 1;
+        self.busy = false;
+        self.awaiting = false;
+        self.opening = false;
+        self.offer = None;
+        self.active = None;
+        true
+    }
 }
 type Exchange = Arc<dyn Fn(&ServiceRequest) -> Result<ServiceReply, String> + Send + Sync>;
 
@@ -487,6 +520,7 @@ fn start(
     let panel = Rc::new(RefCell::new(Panel {
         opening: false,
         offer: None,
+        active: None,
         busy: false,
         awaiting: false,
         last_poll: Instant::now(),
@@ -511,6 +545,7 @@ fn start(
         let mut p = state.borrow_mut();
         p.generation += 1;
         p.offer = None;
+        p.active = None;
         p.awaiting = false;
         p.opening = startup_required;
         p.busy = !startup_required
@@ -562,10 +597,10 @@ fn start(
         if !w.get_updates_can_cancel() {
             return;
         }
-        if let Some(offer) = p.offer.as_ref() {
+        if let Some(ticket) = p.ticket() {
             let command = ServiceRequest::Cancel {
                 schema: SCHEMA,
-                ticket: offer.ticket.clone(),
+                ticket: ticket.clone(),
             };
             if submit(&w, &sender, p.generation, command) {
                 p.busy = true;
@@ -604,18 +639,33 @@ fn start(
             };
             for incoming in batch {
                 let was_preparing = host.pending.is_some();
-                host.request(
+                if let Some(ticket) = host.request(
                     &w,
                     &snapshot,
                     &writer,
                     incoming,
                     now,
                     if draft_valid { frames() } else { None },
-                );
+                ) && panel.borrow_mut().retire(&ticket)
+                {
+                    w.set_updates_can_confirm(false);
+                }
                 if !was_preparing && host.pending.is_some() {
                     // Preserve the saved launcher draft in memory too, so a
                     // later ordinary save after cancellation cannot undo it.
                     *settings.write().unwrap() = snapshot.clone();
+                    let ticket = host.pending.as_ref().unwrap().request.ticket.clone();
+                    let mut p = panel.borrow_mut();
+                    if p.ticket() != Some(&ticket) {
+                        // External confirmation supersedes old panel requests.
+                        // Their delayed replies cannot replace live progress.
+                        p.generation += 1;
+                        p.offer = None;
+                        p.opening = false;
+                        p.busy = false;
+                    }
+                    p.active = Some(ticket);
+                    p.awaiting = true;
                 }
             }
             host.tick(
@@ -638,13 +688,12 @@ fn start(
             match reply {
                 Ok(reply) => {
                     if let Some(aborted) = &reply.aborted {
-                        if let Some(host) = host.borrow_mut().as_mut() {
-                            host.abort(&w, aborted);
+                        if let Some(host) = host.borrow_mut().as_mut()
+                            && host.abort(&w, aborted).is_err()
+                        {
+                            continue;
                         }
-                        if p.offer.as_ref().is_some_and(|o| o.ticket == aborted.ticket) {
-                            p.offer = None;
-                            p.awaiting = false;
-                        }
+                        p.retire(&aborted.ticket);
                         w.set_updates_can_confirm(false);
                         w.set_updates_can_cancel(!w.get_install_fenced());
                     } else if let Some(offer) = reply.offer {
@@ -681,10 +730,8 @@ fn start(
                         } else {
                             failure_message(error).into()
                         });
-                    } else if p
-                        .offer
-                        .as_ref()
-                        .is_some_and(|offer| reply.status.ticket.as_ref() == Some(&offer.ticket))
+                    } else if p.ticket().is_some()
+                        && reply.status.ticket.as_ref() == p.ticket()
                         && let Some(message) = progress_message(reply.status.phase)
                     {
                         w.set_updates_message(message.into());
@@ -718,7 +765,7 @@ fn start(
         if w.get_updates_visible()
             && !p.busy
             && p.awaiting
-            && p.offer.is_some()
+            && p.ticket().is_some()
             && p.last_poll.elapsed() >= Duration::from_millis(250)
         {
             p.last_poll = Instant::now();

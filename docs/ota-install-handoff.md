@@ -5,6 +5,8 @@ coordinator, bounded Unix sockets, the running-app adapter and an Updates panel
 in App Settings. Preparation uses the real ordered settings writer and completed
 kiosk page flips. Startup and lost-acknowledgement recovery now consult the
 durable handoff and recovery journals through an authenticated root worker.
+The device CLI exposes the same exact-ticket offer, confirmation, cancellation
+and status operations without granting a separate installation authority.
 The native manual writer is connected to these gates. Installation remains
 **unavailable on unqualified devices**: ordinary recovery admission requires
 retained, owner-approved physical evidence, and no device approval has been
@@ -211,6 +213,53 @@ from a new service incarnation retires the old unheld offer so Back and reopenin
 Updates work after an early service restart. A delayed Clear for an earlier offer
 cannot discard a newer offer, and Clear never releases a held preparation.
 
+## Manual device CLI
+
+`engine-os-manager install` uses the existing fixed install socket and authenticates
+the root service before sending a request. Run it on the device under an identity
+already admitted by that socket (root or the kiosk account). It adds no sudo grant,
+socket override, native writer entry point or qualification bypass.
+
+```sh
+sudo engine-os-manager install status
+sudo engine-os-manager install offer
+sudo engine-os-manager install confirm \
+  --service <offer.ticket.service> \
+  --sequence <offer.ticket.sequence> \
+  --candidate <offer.ticket.candidate> \
+  --restart
+```
+
+Copy all three ticket fields from the same offer response. `--candidate` is the
+complete signed descriptor identity, not a channel name, build ID or payload path.
+If `offer.ends_game` is true, confirmation also requires `--end-game`; both running
+and paused games require that approval. The command never silently fetches a new
+offer or substitutes a different image. Service restart, expiry, changed candidate,
+app activity or changed settings require inspecting and approving a fresh offer.
+
+Status and offer requests leave the app on its current screen. After confirmation,
+the authenticated Prepare opens Updates from the launcher, paused game or running
+game and fences input. The app saves the exact settings snapshot and waits for two
+completed updater frames before acknowledging. The CLI-started handoff uses the
+same progress polling, pre-admission Cancel control and durable outcome recovery
+as an installation started from the panel. Busy setup/training and missing app
+presentation evidence remain ineligible.
+
+To cancel, use `install cancel` with the same `--service`, `--sequence` and
+`--candidate` arguments. Cancellation is possible only before the service consumes
+consent. Once consumed, it returns `too-late`; wait for the transaction or recovery
+instead of killing the writer.
+
+Each command makes one bounded request and prints the validated JSON response.
+A service refusal produces a nonzero exit status as well as the JSON error.
+A transport failure produces a nonzero exit status without claiming whether the
+request was accepted; inspect `install status` before deciding what to do next.
+There is no automatic retry, reconnect, replacement offer or cancellation on exit.
+An accepted confirmation normally reports `preparing`, not installation success.
+After reboot, the general `engine-os-manager status` recovery record and the Updates
+panel report confirmed trial outcomes; a fresh install-service `idle` is not proof
+of successful installation.
+
 ## Durable association library
 
 [`install_journal.rs`](../crates/engine-os-manager/src/install_journal.rs)
@@ -316,12 +365,11 @@ image update, not copying just the service executable onto an older image.
 
 ## Integration still required
 
-1. Add the equally explicit candidate-bound install CLI. The current diagnostic
-   UI interface can navigate Updates, but is not a privileged install shortcut.
-2. Complete the physical recovery matrix and owner approval, then qualify the
-   coordinated image's systemd permissions, actual DRM presentation, write/readback,
-   trial commit/rollback, worker failure and service/app restart on the device.
-   Local socket/Slint tests do not replace those checks.
+Complete the physical recovery matrix and owner approval, then qualify the
+coordinated image's systemd permissions, actual DRM presentation, write/readback,
+trial commit/rollback, worker failure and service/app restart on the device.
+Include UI and CLI confirmations, explicit game termination, cancellation and lost
+CLI replies. Local socket/Slint tests do not replace those checks.
 
 Ask/Automatic preferences and overnight admission follow this manual path; they
 must reuse the same writer, locks, recovery and final app handoff.
@@ -374,3 +422,11 @@ then Back and reopening Updates. Signed-feed tests reproduce the installer's tru
 rewrite and restore readiness while rejecting payload/recovery replacement,
 candidate revocation and expiry. Runtime tests cover maintenance contention and
 reoffering after cancellation without another scheduled check or network hold.
+
+CLI tests exercise the installed parser, exact ticket preservation, explicit
+restart/end-game flags, read-only commands, stale/expired refusals, wrong peers,
+unmatched replies and bounded lost replies without retries. Slint tests enter
+Updates from the launcher and a running game through authenticated Prepare,
+track only that ticket's progress, reconcile its outcome and cancel before the
+required updater frames are presented. The CLI does not initiate a physical
+installation in these fixtures.
