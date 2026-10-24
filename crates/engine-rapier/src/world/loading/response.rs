@@ -10,6 +10,7 @@ pub mod ball_arrival;
 mod energy;
 pub mod flat_arrival;
 mod geometry;
+pub mod gravity;
 pub mod line_arrival;
 use energy::EnergyCheck;
 use geometry::Footprint;
@@ -696,6 +697,7 @@ impl PhysicsWorld {
                 depth: section.depth,
             },
         );
+        loading.invalidate_gravity(gravity::Invalidation::ExternalEdit);
         Ok(())
     }
 

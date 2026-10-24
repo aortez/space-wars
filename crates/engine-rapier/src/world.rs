@@ -34,6 +34,7 @@ mod connectivity;
 pub use connectivity::{CapsuleConnectivity, ConnectivityGrid};
 mod forecast_body;
 pub mod loading;
+use loading::response::gravity::Invalidation as GravityInvalidation;
 mod query_snapshot;
 mod surface_drive;
 pub use query_snapshot::{
@@ -48,6 +49,7 @@ const LOADING_SNAPSHOT_VERSION: u32 = 2;
 const RESPONSE_SNAPSHOT_VERSION: u32 = 3;
 const ARRIVAL_SNAPSHOT_VERSION: u32 = 4;
 const FLAT_ARRIVAL_SNAPSHOT_VERSION: u32 = 5;
+const GRAVITY_SNAPSHOT_VERSION: u32 = 6;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -671,7 +673,17 @@ impl Clone for PhysicsWorld {
         let mut clone =
             Self::from_snapshot_bytes(&snapshot).expect("a same-build physics snapshot must load");
         if clone.collect_events {
-            clone.rebuild_events();
+            if self.loading.as_ref().is_some_and(|s| s.gravity.is_some()) {
+                // Gravity phases distinguish physical events from auxiliary
+                // projections. Preserve that result, including after invalidation,
+                // instead of reconstructing temporary kicks from the contact graph.
+                clone.contact_events.clone_from(&self.contact_events);
+                clone
+                    .sensor_intersections
+                    .clone_from(&self.sensor_intersections);
+            } else {
+                clone.rebuild_events();
+            }
         }
         clone
     }
@@ -847,6 +859,7 @@ impl PhysicsWorld {
             collider_builders.push((collider.id, builder));
         }
 
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         let body = build_body(id, spec);
         let handle = self.raw.insert_body(body);
         let body_index = self.bodies.len();
@@ -911,6 +924,9 @@ impl PhysicsWorld {
         }
         builders.sort_by_key(|(id, _)| *id);
         let removed: BTreeSet<_> = old.iter().map(|entry| entry.id).collect();
+        if !old.is_empty() || !builders.is_empty() {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         for entry in old {
             self.raw.remove_collider(entry.handle);
             self.remove_collider_mapping(entry.id);
@@ -935,6 +951,7 @@ impl PhysicsWorld {
         let Some(record) = self.entities.get(&entity).cloned() else {
             return false;
         };
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         if let Some(loading) = &mut self.loading {
             loading.retire_entity(entity);
         }
@@ -1061,7 +1078,19 @@ impl PhysicsWorld {
         let Some(handle) = self.body_handle(id) else {
             return false;
         };
+        // Ordinary worlds do not need a copy (additional mass may own a Box).
+        let before = self
+            .loading
+            .as_ref()
+            .is_some_and(|l| l.gravity.is_some())
+            .then(|| self.raw.bodies[handle].mass_properties().clone());
         self.raw.bodies[handle].recompute_mass_properties_from_colliders(&self.raw.colliders);
+        if before
+            .as_ref()
+            .is_some_and(|old| self.raw.bodies[handle].mass_properties() != old)
+        {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1069,7 +1098,11 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = body.body_type();
         body.set_body_type(kind.to_rapier(), wake_up);
+        if body.body_type() != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1081,7 +1114,11 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = body.gravity_scale();
         body.set_gravity_scale(scale, wake_up);
+        if body.gravity_scale() != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1092,7 +1129,11 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = *body.position();
         body.set_position(Pose::new(to_rapier(position), angle), wake_up);
+        if *body.position() != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1103,7 +1144,11 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = *body.next_position();
         body.set_next_kinematic_position(Pose::new(to_rapier(position), angle));
+        if *body.next_position() != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1120,19 +1165,28 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = (body.linvel(), body.angvel());
         body.set_linvel(to_rapier(linear_velocity), wake_up);
         body.set_angvel(angular_velocity, wake_up);
+        if (body.linvel(), body.angvel()) != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
     pub fn clear_forces(&mut self) {
+        let mut changed = false;
         let bodies = &self.bodies;
         let raw_bodies = &mut self.raw.bodies;
         for entry in bodies {
             if let Some(body) = raw_bodies.get_mut(entry.handle) {
+                changed |= body.user_force() != Vector::ZERO || body.user_torque() != 0.0;
                 body.reset_forces(false);
                 body.reset_torques(false);
             }
+        }
+        if changed {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         }
     }
 
@@ -1143,7 +1197,11 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = body.user_force();
         body.add_force(to_rapier(force), wake_up);
+        if body.user_force() != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1154,8 +1212,12 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = body.user_force();
         let force = to_rapier(acceleration) * body.mass();
         body.add_force(force, wake_up);
+        if body.user_force() != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1166,7 +1228,11 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = (body.linvel(), body.angvel());
         body.apply_impulse(to_rapier(impulse), wake_up);
+        if (body.linvel(), body.angvel()) != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1185,7 +1251,11 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = (body.linvel(), body.angvel());
         body.apply_impulse_at_point(to_rapier(impulse), to_rapier(point), wake_up);
+        if (body.linvel(), body.angvel()) != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1198,7 +1268,11 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = body.user_torque();
         body.add_torque(torque, wake_up);
+        if body.user_torque() != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1220,8 +1294,12 @@ impl PhysicsWorld {
         let Some(body) = self.body_mut(id) else {
             return false;
         };
+        let before = (body.linvel(), body.angvel());
         let impulse = to_rapier(delta_velocity) * body.mass();
         body.apply_impulse(impulse, wake_up);
+        if (body.linvel(), body.angvel()) != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
         true
     }
 
@@ -1229,7 +1307,11 @@ impl PhysicsWorld {
         if !finite_vec2(gravity) {
             return false;
         }
-        self.raw.gravity = to_rapier(gravity);
+        let next = to_rapier(gravity);
+        if self.raw.gravity != next {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
+        self.raw.gravity = next;
         true
     }
 
@@ -1262,6 +1344,7 @@ impl PhysicsWorld {
             && dt_seconds > 0.0
             && let Some(loading) = &mut self.loading
         {
+            loading.invalidate_gravity(GravityInvalidation::OtherStep);
             loading.invalidate_arrival_proofs();
         }
         self.step_controlled(dt_seconds, drives, reset_loading, flight, None)
@@ -1349,7 +1432,6 @@ impl PhysicsWorld {
                 collider.set_active_hooks(flags);
             }
         }
-        let counters = self.raw.physics_pipeline.counters;
         for (handle, target) in kinematic_targets {
             let body = &mut self.raw.bodies[handle];
             body.set_body_type(RigidBodyType::KinematicPositionBased, false);
@@ -1369,6 +1451,20 @@ impl PhysicsWorld {
             }
         }
 
+        if self.collect_events {
+            self.rebuild_events();
+        } else {
+            self.contact_events.clear();
+            self.sensor_intersections.clear();
+        }
+
+        self.backend_step_metrics(wall_time)
+    }
+
+    // Shared by ordinary steps and certified internal gravity phases. Timings
+    // are observational; they do not participate in snapshot/replay identity.
+    fn backend_step_metrics(&self, wall_time: Duration) -> PhysicsStepMetrics {
+        let counters = self.raw.physics_pipeline.counters;
         let mut candidate_pairs = 0;
         let mut contact_pairs = 0;
         let mut contacts = 0;
@@ -1382,13 +1478,6 @@ impl PhysicsWorld {
                     .map(|manifold| manifold.data.solver_contacts.len())
                     .sum::<usize>();
             }
-        }
-
-        if self.collect_events {
-            self.rebuild_events();
-        } else {
-            self.contact_events.clear();
-            self.sensor_intersections.clear();
         }
 
         PhysicsStepMetrics {
@@ -2184,7 +2273,9 @@ impl PhysicsWorld {
     /// Serialize authoritative Rapier state and all stable handle mappings.
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, PhysicsWorldError> {
         let mut bytes = bincode::serialize(&PhysicsSnapshotRef {
-            version: if self
+            version: if self.loading.as_ref().is_some_and(|s| s.gravity.is_some()) {
+                GRAVITY_SNAPSHOT_VERSION
+            } else if self
                 .loading
                 .as_ref()
                 .is_some_and(|s| s.flat_departures.is_some())
@@ -2224,7 +2315,14 @@ impl PhysicsWorld {
             bincode::serialize_into(&mut bytes, loading)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
             loading.serialize_response(&mut bytes)?;
-            if let Some(tracker) = &loading.flat_departures {
+            if let Some(gravity) = &loading.gravity {
+                bincode::serialize_into(&mut bytes, &loading.arrival_departures)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+                bincode::serialize_into(&mut bytes, &loading.flat_departures)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+                bincode::serialize_into(&mut bytes, gravity)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            } else if let Some(tracker) = &loading.flat_departures {
                 bincode::serialize_into(&mut bytes, &loading.arrival_departures)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
                 bincode::serialize_into(&mut bytes, tracker)
@@ -2247,6 +2345,7 @@ impl PhysicsWorld {
             RESPONSE_SNAPSHOT_VERSION,
             ARRIVAL_SNAPSHOT_VERSION,
             FLAT_ARRIVAL_SNAPSHOT_VERSION,
+            GRAVITY_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -2281,6 +2380,17 @@ impl PhysicsWorld {
             state.arrival_departures = bincode::deserialize_from(&mut reader)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
             state.flat_departures = Some(
+                bincode::deserialize_from(&mut reader)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?,
+            );
+        }
+        if snapshot.version == GRAVITY_SNAPSHOT_VERSION {
+            let state = loading.as_mut().unwrap();
+            state.arrival_departures = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            state.flat_departures = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            state.gravity = Some(
                 bincode::deserialize_from(&mut reader)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?,
             );
@@ -2381,6 +2491,7 @@ impl PhysicsWorld {
         let Some(handle_b) = self.body_handle(body_b) else {
             return false;
         };
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         let handle = self.raw.insert_impulse_joint(handle_a, handle_b, joint);
         let index = self.joints.len();
         self.joints.push(JointEntry {
@@ -2402,10 +2513,12 @@ impl PhysicsWorld {
     pub(crate) fn impulse_joint_mut(&mut self, id: JointId) -> Option<&mut ImpulseJoint> {
         let index = *self.joint_indices.get(&id)?;
         let handle = self.joints.get(index)?.handle;
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         self.raw.impulse_joints.get_mut(handle, true)
     }
 
     fn register_collider(&mut self, id: ColliderId, parent: BodyId, handle: ColliderHandle) {
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         let index = self.colliders.len();
         self.colliders.push(ColliderEntry { id, parent, handle });
         self.collider_indices.insert(id, index);
@@ -2421,10 +2534,17 @@ impl PhysicsWorld {
         self.raw.bodies.get_mut(handle)
     }
 
+    fn invalidate_gravity(&mut self, reason: GravityInvalidation) {
+        if let Some(loading) = &mut self.loading {
+            loading.invalidate_gravity(reason);
+        }
+    }
+
     fn remove_joint(&mut self, id: JointId) -> bool {
         let Some(index) = self.joint_indices.remove(&id) else {
             return false;
         };
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         let removed = self.joints.swap_remove(index);
         self.raw.remove_impulse_joint(removed.handle);
         if let Some(replacement) = self.joints.get(index) {

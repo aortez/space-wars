@@ -1,6 +1,7 @@
 //! Force-integration and support evidence before admitting gravity-driven arrivals.
 use super::*;
 
+mod ballistic;
 mod tests;
 
 fn fixture(

@@ -143,14 +143,36 @@ physical work source. Static reaction force alone is not a finite damage budget.
 
 ## Next boundary
 
-With reaction reporting corrected, the next integration needs an explicit
-force-aware drift/arrival contract. A safe resting load must not create
-fresh impact budgets; an overload needs bounded deformation supplied by
-gravitational potential or an accounted external driver. Then qualify a landing,
-rest and later genuine reimpact together, retaining actual energy, episode,
-partition, rollback and replay checks. Do not remove the native gravity guard
-or substitute solver penetration for material deformation to make the fixture
-succeed.
+With reaction reporting corrected, the separate
+[ballistic fixture](material-ballistic-gravity.md) qualifies split gravity kicks,
+backend drift and instantaneous impacts. Its optional departure evidence
+qualifies accelerated returns with fresh episode ownership. Its opt-in support
+experiment now holds safe loads with measured reactions and no permanent loss,
+and accounts for small-hop settling as a separate bounded numerical sink.
+Neither phase grants another impact budget. Uncertain excursion ownership,
+overload and failed support still refuse; native gravity admission is unchanged.
+The three-plate extension now qualifies a new arrival against existing support,
+with one incoming budget transmitted through both contacts, separate weight
+and impact reactions, and energy/momentum checks. It retains support identity
+through outbound flight but refuses later returns, support failure and a full
+stack settling transition. Scale-aware departure bounds now resolve the retained
+small-hop case, and a persistent force/work/position discrepancy ledger permits
+bounded tiny frame remainders. The compensated final gravity kick avoids the
+systematic bias of two rounded velocity increments. Genuinely ambiguous
+departure and exhausted numerical allowances still refuse. The implemented
+[native gravity operation](material-native-gravity.md),
+`step_material_flat_gravity(dt, settling)`, exposes the qualified two-plate
+flight/impact/support/settling phases with explicit policy, persistent numerical
+history and snapshot v6 enrollment. Its public timeline reports work, response
+links, ownership, settlement and measured reaction; successful calls account for
+every positive interval exactly. The independent comparisons now use this public
+entry point, with additional downstream integration tests.
+
+The three-plate experiment remains a later extension. An overload needs bounded
+deformation supplied by gravitational potential or an accounted external driver.
+Other arrival methods still refuse gravity, and ordinary material response keeps
+its `ExternalWork` guard. Solver penetration cannot substitute for material
+deformation to make an unsupported scene succeed.
 
 ```sh
 RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib gravity_loading_

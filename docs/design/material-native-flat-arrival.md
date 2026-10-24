@@ -172,5 +172,9 @@ unfinished. This operation is still an opt-in bounded scene, not general
 contact-set admission.
 
 The separate [gravity/support fixture](material-gravity-loading.md) documents
-the force-integration, impulse-reporting and deformation-work boundaries that
-must be resolved before admitting a gravity-driven landing and resting support.
+the force-integration, impulse-reporting and deformation-work evidence behind
+the qualified [native gravity operation](material-native-gravity.md). That
+explicit two-plate API adds constant gravity, safe support and optional bounded
+settling with persistent numerical accounting. It does not relax this
+operation's gravity guard or inherit this operation's clear-on-mode-switch
+departure semantics for the gravity ledger.
