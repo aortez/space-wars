@@ -81,18 +81,18 @@ impl Host {
             && !window.get_training_active()
             && !window.get_genomes_busy()
     }
-    fn abort(&mut self, window: &MainWindow, aborted: &Aborted) {
-        if self.gate.aborted(aborted).is_ok() {
-            self.finish(Err(Failure::Stale));
-            window.set_install_fenced(self.startup_blocked);
-            window.set_updates_can_cancel(!self.startup_blocked);
-            window.set_updates_message(
-                self.failure
-                    .map(failure_message)
-                    .unwrap_or("Installation cancelled. You can return to the app.")
-                    .into(),
-            );
-        }
+    fn abort(&mut self, window: &MainWindow, aborted: &Aborted) -> Result<(), Failure> {
+        self.gate.aborted(aborted).map_err(Failure::from)?;
+        self.finish(Err(Failure::Stale));
+        window.set_install_fenced(self.startup_blocked);
+        window.set_updates_can_cancel(!self.startup_blocked);
+        window.set_updates_message(
+            self.failure
+                .map(failure_message)
+                .unwrap_or("Installation cancelled. You can return to the app.")
+                .into(),
+        );
+        Ok(())
     }
     fn finish(&mut self, result: Result<Acknowledgement, Failure>) {
         if let Some(pending) = self.pending.as_mut() {
@@ -110,6 +110,8 @@ impl Host {
             self.pending = None;
         }
     }
+    // Return an accepted abort so the panel retires the same ticket even when
+    // the CLI advances the service before its terminal status is polled.
     fn request(
         &mut self,
         window: &MainWindow,
@@ -118,8 +120,9 @@ impl Host {
         incoming: Incoming,
         now: u64,
         frames: Option<u64>,
-    ) {
+    ) -> Option<Ticket> {
         self.observe(window, settings);
+        let mut retired = None;
         let result = match incoming.request {
             HostRequest::Observe { nonce, .. } => {
                 let _ = incoming.reply.try_send(HostReply {
@@ -138,19 +141,19 @@ impl Host {
                             && frames.is_some(),
                     }),
                 });
-                return;
+                return None;
             }
             HostRequest::Abort { aborted, .. } => {
-                let result = self.gate.aborted(&aborted).map_err(Failure::from);
+                let result = self.abort(window, &aborted);
                 if result.is_ok() {
-                    self.abort(window, &aborted);
+                    retired = Some(aborted.ticket);
                 }
                 result
             }
             HostRequest::Prepare { prepare, .. } => {
                 if self.startup_blocked {
                     let _ = incoming.reply.try_send(failed(Failure::NotReady));
-                    return;
+                    return None;
                 }
                 if let Some(frame) = frames.filter(|_| Self::available(window)) {
                     let result = self
@@ -195,7 +198,7 @@ impl Host {
                             );
                             window.window().request_redraw();
                         }
-                        return;
+                        return None;
                     }
                     result
                 } else {
@@ -209,6 +212,7 @@ impl Host {
             view: None,
             acknowledgement: None,
         });
+        retired
     }
     fn tick(
         &mut self,
@@ -355,6 +359,20 @@ impl Panel {
         self.active
             .as_ref()
             .or_else(|| self.offer.as_ref().map(|offer| &offer.ticket))
+    }
+    fn retire(&mut self, ticket: &Ticket) -> bool {
+        if self.ticket() != Some(ticket) {
+            return false;
+        }
+        // An accepted abort settles this panel generation. Delayed replies
+        // must not restore its offer or overwrite the terminal message.
+        self.generation += 1;
+        self.busy = false;
+        self.awaiting = false;
+        self.opening = false;
+        self.offer = None;
+        self.active = None;
+        true
     }
 }
 type Exchange = Arc<dyn Fn(&ServiceRequest) -> Result<ServiceReply, String> + Send + Sync>;
@@ -621,14 +639,17 @@ fn start(
             };
             for incoming in batch {
                 let was_preparing = host.pending.is_some();
-                host.request(
+                if let Some(ticket) = host.request(
                     &w,
                     &snapshot,
                     &writer,
                     incoming,
                     now,
                     if draft_valid { frames() } else { None },
-                );
+                ) && panel.borrow_mut().retire(&ticket)
+                {
+                    w.set_updates_can_confirm(false);
+                }
                 if !was_preparing && host.pending.is_some() {
                     // Preserve the saved launcher draft in memory too, so a
                     // later ordinary save after cancellation cannot undo it.
@@ -667,14 +688,12 @@ fn start(
             match reply {
                 Ok(reply) => {
                     if let Some(aborted) = &reply.aborted {
-                        if let Some(host) = host.borrow_mut().as_mut() {
-                            host.abort(&w, aborted);
+                        if let Some(host) = host.borrow_mut().as_mut()
+                            && host.abort(&w, aborted).is_err()
+                        {
+                            continue;
                         }
-                        if p.ticket() == Some(&aborted.ticket) {
-                            p.offer = None;
-                            p.active = None;
-                            p.awaiting = false;
-                        }
+                        p.retire(&aborted.ticket);
                         w.set_updates_can_confirm(false);
                         w.set_updates_can_cancel(!w.get_install_fenced());
                     } else if let Some(offer) = reply.offer {
