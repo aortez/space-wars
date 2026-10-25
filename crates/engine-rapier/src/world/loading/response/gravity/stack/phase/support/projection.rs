@@ -76,8 +76,8 @@ impl Staged {
         let start = self.endpoints();
         let masses = [f64::from(start[0].mass), f64::from(start[1].mass)];
         let incoming = [
-            f64::from(start[0].velocity[0]),
-            f64::from(start[1].velocity[0]),
+            f64::from(self.scene.frame.speed(start[0].velocity)),
+            f64::from(self.scene.frame.speed(start[1].velocity)),
         ];
         let scale = incoming[0].max(incoming[1]);
         if incoming.iter().any(|v| !v.is_finite() || *v < 0.0) || scale <= 0.0 {
@@ -98,12 +98,21 @@ impl Staged {
             if self.projections >= limit.min(MAX_PROJECTIONS) {
                 return Err(Rejection::SolveLimit);
             }
-            let before = handles.map(|h| f64::from(self.world.raw.bodies[h].linvel().x));
+            let before = handles.map(|h| {
+                f64::from(
+                    self.scene
+                        .frame
+                        .speed(self.world.raw.bodies[h].linvel().to_array()),
+                )
+            });
             self.projections += 1;
             let metric = native::auxiliary_step(&mut self.world, 0.0, &hooks);
             self.metrics.push(metric);
             let end = self.endpoints();
-            let after = [f64::from(end[0].velocity[0]), f64::from(end[1].velocity[0])];
+            let after = [
+                f64::from(self.scene.frame.speed(end[0].velocity)),
+                f64::from(self.scene.frame.speed(end[1].velocity)),
+            ];
             let mut measured = [0.0; 2];
             for contact in self.world.raw.narrow_phase.contact_pairs() {
                 let parents = [contact.collider1, contact.collider2]
@@ -124,8 +133,8 @@ impl Staged {
                 || end[2] != start[2]
                 || (0..2).any(|i| {
                     let mut fixed = end[i].clone();
-                    fixed.velocity[0] = start[i].velocity[0];
-                    !end[i].valid()
+                    fixed.velocity = start[i].velocity;
+                    !self.scene.frame.valid_endpoint(&end[i])
                         || fixed != start[i]
                         || !measured[i].is_finite()
                         || (measured[i] - changes[i]).abs() > 1.0e-5 * expected[i]

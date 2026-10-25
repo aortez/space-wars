@@ -193,3 +193,50 @@ fn predicted(start: f64, speed: f64, gravity: f64, dt: f64, n: usize) -> (f64, f
         speed + gravity * dt,
     )
 }
+
+// Independent cardinal permutations: do not use the production gravity Frame.
+fn cardinal(v: Vec2, turn: usize) -> Vec2 {
+    match turn {
+        0 => v,
+        1 => Vec2::new(-v.y, v.x),
+        2 => Vec2::new(-v.x, -v.y),
+        3 => Vec2::new(v.y, -v.x),
+        _ => unreachable!(),
+    }
+}
+
+fn turn_world(world: &mut PhysicsWorld, turn: usize) {
+    use crate::world::QuarterTurn;
+    let orientation = [
+        QuarterTurn::Deg0,
+        QuarterTurn::Deg90,
+        QuarterTurn::Deg180,
+        QuarterTurn::Deg270,
+    ][turn];
+    let endpoints: Vec<_> = world.motions().collect();
+    for e in endpoints {
+        world.set_quarter_turn_pose(e.id, cardinal(e.motion.position, turn), orientation, true);
+        world.set_velocity(e.id, cardinal(e.motion.linear_velocity, turn), 0.0, true);
+    }
+    let g = world.raw.gravity;
+    world.set_gravity(cardinal(Vec2::new(g.x, g.y), turn));
+}
+
+fn cardinal_state(world: &PhysicsWorld, turn: usize) -> (f64, f64, f64) {
+    let a = world.motion(body(1)).unwrap();
+    let n = world.raw.bodies.len();
+    let base = world.motion(body(n as u64)).unwrap();
+    let inv = (4 - turn) % 4;
+    let x = f64::from(cardinal(a.position, inv).x)
+        - (f64::from(cardinal(base.position, inv).x) - (n - 1) as f64);
+    (
+        x,
+        f64::from(cardinal(a.linear_velocity, inv).x),
+        f64::from(world.body_mass(body(1)).unwrap()),
+    )
+}
+
+fn cardinal_mechanical(world: &PhysicsWorld, turn: usize, acceleration: f64) -> f64 {
+    let (x, v, m) = cardinal_state(world, turn);
+    0.5 * m * v * v - m * acceleration * x
+}

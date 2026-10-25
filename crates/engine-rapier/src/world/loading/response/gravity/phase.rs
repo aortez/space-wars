@@ -201,8 +201,8 @@ impl Staged {
         self.validate()?;
         let handles = [self.scene.plates.bodies[0], self.scene.plates.bodies[1]];
         let start = handles.map(|h| Endpoint::read(&self.world.raw.bodies[h]));
-        let incoming = start[0].velocity[0];
-        if self.scene.frame.x(start[0].position[0]).abs() > TOUCH || incoming <= 0.0 {
+        let incoming = self.scene.frame.speed(start[0].velocity);
+        if self.scene.frame.x(start[0].position).abs() > TOUCH || incoming <= 0.0 {
             return Err(Rejection::UnaccountedApproach);
         }
         if !self.world.loading.as_ref().unwrap().episodes.is_empty() {
@@ -220,8 +220,8 @@ impl Staged {
         }
         let end = handles.map(|h| Endpoint::read(&self.world.raw.bodies[h]));
         if end[1] != start[1]
-            || !end[0].valid()
-            || end[0].velocity[0] > 0.0
+            || !self.scene.frame.valid_endpoint(&end[0])
+            || self.scene.frame.speed(end[0].velocity) > 0.0
             || end.iter().zip(&start).any(|(end, start)| {
                 let mut stationary = end.clone();
                 stationary.velocity = start.velocity;
@@ -248,7 +248,7 @@ impl Staged {
             return Err(Rejection::UnaccountedApproach);
         }
         let event = batch.events[0];
-        let outgoing = end[0].velocity[0];
+        let outgoing = self.scene.frame.speed(end[0].velocity);
         let mass = f64::from(start[0].mass);
         let before = 0.5 * mass * f64::from(incoming) * f64::from(incoming);
         let actual = 0.5
@@ -299,8 +299,8 @@ impl Staged {
             sources: event.sources,
             id: event.id,
             energy: 0.5 * mass * f64::from(outgoing) * f64::from(outgoing)
-                - mass * self.scene.acceleration * self.scene.frame.x(end[0].position[0]),
-            gap_upper: -self.scene.frame.x(end[0].position[0]),
+                - mass * self.scene.acceleration * self.scene.frame.x(end[0].position),
+            gap_upper: -self.scene.frame.x(end[0].position),
             turned: false,
             held: false,
             settled_work: 0.0,

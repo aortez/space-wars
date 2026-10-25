@@ -22,11 +22,14 @@ impl Staged {
         let start = self.endpoints();
         let active = self.active()?;
         if active.incoming.as_ref().is_some_and(|e| e.held)
-            || (self.scene.frame.x(start[0].position[0]) >= -TOUCH && start[0].velocity[0] == 0.0)
+            || (self.scene.frame.x(start[0].position) >= -TOUCH
+                && self.scene.frame.speed(start[0].velocity) == 0.0)
         {
             return Err(Rejection::UnsafeSupport);
         }
-        if self.scene.frame.x(start[0].position[0]) >= -TOUCH && start[0].velocity[0] > 0.0 {
+        if self.scene.frame.x(start[0].position) >= -TOUCH
+            && self.scene.frame.speed(start[0].velocity) > 0.0
+        {
             return Err(Rejection::UnaccountedApproach);
         }
         let owner = active.support.id;
@@ -65,7 +68,8 @@ impl Staged {
             }
             // Only B receives this auxiliary kick. The pair filter must preserve
             // A's entire endpoint even when the ballistic drift ends touching.
-            self.world.raw.bodies[self.scene.plates.bodies[1]].set_linvel(Vector::X * kick, true);
+            self.world.raw.bodies[self.scene.plates.bodies[1]]
+                .set_linvel(self.scene.frame.vector(kick), true);
             self.projections += 1;
             let (projected, metric) = self.scene.project_fixed::<3>(&mut self.world, 1)?;
             self.metrics.push(metric);
@@ -102,7 +106,7 @@ impl Staged {
         if let Some(episode) = &mut active.incoming
             && episode.after_flight(
                 &flight,
-                f64::from(start[0].velocity[0]),
+                f64::from(self.scene.frame.speed(start[0].velocity)),
                 &end[0],
                 self.scene.frame,
                 loading.config.touch_tolerance,

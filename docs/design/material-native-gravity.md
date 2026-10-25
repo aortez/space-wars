@@ -1,5 +1,9 @@
 # Native flat gravity stepping contract (#327)
 
+The subsequent [quarter-turn extension](material-quarter-turn-gravity.md) supports
+exact cardinal orientations of this bounded scene, including native stepping and
+compatible saves. The original +x contracts and saved versions remain available.
+
 `PhysicsWorld::step_material_flat_gravity(dt, settling)` now exposes the qualified
 pair and three-plate stack gravity operations. They advance flight, material impacts, safe support
 and explicit bounded settling in one transaction. The independent

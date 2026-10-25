@@ -24,24 +24,32 @@ impl Scene {
         world: &mut PhysicsWorld,
     ) -> Result<(Self, [Plate; N]), Rejection> {
         let plates = Plates::certify(world).map_err(geometry)?;
-        if ![2, 3].contains(&N)
-            || plates.bodies.len() != N
-            || plates.normal != [1.0, 0.0]
-            || !world.raw.gravity.x.is_finite()
-            || world.raw.gravity.x <= 0.0
-            || world.raw.gravity.y != 0.0
+        if ![2, 3].contains(&N) || plates.bodies.len() != N {
+            return Err(Rejection::UnsupportedScene);
+        }
+        let base = &world.raw.bodies[*plates.bodies.last().unwrap()];
+        let frame = Frame::at_base(
+            base.translation().to_array(),
+            base.rotation().angle(),
+            N - 1,
+        )
+        .ok_or(Rejection::UnsupportedScene)?;
+        let acceleration = frame.speed(world.raw.gravity.to_array());
+        let turn = crate::world::QuarterTurn::from_angle(base.rotation().angle()).unwrap();
+        if base.rotation() != &turn.rotation()
+            || !acceleration.is_finite()
+            || acceleration <= 0.0
+            || world.raw.gravity != frame.vector(acceleration)
+            || plates.normal != frame.vector(1.0).to_array().map(f64::from)
         {
             return Err(Rejection::UnsupportedScene);
         }
-        let base = world.raw.bodies[*plates.bodies.last().unwrap()].translation();
-        let frame = Frame::from_base([base.x, base.y], N - 1).ok_or(Rejection::UnsupportedScene)?;
         for (i, handle) in plates.bodies.iter().enumerate() {
             let b = &world.raw.bodies[*handle];
             if (i == N - 1 && !b.is_fixed())
                 || (i < N - 1 && !b.is_dynamic())
-                || b.rotation() != &Pose::IDENTITY.rotation
                 || !frame.valid_position([b.translation().x, b.translation().y], i)
-                || b.linvel().y != 0.0
+                || !frame.valid_endpoint(&Endpoint::read(b))
                 || b.gravity_scale() != 1.0
                 || (i > 0 && b.linvel() != Vector::ZERO)
             {
@@ -110,7 +118,7 @@ impl Scene {
             Self {
                 plates,
                 frame,
-                acceleration: f64::from(world.raw.gravity.x),
+                acceleration: f64::from(acceleration),
             },
             identities,
         ))

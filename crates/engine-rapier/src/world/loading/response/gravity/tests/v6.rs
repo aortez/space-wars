@@ -129,33 +129,42 @@ fn gravity_state_v6_payload_stays_byte_exact_after_stack_extension() {
 
 #[test]
 fn translated_extension_preserves_frozen_v8_pair_tail() {
-    for policy in [GravitySettling::Refuse, GravitySettling::BoundedNumerical] {
-        for dt in [0.001, 0.01] {
-            let mut w = world();
-            masses::set_masses(&mut w, &[11], &[13.0]);
-            w.step_material_flat_gravity(dt, policy).unwrap();
-            for reason in [
-                None,
-                Some(Invalidation::ExternalEdit),
-                Some(Invalidation::OtherStep),
-            ] {
-                let mut saved = w.clone();
-                if let Some(reason) = reason {
-                    saved.loading.as_mut().unwrap().invalidate_gravity(reason);
+    for offset in [0.0, 3.25] {
+        for policy in [GravitySettling::Refuse, GravitySettling::BoundedNumerical] {
+            for dt in [0.001, 0.01] {
+                let mut w = world();
+                masses::set_masses(&mut w, &[11], &[13.0]);
+                for id in [11, 2] {
+                    let p = w.motion(body(id)).unwrap().position;
+                    w.set_pose(body(id), p + Vec2::new(0.0, offset), 0.0, true);
                 }
-                let s = saved.loading.as_ref().unwrap().gravity.as_ref().unwrap();
-                let frozen = frozen_payload(s);
-                assert_eq!(bincode::serialize(s).unwrap(), frozen);
-                let bytes = saved.snapshot_bytes().unwrap();
-                assert_eq!(&bytes[..4], &8_u32.to_le_bytes());
-                assert!(bytes.ends_with(&frozen));
-                assert_eq!(
-                    PhysicsWorld::from_snapshot_bytes(&bytes)
-                        .unwrap()
-                        .snapshot_bytes()
-                        .unwrap(),
-                    bytes
-                );
+                w.step_material_flat_gravity(dt, policy).unwrap();
+                for reason in [
+                    None,
+                    Some(Invalidation::ExternalEdit),
+                    Some(Invalidation::OtherStep),
+                ] {
+                    let mut saved = w.clone();
+                    if let Some(reason) = reason {
+                        saved.loading.as_mut().unwrap().invalidate_gravity(reason);
+                    }
+                    let s = saved.loading.as_ref().unwrap().gravity.as_ref().unwrap();
+                    let frozen = frozen_payload(s);
+                    assert_eq!(bincode::serialize(s).unwrap(), frozen);
+                    let bytes = saved.snapshot_bytes().unwrap();
+                    assert_eq!(
+                        &bytes[..4],
+                        &(if offset == 0.0 { 8_u32 } else { 10 }).to_le_bytes()
+                    );
+                    assert!(bytes.ends_with(&frozen));
+                    assert_eq!(
+                        PhysicsWorld::from_snapshot_bytes(&bytes)
+                            .unwrap()
+                            .snapshot_bytes()
+                            .unwrap(),
+                        bytes
+                    );
+                }
             }
         }
     }

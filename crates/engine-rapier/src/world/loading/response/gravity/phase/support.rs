@@ -179,7 +179,7 @@ impl Staged {
             sources: event.sources,
             id: event.id,
             energy: 0.0,
-            gap_upper: -self.scene.frame.x(start[0].position[0]),
+            gap_upper: -self.scene.frame.x(start[0].position),
             turned: false,
             held: false,
             settled_work: 0.0,
@@ -215,7 +215,8 @@ impl Staged {
         let mut rounding_loss = 0.0;
         let mut projection_energy = 0.0;
         for phase in 0..2 {
-            self.world.raw.bodies[self.scene.plates.bodies[0]].set_linvel(Vector::X * kick, true);
+            self.world.raw.bodies[self.scene.plates.bodies[0]]
+                .set_linvel(self.scene.frame.vector(kick), true);
             let projected = self.project(projection_limit)?;
             impulse += projected.impulse;
             rounding_impulse += projected.rounding_impulse;

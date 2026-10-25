@@ -10,8 +10,11 @@ pub(super) fn check_report(
 ) {
     let mut actual = Trace::default();
     let mut captures = usize::from(fresh);
-    let expected_sources =
-        departure::bound_sources(world, &Plates::new(world).unwrap().handles).unwrap();
+    let expected_sources = departure::bound_sources(
+        world,
+        &[1, 2, 3].map(|n| world.body_handle(body(n)).unwrap()),
+    )
+    .unwrap();
     for (index, entry) in step.records.iter().enumerate() {
         let public::GravityRoles::Stack { bodies, sources } = entry.roles else {
             panic!("stack roles")
@@ -167,6 +170,16 @@ pub(super) fn frame_with_policy(
     dt: f32,
     policy: GravitySettling,
 ) -> Trace {
+    frame_in_orientation(scene, world, dt, policy, 0)
+}
+
+pub(super) fn frame_in_orientation(
+    scene: &mut Verified,
+    world: &mut PhysicsWorld,
+    dt: f32,
+    policy: GravitySettling,
+    turn: usize,
+) -> Trace {
     let trace = scene.step(dt, MAX_ADVANCES).unwrap();
     let mut replay = PhysicsWorld::from_snapshot_bytes(&world.snapshot_bytes().unwrap()).unwrap();
     let fresh = world.loading.as_ref().unwrap().gravity.is_none();
@@ -190,7 +203,17 @@ pub(super) fn frame_with_policy(
         replay.material_response_batches()
     );
     assert_eq!(
-        motion(world, &Plates::new(world).unwrap()),
+        [1, 2, 3]
+            .map(|n| {
+                let m = world.motion(body(n)).unwrap();
+                let inv = (4 - turn) % 4;
+                (
+                    cardinal(m.position, inv).x,
+                    cardinal(m.linear_velocity, inv).x,
+                    world.body_mass(body(n)).unwrap(),
+                )
+            })
+            .to_vec(),
         motion(&scene.world, &Plates::new(&scene.world).unwrap())
     );
     assert_eq!(

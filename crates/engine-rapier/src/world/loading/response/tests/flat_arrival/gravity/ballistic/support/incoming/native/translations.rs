@@ -3,7 +3,13 @@ use super::*;
 use crate::world::loading::response::gravity::GravityRejection;
 
 #[test]
-fn translated_stack_matches_independent_physics_or_refuses_atomically() {
+fn quarter_turn_translated_stack_matches_independent_physics_or_refuses_atomically() {
+    for turn in 0..4 {
+        check_stack_matches_independent_physics_or_refuses_atomically(turn);
+    }
+}
+
+fn check_stack_matches_independent_physics_or_refuses_atomically(turn: usize) {
     let mut counts = [0; 2];
     for x in [
         -16.0,
@@ -35,6 +41,7 @@ fn translated_stack_matches_independent_physics_or_refuses_atomically() {
                     let initial = mechanical(&world, 10.0);
                     let (start_x, v, _) = state(&world);
                     let mut actual = unenrolled(&world);
+                    turn_world(&mut actual, turn);
                     let before = actual.snapshot_bytes().unwrap();
                     let output = (
                         actual.loading_batches().to_vec(),
@@ -72,9 +79,9 @@ fn translated_stack_matches_independent_physics_or_refuses_atomically() {
                             );
                             assert_eq!(
                                 &actual.snapshot_bytes().unwrap()[..4],
-                                &11_u32.to_le_bytes()
+                                &(if turn == 0 { 11_u32 } else { 13 }).to_le_bytes()
                             );
-                            assert_eq!(state(&actual), state(&expected.world));
+                            assert_eq!(cardinal_state(&actual, turn), state(&expected.world));
                             assert_eq!(
                                 balances(&actual, &tokens),
                                 balances(&expected.world, &tokens)
@@ -85,7 +92,10 @@ fn translated_stack_matches_independent_physics_or_refuses_atomically() {
                             let correction: f64 =
                                 trace.support_corrections.iter().map(|s| s.dissipated).sum();
                             near(
-                                mechanical(&actual, 10.0) + losses + settled + correction,
+                                cardinal_mechanical(&actual, turn, 10.0)
+                                    + losses
+                                    + settled
+                                    + correction,
                                 initial,
                                 1.0e-5 * initial,
                             );
@@ -150,7 +160,13 @@ fn translated_stack_matches_independent_physics_or_refuses_atomically() {
 }
 
 #[test]
-fn translated_stack_repeated_returns_preserve_owners_and_original_limits() {
+fn quarter_turn_translated_stack_repeated_returns_preserve_owners_and_original_limits() {
+    for turn in 0..4 {
+        check_stack_repeated_returns_preserve_owners_and_original_limits(turn);
+    }
+}
+
+fn check_stack_repeated_returns_preserve_owners_and_original_limits(turn: usize) {
     let mut cases = 0;
     for masses in [[5.0, 20.0], [20.0, 5.0], [13.0, 31.0], [80.0, 20.0]] {
         for offset in [
@@ -169,18 +185,20 @@ fn translated_stack_repeated_returns_preserve_owners_and_original_limits() {
                     offset,
                 );
                 let mut actual = unenrolled(&world);
+                turn_world(&mut actual, turn);
                 let mut expected = Verified::with_stack(world, true).unwrap();
                 let support = expected.witness.support;
-                let initial = mechanical(&actual, 10.0);
+                let initial = cardinal_mechanical(&actual, turn, 10.0);
                 let mut roots = Vec::new();
                 let mut ended = Vec::new();
                 let mut loss_total = 0.0;
                 for _ in 0..1000 {
-                    let trace = flight::frame_with_policy(
+                    let trace = flight::frame_in_orientation(
                         &mut expected,
                         &mut actual,
                         1.0 / hz,
                         GravitySettling::BoundedNumerical,
+                        turn,
                     );
                     for impact in trace.impacts {
                         assert_eq!(impact.response.impacts[1].episode, support);
@@ -207,7 +225,7 @@ fn translated_stack_repeated_returns_preserve_owners_and_original_limits() {
                 assert!(roots.windows(2).all(|w| w[0] < w[1]));
                 assert_eq!(&ended[..2], &roots[..2]);
                 near(
-                    mechanical(&actual, 10.0) + loss_total,
+                    cardinal_mechanical(&actual, turn, 10.0) + loss_total,
                     initial,
                     1.0e-5 * initial,
                 );

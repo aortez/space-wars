@@ -105,7 +105,7 @@ impl Staged {
             sources: event.sources,
             id: event.id,
             energy: 0.0,
-            gap_upper: -self.scene.frame.x(start[0].position[0]),
+            gap_upper: -self.scene.frame.x(start[0].position),
             turned: false,
             held: true,
             settled_work: 0.0,
@@ -163,8 +163,8 @@ impl Staged {
         }
         self.validate()?;
         let start = self.endpoints();
-        if self.scene.frame.x(start[0].position[0]).abs() > TOUCH
-            || start[0].velocity[0] != 0.0
+        if self.scene.frame.x(start[0].position).abs() > TOUCH
+            || self.scene.frame.speed(start[0].velocity) != 0.0
             || self.active()?.incoming.as_ref().is_some_and(|e| !e.held)
         {
             return Err(Rejection::UnsafeSupport);
@@ -208,7 +208,7 @@ impl Staged {
         for phase in 0..2 {
             for i in 0..2 {
                 self.world.raw.bodies[self.scene.plates.bodies[i]]
-                    .set_linvel(Vector::X * kick, true);
+                    .set_linvel(self.scene.frame.vector(kick), true);
             }
             let result = self.project_stack(projection_limit, MAX_PROJECTION_SOLVES)?;
             for i in 0..2 {
@@ -277,9 +277,9 @@ impl Staged {
         }
         let available = episode.energy;
         let endpoint = &self.endpoints()[0];
-        let v = f64::from(endpoint.velocity[0]);
+        let v = f64::from(self.scene.frame.speed(endpoint.velocity));
         let kinetic = 0.5 * f64::from(endpoint.mass) * v * v;
-        if self.scene.frame.x(endpoint.position[0]).abs() > TOUCH
+        if self.scene.frame.x(endpoint.position).abs() > TOUCH
             || v <= 0.0
             || available <= 0.0
             || kinetic > available * (1.0 + 1.0e-5)

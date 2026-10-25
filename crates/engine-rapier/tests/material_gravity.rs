@@ -3,7 +3,7 @@ use engine_core::Vec2;
 use engine_material::{ARMOR, Material, Region, Section, WOOD};
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderMassProperties, ColliderRole,
-    ColliderSpec, PhysicsId, PhysicsWorld, PhysicsWorldConfig,
+    ColliderSpec, PhysicsId, PhysicsWorld, PhysicsWorldConfig, QuarterTurn,
     loading::{
         CaptureConfig, CaptureRejection, ContactSource, EpisodeTransition, RegionId, RegionToken,
         response::{
@@ -27,6 +27,9 @@ mod masses;
 #[path = "material_gravity/translations.rs"]
 mod translations;
 
+#[path = "material_gravity/orientations.rs"]
+mod orientations;
+
 struct Scene<const N: usize = 2> {
     gap: f32,
     speed: f32,
@@ -40,6 +43,7 @@ struct Scene<const N: usize = 2> {
     remaining: Option<f64>,
     masses: [f32; N],
     offset: Vec2,
+    turn: QuarterTurn,
 }
 
 impl<const N: usize> Default for Scene<N> {
@@ -57,6 +61,7 @@ impl<const N: usize> Default for Scene<N> {
             remaining: None,
             masses: [20.0; N],
             offset: Vec2::ZERO,
+            turn: QuarterTurn::Deg0,
         }
     }
 }
@@ -71,7 +76,7 @@ fn scene(spec: Scene) -> (PhysicsWorld, [RegionToken; 2]) {
 
 fn scene_with_roles<const N: usize>(spec: Scene<N>) -> (PhysicsWorld, [RegionToken; N]) {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig {
-        gravity: Vec2::X * spec.gravity,
+        gravity: spec.turn.rotate(Vec2::X * spec.gravity),
         solver_iterations: spec.iterations,
         ..Default::default()
     });
@@ -120,6 +125,22 @@ fn scene_with_roles<const N: usize>(spec: Scene<N>) -> (PhysicsWorld, [RegionTok
             },
             &shapes
         ));
+        let position = spec.offset + Vec2::X * if role == 0 { -spec.gap } else { role as f32 };
+        assert!(world.set_quarter_turn_pose(
+            body(role),
+            spec.turn.rotate(position),
+            spec.turn,
+            true
+        ));
+        assert!(
+            world.set_velocity(
+                body(role),
+                spec.turn
+                    .rotate(Vec2::X * if role == 0 { spec.speed } else { 0.0 }),
+                0.0,
+                true
+            )
+        );
         assert!(world.refresh_mass_properties(body(role)));
         let token = world
             .create_loading_region(

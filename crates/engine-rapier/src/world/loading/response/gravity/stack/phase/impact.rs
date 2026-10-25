@@ -7,7 +7,7 @@ impl Staged {
     fn correct_recoil(&mut self, incoming: f64) -> Result<Option<Correction>, Rejection> {
         let handle = self.scene.plates.bodies[1];
         let body = &self.world.raw.bodies[handle];
-        let v = f64::from(body.linvel().x);
+        let v = f64::from(self.scene.frame.speed(body.linvel().to_array()));
         if v == 0.0 {
             return Ok(None);
         }
@@ -62,8 +62,8 @@ impl Staged {
         let pairs = [pair(&active.plates, 0), pair(&active.plates, 1)];
         let owner = active.support.id;
         let start = self.endpoints();
-        let incoming = start[0].velocity[0];
-        if self.scene.frame.x(start[0].position[0]).abs() > TOUCH || incoming <= 0.0 {
+        let incoming = self.scene.frame.speed(start[0].velocity);
+        if self.scene.frame.x(start[0].position).abs() > TOUCH || incoming <= 0.0 {
             return Err(Rejection::UnaccountedApproach);
         }
         if self.impacts >= limit.min(MAX_GRAVITY_IMPACTS) {
@@ -81,11 +81,11 @@ impl Staged {
         }
         let end = self.endpoints();
         if end[2] != start[2]
-            || end[0].velocity[0] > 0.0
+            || self.scene.frame.speed(end[0].velocity) > 0.0
             || end.iter().zip(&start).any(|(end, start)| {
                 let mut fixed = end.clone();
                 fixed.velocity = start.velocity;
-                !end.valid() || fixed != *start
+                !self.scene.frame.valid_endpoint(end) || fixed != *start
             })
             || observed
                 != end
@@ -113,9 +113,9 @@ impl Staged {
             return Err(Rejection::UnaccountedApproach);
         }
         let event = batch.events[0];
-        let outgoing = end[0].velocity[0];
+        let outgoing = self.scene.frame.speed(end[0].velocity);
         let mass = f64::from(start[0].mass);
-        let recoil = f64::from(end[1].velocity[0]);
+        let recoil = f64::from(self.scene.frame.speed(end[1].velocity));
         let support_mass = f64::from(start[1].mass);
         let available = 0.5 * mass * f64::from(incoming) * f64::from(incoming);
         let removed = 0.5
@@ -192,8 +192,8 @@ impl Staged {
             energy: 0.5 * mass * f64::from(outgoing) * f64::from(outgoing)
                 - mass
                     * self.scene.acceleration
-                    * self.scene.frame.x(active.plates[0].endpoint.position[0]),
-            gap_upper: -self.scene.frame.x(active.plates[0].endpoint.position[0]),
+                    * self.scene.frame.x(active.plates[0].endpoint.position),
+            gap_upper: -self.scene.frame.x(active.plates[0].endpoint.position),
             turned: false,
             held: outgoing == 0.0,
             settled_work: 0.0,

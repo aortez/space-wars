@@ -1,5 +1,9 @@
 # Native supported-stack gravity extension (#327)
 
+The subsequent [quarter-turn extension](material-quarter-turn-gravity.md) supports
+exact cardinal orientations of this bounded scene, including native stepping and
+compatible saves. The original +x contracts and saved versions remain available.
+
 The public `PhysicsWorld::step_material_flat_gravity` operation now admits the
 qualified three-plate stack as well as the original pair. It runs bootstrap,
 coupled impact, supported flight/departure, full-stack rest and optional bounded

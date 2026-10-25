@@ -35,6 +35,8 @@ pub use connectivity::{CapsuleConnectivity, ConnectivityGrid};
 mod forecast_body;
 pub mod loading;
 use loading::response::gravity::Invalidation as GravityInvalidation;
+mod quarter_turn;
+pub use quarter_turn::QuarterTurn;
 mod query_snapshot;
 mod surface_drive;
 pub use query_snapshot::{
@@ -55,6 +57,8 @@ const MASS_GRAVITY_SNAPSHOT_VERSION: u32 = 8;
 const MASS_STACK_GRAVITY_SNAPSHOT_VERSION: u32 = 9;
 const TRANSLATED_GRAVITY_SNAPSHOT_VERSION: u32 = 10;
 const TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION: u32 = 11;
+const ORIENTED_GRAVITY_SNAPSHOT_VERSION: u32 = 12;
+const ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION: u32 = 13;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -2357,6 +2361,8 @@ impl PhysicsWorld {
             MASS_STACK_GRAVITY_SNAPSHOT_VERSION,
             TRANSLATED_GRAVITY_SNAPSHOT_VERSION,
             TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION,
+            ORIENTED_GRAVITY_SNAPSHOT_VERSION,
+            ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -2402,6 +2408,8 @@ impl PhysicsWorld {
             MASS_STACK_GRAVITY_SNAPSHOT_VERSION,
             TRANSLATED_GRAVITY_SNAPSHOT_VERSION,
             TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION,
+            ORIENTED_GRAVITY_SNAPSHOT_VERSION,
+            ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {

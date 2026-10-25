@@ -38,7 +38,7 @@ enum Status {
     Active(Box<Active>),
     Invalidated(Invalidation),
     // Stack keeps its corrections outside its own active/invalidated state.
-    // Stack tags are accepted in v7 (legacy), v9 (bounded masses) or v11 (translated).
+    // Stack tags retain their payload across v7/v9/v11/v13 contracts.
     Stack(Box<stack::State>),
 }
 
@@ -62,8 +62,8 @@ impl History {
         settling: GravitySettling,
     ) -> Self {
         let (x, v, m) = (
-            frame.x(endpoint.position[0]),
-            f64::from(endpoint.velocity[0]),
+            frame.x(endpoint.position),
+            f64::from(frame.speed(endpoint.velocity)),
             f64::from(endpoint.mass),
         );
         let energy = (0.5 * m * v * v - m * acceleration * x).max(0.0);
@@ -80,13 +80,13 @@ impl History {
         let [x, v, m, a] = self.reference;
         let energy = (0.5 * m * v * v - m * a * x).max(0.0);
         let expected = [energy, libm::sqrt(2.0 * m * energy), x.abs().max(1.0)];
-        matches!(self.revision, 1..=3)
-            // Motion comes from f32 state; revision 3 subtracts world positions
+        matches!(self.revision, 1..=4)
+            // Motion comes from f32 state; revisions 3/4 subtract world positions
             // in f64. Keep the f32 magnitude bound to prevent overflow, and
             // validate the initial coordinate against the frame while active.
             && self.reference.iter().enumerate().all(|(i, n)| {
                 (*n as f32).is_finite()
-                    && ((self.revision == 3 && i == 0) || f64::from(*n as f32) == *n)
+                    && ((self.revision >= 3 && i == 0) || f64::from(*n as f32) == *n)
             })
             && x <= 1.0e-6
             && valid_masses(self.revision, &[m as f32])
@@ -102,6 +102,7 @@ impl History {
 // Revision 2 bounds both scale and conditioning; per-step numerical guards
 // still refuse responses that cannot be represented within their fixed limits.
 // Revision 3 preserves those masses and limits in a bounded translated frame.
+// Revision 4 admits exact nonzero quarter turns, with the same local limits.
 fn mass_revision(masses: &[f32]) -> u32 {
     if masses.iter().all(|m| *m == 20.0) {
         1
@@ -116,7 +117,7 @@ fn valid_masses(revision: u32, masses: &[f32]) -> bool {
     }
     match revision {
         1 => masses.iter().all(|m| *m == 20.0),
-        2 | 3 => {
+        2..=4 => {
             masses.iter().all(|m| (5.0..=80.0).contains(m))
                 && (masses.len() == 1
                     || f64::from(masses[0].max(masses[1]))
@@ -186,8 +187,7 @@ impl Endpoint {
             .chain(&self.velocity)
             .chain(&self.local_com)
             .all(|x| x.is_finite())
-            && self.velocity[1] == 0.0
-            && self.angle == 0.0
+            && crate::world::QuarterTurn::from_angle(self.angle).is_some()
             && self.angular_velocity == 0.0
             && self.mass.is_finite()
             && self.mass >= 0.0
@@ -316,14 +316,13 @@ impl OwnedEpisode {
             && self.energy >= 0.0
             && (self.energy * (1.0 + 1.0e-5)).is_finite()
             && self.gap_upper.is_finite()
-            && self.gap_upper >= -frame.x(endpoint.position[0])
+            && self.gap_upper >= -frame.x(endpoint.position)
             && self.settled_work.is_finite()
             && self.settled_work >= 0.0
             && self.settled_work <= self.energy * (1.0 + 1.0e-5)
             && (self.held || self.settled_work == 0.0)
             && (!self.held
-                || (endpoint.velocity == [0.0, 0.0]
-                    && frame.x(endpoint.position[0]).abs() <= 1.0e-6))
+                || (endpoint.velocity == [0.0, 0.0] && frame.x(endpoint.position).abs() <= 1.0e-6))
             && (self.settled_work == 0.0
                 || (self.turned
                     && self.gap_upper <= 2.0 * f64::from(loading.config.touch_tolerance)))
@@ -333,11 +332,15 @@ impl OwnedEpisode {
 impl Active {
     fn valid_for(&self, loading: &LoadingState, history: &History) -> bool {
         let [dynamic, fixed] = &self.plates;
-        let Some(frame) = Frame::from_base(fixed.endpoint.position, 1) else {
+        let Some(frame) = Frame::at_base(fixed.endpoint.position, fixed.endpoint.angle, 1) else {
             return false;
         };
         valid_contract(loading, &self.plates, &self.capture, &self.integration)
             && frame.valid_history(history)
+            && self
+                .plates
+                .iter()
+                .all(|p| frame.valid_endpoint(&p.endpoint))
             && valid_masses(history.revision, &[dynamic.endpoint.mass])
             && f64::from(dynamic.endpoint.mass) == history.reference[2]
             && frame.valid_position(dynamic.endpoint.position, 0)
@@ -361,7 +364,8 @@ impl Continuation {
     pub(in crate::world) fn snapshot_version(&self) -> u32 {
         use crate::world::{
             GRAVITY_SNAPSHOT_VERSION, MASS_GRAVITY_SNAPSHOT_VERSION,
-            MASS_STACK_GRAVITY_SNAPSHOT_VERSION, STACK_GRAVITY_SNAPSHOT_VERSION,
+            MASS_STACK_GRAVITY_SNAPSHOT_VERSION, ORIENTED_GRAVITY_SNAPSHOT_VERSION,
+            ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION, STACK_GRAVITY_SNAPSHOT_VERSION,
             TRANSLATED_GRAVITY_SNAPSHOT_VERSION, TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION,
         };
         match (self.history.revision, self.is_stack()) {
@@ -371,6 +375,8 @@ impl Continuation {
             (2, true) => MASS_STACK_GRAVITY_SNAPSHOT_VERSION,
             (3, false) => TRANSLATED_GRAVITY_SNAPSHOT_VERSION,
             (3, true) => TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION,
+            (4, false) => ORIENTED_GRAVITY_SNAPSHOT_VERSION,
+            (4, true) => ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION,
             _ => 0,
         }
     }

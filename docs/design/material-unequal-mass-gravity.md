@@ -1,5 +1,9 @@
 # Unequal-mass gravity qualification (#327)
 
+The subsequent [quarter-turn extension](material-quarter-turn-gravity.md) supports
+exact cardinal orientations of this bounded scene, including native stepping and
+compatible saves. The original +x contracts and saved versions remain available.
+
 `step_material_flat_gravity` now admits refreshed dynamic masses in **[5, 80]**.
 A stack additionally requires the larger dynamic mass to be at most four times
 the smaller. Geometry, loading, finite work, numerical bounds and rollback retain
