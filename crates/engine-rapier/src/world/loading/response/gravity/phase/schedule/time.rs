@@ -12,29 +12,32 @@ fn exact_sum(a: f64, b: f64) -> Result<f64, Rejection> {
     Ok(sum)
 }
 
-pub(super) struct Clock {
+pub(in crate::world::loading::response::gravity) struct Clock {
     total: f64,
     elapsed: f64,
 }
 
 impl Clock {
-    pub(super) fn new(duration: f32) -> Self {
+    pub(in crate::world::loading::response::gravity) fn new(duration: f32) -> Self {
         Self {
             total: f64::from(duration),
             elapsed: 0.0,
         }
     }
-    pub(super) fn elapsed(&self) -> f64 {
+    pub(in crate::world::loading::response::gravity) fn elapsed(&self) -> f64 {
         self.elapsed
     }
-    pub(super) fn remaining(&self) -> Result<f64, Rejection> {
+    pub(in crate::world::loading::response::gravity) fn remaining(&self) -> Result<f64, Rejection> {
         let remaining = self.total - self.elapsed;
         if remaining < 0.0 || exact_sum(self.elapsed, remaining)? != self.total {
             return Err(Rejection::TimePrecision);
         }
         Ok(remaining)
     }
-    pub(super) fn advance(&mut self, duration: f32) -> Result<(), Rejection> {
+    pub(in crate::world::loading::response::gravity) fn advance(
+        &mut self,
+        duration: f32,
+    ) -> Result<(), Rejection> {
         if !duration.is_finite() || duration <= 0.0 || f64::from(duration) > self.remaining()? {
             return Err(Rejection::TimePrecision);
         }
@@ -47,7 +50,10 @@ impl Clock {
     }
 }
 
-pub(super) fn bounded(preferred: f64, remaining: f64) -> Result<f32, Rejection> {
+pub(in crate::world::loading::response::gravity) fn bounded(
+    preferred: f64,
+    remaining: f64,
+) -> Result<f32, Rejection> {
     let mut duration = preferred as f32;
     if f64::from(duration) > remaining {
         duration = f32::from_bits(duration.to_bits() - 1);

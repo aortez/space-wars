@@ -161,6 +161,10 @@ or persistent capacity.
 Each held interval uses a gravity half-kick and a zero-duration ordinary
 Rapier contact projection with restitution zero, a force-free stationary drift,
 then a second half-kick and projection. Internal slice faces are suppressed.
+Each projection clears its contact warm-start cache: the incoming kick is
+measured separately, and cancellation against a larger previous cache can
+inflate or erase a tiny interval's reaction. This applies only to these
+auxiliary fixture projections, as in the already-qualified native operation.
 The intervening drift suppresses all impulses: the preceding projection
 already established support, and warm-start or bias corrections must not move
 the held body. Positions stay bit-identical; no pose is snapped to the face.
@@ -204,7 +208,7 @@ Settling and support records count against capture's per-step record limit.
 World, witness, material changes and trace commit together, including a late
 refusal after a provisional settling projection.
 
-## A new arrival against existing support
+## Arrivals and returns against existing support
 
 `ballistic/support/incoming.rs` adds a three-plate fixture: free plate A approaches
 plate B, which already rests on fixed plate C. Their touching centers are x=0,
@@ -227,12 +231,15 @@ energy. B's weight, previous reactions and constitutive strain-energy reference
 do not add to that budget. Material loss at B-C is allowed when funded by the
 incoming pulse; a continuing static reaction alone still charges nothing.
 
-Both contact impulses must match `mass_A * (incoming_A - outgoing_A)`. B remains
-stationary because the impulses on its two sides balance, and C performs zero
-prescribed work. Across the physical horizon, actual kinetic energy plus
-material loss balances initial kinetic energy plus A's measured gravitational
-work. Total momentum separately includes gravity on both dynamic plates,
-B's weight reaction, and the instantaneous impact reaction at C.
+Both contact impulses must match `mass_A * (incoming_A - outgoing_A)` within
+the measured momentum tolerance. B's two reactions balance, and C performs zero
+prescribed work. The default fixture requires exactly stationary B after the
+response; the stack opt-in below additionally accounts for a bounded numerical
+residual. Across the physical horizon, actual kinetic energy plus material and
+explicit numerical losses balances initial kinetic energy plus A's measured
+gravitational work. Total momentum separately includes gravity on both dynamic
+plates, B's weight reaction, the instantaneous impact reaction at C, and any
+recorded numerical correction.
 
 The fixture witness retains all three sources and exact motion/mass, gravity,
 the old support episode and the optional new arrival episode. Serialized replay
@@ -242,11 +249,95 @@ If the impact exhausts either supporting region, the entire call refuses,
 including an arrival exactly at a frame endpoint: this fixture cannot model
 the resulting loss of support. General failure consequences remain outside it.
 
-This extension admits a first incoming impact and outbound flight while B stays
-supported. It does not retire A-B, admit its later return, or settle a three-body
-stack. Those cases refuse explicitly. Its persistent numerical ledger allows
-small rounded frame remainders under the same cumulative bounds as tracked
-two-plate flight.
+The extension now admits repeated A-B departures and returns while B stays
+supported. After each flight, A-B ends only when both the actual and predicted
+gap, less the drift uncertainty, exceed twice capture's touching tolerance.
+The exact motion witness advances even when rounding crosses that threshold
+before the prediction does. Splitting outbound flight at the apex ensures a
+long call observes a genuine separation before scheduling the return. An End
+record consumes the same bounded record allowance as other transitions, and
+always precedes a later Impact for that pair. B-C's support owner is untouched.
+
+Every return must obtain its own finite budget from A's current incoming
+motion. The persistent numerical ledger and its initial bounds survive End and
+reimpact. A contained hop cannot retire its owner or obtain another budget.
+The default fixture still refuses three-body settling and stationary full-stack
+support. The explicit stack opt-in below supplies a separate coupled projection:
+B-C must then support both dynamic bodies. The B-C-only projection used during
+A's free flight cannot represent that load.
+
+The selected f32 flight durations must sum exactly to the requested time in
+f64. The scheduler rounds a duration down if it would exceed the remaining
+time, carries any residual into a further bounded interval, and refuses a sum
+whose exact residual cannot be retained. A rounded remainder previously lost
+about 0.47 ns in a 60 Hz frame. Executing that tail exposed an inflated support
+reaction from cancellation against the previous warm-start cache; clearing
+projection caches fixes the reaction without changing the physical accounting
+or its tolerances. Small flight rounding errors remain charged to the same
+persistent numerical allowance, never to material capacity.
+
+## Coupled full-stack support and settling
+
+`incoming/stack.rs` adds explicit fixture-only support with optional bounded
+settling. Strict support admits an initially stationary stack or an exact stop
+from the ordinary material response. Optional settling also admits the final
+contained return. Neither mode expands the public native operation's two-plate
+admission rules.
+
+At rest, A-B carries `mass_A * gravity`, while B-C carries
+`(mass_A + mass_B) * gravity`. Each contact checks both of its material regions
+against that force with zero measured plastic displacement. Any yielded or
+failed region refuses, including a B-C contact that safely held B alone but
+cannot hold the combined weight. These checks do not model failure consequences.
+
+Each held interval applies a gravity half-kick to both dynamic plates, projects
+both contacts together, drifts the stationary bodies without contact or gravity
+work, then repeats the kick and projection. Both contact impulses are measured
+and checked against the bodies' actual momentum changes. Accepted poses remain
+exact, both velocities end at zero, and both original episode owners survive.
+Physical work and material capacity loss remain zero; the auxiliary kick energy
+equals the complete projection loss. Each record retains both reactions and the
+signed residual impulses and residual kinetic loss separately.
+
+The coupled projection clears contact caches and temporarily sets the backend's
+warm-start coefficient to zero. Clearing the initial cache alone was insufficient:
+with four internal steps, reusing an impulse within a zero-duration solve produced
+a separating rebound equal to one eighth of the incoming speed. Subsequent
+unilateral solves cannot remove that rebound. The selected coefficient is local
+to this auxiliary operation and is restored before an accepted step commits.
+Each projection permits at most 32 raw solves, and a requested step permits at
+most 256 coupled projection solves. Only residual speeds within `1e-6` of the
+incoming speed scale can be explicitly removed; momentum checks retain their
+`1e-5` tolerance. Failed convergence or an exhausted limit refuses the whole call.
+
+Settling requires the retained A-B owner, an observed turn, and a conservative
+upper bound on the entire excursion no greater than twice capture's touching
+tolerance. Its approaching kinetic energy must fit the episode's retained
+post-impact mechanical energy with the existing `1e-5` allowance. Combined
+support must be safe before projection. One coupled projection records the
+actual kinetic loss as numerical settlement, leaves capacity unchanged, and
+marks that excursion held. Later support cannot spend that budget again. An
+excursion that proves neither departure nor containment still refuses.
+
+Longer material-impact histories exposed a separate tiny recoil of B: one
+reproduction left velocity `-1.1920929e-8` after an otherwise accepted coupled
+response. The stack opt-in permits removing this residual only when its magnitude
+is at most `1e-6` times A's incoming speed. It records the signed reaction
+`mass_B * velocity_B` and actual kinetic loss `0.5 * mass_B * velocity_B^2`
+under B-C's existing owner. Material-loss validation first includes B's actual
+post-response kinetic energy; the correction is not attributed to the material.
+Cumulative signed correction impulse and dissipated energy must remain within
+`1e-5` of the initial flight momentum and energy scales. These fixed allowances
+survive frames, End records, new impacts and snapshots; they are not replenished.
+A larger recoil, an unrepresentable accumulated charge or exhausted allowance
+refuses. Freely moving B remains outside the fixture.
+
+The snapshot wrapper retains the selected policy, excursion evidence, settlement
+state and cumulative corrections alongside the existing flight ledger. Support,
+settlement and correction records consume the same per-step record allowance as
+other transitions. Exact duration accounting includes flights and held intervals.
+World, witness and outputs commit together, including when a late interval,
+record or projection limit is reached after a provisional settlement.
 
 ## Evidence and remaining scope
 
@@ -323,7 +414,7 @@ Six support regressions add:
   that threshold. The return still refuses atomically rather than guessing an
   owner or silently settling.
 
-Five supported-arrival regressions add:
+Eleven supported-arrival and return regressions add:
 
 - 192 configurations: safe/damaging approach speeds, 30/60/120/240 Hz, 1/4/8
   internal steps, unsplit/sliced plates, one/two copies and both insertion
@@ -338,7 +429,7 @@ Five supported-arrival regressions add:
 - Exactly representable frame-end arrival (`gap=0.015625`, `a=8`, initially
   stationary, `dt=0.0625`), pause and outbound continuation without a new charge.
 - Atomic drift/record limits after staged damage, support failure, initial
-  overload, later unqualified reimpact, invalid time, and stale motion/gravity/
+  overload, invalid time, and stale motion/gravity/
   support identity/source retirement. Successful steps replay exactly.
 - An explicit numerical boundary reproduced from a 120 Hz fall under `a=1`:
   `gap=0.016631931_f32`, `speed=1.9916679_f32`, `dt=1/120`. About 12 ns remain
@@ -347,6 +438,60 @@ Five supported-arrival regressions add:
   discrepancies. Flight durations account for the entire request. Splitting
   at the rounded arrival time gives identical motion and numerical ledger;
   pause/restore and continuation preserve the discrepancies without rebudgeting.
+- 240 three-impact histories: two initial speeds, one-call or 30/60/120/240 Hz
+  execution, 1/4/8 internal steps, unsplit/sliced plates, one/two copies and both
+  insertion orders. An independent sequence of fresh zero-gravity contacts
+  carries material capacity forward and predicts each return's speed, time,
+  response and remaining capacity. Each history has three Impact/End pairs,
+  one unchanged B-C support owner, exact requested duration sums and unchanged
+  numerical bounds. Energy and momentum close with separate gravity, weight
+  and impact reactions; every frame replays exactly from its snapshot.
+- A rounded departure crossing at speed `0.6`, acceleration `10`, one internal
+  step: durations `2e-6` and `f32::from_bits(0x3811c540)` put the actual gap beyond
+  exit plus uncertainty while the predicted gap remains below it. Pause/replay
+  retain ownership; a subsequent `0.0001` proves End, and the later return
+  agrees with a single `0.12`-second call.
+- Late interval/record refusals roll back a provisional End and a new impact,
+  preserving prior nonempty outputs, capacity and continuation. Stale incoming
+  owners, edited motion and retired sources refuse. A contained small hop
+  cannot obtain another root, and the default mode refuses stationary
+  full-stack support.
+- Three rounded frame-end arrivals with speed `0.25`, acceleration `1`, and
+  one internal step resolve in the current frame even when analytic TOI is
+  slightly later. Continuation cannot duplicate their response.
+- A `2^-31`-second support interval after a `0.01`-second interval reports its
+  own positive weight reaction, with zero physical work or capacity loss.
+
+Nine full-stack regressions add:
+
+- 144 stationary configurations: both policies, 1/4/8 internal steps,
+  warm-start coefficients 0/0.5/1, two partitions, one/two copies and both
+  insertion orders. Both reactions balance the appropriate weight, poses and
+  capacity remain exact, and auxiliary energies cancel. Continuations at
+  30/120 Hz and `2^-31` seconds retain both owners and restore the coefficient.
+- 72 contained-return configurations: 30/120/240 Hz, all three internal-step
+  counts and the same collider variations. Each records one impact and one
+  numerical settlement with unchanged capacity, exact duration sums, and no
+  renewed charge after pause, snapshot restore or a further second at rest.
+- 36 complete bounce histories: initial speeds 0.5/3/4, 120/240 Hz, all three
+  internal-step counts and both insertion orders with sliced, duplicated
+  colliders. Independent fresh zero-gravity contacts carry only material state
+  forward and predict the impacts, losses and final capacity. Both owners
+  persist through final settling, with ordered earlier End/Impact transitions.
+  Actual work and momentum include the measured support and correction records;
+  snapshot replay is exact and the original numerical limits remain fixed.
+- Strict support after an exact material stop, and refusal of an unsettled
+  contained return under that policy.
+- Combined-weight overload despite safe support of B alone, overloaded landing,
+  and failure of each of the three regions.
+- Atomic projection, interval and record limits, including failures after
+  provisional capture or settlement while preserving earlier nonempty outputs;
+  stale B motion, incoming identity and gravity also refuse.
+- An ambiguous excursion that cannot authorize either a new root or settlement.
+- Frame-end settlement, pause with zero work limits, and tiny held continuation
+  without changing either owner or charging material again.
+- Exhaustion of each fixed recoil-correction allowance at a reproduced impact,
+  plus refusal to treat materially moving support as a numerical residual.
 
 Two numerical regressions add:
 
@@ -389,8 +534,9 @@ of the native implementation.
 
 Overloaded support still needs physical deformation work. These fixtures do not
 establish arbitrary long-horizon
-accuracy, changing forces, mixed shapes, full stack settling, material failure
-consequences or a general sustained-load API.
+accuracy, changing forces, mixed shapes, freely moving stacks, material failure
+consequences or a general sustained-load API. Three-plate support and settling
+are qualified only in the independent fixture; native promotion remains separate.
 
 ```sh
 RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib ballistic_

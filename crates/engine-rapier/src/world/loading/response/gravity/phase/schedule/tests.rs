@@ -44,10 +44,13 @@ fn replayed(w: &mut PhysicsWorld, dt: f32) -> Trace {
     );
     assert!(trace.wall_time >= trace.advances.iter().map(|m| m.wall_time).sum());
     for record in &trace.records {
-        assert_eq!(record.bodies, [body(11), body(2)]);
-        assert!(record.sources[0] > record.sources[1]);
+        let GravityRoles::Pair { bodies, sources } = record.roles else {
+            panic!("pair roles")
+        };
+        assert_eq!(bodies, [body(11), body(2)]);
+        assert!(sources[0] > sources[1]);
         if let Record::Episode(event) = record.record {
-            assert_eq!(event.sources, [record.sources[1], record.sources[0]]);
+            assert_eq!(event.sources, [sources[1], sources[0]]);
         }
     }
     assert!(

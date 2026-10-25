@@ -4,11 +4,45 @@ use flat_arrival::scene::Scene as Plates;
 use rapier2d::prelude::ActiveHooks;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+mod admission;
+mod capture;
 mod flight;
+pub(super) use flight::Drift;
+mod projection;
 pub(in crate::world::loading::response) mod schedule;
-mod support;
+pub(super) mod support;
 
 const TOUCH: f64 = 1.0e-6;
+
+// Force-free auxiliary work never produces ordinary gameplay contact events.
+pub(super) fn auxiliary_step(
+    world: &mut PhysicsWorld,
+    duration: f32,
+    hooks: &impl PhysicsHooks,
+) -> PhysicsStepMetrics {
+    let flags: Vec<_> = world
+        .raw
+        .colliders
+        .iter()
+        .map(|(h, c)| (h, c.active_hooks()))
+        .collect();
+    for (h, flags) in &flags {
+        world.raw.colliders[*h].set_active_hooks(*flags | ActiveHooks::MODIFY_SOLVER_CONTACTS);
+    }
+    let gravity = world.raw.gravity;
+    let dt = world.raw.integration_parameters.dt;
+    world.raw.gravity = Vector::ZERO;
+    world.raw.integration_parameters.dt = duration;
+    let started = Instant::now();
+    world.raw.step_with_events(hooks, &());
+    let metric = world.backend_step_metrics(started.elapsed());
+    world.raw.gravity = gravity;
+    world.raw.integration_parameters.dt = dt;
+    for (h, flags) in flags {
+        world.raw.colliders[h].set_active_hooks(flags);
+    }
+    metric
+}
 
 pub(in crate::world::loading::response) use super::{
     GravityImpact as Impact, GravityRejection as Rejection,
@@ -22,13 +56,18 @@ fn geometry(reason: flat_arrival::FlatArrivalRejection) -> Rejection {
     }
 }
 
-struct Scene {
-    plates: Plates,
-    acceleration: f64,
+pub(super) struct Scene {
+    pub(super) plates: Plates,
+    pub(super) acceleration: f64,
+}
+
+#[cfg(test)]
+pub(super) fn observe_stack(world: &mut PhysicsWorld) -> Result<[Plate; 3], Rejection> {
+    Scene::observe::<3>(world).map(|(_, plates)| plates)
 }
 
 impl Endpoint {
-    fn read(b: &RigidBody) -> Self {
+    pub(super) fn read(b: &RigidBody) -> Self {
         Self {
             position: [b.translation().x, b.translation().y],
             velocity: [b.linvel().x, b.linvel().y],
@@ -56,93 +95,6 @@ impl Continuation {
     }
 }
 
-impl Scene {
-    fn admit(world: &mut PhysicsWorld) -> Result<(Self, Active), Rejection> {
-        let plates = Plates::certify(world).map_err(geometry)?;
-        if plates.bodies.len() != 2
-            || plates.normal != [1.0, 0.0]
-            || !world.raw.gravity.x.is_finite()
-            || world.raw.gravity.x <= 0.0
-            || world.raw.gravity.y != 0.0
-        {
-            return Err(Rejection::UnsupportedScene);
-        }
-        let [dynamic, fixed] = [plates.bodies[0], plates.bodies[1]];
-        if !world.raw.bodies[dynamic].is_dynamic()
-            || !world.raw.bodies[fixed].is_fixed()
-            || world.raw.bodies[fixed].translation() != Vector::X
-            || world.raw.bodies.iter().any(|(_, b)| {
-                b.rotation() != &Pose::IDENTITY.rotation
-                    || b.translation().y != 0.0
-                    || b.linvel().y != 0.0
-                    || b.gravity_scale() != 1.0
-            })
-            || f64::from(world.raw.bodies[dynamic].translation().x) > TOUCH
-        {
-            return Err(Rejection::UnsupportedScene);
-        }
-        // Refresh only the disposable world, never the caller or its witness.
-        plates.refresh_mass(world).map_err(geometry)?;
-        if world.raw.bodies[dynamic].mass() != 20.0 {
-            return Err(Rejection::UnsupportedScene);
-        }
-        let loading = world.loading.as_ref().unwrap();
-        let materials = &loading.response.as_ref().unwrap().materials;
-        if materials.values().any(|r| r.remaining <= 0.0) {
-            return Err(Rejection::FailedRegion);
-        }
-        let identities = [0, 1].map(|i| {
-            let b = &world.raw.bodies[plates.bodies[i]];
-            let source = plates.sources[i];
-            let r = &materials[&source.region];
-            let first = &world.raw.colliders[b.colliders()[0]];
-            // The shared certificate proved exact uniform partitions and copies.
-            let slices = (1.0 / first.shape().as_cuboid().unwrap().half_extents.y) as u8;
-            let copies = b.colliders().len() as u8 / slices;
-            let mut ids: Vec<_> = b
-                .colliders()
-                .iter()
-                .map(|h| decode_collider(world.raw.colliders[*h].user_data).unwrap())
-                .collect();
-            ids.sort();
-            let mut colliders = [None; 8];
-            for (slot, id) in colliders.iter_mut().zip(ids) {
-                *slot = Some(id);
-            }
-            Plate {
-                body: loading.regions[&source.region.id].body,
-                source,
-                slices,
-                copies,
-                colliders,
-                material: MaterialIdentity {
-                    parameters: r.parameters,
-                    brittle: r.brittle,
-                    volume: r.volume,
-                    thickness: r.thickness,
-                    depth: r.depth,
-                },
-                endpoint: Endpoint::read(b),
-                additional_iterations: b.additional_solver_iterations(),
-            }
-        });
-        let scene = Self {
-            plates,
-            acceleration: f64::from(world.raw.gravity.x),
-        };
-        let observed = Active {
-            plates: identities,
-            capture: loading.config,
-            integration: IntegrationParameters {
-                dt: 0.0,
-                ..world.raw.integration_parameters
-            },
-            episode: None,
-        };
-        Ok((scene, observed))
-    }
-}
-
 /// Owned staging prevents a phase refusal from leaving a committable partial
 /// transaction. Only the scheduler may publish the completed world.
 pub(in crate::world::loading::response) struct Staged {
@@ -165,7 +117,7 @@ impl Staged {
         let loading = world.loading.as_mut().unwrap();
         let state = match &loading.gravity {
             Some(state) => {
-                if matches!(state.status, Status::Invalidated(_)) {
+                if state.invalidation().is_some() {
                     return Err(Rejection::StaleContinuation);
                 }
                 if state.history.settling != settling {
@@ -189,22 +141,12 @@ impl Staged {
                 {
                     return Err(Rejection::StaleContinuation);
                 }
-                let p = &observed.plates[0].endpoint;
-                let (x, v, m, a) = (
-                    f64::from(p.position[0]),
-                    f64::from(p.velocity[0]),
-                    f64::from(p.mass),
-                    scene.acceleration,
-                );
-                let energy = (0.5 * m * v * v - m * a * x).max(0.0);
                 Continuation {
-                    history: History {
-                        revision: 1,
+                    history: History::new(
+                        &observed.plates[0].endpoint,
+                        scene.acceleration,
                         settling,
-                        reference: [x, v, m, a],
-                        scales: [energy, libm::sqrt(2.0 * m * energy), x.abs().max(1.0)],
-                        errors: [0.0; 3],
-                    },
+                    ),
                     status: Status::Active(Box::new(observed)),
                 }
             }
@@ -227,51 +169,6 @@ impl Staged {
     }
 }
 
-struct Control<'a> {
-    scene: &'a Scene,
-    invalid: AtomicBool,
-    after: Mutex<Option<[Vector; 2]>>,
-}
-
-impl ArrivalControl for Control<'_> {
-    fn preview(&self) -> bool {
-        false
-    }
-
-    fn filter(&self, context: &mut ContactModificationContext) {
-        if context.solver_contacts.is_empty() {
-            return;
-        }
-        if !context.normal.is_finite() || (context.normal.length_squared() - 1.0).abs() > 1.0e-5 {
-            self.invalid.store(true, Ordering::Relaxed);
-            return;
-        }
-        if self.scene.plates.internal_face(context) {
-            context.solver_contacts.clear();
-            return;
-        }
-        context.solver_contacts.retain(|contact| {
-            let velocities = [context.rigid_body1, context.rigid_body2].map(|h| {
-                h.map_or(Vector::ZERO, |h| {
-                    context.bodies[h].velocity_at_point(contact.point)
-                })
-            });
-            let approach = (velocities[0] - velocities[1]).dot(*context.normal);
-            if !contact.dist.is_finite() || contact.dist < -1.0e-5 || !approach.is_finite() {
-                self.invalid.store(true, Ordering::Relaxed);
-            }
-            f64::from(contact.dist) <= TOUCH && approach >= 0.0
-        });
-    }
-
-    fn observe(&self, context: &SolverContactBatchContext) {
-        let velocity = [0, 1].map(|i| context.bodies()[self.scene.plates.bodies[i]].linvel());
-        if context.dt != 0.0 || self.after.lock().unwrap().replace(velocity).is_some() {
-            self.invalid.store(true, Ordering::Relaxed);
-        }
-    }
-}
-
 impl Staged {
     fn validate(&mut self) -> Result<(), Rejection> {
         // Re-prove the current staged endpoint too. A scheduler must never use
@@ -291,61 +188,7 @@ impl Staged {
 
     // Shared zero-duration capture for a real impact or first stationary support.
     fn capture(&mut self) -> Result<[Vector; 2], Rejection> {
-        let flags: Vec<_> = self
-            .world
-            .raw
-            .colliders
-            .iter()
-            .map(|(h, c)| (h, c.active_hooks()))
-            .collect();
-        for (h, flags) in &flags {
-            self.world.raw.colliders[*h]
-                .set_active_hooks(*flags | ActiveHooks::MODIFY_SOLVER_CONTACTS);
-        }
-        let gravity = self.world.raw.gravity;
-        let dt = self.world.raw.integration_parameters.dt;
-        self.world.raw.gravity = Vector::ZERO;
-        self.world.raw.integration_parameters.dt = 0.0;
-        let control = Control {
-            scene: &self.scene,
-            invalid: AtomicBool::new(false),
-            after: Mutex::new(None),
-        };
-        let hooks = Hooks {
-            report_applied_contact_impulses: true,
-            arrival: Some(&control),
-            flight: None,
-            drives: surface_drive::DriveHooks(&[]),
-            loading: self.world.loading.as_mut().map(Mutex::new),
-            // Admission proved zero other forces/constraints. No general guard
-            // is bypassed: this raw solve now has zero gravity and zero duration.
-            external_constraints: false,
-        };
-        let started = Instant::now();
-        if self.world.collect_events {
-            self.world
-                .raw
-                .step_with_events(&hooks, &self.world.contact_event_collector);
-        } else {
-            self.world.raw.step_with_events(&hooks, &());
-        }
-        let metrics = self.world.backend_step_metrics(started.elapsed());
-        self.world.raw.gravity = gravity;
-        self.world.raw.integration_parameters.dt = dt;
-        for (h, flags) in flags {
-            self.world.raw.colliders[h].set_active_hooks(flags);
-        }
-        if control.invalid.load(Ordering::Relaxed) {
-            return Err(Rejection::Numerical);
-        }
-        if let Some(reason) = self.world.material_response_diagnostics().last_rejection {
-            return Err(Rejection::Response(reason));
-        }
-        let observed = control
-            .after
-            .into_inner()
-            .unwrap()
-            .ok_or(Rejection::Numerical)?;
+        let (observed, metrics) = self.scene.capture(&mut self.world, None)?;
         self.metrics.push(metrics);
         Ok(observed)
     }

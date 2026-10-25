@@ -50,6 +50,41 @@ struct Impact {
     response: AppliedResponse,
 }
 
+#[derive(Debug, PartialEq)]
+struct StackSupport {
+    at: f64,
+    duration: f32,
+    episodes: [EpisodeId; 2],
+    forces: [f64; 2],
+    impulses: [f64; 2],
+    rounding_impulses: [f64; 2],
+    rounding_loss: f64,
+    gravity_work: f64,
+    kick_energy: f64,
+    projection_energy: f64,
+    solves: usize,
+}
+
+#[derive(Debug, PartialEq)]
+struct StackSettlement {
+    at: f64,
+    episodes: [EpisodeId; 2],
+    available: f64,
+    dissipated: f64,
+    impulses: [f64; 2],
+    rounding_impulses: [f64; 2],
+    rounding_loss: f64,
+    solves: usize,
+}
+
+#[derive(Debug, PartialEq)]
+struct SupportCorrection {
+    at: f64,
+    episode: EpisodeId,
+    impulse: f64,
+    dissipated: f64,
+}
+
 #[derive(Debug, Default, PartialEq)]
 struct Trace {
     flights: Vec<Flight>,
@@ -57,6 +92,9 @@ struct Trace {
     events: Vec<TimedEvent>,
     settlements: Vec<support::Settlement>,
     supports: Vec<support::Support>,
+    stack_supports: Vec<StackSupport>,
+    stack_settlements: Vec<StackSettlement>,
+    support_corrections: Vec<SupportCorrection>,
 }
 
 #[derive(Debug, PartialEq)]

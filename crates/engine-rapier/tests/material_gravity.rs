@@ -10,19 +10,22 @@ use engine_rapier::world::{
             ResponseRejection,
             flat_arrival::FlatArrivalRejection,
             gravity::{
-                GravityErrorAxis, GravityRecord, GravityRejection, GravitySettling, GravityStep,
-                MAX_GRAVITY_IMPACTS, MAX_GRAVITY_INTERVALS, MAX_GRAVITY_PROJECTIONS,
+                GravityErrorAxis, GravityRecord, GravityRejection, GravityRoles, GravitySettling,
+                GravityStep, MAX_GRAVITY_IMPACTS, MAX_GRAVITY_INTERVALS, MAX_GRAVITY_PROJECTIONS,
                 MAX_GRAVITY_SUPPORT_CAPTURES,
             },
         },
     },
 };
 
-struct Scene {
+#[path = "material_gravity/stack.rs"]
+mod stack;
+
+struct Scene<const N: usize = 2> {
     gap: f32,
     speed: f32,
     gravity: f32,
-    parts: [u16; 2],
+    parts: [u16; N],
     copies: u16,
     reverse: bool,
     iterations: usize,
@@ -31,13 +34,13 @@ struct Scene {
     remaining: Option<f64>,
 }
 
-impl Default for Scene {
+impl<const N: usize> Default for Scene<N> {
     fn default() -> Self {
         Self {
             gap: 0.0,
             speed: 4.0,
             gravity: 10.0,
-            parts: [1, 1],
+            parts: [1; N],
             copies: 1,
             reverse: false,
             iterations: 4,
@@ -49,10 +52,14 @@ impl Default for Scene {
 }
 
 fn body(role: usize) -> BodyId {
-    BodyId::new(PhysicsId::new([11, 2][role]), BodyRole::PRIMARY)
+    BodyId::new(PhysicsId::new([11, 2, 7][role]), BodyRole::PRIMARY)
 }
 
 fn scene(spec: Scene) -> (PhysicsWorld, [RegionToken; 2]) {
+    scene_with_roles(spec)
+}
+
+fn scene_with_roles<const N: usize>(spec: Scene<N>) -> (PhysicsWorld, [RegionToken; N]) {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig {
         gravity: Vec2::X * spec.gravity,
         solver_iterations: spec.iterations,
@@ -60,8 +67,12 @@ fn scene(spec: Scene) -> (PhysicsWorld, [RegionToken; 2]) {
     });
     world.enable_loading_capture(spec.capture).unwrap();
     world.enable_material_response().unwrap();
-    let mut tokens = [None; 2];
-    for role in if spec.reverse { [1, 0] } else { [0, 1] } {
+    let mut tokens = [None; N];
+    let mut roles: Vec<_> = (0..N).collect();
+    if spec.reverse {
+        roles.reverse();
+    }
+    for role in roles {
         let count = spec.parts[role] * spec.copies;
         let half_height = 1.0 / f32::from(spec.parts[role]);
         let mut shapes = Vec::new();
@@ -86,12 +97,12 @@ fn scene(spec: Scene) -> (PhysicsWorld, [RegionToken; 2]) {
         assert!(world.insert_body(
             body(role),
             BodySpec {
-                kind: if role == 0 {
+                kind: if role + 1 < N {
                     BodyKind::Dynamic
                 } else {
                     BodyKind::Fixed
                 },
-                position: Vec2::new(if role == 0 { -spec.gap } else { 1.0 }, 0.0),
+                position: Vec2::new(if role == 0 { -spec.gap } else { role as f32 }, 0.0),
                 linear_velocity: Vec2::X * if role == 0 { spec.speed } else { 0.0 },
                 lock_rotation: true,
                 can_sleep: false,
@@ -138,7 +149,7 @@ fn scene(spec: Scene) -> (PhysicsWorld, [RegionToken; 2]) {
     (world, tokens.map(Option::unwrap))
 }
 
-fn capacity(world: &PhysicsWorld, tokens: [RegionToken; 2]) -> [f64; 2] {
+fn capacity<const N: usize>(world: &PhysicsWorld, tokens: [RegionToken; N]) -> [f64; N] {
     tokens.map(|t| world.loading_material_remaining(t).unwrap())
 }
 
@@ -193,10 +204,13 @@ fn replayed(world: &mut PhysicsWorld, dt: f32, policy: GravitySettling) -> Gravi
     assert_eq!(intervals, step.durations);
     for r in &step.records {
         assert!(r.at <= f64::from(dt) && r.phase < step.advances.len());
-        assert_eq!(r.bodies, [body(0), body(1)]);
-        assert!(r.sources[0] > r.sources[1]);
+        let GravityRoles::Pair { bodies, sources } = r.roles else {
+            panic!("pair roles")
+        };
+        assert_eq!(bodies, [body(0), body(1)]);
+        assert!(sources[0] > sources[1]);
         match &r.record {
-            GravityRecord::Episode(e) => assert_eq!(e.sources, [r.sources[1], r.sources[0]]),
+            GravityRecord::Episode(e) => assert_eq!(e.sources, [sources[1], sources[0]]),
             GravityRecord::Impact(i) => {
                 assert_eq!(
                     world.material_response_batches()[i.response_batch]

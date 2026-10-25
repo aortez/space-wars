@@ -50,6 +50,7 @@ const RESPONSE_SNAPSHOT_VERSION: u32 = 3;
 const ARRIVAL_SNAPSHOT_VERSION: u32 = 4;
 const FLAT_ARRIVAL_SNAPSHOT_VERSION: u32 = 5;
 const GRAVITY_SNAPSHOT_VERSION: u32 = 6;
+const STACK_GRAVITY_SNAPSHOT_VERSION: u32 = 7;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -2274,8 +2275,12 @@ impl PhysicsWorld {
     /// Serialize authoritative Rapier state and all stable handle mappings.
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, PhysicsWorldError> {
         let mut bytes = bincode::serialize(&PhysicsSnapshotRef {
-            version: if self.loading.as_ref().is_some_and(|s| s.gravity.is_some()) {
-                GRAVITY_SNAPSHOT_VERSION
+            version: if let Some(gravity) = self.loading.as_ref().and_then(|s| s.gravity.as_ref()) {
+                if gravity.is_stack() {
+                    STACK_GRAVITY_SNAPSHOT_VERSION
+                } else {
+                    GRAVITY_SNAPSHOT_VERSION
+                }
             } else if self
                 .loading
                 .as_ref()
@@ -2347,6 +2352,7 @@ impl PhysicsWorld {
             ARRIVAL_SNAPSHOT_VERSION,
             FLAT_ARRIVAL_SNAPSHOT_VERSION,
             GRAVITY_SNAPSHOT_VERSION,
+            STACK_GRAVITY_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -2385,7 +2391,7 @@ impl PhysicsWorld {
                     .map_err(|error| PhysicsWorldError(error.to_string()))?,
             );
         }
-        if snapshot.version == GRAVITY_SNAPSHOT_VERSION {
+        if [GRAVITY_SNAPSHOT_VERSION, STACK_GRAVITY_SNAPSHOT_VERSION].contains(&snapshot.version) {
             let state = loading.as_mut().unwrap();
             state.arrival_departures = bincode::deserialize_from(&mut reader)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
@@ -2395,6 +2401,13 @@ impl PhysicsWorld {
                 bincode::deserialize_from(&mut reader)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?,
             );
+            if state.gravity.as_ref().unwrap().is_stack()
+                != (snapshot.version == STACK_GRAVITY_SNAPSHOT_VERSION)
+            {
+                return Err(PhysicsWorldError(
+                    "gravity snapshot kind/version mismatch".into(),
+                ));
+            }
         }
         if reader.position() != bytes.len() as u64 {
             return Err(PhysicsWorldError("trailing physics snapshot data".into()));

@@ -237,6 +237,11 @@ fn gravity_support_native_small_hops_settle_once_without_new_budgets() {
                                     native::GravityRecord::Episode(e) => {
                                         assert_eq!(e.transition, EpisodeTransition::Impact)
                                     }
+                                    native::GravityRecord::StackSupport(_)
+                                    | native::GravityRecord::StackSettlement(_)
+                                    | native::GravityRecord::SupportCorrection(_) => {
+                                        panic!("unexpected stack record")
+                                    }
                                     native::GravityRecord::Support(s) => {
                                         assert_eq!(Some(s.episode), owner)
                                     }
@@ -325,6 +330,11 @@ fn gravity_support_native_genuine_returns_reach_rest_with_finite_work() {
                                 );
                             }
                             native::GravityRecord::Flight(_) => {}
+                            native::GravityRecord::StackSupport(_)
+                            | native::GravityRecord::StackSettlement(_)
+                            | native::GravityRecord::SupportCorrection(_) => {
+                                panic!("unexpected stack record")
+                            }
                         }
                     }
                     if !actual_settled.is_empty() && !expected_settled.is_empty() {

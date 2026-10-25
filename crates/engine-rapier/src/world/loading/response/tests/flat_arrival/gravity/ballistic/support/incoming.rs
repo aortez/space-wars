@@ -1,7 +1,9 @@
 //! A free plate arrives at a plate already supported by a fixed base.
-//! Only the new arrival owns incoming work; the old support transmits it.
+//! Each proven new arrival owns incoming work; the old support transmits it.
 use super::*;
 
+mod native;
+mod stack;
 mod tests;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -12,6 +14,7 @@ struct Witness {
     motion: Vec<(f32, f32, f32)>,
     gravity: f32,
     rounding: numerics::Ledger,
+    stack: Option<stack::History>,
 }
 
 struct Verified {
@@ -52,9 +55,16 @@ impl Verified {
             motion: motion(&world, &plates),
             gravity: world.raw.gravity.x,
             rounding: numerics::Ledger::new(&world, f64::from(world.raw.gravity.x))?,
+            stack: None,
         };
         let result = Self { world, witness };
         result.validate(&plates)?;
+        Ok(result)
+    }
+
+    fn with_stack(world: PhysicsWorld, settling: bool) -> Result<Self, Rejection> {
+        let mut result = Self::new(world)?;
+        result.witness.stack = Some(stack::History::new(settling));
         Ok(result)
     }
 
@@ -119,6 +129,9 @@ impl Verified {
         {
             return Err(Rejection::Evidence);
         }
+        if let Some(stack) = &self.witness.stack {
+            stack.validate(self)?;
+        }
         Ok(())
     }
 
@@ -153,6 +166,7 @@ impl Verified {
         // Even at arrival, they must not alter the incoming body's velocity.
         self.world.raw.bodies[pair[0]].set_linvel(Vector::X * kick, true);
         let first = project_pair(&mut self.world, plates, pair)?;
+        let before_v = state(&self.world).1;
         let flight = fly(
             &mut self.world,
             plates,
@@ -175,6 +189,10 @@ impl Verified {
             return Err(Rejection::Energy);
         }
         self.witness.motion = motion(&self.world, plates);
+        let after_v = state(&self.world).1;
+        if let Some(stack) = &mut self.witness.stack {
+            stack.after_flight(before_v, after_v, &flight);
+        }
         Ok((
             flight,
             Support {
@@ -192,6 +210,45 @@ impl Verified {
         ))
     }
 
+    fn depart(&mut self, flight: &Flight, trace: &mut Trace, at: f64) -> Result<(), Rejection> {
+        let Some(episode) = self.witness.incoming else {
+            return Ok(());
+        };
+        // Every accepted flight extends the exact motion witness, even when
+        // rounding crosses the band before the predicted endpoint does. Keep
+        // the owner until both endpoints prove separation beyond uncertainty.
+        let lower = (-state(&self.world).0).min(-flight.predicted_x) - flight.uncertainty;
+        let loading = self.world.loading.as_ref().unwrap();
+        if lower <= 2.0 * f64::from(loading.config.touch_tolerance) {
+            return Ok(());
+        }
+        let sources = [self.witness.sources[0], self.witness.sources[1]];
+        if loading.episodes.get(&sources).map(|e| e.id) != Some(episode) {
+            return Err(Rejection::Evidence);
+        }
+        reserve(&mut self.world)?;
+        self.world
+            .loading
+            .as_mut()
+            .unwrap()
+            .episodes
+            .remove(&sources);
+        self.witness.incoming = None;
+        if let Some(stack) = &mut self.witness.stack {
+            stack.depart();
+        }
+        trace.events.push(TimedEvent {
+            at,
+            event: EpisodeEvent {
+                id: episode,
+                sources,
+                transition: EpisodeTransition::End,
+                closing_speed: 0.0,
+            },
+        });
+        Ok(())
+    }
+
     fn impact(&mut self, plates: &Plates, trace: &mut Trace, at: f64) -> Result<(), Rejection> {
         if self.witness.incoming.is_some() {
             return Err(Rejection::Reimpact);
@@ -202,8 +259,10 @@ impl Verified {
         let (velocity, _) =
             advance(&mut self.world, plates, 0.0, false, true).map_err(Rejection::Backend)?;
         if plates.positions(&self.world) != start
-            || velocity[0].x >= 0.0
-            || velocity[1..] != [Vector::ZERO; 2]
+            || velocity[0].x > 0.0
+            || (velocity[0].x == 0.0 && self.witness.stack.is_none())
+            || velocity[1].y != 0.0
+            || velocity[2] != Vector::ZERO
             || self.world.material_response_batches().len() != count + 1
         {
             return Err(Rejection::Energy);
@@ -213,7 +272,7 @@ impl Verified {
             .as_ref()
             .unwrap()
             .clone();
-        let events = &self.world.loading_batches().last().unwrap().events;
+        let events = self.world.loading_batches().last().unwrap().events.clone();
         if events.len() != 1
             || events[0].transition != EpisodeTransition::Impact
             || events[0].sources != [self.witness.sources[0], self.witness.sources[1]]
@@ -231,8 +290,10 @@ impl Verified {
         }
         let outgoing = velocity[0].x;
         let energy = 0.5 * mass * incoming * incoming;
+        let recoil = self.correct_support_recoil(plates, trace, at, incoming)?;
         let removed =
-            0.5 * mass * (incoming - f64::from(outgoing)) * (incoming + f64::from(outgoing));
+            0.5 * mass * (incoming - f64::from(outgoing)) * (incoming + f64::from(outgoing))
+                - recoil;
         let impulse = mass * (incoming - f64::from(outgoing));
         if (removed - loss(&response)).abs() > 1.0e-5 * energy
             || (response.budget.components[0].available - energy).abs() > 1.0e-5 * energy
@@ -244,6 +305,11 @@ impl Verified {
             return Err(Rejection::Energy);
         }
         self.witness.incoming = Some(events[0].id);
+        let energy = mechanical(&self.world, f64::from(self.witness.gravity));
+        let x = state(&self.world).0;
+        if let Some(stack) = &mut self.witness.stack {
+            stack.anchor(energy, -x, outgoing == 0.0)?;
+        }
         trace
             .events
             .extend(events.iter().map(|event| TimedEvent { at, event: *event }));
@@ -257,11 +323,23 @@ impl Verified {
         // Failure needs a physical consequence; this held-base fixture cannot
         // continue supporting a failed region, even on a frame-end arrival.
         self.safe_support(plates, 1.0)?;
+        if outgoing == 0.0 {
+            self.safe_stack(plates, 1.0)?;
+        }
         self.witness.rounding.after_response(&self.world)?;
         Ok(())
     }
 
     fn step(&mut self, dt: f32, limit: usize) -> Result<Trace, Rejection> {
+        self.step_with_projection_limit(dt, limit, stack::MAX_SOLVES)
+    }
+
+    fn step_with_projection_limit(
+        &mut self,
+        dt: f32,
+        limit: usize,
+        projection_limit: usize,
+    ) -> Result<Trace, Rejection> {
         if !dt.is_finite() || dt < 0.0 {
             return Err(Rejection::InvalidTime);
         }
@@ -280,6 +358,7 @@ impl Verified {
         staged.world.loading.as_mut().unwrap().begin_step();
         let mut trace = Trace::default();
         let mut elapsed = 0.0;
+        let mut solves = 0;
         loop {
             let (x, v, _) = state(&staged.world);
             if x > TOUCH {
@@ -287,35 +366,66 @@ impl Verified {
             }
             if -x <= TOUCH && v >= 0.0 {
                 if v == 0.0 {
-                    return Err(Rejection::Support);
+                    if staged.witness.stack.is_none() {
+                        return Err(Rejection::Support);
+                    }
+                    if elapsed == f64::from(dt) {
+                        break;
+                    }
+                    if trace.flights.len() + trace.stack_supports.len() >= limit.min(MAX_ADVANCES) {
+                        return Err(Rejection::Limit);
+                    }
+                    let remaining = f64::from(dt) - elapsed;
+                    let duration = bounded_duration(remaining, remaining)?;
+                    let next = exact_advance(elapsed, duration, f64::from(dt))?;
+                    staged.hold_stack(
+                        &plates,
+                        &mut trace,
+                        elapsed,
+                        duration,
+                        &mut solves,
+                        projection_limit,
+                    )?;
+                    elapsed = next;
+                    continue;
                 }
-                staged.impact(&plates, &mut trace, elapsed)?;
+                staged.arrive(&plates, &mut trace, elapsed, &mut solves, projection_limit)?;
+                if state(&staged.world).1 == 0.0 {
+                    continue;
+                }
             }
             if elapsed >= f64::from(dt) {
                 break;
             }
-            if trace.flights.len() >= limit.min(MAX_ADVANCES) {
+            if trace.flights.len() + trace.stack_supports.len() >= limit.min(MAX_ADVANCES) {
                 return Err(Rejection::Limit);
             }
             let (x, v, _) = state(&staged.world);
-            let remaining = (f64::from(dt) - elapsed) as f32;
+            let remaining = f64::from(dt) - elapsed;
             let toi = arrival(-x, v, f64::from(self.witness.gravity));
-            let at_arrival = toi <= f64::from(remaining);
-            let duration = toi.min(f64::from(remaining)) as f32;
-            if !duration.is_finite() || duration <= 0.0 {
-                return Err(Rejection::Geometry);
+            let mut at_arrival = toi <= remaining;
+            let mut duration = bounded_duration(toi.min(remaining), remaining)?;
+            if v < 0.0 {
+                let apex = departure::apex_duration(v, f64::from(self.witness.gravity))?;
+                if apex < duration {
+                    duration = apex;
+                    at_arrival = false;
+                }
             }
+            let next = exact_advance(elapsed, duration, f64::from(dt))?;
             let (flight, support) = staged.flight(&plates, elapsed, duration)?;
-            elapsed += f64::from(duration);
+            elapsed = next;
+            staged.depart(&flight, &mut trace, elapsed)?;
             trace.flights.push(flight);
             trace.supports.push(support);
-            if at_arrival {
+            let (end_x, end_v, _) = state(&staged.world);
+            if at_arrival || (-end_x <= TOUCH && end_v > 0.0) {
                 if state(&staged.world).0.abs() > TOUCH {
                     return Err(Rejection::Geometry);
                 }
-                staged.impact(&plates, &mut trace, elapsed)?;
+                staged.arrive(&plates, &mut trace, elapsed, &mut solves, projection_limit)?;
             }
-            if duration == remaining {
+            if elapsed == f64::from(dt) {
                 break;
             }
         }
@@ -324,4 +434,30 @@ impl Verified {
         *self = staged;
         Ok(trace)
     }
+}
+
+fn bounded_duration(preferred: f64, remaining: f64) -> Result<f32, Rejection> {
+    let mut duration = preferred as f32;
+    if f64::from(duration) > remaining {
+        duration = f32::from_bits(duration.to_bits() - 1);
+    }
+    if !duration.is_finite() || duration <= 0.0 || f64::from(duration) > remaining {
+        return Err(Rejection::Energy);
+    }
+    Ok(duration)
+}
+
+fn exact_advance(elapsed: f64, duration: f32, total: f64) -> Result<f64, Rejection> {
+    let h = f64::from(duration);
+    let next = elapsed + h;
+    // Keep every accepted interval, including a rounded final remainder.
+    let lost = if elapsed >= h {
+        (elapsed - next) + h
+    } else {
+        (h - next) + elapsed
+    };
+    if lost != 0.0 || next <= elapsed || next > total {
+        return Err(Rejection::Energy);
+    }
+    Ok(next)
 }

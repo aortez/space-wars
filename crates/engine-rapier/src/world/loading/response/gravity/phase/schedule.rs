@@ -1,7 +1,7 @@
 //! Bounded private flight, impact, support and optional settlement scheduler.
 use super::*;
 
-mod time;
+pub(in crate::world::loading::response::gravity) mod time;
 use time::Clock;
 
 const MAX_INTERVALS: usize = MAX_GRAVITY_INTERVALS;
@@ -38,22 +38,31 @@ impl Staged {
         TimedRecord {
             at,
             phase,
-            bodies: sources.map(|s| loading.regions[&s.region.id].body),
-            sources,
+            roles: GravityRoles::Pair {
+                bodies: sources.map(|s| loading.regions[&s.region.id].body),
+                sources,
+            },
             record,
         }
     }
 }
 
-fn summary(world: &PhysicsWorld) -> Option<NumericalSummary> {
-    let h = &world.loading.as_ref()?.gravity.as_ref()?.history;
+pub(in crate::world::loading::response::gravity) fn summary(
+    world: &PhysicsWorld,
+) -> Option<NumericalSummary> {
+    let continuation = world.loading.as_ref()?.gravity.as_ref()?;
+    let h = &continuation.history;
     Some(NumericalSummary {
         scales: h.scales,
         errors: h.errors,
+        support_corrections: match &continuation.status {
+            Status::Stack(state) => Some(state.correction_summary(h)),
+            _ => None,
+        },
     })
 }
 
-fn arrival(x: f64, v: f64, a: f64) -> f64 {
+pub(in crate::world::loading::response::gravity) fn arrival(x: f64, v: f64, a: f64) -> f64 {
     let gap = (-x).max(0.0);
     let speed = libm::sqrt(v * v + 2.0 * a * gap);
     if v >= 0.0 {
@@ -63,7 +72,7 @@ fn arrival(x: f64, v: f64, a: f64) -> f64 {
     }
 }
 
-fn apex(v: f64, a: f64) -> Result<f32, Rejection> {
+pub(in crate::world::loading::response::gravity) fn apex(v: f64, a: f64) -> Result<f32, Rejection> {
     let mut duration = (-v / a) as f32;
     for _ in 0..3 {
         if !duration.is_finite() || duration <= 0.0 {
