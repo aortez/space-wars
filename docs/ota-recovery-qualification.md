@@ -532,6 +532,16 @@ The persistent generation floor is never reduced; at most two attempts per
 payload remain permitted, including the first attempt. A new selection cannot
 clear quarantine or manufacture another retry.
 
+The staged download is disposable: an ordinary check with no eligible candidate
+can clear it, including an empty Release check after fallback. If retry inspection
+reports a missing staged payload, the separately built owner tool
+`stage_update nightly FAILED_PAYLOAD_SHA256` can download and verify it again
+while Internet and usable time are available. This uses the same bounded retry
+view as the installer, preserves durable quarantine/attempts and rejects an
+exhausted or unrelated payload before network staging. It reports success only
+when the ready payload matches the explicitly requested digest. Then obtain a
+fresh native retry selection; staging does not consume an installation attempt.
+
 Fixtures cover changed selection/authority/boot/data, stale history, expiration
 at reboot and clock rollback, durable attempt/reboot consumption and bounded
 retry. The signed ext4 integration runs both healthy and failed-app controls

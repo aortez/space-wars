@@ -2567,6 +2567,14 @@ not install, change selectors, reboot, qualify unattended recovery or replace th
 installed time service. Run it over the maintained owner SSH connection; it does
 not alter network policy. The ordinary kiosk API remains unchanged.
 
+For a failed supervised payload whose disposable staged copy has been cleared,
+`stage_update nightly FAILED_PAYLOAD_SHA256` explicitly requests its one remaining
+retry view. The native recovery journal must still authorize that payload's
+retry; its attempts, quarantine and generation floor remain durable and unchanged.
+The normal signed download checks still apply, and a different ready payload is
+an error. This restores staged bytes only; a fresh `install_signed_trial inspect`
+selection and the separate owner installation step are still required.
+
 On 2026-10-17, the owner selected dedicated private local keys for the supervised
 rollout. The authority is retained outside Git and build outputs at
 `/home/oldman/.spacewars-ota-signing/initial-supervised-20261017`, with private
