@@ -72,20 +72,20 @@ impl State {
             && (c.impulse == 0.0 || c.work > 0.0)
             && match &self.status {
                 StackStatus::Invalidated(_) => true,
-                StackStatus::Active(active) => active.valid_for(loading, history.settling),
+                StackStatus::Active(active) => active.valid_for(loading, history),
             }
     }
 }
 
 impl StackActive {
-    fn valid_for(&self, loading: &LoadingState, settling: GravitySettling) -> bool {
+    fn valid_for(&self, loading: &LoadingState, history: &History) -> bool {
         let [a, b, c] = &self.plates;
         let mut support = [b.source, c.source];
         support.sort();
         valid_contract(loading, &self.plates, &self.capture, &self.integration)
-            && a.endpoint.mass == 20.0
+            && valid_masses(history.revision, &[a.endpoint.mass, b.endpoint.mass])
+            && f64::from(a.endpoint.mass) == history.reference[2]
             && a.endpoint.position[0] <= 1.0e-6
-            && b.endpoint.mass == 20.0
             && b.endpoint.position == [1.0, 0.0]
             && b.endpoint.velocity == [0.0, 0.0]
             && c.endpoint.position == [2.0, 0.0]
@@ -100,7 +100,8 @@ impl StackActive {
                 e.id != self.support.id
                     && e.valid_for(loading, [a.source, b.source], &a.endpoint)
                     && loading.episodes[&e.sources].absent_seconds == 0.0
-                    && (e.settled_work == 0.0 || settling == GravitySettling::BoundedNumerical)
+                    && (e.settled_work == 0.0
+                        || history.settling == GravitySettling::BoundedNumerical)
             })
     }
 }

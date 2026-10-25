@@ -36,7 +36,7 @@ enum Status {
     Active(Box<Active>),
     Invalidated(Invalidation),
     // Stack keeps its corrections outside its own active/invalidated state.
-    // This tag is accepted only in snapshot v7.
+    // Stack tags are accepted in snapshot v7 (legacy) or v9 (bounded masses).
     Stack(Box<stack::State>),
 }
 
@@ -61,7 +61,7 @@ impl History {
         );
         let energy = (0.5 * m * v * v - m * acceleration * x).max(0.0);
         Self {
-            revision: 1,
+            revision: mass_revision(&[endpoint.mass]),
             settling,
             reference: [x, v, m, acceleration],
             scales: [energy, libm::sqrt(2.0 * m * energy), x.abs().max(1.0)],
@@ -73,19 +73,46 @@ impl History {
         let [x, v, m, a] = self.reference;
         let energy = (0.5 * m * v * v - m * a * x).max(0.0);
         let expected = [energy, libm::sqrt(2.0 * m * energy), x.abs().max(1.0)];
-        self.revision == 1
+        matches!(self.revision, 1 | 2)
             // Reference values came from stored f32 backend state. Enforcing
             // that also prevents finite f64 inputs overflowing the work formula.
             && self.reference.iter().all(|n| {
                 (*n as f32).is_finite() && f64::from(*n as f32) == *n
             })
             && x <= 1.0e-6
-            && m == 20.0
+            && valid_masses(self.revision, &[m as f32])
             && a > 0.0
             && self.scales == expected
             && self.scales.iter().zip(self.errors).all(|(scale, error)| {
                 scale.is_finite() && error.is_finite() && error.abs() <= 1.0e-5 * scale
             })
+    }
+}
+
+// Revision 1 retains the mass-20 contract and its exact v6/v7 encoding.
+// Revision 2 bounds both scale and conditioning; per-step numerical guards
+// still refuse responses that cannot be represented within their fixed limits.
+fn mass_revision(masses: &[f32]) -> u32 {
+    if masses.iter().all(|m| *m == 20.0) {
+        1
+    } else {
+        2
+    }
+}
+
+fn valid_masses(revision: u32, masses: &[f32]) -> bool {
+    if !(1..=2).contains(&masses.len()) {
+        return false;
+    }
+    match revision {
+        1 => masses.iter().all(|m| *m == 20.0),
+        2 => {
+            masses.iter().all(|m| (5.0..=80.0).contains(m))
+                && (masses.len() == 1
+                    || f64::from(masses[0].max(masses[1]))
+                        <= 4.0 * f64::from(masses[0].min(masses[1])))
+        }
+        _ => false,
     }
 }
 
@@ -293,10 +320,11 @@ impl OwnedEpisode {
 }
 
 impl Active {
-    fn valid_for(&self, loading: &LoadingState) -> bool {
+    fn valid_for(&self, loading: &LoadingState, history: &History) -> bool {
         let [dynamic, fixed] = &self.plates;
         valid_contract(loading, &self.plates, &self.capture, &self.integration)
-            && dynamic.endpoint.mass == 20.0
+            && valid_masses(history.revision, &[dynamic.endpoint.mass])
+            && f64::from(dynamic.endpoint.mass) == history.reference[2]
             && dynamic.endpoint.position[0] <= 1.0e-6
             && fixed.endpoint.position == [1.0, 0.0]
             && fixed.endpoint.velocity == [0.0, 0.0]
@@ -315,6 +343,19 @@ impl Active {
 }
 
 impl Continuation {
+    pub(in crate::world) fn snapshot_version(&self) -> u32 {
+        use crate::world::{
+            GRAVITY_SNAPSHOT_VERSION, MASS_GRAVITY_SNAPSHOT_VERSION,
+            MASS_STACK_GRAVITY_SNAPSHOT_VERSION, STACK_GRAVITY_SNAPSHOT_VERSION,
+        };
+        match (self.history.revision == 2, self.is_stack()) {
+            (false, false) => GRAVITY_SNAPSHOT_VERSION,
+            (false, true) => STACK_GRAVITY_SNAPSHOT_VERSION,
+            (true, false) => MASS_GRAVITY_SNAPSHOT_VERSION,
+            (true, true) => MASS_STACK_GRAVITY_SNAPSHOT_VERSION,
+        }
+    }
+
     pub(in crate::world) fn is_stack(&self) -> bool {
         matches!(self.status, Status::Stack(_))
     }
@@ -343,7 +384,7 @@ impl Continuation {
             && match &self.status {
                 Status::Invalidated(_) => true,
                 Status::Active(active) => {
-                    active.valid_for(loading)
+                    active.valid_for(loading, &self.history)
                         && active.episode.as_ref().is_none_or(|e| {
                             e.settled_work == 0.0
                                 || self.history.settling == GravitySettling::BoundedNumerical

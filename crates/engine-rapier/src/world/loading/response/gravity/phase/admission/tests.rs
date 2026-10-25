@@ -105,7 +105,7 @@ fn gravity_stack_observation_refuses_unsupported_support_motion_loads_and_geomet
             13 => world.raw.bodies[b].lock_rotations(false, true),
             14 => world.raw.bodies[b].set_linear_damping(0.01),
             15 => world.raw.bodies[b].enable_ccd(true),
-            16 => world.raw.colliders[collider].set_mass(19.0),
+            16 => world.raw.colliders[collider].set_mass(4.0),
             17 => world.raw.colliders[collider].set_friction(0.01),
             18 => world.raw.colliders[collider].set_sensor(true),
             19 => world.raw.colliders[collider].set_shape(SharedShape::ball(0.5)),

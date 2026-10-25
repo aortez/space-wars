@@ -3,7 +3,7 @@ use super::*;
 
 impl Scene {
     pub(super) fn admit(world: &mut PhysicsWorld) -> Result<(Self, Active), Rejection> {
-        // Pair admission retains the frozen v6 contract. Stack enrollment
+        // Continuation selects the legacy or bounded-mass contract. Stack enrollment
         // observes three roles separately before establishing its own owners.
         let (scene, plates) = Self::observe::<2>(world)?;
         let observed = Active {
@@ -49,10 +49,11 @@ impl Scene {
             }
         }
         plates.refresh_mass(world).map_err(geometry)?;
-        if plates.bodies[..N - 1]
+        let masses: Vec<_> = plates.bodies[..N - 1]
             .iter()
-            .any(|h| world.raw.bodies[*h].mass() != 20.0)
-        {
+            .map(|h| world.raw.bodies[*h].mass())
+            .collect();
+        if !valid_masses(2, &masses) {
             return Err(Rejection::UnsupportedScene);
         }
         let loading = world.loading.as_ref().unwrap();

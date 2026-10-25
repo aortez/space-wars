@@ -3,6 +3,7 @@ use crate::world::loading::response::gravity::tests::stack_world;
 
 mod corruption;
 mod lifecycle;
+mod masses;
 
 fn body(n: u64) -> BodyId {
     BodyId::new(PhysicsId::new(n), BodyRole::PRIMARY)

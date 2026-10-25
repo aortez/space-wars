@@ -2,6 +2,8 @@
 use super::*;
 use crate::world::loading::response::gravity::{self as native, GravitySettling};
 
+mod masses;
+
 #[derive(Default)]
 struct Observed {
     impacts: Vec<Impact>,

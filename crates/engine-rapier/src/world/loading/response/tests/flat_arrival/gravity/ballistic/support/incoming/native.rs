@@ -4,6 +4,7 @@ use crate::world::loading::response::gravity::GravitySettling;
 use crate::world::loading::response::gravity::stack::phase as native;
 
 mod flight;
+mod masses;
 mod support;
 
 fn unenrolled(world: &PhysicsWorld) -> PhysicsWorld {

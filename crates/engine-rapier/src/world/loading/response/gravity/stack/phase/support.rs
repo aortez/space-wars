@@ -184,7 +184,12 @@ impl Staged {
         };
         self.reserve_record()?;
         self.intervals += 1;
-        let total_mass = f64::from(start[0].mass) + f64::from(start[1].mass);
+        // Sum the actual energy supplied to each body in the same order as
+        // measured projection loss; factoring unequal masses rounds differently.
+        let half_kick_energy: f64 = start[..2]
+            .iter()
+            .map(|e| 0.5 * f64::from(e.mass) * f64::from(kick) * f64::from(kick))
+            .sum();
         let mut support = Support {
             duration,
             episodes: [
@@ -196,7 +201,7 @@ impl Staged {
             rounding_impulses: [0.0; 2],
             rounding_loss: 0.0,
             gravity_work: 0.0,
-            kick_energy: total_mass * f64::from(kick) * f64::from(kick),
+            kick_energy: half_kick_energy + half_kick_energy,
             projection_energy: 0.0,
             solves: 0,
         };

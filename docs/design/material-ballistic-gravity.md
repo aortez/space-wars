@@ -13,6 +13,11 @@ same face. An opt-in support experiment adds safe rest and bounded numerical
 settling of small unresolved hops. This does not expand native admission, add
 production APIs, select gameplay damping, or change native snapshot formats.
 
+The later [unequal-mass qualification](material-unequal-mass-gravity.md) varies
+inertial mass in these same pair and supported-stack fixtures. It records the
+sampled mass ratios, per-body energy accounting and finite-solve refusals, and
+the subsequent native extension with preserved legacy snapshots.
+
 ## Separate the impact from gravity integration
 
 For an interval of duration `h`, flight uses:

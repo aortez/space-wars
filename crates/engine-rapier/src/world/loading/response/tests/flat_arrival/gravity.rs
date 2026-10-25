@@ -20,6 +20,22 @@ fn fixture(
     (world, tokens)
 }
 
+fn fixture_with_masses(
+    plates: &[(u16, f32)],
+    copies: u16,
+    reverse: bool,
+    gap: f32,
+    speed: f32,
+    gravity: f32,
+) -> (PhysicsWorld, Vec<RegionToken>) {
+    let (mut world, tokens) =
+        super::fixture_with_masses(plates, copies, reverse, 0.0, Vec2::ZERO, 0.0, false);
+    world.set_pose(body(1), Vec2::X * -gap, 0.0, true);
+    world.set_velocity(body(1), Vec2::X * speed, 0.0, true);
+    world.set_gravity(Vec2::X * gravity);
+    (world, tokens)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Sample {
     duration: f32,

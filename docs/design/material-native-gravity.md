@@ -8,7 +8,9 @@ Public types live in `world::loading::response::gravity`; continuation state,
 admission and physical phases remain private. No scenario selects this operation
 by default, and this bounded scene does not complete #327.
 
-The first successful positive call enrolls snapshot v6 pair history or v7 stack history. Unenrolled worlds
+The first successful positive call enrolls snapshot v6 pair history or v7 stack
+history when every dynamic mass is 20. Other admitted masses use v8/v9 under the
+[bounded-mass contract](material-unequal-mass-gravity.md). Unenrolled worlds
 keep their existing v1-v5 formats; pause and refusal cannot enroll. There is no
 separate enrollment/reset or partial-step API. Existing public arrival operations
 still refuse gravity, and ordinary stepping retains its `ExternalWork` guard.
@@ -34,10 +36,11 @@ Admission examines the whole world on every positive call:
   one/two/four uniform tangent slices, one/two identical copies per slice, at most
   eight colliders per body and sixteen total. Body roles come from body type and
   geometry, independently of handle, source, or insertion order.
-- The dynamic body has refreshed mass 20, rotation locked, translations unlocked,
+- The dynamic body has refreshed mass in [5, 80], rotation locked, translations unlocked,
   sleeping disabled, finite COM and positive effective inverse mass on both
-  axes. The fixed mass does not supply an energy source. A broader mass range
-  needs additional independent qualification before expanding this boundary.
+  axes. The fixed mass does not supply an energy source. Mass 20 retains the
+  original v6 contract; other admitted masses use the
+  [bounded-mass extension](material-unequal-mass-gravity.md) and v8 history.
 - Gravity is `(a, 0)` with finite `a > 0` and gravity scale 1. No other force,
   torque, damping, friction, joints, CCD/soft CCD, skin, sensor, disabled object,
   custom hook/filter, nondefault dominance or kinematic body is admitted.
@@ -293,8 +296,8 @@ world merely to record that failure.
 
 ## Snapshot layout and validation
 
-Native snapshot **version 6** stores the continuation enrolled by the first
-successful positive gravity call. The base physics, v2 capture and v3 response
+Native snapshot **version 6** stores the original mass-20 pair continuation.
+The base physics, v2 capture and v3 response
 payload layouts are unchanged. The v6
 tail is optional ball tracker, optional flat tracker, then the required gravity
 state (active or invalidated). This is a distinct v6 tail, not bytes appended
@@ -304,8 +307,10 @@ invalidation or switching stepping methods.
 
 The separate [stack persistence extension](material-native-stack-gravity.md#persistent-state-and-compatibility)
 now uses v7 while preserving this v6 pair payload byte for byte. The reader rejects
-cross-labeled pair/stack versions. Successful public stack enrollment produces v7;
-pair calls continue to produce the unchanged v6 layout.
+cross-labeled pair/stack versions. These original mass-20 histories retain v6/v7.
+The [bounded-mass extension](material-unequal-mass-gravity.md#native-admission-and-saved-state-compatibility)
+uses v8/v9 with revision2 for other admitted masses, preserving the original
+field layout and lifecycle tags. Every outer version must match kind and revision.
 
 Continue reading v1-v5 with exactly their current layouts. They contain no
 gravity history and restore as never enrolled; do not infer a continuation from
@@ -359,8 +364,8 @@ entire scene, refreshes mass in the clone, and either constructs initial history
 or compares the exact saved continuation. The existing flat operation and this
 phase share the filled-rectangle certificate and certified seam filter, with
 separate gravity admission. The flat operation still explicitly requires zero
-gravity. Gravity admission additionally requires the original two-plate frame,
-mass 20 and the exact body roles, poses, motion and force restrictions above.
+gravity. Gravity admission additionally requires the original frame, bounded
+refreshed masses and the exact body roles, poses, motion and force restrictions above.
 
 Continuation compares the actual plate identities, collider prefix, material
 definitions, endpoints, mass/COM/inertia, solver settings and acceleration with
@@ -568,7 +573,8 @@ are implemented. Complete stack calls match the independent fixture's schedules,
 physical payloads and retained ledgers through repeated returns and full-stack
 rest/settlement. Three-role reports and public-only integration tests cover
 transactional refusal, replay and invalidation.
-Overloaded deformation, changing gravity/drivers, broader masses,
+The bounded-mass extension now admits masses in [5, 80] and stack ratios up to 4:1.
+Overloaded deformation, changing gravity/drivers, masses beyond that boundary,
 translated/rotated frames, free rotation and general geometry remain later
 work. #328 owns the material lifecycle/failure consequences; this bounded API
 does not finish #327 or select gameplay calibration.
