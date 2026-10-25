@@ -402,10 +402,59 @@ state was generation 12/B, Release selected and partial offline off.
 This establishes the observed repeated-failure case with a documented close-out
 continuation, not an unattended end-to-end runner or installation approval. The
 earlier first-attempt observer deviations remain unresolved evidence limitations.
-Four of the eleven required cases now have observations on this binding; owner
-review and the remaining seven cases are still required. Generation 13 has no
-remaining retry. Further fault cases require a new eligible payload and their
-own reviewed procedures.
+At this checkpoint, four of the eleven required cases had observations on this
+binding; owner review and the remaining seven cases were still required.
+Generation 13 had no remaining retry; the next fault case required a new
+eligible payload and its own reviewed procedure.
+
+### Second Picade trial reset, 2026-10-25
+
+The [retained reset record](data/ota-picade2-trial-reset-20261025.json) documents
+one early **software reset** of signed generation 14, built from merged main
+`c68b21063f0bc062936285249a04b55d390acc4a` after its successful push CI.
+The image passed independent artifact verification and was published to Nightly
+with metadata version 15; Release targets remained empty. The separately built
+owner helper from [#545](https://github.com/aortez/space-wars/pull/545), source
+`e777e2627d85`, is absent from the shipped image. The bound host runner passed
+nineteen guard tests before execution.
+
+The preparation SSH connection was absent after approximately four hours waiting
+for the owner's WAN block; it had a two-hour idle lifetime, but its actual closure
+cause was not observed. Before any install or fault, one new preparation
+connection reverified the same generation-12 boot, usable time, saved data and
+unchanged recovery history. The original records were retained. No install or
+fault was replayed.
+
+With the owner's WAN-only block confirmed by direct-IP HTTPS probes, the
+installer wrote, flushed and verified slot A while generation 12 remained good
+and default in B. The native reset helper admitted the new uncommitted trial and
+recorded its single normal-reboot request at **19.524 seconds of trial uptime**.
+Both the host acknowledgement and durable device result confirm that systemd
+queued the reboot. The helper did not change selectors or recovery history.
+
+One planned return connection observed normal generation 12/B **29.475 seconds
+after reset invocation**, within the 420-second outer observation bound. The
+exact transaction was `rolled-back` with `trial-reset`; generation 14 was
+quarantined at attempt 1. Generation 13's two consumed attempts, prior fault
+receipts and earlier failure history were unchanged. This timing measures host
+observation of return, not the exact hardware reset time.
+
+A separate normal reboot, still WAN-blocked, retained the quarantine, generation
+floor and attempt count with no automatic retry. Clock advanced and recovery was
+healthy. Protected file contents and metadata matched apart from the recorded
+adapter-local Bluetooth `attributes` cache regenerated at boot. After the owner
+restored Internet, network time was usable and the updater was idle. Ordinary
+Nightly selection returned `CandidateChanged` without changing history. The
+device finished on generation 12/B, Release selected, partial offline off and
+SSH closed.
+
+Five of the eleven cases now have observations on this binding; owner review
+remains pending and no installation approval was created. Root startup failure,
+recovery-service failure, kiosk crash, watchdog handoff/expiry, interrupted
+promotion and physical power loss remain separate cases. Generation 14 retains
+one bounded explicit retry for a separately selected procedure. The verified
+portable backup remains available; privileged offline restoration was not
+needed or rehearsed.
 
 ## One missing-root attempt
 
