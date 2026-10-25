@@ -232,6 +232,9 @@ pub(super) struct LoadingState {
     // v14 appends compression history without changing the v2 capture payload.
     #[serde(skip)]
     pub(in crate::world) compression: Option<response::compression::Continuation>,
+    // v15 retains finite-mass compression, without changing earlier payloads.
+    #[serde(skip)]
+    pub(in crate::world) dynamic_compression: Option<response::dynamic_compression::Continuation>,
 }
 
 impl LoadingState {
@@ -251,6 +254,7 @@ impl LoadingState {
             flat_departures: None,
             gravity: None,
             compression: None,
+            dynamic_compression: None,
         }
     }
 
@@ -283,6 +287,9 @@ impl LoadingState {
             state.invalidate(reason);
         }
         if let Some(state) = &mut self.compression {
+            state.invalidate(reason);
+        }
+        if let Some(state) = &mut self.dynamic_compression {
             state.invalidate(reason);
         }
     }
@@ -322,6 +329,12 @@ impl LoadingState {
 
     pub(super) fn valid_for(&self, world: &PhysicsWorld) -> bool {
         self.config.valid()
+            && self.dynamic_compression.as_ref().is_none_or(|c| {
+                self.gravity.is_none()
+                    && self.compression.is_none()
+                    && self.response.is_some()
+                    && c.valid_for(world)
+            })
             && self.compression.as_ref().is_none_or(|c| {
                 self.gravity.is_none() && self.response.is_some() && c.valid_for(world)
             })

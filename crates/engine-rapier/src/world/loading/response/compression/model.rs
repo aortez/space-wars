@@ -213,3 +213,33 @@ fn elastic_energy(stiffness: f64, x: f64, plastic: f64) -> f64 {
     let strain = (x - plastic).max(0.0);
     0.5 * stiffness * strain * strain
 }
+
+#[cfg(test)]
+pub(super) fn frozen_v14_history(h: &History) -> Vec<u8> {
+    let m = &h.initial;
+    let s = &h.summary;
+    bincode::serialize(&(
+        (
+            m.parameters,
+            m.brittle,
+            m.volume,
+            m.remaining,
+            m.thickness,
+            m.depth,
+        ),
+        (
+            s.indentation,
+            s.plastic_indentation,
+            s.elastic_energy,
+            s.driver_work,
+            s.damage_work,
+            s.viscous_loss,
+            s.charge_error,
+            s.absolute_charge_error,
+            s.absolute_motion_error,
+            s.elapsed,
+            s.steps,
+        ),
+    ))
+    .unwrap()
+}

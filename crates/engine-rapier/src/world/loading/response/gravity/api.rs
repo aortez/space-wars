@@ -340,7 +340,7 @@ impl PhysicsWorld {
             if self
                 .loading
                 .as_ref()
-                .is_some_and(|s| s.compression.is_some())
+                .is_some_and(|s| s.compression.is_some() || s.dynamic_compression.is_some())
             {
                 return Err(GravityRejection::StaleContinuation);
             }

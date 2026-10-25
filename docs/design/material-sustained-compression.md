@@ -8,8 +8,9 @@ material law for measured permanent compression. The independent fixture is in
 
 This is the first native sustained-deformation slice. It is displacement-driven;
 it does not yet replace the gravity operation's refusal of overloaded supports.
-Dynamic support deformation, transient-impact handoff, beam connections and
-failure topology remain separate work. The existing impact path still permits
+A separate [finite-mass dynamic operation](material-dynamic-compression.md) now
+covers monotone gravity-driven compression. Transient-impact handoff, beam
+connections and failure topology remain separate work. The existing impact path still permits
 sufficiently energetic weaker materials to damage stronger ones. Here the
 platen is an explicitly ideal prescribed boundary, with no finite material of
 its own.

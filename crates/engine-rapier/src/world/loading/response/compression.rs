@@ -5,7 +5,7 @@ use super::*;
 use engine_material::{CRUSH_TIME_CONSTANT, SustainedLoad, sustained};
 
 mod model;
-mod scene;
+pub(in crate::world::loading::response) mod scene;
 mod step;
 use model::History;
 use scene::Scene;

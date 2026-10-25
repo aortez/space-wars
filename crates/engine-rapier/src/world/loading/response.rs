@@ -8,6 +8,7 @@ use rapier2d::prelude::{ContactImpulse, SolverFlags};
 pub mod arrival;
 pub mod ball_arrival;
 pub mod compression;
+pub mod dynamic_compression;
 mod energy;
 pub mod flat_arrival;
 mod geometry;

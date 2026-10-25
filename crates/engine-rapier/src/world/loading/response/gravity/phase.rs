@@ -15,7 +15,7 @@ pub(super) mod support;
 const TOUCH: f64 = 1.0e-6;
 
 // Force-free auxiliary work never produces ordinary gameplay contact events.
-pub(super) fn auxiliary_step(
+pub(in crate::world::loading::response) fn auxiliary_step(
     world: &mut PhysicsWorld,
     duration: f32,
     hooks: &impl PhysicsHooks,
