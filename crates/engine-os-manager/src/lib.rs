@@ -7,6 +7,8 @@ pub mod bootstrap_canonical;
 mod bootstrap_recovery;
 #[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
 pub mod supervised_install;
+#[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
+pub mod supervised_kiosk_hang;
 #[cfg(all(test, target_os = "linux"))]
 #[allow(dead_code)]
 #[path = "../../engine-ota/tests/support/mod.rs"]

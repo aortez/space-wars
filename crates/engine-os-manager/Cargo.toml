@@ -14,6 +14,10 @@ recovery-qualification = ["engine-ota/recovery-qualification"]
 name = "install_signed_trial"
 required-features = ["recovery-qualification"]
 
+[[example]]
+name = "kiosk_hang_trial"
+required-features = ["recovery-qualification"]
+
 [[bin]]
 name = "engine-os-manager"
 path = "src/main.rs"
