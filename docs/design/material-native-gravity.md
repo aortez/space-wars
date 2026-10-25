@@ -1,14 +1,14 @@
 # Native flat gravity stepping contract (#327)
 
 `PhysicsWorld::step_material_flat_gravity(dt, settling)` now exposes the qualified
-two-plate gravity operation. It advances flight, material impacts, safe support
+pair and three-plate stack gravity operations. They advance flight, material impacts, safe support
 and explicit bounded settling in one transaction. The independent
 [ballistic fixture](material-ballistic-gravity.md) supplies the physical evidence.
 Public types live in `world::loading::response::gravity`; continuation state,
 admission and physical phases remain private. No scenario selects this operation
 by default, and this bounded scene does not complete #327.
 
-The first successful positive call enrolls snapshot v6 history. Unenrolled worlds
+The first successful positive call enrolls snapshot v6 pair history or v7 stack history. Unenrolled worlds
 keep their existing v1-v5 formats; pause and refusal cannot enroll. There is no
 separate enrollment/reset or partial-step API. Existing public arrival operations
 still refuse gravity, and ordinary stepping retains its `ExternalWork` guard.
@@ -19,8 +19,9 @@ classification; see [the reporting boundary](material-gravity-loading.md#correct
 
 ## First admitted scene
 
-Start with the complete two-plate scene, not the three-plate incoming experiment.
-The latter has not qualified departure, later returns or full-stack settling.
+The original pair scene is described below. The public
+[three-plate extension](material-native-stack-gravity.md) adds a supported dynamic
+plate and qualifies complete flight, impact, return and full-stack settling.
 Admission examines the whole world on every positive call:
 
 - Exactly one dynamic plate and one fixed plate, with local half-extents
@@ -195,11 +196,15 @@ temporary support-projection events.
 The exported types are `GravityStep`, `GravityTimedRecord`, `GravityRecord`,
 `GravityFlight`, `GravityImpact`, `GravitySettlement`, `GravitySupport`,
 `GravityNumericalSummary`, `GravityErrorAxis`, `GravitySettling` and
-`GravityRejection`. `GravityStep.records` contains the timeline, `durations` the
+`GravityRejection`. Stack payloads add `GravityStackSupport`,
+`GravityStackSettlement`, `GravitySupportCorrection` and `GravityCorrectionSummary`.
+`GravityStep.records` contains the timeline, `durations` the
 positive intervals, `advances` one metric per raw backend call and `wall_time`
 the complete transaction duration. A record's `at` is frame-relative seconds;
 `phase` indexes `advances` (Support uses its first projection). Its body/source
-arrays use dynamic/fixed role order; Episode payloads use canonical pair order.
+identity is `roles: GravityRoles`: `Pair { bodies, sources }` uses dynamic/fixed
+order and `Stack { bodies, sources }` uses A/B/C order. Episode payloads use
+canonical pair order. This replaces the old direct two-element fields.
 
 `GravityImpact.response_batch` indexes this call's
 `world.material_response_batches()`, and `response` owns the corresponding
@@ -210,7 +215,10 @@ Returned summaries are copies and cannot reset retained state. Pause returns the
 retained summary even for invalidated history; it is `None` only if never enrolled.
 
 The four `MAX_GRAVITY_*` constants expose the interval, impact, projection and
-initial-support-capture caps. Callers cannot raise these limits. Report payloads
+initial-support-capture caps for pairs. Stack calls share the eight interval/impact
+caps and expose `MAX_GRAVITY_STACK_PROJECTIONS` (256),
+`MAX_GRAVITY_STACK_PROJECTION_SOLVES` (32 per coupled projection), and
+`MAX_GRAVITY_STACK_SUPPORT_CAPTURES` (2). Callers cannot raise these limits. Report payloads
 support exact equality/clone; the complete `GravityStep` deliberately has no
 equality implementation because its metrics include nondeterministic timings.
 The method's Rustdoc includes a compiled example linking an Impact to its batch.
@@ -293,6 +301,11 @@ state (active or invalidated). This is a distinct v6 tail, not bytes appended
 after an implicitly present v5 flat tracker. Worlds that never enroll continue
 to emit their existing v1-v5 format. Once enrolled, they retain v6 after End,
 invalidation or switching stepping methods.
+
+The separate [stack persistence extension](material-native-stack-gravity.md#persistent-state-and-compatibility)
+now uses v7 while preserving this v6 pair payload byte for byte. The reader rejects
+cross-labeled pair/stack versions. Successful public stack enrollment produces v7;
+pair calls continue to produce the unchanged v6 layout.
 
 Continue reading v1-v5 with exactly their current layouts. They contain no
 gravity history and restore as never enrolled; do not infer a continuation from
@@ -549,9 +562,13 @@ This completes the bounded two-plate gravity API checkpoint and its local review
 Prepare this slice for PR review before expanding admission or coupling it to
 a gameplay host.
 
-Three-plate support histories remain useful independent evidence. Promote them
-only after their later transitions and failure boundaries have their own native
-contract. Overloaded deformation, changing gravity/drivers, broader masses,
+Three-plate support histories now have a [native extension contract](material-native-stack-gravity.md).
+Shared geometry observation, bounded v7 continuation and public stack dispatch
+are implemented. Complete stack calls match the independent fixture's schedules,
+physical payloads and retained ledgers through repeated returns and full-stack
+rest/settlement. Three-role reports and public-only integration tests cover
+transactional refusal, replay and invalidation.
+Overloaded deformation, changing gravity/drivers, broader masses,
 translated/rotated frames, free rotation and general geometry remain later
 work. #328 owns the material lifecycle/failure consequences; this bounded API
 does not finish #327 or select gameplay calibration.

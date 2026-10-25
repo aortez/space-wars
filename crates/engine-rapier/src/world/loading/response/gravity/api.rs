@@ -1,14 +1,20 @@
-//! Public reports for the admitted two-plate gravity operation.
+//! Public reports for admitted pair and three-plate stack gravity operations.
 use super::*;
 
 /// Maximum positive flight/held intervals in one call, including retained tails.
 pub const MAX_GRAVITY_INTERVALS: usize = 8;
 /// Maximum zero-duration material impact solves in one call.
 pub const MAX_GRAVITY_IMPACTS: usize = 8;
-/// Two projections per held interval, plus at most one numerical settlement.
+/// Pair projections: two per held interval, plus at most one numerical settlement.
 pub const MAX_GRAVITY_PROJECTIONS: usize = 17;
-/// Only fresh stationary contact needs an initial support capture.
+/// Pair support captures: only fresh stationary contact needs one.
 pub const MAX_GRAVITY_SUPPORT_CAPTURES: usize = 1;
+/// Stack projection solves per call, including B-only support projections.
+pub const MAX_GRAVITY_STACK_PROJECTIONS: usize = 256;
+/// Raw solves in each coupled stack projection.
+pub const MAX_GRAVITY_STACK_PROJECTION_SOLVES: usize = 32;
+/// Stack captures: B-C bootstrap and at most one fresh stationary A-B contact.
+pub const MAX_GRAVITY_STACK_SUPPORT_CAPTURES: usize = 2;
 
 /// A discarded transaction. Refusal preserves the entire world and prior outputs.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -37,7 +43,7 @@ pub enum GravityRejection {
     },
     /// Loading capture or material response is not enabled.
     ResponseDisabled,
-    /// The complete world does not fit the admitted two-plate scene.
+    /// The complete world does not fit the admitted pair or three-plate stack scene.
     UnsupportedScene,
     /// Saved ownership/state no longer matches, or an external edit/mode invalidated it.
     StaleContinuation,
@@ -73,6 +79,18 @@ pub struct GravityNumericalSummary {
     /// Signed cumulative work, impulse and position defects; each is bounded by
     /// `1e-5 * scales[i]`. These are numerical measurements, never material charges.
     pub errors: [f64; 3],
+    /// Separate B recoil ledger for stacks, including invalidated histories.
+    /// None for pair history; these corrections are never material damage.
+    pub support_corrections: Option<GravityCorrectionSummary>,
+}
+
+/// Retained B recoil totals and allowances fixed at initial enrollment.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GravityCorrectionSummary {
+    pub impulse: f64,
+    pub dissipated: f64,
+    pub impulse_bound: f64,
+    pub energy_bound: f64,
 }
 
 /// One certified ballistic interval using rounded kicks and force-free backend drift.
@@ -144,6 +162,66 @@ pub struct GravitySupport {
     pub projection_energy: f64,
 }
 
+/// Safe rigid support of both dynamic plates. Contact arrays use A-B/B-C order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GravityStackSupport {
+    pub duration: f32,
+    pub episodes: [EpisodeId; 2],
+    pub forces: [f64; 2],
+    /// Measured reactions, excluding the final residual corrections.
+    pub impulses: [f64; 2],
+    pub rounding_impulses: [f64; 2],
+    /// Already included in projection_energy.
+    pub rounding_loss: f64,
+    /// Zero: both dynamic positions remain unchanged.
+    pub gravity_work: f64,
+    /// Auxiliary kick energy, exactly canceled by projection_energy.
+    pub kick_energy: f64,
+    pub projection_energy: f64,
+    /// Total raw projection solves, excluding the stationary drift and capture.
+    pub solves: usize,
+}
+
+/// One bounded numerical settlement under the retained A-B/B-C owners.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GravityStackSettlement {
+    pub episodes: [EpisodeId; 2],
+    pub available: f64,
+    /// Actual removed kinetic energy, including rounding_loss; no material charge.
+    pub dissipated: f64,
+    /// Measured A-B/B-C reactions, excluding residual corrections.
+    pub impulses: [f64; 2],
+    pub rounding_impulses: [f64; 2],
+    pub rounding_loss: f64,
+    pub solves: usize,
+}
+
+/// Explicit removal of B's bounded residual recoil after a coupled impact.
+/// This loss is additional to material dissipation in the preceding Impact.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GravitySupportCorrection {
+    /// Persistent B-C support owner.
+    pub episode: EpisodeId,
+    /// Signed mass_B * residual_velocity_B reaction correction.
+    pub impulse: f64,
+    pub dissipated: f64,
+}
+
+/// Geometric role identities, independent of source or insertion order.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GravityRoles {
+    /// Dynamic then fixed plate.
+    Pair {
+        bodies: [BodyId; 2],
+        sources: [ContactSource; 2],
+    },
+    /// A, B, C: flying dynamic, supported dynamic, fixed base.
+    Stack {
+        bodies: [BodyId; 3],
+        sources: [ContactSource; 3],
+    },
+}
+
 /// Physical/accounting payload in the step's single execution-ordered timeline.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GravityRecord {
@@ -152,6 +230,9 @@ pub enum GravityRecord {
     Impact(GravityImpact),
     Settlement(GravitySettlement),
     Support(GravitySupport),
+    StackSupport(GravityStackSupport),
+    StackSettlement(GravityStackSettlement),
+    SupportCorrection(GravitySupportCorrection),
 }
 
 /// Stable identities and location of one timeline record.
@@ -161,12 +242,10 @@ pub struct GravityTimedRecord {
     /// uses its start, and instantaneous contact/settlement uses the solve time.
     pub at: f64,
     /// Index into [`GravityStep::advances`]. Support refers to its first
-    /// projection, followed by stationary drift and the second projection.
+    /// projection. A supported Flight refers to the drift between B projections.
     pub phase: usize,
-    /// Dynamic then fixed role order, independent of source or insertion order.
-    pub bodies: [BodyId; 2],
-    /// Same role order as bodies. Episode payloads instead use canonical pair order.
-    pub sources: [ContactSource; 2],
+    /// All scene roles. Episode payloads instead use canonical contact-pair order.
+    pub roles: GravityRoles,
     pub record: GravityRecord,
 }
 
@@ -175,7 +254,8 @@ pub struct GravityTimedRecord {
 #[derive(Debug, Clone, Default)]
 pub struct GravityStep {
     /// Positive flight/held durations whose exact sum equals the requested f32
-    /// time. Instantaneous solves consume no duration; pause returns an empty list.
+    /// time. A stack's B Support and A Flight describe the same interval, listed
+    /// here once. Instantaneous solves consume no duration; pause returns an empty list.
     pub durations: Vec<f32>,
     /// Execution order: capture transition before Impact/initial Support;
     /// Flight before proved End; Settlement before subsequent held intervals.
@@ -190,11 +270,11 @@ pub struct GravityStep {
 }
 
 impl PhysicsWorld {
-    /// Advance an admitted two-plate scene with constant normal gravity, material
+    /// Advance an admitted pair or three-plate stack with constant normal gravity, material
     /// impacts and safe rigid support. The settling policy is explicit and is
     /// frozen by the first successful positive call.
     ///
-    /// Requires exactly two axis-aligned plates of half-extents (0.5, 1): one
+    /// A pair requires exactly two axis-aligned plates of half-extents (0.5, 1): one
     /// dynamic body of refreshed mass 20, rotation locked and sleep disabled,
     /// and one fixed body centered at (1, 0). Both have zero tangent/angular
     /// motion. The dynamic center is at x<=1e-6, y=0; gravity is (a, 0), a>0,
@@ -202,6 +282,10 @@ impl PhysicsWorld {
     /// one/two coincident copies, all bound to its distinct live material region.
     /// Capture's touch tolerance must be 1e-5. No other force/torque, friction,
     /// damping, joints, CCD/soft CCD, skin, sensor, custom filter or extra body.
+    /// A stack adds a stationary dynamic mass-20 plate at (1, 0) and places the
+    /// fixed base at (2, 0). The same geometry/material restrictions apply to all
+    /// three plates. B-C retains its support owner while A flies, impacts and
+    /// eventually rests. Full-stack support carries both dynamic weights.
     /// Failed materials and support overload refuse; failure consequences and
     /// physical overloaded deformation are outside this operation.
     ///
@@ -212,8 +296,8 @@ impl PhysicsWorld {
     ///
     /// dt=0 is a pause: clear ephemeral outputs without enrolling, solving,
     /// changing policy, or resetting history. Invalid time preserves outputs.
-    /// Positive enrollment persists in snapshot v6. Call this operation again
-    /// after restore; ordinary positive stepping and external edits invalidate
+    /// Positive enrollment persists in snapshot v6 (pair) or v7 (stack).
+    /// Call this operation again after restore; ordinary positive stepping and external edits invalidate
     /// continuation permanently while retaining its numerical ledger.
     ///
     /// # Example
@@ -239,6 +323,15 @@ impl PhysicsWorld {
         dt: f32,
         settling: GravitySettling,
     ) -> Result<GravityStep, GravityRejection> {
+        if dt.is_finite() && dt > 0.0 {
+            let continuation = self.loading.as_ref().and_then(|l| l.gravity.as_ref());
+            if continuation.is_some_and(|s| s.invalidation().is_some()) {
+                return Err(GravityRejection::StaleContinuation);
+            }
+            if continuation.is_some_and(Continuation::is_stack) || self.raw.bodies.len() == 3 {
+                return stack::phase::schedule::step(self, dt, settling);
+            }
+        }
         phase::schedule::step(self, dt, settling)
     }
 }

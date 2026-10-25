@@ -1,6 +1,10 @@
 use super::*;
 use engine_material::{ARMOR, WOOD};
 
+mod stack_fixture;
+mod v6;
+pub(super) use stack_fixture::world as stack_world;
+
 fn body(n: u64) -> BodyId {
     BodyId::new(PhysicsId::new(n), BodyRole::PRIMARY)
 }

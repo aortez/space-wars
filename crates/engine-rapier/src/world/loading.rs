@@ -226,7 +226,7 @@ pub(super) struct LoadingState {
     // Snapshot v5 has a separate tail for optional ball and flat evidence.
     #[serde(skip)]
     pub(in crate::world) flat_departures: Option<response::flat_arrival::DepartureTracker>,
-    // Snapshot v6 keeps gravity history even after its live claims invalidate.
+    // Snapshots v6 (pair) and v7 (stack) retain even invalidated gravity history.
     #[serde(skip)]
     pub(in crate::world) gravity: Option<response::gravity::Continuation>,
 }

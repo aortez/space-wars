@@ -44,7 +44,11 @@ impl Observed {
                     outgoing: impact.outgoing,
                     response: impact.response,
                 }),
-                native::GravityRecord::Support(_) | native::GravityRecord::Settlement(_) => {
+                native::GravityRecord::Support(_)
+                | native::GravityRecord::Settlement(_)
+                | native::GravityRecord::StackSupport(_)
+                | native::GravityRecord::StackSettlement(_)
+                | native::GravityRecord::SupportCorrection(_) => {
                     panic!("unexpected support in flight fixture")
                 }
             }

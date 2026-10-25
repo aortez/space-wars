@@ -1,5 +1,8 @@
 use super::*;
 
+mod returns;
+mod stack;
+
 fn verified(
     parts: &[u16],
     copies: u16,
@@ -103,7 +106,10 @@ fn ballistic_supported_arrival_preserves_shared_work_and_old_owner() {
                                 }
                             }
                             assert_eq!(impacts.len(), 1);
-                            assert_eq!(events.len(), 1);
+                            assert_eq!(events.len(), 2);
+                            assert_eq!(events[1].event.transition, EpisodeTransition::End);
+                            assert_eq!(events[1].event.id, events[0].event.id);
+                            assert_eq!(events[1].event.sources, events[0].event.sources);
                             let impact = &impacts[0];
                             let response = &impact.response;
                             near(impact.at, arrival_at, 2.0e-6);
@@ -201,7 +207,8 @@ fn ballistic_supported_arrival_at_frame_end_preserves_pause_and_support() {
     assert!(scene.world.material_response_batches().is_empty());
     let trace = replayed(&mut scene, 0.005);
     assert!(trace.impacts.is_empty());
-    assert!(trace.events.is_empty());
+    assert_eq!(trace.events.len(), 1);
+    assert_eq!(trace.events[0].event.transition, EpisodeTransition::End);
     assert!(trace.supports.iter().all(|s| s.episode == old));
     assert_eq!(balances(&scene.world, &tokens), capacity);
 }
@@ -212,7 +219,6 @@ fn ballistic_supported_arrival_limits_failure_and_stale_evidence_roll_back() {
     let original = scene.snapshot();
     let capacity = balances(&scene.world, &tokens);
     refused(&mut scene, 0.01, 1, Rejection::Limit);
-    refused(&mut scene, 1.0, MAX_ADVANCES, Rejection::Reimpact);
     refused(&mut scene, -1.0, MAX_ADVANCES, Rejection::InvalidTime);
     refused(&mut scene, f32::NAN, MAX_ADVANCES, Rejection::InvalidTime);
     replayed(&mut scene, 0.01);

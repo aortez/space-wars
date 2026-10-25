@@ -52,6 +52,11 @@ impl PhysicsHooks for Projection {
             .retain(|c| f64::from(c.dist) <= TOUCH);
         for c in context.solver_contacts.iter_mut() {
             c.restitution = 0.0;
+            // Each projection has a separately measured incoming kick. A much
+            // larger previous cache can swallow or inflate a tiny tail reaction.
+            c.warmstart_impulse = 0.0;
+            c.warmstart_tangent_impulse = Default::default();
+            c.warmstart_twist_impulse = 0.0;
         }
     }
 }

@@ -1,10 +1,11 @@
 //! Transactional constant-gravity motion, material impacts and safe support for
-//! the admitted two-plate scene. Other arrival methods still refuse gravity.
+//! admitted pair and three-plate stack scenes. Other arrival methods still refuse gravity.
 use super::*;
 
 mod api;
 pub use api::*;
 pub(super) mod phase;
+pub(super) mod stack;
 
 /// Policy for a return that has not proved departure from its original episode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,8 +32,12 @@ pub(in crate::world) struct Continuation {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 enum Status {
+    // Keep these first two tags and payloads frozen for snapshot v6.
     Active(Box<Active>),
     Invalidated(Invalidation),
+    // Stack keeps its corrections outside its own active/invalidated state.
+    // This tag is accepted only in snapshot v7.
+    Stack(Box<stack::State>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -48,6 +53,22 @@ struct History {
 }
 
 impl History {
+    fn new(endpoint: &Endpoint, acceleration: f64, settling: GravitySettling) -> Self {
+        let (x, v, m) = (
+            f64::from(endpoint.position[0]),
+            f64::from(endpoint.velocity[0]),
+            f64::from(endpoint.mass),
+        );
+        let energy = (0.5 * m * v * v - m * acceleration * x).max(0.0);
+        Self {
+            revision: 1,
+            settling,
+            reference: [x, v, m, acceleration],
+            scales: [energy, libm::sqrt(2.0 * m * energy), x.abs().max(1.0)],
+            errors: [0.0; 3],
+        }
+    }
+
     fn valid(&self) -> bool {
         let [x, v, m, a] = self.reference;
         let energy = (0.5 * m * v * v - m * a * x).max(0.0);
@@ -150,130 +171,170 @@ struct OwnedEpisode {
     settled_work: f64,
 }
 
-impl Active {
-    fn valid_for(&self, loading: &LoadingState) -> bool {
-        let Some(response) = &loading.response else {
-            return false;
-        };
-        let [dynamic, fixed] = &self.plates;
-        let integration = &self.integration;
-        let n = integration.num_solver_iterations.checked_add(
-            self.plates
-                .iter()
-                .map(|p| p.additional_iterations)
-                .max()
-                .unwrap_or(0),
-        );
-        if !self.capture.valid()
-            || self.capture != loading.config
-            || self.capture.touch_tolerance != 1.0e-5
-            || dynamic.body == fixed.body
-            || dynamic.source.region == fixed.source.region
-            || loading.regions.len() != 2
-            || response.materials.len() != 2
-            || dynamic.endpoint.mass != 20.0
-            || dynamic.endpoint.position[0] > 1.0e-6
-            || fixed.endpoint.position != [1.0, 0.0]
-            || fixed.endpoint.velocity != [0.0, 0.0]
-            || integration.dt != 0.0
-            || !integration.length_unit.is_finite()
-            || integration.length_unit <= 0.0
-            || !integration.warmstart_coefficient.is_finite()
-            || !(0.0..=1.0).contains(&integration.warmstart_coefficient)
-            || [
-                integration.min_ccd_dt,
-                integration.contact_softness.natural_frequency,
-                integration.contact_softness.damping_ratio,
-                integration.normalized_allowed_linear_error,
-                integration.normalized_max_corrective_velocity,
-                integration.normalized_prediction_distance,
-            ]
+fn valid_integration(integration: &IntegrationParameters, plates: &[Plate]) -> bool {
+    let n = integration.num_solver_iterations.checked_add(
+        plates
             .iter()
-            .any(|x| !x.is_finite() || *x < 0.0)
-            || integration.num_solver_iterations == 0
-            || n.is_none_or(|n| 16.0 * (n as f64 + 4.0) * f64::from(f32::EPSILON) >= 0.01)
-            || loading
-                .arrival_departures
-                .as_ref()
-                .is_some_and(|s| !s.is_empty())
-            || loading
-                .flat_departures
-                .as_ref()
-                .is_some_and(|s| !s.is_empty())
+            .map(|p| p.additional_iterations)
+            .max()
+            .unwrap_or(0),
+    );
+    integration.dt == 0.0
+        && integration.length_unit.is_finite()
+        && integration.length_unit > 0.0
+        && integration.warmstart_coefficient.is_finite()
+        && (0.0..=1.0).contains(&integration.warmstart_coefficient)
+        && [
+            integration.min_ccd_dt,
+            integration.contact_softness.natural_frequency,
+            integration.contact_softness.damping_ratio,
+            integration.normalized_allowed_linear_error,
+            integration.normalized_max_corrective_velocity,
+            integration.normalized_prediction_distance,
+        ]
+        .iter()
+        .all(|x| x.is_finite() && *x >= 0.0)
+        && integration.num_solver_iterations > 0
+        && n.is_some_and(|n| 16.0 * (n as f64 + 4.0) * f64::from(f32::EPSILON) < 0.01)
+}
+
+// Shared structural checks, independent of the admitted role positions.
+fn valid_contract(
+    loading: &LoadingState,
+    plates: &[Plate],
+    capture: &CaptureConfig,
+    integration: &IntegrationParameters,
+) -> bool {
+    let Some(response) = &loading.response else {
+        return false;
+    };
+    if !capture.valid()
+        || *capture != loading.config
+        || capture.touch_tolerance != 1.0e-5
+        || loading.regions.len() != plates.len()
+        || response.materials.len() != plates.len()
+        || !valid_integration(integration, plates)
+        || loading
+            .arrival_departures
+            .as_ref()
+            .is_some_and(|s| !s.is_empty())
+        || loading
+            .flat_departures
+            .as_ref()
+            .is_some_and(|s| !s.is_empty())
+    {
+        return false;
+    }
+    let mut count = 0;
+    for (index, plate) in plates.iter().enumerate() {
+        let expected = usize::from(plate.slices) * usize::from(plate.copies);
+        if ![1, 2, 4].contains(&plate.slices)
+            || ![1, 2].contains(&plate.copies)
+            || !plate.endpoint.valid()
+            || plates[..index]
+                .iter()
+                .any(|p| p.body == plate.body || p.source.region == plate.source.region)
+            || !loading.live(plate.source.region)
+            || loading.regions[&plate.source.region.id].body != plate.body
+            || !response
+                .materials
+                .get(&plate.source.region)
+                .is_some_and(|r| plate.material.matches(r))
         {
             return false;
         }
-        let mut count = 0;
-        for plate in &self.plates {
-            let expected = usize::from(plate.slices) * usize::from(plate.copies);
-            if ![1, 2, 4].contains(&plate.slices)
-                || ![1, 2].contains(&plate.copies)
-                || !plate.endpoint.valid()
-                || !loading.live(plate.source.region)
-                || loading.regions[&plate.source.region.id].body != plate.body
-                || !response
-                    .materials
-                    .get(&plate.source.region)
-                    .is_some_and(|r| plate.material.matches(r))
+        let mut previous = None;
+        for (i, id) in plate.colliders.iter().enumerate() {
+            if i >= expected {
+                if id.is_some() {
+                    return false;
+                }
+                continue;
+            }
+            let Some(id) = id else { return false };
+            if previous.is_some_and(|p| p >= *id)
+                || id.entity != plate.body.entity
+                || loading.bindings.get(id) != Some(&plate.source)
             {
                 return false;
             }
-            let mut previous = None;
-            for (i, id) in plate.colliders.iter().enumerate() {
-                if i >= expected {
-                    if id.is_some() {
-                        return false;
-                    }
-                    continue;
-                }
-                let Some(id) = id else { return false };
-                if previous.is_some_and(|p| p >= *id)
-                    || id.entity != plate.body.entity
-                    || loading.bindings.get(id) != Some(&plate.source)
-                {
-                    return false;
-                }
-                previous = Some(*id);
-                count += 1;
-            }
+            previous = Some(*id);
+            count += 1;
         }
-        if count != loading.bindings.len() {
-            return false;
-        }
-        let Some(episode) = &self.episode else {
-            return loading.episodes.is_empty();
-        };
-        let mut pair = self.plates.each_ref().map(|p| p.source);
+    }
+    count == loading.bindings.len()
+}
+
+impl OwnedEpisode {
+    fn valid_for(
+        &self,
+        loading: &LoadingState,
+        mut pair: [ContactSource; 2],
+        endpoint: &Endpoint,
+    ) -> bool {
         pair.sort();
-        loading.episodes.len() == 1
-            && episode.sources == pair
-            && loading
-                .episodes
-                .get(&pair)
-                .is_some_and(|e| e.id == episode.id)
-            && episode.energy.is_finite()
-            && episode.energy >= 0.0
-            && (episode.energy * (1.0 + 1.0e-5)).is_finite()
-            && episode.gap_upper.is_finite()
-            && episode.gap_upper >= -f64::from(dynamic.endpoint.position[0])
-            && episode.settled_work.is_finite()
-            && episode.settled_work >= 0.0
-            && episode.settled_work <= episode.energy * (1.0 + 1.0e-5)
-            && (episode.held || episode.settled_work == 0.0)
-            && (!episode.held
-                || (dynamic.endpoint.velocity == [0.0, 0.0]
-                    && dynamic.endpoint.position[0].abs() <= 1.0e-6))
-            && (episode.settled_work == 0.0
-                || (episode.turned
-                    && episode.gap_upper <= 2.0 * f64::from(self.capture.touch_tolerance)))
+        self.sources == pair
+            && loading.episodes.get(&pair).is_some_and(|e| e.id == self.id)
+            && self.energy.is_finite()
+            && self.energy >= 0.0
+            && (self.energy * (1.0 + 1.0e-5)).is_finite()
+            && self.gap_upper.is_finite()
+            && self.gap_upper >= -f64::from(endpoint.position[0])
+            && self.settled_work.is_finite()
+            && self.settled_work >= 0.0
+            && self.settled_work <= self.energy * (1.0 + 1.0e-5)
+            && (self.held || self.settled_work == 0.0)
+            && (!self.held
+                || (endpoint.velocity == [0.0, 0.0] && endpoint.position[0].abs() <= 1.0e-6))
+            && (self.settled_work == 0.0
+                || (self.turned
+                    && self.gap_upper <= 2.0 * f64::from(loading.config.touch_tolerance)))
+    }
+}
+
+impl Active {
+    fn valid_for(&self, loading: &LoadingState) -> bool {
+        let [dynamic, fixed] = &self.plates;
+        valid_contract(loading, &self.plates, &self.capture, &self.integration)
+            && dynamic.endpoint.mass == 20.0
+            && dynamic.endpoint.position[0] <= 1.0e-6
+            && fixed.endpoint.position == [1.0, 0.0]
+            && fixed.endpoint.velocity == [0.0, 0.0]
+            && match &self.episode {
+                None => loading.episodes.is_empty(),
+                Some(episode) => {
+                    loading.episodes.len() == 1
+                        && episode.valid_for(
+                            loading,
+                            self.plates.each_ref().map(|p| p.source),
+                            &dynamic.endpoint,
+                        )
+                }
+            }
     }
 }
 
 impl Continuation {
+    pub(in crate::world) fn is_stack(&self) -> bool {
+        matches!(self.status, Status::Stack(_))
+    }
+
+    fn invalidation(&self) -> Option<Invalidation> {
+        match &self.status {
+            Status::Active(_) => None,
+            Status::Invalidated(reason) => Some(*reason),
+            Status::Stack(stack) => stack.invalidation(),
+        }
+    }
+
     pub(in crate::world) fn invalidate(&mut self, reason: Invalidation) {
-        if matches!(self.status, Status::Active(_)) {
-            // Preserve the first cause and history; drop all live identity claims.
-            self.status = Status::Invalidated(reason);
+        match &mut self.status {
+            Status::Active(_) => {
+                // Preserve the first cause and history; drop live identity claims.
+                self.status = Status::Invalidated(reason);
+            }
+            Status::Invalidated(_) => {}
+            Status::Stack(stack) => stack.invalidate(reason),
         }
     }
 
@@ -288,6 +349,7 @@ impl Continuation {
                                 || self.history.settling == GravitySettling::BoundedNumerical
                         })
                 }
+                Status::Stack(stack) => stack.valid_for(loading, &self.history),
             }
     }
 }
