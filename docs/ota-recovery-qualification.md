@@ -147,6 +147,92 @@ tests exercise offline observation, the elapsed-time bound, duplicate activation
 refusal and cleanup after a failed postcheck. These fixtures do not qualify
 physical firmware behavior.
 
+## One supervised kiosk hang
+
+`kiosk_hang_trial` is a separate, feature-gated root-owner example. It is not
+installed by Yocto and is not exposed on the kiosk or system-service socket.
+It sends SIGSTOP once to a pinned kiosk PID during an explicitly selected trial;
+production recovery remains responsible for fallback and quarantine. This tool
+does not qualify hardware or create an installation approval.
+
+```sh
+cargo test --locked -p engine-os-manager --features recovery-qualification \
+  supervised_kiosk_hang -- --test-threads=1
+python3 -m unittest discover -s yocto/tests -p kiosk_hang_test.py
+cargo build --locked --release --target aarch64-unknown-linux-gnu \
+  -p engine-os-manager --features recovery-qualification --example kiosk_hang_trial
+```
+
+Upload the reviewed binary to
+`/data/spacewars-recovery-tools/<sha256>/kiosk_hang_trial`, owned by root with mode
+0500 and a single link. Use the existing owner-selected signed installer for a
+new eligible candidate. Keep the known-good default unchanged. A payload already
+installed as good cannot be relabeled to supply another trial. A deliberately
+failed payload has only one explicit retry; retain it for repeated-failure
+qualification before advancing the attempted generation floor.
+
+Before activation, retain verified restorable boot/data exports and the exact
+normal-boot snapshot, native selection and independently qualified candidate
+image identity. Confirm physical recovery access. Stage and establish usable
+time before the owner blocks this device's WAN access while retaining LAN/SSH.
+Keep that isolation in place through fallback; a local fault with Internet still
+available does not establish offline recovery.
+
+After the expected trial reboot, obtain the new native boot/recovery snapshot.
+The pure `expectation_for_trial` function in `yocto/scripts/qualify-kiosk-hang.py`
+joins the retained selection, normal snapshot, live trial snapshot and independently
+qualified `ImageIdentity`. It rejects old transaction records, wrong origin boots,
+payloads, default slots or images. Retain the returned expectation as JSON. It
+contains schema 1, boot binding, kernel build ID, image identity, transaction ID,
+origin/trial boot IDs, previous-good `SlotImage` and candidate `SlotImage`.
+
+The helper's `inspect` operation accepts that expectation on stdin and returns a
+plan and its SHA-256. Native checks require the matching `observing` transaction,
+live recovery process, valid early-watchdog receipt, no watchdog completion,
+the original default slot, and the verified kiosk executable/systemd instance.
+The plan expires after ten seconds; all checks and the signal must occur before
+45 seconds of trial uptime, ahead of the 60-second minimum health window.
+
+The host wrapper performs inspect and stop over an **existing** shared connection:
+
+```sh
+python3 yocto/scripts/qualify-kiosk-hang.py \
+  --host swadmin@sw-picade-2.local --control-path /absolute/existing/control-socket \
+  --helper-sha256 SELECTED_HELPER_SHA256 \
+  --expectation /private/evidence/expectation.json \
+  --output /private/evidence/new-injection-directory
+```
+
+It checks helper ownership and content, retains intent before each invocation,
+and refuses implicit logins and retries. Native stop records consumption in
+`/data/spacewars-system/recovery-faults/<transaction>.json` before signalling.
+Even a partial or uncertain record blocks another stop for that transaction.
+It uses a pidfd so exit/PID reuse cannot redirect the signal. If the post-stop
+window or identity check fails, it attempts SIGCONT on that same pinned process
+and retains consumption. A successful stopped-state check is also retained as
+`<transaction>.result.json`. Lost replies require observation, never replay.
+
+This is the injection stage, not an end-to-end qualification runner. Keep host
+monotonic timing and boot IDs across the expected automatic return, collect the
+recovery journal and receipts without opening the watchdog, and check the actual
+known-good image, quarantine, preserved data and advancing kiosk. The native
+health deadline is 180 seconds from boot and the early-watchdog allowance is
+210 seconds from arming. A 420-second outer observation bound from fault
+invocation is a stop condition, not proof of exact watchdog expiry. Installation
+write time precedes that bound. Unexpected connection failure ends the current
+observation; a deliberate post-reboot connection is a separate recorded action.
+
+If injection misses its window, observe the actual trial outcome; a healthy
+promotion is not failure-test coverage. If automatic return is not established,
+retain evidence and use independent local recovery. Manual repair, restarting
+recovery or restoring old state cannot count as automatic fallback. Verify
+quarantine through a subsequent normal boot before removing the WAN block.
+
+Tests exercise native trial/deadline mismatches, durable one-use ordering,
+late-signal recovery, actual pidfd behaviour on a disposable host child, and
+host refusal of lost connections, old transactions and lost replies. These tests
+do not perform a device trial or satisfy the physical matrix.
+
 ## One missing-root attempt
 
 Use an independently retained successful bootstrap record and its private

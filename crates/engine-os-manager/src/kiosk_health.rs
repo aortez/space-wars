@@ -277,6 +277,26 @@ fn executable(pid: u32, path: &Path, owner: u32, expected: &KioskExpectation) ->
     Ok(())
 }
 
+#[cfg(feature = "recovery-qualification")]
+pub(crate) fn qualification_instance(
+    health: &KioskHealth,
+    expected: &KioskExpectation,
+) -> Result<()> {
+    let current = install_instance()?;
+    if current.pid != health.process_id
+        || current.start_ticks != health.start_ticks
+        || current.invocation != health.invocation_id
+    {
+        return invalid("selected kiosk instance changed");
+    }
+    executable(current.pid, Path::new(EXECUTABLE), 0, expected)?;
+    // The executable hash can take time. Check the systemd process again.
+    if install_instance()? != current {
+        return invalid("kiosk changed while verifying its executable");
+    }
+    Ok(())
+}
+
 fn peer(stream: &UnixStream, pid: u32, uid: u32) -> Result<()> {
     let mut credentials: libc::ucred = unsafe { std::mem::zeroed() };
     let mut length = std::mem::size_of_val(&credentials) as libc::socklen_t;

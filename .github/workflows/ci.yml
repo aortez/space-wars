@@ -76,6 +76,10 @@ jobs:
         run: cargo build --locked --profile ci -p engine-ota --features publisher --example feed_sign --example feed_inventory
       - name: Check separately enabled supervised installer
         run: cargo check --locked --profile ci -p engine-os-manager --features recovery-qualification --all-targets
+      - name: Test supervised kiosk hang guards
+        run: |
+          cargo test --locked --profile ci -p engine-os-manager --features recovery-qualification supervised_kiosk_hang -- --test-threads=1
+          python3 -m unittest discover -s yocto/tests -p kiosk_hang_test.py
       - name: Test initial owner authority with disposable keys
         run: /usr/bin/python3 .github/ci/ota_authority_tests.py -v
         env:
