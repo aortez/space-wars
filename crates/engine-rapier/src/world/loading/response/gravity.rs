@@ -4,6 +4,8 @@ use super::*;
 
 mod api;
 pub use api::*;
+mod frame;
+use frame::Frame;
 pub(super) mod phase;
 pub(super) mod stack;
 
@@ -36,7 +38,7 @@ enum Status {
     Active(Box<Active>),
     Invalidated(Invalidation),
     // Stack keeps its corrections outside its own active/invalidated state.
-    // Stack tags are accepted in snapshot v7 (legacy) or v9 (bounded masses).
+    // Stack tags are accepted in v7 (legacy), v9 (bounded masses) or v11 (translated).
     Stack(Box<stack::State>),
 }
 
@@ -44,7 +46,7 @@ enum Status {
 struct History {
     revision: u32,
     settling: GravitySettling,
-    // Initial touching-center coordinate, velocity, mass and acceleration.
+    // Initial coordinate relative to touching, velocity, mass and acceleration.
     reference: [f64; 4],
     // Energy, momentum and distance. Frozen through every episode transition.
     scales: [f64; 3],
@@ -53,15 +55,20 @@ struct History {
 }
 
 impl History {
-    fn new(endpoint: &Endpoint, acceleration: f64, settling: GravitySettling) -> Self {
+    fn new(
+        endpoint: &Endpoint,
+        frame: Frame,
+        acceleration: f64,
+        settling: GravitySettling,
+    ) -> Self {
         let (x, v, m) = (
-            f64::from(endpoint.position[0]),
+            frame.x(endpoint.position[0]),
             f64::from(endpoint.velocity[0]),
             f64::from(endpoint.mass),
         );
         let energy = (0.5 * m * v * v - m * acceleration * x).max(0.0);
         Self {
-            revision: mass_revision(&[endpoint.mass]),
+            revision: frame.revision(&[endpoint.mass]),
             settling,
             reference: [x, v, m, acceleration],
             scales: [energy, libm::sqrt(2.0 * m * energy), x.abs().max(1.0)],
@@ -73,11 +80,13 @@ impl History {
         let [x, v, m, a] = self.reference;
         let energy = (0.5 * m * v * v - m * a * x).max(0.0);
         let expected = [energy, libm::sqrt(2.0 * m * energy), x.abs().max(1.0)];
-        matches!(self.revision, 1 | 2)
-            // Reference values came from stored f32 backend state. Enforcing
-            // that also prevents finite f64 inputs overflowing the work formula.
-            && self.reference.iter().all(|n| {
-                (*n as f32).is_finite() && f64::from(*n as f32) == *n
+        matches!(self.revision, 1..=3)
+            // Motion comes from f32 state; revision 3 subtracts world positions
+            // in f64. Keep the f32 magnitude bound to prevent overflow, and
+            // validate the initial coordinate against the frame while active.
+            && self.reference.iter().enumerate().all(|(i, n)| {
+                (*n as f32).is_finite()
+                    && ((self.revision == 3 && i == 0) || f64::from(*n as f32) == *n)
             })
             && x <= 1.0e-6
             && valid_masses(self.revision, &[m as f32])
@@ -92,6 +101,7 @@ impl History {
 // Revision 1 retains the mass-20 contract and its exact v6/v7 encoding.
 // Revision 2 bounds both scale and conditioning; per-step numerical guards
 // still refuse responses that cannot be represented within their fixed limits.
+// Revision 3 preserves those masses and limits in a bounded translated frame.
 fn mass_revision(masses: &[f32]) -> u32 {
     if masses.iter().all(|m| *m == 20.0) {
         1
@@ -106,7 +116,7 @@ fn valid_masses(revision: u32, masses: &[f32]) -> bool {
     }
     match revision {
         1 => masses.iter().all(|m| *m == 20.0),
-        2 => {
+        2 | 3 => {
             masses.iter().all(|m| (5.0..=80.0).contains(m))
                 && (masses.len() == 1
                     || f64::from(masses[0].max(masses[1]))
@@ -176,7 +186,6 @@ impl Endpoint {
             .chain(&self.velocity)
             .chain(&self.local_com)
             .all(|x| x.is_finite())
-            && self.position[1] == 0.0
             && self.velocity[1] == 0.0
             && self.angle == 0.0
             && self.angular_velocity == 0.0
@@ -298,6 +307,7 @@ impl OwnedEpisode {
         loading: &LoadingState,
         mut pair: [ContactSource; 2],
         endpoint: &Endpoint,
+        frame: Frame,
     ) -> bool {
         pair.sort();
         self.sources == pair
@@ -306,13 +316,14 @@ impl OwnedEpisode {
             && self.energy >= 0.0
             && (self.energy * (1.0 + 1.0e-5)).is_finite()
             && self.gap_upper.is_finite()
-            && self.gap_upper >= -f64::from(endpoint.position[0])
+            && self.gap_upper >= -frame.x(endpoint.position[0])
             && self.settled_work.is_finite()
             && self.settled_work >= 0.0
             && self.settled_work <= self.energy * (1.0 + 1.0e-5)
             && (self.held || self.settled_work == 0.0)
             && (!self.held
-                || (endpoint.velocity == [0.0, 0.0] && endpoint.position[0].abs() <= 1.0e-6))
+                || (endpoint.velocity == [0.0, 0.0]
+                    && frame.x(endpoint.position[0]).abs() <= 1.0e-6))
             && (self.settled_work == 0.0
                 || (self.turned
                     && self.gap_upper <= 2.0 * f64::from(loading.config.touch_tolerance)))
@@ -322,11 +333,14 @@ impl OwnedEpisode {
 impl Active {
     fn valid_for(&self, loading: &LoadingState, history: &History) -> bool {
         let [dynamic, fixed] = &self.plates;
+        let Some(frame) = Frame::from_base(fixed.endpoint.position, 1) else {
+            return false;
+        };
         valid_contract(loading, &self.plates, &self.capture, &self.integration)
+            && frame.valid_history(history)
             && valid_masses(history.revision, &[dynamic.endpoint.mass])
             && f64::from(dynamic.endpoint.mass) == history.reference[2]
-            && dynamic.endpoint.position[0] <= 1.0e-6
-            && fixed.endpoint.position == [1.0, 0.0]
+            && frame.valid_position(dynamic.endpoint.position, 0)
             && fixed.endpoint.velocity == [0.0, 0.0]
             && match &self.episode {
                 None => loading.episodes.is_empty(),
@@ -336,6 +350,7 @@ impl Active {
                             loading,
                             self.plates.each_ref().map(|p| p.source),
                             &dynamic.endpoint,
+                            frame,
                         )
                 }
             }
@@ -347,12 +362,16 @@ impl Continuation {
         use crate::world::{
             GRAVITY_SNAPSHOT_VERSION, MASS_GRAVITY_SNAPSHOT_VERSION,
             MASS_STACK_GRAVITY_SNAPSHOT_VERSION, STACK_GRAVITY_SNAPSHOT_VERSION,
+            TRANSLATED_GRAVITY_SNAPSHOT_VERSION, TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION,
         };
-        match (self.history.revision == 2, self.is_stack()) {
-            (false, false) => GRAVITY_SNAPSHOT_VERSION,
-            (false, true) => STACK_GRAVITY_SNAPSHOT_VERSION,
-            (true, false) => MASS_GRAVITY_SNAPSHOT_VERSION,
-            (true, true) => MASS_STACK_GRAVITY_SNAPSHOT_VERSION,
+        match (self.history.revision, self.is_stack()) {
+            (1, false) => GRAVITY_SNAPSHOT_VERSION,
+            (1, true) => STACK_GRAVITY_SNAPSHOT_VERSION,
+            (2, false) => MASS_GRAVITY_SNAPSHOT_VERSION,
+            (2, true) => MASS_STACK_GRAVITY_SNAPSHOT_VERSION,
+            (3, false) => TRANSLATED_GRAVITY_SNAPSHOT_VERSION,
+            (3, true) => TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION,
+            _ => 0,
         }
     }
 

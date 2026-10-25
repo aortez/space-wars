@@ -2,7 +2,12 @@
 use super::*;
 use crate::world::loading::response::gravity as public;
 
-fn check_report(world: &PhysicsWorld, expected: &Trace, step: &public::GravityStep, fresh: bool) {
+pub(super) fn check_report(
+    world: &PhysicsWorld,
+    expected: &Trace,
+    step: &public::GravityStep,
+    fresh: bool,
+) {
     let mut actual = Trace::default();
     let mut captures = usize::from(fresh);
     let expected_sources =

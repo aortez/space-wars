@@ -179,7 +179,7 @@ impl Staged {
             sources: event.sources,
             id: event.id,
             energy: 0.0,
-            gap_upper: -f64::from(start[0].position[0]),
+            gap_upper: -self.scene.frame.x(start[0].position[0]),
             turned: false,
             held: false,
             settled_work: 0.0,

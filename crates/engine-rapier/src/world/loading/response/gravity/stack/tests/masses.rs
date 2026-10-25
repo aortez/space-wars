@@ -153,7 +153,7 @@ fn native_mass_stack_restore_keeps_original_bounds_and_refuses_corruption() {
                             .as_mut()
                             .unwrap()
                             .history
-                            .revision = 3
+                            .revision = 4
                     }
                     1 => {
                         changed
@@ -204,4 +204,84 @@ fn native_mass_stack_restore_keeps_original_bounds_and_refuses_corruption() {
             assert!(PhysicsWorld::from_snapshot_bytes(&changed.snapshot_bytes().unwrap()).is_err());
         }
     }
+}
+
+#[test]
+fn translated_extension_preserves_frozen_v9_stack_tail() {
+    for policy in [GravitySettling::Refuse, GravitySettling::BoundedNumerical] {
+        for dt in [0.001, 0.01] {
+            let mut w = stack_world([11, 2, 7], true, [4, 2, 4], 2);
+            set_masses(&mut w, &[11, 2], &[13.0, 31.0]);
+            w.step_material_flat_gravity(dt, policy).unwrap();
+            for reason in [
+                None,
+                Some(Invalidation::ExternalEdit),
+                Some(Invalidation::OtherStep),
+            ] {
+                let mut saved = w.clone();
+                if let Some(reason) = reason {
+                    saved.loading.as_mut().unwrap().invalidate_gravity(reason);
+                }
+                let s = saved.loading.as_ref().unwrap().gravity.as_ref().unwrap();
+                let frozen = frozen_v7(s);
+                assert_eq!(bincode::serialize(s).unwrap(), frozen);
+                let bytes = saved.snapshot_bytes().unwrap();
+                assert_eq!(&bytes[..4], &9_u32.to_le_bytes());
+                assert!(bytes.ends_with(&frozen));
+                assert_eq!(
+                    PhysicsWorld::from_snapshot_bytes(&bytes)
+                        .unwrap()
+                        .snapshot_bytes()
+                        .unwrap(),
+                    bytes
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn translated_stack_restore_rejects_changed_frame_owners_and_retained_corrections() {
+    let mut world = stack_world([11, 2, 7], true, [4, 2, 4], 2);
+    set_masses(&mut world, &[11, 2], &[13.0, 31.0]);
+    for (role, id) in [11, 2, 7].into_iter().enumerate() {
+        world.set_pose(body(id), Vec2::new(role as f32, 3.25), 0.0, true);
+    }
+    world.set_velocity(body(11), Vec2::X * 0.01, 0.0, true);
+    world
+        .step_material_flat_gravity(0.01, GravitySettling::BoundedNumerical)
+        .unwrap();
+    for case in 0..10 {
+        let mut w = world.clone();
+        match case {
+            0 => active(&mut w).plates[1].endpoint.position[0] += 0.001,
+            1 => active(&mut w).plates[2].endpoint.position[0] += 0.001,
+            2 => active(&mut w).plates[0].endpoint.position[1] = 0.0,
+            3 => active(&mut w).plates[1].endpoint.position[1] = 0.0,
+            4 => active(&mut w).plates[2].endpoint.position[1] = 17.0,
+            5 => active(&mut w).incoming.as_mut().unwrap().gap_upper = -1.0,
+            6 => active(&mut w).support.id = EpisodeId(999),
+            7 => active(&mut w).incoming.as_mut().unwrap().settled_work = 1.0,
+            8 => state_mut(&mut w).corrections.impulse = 1.0,
+            _ => state_mut(&mut w).corrections.work = 1.0,
+        }
+        assert!(
+            PhysicsWorld::from_snapshot_bytes(&w.snapshot_bytes().unwrap()).is_err(),
+            "case {case}"
+        );
+    }
+    state_mut(&mut world).corrections = Corrections {
+        impulse: 1.0e-8,
+        work: 1.0e-14,
+    };
+    let before = state(&world).corrections.clone();
+    for id in [11, 2, 7] {
+        world.remove_entity(body(id).entity);
+    }
+    let bytes = world.snapshot_bytes().unwrap();
+    let mut restored = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+    assert_eq!(state(&restored).corrections, before);
+    assert_eq!(&bytes[..4], &11_u32.to_le_bytes());
+    state_mut(&mut restored).corrections.work = 1.0;
+    assert!(PhysicsWorld::from_snapshot_bytes(&restored.snapshot_bytes().unwrap()).is_err());
 }

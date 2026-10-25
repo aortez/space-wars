@@ -80,15 +80,18 @@ impl State {
 impl StackActive {
     fn valid_for(&self, loading: &LoadingState, history: &History) -> bool {
         let [a, b, c] = &self.plates;
+        let Some(frame) = Frame::from_base(c.endpoint.position, 2) else {
+            return false;
+        };
         let mut support = [b.source, c.source];
         support.sort();
         valid_contract(loading, &self.plates, &self.capture, &self.integration)
+            && frame.valid_history(history)
             && valid_masses(history.revision, &[a.endpoint.mass, b.endpoint.mass])
             && f64::from(a.endpoint.mass) == history.reference[2]
-            && a.endpoint.position[0] <= 1.0e-6
-            && b.endpoint.position == [1.0, 0.0]
+            && frame.valid_position(a.endpoint.position, 0)
+            && frame.valid_position(b.endpoint.position, 1)
             && b.endpoint.velocity == [0.0, 0.0]
-            && c.endpoint.position == [2.0, 0.0]
             && c.endpoint.velocity == [0.0, 0.0]
             && self.support.sources == support
             && loading
@@ -98,7 +101,7 @@ impl StackActive {
             && loading.episodes.len() == 1 + usize::from(self.incoming.is_some())
             && self.incoming.as_ref().is_none_or(|e| {
                 e.id != self.support.id
-                    && e.valid_for(loading, [a.source, b.source], &a.endpoint)
+                    && e.valid_for(loading, [a.source, b.source], &a.endpoint, frame)
                     && loading.episodes[&e.sources].absent_seconds == 0.0
                     && (e.settled_work == 0.0
                         || history.settling == GravitySettling::BoundedNumerical)

@@ -83,6 +83,7 @@ impl Verified {
     fn validate(&self, plates: &Plates) -> Result<(), Rejection> {
         let world = &self.world;
         let g = world.raw.gravity;
+        let frame = origin(world);
         self.witness.rounding.validate(world, f64::from(g.x))?;
         if plates.handles.len() != 3
             || plates.normal != [1.0, 0.0]
@@ -92,8 +93,7 @@ impl Verified {
             || !world.raw.bodies[plates.handles[0]].is_dynamic()
             || !world.raw.bodies[plates.handles[1]].is_dynamic()
             || !world.raw.bodies[plates.handles[2]].is_fixed()
-            || world.raw.bodies[plates.handles[1]].translation() != Vector::X
-            || world.raw.bodies[plates.handles[2]].translation() != Vector::X * 2.0
+            || f64::from(world.raw.bodies[plates.handles[1]].translation().x) - frame[0] != 1.0
             || plates.handles[1..]
                 .iter()
                 .any(|h| world.raw.bodies[*h].linvel() != Vector::ZERO)
@@ -111,7 +111,7 @@ impl Verified {
                     || !b.linvel().is_finite()
                     || !b.translation().is_finite()
                     || b.linvel().y != 0.0
-                    || b.translation().y != 0.0
+                    || f64::from(b.translation().y) != frame[1]
             })
             || world.raw.colliders.iter().any(|(_, c)| c.friction() != 0.0)
         {

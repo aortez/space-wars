@@ -3,6 +3,16 @@ use crate::world::loading::response::gravity::tests::masses::set_masses;
 
 #[test]
 fn native_mass_stack_source_orders_preserve_impact_work_and_support_reactions() {
+    source_orders(Vec2::ZERO);
+}
+
+#[test]
+fn translated_stack_source_orders_preserve_work_and_support() {
+    source_orders(Vec2::new(-0.125, -16.0));
+    source_orders(Vec2::new(0.125, 16.0));
+}
+
+fn source_orders(offset: Vec2) {
     let mut cases = 0;
     for ids in [
         [1, 2, 3],
@@ -30,7 +40,9 @@ fn native_mass_stack_source_orders_preserve_impact_work_and_support_reactions() 
                     for speed in [0.0, 4.0] {
                         let mut world = stack_world(ids, reverse, parts, 2);
                         set_masses(&mut world, &ids[..2], &masses);
-                        world.set_pose(body(ids[0]), Vec2::ZERO, 0.0, true);
+                        for (role, id) in ids.into_iter().enumerate() {
+                            world.set_pose(body(id), offset + Vec2::X * role as f32, 0.0, true);
+                        }
                         world.set_velocity(body(ids[0]), Vec2::X * speed, 0.0, true);
                         let mut replay = world.clone();
                         let policy = GravitySettling::BoundedNumerical;

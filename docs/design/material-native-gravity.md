@@ -30,8 +30,10 @@ Admission examines the whole world on every positive call:
   `(0.5, 1)`, identity rotation, zero y position/velocity and zero angular velocity.
   The fixed center is `(1, 0)` and its velocity is zero. The dynamic center's x
   coordinate is measured relative to its touching position at x=0; the gap is
-  `-x`. The physical contact plane is x=0.5. No translated or rotated frame is
-  claimed by this first operation.
+  `-x`. The physical contact plane is x=0.5 in this original frame. The
+  [translated-scene extension](material-translated-gravity.md) now admits a
+  bounded common world offset with the same local geometry. Rotation remains
+  excluded.
 - Each plate is the certified filled rectangle from native flat admission:
   one/two/four uniform tangent slices, one/two identical copies per slice, at most
   eight colliders per body and sixteen total. Body roles come from body type and
@@ -575,6 +577,7 @@ rest/settlement. Three-role reports and public-only integration tests cover
 transactional refusal, replay and invalidation.
 The bounded-mass extension now admits masses in [5, 80] and stack ratios up to 4:1.
 Overloaded deformation, changing gravity/drivers, masses beyond that boundary,
-translated/rotated frames, free rotation and general geometry remain later
-work. #328 owns the material lifecycle/failure consequences; this bounded API
+rotated frames, free rotation and general geometry remain later work.
+[Translated scenes](material-translated-gravity.md) now have native support and
+v10/v11 saved-state compatibility within the documented bounds. #328 owns the material lifecycle/failure consequences; this bounded API
 does not finish #327 or select gameplay calibration.

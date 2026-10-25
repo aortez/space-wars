@@ -11,7 +11,9 @@ not general contact loading or completion of #327.
 ## Scene and enrollment
 
 Keep the existing constant-normal-gravity frame and restrictions. The three
-roles, determined by geometry rather than IDs or insertion order, are:
+roles, determined by geometry rather than IDs or insertion order, are listed in
+local coordinates. The [translated-scene extension](material-translated-gravity.md)
+now admits a bounded common world offset:
 
 | Role | Body and initial motion | Position |
 | --- | --- | --- |
@@ -21,7 +23,8 @@ roles, determined by geometry rather than IDs or insertion order, are:
 
 The larger dynamic mass must not exceed four times the smaller, using actual
 refreshed backend masses. The [bounded-mass extension](material-unequal-mass-gravity.md)
-retains v7 for 20/20 and uses v9 for other admitted combinations. The original
+retains v7 for 20/20 and uses v9 for other admitted combinations at zero offset.
+A nonzero offset uses revision 3 and snapshot v11. The original
 v7 storage contract described below remains frozen; numerical and work limits
 can still refuse a call within the admitted mass bounds.
 

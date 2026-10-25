@@ -6,7 +6,10 @@ use native::schedule::{Limits, apex, arrival, summary, time};
 impl Staged {
     fn motion(&self) -> (f64, f64) {
         let a = &self.world.raw.bodies[self.scene.plates.bodies[0]];
-        (f64::from(a.translation().x), f64::from(a.linvel().x))
+        (
+            self.scene.frame.x(a.translation().x),
+            f64::from(a.linvel().x),
+        )
     }
 
     fn record(&self, at: f64, phase: usize, record: Record) -> GravityTimedRecord {

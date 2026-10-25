@@ -61,7 +61,7 @@ impl Scene {
         let handles: [_; N] = std::array::from_fn(|i| self.plates.bodies[i]);
         let start = handles.map(|h| Endpoint::read(&world.raw.bodies[h]));
         let (x, v, m) = (
-            f64::from(start[0].position[0]),
+            self.frame.x(start[0].position[0]),
             f64::from(start[0].velocity[0]),
             f64::from(start[0].mass),
         );
@@ -95,7 +95,10 @@ impl Scene {
         if n == 0 || relative >= 0.01 {
             return Err(Rejection::Numerical);
         }
-        let drift_bound = relative * (x.abs() + (f64::from(middle) * h).abs())
+        // Rapier integrates in world coordinates. Translation can enlarge the
+        // uncertainty used for departure, but never the local work/error budget.
+        let drift_bound = relative
+            * (f64::from(start[0].position[0]).abs() + (f64::from(middle) * h).abs())
             + factor * f64::from(f32::from_bits(1)) * (f64::from(middle).abs() + 1.0);
         world.raw.bodies[handles[0]].set_linvel(Vector::X * middle, true);
         let metrics = auxiliary_step(world, duration, &Drift);
@@ -107,7 +110,10 @@ impl Scene {
         let mut unchanged = end[0].clone();
         unchanged.position[0] = start[0].position[0];
         unchanged.velocity[0] = start[0].velocity[0];
-        let (end_x, end_v) = (f64::from(end[0].position[0]), f64::from(end[0].velocity[0]));
+        let (end_x, end_v) = (
+            self.frame.x(end[0].position[0]),
+            f64::from(end[0].velocity[0]),
+        );
         if !end[0].valid()
             || unchanged != start[0]
             || end[1..] != start[1..]
@@ -158,6 +164,7 @@ impl OwnedEpisode {
         flight: &Flight,
         before: f64,
         end: &Endpoint,
+        frame: Frame,
         tolerance: f32,
     ) -> Result<bool, Rejection> {
         if self.held {
@@ -165,7 +172,7 @@ impl OwnedEpisode {
         }
         self.turned |= before < 0.0 && end.velocity[0] >= 0.0;
         self.gap_upper = self.gap_upper.max(flight.gap_upper);
-        let lower = (-f64::from(end.position[0])).min(-flight.predicted_x) - flight.uncertainty;
+        let lower = (-frame.x(end.position[0])).min(-flight.predicted_x) - flight.uncertainty;
         Ok(lower > 2.0 * f64::from(tolerance))
     }
 }
@@ -174,7 +181,7 @@ impl Staged {
     pub(super) fn motion(&self) -> (f64, f64, f64) {
         let body = &self.world.raw.bodies[self.scene.plates.bodies[0]];
         (
-            f64::from(body.translation().x),
+            self.scene.frame.x(body.translation().x),
             f64::from(body.linvel().x),
             f64::from(body.mass()),
         )
@@ -200,7 +207,13 @@ impl Staged {
         active.plates[0].endpoint = end[0].clone();
         let mut departure = None;
         if let Some(episode) = &mut active.episode
-            && episode.after_flight(&flight, before, &end[0], loading.config.touch_tolerance)?
+            && episode.after_flight(
+                &flight,
+                before,
+                &end[0],
+                self.scene.frame,
+                loading.config.touch_tolerance,
+            )?
         {
             if loading.records >= loading.config.max_records_per_step {
                 return Err(Rejection::RecordLimit);

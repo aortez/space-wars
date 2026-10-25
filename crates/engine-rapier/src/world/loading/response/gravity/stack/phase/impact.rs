@@ -63,7 +63,7 @@ impl Staged {
         let owner = active.support.id;
         let start = self.endpoints();
         let incoming = start[0].velocity[0];
-        if f64::from(start[0].position[0]).abs() > TOUCH || incoming <= 0.0 {
+        if self.scene.frame.x(start[0].position[0]).abs() > TOUCH || incoming <= 0.0 {
             return Err(Rejection::UnaccountedApproach);
         }
         if self.impacts >= limit.min(MAX_GRAVITY_IMPACTS) {
@@ -190,8 +190,10 @@ impl Staged {
             sources: event.sources,
             id: event.id,
             energy: 0.5 * mass * f64::from(outgoing) * f64::from(outgoing)
-                - mass * self.scene.acceleration * f64::from(active.plates[0].endpoint.position[0]),
-            gap_upper: -f64::from(active.plates[0].endpoint.position[0]),
+                - mass
+                    * self.scene.acceleration
+                    * self.scene.frame.x(active.plates[0].endpoint.position[0]),
+            gap_upper: -self.scene.frame.x(active.plates[0].endpoint.position[0]),
             turned: false,
             held: outgoing == 0.0,
             settled_work: 0.0,

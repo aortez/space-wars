@@ -276,17 +276,23 @@ impl PhysicsWorld {
     ///
     /// A pair requires exactly two axis-aligned plates of half-extents (0.5, 1): one
     /// dynamic body of refreshed mass in [5, 80], rotation locked and sleep disabled,
-    /// and one fixed body centered at (1, 0). Both have zero tangent/angular
-    /// motion. The dynamic center is at x<=1e-6, y=0; gravity is (a, 0), a>0,
+    /// and one fixed body centered locally at (1, 0). Both have zero tangent/angular
+    /// motion. The dynamic center is locally x<=1e-6, y=0; gravity is (a, 0), a>0,
     /// with scale 1. Each body uses one/two/four uniform tangent slices and
     /// one/two coincident copies, all bound to its distinct live material region.
     /// Capture's touch tolerance must be 1e-5. No other force/torque, friction,
     /// damping, joints, CCD/soft CCD, skin, sensor, custom filter or extra body.
-    /// A stack adds a stationary dynamic plate at (1, 0) and places the
-    /// fixed base at (2, 0). The same geometry/material restrictions apply to all
+    /// A stack adds a stationary dynamic plate locally at (1, 0) and places the
+    /// fixed base locally at (2, 0). The same geometry/material restrictions apply to all
     /// three plates. Each dynamic mass must be in [5, 80], and the larger must
     /// not exceed four times the smaller. B-C retains its support owner while A flies, impacts and
     /// eventually rests. Full-stack support carries both dynamic weights.
+    /// The fixed base defines a common world offset, with each component in
+    /// [-16, 16] and exactly representable in f32. All centers share its y;
+    /// stationary role spacing is exact in f64. Gap, potential energy and
+    /// history scales use local coordinates; drift uncertainty uses world
+    /// coordinates. Offsets do not enlarge numerical budgets or guarantee that
+    /// a particular flight/settlement is representable. Rotation is excluded.
     /// Failed materials and support overload refuse; failure consequences and
     /// physical overloaded deformation are outside this operation.
     ///
@@ -297,8 +303,10 @@ impl PhysicsWorld {
     ///
     /// dt=0 is a pause: clear ephemeral outputs without enrolling, solving,
     /// changing policy, or resetting history. Invalid time preserves outputs.
-    /// Mass-20 enrollment retains snapshot v6 (pair) or v7 (stack). Other
-    /// admitted masses use v8 (pair) or v9 (stack), including after invalidation.
+    /// At zero offset, mass-20 enrollment retains snapshot v6 (pair) or v7
+    /// (stack); other admitted masses use v8 or v9. Nonzero offsets use v10
+    /// (pair) or v11 (stack). Versions and numerical history persist through
+    /// invalidation. Existing v1-v9 saves remain readable without migration.
     /// Call this operation again after restore; ordinary positive stepping and external edits invalidate
     /// continuation permanently while retaining its numerical ledger.
     ///
