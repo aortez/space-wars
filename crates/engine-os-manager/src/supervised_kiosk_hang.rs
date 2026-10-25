@@ -40,6 +40,10 @@ pub struct Plan {
     health: KioskHealth,
 }
 impl Plan {
+    pub(crate) fn health(&self) -> &KioskHealth {
+        &self.health
+    }
+
     pub fn fingerprint(&self) -> Result<Sha256> {
         // Canonical object ordering also permits transport by the Python runner.
         Ok(Sha256::digest(&serde_json::to_vec(&serde_json::to_value(
@@ -130,6 +134,22 @@ fn uuid(value: &str) -> bool {
 }
 
 impl Expectation {
+    pub(crate) fn transaction(&self) -> Sha256 {
+        self.transaction
+    }
+
+    pub(crate) fn trial_boot_id(&self) -> &str {
+        &self.trial_boot_id
+    }
+
+    pub(crate) fn image(&self) -> &ImageIdentity {
+        &self.image
+    }
+
+    pub(crate) fn check_early_trial(&self) -> Result<()> {
+        guard(self)
+    }
+
     fn validate(&self) -> Result<()> {
         self.image.validate()?;
         require(
@@ -365,7 +385,7 @@ impl Pinned {
     }
 }
 
-fn create_record(parent: &File, name: &str, value: &Value) -> Result<()> {
+pub(crate) fn create_record(parent: &File, name: &str, value: &Value) -> Result<()> {
     let mut file = open_at(
         parent,
         name,
@@ -377,7 +397,7 @@ fn create_record(parent: &File, name: &str, value: &Value) -> Result<()> {
     parent.sync_all()?;
     Ok(())
 }
-fn fault_directory() -> Result<File> {
+pub(crate) fn fault_directory() -> Result<File> {
     let system = system_directory()?;
     let name = CString::new("recovery-faults").unwrap();
     if unsafe { libc::mkdirat(system.as_raw_fd(), name.as_ptr(), 0o700) } != 0 {

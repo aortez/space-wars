@@ -159,6 +159,70 @@ tests exercise offline observation, the elapsed-time bound, duplicate activation
 refusal and cleanup after a failed postcheck. These fixtures do not qualify
 physical firmware behavior.
 
+## One supervised trial reset
+
+`reset_trial` is a separately built root-owner helper for one **software reset**
+of an early, uncommitted signed trial. This case is distinct from power loss,
+watchdog expiry and interrupted promotion. It grants no hardware approval and
+is absent from ordinary builds and Yocto images.
+
+```sh
+cargo test --locked -p engine-os-manager --features recovery-qualification \
+  supervised_trial_reset -- --test-threads=1
+python3 -m unittest discover -s yocto/tests -p trial_reset_test.py
+cargo build --locked --release --target aarch64-unknown-linux-gnu \
+  -p engine-os-manager --features recovery-qualification --example reset_trial
+```
+
+Use a new eligible signed payload and the same verified backup, WAN isolation,
+time and normal-baseline preparation as the kiosk-hang procedure below. Do not
+relabel an installed or exhausted payload. Keep the known-good default intact.
+The shared `expectation_for_trial` function joins the independently qualified
+image, selected install, retained normal baseline and new native trial snapshot.
+It must identify the new `observing` transaction, not a retained earlier failure.
+
+Upload the helper to `/data/spacewars-recovery-tools/<sha256>/reset_trial`, owned
+by root with mode 0500 and a single link. The native plan binds both the exact
+trial and the `normal-reboot` action. It expires after ten seconds; inspection,
+durable intent and final admission must finish before 45 seconds of trial uptime.
+The helper reuses the kiosk-hang inspector's boot, image, journal, watchdog,
+recovery-service and live-kiosk checks.
+
+```sh
+python3 yocto/scripts/qualify-trial-reset.py \
+  --host swadmin@sw-picade-2.local --control-path /absolute/existing/control-socket \
+  --helper-sha256 SELECTED_HELPER_SHA256 \
+  --expectation /private/evidence/expectation.json \
+  --output /private/evidence/new-reset-directory
+```
+
+The helper checks that logind's reboot parameter is empty, durably consumes the
+transaction's existing one-fault namespace, then rechecks the trial, parameter
+and deadline. It requests `reboot.target` once through systemd without setting or
+clearing any reboot parameter. It never writes a selector or recovery record.
+An existing hang/reset intent, even partial, prevents another fault on that
+transaction. A lost or timed-out reply may hide an already queued reboot; retain
+the consumed intent and observe rather than replaying or cleaning it up.
+
+Record the request's host monotonic time and collect the subsequent boot through
+one separately planned connection. Require a new normal boot of the original
+good image, unchanged default and data, exact transaction `rolled-back` with
+`trial-reset`, quarantine and retained attempt/generation history. A 420-second
+outer observation bound is a stop condition, not a measured reset timestamp.
+A queued job alone is not recovery evidence. If a late request permits promotion,
+record the actual outcome; it is not this failure case's pass.
+
+Keep WAN blocked through a separate normal boot and verify no automatic retry.
+Restore Internet and usable time, wait for the updater to become idle, then check
+ordinary candidate refusal before closing SSH. Save the payload's remaining
+explicit retry for a separately selected case; never erase consumed history.
+
+Native fixtures use a private D-Bus and disposable files to exercise deadlines,
+occupied/changing reboot parameters, durable one-use ordering, lost job replies
+and failed receipts. Host tests cover wrong action/transaction, old intents and
+connection loss without implicit logins. These fixtures do not run a device reset
+or satisfy the physical matrix.
+
 ## One supervised kiosk hang
 
 `kiosk_hang_trial` is a separate, feature-gated root-owner example. It is not
