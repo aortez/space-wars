@@ -33,17 +33,17 @@ impl Scene {
         {
             return Err(Rejection::UnsupportedScene);
         }
+        let base = world.raw.bodies[*plates.bodies.last().unwrap()].translation();
+        let frame = Frame::from_base([base.x, base.y], N - 1).ok_or(Rejection::UnsupportedScene)?;
         for (i, handle) in plates.bodies.iter().enumerate() {
             let b = &world.raw.bodies[*handle];
             if (i == N - 1 && !b.is_fixed())
                 || (i < N - 1 && !b.is_dynamic())
                 || b.rotation() != &Pose::IDENTITY.rotation
-                || b.translation().y != 0.0
+                || !frame.valid_position([b.translation().x, b.translation().y], i)
                 || b.linvel().y != 0.0
                 || b.gravity_scale() != 1.0
-                || (i == 0 && f64::from(b.translation().x) > TOUCH)
-                || (i > 0
-                    && (b.translation() != Vector::X * i as f32 || b.linvel() != Vector::ZERO))
+                || (i > 0 && b.linvel() != Vector::ZERO)
             {
                 return Err(Rejection::UnsupportedScene);
             }
@@ -109,6 +109,7 @@ impl Scene {
         Ok((
             Self {
                 plates,
+                frame,
                 acceleration: f64::from(world.raw.gravity.x),
             },
             identities,

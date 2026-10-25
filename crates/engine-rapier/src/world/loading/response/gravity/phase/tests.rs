@@ -34,7 +34,8 @@ fn gravity_phase_admission_rejects_unsupported_worlds_without_mutation() {
             0 => w.raw.gravity = Vector::ZERO,
             1 => w.raw.gravity = -Vector::X,
             2 => w.raw.gravity = Vector::Y,
-            3 => w.raw.bodies[fixed].set_translation(Vector::new(2.0, 0.0), true),
+            // An in-range base shift is now admitted; test beyond the frame bound.
+            3 => w.raw.bodies[fixed].set_translation(Vector::new(18.0, 0.0), true),
             4 => w.raw.bodies[dynamic].set_translation(Vector::new(0.0, 0.1), true),
             5 => w.raw.bodies[dynamic].set_linvel(Vector::Y, true),
             6 => w.raw.bodies[dynamic].set_body_type(RigidBodyType::KinematicVelocityBased, true),

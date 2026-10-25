@@ -7,6 +7,10 @@ the [native pair](material-native-gravity.md) and
 [native stack](material-native-stack-gravity.md) contracts. Admission does not
 guarantee success: each call must still pass all physical and numerical checks.
 
+The later [translated-scene extension](material-translated-gravity.md) preserves
+these mass bounds and numerical limits at bounded nonzero world offsets, using
+v10/v11 instead of the v6-v9 versions of the zero-offset scenes below.
+
 Independent fixtures establish the physical evidence below. Native complete-call
 comparisons then qualify the implementation and its saved-state continuation.
 

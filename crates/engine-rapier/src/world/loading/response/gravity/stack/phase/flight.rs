@@ -22,11 +22,11 @@ impl Staged {
         let start = self.endpoints();
         let active = self.active()?;
         if active.incoming.as_ref().is_some_and(|e| e.held)
-            || (f64::from(start[0].position[0]) >= -TOUCH && start[0].velocity[0] == 0.0)
+            || (self.scene.frame.x(start[0].position[0]) >= -TOUCH && start[0].velocity[0] == 0.0)
         {
             return Err(Rejection::UnsafeSupport);
         }
-        if f64::from(start[0].position[0]) >= -TOUCH && start[0].velocity[0] > 0.0 {
+        if self.scene.frame.x(start[0].position[0]) >= -TOUCH && start[0].velocity[0] > 0.0 {
             return Err(Rejection::UnaccountedApproach);
         }
         let owner = active.support.id;
@@ -104,6 +104,7 @@ impl Staged {
                 &flight,
                 f64::from(start[0].velocity[0]),
                 &end[0],
+                self.scene.frame,
                 loading.config.touch_tolerance,
             )?
         {

@@ -36,6 +36,25 @@ fn fixture_with_masses(
     (world, tokens)
 }
 
+// Translate the entire physical scene before creating any gravity witness.
+fn translated_fixture(
+    plates: &[(u16, f32)],
+    copies: u16,
+    reverse: bool,
+    gap: f32,
+    speed: f32,
+    gravity: f32,
+    offset: Vec2,
+) -> (PhysicsWorld, Vec<RegionToken>) {
+    let (mut world, tokens) = fixture_with_masses(plates, copies, reverse, gap, speed, gravity);
+    for role in 0..plates.len() {
+        let id = body(role as u64 + 1);
+        let p = world.raw.bodies[world.body_handle(id).unwrap()].translation();
+        world.set_pose(id, Vec2::new(p.x + offset.x, p.y + offset.y), 0.0, true);
+    }
+    (world, tokens)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Sample {
     duration: f32,

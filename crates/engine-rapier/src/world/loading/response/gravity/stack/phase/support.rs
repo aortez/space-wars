@@ -105,7 +105,7 @@ impl Staged {
             sources: event.sources,
             id: event.id,
             energy: 0.0,
-            gap_upper: -f64::from(start[0].position[0]),
+            gap_upper: -self.scene.frame.x(start[0].position[0]),
             turned: false,
             held: true,
             settled_work: 0.0,
@@ -163,7 +163,7 @@ impl Staged {
         }
         self.validate()?;
         let start = self.endpoints();
-        if f64::from(start[0].position[0]).abs() > TOUCH
+        if self.scene.frame.x(start[0].position[0]).abs() > TOUCH
             || start[0].velocity[0] != 0.0
             || self.active()?.incoming.as_ref().is_some_and(|e| !e.held)
         {
@@ -279,7 +279,7 @@ impl Staged {
         let endpoint = &self.endpoints()[0];
         let v = f64::from(endpoint.velocity[0]);
         let kinetic = 0.5 * f64::from(endpoint.mass) * v * v;
-        if f64::from(endpoint.position[0]).abs() > TOUCH
+        if self.scene.frame.x(endpoint.position[0]).abs() > TOUCH
             || v <= 0.0
             || available <= 0.0
             || kinetic > available * (1.0 + 1.0e-5)

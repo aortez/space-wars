@@ -210,8 +210,16 @@ impl Staged {
             return Err(Rejection::UnaccountedApproach);
         }
         let event = batch.events[0];
-        let mut history = History::new(&plates[0].endpoint, self.scene.acceleration, policy);
-        history.revision = mass_revision(&[plates[0].endpoint.mass, plates[1].endpoint.mass]);
+        let mut history = History::new(
+            &plates[0].endpoint,
+            self.scene.frame,
+            self.scene.acceleration,
+            policy,
+        );
+        history.revision = self
+            .scene
+            .frame
+            .revision(&[plates[0].endpoint.mass, plates[1].endpoint.mass]);
         let loading = self.world.loading.as_mut().unwrap();
         loading.gravity = Some(Continuation {
             history,

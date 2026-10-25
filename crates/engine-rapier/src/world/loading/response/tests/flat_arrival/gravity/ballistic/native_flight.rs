@@ -3,6 +3,7 @@ use super::*;
 use crate::world::loading::response::gravity::{self as native, GravitySettling};
 
 mod masses;
+mod translations;
 
 #[derive(Default)]
 struct Observed {

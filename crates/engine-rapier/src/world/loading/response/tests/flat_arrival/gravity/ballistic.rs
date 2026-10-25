@@ -10,6 +10,7 @@ mod native_support;
 mod numerics;
 mod support;
 mod tests;
+mod translations;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SupportMode {
@@ -158,10 +159,21 @@ impl PhysicsHooks for FreeDrift {
     }
 }
 
+// Independent fixture frame: use its stable base role, never native admission.
+fn origin(world: &PhysicsWorld) -> [f64; 2] {
+    let fixed = &world.raw.bodies[world
+        .body_handle(body(world.raw.bodies.len() as u64))
+        .unwrap()];
+    [
+        f64::from(fixed.translation().x) - (world.raw.bodies.len() - 1) as f64,
+        f64::from(fixed.translation().y),
+    ]
+}
+
 fn state(world: &PhysicsWorld) -> (f64, f64, f64) {
     let b = &world.raw.bodies[world.body_handle(body(1)).unwrap()];
     (
-        f64::from(b.translation().x),
+        f64::from(b.translation().x) - origin(world)[0],
         f64::from(b.linvel().x),
         f64::from(b.mass()),
     )
@@ -298,7 +310,8 @@ fn fly(
     {
         return Err(Rejection::Energy);
     }
-    let drift_uncertainty = numerics::drift_uncertainty(world, x, middle, dt)?;
+    let drift_uncertainty =
+        numerics::drift_uncertainty(world, f64::from(positions[0].x), middle, dt)?;
     if (end - x - f64::from(middle) * h).abs() > drift_uncertainty {
         return Err(Rejection::Geometry);
     }
@@ -357,6 +370,7 @@ fn step_mode(
     }
     let plates = Plates::new(world).map_err(Rejection::Backend)?;
     let acceleration = f64::from(world.raw.gravity.x);
+    let frame = origin(world);
     if plates.handles.len() != 2
         || plates.normal != [1.0, 0.0]
         || !acceleration.is_finite()
@@ -364,7 +378,6 @@ fn step_mode(
         || world.raw.gravity.y != 0.0
         || !world.raw.bodies[plates.handles[0]].is_dynamic()
         || !world.raw.bodies[plates.handles[1]].is_fixed()
-        || world.raw.bodies[plates.handles[1]].translation() != Vector::X
         || !world.raw.impulse_joints.is_empty()
         || world.raw.multibody_joints.iter().next().is_some()
         || world.raw.bodies.iter().any(|(_, b)| {
@@ -377,7 +390,7 @@ fn step_mode(
                 || b.locked_axes().intersects(LockedAxes::TRANSLATION_LOCKED)
                 || (b.is_dynamic() && (!b.mass().is_finite() || b.mass() <= 0.0))
                 || b.linvel().y != 0.0
-                || b.translation().y != 0.0
+                || f64::from(b.translation().y) != frame[1]
         })
         || world.raw.colliders.iter().any(|(_, c)| c.friction() != 0.0)
     {

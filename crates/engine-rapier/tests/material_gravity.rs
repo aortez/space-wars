@@ -24,6 +24,9 @@ mod stack;
 #[path = "material_gravity/masses.rs"]
 mod masses;
 
+#[path = "material_gravity/translations.rs"]
+mod translations;
+
 struct Scene<const N: usize = 2> {
     gap: f32,
     speed: f32,
@@ -36,6 +39,7 @@ struct Scene<const N: usize = 2> {
     damping: Option<f32>,
     remaining: Option<f64>,
     masses: [f32; N],
+    offset: Vec2,
 }
 
 impl<const N: usize> Default for Scene<N> {
@@ -52,6 +56,7 @@ impl<const N: usize> Default for Scene<N> {
             damping: None,
             remaining: None,
             masses: [20.0; N],
+            offset: Vec2::ZERO,
         }
     }
 }
@@ -107,7 +112,7 @@ fn scene_with_roles<const N: usize>(spec: Scene<N>) -> (PhysicsWorld, [RegionTok
                 } else {
                     BodyKind::Fixed
                 },
-                position: Vec2::new(if role == 0 { -spec.gap } else { role as f32 }, 0.0),
+                position: spec.offset + Vec2::X * if role == 0 { -spec.gap } else { role as f32 },
                 linear_velocity: Vec2::X * if role == 0 { spec.speed } else { 0.0 },
                 lock_rotation: true,
                 can_sleep: false,

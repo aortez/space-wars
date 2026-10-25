@@ -170,7 +170,7 @@ fn native_mass_pair_restore_rejects_bad_reference_scales_and_endpoints() {
         let s = w.loading.as_mut().unwrap().gravity.as_mut().unwrap();
         match case {
             0 => s.history.revision = 1,
-            1 => s.history.revision = 3,
+            1 => s.history.revision = 4,
             2 => s.history.errors[0] = s.history.scales[0],
             3 => s.history.reference[2] = 81.0,
             4 => s.history.scales[1] *= 2.0,

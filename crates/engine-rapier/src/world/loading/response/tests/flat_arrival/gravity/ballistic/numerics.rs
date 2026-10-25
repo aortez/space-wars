@@ -13,6 +13,7 @@ pub(super) struct Ledger {
     pub position_error: f64,
     motion: (f64, f64, f64),
     acceleration: f64,
+    origin: [f64; 2],
 }
 
 impl Ledger {
@@ -34,6 +35,7 @@ impl Ledger {
             position_error: 0.0,
             motion,
             acceleration,
+            origin: origin(world),
         })
     }
 
@@ -42,7 +44,8 @@ impl Ledger {
         world: &PhysicsWorld,
         acceleration: f64,
     ) -> Result<(), Rejection> {
-        if self.motion != state(world)
+        if self.origin != origin(world)
+            || self.motion != state(world)
             || self.acceleration != acceleration
             || [
                 (self.work_error, self.energy_scale),
