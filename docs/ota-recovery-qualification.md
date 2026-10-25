@@ -22,6 +22,12 @@ adds the second failed attempt, return within 191.705 seconds, preserved history
 through another normal boot and refusal of a third attempt. The trial observer
 completed; a close-out probe initially returned `Busy` and was repeated only after
 the updater became idle. Both results are retained.
+The [software-reset record](data/ota-picade2-trial-reset-20261025.json) and
+[kiosk-crash record](data/ota-picade2-kiosk-crash-20261025.json) add both offline
+generation-14 attempts on 2026-10-25. The crash series observed five distinct
+process exits and automatic return to generation 12 within 189.919 seconds.
+Both generations 13 and 14 are now exhausted. Six of eleven physical cases have
+observations; the remaining five cases and owner review still precede approval.
 The [review-fix image record](data/ota-picade2-review-fixes-20261018.json) adds
 its subsequent generation-7 trial, default boot and installed service/network
 checks. Exact pre-update settings bytes were retained before installation;
@@ -284,8 +290,9 @@ candidate refusal and any exhausted-retry refusal after idle, then close SSH.
 
 Fixtures exercise timing, durable one-use ordering, stale/repeated instances,
 lost replies and actual pidfd delivery to disposable child processes. They do
-not qualify a physical device. No kiosk-crash observation has yet been recorded
-for the second Picade by this helper.
+not qualify a physical device. The separately retained
+[second-Picade observation](#second-picade-kiosk-crash-2026-10-25) below records
+this helper's first completed physical series and recovery checks.
 
 ## One supervised kiosk hang
 
@@ -512,13 +519,64 @@ Nightly selection returned `CandidateChanged` without changing history. The
 device finished on generation 12/B, Release selected, partial offline off and
 SSH closed.
 
-Five of the eleven cases now have observations on this binding; owner review
-remains pending and no installation approval was created. Root startup failure,
-recovery-service failure, kiosk crash, watchdog handoff/expiry, interrupted
-promotion and physical power loss remain separate cases. Generation 14 retains
-one bounded explicit retry for a separately selected procedure. The verified
-portable backup remains available; privileged offline restoration was not
-needed or rehearsed.
+At this checkpoint, five of the eleven cases had observations on this binding;
+owner review remained pending and no installation approval was created. Root
+startup failure, recovery-service failure, kiosk crash, watchdog handoff/expiry, interrupted
+promotion and physical power loss remained separate cases. Generation 14 retained
+one bounded explicit retry, used by the subsequent kiosk-crash case below. The
+verified portable backup remains available; privileged offline restoration was
+not needed or rehearsed.
+
+### Second Picade kiosk crash, 2026-10-25
+
+The [retained crash record](data/ota-picade2-kiosk-crash-20261025.json) documents
+the sole explicit retry of the same signed generation-14 payload. Generation 12
+remained good and default in slot B; generation 13's exhausted failure record and
+generation 14's first `trial-reset` fault receipts were preserved. The separate
+owner helper came from [#547](https://github.com/aortez/space-wars/pull/547), clean
+source `9bdf377b9b3e`, after its exact-source CI passed. The local runner passed
+seventeen guard tests and was frozen before device access. The helper is absent
+from the shipped image.
+
+The owner blocked WAN while keeping Wi-Fi and LAN available. Direct-IP HTTPS
+probes confirmed the sampled block before installation, after fallback and after
+the separate normal reboot. Installation completed write, flush and read-back
+verification before requesting tryboot. Disk flushing was slower than the prior
+trial; the installer completed normally without replay or a replacement login.
+
+The new attempt-2 transaction reached `observing` on A. Five distinct verified
+kiosk processes received SIGKILL at **19.794, 52.508, 85.286, 118.021 and 150.774
+seconds** of trial uptime. Every pinned exit was observed and durably recorded;
+the host received the complete series result. The journal independently records
+five killed processes and five normal service restarts. Restart policy stayed
+active. No incomplete series or uncertain delivery was treated as a pass.
+
+The trial connection closed with a conservative uptime lower bound of
+**180.998 seconds**. One planned return connection observed normal generation
+12/B **189.919 seconds after series invocation**, within the 420-second bound.
+The exact transaction was `rolled-back` with `health-timeout`; generation 14 was
+quarantined at attempt 2. All per-process device intents/results matched the
+acknowledged series, and the prior generation-13 and first generation-14 fault
+records were unchanged. These timings measure host observations, not exact
+hardware reset timing or watchdog expiry.
+
+A separate normal reboot while WAN remained blocked preserved quarantine and
+attempt counts without automatic retry. Clock advanced and recovery was healthy.
+Protected file contents and metadata matched apart from the recorded
+adapter-local Bluetooth `attributes` cache regenerated at boot. After WAN was
+restored, network time was usable and the updater became idle. Ordinary Nightly
+selection returned `CandidateChanged`; the explicit third attempt returned
+`Recovery(Quarantined)`. Both inspections left recovery history unchanged.
+The device finished on generation 12/B, Release selected, partial offline off,
+Clock running and SSH closed.
+
+Six of eleven cases now have observations on this binding. Root startup failure,
+recovery-service failure, watchdog handoff/expiry, interrupted promotion and
+physical power loss remain, along with owner review; no installation approval
+was created. Generations 13 and 14 have no remaining retry. A further fault case
+requires a new eligible payload and its own reviewed procedure, preserving all
+consumed history. The verified portable backup remains retained; privileged
+offline restoration was not exercised.
 
 ## One missing-root attempt
 
