@@ -5,6 +5,7 @@ use rapier2d::prelude::ActiveHooks;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 mod departure;
+mod gravity;
 mod native;
 mod tests;
 

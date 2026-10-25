@@ -140,7 +140,35 @@ the low-level operation without host energy validation; its caller owns that
 accounting. Shared-response tests serialize bodies and contacts around a host
 veto, and native regressions cover low relative speeds at large common velocity.
 
-These twelve Rust files and the diagnostic feature in `Cargo.toml` are the
+The gravity/support qualification opts into corrected contact impulse accumulation in
+`contact_constraints_set.rs`, `contact_with_coulomb_friction.rs` and
+`generic_contact_constraint.rs`. Builders receive an accumulation flag selected
+using the integer internal-step index. At the first update, the impulse is still
+the previous frame's cache; it seeds warmstarting but must not be counted as an
+already completed substep.
+Later updates accumulate normal/tangent impulses as before. The shared,
+3D-only `contact_with_twist_friction.rs` builder follows the same signature and
+rule for normal/tangent/twist totals; this 2D package does not qualify 3D motion.
+Existing public signatures, snapshot schemas, solver impulse updates and
+warm-start writeback are unchanged. The default-false
+`PhysicsHooks::report_applied_contact_impulses` selects corrected reporting for
+one pipeline step, including all islands and CCD subdivisions. The pipeline
+resets reused island solvers for every step. Native gravity operations and
+their independent fixtures opt in; ordinary stepping and passive loading
+capture preserve existing behavior. Corrected reports change force-event
+thresholds and subsequent new-contact/restitution classification when a stale
+positive impulse becomes zero. Applying that change globally caused gameplay
+regressions, so a global migration is outside this patch.
+
+`crates/engine-rapier/src/world/tests/contact_impulses.rs` checks normal/friction
+reports against momentum for rigid and multibody contacts, varying gravity,
+duration, internal subdivision, insertion order and warm-start coefficients.
+It also checks unloading, a false force-event threshold crossing, and default
+report preservation when alternating corrected and ordinary steps. The
+gravity fixture independently checks resting force across equivalent plate
+representations. See `docs/design/material-gravity-loading.md` for scope.
+
+These Rust files and the diagnostic feature in `Cargo.toml` are the
 complete source/configuration differences from the published crate. See
 `docs/picade-late-match-physics.md` for the retained inputs and qualification.
 

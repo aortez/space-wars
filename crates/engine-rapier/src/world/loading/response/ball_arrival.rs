@@ -306,6 +306,7 @@ impl PhysicsWorld {
         let scene = Scene::admit(self, line_only)?;
         let snapshot = self.snapshot_bytes().map_err(|_| R::Snapshot)?;
         let mut staged = Self::from_snapshot_bytes(&snapshot).map_err(|_| R::Snapshot)?;
+        staged.invalidate_gravity(GravityInvalidation::OtherStep);
         for h in scene.bodies {
             let b = &mut staged.raw.bodies[h];
             b.recompute_mass_properties_from_colliders(&staged.raw.colliders);

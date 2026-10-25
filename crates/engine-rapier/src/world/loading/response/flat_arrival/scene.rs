@@ -9,10 +9,10 @@ struct Boundary {
     internal_top: bool,
 }
 
-pub(super) struct Scene {
-    pub(super) bodies: Vec<RigidBodyHandle>,
-    pub(super) normal: [f64; 2],
-    pub(super) sources: Vec<ContactSource>,
+pub(in crate::world::loading::response) struct Scene {
+    pub(in crate::world::loading::response) bodies: Vec<RigidBodyHandle>,
+    pub(in crate::world::loading::response) normal: [f64; 2],
+    pub(in crate::world::loading::response) sources: Vec<ContactSource>,
     tangent: [f64; 2],
     boundaries: Vec<Boundary>,
 }
@@ -30,6 +30,16 @@ fn dot(a: [f64; 2], b: [f64; 2]) -> f64 {
 
 impl Scene {
     pub(super) fn admit(world: &PhysicsWorld) -> Result<Self, R> {
+        let scene = Self::certify(world)?;
+        if world.raw.gravity != Vector::ZERO {
+            return Err(R::UnsupportedScene);
+        }
+        Ok(scene)
+    }
+
+    // Shared geometry/body certificate. Each stepping operation must separately
+    // admit its force model; ordinary flat arrival still requires zero gravity.
+    pub(in crate::world::loading::response) fn certify(world: &PhysicsWorld) -> Result<Self, R> {
         let loading = world.loading.as_ref().ok_or(R::ResponseDisabled)?;
         let response = loading.response.as_ref().ok_or(R::ResponseDisabled)?;
         let count = world.raw.bodies.len();
@@ -38,7 +48,6 @@ impl Scene {
             || loading.regions.len() != count
             || response.materials.len() != count
             || loading.bindings.len() != world.raw.colliders.len()
-            || world.raw.gravity != Vector::ZERO
             || !world.raw.impulse_joints.is_empty()
             || world.raw.multibody_joints.iter().next().is_some()
             || loading.config.touch_tolerance != 1.0e-5
@@ -195,7 +204,10 @@ impl Scene {
         Ok(scene)
     }
 
-    pub(super) fn refresh_mass(&self, world: &mut PhysicsWorld) -> Result<(), R> {
+    pub(in crate::world::loading::response) fn refresh_mass(
+        &self,
+        world: &mut PhysicsWorld,
+    ) -> Result<(), R> {
         for h in &self.bodies {
             let b = &mut world.raw.bodies[*h];
             b.recompute_mass_properties_from_colliders(&world.raw.colliders);
@@ -293,7 +305,10 @@ impl Scene {
         self.check_geometry(world, velocity)
     }
 
-    pub(super) fn internal_face(&self, context: &ContactModificationContext) -> bool {
+    pub(in crate::world::loading::response) fn internal_face(
+        &self,
+        context: &ContactModificationContext,
+    ) -> bool {
         [context.collider1, context.collider2]
             .into_iter()
             .zip([1.0, -1.0])

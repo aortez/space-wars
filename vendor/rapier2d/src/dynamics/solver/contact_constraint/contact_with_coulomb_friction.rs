@@ -252,6 +252,7 @@ impl ContactWithCoulombFrictionBuilder {
         &self,
         params: &IntegrationParameters,
         solved_dt: Real,
+        accumulate_impulse: bool,
         bodies: &SolverBodies,
         _multibodies: &MultibodyJointSet,
         constraint: &mut ContactWithCoulombFriction<SimdReal>,
@@ -298,13 +299,17 @@ impl ContactWithCoulombFrictionBuilder {
 
                 normal_part.rhs_wo_bias = rhs_wo_bias;
                 normal_part.rhs = new_rhs;
-                normal_part.impulse_accumulator += normal_part.impulse;
+                if accumulate_impulse {
+                    normal_part.impulse_accumulator += normal_part.impulse;
+                }
                 normal_part.impulse *= warmstart_coeff;
             }
 
             // tangent parts.
             {
-                tangent_part.impulse_accumulator += tangent_part.impulse;
+                if accumulate_impulse {
+                    tangent_part.impulse_accumulator += tangent_part.impulse;
+                }
                 tangent_part.impulse *= warmstart_coeff;
 
                 for j in 0..DIM - 1 {

@@ -4,7 +4,7 @@ use rapier2d::prelude::ActiveHooks;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 mod departure;
-mod scene;
+pub(super) mod scene;
 pub(in crate::world) use departure::DepartureTracker;
 use scene::Scene;
 
@@ -197,6 +197,7 @@ impl PhysicsWorld {
         let scene = Scene::admit(self)?;
         let snapshot = self.snapshot_bytes().map_err(|_| R::Snapshot)?;
         let mut staged = Self::from_snapshot_bytes(&snapshot).map_err(|_| R::Snapshot)?;
+        staged.invalidate_gravity(GravityInvalidation::OtherStep);
         scene.refresh_mass(&mut staged)?;
         let loading = staged.loading.as_mut().unwrap();
         // A ball departure witness cannot certify later plate motion. Only

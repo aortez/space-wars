@@ -255,6 +255,7 @@ impl ContactWithTwistFrictionBuilder<SimdReal> {
         &self,
         params: &IntegrationParameters,
         solved_dt: Real,
+        accumulate_impulse: bool,
         bodies: &SolverBodies,
         _multibodies: &MultibodyJointSet,
         constraint: &mut ContactWithTwistFriction<SimdReal>,
@@ -299,7 +300,9 @@ impl ContactWithTwistFrictionBuilder<SimdReal> {
 
                 normal_part.rhs_wo_bias = rhs_wo_bias;
                 normal_part.rhs = new_rhs;
-                normal_part.impulse_accumulator += normal_part.impulse;
+                if accumulate_impulse {
+                    normal_part.impulse_accumulator += normal_part.impulse;
+                }
                 normal_part.impulse *= warmstart_coeff;
             }
         }
@@ -313,9 +316,11 @@ impl ContactWithTwistFrictionBuilder<SimdReal> {
                 let bias = (p1 - p2).gdot(tangents1[j]) * inv_dt;
                 tangent_part.rhs[j] = tangent_part.rhs_wo_bias[j] + bias;
             }
-            tangent_part.impulse_accumulator += tangent_part.impulse;
+            if accumulate_impulse {
+                tangent_part.impulse_accumulator += tangent_part.impulse;
+                twist_part.impulse_accumulator += twist_part.impulse;
+            }
             tangent_part.impulse *= warmstart_coeff;
-            twist_part.impulse_accumulator += twist_part.impulse;
             twist_part.impulse *= warmstart_coeff;
         }
 

@@ -222,6 +222,7 @@ impl PhysicsWorld {
         }
         let bytes = self.snapshot_bytes().map_err(|_| R::Snapshot)?;
         let mut staged = Self::from_snapshot_bytes(&bytes).map_err(|_| R::Snapshot)?;
+        staged.invalidate_gravity(GravityInvalidation::OtherStep);
         for h in pair.bodies {
             let b = &mut staged.raw.bodies[h];
             b.recompute_mass_properties_from_colliders(&staged.raw.colliders);

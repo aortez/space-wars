@@ -226,6 +226,9 @@ pub(super) struct LoadingState {
     // Snapshot v5 has a separate tail for optional ball and flat evidence.
     #[serde(skip)]
     pub(in crate::world) flat_departures: Option<response::flat_arrival::DepartureTracker>,
+    // Snapshot v6 keeps gravity history even after its live claims invalidate.
+    #[serde(skip)]
+    pub(in crate::world) gravity: Option<response::gravity::Continuation>,
 }
 
 impl LoadingState {
@@ -243,6 +246,7 @@ impl LoadingState {
             response: None,
             arrival_departures: None,
             flat_departures: None,
+            gravity: None,
         }
     }
 
@@ -261,11 +265,18 @@ impl LoadingState {
     }
 
     pub(in crate::world) fn invalidate_arrival_proofs(&mut self) {
+        self.invalidate_gravity(response::gravity::Invalidation::ExternalEdit);
         if let Some(tracker) = &mut self.arrival_departures {
             tracker.clear();
         }
         if let Some(tracker) = &mut self.flat_departures {
             tracker.clear();
+        }
+    }
+
+    pub(in crate::world) fn invalidate_gravity(&mut self, reason: response::gravity::Invalidation) {
+        if let Some(state) = &mut self.gravity {
+            state.invalidate(reason);
         }
     }
 
@@ -305,6 +316,10 @@ impl LoadingState {
     pub(super) fn valid_for(&self, world: &PhysicsWorld) -> bool {
         self.config.valid()
             && self.response.as_ref().is_none_or(|r| r.valid_for(self))
+            && self
+                .gravity
+                .as_ref()
+                .is_none_or(|g| self.response.is_some() && g.valid_for(self))
             && self
                 .arrival_departures
                 .as_ref()
@@ -596,6 +611,7 @@ pub(super) trait ArrivalControl: Sync {
 }
 
 pub(super) struct Hooks<'a> {
+    pub report_applied_contact_impulses: bool,
     pub arrival: Option<&'a dyn ArrivalControl>,
     pub flight: Option<&'a std::sync::atomic::AtomicBool>,
     pub drives: surface_drive::DriveHooks<'a>,
@@ -604,6 +620,10 @@ pub(super) struct Hooks<'a> {
 }
 
 impl PhysicsHooks for Hooks<'_> {
+    fn report_applied_contact_impulses(&self) -> bool {
+        self.report_applied_contact_impulses
+    }
+
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
         if let Some(arrival) = self.arrival {
             arrival.filter(context);
@@ -676,6 +696,7 @@ impl PhysicsWorld {
         };
         state.next_region = next;
         state.regions.insert(id, RegionEntry { token, body });
+        state.invalidate_gravity(response::gravity::Invalidation::ExternalEdit);
         Ok(token)
     }
 

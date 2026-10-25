@@ -195,6 +195,7 @@ impl PhysicsPipeline {
         colliders: &mut ColliderSet,
         impulse_joints: &mut ImpulseJointSet,
         multibody_joints: &mut MultibodyJointSet,
+        report_applied_contact_impulses: bool,
         events: &dyn EventHandler,
     ) {
         self.counters.stages.island_construction_time.resume();
@@ -259,6 +260,9 @@ impl PhysicsPipeline {
         if self.solvers.len() < num_active_islands {
             self.solvers
                 .resize_with(num_active_islands, IslandSolver::new);
+        }
+        for solver in self.solvers.iter_mut().take(num_active_islands) {
+            solver.set_report_applied_contact_impulses(report_applied_contact_impulses);
         }
 
         #[cfg(not(feature = "parallel"))]
@@ -506,6 +510,7 @@ impl PhysicsPipeline {
     ) {
         self.counters.reset();
         self.counters.step_started();
+        let report_applied_contact_impulses = hooks.report_applied_contact_impulses();
 
         // Apply some of delayed wake-ups.
         self.counters.stages.user_changes.start();
@@ -707,6 +712,7 @@ impl PhysicsPipeline {
                 colliders,
                 impulse_joints,
                 multibody_joints,
+                report_applied_contact_impulses,
                 events,
             );
 
