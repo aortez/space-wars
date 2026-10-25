@@ -207,16 +207,29 @@ fn native_mass_stack_restore_keeps_original_bounds_and_refuses_corruption() {
 }
 
 #[test]
-fn translated_extension_preserves_frozen_v9_stack_tail() {
-    for offset in [0.0, 3.25] {
+fn compression_extension_preserves_frozen_stack_tails() {
+    for (turn, offset) in [
+        (QuarterTurn::Deg0, 0.0),
+        (QuarterTurn::Deg0, 3.25),
+        (QuarterTurn::Deg90, 0.0),
+        (QuarterTurn::Deg270, 3.25),
+    ] {
         for policy in [GravitySettling::Refuse, GravitySettling::BoundedNumerical] {
             for dt in [0.001, 0.01] {
                 let mut w = stack_world([11, 2, 7], true, [4, 2, 4], 2);
                 set_masses(&mut w, &[11, 2], &[13.0, 31.0]);
                 for id in [11, 2, 7] {
                     let p = w.motion(body(id)).unwrap().position;
-                    w.set_pose(body(id), p + Vec2::new(0.0, offset), 0.0, true);
+                    let velocity = w.motion(body(id)).unwrap().linear_velocity;
+                    w.set_quarter_turn_pose(
+                        body(id),
+                        turn.rotate(p + Vec2::new(0.0, offset)),
+                        turn,
+                        true,
+                    );
+                    w.set_velocity(body(id), turn.rotate(velocity), 0.0, true);
                 }
+                w.set_gravity(turn.rotate(Vec2::X * 10.0));
                 w.step_material_flat_gravity(dt, policy).unwrap();
                 for reason in [
                     None,
@@ -233,7 +246,14 @@ fn translated_extension_preserves_frozen_v9_stack_tail() {
                     let bytes = saved.snapshot_bytes().unwrap();
                     assert_eq!(
                         &bytes[..4],
-                        &(if offset == 0.0 { 9_u32 } else { 11 }).to_le_bytes()
+                        &(if turn != QuarterTurn::Deg0 {
+                            13_u32
+                        } else if offset == 0.0 {
+                            9
+                        } else {
+                            11
+                        })
+                        .to_le_bytes()
                     );
                     assert!(bytes.ends_with(&frozen));
                     assert_eq!(

@@ -7,6 +7,7 @@ use rapier2d::prelude::{ContactImpulse, SolverFlags};
 
 pub mod arrival;
 pub mod ball_arrival;
+pub mod compression;
 mod energy;
 pub mod flat_arrival;
 mod geometry;
@@ -79,7 +80,7 @@ pub struct ResponseDiagnostics {
 
 /// Numeric parameters only: material names are presentation metadata, not an
 /// authoritative identity. Avoid leaking owned snapshot labels into static str.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct StoredRegion {
     parameters: [f32; 5],
     brittle: bool,

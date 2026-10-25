@@ -229,6 +229,9 @@ pub(super) struct LoadingState {
     // Snapshots v6 (pair) and v7 (stack) retain even invalidated gravity history.
     #[serde(skip)]
     pub(in crate::world) gravity: Option<response::gravity::Continuation>,
+    // v14 appends compression history without changing the v2 capture payload.
+    #[serde(skip)]
+    pub(in crate::world) compression: Option<response::compression::Continuation>,
 }
 
 impl LoadingState {
@@ -247,6 +250,7 @@ impl LoadingState {
             arrival_departures: None,
             flat_departures: None,
             gravity: None,
+            compression: None,
         }
     }
 
@@ -276,6 +280,9 @@ impl LoadingState {
 
     pub(in crate::world) fn invalidate_gravity(&mut self, reason: response::gravity::Invalidation) {
         if let Some(state) = &mut self.gravity {
+            state.invalidate(reason);
+        }
+        if let Some(state) = &mut self.compression {
             state.invalidate(reason);
         }
     }
@@ -315,6 +322,9 @@ impl LoadingState {
 
     pub(super) fn valid_for(&self, world: &PhysicsWorld) -> bool {
         self.config.valid()
+            && self.compression.as_ref().is_none_or(|c| {
+                self.gravity.is_none() && self.response.is_some() && c.valid_for(world)
+            })
             && self.response.as_ref().is_none_or(|r| r.valid_for(self))
             && self
                 .gravity

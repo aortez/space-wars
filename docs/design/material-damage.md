@@ -317,6 +317,11 @@ The opt-in [native adapter](material-native-response.md) now applies that respon
 and persists capacity for restricted complete ball and rotation-locked flat-face
 contact batches. It explicitly refuses unsupported loading; scenarios continue
 to use their existing paths.
+The [driven sustained-compression slice](material-sustained-compression.md) adds
+measured deformation and work for an ideal prescribed platen pressing a fixed
+material layer, including elastic return, permanent compression and compatible
+saved history. Dynamic overloaded supports and connection loads remain future
+work.
 
 ## Evidence
 
