@@ -7,8 +7,8 @@ impl Staged {
     fn motion(&self) -> (f64, f64) {
         let a = &self.world.raw.bodies[self.scene.plates.bodies[0]];
         (
-            self.scene.frame.x(a.translation().x),
-            f64::from(a.linvel().x),
+            self.scene.frame.x(a.translation().to_array()),
+            f64::from(self.scene.frame.speed(a.linvel().to_array())),
         )
     }
 

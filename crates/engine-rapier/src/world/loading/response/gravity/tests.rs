@@ -2,6 +2,7 @@ use super::*;
 use engine_material::{ARMOR, WOOD};
 
 pub(super) mod masses;
+mod orientations;
 mod stack_fixture;
 mod translations;
 mod v6;
@@ -580,7 +581,7 @@ fn gravity_state_snapshot_rejects_incoherent_and_truncated_histories() {
         let mut changed = w.clone();
         let state = changed.loading.as_mut().unwrap().gravity.as_mut().unwrap();
         match case {
-            0 => state.history.revision = 4,
+            0 => state.history.revision = 5,
             1 => state.history.reference[0] = f64::NAN,
             2 => state.history.reference[2] = 0.0,
             3 => state.history.reference[3] = -10.0,

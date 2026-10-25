@@ -40,6 +40,14 @@ struct SupportOwner {
 }
 
 impl State {
+    #[cfg(test)]
+    pub(super) fn test_plates_mut(&mut self) -> &mut [Plate] {
+        match &mut self.status {
+            StackStatus::Active(a) => &mut a.plates,
+            _ => panic!("expected active stack"),
+        }
+    }
+
     pub(super) fn correction_summary(&self, history: &History) -> GravityCorrectionSummary {
         GravityCorrectionSummary {
             impulse: self.corrections.impulse,
@@ -80,13 +88,17 @@ impl State {
 impl StackActive {
     fn valid_for(&self, loading: &LoadingState, history: &History) -> bool {
         let [a, b, c] = &self.plates;
-        let Some(frame) = Frame::from_base(c.endpoint.position, 2) else {
+        let Some(frame) = Frame::at_base(c.endpoint.position, c.endpoint.angle, 2) else {
             return false;
         };
         let mut support = [b.source, c.source];
         support.sort();
         valid_contract(loading, &self.plates, &self.capture, &self.integration)
             && frame.valid_history(history)
+            && self
+                .plates
+                .iter()
+                .all(|p| frame.valid_endpoint(&p.endpoint))
             && valid_masses(history.revision, &[a.endpoint.mass, b.endpoint.mass])
             && f64::from(a.endpoint.mass) == history.reference[2]
             && frame.valid_position(a.endpoint.position, 0)

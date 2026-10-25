@@ -4,7 +4,8 @@
 of the qualified pair and three-plate stack. It retains the
 [unequal-mass contract](material-unequal-mass-gravity.md), physical geometry,
 positive +x gravity, locked rotation, safe support and transactional refusal.
-This extension does not introduce moving supports or rotated frames.
+The subsequent [quarter-turn extension](material-quarter-turn-gravity.md) admits
+exact cardinal orientations with the same bounds. Moving supports remain separate.
 
 ## Frame and admission
 
@@ -110,5 +111,5 @@ Some slow approaches and tiny hops refuse at larger offsets while equivalent
 small-offset scenes succeed. The matrix keeps those refusals as precision
 regressions; no work tolerance, departure threshold or solve cap was relaxed.
 Samples establish bounded evidence, not universal translation invariance in f32.
-Rotated orientations, moving/rotating supports, broader geometry and measured
+General oblique orientations, moving/rotating supports, broader geometry and measured
 sustained deformation remain separate work under #327.

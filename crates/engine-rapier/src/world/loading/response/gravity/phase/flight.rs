@@ -61,8 +61,8 @@ impl Scene {
         let handles: [_; N] = std::array::from_fn(|i| self.plates.bodies[i]);
         let start = handles.map(|h| Endpoint::read(&world.raw.bodies[h]));
         let (x, v, m) = (
-            self.frame.x(start[0].position[0]),
-            f64::from(start[0].velocity[0]),
+            self.frame.x(start[0].position),
+            f64::from(self.frame.speed(start[0].velocity)),
             f64::from(start[0].mass),
         );
         let a = self.acceleration;
@@ -98,23 +98,24 @@ impl Scene {
         // Rapier integrates in world coordinates. Translation can enlarge the
         // uncertainty used for departure, but never the local work/error budget.
         let drift_bound = relative
-            * (f64::from(start[0].position[0]).abs() + (f64::from(middle) * h).abs())
+            * (self.frame.world_axis(start[0].position).abs() + (f64::from(middle) * h).abs())
             + factor * f64::from(f32::from_bits(1)) * (f64::from(middle).abs() + 1.0);
-        world.raw.bodies[handles[0]].set_linvel(Vector::X * middle, true);
+        world.raw.bodies[handles[0]].set_linvel(self.frame.vector(middle), true);
         let metrics = auxiliary_step(world, duration, &Drift);
-        if world.raw.bodies[handles[0]].linvel() != Vector::X * middle {
+        if world.raw.bodies[handles[0]].linvel() != self.frame.vector(middle) {
             return Err(Rejection::Numerical);
         }
-        world.raw.bodies[handles[0]].set_linvel(Vector::X * final_v, true);
+        world.raw.bodies[handles[0]].set_linvel(self.frame.vector(final_v), true);
         let end = handles.map(|h| Endpoint::read(&world.raw.bodies[h]));
         let mut unchanged = end[0].clone();
-        unchanged.position[0] = start[0].position[0];
-        unchanged.velocity[0] = start[0].velocity[0];
+        unchanged.position = start[0].position;
+        unchanged.velocity = start[0].velocity;
         let (end_x, end_v) = (
-            self.frame.x(end[0].position[0]),
-            f64::from(end[0].velocity[0]),
+            self.frame.x(end[0].position),
+            f64::from(self.frame.speed(end[0].velocity)),
         );
-        if !end[0].valid()
+        if !self.frame.valid_endpoint(&end[0])
+            || !self.frame.valid_position(end[0].position, 0)
             || unchanged != start[0]
             || end[1..] != start[1..]
             || end_x > TOUCH
@@ -170,9 +171,9 @@ impl OwnedEpisode {
         if self.held {
             return Err(Rejection::UnsafeSupport);
         }
-        self.turned |= before < 0.0 && end.velocity[0] >= 0.0;
+        self.turned |= before < 0.0 && frame.speed(end.velocity) >= 0.0;
         self.gap_upper = self.gap_upper.max(flight.gap_upper);
-        let lower = (-frame.x(end.position[0])).min(-flight.predicted_x) - flight.uncertainty;
+        let lower = (-frame.x(end.position)).min(-flight.predicted_x) - flight.uncertainty;
         Ok(lower > 2.0 * f64::from(tolerance))
     }
 }
@@ -181,8 +182,8 @@ impl Staged {
     pub(super) fn motion(&self) -> (f64, f64, f64) {
         let body = &self.world.raw.bodies[self.scene.plates.bodies[0]];
         (
-            self.scene.frame.x(body.translation().x),
-            f64::from(body.linvel().x),
+            self.scene.frame.x(body.translation().to_array()),
+            f64::from(self.scene.frame.speed(body.linvel().to_array())),
             f64::from(body.mass()),
         )
     }

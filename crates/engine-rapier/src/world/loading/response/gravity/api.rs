@@ -274,7 +274,7 @@ impl PhysicsWorld {
     /// impacts and safe rigid support. The settling policy is explicit and is
     /// frozen by the first successful positive call.
     ///
-    /// A pair requires exactly two axis-aligned plates of half-extents (0.5, 1): one
+    /// A pair requires exactly two parallel cardinal plates of half-extents (0.5, 1): one
     /// dynamic body of refreshed mass in [5, 80], rotation locked and sleep disabled,
     /// and one fixed body centered locally at (1, 0). Both have zero tangent/angular
     /// motion. The dynamic center is locally x<=1e-6, y=0; gravity is (a, 0), a>0,
@@ -288,11 +288,13 @@ impl PhysicsWorld {
     /// not exceed four times the smaller. B-C retains its support owner while A flies, impacts and
     /// eventually rests. Full-stack support carries both dynamic weights.
     /// The fixed base defines a common world offset, with each component in
-    /// [-16, 16] and exactly representable in f32. All centers share its y;
+    /// [-16, 16] and exactly representable in f32. All centers share its local y;
     /// stationary role spacing is exact in f64. Gap, potential energy and
     /// history scales use local coordinates; drift uncertainty uses world
     /// coordinates. Offsets do not enlarge numerical budgets or guarantee that
-    /// a particular flight/settlement is representable. Rotation is excluded.
+    /// a particular flight/settlement is representable. Exact quarter-turn poses
+    /// set through `PhysicsWorld::set_quarter_turn_pose` rotate the entire frame
+    /// and gravity together. Body rotation stays locked; oblique poses refuse.
     /// Failed materials and support overload refuse; failure consequences and
     /// physical overloaded deformation are outside this operation.
     ///
@@ -303,10 +305,11 @@ impl PhysicsWorld {
     ///
     /// dt=0 is a pause: clear ephemeral outputs without enrolling, solving,
     /// changing policy, or resetting history. Invalid time preserves outputs.
-    /// At zero offset, mass-20 enrollment retains snapshot v6 (pair) or v7
+    /// For the original +x orientation, at zero offset mass-20 enrollment retains snapshot v6 (pair) or v7
     /// (stack); other admitted masses use v8 or v9. Nonzero offsets use v10
-    /// (pair) or v11 (stack). Versions and numerical history persist through
-    /// invalidation. Existing v1-v9 saves remain readable without migration.
+    /// (pair) or v11 (stack). Other cardinal orientations use v12/v13 regardless
+    /// of translation or mass. Versions and numerical history persist through
+    /// invalidation. Existing v1-v11 saves remain readable without migration.
     /// Call this operation again after restore; ordinary positive stepping and external edits invalidate
     /// continuation permanently while retaining its numerical ledger.
     ///

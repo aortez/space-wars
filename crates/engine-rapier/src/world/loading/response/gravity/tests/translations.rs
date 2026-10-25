@@ -2,7 +2,7 @@
 use super::*;
 use masses::set_masses;
 
-fn shifted(stack: bool, mass: bool, offset: Vec2, gap: f32, speed: f32) -> PhysicsWorld {
+pub(super) fn shifted(stack: bool, mass: bool, offset: Vec2, gap: f32, speed: f32) -> PhysicsWorld {
     let mut w = if stack {
         stack_world([11, 2, 7], true, [4, 2, 4], 2)
     } else {
@@ -133,7 +133,7 @@ fn translated_snapshot_validates_frame_and_relative_reference_without_f32_trunca
         let s = changed.loading.as_mut().unwrap().gravity.as_mut().unwrap();
         match case {
             0 => s.history.revision = 2,
-            1 => s.history.revision = 4,
+            1 => s.history.revision = 5,
             2 => s.history.reference[0] = -1.0e300,
             3 => s.history.errors[0] = s.history.scales[0],
             4 => s.history.scales[2] *= 2.0,

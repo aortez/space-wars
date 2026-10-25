@@ -55,8 +55,14 @@ impl Continuation {
             dt: 0.0,
             ..world.raw.integration_parameters
         };
-        self.history.reference[3] == f64::from(world.raw.gravity.x)
-            && observed == **active
+        Frame::at_base(
+            observed.plates[2].endpoint.position,
+            observed.plates[2].endpoint.angle,
+            2,
+        )
+        .is_some_and(|f| {
+            self.history.reference[3] == f64::from(f.speed(world.raw.gravity.to_array()))
+        }) && observed == **active
             && self.valid_for(loading)
     }
 }

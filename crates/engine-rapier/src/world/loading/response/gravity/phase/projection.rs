@@ -68,7 +68,7 @@ impl Scene {
             })
         };
         let start = endpoints(world);
-        let before = f64::from(start[index].velocity[0]);
+        let before = f64::from(self.frame.speed(start[index].velocity));
         let mass = f64::from(start[index].mass);
         if before <= 0.0 || !before.is_finite() {
             return Err(Rejection::Numerical);
@@ -84,7 +84,7 @@ impl Scene {
         };
         let metric = auxiliary_step(world, 0.0, &hooks);
         let end = endpoints(world);
-        let after = f64::from(end[index].velocity[0]);
+        let after = f64::from(self.frame.speed(end[index].velocity));
         let impulse: f64 = world
             .raw
             .narrow_phase
@@ -97,9 +97,9 @@ impl Scene {
             .map(|p| f64::from(p.total_impulse_magnitude()))
             .sum();
         let mut unchanged = end[index].clone();
-        unchanged.velocity[0] = start[index].velocity[0];
+        unchanged.velocity = start[index].velocity;
         if hooks.invalid.load(Ordering::Relaxed)
-            || !end[index].valid()
+            || !self.frame.valid_endpoint(&end[index])
             || unchanged != start[index]
             || end
                 .iter()
