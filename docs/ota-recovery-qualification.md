@@ -10,6 +10,13 @@ device-specific coverage and rollout order. The
 successful signed trial/normal boot and installed radio/time/OTA qualification;
 it includes an explicitly reviewed additive settings migration, not a new
 deliberate-failure or power-loss trial.
+The [second-Picade kiosk-hang record](data/ota-picade2-kiosk-hang-20261024.json)
+adds an offline generation-13 hang, automatic return to generation 12, quarantine
+and a subsequent normal boot on 2026-10-24. Its original host observer failed;
+an explicitly authorized read-only diagnostic established the return. The
+[case details](#second-picade-kiosk-hang-2026-10-24) retain that observation gap and
+the corrected host assertions. Owner review and the remaining physical matrix
+are still required; no installation approval was created.
 The [review-fix image record](data/ota-picade2-review-fixes-20261018.json) adds
 its subsequent generation-7 trial, default boot and installed service/network
 checks. Exact pre-update settings bytes were retained before installation;
@@ -232,6 +239,57 @@ Tests exercise native trial/deadline mismatches, durable one-use ordering,
 late-signal recovery, actual pidfd behaviour on a disposable host child, and
 host refusal of lost connections, old transactions and lost replies. These tests
 do not perform a device trial or satisfy the physical matrix.
+
+### Second Picade kiosk hang, 2026-10-24
+
+The [retained case record](data/ota-picade2-kiosk-hang-20261024.json) documents one
+owner-supervised fault on `sw-picade-2.local`, Pi 4 Model B Rev 1.2. The signed
+generation-13 candidate was built from `56a5972e5037`, whose tree matches merged
+main `8e2a3394b43c` and its successful push CI. The root-owner fault helper from
+#542 was separately uploaded; it is absent from the ordinary image.
+
+The owner blocked this device's WAN access at the router while preserving LAN.
+Direct-IP HTTPS probes failed for both IPv4 destinations; IPv6 had no external
+route. The block remained through automatic fallback and a separate normal boot.
+The one-use installer wrote and verified slot A while generation 12 remained the
+good/default image in B. The native helper consumed the selected transaction's
+fault intent, pinned the exact kiosk process and observed SIGSTOP at 19.230 seconds
+of trial uptime. No fault was replayed.
+
+An authorized read-only diagnostic observed a new normal B boot **249.329 seconds
+after the fault invocation**, within the 420-second outer observation bound.
+The exact transaction was `rolled-back` with `health-timeout`; its generation-13
+payload was quarantined with one attempt, while the original generation-12 good
+image and earlier failure history were preserved. This is a bound on observation
+of return, not a measurement of hardware watchdog expiry or reset time.
+
+The original host observer did not complete. It directly invoked the hidden
+`kiosk-health-worker`, whose caller normally supplies process supervision; that
+extra probe exceeded the host's 12-second timeout. The shared connection was later
+found absent before the expected recovery deadline. Its loss is unexplained, and
+no automatic replacement login was attempted. The owner explicitly authorized
+one diagnostic connection. A second host assertion incorrectly expected the old
+`good_boot` marker to persist: `RecoveryRecord::begin_admitted` correctly clears
+it for a normal-origin install. The corrected read-only validator checked the
+actual journal and rejected seven deliberately altered histories/transactions.
+The original scripts, errors and receipts remain in the evidence manifest.
+
+The subsequent normal boot retained quarantine, the generation floor and the
+single attempt without an automatic retry. Clock advanced, and protected file
+contents and metadata matched, apart from the recorded adapter-local Bluetooth
+`attributes` cache regenerated at boot. After the owner restored WAN access and
+usable network time returned, ordinary native Nightly selection refused the
+failed candidate without changing recovery history. The device finished on
+generation 12, normal B, Release selected, partial offline off, with SSH closed.
+
+This is an observed physical recovery result with observer deviations, not a
+successful unattended runner or a complete hardware approval. The future local
+runner removes the extra raw-worker probe and requires the correct null marker;
+nine guard tests pass, but that revised full runner has not executed a device
+trial. Preserve the failed generation-13 payload and its remaining explicit retry
+for `repeated-failure` before moving this device to another candidate. Root startup,
+recovery-service failure, crash/reset, watchdog handoff, interrupted promotion and
+physical power-loss coverage remain separate.
 
 ## One missing-root attempt
 
