@@ -60,7 +60,7 @@ fn gravity_phase_admission_rejects_unsupported_worlds_without_mutation() {
             22 => w.raw.colliders[collider].set_active_hooks(ActiveHooks::MODIFY_SOLVER_CONTACTS),
             23 => w.raw.colliders[collider].set_shape(SharedShape::ball(0.5)),
             24 => w.raw.colliders[collider].set_position_wrt_parent(Pose::translation(0.1, 0.0)),
-            25 => w.raw.colliders[collider].set_mass(30.0),
+            25 => w.raw.colliders[collider].set_mass(81.0),
             26 => {
                 w.insert_body(body(99), BodySpec::default(), &[]);
             }

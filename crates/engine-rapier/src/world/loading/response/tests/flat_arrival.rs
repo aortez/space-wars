@@ -403,8 +403,23 @@ fn fixture(
     offset: f32,
     dynamic: bool,
 ) -> (PhysicsWorld, Vec<RegionToken>) {
+    let plates: Vec<_> = parts.iter().map(|&parts| (parts, 20.0)).collect();
+    fixture_with_masses(&plates, copies, reverse, angle, shift, offset, dynamic)
+}
+
+fn fixture_with_masses(
+    plates: &[(u16, f32)],
+    copies: u16,
+    reverse: bool,
+    angle: f32,
+    shift: Vec2,
+    offset: f32,
+    dynamic: bool,
+) -> (PhysicsWorld, Vec<RegionToken>) {
+    let parts: Vec<_> = plates.iter().map(|p| p.0).collect();
     assert!((2..=3).contains(&parts.len()));
     assert!(parts.iter().all(|n| [1, 2, 4].contains(n)) && [1, 2].contains(&copies));
+    assert!(plates.iter().all(|p| p.1.is_finite() && p.1 > 0.0));
     let mut world = PhysicsWorld::new(PhysicsWorldConfig {
         gravity: Vec2::ZERO,
         collect_events: false,
@@ -420,6 +435,7 @@ fn fixture(
     }
     for n in ids {
         let count = parts[(n - 1) as usize];
+        let mass = plates[(n - 1) as usize].1;
         let mut specs = Vec::new();
         for part in 0..count {
             for copy in 0..copies {
@@ -432,8 +448,8 @@ fn fixture(
                 spec.friction = 0.0;
                 spec.mass_properties = Some(ColliderMassProperties {
                     center: Vec2::ZERO,
-                    mass: 20.0 / f32::from(count * copies),
-                    inertia: 10.0 / f32::from(count * copies),
+                    mass: mass / f32::from(count * copies),
+                    inertia: 0.5 * mass / f32::from(count * copies),
                 });
                 specs.push(spec);
             }

@@ -274,9 +274,16 @@ impl Verified {
             return Err(Rejection::Energy);
         }
         let handles = [plates.handles[0], plates.handles[1]];
-        let total_mass: f64 = handles
+        // Count the kinetic energy actually supplied to each body. Factoring
+        // unequal masses into one total changes f64 rounding and can disagree
+        // with the sum of the two independently measured projection losses.
+        let half_kick_energy: f64 = handles
             .iter()
-            .map(|h| f64::from(self.world.raw.bodies[*h].mass()))
+            .map(|h| {
+                0.5 * f64::from(self.world.raw.bodies[*h].mass())
+                    * f64::from(kick)
+                    * f64::from(kick)
+            })
             .sum();
         let before_solves = *solves;
         let mut impulses = [0.0; 2];
@@ -313,7 +320,7 @@ impl Verified {
                 }
             }
         }
-        let kick_energy = total_mass * f64::from(kick) * f64::from(kick);
+        let kick_energy = half_kick_energy + half_kick_energy;
         if plates.positions(&self.world) != start
             || projection_energy != kick_energy
             || plates

@@ -275,16 +275,17 @@ impl PhysicsWorld {
     /// frozen by the first successful positive call.
     ///
     /// A pair requires exactly two axis-aligned plates of half-extents (0.5, 1): one
-    /// dynamic body of refreshed mass 20, rotation locked and sleep disabled,
+    /// dynamic body of refreshed mass in [5, 80], rotation locked and sleep disabled,
     /// and one fixed body centered at (1, 0). Both have zero tangent/angular
     /// motion. The dynamic center is at x<=1e-6, y=0; gravity is (a, 0), a>0,
     /// with scale 1. Each body uses one/two/four uniform tangent slices and
     /// one/two coincident copies, all bound to its distinct live material region.
     /// Capture's touch tolerance must be 1e-5. No other force/torque, friction,
     /// damping, joints, CCD/soft CCD, skin, sensor, custom filter or extra body.
-    /// A stack adds a stationary dynamic mass-20 plate at (1, 0) and places the
+    /// A stack adds a stationary dynamic plate at (1, 0) and places the
     /// fixed base at (2, 0). The same geometry/material restrictions apply to all
-    /// three plates. B-C retains its support owner while A flies, impacts and
+    /// three plates. Each dynamic mass must be in [5, 80], and the larger must
+    /// not exceed four times the smaller. B-C retains its support owner while A flies, impacts and
     /// eventually rests. Full-stack support carries both dynamic weights.
     /// Failed materials and support overload refuse; failure consequences and
     /// physical overloaded deformation are outside this operation.
@@ -296,7 +297,8 @@ impl PhysicsWorld {
     ///
     /// dt=0 is a pause: clear ephemeral outputs without enrolling, solving,
     /// changing policy, or resetting history. Invalid time preserves outputs.
-    /// Positive enrollment persists in snapshot v6 (pair) or v7 (stack).
+    /// Mass-20 enrollment retains snapshot v6 (pair) or v7 (stack). Other
+    /// admitted masses use v8 (pair) or v9 (stack), including after invalidation.
     /// Call this operation again after restore; ordinary positive stepping and external edits invalidate
     /// continuation permanently while retaining its numerical ledger.
     ///

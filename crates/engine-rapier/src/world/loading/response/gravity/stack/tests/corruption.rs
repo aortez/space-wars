@@ -18,7 +18,7 @@ fn gravity_stack_state_rejects_incoherent_owners_topology_and_numerical_limits()
                     .as_mut()
                     .unwrap()
                     .history
-                    .revision = 2
+                    .revision = 3
             }
             1 => {
                 w.loading

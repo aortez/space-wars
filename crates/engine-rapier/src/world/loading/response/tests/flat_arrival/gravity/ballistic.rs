@@ -3,6 +3,7 @@
 use super::*;
 
 mod departure;
+mod masses;
 mod native_flight;
 mod native_impact;
 mod native_support;

@@ -15,9 +15,15 @@ roles, determined by geometry rather than IDs or insertion order, are:
 
 | Role | Body and initial motion | Position |
 | --- | --- | --- |
-| A | Dynamic, refreshed mass 20; free normal motion | x <= 1e-6, y = 0 |
-| B | Dynamic, refreshed mass 20; exactly stationary between verified phases | (1, 0) |
+| A | Dynamic, refreshed mass in [5, 80]; free normal motion | x <= 1e-6, y = 0 |
+| B | Dynamic, refreshed mass in [5, 80]; exactly stationary between verified phases | (1, 0) |
 | C | Fixed, exactly stationary | (2, 0) |
+
+The larger dynamic mass must not exceed four times the smaller, using actual
+refreshed backend masses. The [bounded-mass extension](material-unequal-mass-gravity.md)
+retains v7 for 20/20 and uses v9 for other admitted combinations. The original
+v7 storage contract described below remains frozen; numerical and work limits
+can still refuse a call within the admitted mass bounds.
 
 Each role has a distinct live region and consistent source, a certified filled
 rectangle with half-extents (0.5, 1), one/two/four tangent slices and one/two
@@ -52,15 +58,20 @@ stack history. Invalidated history refuses before dispatch and cannot switch kin
 One gravity continuation now distinguishes pair and stack history. It cannot hold
 both kinds of active history or switch scene kinds to renew a numerical allowance.
 The existing pair payload and its snapshot v6 layout remain frozen. Reading v6
-constructs pair history; writing pair history emits the same v6 bytes. An independent
+constructs legacy pair history; writing that history emits the same v6 bytes. An independent
 serializer in the regression tests spells the original fields and lifecycle tags.
 
-Snapshot v7 now stores a distinct tail for stack history: the existing
+Snapshot v7 stores a distinct tail for the original mass-20 stack history: the existing
 optional ball and flat tracker slots followed by the required stack continuation.
-Unenrolled worlds retain v1-v5. Stack history retains v7 after invalidation or
+Unenrolled worlds retain v1-v5. Legacy stack history retains v7 after invalidation or
 ordinary stepping, even after all former sources are deleted. Restore explicitly
 rejects a stack payload labeled v6 and a pair payload labeled v7. Unknown
 versions/tags, truncation, extra bytes and mixed live claims refuse.
+
+Bounded-mass stacks use revision2 and v9; bounded-mass pairs use revision2 and
+v8. The tail field layout is unchanged. Restore checks both kind and revision
+against the outer version. These histories retain their new versions after
+invalidation, including when A's reference mass is 20 and only B differed.
 
 The shared initial reference/flight history precedes the lifecycle discriminator.
 Existing pair Active/Invalidated tags retain values 0/1 and their original fields.

@@ -21,6 +21,9 @@ use engine_rapier::world::{
 #[path = "material_gravity/stack.rs"]
 mod stack;
 
+#[path = "material_gravity/masses.rs"]
+mod masses;
+
 struct Scene<const N: usize = 2> {
     gap: f32,
     speed: f32,
@@ -32,6 +35,7 @@ struct Scene<const N: usize = 2> {
     capture: CaptureConfig,
     damping: Option<f32>,
     remaining: Option<f64>,
+    masses: [f32; N],
 }
 
 impl<const N: usize> Default for Scene<N> {
@@ -47,6 +51,7 @@ impl<const N: usize> Default for Scene<N> {
             capture: CaptureConfig::default(),
             damping: None,
             remaining: None,
+            masses: [20.0; N],
         }
     }
 }
@@ -89,8 +94,8 @@ fn scene_with_roles<const N: usize>(spec: Scene<N>) -> (PhysicsWorld, [RegionTok
             shape.friction = 0.0;
             shape.mass_properties = Some(ColliderMassProperties {
                 center: Vec2::ZERO,
-                mass: 20.0 / f32::from(count),
-                inertia: 10.0 / f32::from(count),
+                mass: spec.masses[role] / f32::from(count),
+                inertia: 0.5 * spec.masses[role] / f32::from(count),
             });
             shapes.push(shape);
         }

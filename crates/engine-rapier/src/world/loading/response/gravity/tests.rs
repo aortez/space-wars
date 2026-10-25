@@ -1,6 +1,7 @@
 use super::*;
 use engine_material::{ARMOR, WOOD};
 
+pub(super) mod masses;
 mod stack_fixture;
 mod v6;
 pub(super) use stack_fixture::world as stack_world;
@@ -578,7 +579,7 @@ fn gravity_state_snapshot_rejects_incoherent_and_truncated_histories() {
         let mut changed = w.clone();
         let state = changed.loading.as_mut().unwrap().gravity.as_mut().unwrap();
         match case {
-            0 => state.history.revision = 2,
+            0 => state.history.revision = 3,
             1 => state.history.reference[0] = f64::NAN,
             2 => state.history.reference[2] = 0.0,
             3 => state.history.reference[3] = -10.0,

@@ -1,6 +1,8 @@
 use super::*;
 use crate::world::loading::response::gravity::tests::stack_world;
 
+mod masses;
+
 mod boundaries;
 
 fn body(n: u64) -> BodyId {
