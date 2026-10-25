@@ -337,6 +337,13 @@ impl PhysicsWorld {
         settling: GravitySettling,
     ) -> Result<GravityStep, GravityRejection> {
         if dt.is_finite() && dt > 0.0 {
+            if self
+                .loading
+                .as_ref()
+                .is_some_and(|s| s.compression.is_some())
+            {
+                return Err(GravityRejection::StaleContinuation);
+            }
             let continuation = self.loading.as_ref().and_then(|l| l.gravity.as_ref());
             if continuation.is_some_and(|s| s.invalidation().is_some()) {
                 return Err(GravityRejection::StaleContinuation);

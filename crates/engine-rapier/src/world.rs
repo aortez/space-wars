@@ -59,6 +59,8 @@ const TRANSLATED_GRAVITY_SNAPSHOT_VERSION: u32 = 10;
 const TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION: u32 = 11;
 const ORIENTED_GRAVITY_SNAPSHOT_VERSION: u32 = 12;
 const ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION: u32 = 13;
+const COMPRESSION_SNAPSHOT_VERSION: u32 = 14;
+const COMPRESSION_SNAPSHOT_TAG: u64 = 0x434f_4d50_5245_5353;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -2283,7 +2285,13 @@ impl PhysicsWorld {
     /// Serialize authoritative Rapier state and all stable handle mappings.
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, PhysicsWorldError> {
         let mut bytes = bincode::serialize(&PhysicsSnapshotRef {
-            version: if let Some(gravity) = self.loading.as_ref().and_then(|s| s.gravity.as_ref()) {
+            version: if self
+                .loading
+                .as_ref()
+                .is_some_and(|s| s.compression.is_some())
+            {
+                COMPRESSION_SNAPSHOT_VERSION
+            } else if let Some(gravity) = self.loading.as_ref().and_then(|s| s.gravity.as_ref()) {
                 gravity.snapshot_version()
             } else if self
                 .loading
@@ -2325,7 +2333,16 @@ impl PhysicsWorld {
             bincode::serialize_into(&mut bytes, loading)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
             loading.serialize_response(&mut bytes)?;
-            if let Some(gravity) = &loading.gravity {
+            if let Some(compression) = &loading.compression {
+                bincode::serialize_into(&mut bytes, &loading.arrival_departures)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+                bincode::serialize_into(&mut bytes, &loading.flat_departures)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+                bincode::serialize_into(&mut bytes, &COMPRESSION_SNAPSHOT_TAG)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+                bincode::serialize_into(&mut bytes, compression)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            } else if let Some(gravity) = &loading.gravity {
                 bincode::serialize_into(&mut bytes, &loading.arrival_departures)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
                 bincode::serialize_into(&mut bytes, &loading.flat_departures)
@@ -2363,6 +2380,7 @@ impl PhysicsWorld {
             TRANSLATED_STACK_GRAVITY_SNAPSHOT_VERSION,
             ORIENTED_GRAVITY_SNAPSHOT_VERSION,
             ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION,
+            COMPRESSION_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -2427,6 +2445,24 @@ impl PhysicsWorld {
                     "gravity snapshot kind/version mismatch".into(),
                 ));
             }
+        }
+        if snapshot.version == COMPRESSION_SNAPSHOT_VERSION {
+            let state = loading.as_mut().unwrap();
+            state.arrival_departures = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            state.flat_departures = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            let tag: u64 = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            if tag != COMPRESSION_SNAPSHOT_TAG {
+                return Err(PhysicsWorldError(
+                    "compression snapshot tag mismatch".into(),
+                ));
+            }
+            state.compression = Some(
+                bincode::deserialize_from(&mut reader)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?,
+            );
         }
         if reader.position() != bytes.len() as u64 {
             return Err(PhysicsWorldError("trailing physics snapshot data".into()));
