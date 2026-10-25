@@ -154,6 +154,12 @@ impl Expectation {
         guard(self, engine_ota::recovery::TRIAL_DEADLINE_MS)
     }
 
+    // Read-only evidence for the intentionally failed recovery-observer case.
+    // Signal admission still uses check_early_trial with the running service.
+    pub(crate) fn uncommitted_trial_state(&self, latest_ms: u64) -> Result<TrialState> {
+        trial_state(self, latest_ms)
+    }
+
     fn validate(&self) -> Result<()> {
         self.image.validate()?;
         require(
@@ -307,7 +313,15 @@ fn read_at(parent: &File, name: &str, limit: u64, owner: u32) -> Result<Vec<u8>>
     )?;
     Ok(bytes)
 }
-fn guard(expected: &Expectation, latest_ms: u64) -> Result<()> {
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TrialState {
+    pub recovery: Sha256,
+    pub watchdog_armed_ms: u64,
+    pub watchdog_timeout_seconds: u32,
+}
+
+fn trial_state(expected: &Expectation, latest_ms: u64) -> Result<TrialState> {
     let boot = inspect_boot()?;
     let system = system_directory()?;
     let recovery = directory(&system, "recovery", 0, true)?;
@@ -332,6 +346,16 @@ fn guard(expected: &Expectation, latest_ms: u64) -> Result<()> {
         }
     }
     expected.matches(&boot, &journal, &early, latest_ms)?;
+    require(now_ms()? < latest_ms, "trial observation window expired")?;
+    Ok(TrialState {
+        recovery: journal.checksum,
+        watchdog_armed_ms: early.armed_boottime_ms,
+        watchdog_timeout_seconds: early.timeout_seconds,
+    })
+}
+
+fn guard(expected: &Expectation, latest_ms: u64) -> Result<()> {
+    trial_state(expected, latest_ms)?;
     recovery_running()?;
     require(
         now_ms()? < latest_ms,

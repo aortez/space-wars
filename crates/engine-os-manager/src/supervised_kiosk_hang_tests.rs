@@ -135,6 +135,32 @@ fn plan() -> Plan {
 }
 
 #[test]
+fn read_only_failed_observer_window_does_not_extend_signal_admission() {
+    let (expected, mut boot, journal, early) = fixture();
+    let original = serde_json::to_vec(&journal.record).unwrap();
+    boot.observation.uptime_ms = 185_000;
+    expected.matches(&boot, &journal, &early, 300_000).unwrap();
+    assert!(
+        expected
+            .matches(&boot, &journal, &early, LATEST_STOP_MS)
+            .is_err()
+    );
+    assert!(
+        expected
+            .matches(
+                &boot,
+                &journal,
+                &early,
+                engine_ota::recovery::TRIAL_DEADLINE_MS
+            )
+            .is_err()
+    );
+    assert_eq!(serde_json::to_vec(&journal.record).unwrap(), original);
+    boot.observation.uptime_ms = 300_000;
+    assert!(expected.matches(&boot, &journal, &early, 300_000).is_err());
+}
+
+#[test]
 fn exact_early_trial_is_required() {
     let (expected, boot, journal, early) = fixture();
     expected
