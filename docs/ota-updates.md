@@ -47,8 +47,13 @@ automatic fallback from generation 13, one quarantined attempt and preservation
 through a separate normal boot. The original host observer failed; an explicitly
 authorized read-only diagnostic established return within 249.329 seconds, and
 the record retains both host corrections and the observation gap. No physical
-installation approval was granted. The next planned failure case is the one
-explicit retry of that same generation-13 payload.
+installation approval was granted. The subsequent
+[repeated-failure record](data/ota-picade2-repeated-failure-20261024.json) consumed
+the single explicit retry, observed return within 191.705 seconds and retained
+both attempts through another normal boot. Ordinary selection and a third retry
+were refused after the updater became idle. The device remains on generation 12;
+generation 13 has no remaining attempt. Further physical cases require another
+eligible payload and their own reviewed procedures.
 
 The earlier generation-10 source
 `44c3647657964600fdd7e21195a5d9356466b8be` retains separate SSH coverage. The
@@ -72,7 +77,7 @@ their original source `0a32db2` and scope.
 | --- | --- | --- |
 | `spacewars.local`, Pi 5 / HyperPixel | Source `0a32db2`, signed Nightly generation 6; healthy trial/normal boot and radio/time/OTA cycles | Review-fix image rollout, actual daily timer, payload/gameplay checks, integrated install policy |
 | `sw-picade.local`, primary Pi 4 / Picade | Source `5b420c9`, good generation 2; healthy game/recovery, update preparation failing; candidate provider/SSH controls passed | Corrected-image rollout and installed startup/radio/time/OTA checks |
-| `sw-picade-2.local`, second Pi 4 / Picade | Source `ebf00811`, good generation 12 on normal B; generation 13 rolled back after an offline kiosk hang and remains quarantined at one attempt; Release selected, partial offline off | Explicit repeated-failure test of generation 13, remaining physical matrix and owner review; actual daily timer and payload/gameplay performance remain separate |
+| `sw-picade-2.local`, second Pi 4 / Picade | Source `ebf00811`, good generation 12 on normal B; generation 13 quarantined with both attempts consumed after offline hang/repeated-failure tests and normal boots; Release selected, partial offline off | Remaining seven physical cases and owner review; actual daily timer and payload/gameplay performance remain separate |
 | Owner feed | Thirteen supervised Nightly generations, metadata version 14; Release targets remain empty | Protected automated publishing, renewal and explicit Release promotion |
 
 The earlier time-wake experiments used the real `sync-now` API, and OTA joined
@@ -155,7 +160,7 @@ New image changes and previously untested failure cases still need qualification
 | #258–#260 | Native off/time-wake/automatic-OTA/off cycle and SSH controls passed on Pi 5 and the selected second Picade; expected setup profile changes and remaining per-device rollout remain |
 | #261 | Shared metadata/image contract and verification fixtures implemented and used by the supervised path; retain those checks through normal service integration |
 | #262 | Owner-local publication, admission checks and durable journal/readback implemented; daily CI builds unsigned candidates; protected automatic signing/publication, renewal and Release promotion remain |
-| #263 | Earlier signed trials retain their Pi 5/primary-Picade scope; the second Picade now has an offline kiosk-hang rollback/quarantine and subsequent normal boot with documented observer deviations. Its repeated-failure case and remaining startup/service failures, watchdog, interrupted promotion and power-loss coverage remain |
+| #263 | Earlier signed trials retain their Pi 5/primary-Picade scope; the second Picade now has offline kiosk-hang/repeated-failure rollback, quarantine through normal boots and exhausted-retry refusal, with documented observation/close-out deviations. Remaining startup/service failures, crash/reset, watchdog, interrupted promotion and power-loss coverage still need qualification |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; bounded install-service sockets and candidate-bound app handoff implemented with the writer disabled; native writer integration and remaining physical maintenance/data checks remain |
 | #265 | Signed delivery verified; corrected startup/time-wake feed checks passed on Pi 5 and the second Picade; actual daily opportunity, new/resumed payload performance and fresh-SSH latency remain |
 | #266 | Manual Updates panel, consent, exact settings-save receipt and cancellable app handoff implemented; native progress/reconciliation, install CLI, saved Ask/Automatic policy and overnight admission/countdown remain |
