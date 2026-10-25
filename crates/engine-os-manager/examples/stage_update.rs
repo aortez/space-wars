@@ -2,13 +2,18 @@
 //! evidence. Never writes a root partition, selects a boot slot or reboots.
 //! Run over the owner's maintained SSH connection; no radio policy is changed.
 #[cfg(target_os = "linux")]
+#[path = "stage_update/request.rs"]
+mod request;
+
+#[cfg(target_os = "linux")]
 mod linux {
+    use super::request::Request;
     use engine_os_manager::{
         linux,
         time::{TimeReason, TimeRecord, TimeTracker},
     };
     use engine_ota::{
-        Channel, DeviceIdentity, Error, RecoveryStore, Result, TrustStore, UsableTime,
+        DeviceIdentity, Error, RecoveryStore, Result, TrustStore, UsableTime,
         boot_linux::BootController,
         download::{Control, DownloadSession, Progress},
         install_lock::InstallLock,
@@ -43,15 +48,7 @@ mod linux {
     }
 
     pub async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let channel = match std::env::args().skip(1).collect::<Vec<_>>().as_slice() {
-            [channel] if channel == "release" => Channel::Release,
-            [channel] if channel == "nightly" => Channel::Nightly,
-            _ => {
-                return Err(
-                    "usage: stage_update release|nightly (root operator; download only)".into(),
-                );
-            }
-        };
+        let request = Request::parse(&std::env::args().skip(1).collect::<Vec<_>>())?;
         if unsafe { libc::geteuid() } != 0 {
             return Err("staging requires separately authenticated root operator access".into());
         }
@@ -60,6 +57,9 @@ mod linux {
         let recovery = RecoveryStore::open(Path::new("/data/spacewars-system/recovery"))?;
         let controller = BootController::open(&lock)?;
         controller.authorize_maintenance(&recovery)?;
+        // This temporary verifier view uses the same bounded explicit retry as
+        // the signed installer. Never lower or rewrite the durable journal.
+        let history = request.history(recovery.record())?;
         let boot = controller.observe()?;
         let setup = provision_linux::inspect(&boot.layout, &boot.observation.binding)?;
         let observation = linux::observe_sync().map_err(std::io::Error::other)?;
@@ -95,14 +95,9 @@ mod linux {
         let mut staging = StagingStore::open(&boot.layout)?;
         let before = recovery.record().clone();
         let outcome = session
-            .run(
-                &mut trust,
-                &mut staging,
-                channel,
-                &device,
-                &recovery.record().image_history(),
-            )
+            .run(&mut trust, &mut staging, request.channel, &device, &history)
             .await?;
+        request.check_outcome(&outcome)?;
         controller.authorize_maintenance(&recovery)?;
         let after = controller.observe()?;
         if after.observation.boot_id != boot.observation.boot_id
@@ -120,7 +115,8 @@ mod linux {
         println!(
             "{}",
             serde_json::to_string_pretty(&serde_json::json!({
-                "schema": 1, "channel": channel, "boot_id": boot.observation.boot_id,
+                "schema": 1, "channel": request.channel, "boot_id": boot.observation.boot_id,
+                "retry_payload": request.retry_payload,
                 "bundle": setup.bundle, "initial_root": setup.initial_root,
                 "outcome": outcome,
                 "recovery_record_sha256": engine_ota::Sha256::digest(&serde_json::to_vec(&before)?),
