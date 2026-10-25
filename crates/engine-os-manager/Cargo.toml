@@ -22,6 +22,10 @@ required-features = ["recovery-qualification"]
 name = "reset_trial"
 required-features = ["recovery-qualification"]
 
+[[example]]
+name = "crash_kiosk_trial"
+required-features = ["recovery-qualification"]
+
 [[bin]]
 name = "engine-os-manager"
 path = "src/main.rs"

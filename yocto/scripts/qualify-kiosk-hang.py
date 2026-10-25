@@ -91,14 +91,14 @@ class SharedConnection:
         self.host, self.control, self.sha = host, str(control), helper_sha
         self.helper = '/data/spacewars-recovery-tools/' + helper_sha + '/kiosk_hang_trial'
 
-    def remote(self, args, data=None):
+    def remote(self, args, data=None, timeout=12):
         checked = subprocess.run(['ssh', '-o', 'ControlPath=' + self.control, '-O', 'check',
                                   self.host], capture_output=True, timeout=3)
         require(checked.returncode == 0, 'Shared connection lost; no fresh login or retry')
         result = subprocess.run(['ssh', '-T', '-o', 'BatchMode=yes', '-o', 'ControlMaster=no',
             '-o', 'ControlPath=' + self.control, '-o', 'ProxyCommand=false',
             self.host, shlex.join(['sudo', '-n', *args])],
-            input=data, capture_output=True, timeout=12)
+            input=data, capture_output=True, timeout=timeout)
         require(len(result.stdout) <= 128 * 1024 and len(result.stderr) <= 128 * 1024,
                 'Oversized native response; inspect without replay')
         return result

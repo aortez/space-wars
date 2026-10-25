@@ -1,0 +1,1248 @@
+{
+  "schema": 1,
+  "purpose": "physical-recovery-case-summary",
+  "case": "kiosk-crash",
+  "outcome": "observed-pass",
+  "original_automated_observer_completed": true,
+  "owner_review_pending": true,
+  "owner_attestation_created": false,
+  "device": "sw-picade-2.local",
+  "binding": {
+    "device_id": "253c3a278e385d2d86a618903ec49717d05715da12ca4c75e1425f8ea7c5e690",
+    "layout_id": "d5772d7a209403254fd62a8171e3dbb10f2db3514e43254172882fa01939d071",
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "hardware_profile": "8f3a364ec78cb6e7e26b75db39a3b902ff9bb549b32f566c8135ef5e02df8cd6"
+  },
+  "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+  "recovery_protocol": 2,
+  "candidate_image": {
+    "schema": 1,
+    "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+    "rootfs_tree": "874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+    "source": {
+      "schema": 1,
+      "commit": "c68b21063f0bc062936285249a04b55d390acc4a",
+      "dirty": false,
+      "revision": "c68b21063f0b"
+    },
+    "machine": "raspberrypi-spacewars",
+    "architecture": "aarch64",
+    "layout": "spacewars-ab-v1",
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "updater_protocol": 1,
+    "recovery_protocol": 2,
+    "data": {
+      "reads": {
+        "min": 1,
+        "max": 1
+      },
+      "writes": 1
+    },
+    "binaries": {
+      "client": {
+        "bytes": 27676280,
+        "sha256": "d96ab80c338e00627cb78124ac5f4d549c3f41d9a313d2db04c3586e052f4f15"
+      },
+      "os_manager": {
+        "bytes": 11792768,
+        "sha256": "10ed320fb8c34f723e812a0bda32136b8c42852d056c1ff491296f4522f06c38"
+      }
+    }
+  },
+  "candidate": {
+    "slot": "a",
+    "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+    "generation": 14,
+    "payload": "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c",
+    "expanded": "976883a859d56a47f72441e601a1b7b2a989c8a6c761901bc9184337331bf4c1",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    }
+  },
+  "previous_good": {
+    "slot": "b",
+    "build_id": "rootfs-243c22b6abdfb5119afc15905e7cbcedae40db13ba27b7d18972fbd874509ee5",
+    "generation": 12,
+    "payload": "7ffb4b6c7f89bb014a4a13cfa5f1f24a096f660de526800b54fdbc377df4dd87",
+    "expanded": "4dfcff5cfb8fd3b4ec28bb286a0e0afb6277ed5d8f7eba0e02e355965b288da6",
+    "data": {
+      "reads": {
+        "min": 1,
+        "max": 1
+      },
+      "writes": 1
+    }
+  },
+  "transaction": "f36cc184a9645ecf6fc64e8f4e747b109e5aee48936390ac33cffa08ef716f89",
+  "origin_boot_id": "33a8e6f0-1f4a-4c2a-b052-33656afd2467",
+  "trial_boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+  "return_boot_id": "07038b05-3a51-4382-94ce-e3cc72c0fb06",
+  "subsequent_normal_boot_id": "05d69521-1cbe-424a-870c-68fa1f7bdeb4",
+  "observed_return_seconds": 189.918605759005,
+  "outer_observation_bound_seconds": 420,
+  "exact_hardware_reset_time_measured": false,
+  "bounded_crash_series": true,
+  "crash_series_acknowledged": true,
+  "host_crash_acknowledged": true,
+  "injection": {
+    "action": "bounded-sigkill-series",
+    "automatic_recovery_qualified": false,
+    "boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+    "case": "kiosk-crash",
+    "next": "Observe automatic fallback; never resume or replay this consumed series",
+    "plan_sha256": "3c84d0fc12d7894bc1443575d351a5fde96c20010ad42f76877ad74c8e46adcb",
+    "policy": {
+      "interval_ms": 30000,
+      "last_at_least_ms": 125000,
+      "latest_ms": 170000,
+      "max_crashes": 6,
+      "max_gap_ms": 45000
+    },
+    "receipts": [
+      {
+        "exit_observed_ms": 19921,
+        "health_before": {
+          "boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+          "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+          "control_response": 3,
+          "invocation_id": "5d94a21cf59a4b888c089c5999edcc34",
+          "presented_frames": 2,
+          "process_id": 875,
+          "start_ticks": 792,
+          "uptime_ms": 15850
+        },
+        "signal_requested_ms": 19794,
+        "step": 1
+      },
+      {
+        "exit_observed_ms": 52666,
+        "health_before": {
+          "boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+          "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+          "control_response": 12,
+          "invocation_id": "079086e0f236450fb3f1cda494566477",
+          "presented_frames": 11,
+          "process_id": 1072,
+          "start_ticks": 2194,
+          "uptime_ms": 51217
+        },
+        "signal_requested_ms": 52508,
+        "step": 2
+      },
+      {
+        "exit_observed_ms": 85428,
+        "health_before": {
+          "boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+          "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+          "control_response": 12,
+          "invocation_id": "5029e89f07ea473382c34e999ba47400",
+          "presented_frames": 11,
+          "process_id": 1355,
+          "start_ticks": 5469,
+          "uptime_ms": 83998
+        },
+        "signal_requested_ms": 85286,
+        "step": 3
+      },
+      {
+        "exit_observed_ms": 118176,
+        "health_before": {
+          "boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+          "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+          "control_response": 12,
+          "invocation_id": "87d3834887484cd5a19b5576a58d0184",
+          "presented_frames": 11,
+          "process_id": 1628,
+          "start_ticks": 8744,
+          "uptime_ms": 116723
+        },
+        "signal_requested_ms": 118021,
+        "step": 4
+      },
+      {
+        "exit_observed_ms": 150898,
+        "health_before": {
+          "boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+          "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+          "control_response": 12,
+          "invocation_id": "43f4d05edb164326af62fc1c0f77d2ba",
+          "presented_frames": 11,
+          "process_id": 1903,
+          "start_ticks": 12019,
+          "uptime_ms": 149469
+        },
+        "signal_requested_ms": 150774,
+        "step": 5
+      }
+    ],
+    "schema": 1,
+    "series_completed": true,
+    "signal": "SIGKILL",
+    "transaction": "f36cc184a9645ecf6fc64e8f4e747b109e5aee48936390ac33cffa08ef716f89"
+  },
+  "durable_fault_intent": {
+    "case": "kiosk-crash",
+    "consumed": true,
+    "plan": {
+      "action": "bounded-sigkill-series",
+      "case": "kiosk-crash",
+      "expectation": {
+        "binding": {
+          "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+          "device_id": "253c3a278e385d2d86a618903ec49717d05715da12ca4c75e1425f8ea7c5e690",
+          "hardware_profile": "8f3a364ec78cb6e7e26b75db39a3b902ff9bb549b32f566c8135ef5e02df8cd6",
+          "layout_id": "d5772d7a209403254fd62a8171e3dbb10f2db3514e43254172882fa01939d071"
+        },
+        "candidate": {
+          "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+          "data": {
+            "reads": {
+              "max": 1,
+              "min": 1
+            },
+            "writes": 1
+          },
+          "expanded": "976883a859d56a47f72441e601a1b7b2a989c8a6c761901bc9184337331bf4c1",
+          "generation": 14,
+          "payload": "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c",
+          "slot": "a"
+        },
+        "image": {
+          "architecture": "aarch64",
+          "binaries": {
+            "client": {
+              "bytes": 27676280,
+              "sha256": "d96ab80c338e00627cb78124ac5f4d549c3f41d9a313d2db04c3586e052f4f15"
+            },
+            "os_manager": {
+              "bytes": 11792768,
+              "sha256": "10ed320fb8c34f723e812a0bda32136b8c42852d056c1ff491296f4522f06c38"
+            }
+          },
+          "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+          "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+          "data": {
+            "reads": {
+              "max": 1,
+              "min": 1
+            },
+            "writes": 1
+          },
+          "layout": "spacewars-ab-v1",
+          "machine": "raspberrypi-spacewars",
+          "recovery_protocol": 2,
+          "rootfs_tree": "874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+          "schema": 1,
+          "source": {
+            "commit": "c68b21063f0bc062936285249a04b55d390acc4a",
+            "dirty": false,
+            "revision": "c68b21063f0b",
+            "schema": 1
+          },
+          "updater_protocol": 1
+        },
+        "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+        "origin_boot_id": "33a8e6f0-1f4a-4c2a-b052-33656afd2467",
+        "previous_good": {
+          "build_id": "rootfs-243c22b6abdfb5119afc15905e7cbcedae40db13ba27b7d18972fbd874509ee5",
+          "data": {
+            "reads": {
+              "max": 1,
+              "min": 1
+            },
+            "writes": 1
+          },
+          "expanded": "4dfcff5cfb8fd3b4ec28bb286a0e0afb6277ed5d8f7eba0e02e355965b288da6",
+          "generation": 12,
+          "payload": "7ffb4b6c7f89bb014a4a13cfa5f1f24a096f660de526800b54fdbc377df4dd87",
+          "slot": "b"
+        },
+        "schema": 1,
+        "transaction": "f36cc184a9645ecf6fc64e8f4e747b109e5aee48936390ac33cffa08ef716f89",
+        "trial_boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1"
+      },
+      "health": {
+        "boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+        "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+        "control_response": 3,
+        "invocation_id": "5d94a21cf59a4b888c089c5999edcc34",
+        "presented_frames": 2,
+        "process_id": 875,
+        "start_ticks": 792,
+        "uptime_ms": 15850
+      },
+      "policy": {
+        "interval_ms": 30000,
+        "last_at_least_ms": 125000,
+        "latest_ms": 170000,
+        "max_crashes": 6,
+        "max_gap_ms": 45000
+      },
+      "schema": 1,
+      "selected_ms": 16602
+    },
+    "plan_sha256": "3c84d0fc12d7894bc1443575d351a5fde96c20010ad42f76877ad74c8e46adcb",
+    "schema": 1,
+    "signal_delivery": "not-yet-established"
+  },
+  "quarantine": {
+    "generation": 14,
+    "attempts": 2,
+    "reason": "health-timeout"
+  },
+  "data_preservation_scope": {
+    "preserved": true,
+    "removed": [
+      "b74e80eab47761bf4d405ede80391d2b3753dbb3c97c7e67f03be27b28690a46  /data/bluetooth/DC:A6:32:82:36:12/attributes"
+    ],
+    "added": [
+      "47fc2a50a7c3b99523803edb7365db84247dc460e9454c125315ec33426fd18d  /data/bluetooth/DC:A6:32:82:36:12/attributes"
+    ],
+    "regenerated_cache": [
+      "/data/bluetooth/DC:A6:32:82:36:12/attributes"
+    ]
+  },
+  "normal_boot": {
+    "passed": true,
+    "quarantine_survived": true,
+    "attempts": 2,
+    "automatic_retry_observed": false,
+    "boot_id": "05d69521-1cbe-424a-870c-68fa1f7bdeb4",
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 56032.475293931,
+    "utc_seconds": 1792919020.2314048
+  },
+  "closeout": {
+    "passed": true,
+    "generation": 12,
+    "slot": "b",
+    "release": true,
+    "partial_offline": false,
+    "attempts": 2,
+    "explicit_retry_remaining": false,
+    "ordinary_reselection_refused": true,
+    "third_attempt_refused": true,
+    "prior_fault_receipts_preserved": true,
+    "physical_approval": false,
+    "shared_connection_closed": true,
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 56083.594386839,
+    "utc_seconds": 1792919071.3504972
+  },
+  "ordinary_reselection_refused": true,
+  "explicit_retry_remaining": false,
+  "third_attempt_refused": true,
+  "prior_failures_preserved": true,
+  "release": true,
+  "partial_offline": false,
+  "installed_generation": 12,
+  "limitations": [
+    "One persistent kiosk-crash series; watchdog handoff/expiry and physical power loss remain separate.",
+    "Return timing measures host observation, not an exact hardware reset timestamp.",
+    "WAN isolation combines owner confirmation and sampled direct-IP probes.",
+    "Incomplete series or missing per-process receipts cannot qualify this case.",
+    "Retained fake-super backup was verified; privileged offline restoration was not exercised.",
+    "Generations 13 and 14 have exhausted their explicit retries. A further fault case needs a new eligible payload and a separately reviewed procedure; consumed history must be retained."
+  ],
+  "artifact_sha256": {
+    "activate-and-crash.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "activation-intent.json": {
+      "bytes": 333,
+      "sha256": "a7db02f46f215619c2288d6c0fe03a5701db594d6620534e60d88f7dd0b620bd"
+    },
+    "activation-result.json": {
+      "bytes": 4044,
+      "sha256": "dd0043da7923b298cc902fd2e0a154d7814f746f75aa13c4ba1529596c455be9"
+    },
+    "after-stage.json": {
+      "bytes": 16951,
+      "sha256": "f9970b88903e903f402cdc77ff597b79292e17bc225dcee3a491864721c44acb"
+    },
+    "backup-reverified.json": {
+      "bytes": 614,
+      "sha256": "20c6cc8cb217daa66eb2c2bd67da6b86dc68301d9b26dc62d1f1ce83721356ca"
+    },
+    "baseline-result.json": {
+      "bytes": 285,
+      "sha256": "7947d4d973851c4fd1ab7897500c2f0a7cac8cac54f87ef66ae834c47e0c1843"
+    },
+    "baseline-stores.json": {
+      "bytes": 83,
+      "sha256": "cb6049310c61774c748e3ba33e01f6b6d054b183320f74e32d1c6ade742c8782"
+    },
+    "before-activation-stores.json": {
+      "bytes": 83,
+      "sha256": "cb6049310c61774c748e3ba33e01f6b6d054b183320f74e32d1c6ade742c8782"
+    },
+    "before-activation.json": {
+      "bytes": 16953,
+      "sha256": "c6b03b9ddf86638904470b84ff6c20c78855aa4f621f086bc78babaee5e55296"
+    },
+    "before.json": {
+      "bytes": 16952,
+      "sha256": "713926e4a17dc8ed8c7960812a35d6301e659f7c46daf099ac3b5fc3e433d4fd"
+    },
+    "case.json": {
+      "bytes": 1242,
+      "sha256": "3c9aabe726007393c2f5fe91a1e3d316b813493af209d20386f7d1dfd8d6b3ad"
+    },
+    "closeout-first.json": {
+      "bytes": 16947,
+      "sha256": "cc87cb7115ecf696961c2899f6c9fbb3cdcd3780a87c383879a190d9242f14b3"
+    },
+    "closeout-idle-observations.json": {
+      "bytes": 2248,
+      "sha256": "73262420a74372b53a075bfe0b4462f72306dc4372db8a2c68a9fe026758d8b0"
+    },
+    "closeout-prior-faults.json": {
+      "bytes": 14498,
+      "sha256": "23abc61243206634bbaafed1700443b6964011103a3f84d4cb88518bd86dc05c"
+    },
+    "closeout-result.json": {
+      "bytes": 465,
+      "sha256": "e05110a666ee5cc1f5e2e10af80fed554ef50a61373657ee8e3b256b3ce6ac9c"
+    },
+    "closeout-snapshot.json": {
+      "bytes": 16947,
+      "sha256": "59c295cfb9c271375bc1b916552e18f52b287d4d023c1192d27d6e175ae2825e"
+    },
+    "closeout-stores.json": {
+      "bytes": 377,
+      "sha256": "ae87d5955789f0d444d47df40816da6cc5d40a36873769326a333c7c7ef5c9d3"
+    },
+    "closeout-ui.json": {
+      "bytes": 410,
+      "sha256": "55c33070566a2e71f99c0b59a97cd997f7043ba1b0756331b5e7f9183c5f08a2"
+    },
+    "closeout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "closure-observations.jsonl": {
+      "bytes": 2948,
+      "sha256": "46e0a56fb6cd018483da7643485e9792dbe6107352b92e795d4d33bb77753cfd"
+    },
+    "connection-closed.json": {
+      "bytes": 185,
+      "sha256": "376cd15936b98db4d96fe1dcc0cc5241b1e13d97656a953f3430f3e35be81b9f"
+    },
+    "control-path": {
+      "bytes": 34,
+      "sha256": "500d8d1287b63e31db45d69318cac7e800dd8d3470d159bba391a1b3edf619dd"
+    },
+    "crash-outcome.json": {
+      "bytes": 3485,
+      "sha256": "63324f1ec19638db6dc14de098b6453843540e3ba945a4c721aff4d6b3f0e74f"
+    },
+    "crash_kiosk_trial": {
+      "bytes": 3120848,
+      "sha256": "194b37bdd8aa0e666ada2c7314de9236ef5bd5bce8a9799bd489009bb08289c1"
+    },
+    "device-fault.json": {
+      "bytes": 3682,
+      "sha256": "8e93cda73c98d1664b30a6232c7c243236d06c439f88b3520cf06ae246225c4b"
+    },
+    "device-fault.result.json": {
+      "bytes": 3127,
+      "sha256": "c610fda38cfa6d8a09ae55d71bd0933192bc11ba96bcb12c3eea3c5d5fc3cd6a"
+    },
+    "device-fault.step-1.json": {
+      "bytes": 699,
+      "sha256": "a9694cbe8c80e7789d044364e305d009117caa32cc23b832409188bb61432132"
+    },
+    "device-fault.step-1.result.json": {
+      "bytes": 793,
+      "sha256": "5d1d3ecc3a3eddca7a8a7be60f38acba05c801abb14b4e1d1e2374b07d282841"
+    },
+    "device-fault.step-2.json": {
+      "bytes": 703,
+      "sha256": "06421024c63c6b82c1548afe7405cdac16a6666d6ff0f8673b32f41b47fe7f5e"
+    },
+    "device-fault.step-2.result.json": {
+      "bytes": 797,
+      "sha256": "9dac3490e11e0cf839f1841622b790be516f956a93abaf7bbb2c00a6021d65f9"
+    },
+    "device-fault.step-3.json": {
+      "bytes": 703,
+      "sha256": "1a7abe6fd01fdd884e810379b3dbd20610b7d9c9812b628fa165275f4652056a"
+    },
+    "device-fault.step-3.result.json": {
+      "bytes": 797,
+      "sha256": "59b607355d6dc5b8c7e1c5e1632c5fd1fb82a74aadbc5e0c40aebbc66e47e10d"
+    },
+    "device-fault.step-4.json": {
+      "bytes": 704,
+      "sha256": "080c09547e734bb9bc200334339ce588047122b9ac2af592f4fc108b678694ea"
+    },
+    "device-fault.step-4.result.json": {
+      "bytes": 800,
+      "sha256": "7743dffcf3d1fd130761cf1f471238140faf6a243be8052f46d0d9308abed3ce"
+    },
+    "device-fault.step-5.json": {
+      "bytes": 705,
+      "sha256": "634b59c4e3afd2c027b5309b0ecc81b08e514d010e20dd560c254ab5b6d1476c"
+    },
+    "device-fault.step-5.result.json": {
+      "bytes": 801,
+      "sha256": "1c8b1c119d3d7da0ce99fef8e0fb53efb44b9083b33c295feaf63b9bdeb3f8b2"
+    },
+    "expectation.json": {
+      "bytes": 2520,
+      "sha256": "88eb330da99375c75fdbde5768626f32049c64d0b151b1642b30bad29684be88"
+    },
+    "fault-connection-ended.json": {
+      "bytes": 208,
+      "sha256": "ccd9baa279b178c9ab938e111309f07521de44310c91d485449542829dd033a3"
+    },
+    "first-trial.json": {
+      "bytes": 6751,
+      "sha256": "875e8881df79c8dc1217222b9c3497c6cdd5e9de69c8d14553c6cd0bc4b775b4"
+    },
+    "helper-normal-refusal.json": {
+      "bytes": 126,
+      "sha256": "f6ae5c58c9c314df716f45fe611bf83b156762d7029bc3ab4a90a55f973b85f3"
+    },
+    "helper-upload-intent.json": {
+      "bytes": 356,
+      "sha256": "02a03cd214f43ac9f2fe36c4123123dbc37b835ac9b591ad10b1e3ff1f27a11e"
+    },
+    "helper-upload-result.json": {
+      "bytes": 277,
+      "sha256": "844a8ab0cd567f69674583266f5710122f5ba0af6c8fb9b724e40efee37588a7"
+    },
+    "initial-connect-intent.json": {
+      "bytes": 332,
+      "sha256": "cb1ae200b4ecadc19770ac36e8d315d19c2b7e703511896f2ca289c9c4094d4f"
+    },
+    "initial-connect-result.json": {
+      "bytes": 165,
+      "sha256": "039711faaa1c02215ec3ff24d8084a097d92e7ae9ebd90403dc193e659ee6314"
+    },
+    "initial-prior-faults.json": {
+      "bytes": 14499,
+      "sha256": "ff2fe47d98d422f3abd0241bf7a80e6dde7ad3dded1d50d99d7f2cdb27fc59af"
+    },
+    "initial.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "injection/crash-intent.json": {
+      "bytes": 322,
+      "sha256": "6db491991be5139f71b98a79d9f1310bfc3c073363ea2a75d5b6b2844f6c8c4e"
+    },
+    "injection/crash-response.json": {
+      "bytes": 3475,
+      "sha256": "4de61ef467870ba795b90e867be75b73bb8324d7415a3aa1ea4125152688cd53"
+    },
+    "injection/inspect-intent.json": {
+      "bytes": 251,
+      "sha256": "429f35dd2d56dd3a0812652729a50c17441b96e32ac6fd9f05577df9eebbc788"
+    },
+    "injection/inspect-response.json": {
+      "bytes": 3959,
+      "sha256": "46069ef1f4bc0bb6e8f7a9351d76a39a3a26921786a7146fa9b6fc1f56c69633"
+    },
+    "injection/plan.json": {
+      "bytes": 3285,
+      "sha256": "60dd3c4751591041e3ed89a5a9de16c379b86d3702d4b51edea67a9ffdb92f90"
+    },
+    "injection/result.json": {
+      "bytes": 3127,
+      "sha256": "c610fda38cfa6d8a09ae55d71bd0933192bc11ba96bcb12c3eea3c5d5fc3cd6a"
+    },
+    "install-connection-ended.json": {
+      "bytes": 129,
+      "sha256": "cef796761ab552341e0d68184c71e8f2b7d4791f03854a8b904d5375d1689245"
+    },
+    "install.stderr": {
+      "bytes": 2413,
+      "sha256": "d5d27400d345a1028596c3798b58a308520e33f1db081ab6679a94b2fd11c534"
+    },
+    "install.stdout": {
+      "bytes": 156,
+      "sha256": "59da7974fcc07283639677578d8bced45587479e6831724f28e3d6f9b6d4bedb"
+    },
+    "normal-connect-intent.json": {
+      "bytes": 337,
+      "sha256": "5551f1159622e7871a02cc265cb382d3ed174fa5a48a82a781bc56e63a8ae36f"
+    },
+    "normal-connect-result.json": {
+      "bytes": 163,
+      "sha256": "3aefb061357b951bc6d1b62dd5f5a80f2e29121a5667d70f574a1a1f9319f65c"
+    },
+    "normal-final.json": {
+      "bytes": 17243,
+      "sha256": "1e325a9dc97016a1b9b8c5d74fa163f9f1b0899f28519932b1139e2b0e735769"
+    },
+    "normal-first.json": {
+      "bytes": 16503,
+      "sha256": "4f79a9fbf18f54455cc16467465092c96624f96f1cef6080ed9148e001847b49"
+    },
+    "normal-reboot-intent.json": {
+      "bytes": 281,
+      "sha256": "7899d3f3c417d8791d7a810ded4950a659dc3614a7c11a5b1ae1bcf7eac53d0f"
+    },
+    "normal-reboot-response.json": {
+      "bytes": 181,
+      "sha256": "8a278321096898a031573aedfe4f28370bf69352095f26c23b55ae656b55880f"
+    },
+    "normal-reboot.log": {
+      "bytes": 88,
+      "sha256": "c957091afd25fa4c0d1ddd01fa239b36e642f7d5d6363ecace2c6047e49031c3"
+    },
+    "normal-result.json": {
+      "bytes": 286,
+      "sha256": "1166c9560408bbfdd9eb1d0795a53af8e27f00e9640607f1a4dc980fe954749e"
+    },
+    "normal-stores.json": {
+      "bytes": 377,
+      "sha256": "ae87d5955789f0d444d47df40816da6cc5d40a36873769326a333c7c7ef5c9d3"
+    },
+    "offline-after-normal-reboot.json": {
+      "bytes": 816,
+      "sha256": "8ee2b2e681f955568e40aed56c3e8fc7c6adb5a513bb7aa94ed7ec55e685062d"
+    },
+    "offline-after-return.json": {
+      "bytes": 815,
+      "sha256": "902a1c472efbc2d6c113818c40171baaf3d384855d994a34176a74fc5038ae55"
+    },
+    "offline-before-normal-reboot.json": {
+      "bytes": 816,
+      "sha256": "172d366085d8b6a843653c5509b811e63fc3bdc7d7893524693d3fb0ce59cc02"
+    },
+    "offline-before-selection.json": {
+      "bytes": 815,
+      "sha256": "ee5e7738b2244355c93356beff716ce31070974bc0ec9aa42d7bc384ac1e3cf0"
+    },
+    "offline-final-admission.json": {
+      "bytes": 815,
+      "sha256": "9b52af8d911e33182ae0c4b152420493ecba7b1f36d198e3413ea5196e0e4443"
+    },
+    "offline-result.json": {
+      "bytes": 335,
+      "sha256": "6bbd19cef9a30dbc1acf3e6bd3e5d2167cbf9c6d6135a457b9e13fc1826d9406"
+    },
+    "offline.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "online-baseline.json": {
+      "bytes": 829,
+      "sha256": "837a93fee119e336016cf9bf1d60b2804d4aef9c88df1a301b8da1e1fc77e7a5"
+    },
+    "ordinary-reselection.json": {
+      "bytes": 79,
+      "sha256": "6e93c08bec974a8cd9bfe843c6654f6e92918223c9465b90ef5c03525b962f0d"
+    },
+    "preactivation-prior-faults.json": {
+      "bytes": 14499,
+      "sha256": "33cf7e037b794d685d683c7d832202c6561b95392e3fb372208b47161ed26a05"
+    },
+    "preblock-online.json": {
+      "bytes": 828,
+      "sha256": "24bedbc60c193e773560209beafd0e32f904b2b240744cc7089063c4c89e1b6e"
+    },
+    "preflight-selection.json": {
+      "bytes": 3191,
+      "sha256": "f6f997ec67b464b27375fd7112e1121c96c1011f81e22ace9668f6c516083d43"
+    },
+    "qualify-kiosk-crash.py": {
+      "bytes": 5371,
+      "sha256": "92feec307f067547678f38f77050680f699c877893b8c56180cbaf22ae352dca"
+    },
+    "qualify-kiosk-hang.py": {
+      "bytes": 8392,
+      "sha256": "2b26f08f819a7a570883a0f8f5528356431ffe80b1b2cd102a206783b801d79a"
+    },
+    "report.py": {
+      "bytes": 6557,
+      "sha256": "5ddd78236c210245a58fea5dfd11ce43c4ce35ebe45e87041b978d6030319c40"
+    },
+    "restored-online.json": {
+      "bytes": 830,
+      "sha256": "06977ac6e36f11cf18a520b47733fe0772ac603d190f7268487a665f01bbff3c"
+    },
+    "return-connect-intent.json": {
+      "bytes": 363,
+      "sha256": "b0c53d1a6360d69fc667aa7e5b85b5975797db7b3c4b5d03deef37ef364f7421"
+    },
+    "return-connect-result.json": {
+      "bytes": 165,
+      "sha256": "b0278ee8b1ed95118ecf6ce77e13c74ccd01663baa37e60fea4234f28ce387a7"
+    },
+    "return-final.json": {
+      "bytes": 17243,
+      "sha256": "42b5e8a0aa053e341e17f0eca724df7960588b14c9d00b0253a2ac5361c528b4"
+    },
+    "return-first.json": {
+      "bytes": 17068,
+      "sha256": "03d7b010c094c4b94da34b98e840bc2a0001250844421aaed2ba9f1efd0db390"
+    },
+    "return-observed.json": {
+      "bytes": 166,
+      "sha256": "3ff285d0a0c778f2abee586766fff7f8065979418d18fd763a850bc314fd3a3e"
+    },
+    "return-prior-faults.json": {
+      "bytes": 14499,
+      "sha256": "9f7fd13486caf0e4a8aa88f00c5e86b1392790b4c66d0e6c61fdba73bd83c8fd"
+    },
+    "return-result.json": {
+      "bytes": 557,
+      "sha256": "dbe42bd8c2f0c29431c0afd0e9ec0a1b21da77ea55f28f51c5801efeec871295"
+    },
+    "return-stores.json": {
+      "bytes": 377,
+      "sha256": "7efacb79cf6e073dfd66d00b1e076044ca03cdecb57df51b0439b362d933700e"
+    },
+    "return.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "router-owner-confirmation.json": {
+      "bytes": 291,
+      "sha256": "498abfec0e3157bd1bb3623c313668fce1309bf73628d2e7fe3683ebb66319a0"
+    },
+    "router-restored.json": {
+      "bytes": 186,
+      "sha256": "083c3a391c8a8a65b6a12cb72928ed422f27d83958560037cd7b745011b25c59"
+    },
+    "runner-verification.json": {
+      "bytes": 3060,
+      "sha256": "9a0b9641237068988c5e0520d10bf1bf433ab81d17bd87903b402f0a29b700d1"
+    },
+    "selection.json": {
+      "bytes": 3191,
+      "sha256": "2b430b8bb026ff2c2e4fcff254bab73bf3de518f3ae3be644295ca593f877b29"
+    },
+    "snapshot-before.sh": {
+      "bytes": 1833,
+      "sha256": "ed921abc3ccd3b3030b029ce7bc1b6834ee549ecc56ae8d09cf9c1dc246d0641"
+    },
+    "stage-exit.json": {
+      "bytes": 149,
+      "sha256": "135ccc3f11dd9bdb63040b0559a7508c4b23f6bd747ac5f57e01b586444eecb0"
+    },
+    "stage-intent.json": {
+      "bytes": 1155,
+      "sha256": "dd9d57c9c676d7d59347cb37e9870b4b3fb6c9f76f356b6cfa9a1407ccc0b718"
+    },
+    "stage-result.json": {
+      "bytes": 1263,
+      "sha256": "bedd95f9f6f7ae7416b594a895594cf8786b73e23e9161aa295c97023e4a0417"
+    },
+    "stage-stores.json": {
+      "bytes": 83,
+      "sha256": "cb6049310c61774c748e3ba33e01f6b6d054b183320f74e32d1c6ade742c8782"
+    },
+    "stage.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stage.stderr": {
+      "bytes": 317109,
+      "sha256": "4c59865e4388fd55905fc4f0418a189f2cd682a86cddfc34e8571c6ea8530811"
+    },
+    "stage.stdout": {
+      "bytes": 2555,
+      "sha256": "0a6f54bf607385a85ed84a18476eb6758d366d9ac70a0eb5c6e22dec4e7dfbe1"
+    },
+    "staged-network-identity.json": {
+      "bytes": 445,
+      "sha256": "85eba229e1e1e1323091484cad413e4d1421bf82f095e8b6e4b74a2c211d5185"
+    },
+    "staged-ui.json": {
+      "bytes": 410,
+      "sha256": "55c33070566a2e71f99c0b59a97cd997f7043ba1b0756331b5e7f9183c5f08a2"
+    },
+    "test_crash.py": {
+      "bytes": 14507,
+      "sha256": "fa78bb4d0ea33104e4abc88d5d6bee47e3b7f5f0f63e037d4d4b9046ef5b14de"
+    },
+    "test_trial.py": {
+      "bytes": 9694,
+      "sha256": "6686a475eb616e59c75f2508c1e69f9cd186c7cc8e49dae43008713e3f8c9d83"
+    },
+    "third-attempt-refusal.json": {
+      "bytes": 84,
+      "sha256": "22cf03a462a44ef1b44e22c1ae21e709d647f0b4fefbad945fd06a297a58db26"
+    },
+    "trial-clock-anchor.json": {
+      "bytes": 151,
+      "sha256": "7ca967d4859d0a543cf44fe111c80563fcf260e62dce39011a181fad7f903184"
+    },
+    "trial-connect-intent.json": {
+      "bytes": 334,
+      "sha256": "01dff55f4b991e7fe97e990a6f4bf8259382cd14e0d93bc67824cc9c946c7f76"
+    },
+    "trial-connect-result.json": {
+      "bytes": 163,
+      "sha256": "7fc0452a022224ebfd382dfe1f03fbfcd5320c262575e7aba9987f4b202c95b5"
+    },
+    "trial-early-watchdog.json": {
+      "bytes": 208,
+      "sha256": "4548211ef25e827d6487def24aad636875d0413f52e0673af2eb58dd93144af0"
+    },
+    "trial-journal.jsonl": {
+      "bytes": 115774,
+      "sha256": "35fab15671df82db92ed59a4ebce537227680c6929c379e7c2c933c8f73c40a4"
+    },
+    "trial-journal.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "trial.py": {
+      "bytes": 44252,
+      "sha256": "f18b6a2ca15b1eb786e25aa0f7157c1aa9ce447120e99e241ca59a7c9b9e5c0d"
+    },
+    "wan-probe.sh": {
+      "bytes": 1030,
+      "sha256": "7bbfd5668480f9112d1850a829188248d8e3bbce35c58097ca576e83fa3bd7df"
+    }
+  },
+  "external_references": [
+    {
+      "path": "/home/data/workspace/space-wars2/target/manual-install-qualification/c68b2106/preparation-result.json",
+      "bytes": 6863,
+      "sha256": "56b5f8cc932c74e21dc540e95ce57add667c27bf40a237756054a137d4537029"
+    },
+    {
+      "path": "/home/data/workspace/space-wars2/target/manual-install-qualification/c68b2106/publication/publication-result.json",
+      "bytes": 924,
+      "sha256": "8cc463f2aa974a3bfac51880adae1099134ee20d01b1aa8b7985cba7c6aed643"
+    },
+    {
+      "path": "/home/data/workspace/space-wars2/target/manual-install-qualification/c68b2106/publication/plan.json",
+      "bytes": 2753,
+      "sha256": "d822893e1ec171f2bd3c9f077339ace73626538c8c6ed4b59cac1ed30aae7170"
+    },
+    {
+      "path": "/home/data/workspace/space-wars2/target/kiosk-crash-preparation/helper-build.json",
+      "bytes": 1695,
+      "sha256": "25cb7204d82d3b90b167d2cd9d19c9997c5115122428a057248ecc36520d016b"
+    },
+    {
+      "path": "/home/data/workspace/space-wars2/target/kiosk-crash-preparation/helper-ci.json",
+      "bytes": 1132,
+      "sha256": "55ad1e8b7ddcce9d41bb890f64cd45ac088843d2c3b6de494004a0e5c015dd37"
+    }
+  ],
+  "observed_local_date": "2026-10-25",
+  "timezone": "America/Los_Angeles",
+  "physical": {
+    "model": "Raspberry Pi 4 Model B Rev 1.2",
+    "serial": "10000000b47f9ef0",
+    "bootloader_revision": "224877da90f82a72dbcc9db10bcf059259f54680",
+    "medium_sectors": 245760000,
+    "medium": {
+      "ID_BUS": "usb",
+      "ID_MODEL": "USB_DISK",
+      "ID_MODEL_ID": "2000",
+      "ID_REVISION": "1100",
+      "ID_SERIAL": "SMI_USB_DISK-0:0",
+      "ID_TYPE": "disk",
+      "ID_VENDOR": "SMI",
+      "ID_VENDOR_ID": "090c"
+    }
+  },
+  "source_pull_request": "https://github.com/aortez/space-wars/pull/547",
+  "procedure": "One bounded series of five verified kiosk process crashes during signed generation 14 attempt 2 while WAN was blocked; automatic return to generation 12, a separate offline normal boot, and post-restoration refusal of ordinary selection and a third attempt.",
+  "private_evidence": "/home/data/workspace/space-wars2/target/kiosk-crash-runner-v1",
+  "original_case_report": {
+    "path": "target/kiosk-crash-runner-v1/case-report.json",
+    "bytes": 29839,
+    "sha256": "916255d29c9c8995a833d2ce52daeaceb3c4d843d41b58c166ea2c8d4d791abd"
+  },
+  "early_watchdog": {
+    "schema": 1,
+    "boot_id": "e843335c-2ff4-46a1-9fb6-6efcc87c60b1",
+    "trial_id": "f36cc184a9645ecf6fc64e8f4e747b109e5aee48936390ac33cffa08ef716f89",
+    "armed_boottime_ms": 1384,
+    "timeout_seconds": 210
+  },
+  "saved_data_preserved": true,
+  "ordinary_refusal_after_idle": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "Error: CandidateChanged\n"
+  },
+  "exhausted_retry_refusal": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "Error: Recovery(Quarantined)\n"
+  },
+  "return_receipt": {
+    "passed": true,
+    "observed_return_seconds": 189.918605759005,
+    "exact_watchdog_reset_measured": false,
+    "crash_series_proof": {
+      "host_acknowledged": true,
+      "complete_series": true,
+      "processes": 5
+    },
+    "physical_case_pass": true,
+    "note": "Case attribution requires the complete acknowledged series and every durable per-process receipt",
+    "separate_normal_boot_pending": true,
+    "physical_approval": false,
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 55987.539086003,
+    "utc_seconds": 1792918975.2951965
+  },
+  "connection_ended": {
+    "host_seconds": 164.2853984310059,
+    "uptime_lower_ms": 180997.80028200563,
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 55956.734094723,
+    "utc_seconds": 1792918944.4902053
+  },
+  "publication": {
+    "automatic_installation_enabled": false,
+    "channel": "nightly",
+    "current": {
+      "manifest_sha256": "762dde992b9fe2f8d95ed936e6fea81e2fd5f196a9e37bfd166568d7446790d5",
+      "timestamp": {
+        "bytes": 471,
+        "sha256": "16e121aeeb38d3164a4797784127c6601c4b0a1d9d7742e8d519d8e7d42cf156"
+      },
+      "version": 15
+    },
+    "device_accessed": false,
+    "generation": 14,
+    "intent_sha256": "f8e4affed2cd5ab918bedbbfa32e295de6094515b22c79c2e5a1c8afb432b479",
+    "payload": {
+      "bytes": 133765909,
+      "sha256": "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c"
+    },
+    "physical_qualification_pending": true,
+    "plan_sha256": "d822893e1ec171f2bd3c9f077339ace73626538c8c6ed4b59cac1ed30aae7170",
+    "published": true,
+    "release_targets_unchanged": true,
+    "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+    "result": "published",
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "signed": true,
+    "source": "c68b21063f0bc062936285249a04b55d390acc4a"
+  },
+  "main_ci": {
+    "conclusion": "success",
+    "event": "push",
+    "headSha": "c68b21063f0bc062936285249a04b55d390acc4a",
+    "source_tree_matches_tested_main": true,
+    "status": "completed",
+    "url": "https://github.com/aortez/space-wars/actions/runs/40157338461"
+  },
+  "helper_build": {
+    "schema": 1,
+    "source": "9bdf377b9b3e7a17368007e16f50d659c83c4921",
+    "source_clean": true,
+    "recorded_utc": "2026-10-25T08:26:25.929071+00:00",
+    "target": "aarch64-unknown-linux-gnu",
+    "profile": "release",
+    "features": [
+      "recovery-qualification"
+    ],
+    "artifact": {
+      "path": "target/kiosk-crash-preparation/crash_kiosk_trial",
+      "bytes": 3120848,
+      "sha256": "194b37bdd8aa0e666ada2c7314de9236ef5bd5bce8a9799bd489009bb08289c1"
+    },
+    "logs": [
+      {
+        "path": "target/kiosk-crash-preparation/native-tests.log",
+        "bytes": 1884,
+        "sha256": "7224e8e0bc66b27576b887591b6ded2df027b64f6405d4c5b1f7ce675b73445c"
+      },
+      {
+        "path": "target/kiosk-crash-preparation/crash-host-tests.log",
+        "bytes": 588,
+        "sha256": "bef0819b8525e49a9c95d6f8f57387b09ddc40eb72b8ae11f9f0794fc0103419"
+      },
+      {
+        "path": "target/kiosk-crash-preparation/hang-host-tests.log",
+        "bytes": 678,
+        "sha256": "27169db13be5e6d1642e5b6f6ac6483ed538abc1e86cc711f5505fedea451ff8"
+      },
+      {
+        "path": "target/kiosk-crash-preparation/reset-host-tests.log",
+        "bytes": 408,
+        "sha256": "ec0831068543f418619a14c8abe719916df65fe1df7160b8f0fba1f5c82f1d5d"
+      },
+      {
+        "path": "target/kiosk-crash-preparation/clippy.log",
+        "bytes": 170,
+        "sha256": "70bddaa6f18b38b523db35f0f28a9597646a12bf709b18eecedf312029b96e4a"
+      },
+      {
+        "path": "target/kiosk-crash-preparation/aarch64-build.log",
+        "bytes": 62,
+        "sha256": "a70da5408e7a6da7efe97b23011504833b16a7875bda14543f2504b5b8c7d97a"
+      }
+    ],
+    "native_tests": 15,
+    "host_tests": 9,
+    "device_accessed": false,
+    "device_crash_executed": false,
+    "approval_created": false
+  },
+  "helper_ci": {
+    "schema": 1,
+    "source": "9bdf377b9b3e7a17368007e16f50d659c83c4921",
+    "status": "completed",
+    "conclusion": "success",
+    "reviewed": true,
+    "review_scope": "Local code and evidence-path review; not an independent second reviewer or device qualification",
+    "pr": "https://github.com/aortez/space-wars/pull/547",
+    "run": "https://github.com/aortez/space-wars/actions/runs/40176621226",
+    "observed_utc": "2026-10-25T08:50:40.921346+00:00",
+    "pr_snapshot": {
+      "path": "/home/data/workspace/space-wars2/target/kiosk-crash-preparation/helper-ci-pr.json",
+      "bytes": 6056,
+      "sha256": "2fd839d67f9630882a7c2e7598626c7e6e3e4ad56d22160b49f58d838cd3ef20"
+    },
+    "run_snapshot": {
+      "path": "/home/data/workspace/space-wars2/target/kiosk-crash-preparation/helper-ci-run.json",
+      "bytes": 49729,
+      "sha256": "316c6fbe184f92c93360faac4fb9e743ed8d16422ef21e6a1f08182bb4f325af"
+    },
+    "runner_draft_review": {
+      "path": "/home/data/workspace/space-wars2/target/kiosk-crash-preparation/runner-draft-review-v2.json",
+      "bytes": 2362,
+      "sha256": "d26ef346dd3cb41693aeb89c275634f6bdfb623f862b29e902364f9b7a612241"
+    }
+  },
+  "runner_verification": {
+    "schema": 1,
+    "reviewed": true,
+    "review_scope": "Local code and evidence-path review; not an independent second reviewer or device qualification",
+    "passed": true,
+    "recorded_utc": "2026-10-25T08:50:40.934442+00:00",
+    "source": "9bdf377b9b3e7a17368007e16f50d659c83c4921",
+    "runner_tests": 17,
+    "native_tests": 15,
+    "host_tests": 9,
+    "files": {
+      "trial.py": "f18b6a2ca15b1eb786e25aa0f7157c1aa9ce447120e99e241ca59a7c9b9e5c0d",
+      "report.py": "5ddd78236c210245a58fea5dfd11ce43c4ce35ebe45e87041b978d6030319c40",
+      "test_trial.py": "6686a475eb616e59c75f2508c1e69f9cd186c7cc8e49dae43008713e3f8c9d83",
+      "test_crash.py": "fa78bb4d0ea33104e4abc88d5d6bee47e3b7f5f0f63e037d4d4b9046ef5b14de",
+      "snapshot-before.sh": "ed921abc3ccd3b3030b029ce7bc1b6834ee549ecc56ae8d09cf9c1dc246d0641",
+      "wan-probe.sh": "7bbfd5668480f9112d1850a829188248d8e3bbce35c58097ca576e83fa3bd7df",
+      "qualify-kiosk-hang.py": "2b26f08f819a7a570883a0f8f5528356431ffe80b1b2cd102a206783b801d79a",
+      "qualify-kiosk-crash.py": "92feec307f067547678f38f77050680f699c877893b8c56180cbaf22ae352dca",
+      "crash_kiosk_trial": "194b37bdd8aa0e666ada2c7314de9236ef5bd5bce8a9799bd489009bb08289c1",
+      "case.json": "3c9aabe726007393c2f5fe91a1e3d316b813493af209d20386f7d1dfd8d6b3ad"
+    },
+    "published_candidate_source": "c68b21063f0bc062936285249a04b55d390acc4a",
+    "generation": 14,
+    "attempt": 2,
+    "helper_ci_pending": false,
+    "case_admitted": true,
+    "device_accessed": false,
+    "prior_evidence_preserved": true,
+    "backup_rehashed": "739389b0edd745d638cb141e3e857ddbe52c9ad31ebb9bc8b640158e978ccc6f",
+    "privileged_offline_restore_exercised": false,
+    "physical_approval": false,
+    "review_checks": [
+      "Exact signed generation-14 payload and sole remaining explicit retry",
+      "Fresh normal B baseline, no approval file, protected data and all prior fault receipts",
+      "Shared SSH only and one-use phase/fault intents",
+      "Complete native series and every durable per-process receipt required",
+      "Early or uncertain connection loss cannot authorize a fresh login",
+      "Expected deadline closure and bounded separate return/normal-boot connections",
+      "Exact health-timeout attempt-2 rollback and prior history preservation",
+      "WAN restored, usable time, idle Release, ordinary and exhausted-retry refusal before SSH closure",
+      "Read-only trial journal stream includes kiosk service exit/restart records as well as recovery/system events"
+    ],
+    "helper_ci": {
+      "path": "/home/data/workspace/space-wars2/target/kiosk-crash-preparation/helper-ci.json",
+      "bytes": 1132,
+      "sha256": "55ad1e8b7ddcce9d41bb890f64cd45ac088843d2c3b6de494004a0e5c015dd37"
+    },
+    "payload": "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c",
+    "planned_connections": [
+      "initial preparation",
+      "selected trial after prepared installation",
+      "normal return only after acknowledged crash series and deadline closure",
+      "normal boot after separate requested reboot"
+    ],
+    "automatic_fresh_login_on_unexpected_loss": false,
+    "fault_replay": false
+  },
+  "backup": {
+    "passed": true,
+    "archive": "/home/data/workspace/space-wars2/target/manual-install-qualification/f97a8d1d/backup-rsync-v2/recovery-exports-rsync-fake-super.tar",
+    "bytes": 86691840,
+    "sha256": "739389b0edd745d638cb141e3e857ddbe52c9ad31ebb9bc8b640158e978ccc6f",
+    "owner_disk_access_confirmed_previously": true,
+    "privileged_offline_restore_performed": false,
+    "note": "Decode fake-super metadata during separately reviewed offline restore; never restore consumed OTA history",
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 55260.613419913,
+    "utc_seconds": 1792918248.369531
+  },
+  "wan_isolation": {
+    "mechanism": "Owner-applied router parental controls for this device",
+    "owner_confirmation": {
+      "note": "Owner confirmed the requested WAN-only block: ok it is blocked; Wi-Fi and local LAN are to remain enabled.",
+      "device": "swadmin@sw-picade-2.local",
+      "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+      "monotonic": 55440.142813485,
+      "utc_seconds": 1792918427.8989244
+    },
+    "sampled_direct_ip_https": true,
+    "ipv6_external_route_before": false,
+    "restored": {
+      "note": "Owner confirmed: Internet access restored.",
+      "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+      "monotonic": 56074.633074896,
+      "utc_seconds": 1792919062.3891854
+    }
+  },
+  "service_observations": {
+    "killed_processes": 5,
+    "automatic_service_restarts": 5,
+    "events": [
+      {
+        "monotonic_us": 19922276,
+        "message": "spacewars-kiosk.service: Main process exited, code=killed, status=9/KILL"
+      },
+      {
+        "monotonic_us": 21939399,
+        "message": "spacewars-kiosk.service: Scheduled restart job, restart counter is at 1."
+      },
+      {
+        "monotonic_us": 52666497,
+        "message": "spacewars-kiosk.service: Main process exited, code=killed, status=9/KILL"
+      },
+      {
+        "monotonic_us": 54688308,
+        "message": "spacewars-kiosk.service: Scheduled restart job, restart counter is at 2."
+      },
+      {
+        "monotonic_us": 85429161,
+        "message": "spacewars-kiosk.service: Main process exited, code=killed, status=9/KILL"
+      },
+      {
+        "monotonic_us": 87439280,
+        "message": "spacewars-kiosk.service: Scheduled restart job, restart counter is at 3."
+      },
+      {
+        "monotonic_us": 118177575,
+        "message": "spacewars-kiosk.service: Main process exited, code=killed, status=9/KILL"
+      },
+      {
+        "monotonic_us": 120189061,
+        "message": "spacewars-kiosk.service: Scheduled restart job, restart counter is at 4."
+      },
+      {
+        "monotonic_us": 150898628,
+        "message": "spacewars-kiosk.service: Main process exited, code=killed, status=9/KILL"
+      },
+      {
+        "monotonic_us": 152939790,
+        "message": "spacewars-kiosk.service: Scheduled restart job, restart counter is at 5."
+      }
+    ]
+  },
+  "installation": {
+    "host_elapsed_seconds": 309.87467044700315,
+    "result": 0,
+    "completed_stages": [
+      "checking-payload",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "flushing",
+      "reading-back",
+      "reading-back",
+      "checking-filesystem",
+      "reading-back",
+      "reading-back",
+      "prepared"
+    ],
+    "note": "The disk flush was slower than the prior trial; the installer completed write, flush and read-back verification before reporting prepared. No install or fault was replayed."
+  },
+  "prior_failure_history": {
+    "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c": {
+      "generation": 14,
+      "attempts": 1,
+      "reason": "trial-reset"
+    },
+    "6d385a570a35633b6aee96a5fcc4f17975b1ad822b5778f81d5c6971500031b5": {
+      "generation": 13,
+      "attempts": 2,
+      "reason": "health-timeout"
+    }
+  },
+  "final_failure_history": {
+    "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c": {
+      "generation": 14,
+      "attempts": 2,
+      "reason": "health-timeout"
+    },
+    "6d385a570a35633b6aee96a5fcc4f17975b1ad822b5778f81d5c6971500031b5": {
+      "generation": 13,
+      "attempts": 2,
+      "reason": "health-timeout"
+    }
+  },
+  "remaining_qualification": {
+    "observed_cases": [
+      "healthy-trial",
+      "normal-boot",
+      "kiosk-hang",
+      "repeated-failure",
+      "trial-reset",
+      "kiosk-crash"
+    ],
+    "pending_cases": [
+      "root-startup-failure",
+      "recovery-service-failure",
+      "watchdog-handoff",
+      "interrupted-promotion",
+      "power-loss"
+    ],
+    "owner_review_pending": true,
+    "approval_created": false
+  },
+  "stage_receipt_note": "Pending and pre-device flags in helper-build, publication, preparation and return receipts describe those earlier stages; normal_boot and closeout contain the completed outcomes."
+}

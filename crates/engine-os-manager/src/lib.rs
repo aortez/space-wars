@@ -8,6 +8,8 @@ mod bootstrap_recovery;
 #[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
 pub mod supervised_install;
 #[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
+pub mod supervised_kiosk_crash;
+#[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
 pub mod supervised_kiosk_hang;
 #[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
 pub mod supervised_trial_reset;
