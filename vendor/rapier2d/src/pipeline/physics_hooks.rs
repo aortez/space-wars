@@ -235,6 +235,14 @@ impl Default for ActiveHooks {
 /// User-defined functions called by the physics engines during one timestep in order to customize its behavior.
 #[cfg(all(target_arch = "wasm32", feature = "alloc"))]
 pub trait PhysicsHooks {
+    /// Exclude the previous step's warm-start cache from reported contact impulses.
+    /// Defaults to false for compatibility. The choice applies to this pipeline step,
+    /// including CCD subdivisions. It changes force events and the subsequent
+    /// new-contact/restitution classification, which uses the reported impulse.
+    fn report_applied_contact_impulses(&self) -> bool {
+        false
+    }
+
     /// Global pre-solve contact batch; see [`SolverContactBatchContext`].
     /// Called once per solver substep, independently of collider hook flags.
     fn modify_solver_contacts_batch(&self, _context: &mut SolverContactBatchContext) {}
@@ -256,6 +264,14 @@ pub trait PhysicsHooks {
 /// User-defined functions called by the physics engines during one timestep in order to customize its behavior.
 #[cfg(all(not(target_arch = "wasm32"), feature = "alloc"))]
 pub trait PhysicsHooks: Send + Sync {
+    /// Exclude the previous step's warm-start cache from reported contact impulses.
+    /// Defaults to false for compatibility. The choice applies to this pipeline step,
+    /// including CCD subdivisions. It changes force events and the subsequent
+    /// new-contact/restitution classification, which uses the reported impulse.
+    fn report_applied_contact_impulses(&self) -> bool {
+        false
+    }
+
     /// Global pre-solve contact batch; see [`SolverContactBatchContext`].
     /// Called once per solver substep, independently of collider hook flags.
     /// The default is a no-op, preserving existing solver behavior.

@@ -20,6 +20,10 @@ impl Default for IslandSolver {
 }
 
 impl IslandSolver {
+    pub(crate) fn set_report_applied_contact_impulses(&mut self, enabled: bool) {
+        self.contact_constraints.report_applied_contact_impulses = enabled;
+    }
+
     pub fn new() -> Self {
         Self {
             contact_constraints: ContactConstraintsSet::new(),

@@ -86,9 +86,10 @@ repair the report.
 | 4 | 1.25 |
 | 8 | 1.125 |
 
-The correction passes the integer internal-step index to contact builders and
-accumulates only completed substeps. The initial cache still seeds the first
-solve, with the same warm-start coefficient; it no longer enters the new total
+The opt-in correction uses the integer internal-step index to select which
+impulses builders accumulate. Only completed substeps enter the report. The
+initial cache still seeds the first solve, with the same warm-start coefficient;
+it no longer enters the new total
 before that solve. Normal and tangent totals are corrected in the rigid-body
 and generic multibody paths. This avoids subtracting a cache from a rounded
 total or identifying the first step through floating-point elapsed time.
@@ -115,13 +116,29 @@ state, multibody state and normal/tangent warm-start caches after every step.
 All 288 observations matched byte for byte. The three backend regressions fail
 against the original accumulation and pass with the correction.
 
-The solver impulse updates and warm-start writeback are unchanged. Corrected
-reports intentionally change force-event thresholds and serialized contact
-impulse values. Rapier also uses a zero reported normal impulse to classify a
-later contact as new; removing a stale positive report restores that behavior
-after unloading. This is not a promise of identical later restitution in every
-scene. General gravity work accounting and native multibody admission remain
-outside this correction.
+The solver impulse updates and warm-start writeback are unchanged. However,
+Rapier also uses a zero reported normal impulse to classify a later contact as
+new. Applying the correction globally changed the navigation-v1 seed-0 trace
+at tick 9723: the preceding step's stale positive report became zero, changing
+restitution on a continuing contact. Two existing Clock regressions also failed.
+These cases make corrected reports a physics behavior choice, not a passive
+diagnostic fix.
+
+`PhysicsHooks::report_applied_contact_impulses` therefore defaults to false.
+The pipeline samples it once per step, applies the choice to every island and
+CCD subdivision, and resets reused solvers on the next step. Native gravity
+operations and the independent gravity/impulse fixtures opt in. Ordinary
+stepping, passive loading capture and the earlier arrival operations retain
+their existing reports, force events and restitution behavior. The setting
+adds no serialized state or snapshot schema changes.
+
+The opted-in reports change force-event thresholds and serialized contact
+impulse values, including later new-contact classification. A regression
+alternates default and corrected steps for rigid and multibody support with
+1/4/8 internal steps and warm-start coefficients 0/0.5/1; it checks both the
+reaction and event reports against momentum and the retained cache. General
+gravity work accounting, native multibody admission and a global reporting
+migration remain outside this correction.
 
 ## Solver position error is not plastic deformation
 

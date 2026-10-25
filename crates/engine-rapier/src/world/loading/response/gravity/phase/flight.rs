@@ -31,6 +31,10 @@ impl History {
 
 pub(super) struct Drift;
 impl PhysicsHooks for Drift {
+    fn report_applied_contact_impulses(&self) -> bool {
+        true
+    }
+
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
         // Convex ballistic x(t) and both endpoint bounds proved no crossing.
         // Rotation/tangent motion and every other body are excluded by admission.

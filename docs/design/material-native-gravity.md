@@ -12,6 +12,10 @@ The first successful positive call enrolls snapshot v6 history. Unenrolled world
 keep their existing v1-v5 formats; pause and refusal cannot enroll. There is no
 separate enrollment/reset or partial-step API. Existing public arrival operations
 still refuse gravity, and ordinary stepping retains its `ExternalWork` guard.
+Only this operation opts into corrected backend contact impulse reports through
+`PhysicsHooks::report_applied_contact_impulses`. Ordinary stepping, passive
+capture and earlier arrival operations retain their prior reports and bounce
+classification; see [the reporting boundary](material-gravity-loading.md#corrected-support-impulse-reporting).
 
 ## First admitted scene
 

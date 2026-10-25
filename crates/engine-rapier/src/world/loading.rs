@@ -611,6 +611,7 @@ pub(super) trait ArrivalControl: Sync {
 }
 
 pub(super) struct Hooks<'a> {
+    pub report_applied_contact_impulses: bool,
     pub arrival: Option<&'a dyn ArrivalControl>,
     pub flight: Option<&'a std::sync::atomic::AtomicBool>,
     pub drives: surface_drive::DriveHooks<'a>,
@@ -619,6 +620,10 @@ pub(super) struct Hooks<'a> {
 }
 
 impl PhysicsHooks for Hooks<'_> {
+    fn report_applied_contact_impulses(&self) -> bool {
+        self.report_applied_contact_impulses
+    }
+
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
         if let Some(arrival) = self.arrival {
             arrival.filter(context);

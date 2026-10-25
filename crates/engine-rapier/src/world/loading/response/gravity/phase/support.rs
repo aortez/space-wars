@@ -10,6 +10,10 @@ struct Projection<'a> {
 }
 
 impl PhysicsHooks for Projection<'_> {
+    fn report_applied_contact_impulses(&self) -> bool {
+        true
+    }
+
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
         if self.scene.plates.internal_face(context) {
             context.solver_contacts.clear();

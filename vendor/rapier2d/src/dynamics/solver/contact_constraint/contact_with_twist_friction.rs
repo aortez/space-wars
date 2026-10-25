@@ -254,7 +254,8 @@ impl ContactWithTwistFrictionBuilder<SimdReal> {
     pub fn update(
         &self,
         params: &IntegrationParameters,
-        small_step_id: usize,
+        solved_dt: Real,
+        accumulate_impulse: bool,
         bodies: &SolverBodies,
         _multibodies: &MultibodyJointSet,
         constraint: &mut ContactWithTwistFriction<SimdReal>,
@@ -281,7 +282,7 @@ impl ContactWithTwistFrictionBuilder<SimdReal> {
             constraint.dir1.gcross(constraint.tangent1),
         ];
 
-        let solved_dt = SimdReal::splat(small_step_id as Real * params.dt);
+        let solved_dt = SimdReal::splat(solved_dt);
         let tangent_delta = self.tangent_vel * solved_dt;
 
         for (info, normal_part) in all_infos.iter().zip(normal_parts.iter_mut()) {
@@ -299,8 +300,7 @@ impl ContactWithTwistFrictionBuilder<SimdReal> {
 
                 normal_part.rhs_wo_bias = rhs_wo_bias;
                 normal_part.rhs = new_rhs;
-                // Exclude the previous frame's cache from this frame's total.
-                if small_step_id != 0 {
+                if accumulate_impulse {
                     normal_part.impulse_accumulator += normal_part.impulse;
                 }
                 normal_part.impulse *= warmstart_coeff;
@@ -316,7 +316,7 @@ impl ContactWithTwistFrictionBuilder<SimdReal> {
                 let bias = (p1 - p2).gdot(tangents1[j]) * inv_dt;
                 tangent_part.rhs[j] = tangent_part.rhs_wo_bias[j] + bias;
             }
-            if small_step_id != 0 {
+            if accumulate_impulse {
                 tangent_part.impulse_accumulator += tangent_part.impulse;
                 twist_part.impulse_accumulator += twist_part.impulse;
             }

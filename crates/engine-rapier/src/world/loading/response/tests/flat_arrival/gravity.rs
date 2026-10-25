@@ -41,6 +41,10 @@ struct Observer<'a> {
 }
 
 impl PhysicsHooks for Observer<'_> {
+    fn report_applied_contact_impulses(&self) -> bool {
+        true
+    }
+
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
         if internal_face(context) {
             context.solver_contacts.clear();

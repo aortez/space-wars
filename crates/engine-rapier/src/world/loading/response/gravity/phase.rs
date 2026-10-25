@@ -312,6 +312,7 @@ impl Staged {
             after: Mutex::new(None),
         };
         let hooks = Hooks {
+            report_applied_contact_impulses: true,
             arrival: Some(&control),
             flight: None,
             drives: surface_drive::DriveHooks(&[]),

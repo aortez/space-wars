@@ -1,6 +1,14 @@
 //! Check backend reports against momentum, independently of the material ledger.
 use super::*;
-use rapier2d::prelude::FixedJointBuilder;
+use rapier2d::prelude::{FixedJointBuilder, PhysicsHooks, SolverContactBatchContext};
+
+struct AppliedReports;
+
+impl PhysicsHooks for AppliedReports {
+    fn report_applied_contact_impulses(&self) -> bool {
+        true
+    }
+}
 
 fn fixture(multibody: bool, speed: f32, reverse: bool) -> (RapierWorld, Vec<RigidBodyHandle>) {
     let mut world = RapierWorld {
@@ -170,7 +178,7 @@ fn contact_impulses_match_momentum_with_friction_and_multibodies() {
                             world.gravity.y = gravity;
                             let before = momentum(&world, &moving);
                             let events = Forces::default();
-                            world.step_with_events(&(), &events);
+                            world.step_with_events(&AppliedReports, &events);
                             let after = momentum(&world, &moving);
                             let impulse = reported(&world);
                             near(impulse[0], after[0] - before[0]);
@@ -217,7 +225,7 @@ fn contact_impulses_do_not_trigger_force_events_from_old_cache() {
         }
         for _ in 0..4 {
             let events = Forces::default();
-            world.step_with_events(&(), &events);
+            world.step_with_events(&AppliedReports, &events);
             // Weight is 200. The old four-substep report incorrectly said 250.
             assert!(events.0.into_inner().unwrap().is_empty());
         }
@@ -232,12 +240,12 @@ fn contact_impulses_release_does_not_report_past_support() {
                 let (mut world, moving) = fixture(multibody, 0.0, false);
                 world.integration_parameters.num_solver_iterations = n;
                 world.integration_parameters.warmstart_coefficient = warm;
-                world.step();
+                world.step_with_events(&AppliedReports, &());
                 assert!(reported(&world)[1] > 0.0);
                 let before = momentum(&world, &moving);
                 world.gravity.y = 10.0;
                 let events = Forces::default();
-                world.step_with_events(&(), &events);
+                world.step_with_events(&AppliedReports, &events);
                 let after = momentum(&world, &moving);
                 near(reported(&world)[1], 0.0);
                 near(
@@ -245,6 +253,83 @@ fn contact_impulses_release_does_not_report_past_support() {
                     200.0 * f64::from(world.integration_parameters.dt),
                 );
                 assert!(events.0.into_inner().unwrap().is_empty());
+            }
+        }
+    }
+}
+
+#[test]
+fn applied_contact_reporting_is_opt_in_and_resets_between_steps() {
+    struct ReportMode {
+        applied: bool,
+        incoming_cache: Mutex<f64>,
+    }
+
+    impl PhysicsHooks for ReportMode {
+        fn report_applied_contact_impulses(&self) -> bool {
+            self.applied
+        }
+
+        fn modify_solver_contacts_batch(&self, context: &mut SolverContactBatchContext) {
+            // A retained manifold may have lost its solver contacts this step.
+            // Only caches admitted to the current solve can enter its report.
+            *self.incoming_cache.lock().unwrap() = context
+                .contact_pairs()
+                .flat_map(|p| &p.manifolds)
+                .flat_map(|m| &m.data.solver_contacts)
+                .map(|c| f64::from(c.warmstart_impulse))
+                .sum();
+        }
+    }
+
+    assert!(!().report_applied_contact_impulses());
+    for multibody in [false, true] {
+        for n in [1, 4, 8] {
+            for warm in [0.0, 0.5, 1.0] {
+                let (mut world, moving) = fixture(multibody, 0.0, false);
+                world.integration_parameters.num_solver_iterations = n;
+                world.integration_parameters.warmstart_coefficient = warm;
+                world.step();
+                let mut cached_steps = [0; 2];
+                for applied in [
+                    false, false, true, true, false, false, true, true, false, false,
+                ] {
+                    let before = momentum(&world, &moving);
+                    let events = Forces::default();
+                    let hooks = ReportMode {
+                        applied,
+                        incoming_cache: Mutex::new(0.0),
+                    };
+                    world.step_with_events(&hooks, &events);
+                    let cached = hooks.incoming_cache.into_inner().unwrap();
+                    cached_steps[usize::from(applied)] += usize::from(cached > 0.0);
+                    let after = momentum(&world, &moving);
+                    let reaction =
+                        after[1] - before[1] + 200.0 * f64::from(world.integration_parameters.dt);
+                    let expected = reaction + if applied { 0.0 } else { cached };
+                    assert!(
+                        (reported(&world)[1] - expected).abs() < 2.0e-4,
+                        "multibody={multibody} n={n} warm={warm} applied={applied} cached={cached} reaction={reaction} reported={:?}",
+                        reported(&world),
+                    );
+                    near(
+                        events
+                            .0
+                            .into_inner()
+                            .unwrap()
+                            .into_iter()
+                            .map(f64::from)
+                            .sum::<f64>()
+                            * f64::from(world.integration_parameters.dt),
+                        expected,
+                    );
+                }
+                // The rigid fixture guarantees a reused cache in both modes.
+                // The free multibody can lose the contact feature between steps;
+                // its expected report above uses the actual admitted cache.
+                if !multibody {
+                    assert!(cached_steps.into_iter().all(|n| n > 0));
+                }
             }
         }
     }

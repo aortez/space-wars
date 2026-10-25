@@ -107,6 +107,10 @@ impl Trace {
 struct FreeDrift;
 
 impl PhysicsHooks for FreeDrift {
+    fn report_applied_contact_impulses(&self) -> bool {
+        true
+    }
+
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
         // fly() proves that the ballistic interval stays outside the fixed
         // plate. hold() instead proves zero velocity after support projection.

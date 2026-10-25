@@ -1404,6 +1404,7 @@ impl PhysicsWorld {
 
         let capture_loading = self.loading.is_some();
         let hooks = loading::Hooks {
+            report_applied_contact_impulses: false,
             arrival,
             flight,
             drives: surface_drive::DriveHooks(drives),

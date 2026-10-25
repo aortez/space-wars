@@ -35,6 +35,10 @@ struct Projection {
     pair: [RigidBodyHandle; 2],
 }
 impl PhysicsHooks for Projection {
+    fn report_applied_contact_impulses(&self) -> bool {
+        true
+    }
+
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
         if ![context.rigid_body1, context.rigid_body2]
             .iter()

@@ -251,7 +251,8 @@ impl ContactWithCoulombFrictionBuilder {
     pub fn update(
         &self,
         params: &IntegrationParameters,
-        small_step_id: usize,
+        solved_dt: Real,
+        accumulate_impulse: bool,
         bodies: &SolverBodies,
         _multibodies: &MultibodyJointSet,
         constraint: &mut ContactWithCoulombFriction<SimdReal>,
@@ -277,7 +278,7 @@ impl ContactWithCoulombFrictionBuilder {
             constraint.dir1.gcross(constraint.tangent1),
         ];
 
-        let solved_dt = SimdReal::splat(small_step_id as Real * params.dt);
+        let solved_dt = SimdReal::splat(solved_dt);
 
         for ((info, normal_part), tangent_part) in all_infos
             .iter()
@@ -298,10 +299,7 @@ impl ContactWithCoulombFrictionBuilder {
 
                 normal_part.rhs_wo_bias = rhs_wo_bias;
                 normal_part.rhs = new_rhs;
-                // At the first update, impulse is the previous frame's cache,
-                // not an impulse applied during this frame. Keep it for
-                // warmstarting, but report only completed substeps.
-                if small_step_id != 0 {
+                if accumulate_impulse {
                     normal_part.impulse_accumulator += normal_part.impulse;
                 }
                 normal_part.impulse *= warmstart_coeff;
@@ -309,7 +307,7 @@ impl ContactWithCoulombFrictionBuilder {
 
             // tangent parts.
             {
-                if small_step_id != 0 {
+                if accumulate_impulse {
                     tangent_part.impulse_accumulator += tangent_part.impulse;
                 }
                 tangent_part.impulse *= warmstart_coeff;
