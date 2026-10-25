@@ -223,6 +223,70 @@ and failed receipts. Host tests cover wrong action/transaction, old intents and
 connection loss without implicit logins. These fixtures do not run a device reset
 or satisfy the physical matrix.
 
+## One bounded kiosk-crash series
+
+`crash_kiosk_trial` is a separately built owner helper for persistent application
+crashes during an uncommitted signed trial. The shipped kiosk automatically
+restarts after a failure; a single early crash can therefore recover and finish
+the 60-second continuous health window. This procedure leaves that restart policy
+active and exercises a bounded series of crashes. It does not change services,
+the recovery journal, boot selectors, a watchdog or installation approval.
+
+```sh
+cargo test --locked -p engine-os-manager --features recovery-qualification \
+  supervised_kiosk_crash -- --test-threads=1
+python3 -m unittest discover -s yocto/tests -p kiosk_crash_test.py
+cargo build --locked --release --target aarch64-unknown-linux-gnu \
+  -p engine-os-manager --features recovery-qualification --example crash_kiosk_trial
+```
+
+Use an eligible signed payload, including a specifically selected bounded
+explicit retry when available, with the same backup, normal baseline, native
+time and WAN-only isolation checks as the other failure cases. Preserve earlier
+transactions and consumed faults. Upload the helper under its content hash at
+`/data/spacewars-recovery-tools/<sha256>/crash_kiosk_trial`, root-owned, mode 0500
+and singly linked. It is excluded from ordinary device builds and Yocto images.
+
+```sh
+python3 yocto/scripts/qualify-kiosk-crash.py \
+  --host swadmin@sw-picade-2.local --control-path /absolute/existing/control-socket \
+  --helper-sha256 SELECTED_HELPER_SHA256 \
+  --expectation /private/evidence/expectation.json \
+  --output /private/evidence/new-crash-directory
+```
+
+The native plan binds the exact image, boot, observing transaction and a fixed
+`bounded-sigkill-series` action. Initial inspection and the first signal must
+finish before 45 seconds of boot uptime and within ten seconds of selection.
+The helper durably consumes the shared one-fault transaction intent, then records
+each individual signal intent before delivering SIGKILL through a pidfd. It
+waits at most two seconds for the pinned process to exit and retains the result.
+Every replacement must pass fresh systemd, process, executable and kiosk-health
+checks; an old process, changed trial, error or uncertain signal stops the series.
+
+The next crash is no sooner than 30 seconds after observed exit and less than
+45 seconds after the previous signal request. At most six processes may be
+signalled, all before 170 seconds of boot uptime. The series ends immediately
+after a verified crash at or after 125 seconds. These bounds interrupt every
+possible 60-second health window before the fixed 180-second trial deadline.
+Slow observation or storage cannot extend the limits. No failed or incomplete
+series can be resumed or replayed, even after an SSH timeout. The host uses the
+existing connection only; only the fixed series request has a 190-second timeout.
+
+Require the consumed intent, matching per-process intents/results and final
+series receipt, then separately observe automatic return to the original good
+image within 420 seconds of invocation. An injection receipt alone is not a
+recovery result. A failed series followed by promotion is not this case's pass;
+retain that actual outcome. Verify the exact rollback transaction, failure reason,
+quarantine, prior attempt history and protected data, then keep WAN blocked
+through a separate normal boot. Restore WAN and usable time, check ordinary
+candidate refusal and any exhausted-retry refusal after idle, then close SSH.
+
+Fixtures exercise timing, durable one-use ordering, stale/repeated instances,
+lost replies and actual pidfd delivery to disposable child processes. They do
+not qualify a physical device. No kiosk-crash observation has yet been recorded
+for the second Picade by this helper.
+
 ## One supervised kiosk hang
 
 `kiosk_hang_trial` is a separate, feature-gated root-owner example. It is not

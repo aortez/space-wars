@@ -137,7 +137,9 @@ fn plan() -> Plan {
 #[test]
 fn exact_early_trial_is_required() {
     let (expected, boot, journal, early) = fixture();
-    expected.matches(&boot, &journal, &early).unwrap();
+    expected
+        .matches(&boot, &journal, &early, LATEST_STOP_MS)
+        .unwrap();
     for case in 0..12 {
         let (_, mut b, mut j, mut e) = fixture();
         match case {
@@ -155,13 +157,20 @@ fn exact_early_trial_is_required() {
             11 => e.timeout_seconds = 211,
             _ => unreachable!(),
         }
-        assert!(expected.matches(&b, &j, &e).is_err(), "case {case}");
+        assert!(
+            expected.matches(&b, &j, &e, LATEST_STOP_MS).is_err(),
+            "case {case}"
+        );
     }
     for field in ["candidate", "previous_good"] {
         let mut value = serde_json::to_value(&expected).unwrap();
         value[field]["payload"] = json!(Sha256::digest(b"wrong-payload"));
         let changed: Expectation = serde_json::from_value(value).unwrap();
-        assert!(changed.matches(&boot, &journal, &early).is_err());
+        assert!(
+            changed
+                .matches(&boot, &journal, &early, LATEST_STOP_MS)
+                .is_err()
+        );
     }
     let mut value = serde_json::to_value(&journal.record).unwrap();
     value["transaction"]["phase"] = json!("trial-requested");
@@ -171,7 +180,11 @@ fn exact_early_trial_is_required() {
         checksum: record.fingerprint(),
         record,
     };
-    assert!(expected.matches(&boot, &old, &early).is_err());
+    assert!(
+        expected
+            .matches(&boot, &old, &early, LATEST_STOP_MS)
+            .is_err()
+    );
 }
 
 #[test]
@@ -193,6 +206,26 @@ fn plan_digest_and_deadlines_bind_transport() {
     let mut value = serde_json::to_value(&plan).unwrap();
     value["extra"] = json!(true);
     assert!(serde_json::from_value::<Plan>(value).is_err());
+}
+
+#[test]
+fn continuing_crash_guard_retains_trial_identity_and_absolute_deadline() {
+    let (expected, mut boot, journal, early) = fixture();
+    boot.observation.uptime_ms = 125_000;
+    assert!(
+        expected
+            .matches(&boot, &journal, &early, LATEST_STOP_MS)
+            .is_err()
+    );
+    expected.matches(&boot, &journal, &early, 180_000).unwrap();
+    boot.observation.uptime_ms = 180_000;
+    assert!(expected.matches(&boot, &journal, &early, 180_000).is_err());
+    boot.observation.uptime_ms = 125_000;
+    boot.observation.tryboot = false;
+    assert!(expected.matches(&boot, &journal, &early, 180_000).is_err());
+    boot.observation.tryboot = true;
+    boot.observation.trial_id = Some(Sha256::digest(b"other-trial"));
+    assert!(expected.matches(&boot, &journal, &early, 180_000).is_err());
 }
 
 #[test]

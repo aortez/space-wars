@@ -244,13 +244,14 @@ fn native_bus_requests_once_after_durable_intent_and_keeps_uncertain_consumption
             )
             .await;
             assert_eq!(outcome.is_ok(), case == "good", "{case}: {outcome:?}");
-            let s = state.lock().unwrap();
-            assert!(!s.set_parameter, "{case}");
-            assert_eq!(s.queued, case == "good", "{case}");
-            let requested = matches!(case, "good" | "denied" | "lost-reply" | "receipt-error");
-            assert_eq!(s.requests, usize::from(requested), "{case}");
-            let consumed = s.consumed;
-            drop(s);
+            let consumed = {
+                let s = state.lock().unwrap();
+                assert!(!s.set_parameter, "{case}");
+                assert_eq!(s.queued, case == "good", "{case}");
+                let requested = matches!(case, "good" | "denied" | "lost-reply" | "receipt-error");
+                assert_eq!(s.requests, usize::from(requested), "{case}");
+                s.consumed
+            };
             if consumed {
                 let before = state.lock().unwrap().requests;
                 // The same native record also excludes an intent written by

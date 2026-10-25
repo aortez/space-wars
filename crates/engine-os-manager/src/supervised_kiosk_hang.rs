@@ -147,7 +147,11 @@ impl Expectation {
     }
 
     pub(crate) fn check_early_trial(&self) -> Result<()> {
-        guard(self)
+        guard(self, LATEST_STOP_MS)
+    }
+
+    pub(crate) fn check_observing_trial(&self) -> Result<()> {
+        guard(self, engine_ota::recovery::TRIAL_DEADLINE_MS)
     }
 
     fn validate(&self) -> Result<()> {
@@ -184,7 +188,13 @@ impl Expectation {
         )
     }
 
-    fn matches(&self, boot: &BootEvidence, journal: &Envelope, early: &Early) -> Result<()> {
+    fn matches(
+        &self,
+        boot: &BootEvidence,
+        journal: &Envelope,
+        early: &Early,
+        latest_ms: u64,
+    ) -> Result<()> {
         self.validate()?;
         let b = &boot.observation;
         let record = &journal.record;
@@ -211,7 +221,7 @@ impl Expectation {
                 && b.actual_slot == Some(self.candidate.slot)
                 && b.default_slot == Some(self.previous_good.slot)
                 && b.actual_build_id.as_deref() == Some(self.image.build_id.as_str())
-                && b.uptime_ms < LATEST_STOP_MS
+                && b.uptime_ms < latest_ms
                 && record.good() == &self.previous_good
                 && tx.id == self.transaction
                 && tx.phase == Phase::Observing
@@ -297,7 +307,7 @@ fn read_at(parent: &File, name: &str, limit: u64, owner: u32) -> Result<Vec<u8>>
     )?;
     Ok(bytes)
 }
-fn guard(expected: &Expectation) -> Result<()> {
+fn guard(expected: &Expectation, latest_ms: u64) -> Result<()> {
     let boot = inspect_boot()?;
     let system = system_directory()?;
     let recovery = directory(&system, "recovery", 0, true)?;
@@ -321,10 +331,10 @@ fn guard(expected: &Expectation) -> Result<()> {
             ));
         }
     }
-    expected.matches(&boot, &journal, &early)?;
+    expected.matches(&boot, &journal, &early, latest_ms)?;
     recovery_running()?;
     require(
-        now_ms()? < LATEST_STOP_MS,
+        now_ms()? < latest_ms,
         "injection window expired during observation",
     )
 }
@@ -345,10 +355,10 @@ fn plan_time(plan: &Plan, now: u64) -> Result<()> {
 
 pub fn inspect(expectation: Expectation) -> Result<Plan> {
     root()?;
-    guard(&expectation)?;
+    guard(&expectation, LATEST_STOP_MS)?;
     let expected = KioskExpectation::from_image(&expectation.image)?;
     let health = KioskObserver::default().observe(&expected)?;
-    guard(&expectation)?;
+    guard(&expectation, LATEST_STOP_MS)?;
     let plan = Plan {
         expectation,
         selected_ms: now_ms()?,
@@ -358,9 +368,27 @@ pub fn inspect(expectation: Expectation) -> Result<Plan> {
     Ok(plan)
 }
 
-struct Pinned(File);
+pub(crate) struct Pinned(File);
 impl Pinned {
-    fn open(pid: u32) -> Result<Self> {
+    pub(crate) fn wait_exited(&self) -> Result<()> {
+        let mut descriptor = libc::pollfd {
+            fd: self.0.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        // A pidfd becomes readable only when its pinned process exits. Never
+        // look up the numeric PID again after delivering the signal.
+        let result = unsafe { libc::poll(&mut descriptor, 1, 2000) };
+        if result < 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
+        require(
+            result == 1 && descriptor.revents & libc::POLLIN != 0,
+            "pinned kiosk exit was not observed within two seconds",
+        )
+    }
+
+    pub(crate) fn open(pid: u32) -> Result<Self> {
         require(pid > 1 && pid <= i32::MAX as u32, "invalid kiosk PID")?;
         let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid as i32, 0) };
         if fd < 0 {
@@ -368,7 +396,7 @@ impl Pinned {
         }
         Ok(Self(unsafe { File::from_raw_fd(fd as i32) }))
     }
-    fn signal(&self, signal: i32) -> Result<()> {
+    pub(crate) fn signal(&self, signal: i32) -> Result<()> {
         if unsafe {
             libc::syscall(
                 libc::SYS_pidfd_send_signal,
@@ -464,7 +492,7 @@ pub fn stop(plan: Plan, selected: Sha256) -> Result<Value> {
         "plan digest differs from owner selection",
     )?;
     plan_time(&plan, now_ms()?)?;
-    guard(&plan.expectation)?;
+    guard(&plan.expectation, LATEST_STOP_MS)?;
     let expected = KioskExpectation::from_image(&plan.expectation.image)?;
     let pinned = Pinned::open(plan.health.process_id)?;
     kiosk_health::qualification_instance(&plan.health, &expected)?;
@@ -484,14 +512,14 @@ pub fn stop(plan: Plan, selected: Sha256) -> Result<Value> {
         },
         || {
             kiosk_health::qualification_instance(&plan.health, &expected)?;
-            guard(&plan.expectation)?;
+            guard(&plan.expectation, LATEST_STOP_MS)?;
             plan_time(&plan, now_ms()?)
         },
         |signal| pinned.signal(signal),
         || {
             stopped(&plan.health)?;
             kiosk_health::qualification_instance(&plan.health, &expected)?;
-            guard(&plan.expectation)?;
+            guard(&plan.expectation, LATEST_STOP_MS)?;
             plan_time(&plan, now_ms()?)
         },
     )?;
