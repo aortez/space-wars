@@ -235,10 +235,7 @@ fn directory(parent: &File, name: &str, owner: u32, private: bool) -> Result<Fil
     let file = open_at(parent, name, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
     let m = file.metadata()?;
     require(
-        m.is_dir()
-            && m.uid() == owner
-            && m.gid() == owner
-            && m.mode() & if private { 0o077 } else { 0o022 } == 0,
+        m.is_dir() && m.uid() == owner && m.mode() & if private { 0o077 } else { 0o022 } == 0,
         "unsafe evidence directory",
     )?;
     Ok(file)
@@ -253,13 +250,12 @@ fn system_directory() -> Result<File> {
     )?;
     Ok(system)
 }
-fn read_at(parent: &File, name: &str, limit: u64) -> Result<Vec<u8>> {
+fn read_at(parent: &File, name: &str, limit: u64, owner: u32) -> Result<Vec<u8>> {
     let pinned = open_at(parent, name, libc::O_PATH, 0)?;
     let before = pinned.metadata()?;
     require(
         before.is_file()
-            && before.uid() == 0
-            && before.gid() == 0
+            && before.uid() == owner
             && before.mode() & 0o077 == 0
             && before.nlink() == 1
             && before.dev() == parent.metadata()?.dev()
@@ -285,11 +281,18 @@ fn guard(expected: &Expectation) -> Result<()> {
     let boot = inspect_boot()?;
     let system = system_directory()?;
     let recovery = directory(&system, "recovery", 0, true)?;
-    let journal: Envelope = serde_json::from_slice(&read_at(&recovery, "state.json", 128 * 1024)?)?;
+    // Recovery runs as root with Group=spacewars. Private mode and owner UID
+    // are authority; the file's group grants no access through mode 0600.
+    let journal: Envelope =
+        serde_json::from_slice(&read_at(&recovery, "state.json", 128 * 1024, 0)?)?;
+    require(
+        boot.observation.tryboot && boot.observation.boot_id == expected.trial_boot_id,
+        "not the selected early uncommitted candidate trial",
+    )?;
     let root = File::open("/")?;
     let run = directory(&root, "run", 0, false)?;
     let evidence = directory(&run, "spacewars-recovery", 0, true)?;
-    let early = serde_json::from_slice(&read_at(&evidence, "early-watchdog.json", 1024)?)?;
+    let early = serde_json::from_slice(&read_at(&evidence, "early-watchdog.json", 1024, 0)?)?;
     match open_at(&evidence, "completed-watchdog.json", libc::O_PATH, 0) {
         Err(Error::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {}
         _ => {

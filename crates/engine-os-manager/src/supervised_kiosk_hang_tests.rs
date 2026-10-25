@@ -256,6 +256,29 @@ fn consumed_or_partial_record_cannot_be_replayed_or_linked() {
 }
 
 #[test]
+fn private_evidence_uses_owner_access_without_requiring_group_zero() {
+    let dir = tempfile::tempdir().unwrap();
+    let parent = File::open(dir.path()).unwrap();
+    let path = dir.path().join("state.json");
+    std::fs::write(&path, b"private record").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let owner = unsafe { libc::geteuid() };
+    assert_eq!(
+        read_at(&parent, "state.json", 128, owner).unwrap(),
+        b"private record"
+    );
+    assert!(read_at(&parent, "state.json", 128, owner.wrapping_add(1)).is_err());
+    assert!(read_at(&parent, "state.json", 2, owner).is_err());
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+    assert!(read_at(&parent, "state.json", 128, owner).is_err());
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    std::fs::hard_link(&path, dir.path().join("hardlink")).unwrap();
+    assert!(read_at(&parent, "state.json", 128, owner).is_err());
+    symlink(&path, dir.path().join("symlink")).unwrap();
+    assert!(read_at(&parent, "symlink", 128, owner).is_err());
+}
+
+#[test]
 fn actual_pidfd_targets_only_its_child_and_does_not_retarget_after_exit() {
     let mut child = Command::new("/bin/sleep")
         .arg("30")
