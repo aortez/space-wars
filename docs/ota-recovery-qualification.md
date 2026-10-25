@@ -294,6 +294,90 @@ not qualify a physical device. The separately retained
 [second-Picade observation](#second-picade-kiosk-crash-2026-10-25) below records
 this helper's first completed physical series and recovery checks.
 
+## One recovery-service failure
+
+`fail_recovery_trial` is a separate owner-only helper for killing the production
+recovery observer during an early, uncommitted signed trial. The normal service
+has no restart policy. The test leaves the early watchdog armed and expects an
+automatic return to the original good image. It does not stop or restart units,
+change their configuration, open a watchdog, request a reboot, edit recovery
+state or write installation approval. This is a prepared procedure, **not a
+physical result**; `recovery-service-failure` remains outstanding until observed.
+
+```sh
+cargo test --locked -p engine-os-manager --features recovery-qualification \
+  supervised_recovery_failure -- --test-threads=1
+python3 -m unittest discover -s yocto/tests -p recovery_failure_test.py
+cargo build --locked --release --target aarch64-unknown-linux-gnu \
+  -p engine-os-manager --features recovery-qualification --example fail_recovery_trial
+```
+
+For the next second-Picade test, retain generation 12 in B as the good image and
+the exhausted generation-13/14 failures. Use a newly admitted signed payload
+with a generation above the retained floor; do not reset attempts or relabel an
+old payload. Recheck the backup and independent physical disk-recovery access,
+native time, exact normal baseline and protected-data inventory. Record the
+image source, publication, helper source and hashes independently. Stage using
+the supervised signed installer before WAN isolation. Keep Wi-Fi/LAN enabled
+and ask the owner to block only Internet access before activating the selected
+trial. Retain the old evidence directories unchanged and use a new run directory.
+
+Install the reviewed helper at
+`/data/spacewars-recovery-tools/<sha256>/fail_recovery_trial`, root-owned, mode
+0500 and singly linked. It is feature-gated and excluded from ordinary images.
+Build the expectation from the independently retained candidate selection,
+normal baseline and fresh trial snapshot using `expectation_for_trial`.
+
+```sh
+python3 yocto/scripts/qualify-recovery-failure.py \
+  --host swadmin@sw-picade-2.local --control-path /absolute/existing/control-socket \
+  --helper-sha256 SELECTED_HELPER_SHA256 \
+  --expectation /private/evidence/expectation.json \
+  --output /private/evidence/new-recovery-failure-directory
+```
+
+The native plan binds the trial, journal checksum, early-watchdog receipt and
+the recovery observer's systemd invocation, main PID, process start time, root
+UID, fixed command line and complete executable hash. It requires the reviewed
+oneshot policy, no restart or exit-status overrides, and no failure/stop hooks.
+The plan expires after ten seconds; injection and failed-state confirmation
+must finish before 45 seconds of boot uptime. A durable shared one-use fault
+intent precedes the final identity/time check and a single pidfd SIGKILL.
+
+Require a pinned process exit and a receipt identifying that same invocation
+as `failed`, with `Result=signal`, `ExecMainCode=CLD_KILLED`,
+`ExecMainStatus=SIGKILL`, no main PID and no restart. PID 1 may take a bounded
+six seconds to collect the failed service. A changed process, journal, watchdog
+receipt, restart, timeout or lost response stops the procedure; it never sends
+another signal. An uncertain injection is consumed, not replayable.
+
+The host uses the existing connection only, with a 25-second bound for the
+fixed kill request and 12 seconds for reads. After receiving the matching
+receipt, use `observe_failure(connection, plan, plan_sha256, output, label)` on
+that same connection. It invokes the helper's read-only `observe` operation,
+which cannot deliver another signal. Retain samples shortly after failure,
+around 120 seconds and at 185 seconds of boot uptime. The last sample must
+show the same failed invocation and unchanged observing journal beyond the
+ordinary 180-second recovery deadline. These reads expire at 300 seconds.
+
+Then observe the expected connection closure and automatic return within 420
+seconds of fault invocation. Return observation is a separately planned phase;
+never turn an unexpected early disconnect or missing receipt into an automatic
+fresh login. Require the durable intent/result files, exact original good image,
+new boot ID, normal B/B selectors, and the selected transaction rolled back
+with **`trial-reset`**, attempt 1 for the new payload. The killed observer cannot
+record `health-timeout`; that reason is not this case's expected result.
+Preserve the older exhausted failures and compare all protected data.
+
+Keep WAN blocked through a separate normal boot and verify stable recovery
+state. Restore WAN, usable time, Release and partial offline off; after idle,
+confirm ordinary candidate quarantine. A first failed attempt may still permit
+one separately selected owner retry, so do not require the exhausted-retry
+refusal used for generation 14's second attempt. Close the SSH master.
+Retain and review the physical report separately; do not create approval.
+SSH timing bounds the observed return, not the exact hardware reset instant.
+This case alone does not complete watchdog-handoff/expiry qualification.
+
 ## One supervised kiosk hang
 
 `kiosk_hang_trial` is a separate, feature-gated root-owner example. It is not
