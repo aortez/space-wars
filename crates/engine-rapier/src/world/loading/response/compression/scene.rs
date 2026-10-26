@@ -218,7 +218,7 @@ impl Scene {
 }
 
 #[cfg(test)]
-pub(super) fn frozen_v14_scene(s: &Scene) -> Vec<u8> {
+pub(in crate::world::loading::response) fn frozen_v14_scene(s: &Scene) -> Vec<u8> {
     let m = &s.material;
     bincode::serialize(&(
         s.bodies,

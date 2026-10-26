@@ -61,6 +61,8 @@ const ORIENTED_GRAVITY_SNAPSHOT_VERSION: u32 = 12;
 const ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION: u32 = 13;
 const COMPRESSION_SNAPSHOT_VERSION: u32 = 14;
 const DYNAMIC_COMPRESSION_SNAPSHOT_VERSION: u32 = 15;
+const REBOUND_SNAPSHOT_VERSION: u32 = 16;
+const REBOUND_SNAPSHOT_TAG: u64 = 0x5245_424f_554e_4432;
 const DYNAMIC_COMPRESSION_SNAPSHOT_TAG: u64 = 0x4459_4e43_4f4d_5052;
 const COMPRESSION_SNAPSHOT_TAG: u64 = 0x434f_4d50_5245_5353;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
@@ -2287,12 +2289,12 @@ impl PhysicsWorld {
     /// Serialize authoritative Rapier state and all stable handle mappings.
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, PhysicsWorldError> {
         let mut bytes = bincode::serialize(&PhysicsSnapshotRef {
-            version: if self
+            version: if let Some(dynamic) = self
                 .loading
                 .as_ref()
-                .is_some_and(|s| s.dynamic_compression.is_some())
+                .and_then(|s| s.dynamic_compression.as_ref())
             {
-                DYNAMIC_COMPRESSION_SNAPSHOT_VERSION
+                dynamic.snapshot_version()
             } else if self
                 .loading
                 .as_ref()
@@ -2346,7 +2348,7 @@ impl PhysicsWorld {
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
                 bincode::serialize_into(&mut bytes, &loading.flat_departures)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
-                bincode::serialize_into(&mut bytes, &DYNAMIC_COMPRESSION_SNAPSHOT_TAG)
+                bincode::serialize_into(&mut bytes, &dynamic.snapshot_tag())
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
                 bincode::serialize_into(&mut bytes, dynamic)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
@@ -2399,6 +2401,7 @@ impl PhysicsWorld {
             ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION,
             COMPRESSION_SNAPSHOT_VERSION,
             DYNAMIC_COMPRESSION_SNAPSHOT_VERSION,
+            REBOUND_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -2482,7 +2485,12 @@ impl PhysicsWorld {
                     .map_err(|error| PhysicsWorldError(error.to_string()))?,
             );
         }
-        if snapshot.version == DYNAMIC_COMPRESSION_SNAPSHOT_VERSION {
+        if [
+            DYNAMIC_COMPRESSION_SNAPSHOT_VERSION,
+            REBOUND_SNAPSHOT_VERSION,
+        ]
+        .contains(&snapshot.version)
+        {
             let state = loading.as_mut().unwrap();
             state.arrival_departures = bincode::deserialize_from(&mut reader)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
@@ -2490,7 +2498,12 @@ impl PhysicsWorld {
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
             let tag: u64 = bincode::deserialize_from(&mut reader)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
-            if tag != DYNAMIC_COMPRESSION_SNAPSHOT_TAG {
+            let expected_tag = if snapshot.version == DYNAMIC_COMPRESSION_SNAPSHOT_VERSION {
+                DYNAMIC_COMPRESSION_SNAPSHOT_TAG
+            } else {
+                REBOUND_SNAPSHOT_TAG
+            };
+            if tag != expected_tag {
                 return Err(PhysicsWorldError(
                     "dynamic compression snapshot tag mismatch".into(),
                 ));
@@ -2499,6 +2512,17 @@ impl PhysicsWorld {
                 bincode::deserialize_from(&mut reader)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?,
             );
+            if state
+                .dynamic_compression
+                .as_ref()
+                .unwrap()
+                .snapshot_version()
+                != snapshot.version
+            {
+                return Err(PhysicsWorldError(
+                    "dynamic compression revision/version mismatch".into(),
+                ));
+            }
         }
         if reader.position() != bytes.len() as u64 {
             return Err(PhysicsWorldError("trailing physics snapshot data".into()));

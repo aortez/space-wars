@@ -73,7 +73,7 @@ impl MaterialCurve {
             loss,
             work,
             force,
-            mean: if dx > 0.0 { work / dx } else { force },
+            mean: if dx != 0.0 { work / dx } else { force },
         }
     }
 }
@@ -91,6 +91,18 @@ impl History {
             return Err(R::UnsupportedScene);
         }
         Ok(h)
+    }
+    // Enrollment selects the immutable physical contract. Old overload and exact
+    // safe-equilibrium histories retain revision 1, including their v15 bytes.
+    pub(super) fn revision(&self) -> u32 {
+        let c = MaterialCurve::new(&self.initial);
+        if (self.initial_x == 0.0 && self.weight() > c.y)
+            || (self.initial_x > 0.0 && self.weight() == c.k * self.initial_x)
+        {
+            1
+        } else {
+            2
+        }
     }
     fn weight(&self) -> f64 {
         f64::from(self.mass) * f64::from(self.acceleration)
@@ -118,6 +130,7 @@ impl History {
         let s = &self.summary;
         let start = self.initial_summary();
         let weight = self.weight();
+        let rebound = self.revision() == 2;
         let near = |a: f64, b: f64, scale: f64| (a - b).abs() <= 1e-10 * scale;
         self.initial.region().is_ok()
             && self.initial.remaining > 0.0
@@ -126,7 +139,7 @@ impl History {
             && (5.0..=80.0).contains(&self.mass)
             && self.acceleration.is_finite()
             && (0.0..=1e6).contains(&self.acceleration)
-            && self.acceleration > 0.0
+            && (rebound || self.acceleration > 0.0)
             && c.k.is_finite()
             && c.k > 0.0
             && c.y.is_finite()
@@ -136,7 +149,11 @@ impl History {
             && ((self.initial_x == 0.0 && weight > c.y && weight <= 2.0 * c.y)
                 || (self.initial_x > 0.0
                     && self.initial_x <= c.ey
-                    && weight == c.k * self.initial_x))
+                    && weight == c.k * self.initial_x)
+                || (rebound
+                    && weight <= c.y
+                    && (0.0..=c.ey).contains(&self.initial_x)
+                    && (self.initial_x > 0.0 || weight > 0.0)))
             && [
                 s.indentation,
                 s.velocity,
@@ -154,9 +171,14 @@ impl History {
             ]
             .iter()
             .all(|v| v.is_finite() && v.abs() <= 1e12)
-            && s.indentation >= self.initial_x
+            && s.indentation
+                >= if rebound {
+                    -c.depth / 4.0
+                } else {
+                    self.initial_x
+                }
             && s.indentation <= c.depth / 4.0
-            && (0.0..=64.0).contains(&s.velocity)
+            && (if rebound { -64.0 } else { 0.0 }..=64.0).contains(&s.velocity)
             && f64::from(s.velocity as f32) == s.velocity
             && (0.0..=c.depth / 4.0 - c.ey).contains(&s.plastic_indentation)
             && s.indentation - s.plastic_indentation <= c.ey + 1e-14 * c.depth
@@ -221,7 +243,8 @@ impl History {
             && (0.0..=3600.0).contains(&s.elapsed)
             && s.solves <= 1_000_000
             && ((s.solves == 0 && *s == start) || (s.solves > 0 && s.elapsed > 0.0))
-            && (self.initial_x == 0.0
+            && (rebound
+                || self.initial_x == 0.0
                 || (s.indentation == self.initial_x
                     && s.velocity == 0.0
                     && s.plastic_indentation == 0.0))
@@ -247,6 +270,9 @@ impl History {
     pub(super) fn displacement(&self, h: f64) -> Result<f64, R> {
         let s = &self.summary;
         let c = MaterialCurve::new(&self.initial);
+        if self.revision() == 2 {
+            return self.signed_displacement(h);
+        }
         if self.initial_x > 0.0 {
             return Ok(0.0);
         }
@@ -274,6 +300,41 @@ impl History {
             Ok(dx)
         }
     }
+    fn signed_displacement(&self, h: f64) -> Result<f64, R> {
+        let s = &self.summary;
+        let c = MaterialCurve::new(&self.initial);
+        let residual = |dx: f64| {
+            let reaction = c
+                .segment(s.indentation, s.plastic_indentation, s.indentation + dx, h)
+                .mean;
+            2.0 * f64::from(self.mass) * (dx / h - s.velocity) / h - self.weight() + reaction
+        };
+        if residual(0.0) == 0.0 {
+            return Ok(0.0);
+        }
+        let (mut lo, mut hi) = (-c.depth, c.depth);
+        if !residual(lo).is_finite()
+            || !residual(hi).is_finite()
+            || residual(lo) >= 0.0
+            || residual(hi) <= 0.0
+        {
+            return Err(R::Numerical);
+        }
+        for _ in 0..64 {
+            let dx = 0.5 * (lo + hi);
+            if residual(dx) > 0.0 {
+                hi = dx;
+            } else {
+                lo = dx;
+            }
+        }
+        let dx = 0.5 * (lo + hi);
+        if dx.is_finite() {
+            Ok(dx)
+        } else {
+            Err(R::Numerical)
+        }
+    }
     pub(super) fn finish(
         &mut self,
         scene: &Scene,
@@ -281,16 +342,19 @@ impl History {
         v: f32,
         h: f32,
         at: f64,
-        owner: EpisodeId,
+        owner: Option<EpisodeId>,
     ) -> Result<DynamicCompressionInterval, R> {
         let old = self.summary.clone();
         let c = MaterialCurve::new(&self.initial);
         let dt = f64::from(h);
         let dx = x - old.indentation;
-        if !x.is_finite() || x > c.depth / 4.0 {
+        if !x.is_finite() || x.abs() > c.depth / 4.0 {
             return Err(R::Limit);
         }
-        if !v.is_finite() || v < 0.0 || dx < 0.0 || (self.initial_x == 0.0 && dx == 0.0) {
+        if !v.is_finite()
+            || (self.revision() == 1
+                && (v < 0.0 || dx < 0.0 || (self.initial_x == 0.0 && dx == 0.0)))
+        {
             return Err(R::Numerical);
         }
         let q = c.segment(old.indentation, old.plastic_indentation, x, dt);
@@ -367,7 +431,7 @@ impl History {
             load: CompressionLoad {
                 law: engine_material::LAW_VERSION,
                 material_id: region.material().identity(),
-                episode: Some(owner),
+                episode: owner,
                 sources: scene.plates.sources,
                 normal: Vec2::new(scene.plates.normal[0], scene.plates.normal[1]),
                 duration: h,
@@ -403,4 +467,50 @@ fn exact_time(a: f64, b: f64) -> Result<f64, R> {
     } else {
         Ok(sum)
     }
+}
+
+#[cfg(test)]
+pub(super) fn frozen_v15_history(h: &History) -> Vec<u8> {
+    let m = &h.initial;
+    let s = &h.summary;
+    let mut bytes = bincode::serialize(&(
+        (
+            m.parameters,
+            m.brittle,
+            m.volume,
+            m.remaining,
+            m.thickness,
+            m.depth,
+        ),
+        h.mass,
+        h.acceleration,
+        h.initial_x,
+    ))
+    .unwrap();
+    // Field order is independent of the current History/Summary serializers.
+    bytes.extend(
+        bincode::serialize(&(
+            (
+                s.indentation,
+                s.velocity,
+                s.plastic_indentation,
+                s.kinetic_energy,
+                s.elastic_energy,
+                s.gravity_work,
+                s.damage_work,
+                s.viscous_loss,
+                s.charge_error,
+                s.absolute_charge_error,
+                s.reaction_impulse,
+                s.integrated_velocity,
+            ),
+            s.errors,
+            s.absolute_errors,
+            s.scales,
+            s.elapsed,
+            s.solves,
+        ))
+        .unwrap(),
+    );
+    bytes
 }

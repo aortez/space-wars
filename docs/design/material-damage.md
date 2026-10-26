@@ -322,7 +322,10 @@ measured deformation and work for an ideal prescribed platen pressing a fixed
 material layer, including elastic return, permanent compression and compatible
 saved history. The [finite-mass dynamic support slice](material-dynamic-compression.md)
 adds monotone gravity-driven compression, momentum/work accounting and saved
-history. General impact/support handoff and connection loads remain future work.
+history. The [unloading/rebound extension](material-rebound.md) adds explicit
+elastic release, native separation/compliant recontact, permanent-set unloading
+and compatible saved lifecycles. General impact/support handoff and connection
+loads remain future work.
 
 ## Evidence
 

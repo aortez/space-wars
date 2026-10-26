@@ -8,13 +8,15 @@ charges and viscous loss. It builds on the
 [driven-compression layer](material-sustained-compression.md), with a different
 native motion solve and its own saved history.
 
-This first dynamic slice covers monotone compression from rest under constant
+The original v15 dynamic contract covers monotone compression from rest under constant
 overload, including deceleration toward viscous terminal speed. It also admits
 an exactly balanced elastic equilibrium. One Support episode persists through
-elastic compression and plastic flow. It does not yet accept a falling body,
-rebound, detachment, a moving support, multiple finite-material bodies or a
-handoff from another impact/gravity/driven history. Those transitions require
-separate qualification before they can share energy and episode ownership.
+elastic compression and plastic flow. The [v16 unloading and rebound extension](material-rebound.md) adds elastic
+release, separation, free flight and compliant recontact for independently
+enrolled preloaded/sub-yield scenes. Existing v15 histories keep the monotone
+contract described below. Initial falling bodies, moving supports, multiple
+finite-material bodies and handoff from another impact/gravity/driven history
+still require separate qualification before sharing energy and episode ownership.
 The existing rigid gravity operation continues to refuse overloaded support.
 
 ## Admitted scene and enrollment
