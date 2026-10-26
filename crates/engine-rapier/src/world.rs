@@ -62,6 +62,8 @@ const ORIENTED_STACK_GRAVITY_SNAPSHOT_VERSION: u32 = 13;
 const COMPRESSION_SNAPSHOT_VERSION: u32 = 14;
 const DYNAMIC_COMPRESSION_SNAPSHOT_VERSION: u32 = 15;
 const REBOUND_SNAPSHOT_VERSION: u32 = 16;
+const FALLING_SUPPORT_SNAPSHOT_VERSION: u32 = 17;
+const FALLING_SUPPORT_SNAPSHOT_TAG: u64 = 0x4641_4c4c_5355_5050;
 const REBOUND_SNAPSHOT_TAG: u64 = 0x5245_424f_554e_4432;
 const DYNAMIC_COMPRESSION_SNAPSHOT_TAG: u64 = 0x4459_4e43_4f4d_5052;
 const COMPRESSION_SNAPSHOT_TAG: u64 = 0x434f_4d50_5245_5353;
@@ -2352,6 +2354,7 @@ impl PhysicsWorld {
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
                 bincode::serialize_into(&mut bytes, dynamic)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
+                dynamic.serialize_incoming(&mut bytes)?;
             } else if let Some(compression) = &loading.compression {
                 bincode::serialize_into(&mut bytes, &loading.arrival_departures)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
@@ -2402,6 +2405,7 @@ impl PhysicsWorld {
             COMPRESSION_SNAPSHOT_VERSION,
             DYNAMIC_COMPRESSION_SNAPSHOT_VERSION,
             REBOUND_SNAPSHOT_VERSION,
+            FALLING_SUPPORT_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -2488,6 +2492,7 @@ impl PhysicsWorld {
         if [
             DYNAMIC_COMPRESSION_SNAPSHOT_VERSION,
             REBOUND_SNAPSHOT_VERSION,
+            FALLING_SUPPORT_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -2500,8 +2505,10 @@ impl PhysicsWorld {
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
             let expected_tag = if snapshot.version == DYNAMIC_COMPRESSION_SNAPSHOT_VERSION {
                 DYNAMIC_COMPRESSION_SNAPSHOT_TAG
-            } else {
+            } else if snapshot.version == REBOUND_SNAPSHOT_VERSION {
                 REBOUND_SNAPSHOT_TAG
+            } else {
+                FALLING_SUPPORT_SNAPSHOT_TAG
             };
             if tag != expected_tag {
                 return Err(PhysicsWorldError(
@@ -2512,6 +2519,13 @@ impl PhysicsWorld {
                 bincode::deserialize_from(&mut reader)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?,
             );
+            if snapshot.version == FALLING_SUPPORT_SNAPSHOT_VERSION {
+                state
+                    .dynamic_compression
+                    .as_mut()
+                    .unwrap()
+                    .deserialize_incoming(&mut reader)?;
+            }
             if state
                 .dynamic_compression
                 .as_ref()

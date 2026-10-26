@@ -324,8 +324,10 @@ saved history. The [finite-mass dynamic support slice](material-dynamic-compress
 adds monotone gravity-driven compression, momentum/work accounting and saved
 history. The [unloading/rebound extension](material-rebound.md) adds explicit
 elastic release, native separation/compliant recontact, permanent-set unloading
-and compatible saved lifecycles. General impact/support handoff and connection
-loads remain future work.
+and compatible saved lifecycles. The [falling-platen handoff](material-impact-support.md)
+adds incoming kinetic energy and same-owner Impact/Support continuation through
+one compliant work law. Transfer between older loading modes, general connection
+loads and broader geometry remain future work.
 
 ## Evidence
 

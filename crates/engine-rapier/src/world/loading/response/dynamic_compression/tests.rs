@@ -273,13 +273,13 @@ fn dynamic_limits_and_unsupported_enrollment_roll_back() {
         ),
         (
             |w| {
-                w.set_velocity(body(11), Vec2::X, 0.0, true);
+                w.set_velocity(body(11), -Vec2::X, 0.0, true);
             },
             R::UnsupportedScene,
         ),
         (
             |w| {
-                w.set_pose(body(11), Vec2::new(-0.01, 0.0), 0.0, true);
+                w.set_pose(body(11), Vec2::new(-0.3, 0.0), 0.0, true);
             },
             R::UnsupportedScene,
         ),
@@ -365,3 +365,5 @@ fn dynamic_limits_and_unsupported_enrollment_roll_back() {
 }
 
 mod rebound;
+
+mod falling;

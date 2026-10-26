@@ -7,7 +7,15 @@ pub(super) struct History {
     pub(super) mass: f32,
     pub(super) acceleration: f32,
     initial_x: f64,
+    // Written only in the tagged v17 extension; v15/v16 history bytes stay fixed.
+    #[serde(skip)]
+    pub(super) incoming: Option<IncomingMotion>,
     pub(super) summary: DynamicCompressionSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(super) struct IncomingMotion {
+    pub(super) velocity: f32,
 }
 
 pub(super) struct MaterialCurve {
@@ -84,10 +92,15 @@ impl History {
             mass: scene.mass,
             acceleration: scene.acceleration,
             initial_x: scene.plates.x,
+            incoming: (scene.plates.x < 0.0 || scene.plates.speed != 0.0).then_some(
+                IncomingMotion {
+                    velocity: scene.plates.speed,
+                },
+            ),
             summary: DynamicCompressionSummary::default(),
         };
         h.summary = h.initial_summary();
-        if scene.plates.speed != 0.0 || !h.valid() {
+        if !h.valid() {
             return Err(R::UnsupportedScene);
         }
         Ok(h)
@@ -95,6 +108,9 @@ impl History {
     // Enrollment selects the immutable physical contract. Old overload and exact
     // safe-equilibrium histories retain revision 1, including their v15 bytes.
     pub(super) fn revision(&self) -> u32 {
+        if self.incoming.is_some() {
+            return 3;
+        }
         let c = MaterialCurve::new(&self.initial);
         if (self.initial_x == 0.0 && self.weight() > c.y)
             || (self.initial_x > 0.0 && self.weight() == c.k * self.initial_x)
@@ -104,6 +120,11 @@ impl History {
             2
         }
     }
+    fn initial_velocity(&self) -> f64 {
+        self.incoming
+            .as_ref()
+            .map_or(0.0, |v| f64::from(v.velocity))
+    }
     fn weight(&self) -> f64 {
         f64::from(self.mass) * f64::from(self.acceleration)
     }
@@ -111,6 +132,11 @@ impl History {
         let c = MaterialCurve::new(&self.initial);
         DynamicCompressionSummary {
             indentation: self.initial_x,
+            velocity: self.initial_velocity(),
+            kinetic_energy: 0.5
+                * f64::from(self.mass)
+                * self.initial_velocity()
+                * self.initial_velocity(),
             elastic_energy: c.energy(self.initial_x, 0.0),
             scales: [
                 c.y * c.depth,
@@ -130,7 +156,9 @@ impl History {
         let s = &self.summary;
         let start = self.initial_summary();
         let weight = self.weight();
-        let rebound = self.revision() == 2;
+        let rebound = self.revision() >= 2;
+        let falling = self.incoming.is_some();
+        let v0 = self.initial_velocity();
         let near = |a: f64, b: f64, scale: f64| (a - b).abs() <= 1e-10 * scale;
         self.initial.region().is_ok()
             && self.initial.remaining > 0.0
@@ -146,14 +174,22 @@ impl History {
             && c.y > 0.0
             && c.ey > 0.0
             && c.ey < c.depth / 4.0
-            && ((self.initial_x == 0.0 && weight > c.y && weight <= 2.0 * c.y)
-                || (self.initial_x > 0.0
-                    && self.initial_x <= c.ey
-                    && weight == c.k * self.initial_x)
-                || (rebound
-                    && weight <= c.y
-                    && (0.0..=c.ey).contains(&self.initial_x)
-                    && (self.initial_x > 0.0 || weight > 0.0)))
+            && (if falling {
+                (-c.depth / 4.0..=0.0).contains(&self.initial_x)
+                    && (0.0..=64.0).contains(&v0)
+                    && weight <= 2.0 * c.y
+                    && ((self.initial_x < 0.0 && (v0 > 0.0 || weight > 0.0))
+                        || (self.initial_x == 0.0 && v0 > 0.0))
+            } else {
+                (self.initial_x == 0.0 && weight > c.y && weight <= 2.0 * c.y)
+                    || (self.initial_x > 0.0
+                        && self.initial_x <= c.ey
+                        && weight == c.k * self.initial_x)
+                    || (rebound
+                        && weight <= c.y
+                        && (0.0..=c.ey).contains(&self.initial_x)
+                        && (self.initial_x > 0.0 || weight > 0.0))
+            })
             && [
                 s.indentation,
                 s.velocity,
@@ -223,7 +259,7 @@ impl History {
                 })
             && near(
                 s.errors[0],
-                s.gravity_work + start.elastic_energy
+                s.gravity_work + start.elastic_energy + start.kinetic_energy
                     - s.kinetic_energy
                     - s.elastic_energy
                     - c.y * s.plastic_indentation
@@ -232,7 +268,7 @@ impl History {
             )
             && near(
                 s.errors[1],
-                weight * s.elapsed - s.reaction_impulse - f64::from(self.mass) * s.velocity,
+                weight * s.elapsed - s.reaction_impulse - f64::from(self.mass) * (s.velocity - v0),
                 s.scales[1],
             )
             && near(
@@ -270,7 +306,7 @@ impl History {
     pub(super) fn displacement(&self, h: f64) -> Result<f64, R> {
         let s = &self.summary;
         let c = MaterialCurve::new(&self.initial);
-        if self.revision() == 2 {
+        if self.revision() >= 2 {
             return self.signed_displacement(h);
         }
         if self.initial_x > 0.0 {
