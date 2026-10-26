@@ -37,10 +37,12 @@ This fixture does not separate after plastic flow. These are distinct qualified
 lifecycles, not a claim that every loaded history can be released arbitrarily.
 
 Changing gravity, applying an impulse, editing poses or switching steppers after
-enrollment still invalidates continuation permanently. Starting in free flight,
-importing an existing plastic preload, transferring a driven/impact/gravity
-history, moving supports and general angular/oblique contacts remain unsupported.
-A future impact/support handoff must carry attributable work and material state.
+enrollment still invalidates continuation permanently. The subsequent
+[falling-platen handoff](material-impact-support.md) adds independently enrolled
+incoming motion and same-owner Impact/Support observations under revision 3/v17.
+Existing v16 histories retain the contract below. Imported plastic preload,
+transfer from driven/rigid-impact/gravity histories, moving supports and general
+angular/oblique contacts remain unsupported.
 
 ## Signed work and native motion
 

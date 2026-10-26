@@ -134,7 +134,7 @@ fn rebound_versions_and_modes_cannot_relabel_or_renew_history() {
 fn rebound_corrupt_totals_and_owner_phase_refuse() {
     let changes: &[fn(&mut Continuation)] = &[
         |c| c.revision = 1,
-        |c| c.revision = 3,
+        |c| c.revision = 4,
         |c| c.history.summary.indentation = -0.3,
         |c| c.history.summary.velocity += 1e-12,
         |c| c.history.summary.plastic_indentation = -0.01,

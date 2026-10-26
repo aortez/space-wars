@@ -14,8 +14,9 @@ an exactly balanced elastic equilibrium. One Support episode persists through
 elastic compression and plastic flow. The [v16 unloading and rebound extension](material-rebound.md) adds elastic
 release, separation, free flight and compliant recontact for independently
 enrolled preloaded/sub-yield scenes. Existing v15 histories keep the monotone
-contract described below. Initial falling bodies, moving supports, multiple
-finite-material bodies and handoff from another impact/gravity/driven history
+contract described below. The [falling-platen handoff](material-impact-support.md) further adds incoming
+motion and same-owner Impact/Support observations in v17. Moving supports,
+multiple finite-material bodies and handoff from another impact/gravity/driven history
 still require separate qualification before sharing energy and episode ownership.
 The existing rigid gravity operation continues to refuse overloaded support.
 

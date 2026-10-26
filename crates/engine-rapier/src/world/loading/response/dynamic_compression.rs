@@ -69,6 +69,15 @@ enum Status {
     Invalidated(gravity::Invalidation),
     // Appended variant: preserve the v15 Active/Invalidated tags and layout.
     Rebound(Box<ReboundActive>),
+    Falling(Box<FallingActive>),
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct FallingActive {
+    scene: Scene,
+    owner: Option<EpisodeId>,
+    /// The first impact interval has committed; continuation must observe Support
+    /// with the same owner on the next interval, including after a save.
+    pending_support: bool,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct ReboundActive {
@@ -127,21 +136,53 @@ impl Continuation {
     pub(in crate::world) fn snapshot_version(&self) -> u32 {
         if self.revision == 1 {
             DYNAMIC_COMPRESSION_SNAPSHOT_VERSION
-        } else {
+        } else if self.revision == 2 {
             REBOUND_SNAPSHOT_VERSION
+        } else {
+            FALLING_SUPPORT_SNAPSHOT_VERSION
         }
     }
     pub(in crate::world) fn snapshot_tag(&self) -> u64 {
         if self.revision == 1 {
             DYNAMIC_COMPRESSION_SNAPSHOT_TAG
-        } else {
+        } else if self.revision == 2 {
             REBOUND_SNAPSHOT_TAG
+        } else {
+            FALLING_SUPPORT_SNAPSHOT_TAG
         }
+    }
+    pub(in crate::world) fn serialize_incoming(
+        &self,
+        bytes: &mut Vec<u8>,
+    ) -> Result<(), PhysicsWorldError> {
+        if self.revision == 3 {
+            let incoming = self
+                .history
+                .incoming
+                .as_ref()
+                .ok_or_else(|| PhysicsWorldError("missing falling initial motion".into()))?;
+            bincode::serialize_into(bytes, incoming)
+                .map_err(|e| PhysicsWorldError(e.to_string()))?;
+        }
+        Ok(())
+    }
+    pub(in crate::world) fn deserialize_incoming(
+        &mut self,
+        reader: &mut impl std::io::Read,
+    ) -> Result<(), PhysicsWorldError> {
+        self.history.incoming =
+            Some(bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?);
+        Ok(())
     }
     fn active(&self) -> Option<(&Scene, Option<EpisodeId>)> {
         match &self.status {
             Status::Active(a) if self.revision == 1 => Some((&a.scene, Some(a.owner))),
             Status::Rebound(a) if self.revision == 2 => Some((&a.scene, a.owner)),
+            Status::Falling(a)
+                if self.revision == 3 && (!a.pending_support || a.owner.is_some()) =>
+            {
+                Some((&a.scene, a.owner))
+            }
             _ => None,
         }
     }
@@ -185,23 +226,25 @@ impl PhysicsWorld {
     /// Uses the driven-compression rectangle/source/section/frame restrictions,
     /// with one dynamic, rotation-locked, nonsleeping body of refreshed mass
     /// `[5,80]` and gravity scale 1. The support alone has a material. Gravity is
-    /// constant along local +x (zero is also allowed for a preloaded release).
-    /// Enroll at rest: exactly touching with weight in (0,2Y], or elastically
-    /// preloaded at 0 < x <= Y/k with weight <= Y. Initial elastic energy is
-    /// explicit. Initial free flight and transfer from other histories refuse.
+    /// constant along local +x, including zero for release or incoming motion.
+    /// Resting touching/preloaded starts retain their v15/v16 contracts.
+    /// Revision 3 also admits -depth/4 <= x0 <= 0 with normal speed `[0,64]`
+    /// and weight <= 2Y. A detached start needs positive speed or gravity;
+    /// touching arrival needs positive speed. Initial kinetic energy/momentum
+    /// are retained explicitly. Imported histories and plastic preload refuse.
     ///
-    /// The v15 contract retains monotone overload and exact safe equilibrium.
-    /// Other admitted starts use the v16 rebound contract: signed material work,
-    /// unloading, free flight and compliant recontact. Permanent indentation and
-    /// fixed error budgets persist. Each contact episode has one Support owner;
-    /// actual drift across the deformed surface ends/restarts ownership. No
-    /// separate transient impact budget or rigid correction supplies energy.
+    /// Signed material work covers loading, unloading, separation and return.
+    /// Falling contact emits Impact, then Support with the same owner on the
+    /// next interval. Support observes continued contact; it does not imply rest.
+    /// All phases use one compliant work calculation, with no separate impact
+    /// charge. Actual drift across the deformed surface ends/restarts ownership;
+    /// permanent set, capacity and fixed numerical budgets persist.
     ///
     /// Positive dt <= 1/30; at most 1024 power-of-two subdivisions, bounded by
     /// elastic/viscous timescales. Actual intervals sum exactly to dt. Physical
     /// and numerical limits refuse atomically. Pause clears ephemeral output
     /// without enrollment. Public edits/other stepping permanently invalidate
-    /// retained history. Snapshot v16 preserves v1-v15 selection and layouts.
+    /// retained history. Snapshot v17 preserves v1-v16 selection and layouts.
     pub fn step_material_dynamic_compression(
         &mut self,
         dt: f32,

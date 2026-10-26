@@ -38,7 +38,9 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     };
     let (count, h) = history.subdivision(dt)?;
     let loading = world.loading.as_ref().unwrap();
-    if count + usize::from(saved.is_none()) > loading.config.max_records_per_step {
+    if count + usize::from(saved.is_none() && scene.plates.x >= 0.0)
+        > loading.config.max_records_per_step
+    {
         return Err(R::Limit);
     }
     let mut staged =
@@ -52,12 +54,36 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     pair.sort();
     let mut owner = if let Some(c) = saved {
         c.active().unwrap().1
+    } else if revision == 3 {
+        None
     } else {
-        Some(enter(loading, pair, 0.0, 0.0, &mut events)?)
+        Some(enter(
+            loading,
+            pair,
+            0.0,
+            0.0,
+            EpisodeTransition::Support,
+            &mut events,
+        )?)
     };
+    let mut pending_support =
+        saved.is_some_and(|c| matches!(&c.status, Status::Falling(a) if a.pending_support));
     let mut current = scene;
     let mut intervals = Vec::with_capacity(count);
     for i in 0..count {
+        let at = (i as f64) * f64::from(h);
+        if pending_support {
+            events.push(CompressionEvent {
+                at,
+                event: EpisodeEvent {
+                    id: owner.ok_or(R::Numerical)?,
+                    sources: pair,
+                    transition: EpisodeTransition::Support,
+                    closing_speed: current.plates.speed.max(0.0),
+                },
+            });
+            pending_support = false;
+        }
         let dx = history.displacement(f64::from(h))?;
         let middle = (dx / f64::from(h)) as f32;
         if !middle.is_finite() {
@@ -89,17 +115,26 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         // Ownership follows the actual monotone backend drift, not a predicted
         // endpoint or a raw contact manifold on the undeformed envelope.
         let old_p = history.summary.plastic_indentation;
-        let at = (i as f64) * f64::from(h);
         let crossing =
             || at + f64::from(h) * (old_p - current.plates.x) / (after.plates.x - current.plates.x);
         if owner.is_none() && after.plates.x >= old_p {
             owner = Some(enter(
                 staged.loading.as_mut().unwrap(),
                 pair,
-                crossing(),
+                if current.plates.x == old_p {
+                    at
+                } else {
+                    crossing()
+                },
                 middle.max(0.0),
+                if revision == 3 {
+                    EpisodeTransition::Impact
+                } else {
+                    EpisodeTransition::Support
+                },
                 &mut events,
             )?);
+            pending_support = revision == 3;
         }
         let interval = history.finish(&current, after.plates.x, next, h, at, owner)?;
         if after.plates.x < history.summary.plastic_indentation
@@ -115,6 +150,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
                 },
             });
             staged.loading.as_mut().unwrap().episodes.remove(&pair);
+            pending_support = false;
         }
         if count + events.len() > staged.loading.as_ref().unwrap().config.max_records_per_step {
             return Err(R::Limit);
@@ -146,6 +182,12 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
                 scene: current,
                 owner: owner.ok_or(R::Numerical)?,
             }))
+        } else if revision == 3 {
+            Status::Falling(Box::new(FallingActive {
+                scene: current,
+                owner,
+                pending_support,
+            }))
         } else {
             Status::Rebound(Box::new(ReboundActive {
                 scene: current,
@@ -169,6 +211,7 @@ fn enter(
     pair: [ContactSource; 2],
     at: f64,
     speed: f32,
+    transition: EpisodeTransition,
     events: &mut Vec<CompressionEvent>,
 ) -> Result<EpisodeId, R> {
     if loading.episodes.len() >= loading.config.max_episodes {
@@ -189,7 +232,7 @@ fn enter(
         event: EpisodeEvent {
             id,
             sources: pair,
-            transition: EpisodeTransition::Support,
+            transition,
             closing_speed: speed,
         },
     });
