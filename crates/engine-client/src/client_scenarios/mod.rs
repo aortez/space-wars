@@ -582,6 +582,7 @@ mod tests {
                 "clock",
                 "falling",
                 "garden-lab",
+                "material-lab",
                 "nes",
                 "pizza",
                 "rover-lab",
