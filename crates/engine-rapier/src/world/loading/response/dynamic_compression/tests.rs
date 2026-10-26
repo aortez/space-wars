@@ -264,7 +264,7 @@ fn dynamic_limits_and_unsupported_enrollment_roll_back() {
     let changes: &[(Change, R)] = &[
         (|w| w.raw.gravity = Vector::ZERO, R::UnsupportedScene),
         (
-            |w| w.raw.gravity = Vector::new(200.0, 0.0),
+            |w| w.raw.gravity = Vector::new(-200.0, 0.0),
             R::UnsupportedScene,
         ),
         (
@@ -363,3 +363,5 @@ fn dynamic_limits_and_unsupported_enrollment_roll_back() {
         rollback(&mut w, 1.0 / 30.0, *reason);
     }
 }
+
+mod rebound;

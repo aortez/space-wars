@@ -1,4 +1,4 @@
-//! One transaction, a persistent support owner, bounded midpoint/drift solves.
+//! Atomic midpoint/drift solves with contact ownership across unilateral motion.
 use super::*;
 struct CompliantPair;
 impl PhysicsHooks for CompliantPair {
@@ -21,7 +21,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         .loading
         .as_ref()
         .and_then(|l| l.dynamic_compression.as_ref());
-    if saved.is_some_and(|c| !matches!(c.status, Status::Active(_)) || !c.valid_for(world)) {
+    if saved.is_some_and(|c| c.active().is_none() || !c.valid_for(world)) {
         return Err(R::StaleContinuation);
     }
     let scene = Scene::read(world)?;
@@ -47,38 +47,13 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     let loading = staged.loading.as_mut().unwrap();
     loading.begin_step();
     let mut events = Vec::new();
-    let owner = if let Some(Continuation {
-        status: Status::Active(a),
-        ..
-    }) = saved
-    {
-        a.owner
+    let revision = history.revision();
+    let mut pair = scene.plates.sources;
+    pair.sort();
+    let mut owner = if let Some(c) = saved {
+        c.active().unwrap().1
     } else {
-        if loading.episodes.len() >= loading.config.max_episodes {
-            return Err(R::Limit);
-        }
-        let next = loading.next_episode.checked_add(1).ok_or(R::Limit)?;
-        let id = EpisodeId(loading.next_episode);
-        loading.next_episode = next;
-        let mut pair = scene.plates.sources;
-        pair.sort();
-        loading.episodes.insert(
-            pair,
-            Episode {
-                id,
-                absent_seconds: 0.0,
-            },
-        );
-        events.push(CompressionEvent {
-            at: 0.0,
-            event: EpisodeEvent {
-                id,
-                sources: pair,
-                transition: EpisodeTransition::Support,
-                closing_speed: 0.0,
-            },
-        });
-        id
+        Some(enter(loading, pair, 0.0, 0.0, &mut events)?)
     };
     let mut current = scene;
     let mut intervals = Vec::with_capacity(count);
@@ -98,7 +73,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         let mut expected = current.clone();
         expected.plates.x = after.plates.x;
         expected.plates.speed = middle;
-        if after != expected || (dx > 0.0 && after.plates.x <= current.plates.x) {
+        if after != expected || (revision == 1 && dx > 0.0 && after.plates.x <= current.plates.x) {
             return Err(R::Numerical);
         }
         let curve = MaterialCurve::new(&current.plates.material);
@@ -111,14 +86,39 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         let next = (f64::from(current.plates.speed)
             + f64::from(h) * (f64::from(current.acceleration) - q.mean / f64::from(current.mass)))
             as f32;
-        let interval = history.finish(
-            &current,
-            after.plates.x,
-            next,
-            h,
-            (i as f64) * f64::from(h),
-            owner,
-        )?;
+        // Ownership follows the actual monotone backend drift, not a predicted
+        // endpoint or a raw contact manifold on the undeformed envelope.
+        let old_p = history.summary.plastic_indentation;
+        let at = (i as f64) * f64::from(h);
+        let crossing =
+            || at + f64::from(h) * (old_p - current.plates.x) / (after.plates.x - current.plates.x);
+        if owner.is_none() && after.plates.x >= old_p {
+            owner = Some(enter(
+                staged.loading.as_mut().unwrap(),
+                pair,
+                crossing(),
+                middle.max(0.0),
+                &mut events,
+            )?);
+        }
+        let interval = history.finish(&current, after.plates.x, next, h, at, owner)?;
+        if after.plates.x < history.summary.plastic_indentation
+            && let Some(id) = owner.take()
+        {
+            events.push(CompressionEvent {
+                at: crossing(),
+                event: EpisodeEvent {
+                    id,
+                    sources: pair,
+                    transition: EpisodeTransition::End,
+                    closing_speed: 0.0,
+                },
+            });
+            staged.loading.as_mut().unwrap().episodes.remove(&pair);
+        }
+        if count + events.len() > staged.loading.as_ref().unwrap().config.max_records_per_step {
+            return Err(R::Limit);
+        }
         staged.raw.bodies[handle].set_linvel(normal * next, true);
         after.plates.speed = next;
         after.plates.material = history.current_material();
@@ -139,12 +139,19 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     }
     let summary = history.summary.clone();
     staged.loading.as_mut().unwrap().dynamic_compression = Some(Continuation {
-        revision: 1,
+        revision,
         history,
-        status: Status::Active(Box::new(Active {
-            scene: current,
-            owner,
-        })),
+        status: if revision == 1 {
+            Status::Active(Box::new(Active {
+                scene: current,
+                owner: owner.ok_or(R::Numerical)?,
+            }))
+        } else {
+            Status::Rebound(Box::new(ReboundActive {
+                scene: current,
+                owner,
+            }))
+        },
     });
     if !staged.loading.as_ref().unwrap().valid_for(&staged) {
         return Err(R::Numerical);
@@ -155,4 +162,36 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         intervals,
         summary: Some(summary),
     })
+}
+
+fn enter(
+    loading: &mut LoadingState,
+    pair: [ContactSource; 2],
+    at: f64,
+    speed: f32,
+    events: &mut Vec<CompressionEvent>,
+) -> Result<EpisodeId, R> {
+    if loading.episodes.len() >= loading.config.max_episodes {
+        return Err(R::Limit);
+    }
+    let next = loading.next_episode.checked_add(1).ok_or(R::Limit)?;
+    let id = EpisodeId(loading.next_episode);
+    loading.next_episode = next;
+    loading.episodes.insert(
+        pair,
+        Episode {
+            id,
+            absent_seconds: 0.0,
+        },
+    );
+    events.push(CompressionEvent {
+        at,
+        event: EpisodeEvent {
+            id,
+            sources: pair,
+            transition: EpisodeTransition::Support,
+            closing_speed: speed,
+        },
+    });
+    Ok(id)
 }
