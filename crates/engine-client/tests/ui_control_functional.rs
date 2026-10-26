@@ -28,6 +28,9 @@ const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 #[path = "ui_control_functional/launcher_catalog.rs"]
 mod launcher_catalog;
 
+#[path = "ui_control_functional/material_lab.rs"]
+mod material_lab;
+
 #[path = "ui_control_functional/garden_lab.rs"]
 mod garden_lab;
 

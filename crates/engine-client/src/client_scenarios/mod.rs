@@ -14,6 +14,7 @@ use crate::render::{FrameLayout, Viewport};
 mod clock;
 mod falling;
 mod garden_lab;
+mod material_lab;
 mod nes;
 mod null;
 mod pizza;
@@ -70,6 +71,7 @@ pub enum ScenarioAsset {
     None,
     NesRom(crate::nes_roms::NesRomAsset),
     PizzaLab(crate::pizza_lab::Config),
+    MaterialLab(std::path::PathBuf),
 }
 
 impl ScenarioStartMode {
@@ -470,6 +472,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     clock::REGISTRATION,
     falling::REGISTRATION,
     garden_lab::REGISTRATION,
+    material_lab::REGISTRATION,
     nes::REGISTRATION,
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,

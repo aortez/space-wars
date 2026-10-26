@@ -95,6 +95,9 @@ The local launcher includes the following scenarios and presets:
 - **Garden Lab** — a reproducible grass lifecycle testbed with underground
   inspection, shade, light/resource controls, cutting and bounded playback.
   See [Garden Lab](docs/garden-lab.md).
+- **Material Lab** — a falling-platen sandbox for impact, material yielding,
+  support and rebound, with slow playback, pause, single step and save/load.
+  Enable **Show all scenarios** in the launcher. See [Material Lab](docs/design/material-lab.md).
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 - **Spaceling Lab** — a single-body character walking and jumping on a rotating
@@ -197,6 +200,7 @@ Or start a scenario directly:
 ```sh
 cargo run -p engine-client -- --scenario pizza
 cargo run -p engine-client -- --scenario clock
+cargo run -p engine-client -- --scenario material-lab
 cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spaceling-lab
 cargo run -p engine-client -- --scenario surface-sortie

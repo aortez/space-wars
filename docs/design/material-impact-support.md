@@ -151,3 +151,9 @@ changing applied forces while retaining attributable work, multiple finite
 material bodies, moving/oblique/angular contact geometry, connection loads and
 #328 failure consequences. This completes the first bounded falling-platen
 handoff, not all of #327.
+
+## Application demonstration
+
+The [Material Lab](material-lab.md) hosts four bounded falling-platen cases with
+slow playback, pause, single step and a persistent save slot. It uses this native
+path without changing its physical or numerical restrictions.
