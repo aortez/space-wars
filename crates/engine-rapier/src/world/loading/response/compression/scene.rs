@@ -3,27 +3,39 @@ use super::*;
 use rapier2d::prelude::ActiveCollisionTypes;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(super) struct Scene {
-    pub(super) bodies: [BodyId; 2],
-    pub(super) sources: [ContactSource; 2],
+pub(in crate::world::loading::response) struct Scene {
+    pub(in crate::world::loading::response) bodies: [BodyId; 2],
+    pub(in crate::world::loading::response) sources: [ContactSource; 2],
     colliders: [Vec<ColliderId>; 2],
     slices: [usize; 2],
     copies: [usize; 2],
-    pub(super) normal: [f32; 2],
+    pub(in crate::world::loading::response) normal: [f32; 2],
     origin: [f32; 2],
-    pub(super) x: f64,
-    pub(super) speed: f32,
-    pub(super) material: StoredRegion,
+    pub(in crate::world::loading::response) x: f64,
+    pub(in crate::world::loading::response) speed: f32,
+    pub(in crate::world::loading::response) material: StoredRegion,
     capture: CaptureConfig,
     integration: IntegrationParameters,
 }
 impl Scene {
-    pub(super) fn read(world: &PhysicsWorld) -> Result<Self, R> {
+    pub(in crate::world::loading::response) fn read(world: &PhysicsWorld) -> Result<Self, R> {
+        Self::read_mode(world, false)
+    }
+
+    pub(in crate::world::loading::response) fn read_dynamic(
+        world: &PhysicsWorld,
+    ) -> Result<Self, R> {
+        Self::read_mode(world, true)
+    }
+
+    fn read_mode(world: &PhysicsWorld, dynamic: bool) -> Result<Self, R> {
         let loading = world.loading.as_ref().ok_or(R::ResponseDisabled)?;
         let response = loading.response.as_ref().ok_or(R::ResponseDisabled)?;
         if world.raw.bodies.len() != 2
             || world.raw.colliders.len() > 16
-            || world.raw.gravity != Vector::ZERO
+            || (!dynamic && world.raw.gravity != Vector::ZERO)
+            || (!dynamic && loading.dynamic_compression.is_some())
+            || (dynamic && loading.compression.is_some())
             || !world.raw.impulse_joints.is_empty()
             || world.raw.multibody_joints.iter().next().is_some()
             || loading.regions.len() != 2
@@ -39,7 +51,14 @@ impl Scene {
             .raw
             .bodies
             .iter()
-            .find(|(_, b)| b.body_type() == RigidBodyType::KinematicVelocityBased)
+            .find(|(_, b)| {
+                b.body_type()
+                    == if dynamic {
+                        RigidBodyType::Dynamic
+                    } else {
+                        RigidBodyType::KinematicVelocityBased
+                    }
+            })
             .map(|(h, _)| h)
             .ok_or(R::UnsupportedScene)?;
         let fixed = world
@@ -96,6 +115,12 @@ impl Scene {
                 || b.dominance_group() != 0
                 || b.locked_axes().intersects(LockedAxes::TRANSLATION_LOCKED)
                 || b.additional_solver_iterations() != 0
+                || (b.is_dynamic()
+                    && (b.is_sleeping()
+                        || !b.locked_axes().contains(LockedAxes::ROTATION_LOCKED)
+                        || b.gravity_scale() != 1.0
+                        || b.activation().normalized_linear_threshold >= 0.0
+                        || b.activation().angular_threshold >= 0.0))
                 || !(1..=8).contains(&b.colliders().len())
                 || -n.y * b.linvel().x + n.x * b.linvel().y != 0.0
                 || (role == 1 && b.linvel() != Vector::ZERO)
@@ -190,4 +215,31 @@ impl Scene {
             integration,
         })
     }
+}
+
+#[cfg(test)]
+pub(super) fn frozen_v14_scene(s: &Scene) -> Vec<u8> {
+    let m = &s.material;
+    bincode::serialize(&(
+        s.bodies,
+        s.sources,
+        &s.colliders,
+        s.slices,
+        s.copies,
+        s.normal,
+        s.origin,
+        s.x,
+        s.speed,
+        (
+            m.parameters,
+            m.brittle,
+            m.volume,
+            m.remaining,
+            m.thickness,
+            m.depth,
+        ),
+        s.capture,
+        s.integration,
+    ))
+    .unwrap()
 }

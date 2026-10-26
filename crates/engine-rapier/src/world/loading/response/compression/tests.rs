@@ -394,3 +394,71 @@ fn compression_depth_and_thickness_scale_the_physical_curve() {
     assert!((again.damage_work - f64::from(pure.consumed[0])).abs() < 1e-5);
     assert!((again.impulse - 12187.5 * 0.5).abs() < 1e-9);
 }
+
+#[test]
+fn dynamic_extension_preserves_frozen_v14_history_and_scene_bytes() {
+    for phase in 0..3 {
+        for reason in [
+            None,
+            Some(gravity::Invalidation::ExternalEdit),
+            Some(gravity::Invalidation::OtherStep),
+        ] {
+            let mut w = world();
+            w.step_material_compression(if phase == 0 { 0.01 } else { 1.0 }, 0.0625)
+                .unwrap();
+            if phase == 2 {
+                w.step_material_compression(1.0, -0.0625).unwrap();
+            }
+            if let Some(reason) = reason {
+                w.loading.as_mut().unwrap().invalidate_gravity(reason);
+            }
+            let c = w.loading.as_ref().unwrap().compression.as_ref().unwrap();
+            let mut frozen = bincode::serialize(&c.revision).unwrap();
+            frozen.extend(model::frozen_v14_history(&c.history));
+            match &c.status {
+                Status::Active(a) => {
+                    bincode::serialize_into(&mut frozen, &0_u32).unwrap();
+                    frozen.extend(scene::frozen_v14_scene(&a.scene));
+                    bincode::serialize_into(&mut frozen, &a.owner).unwrap();
+                }
+                Status::Invalidated(reason) => {
+                    bincode::serialize_into(&mut frozen, &1_u32).unwrap();
+                    bincode::serialize_into(
+                        &mut frozen,
+                        &match reason {
+                            gravity::Invalidation::ExternalEdit => 0_u32,
+                            gravity::Invalidation::OtherStep => 1,
+                        },
+                    )
+                    .unwrap();
+                }
+            }
+            assert_eq!(bincode::serialize(c).unwrap(), frozen);
+            let bytes = w.snapshot_bytes().unwrap();
+            assert_eq!(&bytes[..4], &14_u32.to_le_bytes());
+            assert!(bytes.ends_with(&frozen));
+            assert_eq!(
+                PhysicsWorld::from_snapshot_bytes(&bytes)
+                    .unwrap()
+                    .snapshot_bytes()
+                    .unwrap(),
+                bytes
+            );
+            let mut wrong = bytes.clone();
+            wrong[..4].copy_from_slice(&15_u32.to_le_bytes());
+            assert!(PhysicsWorld::from_snapshot_bytes(&wrong).is_err());
+            if reason.is_none() {
+                let mut restored = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+                let command = if phase == 2 { 0.01 } else { 0.0 };
+                assert_eq!(
+                    w.step_material_compression(0.01, command).unwrap(),
+                    restored.step_material_compression(0.01, command).unwrap()
+                );
+                assert_eq!(
+                    w.snapshot_bytes().unwrap(),
+                    restored.snapshot_bytes().unwrap()
+                );
+            }
+        }
+    }
+}

@@ -320,8 +320,9 @@ to use their existing paths.
 The [driven sustained-compression slice](material-sustained-compression.md) adds
 measured deformation and work for an ideal prescribed platen pressing a fixed
 material layer, including elastic return, permanent compression and compatible
-saved history. Dynamic overloaded supports and connection loads remain future
-work.
+saved history. The [finite-mass dynamic support slice](material-dynamic-compression.md)
+adds monotone gravity-driven compression, momentum/work accounting and saved
+history. General impact/support handoff and connection loads remain future work.
 
 ## Evidence
 
