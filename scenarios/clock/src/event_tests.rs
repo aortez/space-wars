@@ -430,3 +430,211 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         );
     }
 }
+
+/// An even layer is a ground height, not an obstacle. A raised patch forced the
+/// runner to jump beside a doorway, where the opened flap - an awning reaching
+/// `radius*4.25` inward from its top hinge - struck it back down onto the dirt
+/// until the visit timed out. These aspects and seeds all failed that way.
+///
+/// The layer is inset into the support that already holds actors up, so it must
+/// never become what a runner stands on, and the runner must leave through its
+/// own doorway with the layer delivered.
+#[test]
+fn clock_grass_contract_floor_layer_is_inset_and_never_supports_a_runner() {
+    for (aspect, seeds) in [
+        (1.0f32, [0u64, 3, 14]),
+        (4.0 / 3.0, [3, 13, 25]),
+        (2.0, [0, 8, 25]),
+    ] {
+        let layout = Layout::new(aspect);
+        for seed in seeds {
+            let mut s = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: aspect,
+                    event_profile: ClockEventProfile::Off,
+                    ..Default::default()
+                },
+                seed,
+            );
+            ClockScenario::step(
+                &mut s,
+                &[
+                    ClockAction::set_reading(ClockReading::new(23, 58, 0).unwrap()),
+                    ClockAction::trigger_event(ClockEventKind::Grass),
+                ],
+                Duration::ZERO,
+            );
+            // The opening takes five seconds, then delivers its material.
+            ticks(&mut s, 6 * 60);
+            let soil = s.soil().expect("delivered layer");
+            assert_eq!(
+                s.grass_state().soil_retained,
+                soil.terrain().width() as usize * crate::grass::SOIL_DEPTH_CELLS,
+                "aspect={aspect}: the layer covers every supported column"
+            );
+            for quad in soil.quads() {
+                assert!(
+                    quad[2].y <= layout.floor_y + 0.01,
+                    "aspect={aspect}: material stays inside the floor"
+                );
+            }
+            let mut waited = 0;
+            while !s.can_trigger_event() && waited < 2000 {
+                ticks(&mut s, 1);
+                waited += 1;
+            }
+            ClockScenario::step(
+                &mut s,
+                &[ClockAction::trigger_event(ClockEventKind::Duck)],
+                Duration::ZERO,
+            );
+            let mut outcome = None;
+            let mut soil_only_ticks = 0;
+            for _ in 0..crate::events::duck::DUCK_TICKS + 200 {
+                ticks(&mut s, 1);
+                if let Some(duck) = s.duck_scene()
+                    && let Some(world) = duck.existing_world()
+                {
+                    let mut ground = world
+                        .surface_contacts(crate::events::duck::DUCK_COLLIDER)
+                        .filter(|c| {
+                            c.normal.y > 0.7 && c.separation <= duck.radius * 0.05
+                        })
+                        .map(|c| c.collider.entity.value())
+                        .peekable();
+                    if ground.peek().is_some()
+                        && ground.all(|id| id == crate::grass::SOIL_PHYSICS_ID)
+                    {
+                        soil_only_ticks += 1;
+                    }
+                }
+                if let Some(o) = s.duck_state().and_then(|d| d.outcome) {
+                    outcome = Some(o);
+                    break;
+                }
+                if s.duck_visit.is_none() {
+                    break;
+                }
+            }
+            assert_eq!(
+                soil_only_ticks, 0,
+                "aspect={aspect} seed={seed}: the inset layer became the runner's support"
+            );
+            assert_eq!(
+                outcome,
+                Some(engine_common::ClockDuckOutcome::Exited),
+                "aspect={aspect} seed={seed}: the runner left through its doorway"
+            );
+        }
+    }
+}
+
+
+/// A ceiling breaks in one to several places, randomised per opening sequence.
+/// Openings stay in the corridors beside the clock face: material covers the
+/// whole floor, but a vertical beam through whichever segments form the current
+/// hour does not sustain a patch, so an opening under the face grows nothing.
+/// Each opening carries its own seeded patch, bounded to its own lit columns.
+#[test]
+fn clock_grass_contract_randomised_openings_each_grow_their_own_patch() {
+    use crate::ceiling::{CORRIDORS, Ceiling, MAX_OPENINGS};
+    let mut counts = std::collections::BTreeSet::new();
+    for aspect in [0.25f32, 0.6, 4.0 / 3.0, 800.0 / 480.0, 4.0] {
+        let layout = Layout::new(aspect);
+        let corridors = Ceiling::corridors(layout);
+        for &(start, end) in &corridors {
+            assert!(start < end, "aspect={aspect}: every corridor is real floor");
+        }
+        for seed in 0..12u64 {
+            let mut ceiling = Ceiling::default();
+            assert!(ceiling.start(seed));
+            ceiling.advance(crate::ceiling::OPENING_DURATION);
+            let openings = ceiling.sources(layout);
+            assert!(!openings.is_empty() && openings.len() <= MAX_OPENINGS);
+            counts.insert(openings.len());
+            for pair in openings.windows(2) {
+                assert!(
+                    pair[0].right < pair[1].left,
+                    "aspect={aspect} seed={seed}: openings stay disjoint and ordered"
+                );
+            }
+            for opening in &openings {
+                assert!(opening.left < opening.right);
+                assert!(
+                    corridors.iter().any(|&(start, end)| {
+                        opening.left >= start - 0.01 && opening.right <= end + 0.01
+                    }),
+                    "aspect={aspect} seed={seed}: an opening left its corridor"
+                );
+                // Beside the 6x9 font, never under it.
+                assert!(
+                    opening.right <= layout.face_origin.x + 0.01
+                        || opening.left >= -layout.face_origin.x - 0.01
+                    );
+            }
+            // Identities are unique, so one publication accepts them all.
+            let ids: std::collections::BTreeSet<_> =
+                openings.iter().map(|a| (a.id.0, a.id.1)).collect();
+            assert_eq!(ids.len(), openings.len());
+            // The same sequence redraws the same holes after a resize.
+            let resized = ceiling.sources(Layout::new(aspect * 1.1));
+            assert_eq!(resized.len(), openings.len());
+        }
+    }
+    assert!(
+        counts.len() > 1 && counts.contains(&1),
+        "the count varies and a single opening remains possible: {counts:?}"
+    );
+
+    // Each opening's patch establishes, and no tissue grows outside a lit
+    // column. Several openings mean several organisms, within the resident cap.
+    for seed in [1u64, 2, 4242] {
+        let mut s = ClockScenario::init(
+            ClockConfig {
+                aspect_ratio: 800.0 / 480.0,
+                event_profile: ClockEventProfile::Off,
+                ..Default::default()
+            },
+            seed,
+        );
+        ClockScenario::step(
+            &mut s,
+            &[
+                ClockAction::set_reading(ClockReading::new(0, 34, 0).unwrap()),
+                ClockAction::trigger_event(ClockEventKind::Grass),
+            ],
+            Duration::ZERO,
+        );
+        ticks(&mut s, 180 * 60);
+        let layout = Layout::new(s.aspect_ratio());
+        let openings = s.ceiling.sources(layout);
+        let g = s.grass_state();
+        assert_eq!(g.seeded, crate::grass::SEED_BATCH, "seed={seed}");
+        assert!(
+            g.development.iter().all(|v| *v > 0),
+            "seed={seed}: every opening's patch is paid for: {g:?}"
+        );
+        // Each seed is its own patch, so the resident budget bounds the count
+        // rather than the opening count.
+        assert!(
+            !g.organisms.is_empty()
+                && g.organisms.len() <= crate::grass::residents::MAX_PLANT_ORGANISMS,
+            "seed={seed}: patches stay inside the resident budget: {:?}",
+            g.organisms
+        );
+        let soil = s.soil().unwrap();
+        let lit: Vec<_> = openings
+            .iter()
+            .filter_map(|a| soil.columns_within(a.left, a.right))
+            .collect();
+        for tissue in &s.plants().plants.observe().tissues {
+            assert!(
+                lit.iter()
+                    .any(|&(low, high)| (low..=high).contains(&tissue.cell[0])),
+                "seed={seed}: tissue at column {} grew outside every lit opening",
+                tissue.cell[0]
+            );
+        }
+        assert!(openings.len() <= CORRIDORS * MAX_OPENINGS);
+    }
+}

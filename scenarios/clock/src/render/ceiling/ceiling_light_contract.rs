@@ -35,7 +35,7 @@ fn fresh_light(s: &ClockState, receivers: &[Receiver]) -> Vec<engine_core::light
         .query_light(
             s.simulation_tick(),
             50,
-            s.ceiling.source(Layout::new(s.aspect_ratio())),
+            &s.ceiling.sources(Layout::new(s.aspect_ratio())),
             receivers,
         )
         .unwrap()
@@ -137,7 +137,7 @@ fn ceiling_light_contract_duck_motion_beam_matches_current_exposure() {
         }
         previous = step;
         let layout = Layout::new(s.aspect_ratio());
-        let source = s.ceiling.source(layout).unwrap();
+        let source = s.ceiling.sources(layout)[0];
         let frame = ClockScenario::render_frame(&s);
         let beam = sunlight(&frame);
         assert!(!beam.is_empty(), "no silent refusal at moving pose {step}");
@@ -250,7 +250,7 @@ fn ceiling_light_contract_slopes_subpixel_blockers_crossings_and_refusal() {
                 geometry: None,
                 transparent: &[],
             }
-            .query_light(0, 0, Some(source), &receivers)
+            .query_light(0, 0, std::slice::from_ref(&source), &receivers)
             .unwrap();
             for (&p, e) in chunk.iter().zip(samples) {
                 let drawn = beam.iter().any(|q| contains(q, p));
@@ -385,7 +385,7 @@ fn ceiling_light_contract_canonical_silhouettes_block_without_aabb_shadows() {
                     geometry: Some(&snapshot),
                     transparent: &[],
                 }
-                .query_light(0, 0, Some(source), &receivers)
+                .query_light(0, 0, std::slice::from_ref(&source), &receivers)
                 .unwrap();
                 for (&p, e) in chunk.iter().zip(samples) {
                     let lit = contains(&beam::outline(&beam), p);
@@ -505,7 +505,7 @@ fn ceiling_light_contract_source_plane_containment_keeps_local_endpoint_rules() 
         geometry: None,
         transparent: &[],
     }
-    .query_light(0, 0, Some(source), &receivers)
+    .query_light(0, 0, std::slice::from_ref(&source), &receivers)
     .unwrap();
     assert_eq!(
         samples[0].local, 0.0,

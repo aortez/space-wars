@@ -117,15 +117,18 @@ impl DuckEvent {
                                 .surfaces
                                 .iter()
                                 .position(|s| {
+                                    // The layer is inset, so retained material
+                                    // fills the surface's own top rows: its top
+                                    // is the surface line, never above it.
                                     s.start <= a.min(b) + 0.01
                                         && a.max(b) <= s.end + 0.01
-                                        && min.y >= self.layout.floor_y + s.height - 0.01
-                                        && max.y
-                                            <= self.layout.floor_y
+                                        && min.y
+                                            >= self.layout.floor_y
                                                 + s.height
-                                                + crate::grass::SOIL_CELL_SIZE
+                                                - crate::grass::SOIL_CELL_SIZE
                                                     * crate::grass::SOIL_DEPTH_CELLS as f32
-                                                + 0.01
+                                                - 0.01
+                                        && max.y <= self.layout.floor_y + s.height + 0.01
                                 })
                                 .map(|owner| (owner, min, max, a.min(b), a.max(b)))
                         })
@@ -333,17 +336,19 @@ mod soil_tests {
             assert!(!duck.soil_supports.is_empty());
             let course = duck.course.as_ref().unwrap();
             let navigation = duck.soil_course.as_ref().unwrap();
+            // An inset layer fills each surface's own top rows, so retained
+            // material never changes the height the planner navigates, and the
+            // runner meets no step where the material begins or ends.
             for (index, surface) in navigation.surfaces.iter().enumerate() {
                 let original = course.surfaces[duck.soil_navigation_owners[index]];
-                let retained = duck.soil_supports.iter().any(|(i, _, _)| *i == index);
-                assert_eq!(surface.height > original.height, retained);
+                assert_eq!(surface.height, original.height);
                 assert!(surface.start >= original.start && surface.end <= original.end);
             }
             assert!(
-                navigation.surfaces.iter().enumerate().any(
-                    |(i, s)| s.height == course.surfaces[duck.soil_navigation_owners[i]].height
-                ),
-                "bare ground retains its own real height"
+                duck.soil_supports.iter().all(|(index, _, max)| {
+                    (max.y - (layout.floor_y + navigation.surfaces[*index].height)).abs() < 0.01
+                }),
+                "mapped material tops out on its own surface line"
             );
             // Settle onto actual dirt through the canonical solver.
             let (index, min, max) = duck.soil_supports[0];
@@ -362,11 +367,13 @@ mod soil_tests {
 
             // Actual support loss must clear mapping even while dirt is retained
             // and falling. Restoring a floor cannot reattach detached columns.
+            // The runner keeps the real floor support it was already standing
+            // on, which never depended on the inset material.
             soil.revalidate(Some(&[]), true);
             soil.advance_loss(std::time::Duration::from_millis(250));
             duck.synchronize_soil(Some(&mut soil));
             assert!(duck.soil_supports.is_empty());
-            assert_eq!(duck.supported_surface(), None);
+            assert_eq!(duck.supported_surface(), Some(index));
             duck.synchronize_soil(None);
             assert!(duck.soil_course.is_none());
         }

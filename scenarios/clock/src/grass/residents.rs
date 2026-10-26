@@ -36,11 +36,25 @@ impl PlantPlayback {
 
 pub struct ClockPlants {
     pub plants: Plants,
-    pub grass: Option<Grass>,
+    /// One policy per planted patch. A policy bounds spread to its own origin
+    /// and radius while planning for every tissue on the shared soil support,
+    /// so a single retained policy would refuse all growth in a second lit
+    /// patch and leave its seed to starve.
+    pub(crate) policies: Vec<Grass>,
     pub playback: PlantPlayback,
     /// Real incident source intensity; the ordinary room stays dim.
     pub intensity: u16,
-    pub(crate) aperture: Option<lighting::ApertureSource>,
+    pub(crate) apertures: Vec<lighting::ApertureSource>,
+    /// Inclusive soil column ranges the openings have lit during this growth,
+    /// one per opening. Material now covers the whole floor, so this is what
+    /// bounds an organism instead: a runner may not reach soil the light has
+    /// never touched, where its own maintenance would consume the colony's
+    /// energy intake. `None` leaves growth unbounded for fixtures and lab modes
+    /// that run without an opening.
+    pub(crate) lit_columns: Option<Vec<(i32, i32)>>,
+    /// A fixture that supplies its own full-sun habitat is not aperture-gated,
+    /// so its establishment timing stays a controlled reference.
+    pub(crate) light_bounded: bool,
     pub availability: [u16; 2],
     pub exposure: BTreeMap<u64, Exposure>,
     pub admitted_at: BTreeMap<u64, u64>,
@@ -56,9 +70,11 @@ impl ClockPlants {
         config.max_organisms = MAX_PLANT_ORGANISMS;
         Self {
             plants: Plants::new(config, seed).unwrap(),
-            grass: None,
+            policies: Vec::new(),
             playback: PlantPlayback::Normal,
-            aperture: None,
+            apertures: Vec::new(),
+            lit_columns: None,
+            light_bounded: true,
             intensity: engine_rapier::plant_light::DIM_ROOM as u16,
             availability: [1000; 2],
             exposure: BTreeMap::new(),
@@ -77,7 +93,9 @@ impl ClockPlants {
         soil: &SoilHabitat,
         column: i32,
     ) -> Result<u64, plants::Rejection> {
-        let env = HostEnvironment::new(soil, self.availability, BTreeMap::new());
+        // A seed's placement is chosen against the live opening by the host.
+        // The lit window bounds later spread, never the deliberate planting.
+        let env = HostEnvironment::new(soil, self.availability, BTreeMap::new(), None);
         let grass = Grass::new(
             Traits {
                 max_tissues: MAX_PLANT_TISSUES,
@@ -93,11 +111,16 @@ impl ClockPlants {
         let observation = self.plants.observe();
         let tissue = observation.tissues.iter().find(|t| t.id == id).unwrap();
         self.admitted_at.insert(tissue.organism, observation.tick);
-        self.grass.get_or_insert(grass);
+        self.policies.push(grass);
         Ok(id)
     }
     pub(crate) fn revalidate(&mut self, soil: &SoilHabitat) {
-        let env = HostEnvironment::new(soil, self.availability, BTreeMap::new());
+        let env = HostEnvironment::new(
+            soil,
+            self.availability,
+            BTreeMap::new(),
+            self.lit_columns.as_deref(),
+        );
         engine_rapier::grass::detach_invalid(&mut self.plants, &env)
             .expect("bounded material attachment loss");
         let before = self.plants.observe();
@@ -121,7 +144,7 @@ impl ClockPlants {
         self.admitted_at
             .retain(|id, _| current.tissues.iter().any(|t| t.organism == *id));
         if current.tissues.is_empty() {
-            self.grass = None;
+            self.policies.clear();
         }
     }
     /// Lightweight crushing affects exposed tissue, using current canonical
@@ -212,6 +235,30 @@ impl ClockPlants {
         if optical_overflow {
             footprints.clear();
         }
+        if self.plants.observe().tissues.is_empty() {
+            self.lit_columns = None;
+        }
+        if self.light_bounded && !self.apertures.is_empty() {
+            // One range per opening, widened as a closing edge never strands
+            // tissue it already lit. Openings are disjoint, so are the ranges.
+            let windows = self.lit_columns.take();
+            self.lit_columns = Some(
+                self.apertures
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, a)| {
+                        let full = soil.columns_within(a.left, a.right);
+                        match (windows.as_ref().and_then(|w| w.get(i)), full) {
+                            (Some(&(l, h)), Some((low, high))) => {
+                                Some((l.min(low), h.max(high)))
+                            }
+                            (Some(&kept), None) => Some(kept),
+                            (None, full) => full,
+                        }
+                    })
+                    .collect(),
+            );
+        }
         for _ in 0..MAX_BIOLOGY_STEPS_PER_UPDATE {
             if self.pending_ns < 1_000_000_000 {
                 break;
@@ -252,12 +299,7 @@ impl ClockPlants {
                     geometry,
                     transparent,
                 }
-                .query_light(
-                    before.tick,
-                    self.intensity,
-                    self.aperture,
-                    &receivers,
-                )
+                .query_light(before.tick, self.intensity, &self.apertures, &receivers)
             };
             // A refused optical publication grants no light. Physiology still
             // charges maintenance and shortage/dieback, rather than freezing.
@@ -269,17 +311,20 @@ impl ClockPlants {
                 .zip(samples.unwrap_or_default())
                 .map(|(id, e)| (id, e.intensity.floor() as u16))
                 .collect();
-            let env = HostEnvironment::new(soil, self.availability, light);
+            let env =
+                HostEnvironment::new(soil, self.availability, light, self.lit_columns.as_deref());
             self.exposure = before
                 .tissues
                 .iter()
                 .map(|t| (t.id, env.exposure(t)))
                 .collect();
-            let mut intents = self
-                .grass
-                .as_ref()
-                .map(|g| g.plan(&before, &env).intents)
-                .unwrap_or_default();
+            // Each patch plans inside its own radius. Their origins are
+            // corridors apart, so no two policies can propose the same cell.
+            let mut intents: Vec<_> = self
+                .policies
+                .iter()
+                .flat_map(|g| g.plan(&before, &env).intents)
+                .collect();
             intents.retain(|intent| match intent {
                 plants::Intent::Grow { parent, cell, .. } => before
                     .tissues
@@ -353,7 +398,7 @@ impl OpticalScene<'_> {
         &self,
         tick: u64,
         intensity: u16,
-        aperture: Option<lighting::ApertureSource>,
+        apertures: &[lighting::ApertureSource],
         receivers: &[Receiver],
     ) -> Result<Vec<lighting::Exposure>, lighting::LightingError> {
         if self.polygons.len() + self.footprints.len() > engine_rapier::world::MAX_LIGHT_FOOTPRINTS
@@ -364,8 +409,8 @@ impl OpticalScene<'_> {
         let mut source = engine_rapier::plant_light::full_sun(Vec2::Y);
         source.strength = f32::from(intensity.min(1000));
         let mut snapshot = lighting::LightingSnapshot::new(tick, tick, source, &[])?;
-        if let Some(aperture) = aperture {
-            snapshot = snapshot.with_aperture(aperture)?;
+        for aperture in apertures {
+            snapshot = snapshot.with_aperture(*aperture)?;
         }
         let material = StaticVisibility {
             footprints: self.footprints,
@@ -398,11 +443,18 @@ struct HostEnvironment<'a> {
     soil: &'a SoilHabitat,
     roots: MaterialUptake<'a>,
     light: BTreeMap<u64, u16>,
+    lit_columns: Option<&'a [(i32, i32)]>,
 }
 impl<'a> HostEnvironment<'a> {
-    fn new(soil: &'a SoilHabitat, availability: [u16; 2], light: BTreeMap<u64, u16>) -> Self {
+    fn new(
+        soil: &'a SoilHabitat,
+        availability: [u16; 2],
+        light: BTreeMap<u64, u16>,
+        lit_columns: Option<&'a [(i32, i32)]>,
+    ) -> Self {
         Self {
             soil,
+            lit_columns,
             roots: MaterialUptake {
                 terrain: soil.terrain(),
                 geometry: soil.geometry(),
@@ -432,6 +484,11 @@ impl Environment for HostEnvironment<'_> {
         self.support_valid(Some(self.roots.support), cell)
             && self.roots.space_available(cell, role, size)
             && cell[1] < (SOIL_DEPTH_CELLS + MAX_SHOOT_HEIGHT_CELLS) as i32
+            && self.lit_columns.is_none_or(|windows| {
+                windows
+                    .iter()
+                    .any(|&(low, high)| (low..=high).contains(&cell[0]))
+            })
     }
 }
 struct CombinedVisibility<'a, V> {

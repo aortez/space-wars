@@ -797,12 +797,25 @@ pub struct ClockGrassState {
 pub struct ClockCeilingOptics {
     pub simulation_tick: u64,
     pub geometry_generation: u64,
+    /// First opening's identity and its left, right and ceiling coordinates.
+    /// Retained so a state written by the single-opening build still loads.
     pub source_id: [u64; 2],
     pub aperture_milli: [i32; 3],
+    /// Every live opening, left to right. Empty in a state written before the
+    /// ceiling could break in more than one place.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub apertures: Vec<ClockCeilingAperture>,
     pub collider_generations: Vec<[u64; 4]>,
     pub moving_blocker: Option<[u64; 2]>,
     pub silhouettes_milli: Vec<Vec<[i32; 2]>>,
     pub samples: Vec<ClockCeilingSample>,
+}
+
+/// One ceiling opening, in the same world mill units as the samples.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCeilingAperture {
+    pub source_id: [u64; 2],
+    pub aperture_milli: [i32; 3],
 }
 
 /// One fresh receiver: total and aperture-only intensity plus its first blocker.
