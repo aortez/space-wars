@@ -21,6 +21,7 @@ members = [
     "scenarios/garden-lab",
     "scenarios/falling",
     "scenarios/line-mover",
+    "scenarios/material-lab",
     "scenarios/nes",
     "scenarios/null",
     "scenarios/pizza",
@@ -94,6 +95,7 @@ scenario-garden-lab = { path = "scenarios/garden-lab" }
 scenario-clock = { path = "scenarios/clock" }
 scenario-falling = { path = "scenarios/falling" }
 scenario-line-mover = { path = "scenarios/line-mover" }
+scenario-material-lab = { path = "scenarios/material-lab" }
 scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }

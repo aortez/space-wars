@@ -605,6 +605,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     args.rom.as_deref(),
                     &scenario_settings,
                     &rom_catalog.borrow(),
+                    settings_path.parent(),
                 )
                 .and_then(|asset| {
                     let asset = pizza_lab
@@ -980,7 +981,14 @@ fn resolve_launch_asset(
     explicit_rom: Option<&Path>,
     settings: &Settings,
     catalog: &nes_roms::NesRomCatalog,
+    config_directory: Option<&Path>,
 ) -> Result<client_scenarios::ScenarioAsset, String> {
+    if launch.scenario == "material-lab" {
+        let directory = config_directory.ok_or("Material Lab save directory is unavailable")?;
+        return Ok(client_scenarios::ScenarioAsset::MaterialLab(
+            directory.join("material-lab.bin"),
+        ));
+    }
     if launch.scenario != "nes" {
         return Ok(client_scenarios::ScenarioAsset::None);
     }
@@ -4050,7 +4058,8 @@ mod tests {
             raster_scale: 1.0,
         };
 
-        let asset = resolve_launch_asset(&launch, None, &settings, &catalog).unwrap();
+        let asset =
+            resolve_launch_asset(&launch, None, &settings, &catalog, Some(config.path())).unwrap();
 
         let client_scenarios::ScenarioAsset::NesRom(asset) = asset else {
             panic!("NES launch did not resolve a cartridge asset");

@@ -106,6 +106,7 @@ pub(crate) struct Launcher {
     settings: Arc<RwLock<Settings>>,
     catalog: SharedNesRomCatalog,
     writer: SaveSettings,
+    config_directory: Option<std::path::PathBuf>,
     pending: RefCell<Option<PendingLaunch>>,
     timer: Timer,
 }
@@ -127,6 +128,7 @@ impl Launcher {
             input,
             settings,
             catalog,
+            config_directory: settings_writer.config_directory().map(ToOwned::to_owned),
             writer: Arc::new(move |settings| settings_writer.save_blocking(settings.clone())),
             pending: RefCell::new(None),
             timer: Timer::default(),
@@ -259,12 +261,21 @@ impl Launcher {
         *self.pending.borrow_mut() = Some(pending);
 
         let writer = Arc::clone(&self.writer);
+        let config_directory = self.config_directory.clone();
         // The worker owns snapshots, never UI objects or the shared settings
         // lock. Dropping a window must not join a thread stuck in filesystem I/O.
         if let Err(error) = std::thread::Builder::new()
             .name("spacewars-launch-io".into())
             .spawn(move || {
-                prepare(launch, candidate, save_needed, catalog, writer, sender);
+                prepare(
+                    launch,
+                    candidate,
+                    save_needed,
+                    catalog,
+                    writer,
+                    sender,
+                    config_directory,
+                );
             })
         {
             let pending = self.pending.borrow_mut().take().unwrap();
@@ -405,6 +416,7 @@ fn prepare(
     catalog: crate::nes_roms::NesRomCatalog,
     writer: SaveSettings,
     sender: mpsc::Sender<PreparationMessage>,
+    config_directory: Option<std::path::PathBuf>,
 ) {
     if save_needed {
         if sender
@@ -432,7 +444,13 @@ fn prepare(
         return;
     }
     let started = Instant::now();
-    let result = crate::resolve_launch_asset(&launch, None, &settings, &catalog);
+    let result = crate::resolve_launch_asset(
+        &launch,
+        None,
+        &settings,
+        &catalog,
+        config_directory.as_deref(),
+    );
     let _ = sender.send(PreparationMessage::Ready(result, started.elapsed()));
 }
 

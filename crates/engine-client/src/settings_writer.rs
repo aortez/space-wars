@@ -29,13 +29,21 @@ struct SaveRequest {
 pub(crate) struct SettingsWriter {
     sender: mpsc::Sender<SaveRequest>,
     status: Arc<Mutex<SaveStatus>>,
+    path: Option<PathBuf>,
 }
 
 impl SettingsWriter {
     pub(crate) fn new(path: PathBuf) -> std::io::Result<Self> {
-        Self::with_writer(Arc::new(move |settings| {
+        let stored_path = path.clone();
+        let mut writer = Self::with_writer(Arc::new(move |settings| {
             crate::settings::save_settings(settings, &path).map_err(|error| error.to_string())
-        }))
+        }))?;
+        writer.path = Some(stored_path);
+        Ok(writer)
+    }
+
+    pub(crate) fn config_directory(&self) -> Option<&std::path::Path> {
+        self.path.as_ref()?.parent()
     }
 
     pub(super) fn with_writer(write: WriteSettings) -> std::io::Result<Self> {
@@ -85,7 +93,11 @@ impl SettingsWriter {
                     }
                 }
             })?;
-        Ok(Self { sender, status })
+        Ok(Self {
+            sender,
+            status,
+            path: None,
+        })
     }
 
     pub(crate) fn save(&self, settings: Settings) -> SaveReceipt {
