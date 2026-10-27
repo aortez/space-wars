@@ -289,7 +289,12 @@ fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
         geometry: None,
         transparent: &[],
     }
-    .query_light(s.simulation_tick(), 0, std::slice::from_ref(&source), &receivers)
+    .query_light(
+        s.simulation_tick(),
+        0,
+        std::slice::from_ref(&source),
+        &receivers,
+    )
     .unwrap();
     assert_eq!(
         samples[0].local, 950.0,
@@ -318,7 +323,12 @@ fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
             geometry: None,
             transparent: &[],
         }
-        .query_light(s.simulation_tick(), 0, std::slice::from_ref(&source), &receivers)
+        .query_light(
+            s.simulation_tick(),
+            0,
+            std::slice::from_ref(&source),
+            &receivers
+        )
         .unwrap()[1]
             .local,
         950.0
@@ -449,11 +459,7 @@ fn ceiling_light_contract_margin_and_digit_occlusion_share_geometry() {
                 // Floor beyond every opening, which no hole may light.
                 let outside = (0..=2000)
                     .map(|i| span_left + (span_right - span_left) * i as f32 / 2000.0)
-                    .find(|x| {
-                        sources
-                            .iter()
-                            .all(|a| !(a.left..=a.right).contains(x))
-                    })
+                    .find(|x| sources.iter().all(|a| !(a.left..=a.right).contains(x)))
                     .expect("partitioned slots leave unlit floor");
                 let mut receivers: Vec<_> = sources
                     .iter()

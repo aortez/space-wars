@@ -497,9 +497,7 @@ fn clock_grass_contract_floor_layer_is_inset_and_never_supports_a_runner() {
                 {
                     let mut ground = world
                         .surface_contacts(crate::events::duck::DUCK_COLLIDER)
-                        .filter(|c| {
-                            c.normal.y > 0.7 && c.separation <= duck.radius * 0.05
-                        })
+                        .filter(|c| c.normal.y > 0.7 && c.separation <= duck.radius * 0.05)
                         .map(|c| c.collider.entity.value())
                         .peekable();
                     if ground.peek().is_some()
@@ -528,7 +526,6 @@ fn clock_grass_contract_floor_layer_is_inset_and_never_supports_a_runner() {
         }
     }
 }
-
 
 /// A ceiling breaks in one to several places, randomised per opening sequence.
 /// Openings stay in the corridors beside the clock face: material covers the
@@ -570,7 +567,7 @@ fn clock_grass_contract_randomised_openings_each_grow_their_own_patch() {
                 assert!(
                     opening.right <= layout.face_origin.x + 0.01
                         || opening.left >= -layout.face_origin.x - 0.01
-                    );
+                );
             }
             // Identities are unique, so one publication accepts them all.
             let ids: std::collections::BTreeSet<_> =
@@ -613,7 +610,10 @@ fn clock_grass_contract_randomised_openings_each_grow_their_own_patch() {
         // Several openings introduce a refusal path the single aperture had
         // not: an overlap, a reused identity or a capacity overrun all cost
         // the whole publication, and the patches would go dark together.
-        assert_eq!(g.optical_refusals, 0, "seed={seed}: every opening published");
+        assert_eq!(
+            g.optical_refusals, 0,
+            "seed={seed}: every opening published"
+        );
         assert!(
             g.development.iter().all(|v| *v > 0),
             "seed={seed}: every opening's patch is paid for: {g:?}"
@@ -669,7 +669,9 @@ fn capture_frames_for_review() {
         );
         ClockScenario::step(
             &mut s,
-            &[ClockAction::set_reading(ClockReading::new(10, 42, 0).unwrap())],
+            &[ClockAction::set_reading(
+                ClockReading::new(10, 42, 0).unwrap(),
+            )],
             Duration::ZERO,
         );
         if grass_seconds > 0 {
@@ -804,4 +806,3 @@ fn clock_grass_contract_ground_cover_greens_the_floor_then_recedes_to_the_openin
         "no cover once the ceiling has closed"
     );
 }
-

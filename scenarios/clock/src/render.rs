@@ -294,7 +294,11 @@ fn ground_cover(frame: &mut RenderFrame, state: &ClockState, soil: &crate::grass
         for (index, &(base, angle)) in run.iter().enumerate() {
             // A blade tip and a notch per column give the strip a cut edge
             // instead of a painted line, without a primitive per blade.
-            let tall = if index % 2 == 0 { height } else { height * 0.62 };
+            let tall = if index % 2 == 0 {
+                height
+            } else {
+                height * 0.62
+            };
             for offset in [
                 Vec2::new(-SOIL_CELL_SIZE * 0.25, tall),
                 Vec2::new(SOIL_CELL_SIZE * 0.25, tall * 0.35),

@@ -123,8 +123,7 @@ impl DuckEvent {
                                     s.start <= a.min(b) + 0.01
                                         && a.max(b) <= s.end + 0.01
                                         && min.y
-                                            >= self.layout.floor_y
-                                                + s.height
+                                            >= self.layout.floor_y + s.height
                                                 - crate::grass::SOIL_CELL_SIZE
                                                     * crate::grass::SOIL_DEPTH_CELLS as f32
                                                 - 0.01
@@ -446,7 +445,11 @@ mod navigation_contract {
                         ticks(&mut s, 1);
                         waited += 1;
                     }
-                    ClockScenario::step(&mut s, &[ClockAction::trigger_event(kind)], Duration::ZERO);
+                    ClockScenario::step(
+                        &mut s,
+                        &[ClockAction::trigger_event(kind)],
+                        Duration::ZERO,
+                    );
                     ticks(&mut s, 300);
                 }
                 let mut waited = 0;

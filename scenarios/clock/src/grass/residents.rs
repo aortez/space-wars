@@ -249,9 +249,7 @@ impl ClockPlants {
                     .filter_map(|(i, a)| {
                         let full = soil.columns_within(a.left, a.right);
                         match (windows.as_ref().and_then(|w| w.get(i)), full) {
-                            (Some(&(l, h)), Some((low, high))) => {
-                                Some((l.min(low), h.max(high)))
-                            }
+                            (Some(&(l, h)), Some((low, high))) => Some((l.min(low), h.max(high))),
                             (Some(&kept), None) => Some(kept),
                             (None, full) => full,
                         }
@@ -299,7 +297,12 @@ impl ClockPlants {
                     geometry,
                     transparent,
                 }
-                .query_light(before.tick, self.intensity, &self.apertures, &receivers)
+                .query_light(
+                    before.tick,
+                    self.intensity,
+                    &self.apertures,
+                    &receivers,
+                )
             };
             // A refused optical publication grants no light. Physiology still
             // charges maintenance and shortage/dieback, rather than freezing.
