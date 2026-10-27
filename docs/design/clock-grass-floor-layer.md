@@ -309,8 +309,8 @@ receiver budget is shared between openings rather than exceeding
    seeded beneath each hole with spacing that follows the opening's lit width.
 4. **Done.** Render-only ground cover across the floor, receding to the
    openings, and a soil tone that reads as earth rather than as another plank.
-5. The navigation viability filter was measured rather than changed, and the
-   opened flap's inward reach remains open. See below.
+5. **Closed.** The navigation viability filter was measured rather than
+   changed, and the opened flap's reach is retained deliberately. See below.
 
 ## The navigation viability filter is inert, not fixed
 
@@ -338,6 +338,26 @@ that, while material is retained, the navigation course covers everything the
 course covers, including after an event has opened the floor and exported
 columns. If a later habitat mounds material above a surface again, that fails
 loudly rather than stranding a runner on geometry nobody can see.
+
+## The opened flap keeps its reach, deliberately
+
+A flap is hinged at its top, so opening rotates it into a horizontal awning
+reaching `radius * 4.25` inward at lintel height. That awning is what struck
+the runner down in the original failure, and it still bats down anything
+airborne near a doorway: a player jumping at the exit, or a bot arriving by a
+ledge or detour route.
+
+Shortening the reach, or re-hinging to remove it, is possible - two shorter
+stacked panels would halve it - but the awning is not accidental. It is a
+platform the runner is meant to stand on, through `attach_to_flap`,
+`ClockDuckFlapHold::Standing`, the flap-detour routing and
+`direct_flap_landing`, which carries its own setting. Removing the swat removes
+the perch.
+
+The perch is worth more than the swat, so the reach stays as authored. The
+inset layer already removed the case that made the swat unavoidable, by never
+forcing a jump beside a doorway. Anyone revisiting this should treat the swat
+as a known consequence of a wanted feature rather than as a defect.
 
 ## Not covered
 
