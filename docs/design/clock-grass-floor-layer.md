@@ -297,6 +297,20 @@ still loads in a build that only reads the first opening. The diagnostic
 receiver budget is shared between openings rather than exceeding
 `MAX_RECEIVERS`, so more openings sample each in less detail.
 
+## One beam outline per opening
+
+`render::ceiling` draws one coverage outline per source, so the client's
+banding test, which isolated primitives by the beam's fill colour and asserted
+exactly one, measured two at seed 4242. The count is now bounded by
+`MAX_OPENINGS` rather than fixed.
+
+The band check the test exists for - every lit pixel in a rasterised frame
+holds the same value - is strengthened by the plural case rather than weakened:
+identical fills blend to one value only while the outlines stay disjoint, so a
+shared pixel between two openings would read brighter and fail. Spans are
+already asserted disjoint across aspects and seeds; the frame check adds that
+they do not meet after rasterisation at 320x180, 853x480 or 1280x720.
+
 ## Staging
 
 1. **Done.** Inset the soil; the walking surface stays at `floor_y`, and the
