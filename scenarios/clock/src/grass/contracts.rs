@@ -457,7 +457,7 @@ fn clock_grass_contract_favorable_establishment_timing() {
     // origin and radius. One retained policy used to plan every seed from the
     // first seed's origin, which truncated the outer two and slowed the whole
     // batch; the measured window widened downward when that was corrected.
-    assert!(established.is_some_and(|s| (120..=300).contains(&s)));
+    assert!(established.is_some_and(|s| (120..=200).contains(&s)));
     if let Some(path) = std::env::var_os("SPACEWARS_CLOCK_GRASS_ARTIFACTS") {
         let path = std::path::PathBuf::from(path);
         std::fs::create_dir_all(&path).unwrap();

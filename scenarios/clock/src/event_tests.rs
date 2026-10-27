@@ -610,6 +610,10 @@ fn clock_grass_contract_randomised_openings_each_grow_their_own_patch() {
         let openings = s.ceiling.sources(layout);
         let g = s.grass_state();
         assert_eq!(g.seeded, crate::grass::SEED_BATCH, "seed={seed}");
+        // Several openings introduce a refusal path the single aperture had
+        // not: an overlap, a reused identity or a capacity overrun all cost
+        // the whole publication, and the patches would go dark together.
+        assert_eq!(g.optical_refusals, 0, "seed={seed}: every opening published");
         assert!(
             g.development.iter().all(|v| *v > 0),
             "seed={seed}: every opening's patch is paid for: {g:?}"
@@ -800,3 +804,4 @@ fn clock_grass_contract_ground_cover_greens_the_floor_then_recedes_to_the_openin
         "no cover once the ceiling has closed"
     );
 }
+
