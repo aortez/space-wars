@@ -188,6 +188,35 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         }
         ground_cover(&mut frame, state, soil);
         let observation = state.plants.plants.observe();
+        // Mats draw first: they lie on the floor line that the shoots rise from.
+        for tissue in observation
+            .tissues
+            .iter()
+            .filter(|t| t.role == engine_core::plants::Role::Moss)
+        {
+            if let Some(points) = crate::grass::residents::moss_polygon(tissue, soil) {
+                let points = points
+                    .into_iter()
+                    .map(|p| RenderPoint::new(p.x, p.y))
+                    .collect();
+                frame.push_primitive(
+                    ARENA_LAYER,
+                    RenderPrimitive::Polygon(RenderPolygon::filled(
+                        points,
+                        if tissue.health == 0 {
+                            RenderColor::rgb(0.28, 0.24, 0.16)
+                        } else if tissue.shade_ticks > 0 || tissue.shortage_ticks > 0 {
+                            let health = f32::from(tissue.health) / 100.0;
+                            RenderColor::rgb(0.38 - 0.22 * health, 0.3 + 0.12 * health, 0.17)
+                        } else {
+                            // Deeper and duller than a blade, so a mat never
+                            // reads as grass at a glance.
+                            RenderColor::rgb(0.16, 0.42, 0.24)
+                        },
+                    )),
+                );
+            }
+        }
         for tissue in observation
             .tissues
             .iter()

@@ -133,7 +133,15 @@ fn ceiling_light_contract_reference_paid_growth_and_minutes_of_decline() {
         if g.stressed_tissues > 0 {
             first_stress.get_or_insert(second);
         }
-        if o.tissues.iter().any(|t| t.health < 100) {
+        // The reference sequence is about the lit grass patch. A retained mat
+        // shares the runtime from the closing boundary onward, so every
+        // observation here names grass explicitly.
+        let grass = || {
+            o.tissues
+                .iter()
+                .filter(|t| t.role != engine_core::plants::Role::Moss)
+        };
+        if grass().any(|t| t.health < 100) {
             first_damage.get_or_insert(second);
         }
         if g.living_tissues < prior_living {
@@ -149,7 +157,8 @@ fn ceiling_light_contract_reference_paid_growth_and_minutes_of_decline() {
         if [5, 10, 60, 180, 300, 305, 335, 365, 425, 485, 545, 605, 665].contains(&second) {
             history.push(serde_json::json!({"second":second,"phase":g.ceiling_phase,
                 "living":g.living_tissues,"shoots":g.shoots,"mature":g.mature_blades,
-                "stressed":g.stressed_tissues,"health_sum":o.tissues.iter().map(|t| u64::from(t.health)).sum::<u64>(),
+                "stressed":g.stressed_tissues,"health_sum":grass().map(|t| u64::from(t.health)).sum::<u64>(),
+                "mat":g.moss_tissues,
                 "reserves":g.reserves,"intake_per_tick":g.intake,"upkeep_per_tick":g.maintenance}));
         }
         if second == 300 {
@@ -164,7 +173,7 @@ fn ceiling_light_contract_reference_paid_growth_and_minutes_of_decline() {
         }
         if second == 485 {
             assert!(
-                g.shoots > 0 && o.tissues.iter().any(|t| t.health < 100),
+                g.shoots > 0 && grass().any(|t| t.health < 100),
                 "damage must be gradual before tissue loss"
             );
         }

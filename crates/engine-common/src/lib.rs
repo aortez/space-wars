@@ -767,10 +767,18 @@ pub struct ClockGrassState {
     pub ceiling_committed_material: u64,
     #[serde(default)]
     pub ceiling_cancelled_material: u64,
+    /// Grass tissue only. A retained moss mat outlives the patch it succeeded,
+    /// so it is counted on its own rather than folded into these totals.
     #[serde(default)]
     pub stressed_tissues: usize,
     #[serde(default)]
     pub dead_tissues: usize,
+    #[serde(default)]
+    pub moss_tissues: usize,
+    #[serde(default)]
+    pub moss_stressed: usize,
+    #[serde(default)]
+    pub moss_dead: usize,
     pub biology_tick: u64,
     pub soil_added: u64,
     pub soil_retained: usize,

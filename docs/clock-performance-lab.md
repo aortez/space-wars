@@ -458,7 +458,7 @@ both visual and headless benchmarks and gain the shared viewport/warm-up metadat
 ## Ceiling sunlight opening (2026-10-19)
 
 The `grass` fixture requests Grass once at tick 0, so a 60-second window covers
-the five-second opening, soil arrival and paid growth to the 52-tissue patch
+the five-second opening, soil arrival and paid growth to the 64-tissue patch
 under the beam; the ceiling refuses the fixture's later repeat requests. Pi 4
 `sw-picade-2` (Raspberry Pi 4 Model B Rev 1.2, Linux 6.6.63-v8, ondemand
 governor, about 64 °C, kiosk parked at its launcher), release `pi-kiosk-gpu`
