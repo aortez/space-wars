@@ -4,6 +4,10 @@
 //! actual dirt only after the host checks canonical occupancy at that boundary.
 //! Retained cells occupy their original coordinates, so another introduction
 //! fills holes rather than stacking another layer.
+//!
+//! The layer is inset into the top of the supporting floor rather than stacked
+//! on it, so the walking surface stays at the floor line for every actor and
+//! event. Roots occupy the rows below that line and shoots grow above it.
 
 use engine_core::Vec2;
 
@@ -38,7 +42,8 @@ pub use residents::{
     BIOLOGY_TICK_MS, ClockPlants, MAX_BIOLOGY_STEPS_PER_UPDATE, MAX_PLANT_TISSUES, PlantPlayback,
 };
 
-/// World units; three rows leave finite underground runner/root space.
+/// World units; three rows leave finite underground runner/root space, cut into
+/// the supporting floor so the surface row's top rests on the floor line.
 pub const SOIL_CELL_SIZE: f32 = 2.0;
 pub const SOIL_DEPTH_CELLS: usize = 3;
 /// Covers the widest supported Clock layout (1920 units) at the target depth.
@@ -50,10 +55,21 @@ pub const MAX_SOIL_SITE_QUERIES: usize = 2880;
 pub struct SoilSite {
     /// Stable horizontal grid coordinate relative to the arena's left edge.
     pub column: usize,
-    /// Depth coordinate measured upward from the supporting floor.
+    /// Depth coordinate measured upward from the layer's deepest row. The
+    /// surface row is `SOIL_DEPTH_CELLS - 1`; its top is the floor line.
     pub row: usize,
     pub min: Vec2,
     pub max: Vec2,
+}
+
+impl SoilSite {
+    /// An inset cell at or below the floor line is inside solid support
+    /// geometry, which every floor type supplies as a thick slab, and
+    /// `plan_soil_admission` already refuses a column without full support.
+    /// No canonical occupancy query can observe an actor inside it.
+    pub fn inside_support(self, floor_y: f32) -> bool {
+        self.max.y <= floor_y + 1e-3
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,7 +138,8 @@ pub fn plan_soil_admission(
             if plan.queries == MAX_SOIL_SITE_QUERIES {
                 break;
             }
-            let y = floor_y + row as f32 * SOIL_CELL_SIZE;
+            // Inset: the surface row's top is the floor line, not its bottom.
+            let y = floor_y - (SOIL_DEPTH_CELLS - row) as f32 * SOIL_CELL_SIZE;
             let site = SoilSite {
                 column,
                 row,
@@ -181,8 +198,9 @@ mod tests {
                     .iter()
                     .any(|&(a, b)| a <= site.min.x && site.max.x <= b)
             );
-            assert!(site.min.y >= layout.floor_y);
-            assert!(site.max.y <= layout.floor_y + 6.0);
+            // Inset: the layer fills the floor's top rows, not the space above.
+            assert!(site.min.y >= layout.floor_y - 6.0);
+            assert!(site.max.y <= layout.floor_y);
         }
     }
 

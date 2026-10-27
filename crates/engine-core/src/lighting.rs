@@ -2,6 +2,8 @@
 use crate::{Color, Vec2};
 
 pub const MAX_SOURCES: usize = 256;
+/// Separate ceiling openings in one publication. Each is its own identity.
+pub const MAX_APERTURES: usize = 8;
 pub const MAX_FOOTPRINT: usize = 8;
 pub const MAX_RECEIVERS: usize = 64;
 pub const MAX_AGE_TICKS: u64 = 1;
@@ -97,7 +99,7 @@ pub struct LightingSnapshot {
     directional: DirectionalSource,
     sources: Vec<LocalSource>,
     duplicate_copies: usize,
-    aperture: Option<ApertureSource>,
+    apertures: Vec<ApertureSource>,
 }
 
 fn finite(p: Vec2) -> bool {
@@ -167,28 +169,40 @@ impl LightingSnapshot {
             directional,
             sources: unique.into_values().cloned().collect(),
             duplicate_copies,
-            aperture: None,
+            apertures: Vec::new(),
         })
     }
 
+    /// Adds one opening. Openings must be disjoint: two overlapping spans would
+    /// both light the same receiver, which is more energy than one wider hole
+    /// in the same ceiling admits.
     pub fn with_aperture(mut self, aperture: ApertureSource) -> Result<Self, LightingError> {
         if !finite(Vec2::new(aperture.left, aperture.ceiling_y))
             || !finite(Vec2::new(aperture.right, aperture.ceiling_y))
             || aperture.left >= aperture.right
             || !strength(aperture.strength)
             || self.sources.iter().any(|s| s.id == aperture.id)
+            || self
+                .apertures
+                .iter()
+                .any(|a| a.left <= aperture.right && aperture.left <= a.right)
         {
             return Err(LightingError::InvalidInput);
         }
-        if self.sources.len() == MAX_SOURCES {
+        if self.apertures.iter().any(|a| a.id == aperture.id) {
+            return Err(LightingError::ConflictingIdentity);
+        }
+        if self.sources.len() + self.apertures.len() == MAX_SOURCES
+            || self.apertures.len() == MAX_APERTURES
+        {
             return Err(LightingError::Capacity);
         }
-        self.aperture = Some(aperture);
+        self.apertures.push(aperture);
         Ok(self)
     }
 
-    pub fn aperture(&self) -> Option<ApertureSource> {
-        self.aperture
+    pub fn apertures(&self) -> &[ApertureSource] {
+        &self.apertures
     }
 
     pub fn tick(&self) -> u64 {
@@ -260,10 +274,11 @@ impl LightingSnapshot {
                         );
                     }
                 }
-                if let Some(source) = self.aperture
-                    && (source.left..=source.right).contains(&receiver.position.x)
-                    && receiver.position.y < source.ceiling_y
-                {
+                // Openings are disjoint, so at most one lights this receiver.
+                for source in self.apertures.iter().filter(|a| {
+                    (a.left..=a.right).contains(&receiver.position.x)
+                        && receiver.position.y < a.ceiling_y
+                }) {
                     result.local += sample(
                         EmissionPoint {
                             position: Vec2::new(receiver.position.x, source.ceiling_y),

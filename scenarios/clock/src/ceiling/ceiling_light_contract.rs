@@ -28,12 +28,12 @@ fn seconds(s: &mut ClockState, n: u64) {
 #[test]
 fn ceiling_light_contract_exact_timing_pause_preview_and_duplicate() {
     let mut c = Ceiling::default();
-    assert!(c.start());
+    assert!(c.start(7));
     assert!(!c.advance(OPENING_DURATION - Duration::from_nanos(1)));
     assert_eq!(c.phase, Phase::Opening);
     assert!(c.advance(Duration::from_nanos(1)));
     assert_eq!(c.phase, Phase::Open);
-    assert!(!c.start());
+    assert!(!c.start(7));
     c.advance(Duration::ZERO);
     assert_eq!(c.elapsed, Duration::ZERO);
     c.advance(OPEN_DURATION - Duration::from_nanos(1));
@@ -83,7 +83,7 @@ fn ceiling_light_contract_cancellation_disable_resize_and_committed_retention() 
     assert_eq!(s.ceiling.cancellations, 1);
     assert_eq!(s.soil.as_ref().unwrap().accounting(), soil);
     assert_eq!(s.grass_state().organisms, organisms);
-    assert!(s.plants.aperture.is_none());
+    assert!(s.plants.apertures.is_empty());
     let mut s = fixture();
     s.set_aspect_ratio(0.75);
     seconds(&mut s, 6);
@@ -113,7 +113,7 @@ fn ceiling_light_contract_coexistence_reading_and_incompatible_replacement() {
         Duration::ZERO,
     );
     assert_eq!(s.ceiling.phase, Phase::Closed);
-    assert!(s.plants.aperture.is_none());
+    assert!(s.plants.apertures.is_empty());
     assert_eq!(s.ceiling.deliveries, 1);
 }
 #[test]
@@ -190,7 +190,7 @@ fn ceiling_light_contract_reference_paid_growth_and_minutes_of_decline() {
     assert!(first_damage.is_some_and(|s| s > 365));
     assert_eq!(
         first_loss,
-        Some(480),
+        Some(483),
         "measured loss after gradual closing and two minutes of decline"
     );
     assert_eq!(s.ceiling.phase, Phase::Closed);
@@ -272,7 +272,7 @@ fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
     let (id, polygon) = &polygons[0];
     let id = *id;
     let tip = polygon[2];
-    let source = s.ceiling.source(Layout::new(s.aspect_ratio())).unwrap();
+    let source = s.ceiling.sources(Layout::new(s.aspect_ratio()))[0];
     let receivers = [
         Receiver {
             position: tip,
@@ -289,7 +289,12 @@ fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
         geometry: None,
         transparent: &[],
     }
-    .query_light(s.simulation_tick(), 0, Some(source), &receivers)
+    .query_light(
+        s.simulation_tick(),
+        0,
+        std::slice::from_ref(&source),
+        &receivers,
+    )
     .unwrap();
     assert_eq!(
         samples[0].local, 950.0,
@@ -318,7 +323,12 @@ fn ceiling_light_contract_shoot_geometry_is_shared_with_beam_queries() {
             geometry: None,
             transparent: &[],
         }
-        .query_light(s.simulation_tick(), 0, Some(source), &receivers)
+        .query_light(
+            s.simulation_tick(),
+            0,
+            std::slice::from_ref(&source),
+            &receivers
+        )
         .unwrap()[1]
             .local,
         950.0
@@ -428,27 +438,40 @@ fn ceiling_light_contract_margin_and_digit_occlusion_share_geometry() {
                 );
                 let layout = Layout::new(aspect);
                 let mut ceiling = Ceiling::default();
-                ceiling.start();
+                ceiling.start(4242);
                 ceiling.advance(OPENING_DURATION);
-                let source = ceiling.source(layout).unwrap();
-                assert!(source.left < source.right && source.right < layout.face_origin.x);
+                let sources = ceiling.sources(layout);
+                let (span_left, span_right) = Ceiling::span(layout);
+                assert!(!sources.is_empty() && sources.len() <= crate::ceiling::MAX_OPENINGS);
+                for opening in &sources {
+                    assert!(opening.left < opening.right);
+                    assert!(opening.left >= span_left && opening.right <= span_right);
+                }
+                // The lighting publication refuses overlapping openings, so the
+                // drawn geometry must already be disjoint at every layout.
+                for pair in sources.windows(2) {
+                    assert!(pair[0].right < pair[1].left, "openings stay disjoint");
+                }
                 let polygons = crate::render::plant_face_polygons(&s);
                 assert!(!polygons.is_empty());
                 let digit_x =
                     polygons[0].iter().map(|p| p.x).sum::<f32>() / polygons[0].len() as f32;
-                let receivers = [
-                    Receiver {
-                        position: Vec2::new(
-                            (source.left + source.right) * 0.5,
-                            layout.floor_y + 10.0,
-                        ),
+                // Floor beyond every opening, which no hole may light.
+                let outside = (0..=2000)
+                    .map(|i| span_left + (span_right - span_left) * i as f32 / 2000.0)
+                    .find(|x| sources.iter().all(|a| !(a.left..=a.right).contains(x)))
+                    .expect("partitioned slots leave unlit floor");
+                let mut receivers: Vec<_> = sources
+                    .iter()
+                    .map(|a| Receiver {
+                        position: Vec2::new((a.left + a.right) * 0.5, layout.floor_y + 10.0),
                         surface: None,
-                    },
-                    Receiver {
-                        position: Vec2::new(digit_x, layout.floor_y + 10.0),
-                        surface: None,
-                    },
-                ];
+                    })
+                    .collect();
+                receivers.push(Receiver {
+                    position: Vec2::new(outside, layout.floor_y + 10.0),
+                    surface: None,
+                });
                 let quads = optical_polygons(polygons);
                 let occluded = OpticalScene {
                     footprints: &[],
@@ -456,30 +479,39 @@ fn ceiling_light_contract_margin_and_digit_occlusion_share_geometry() {
                     geometry: None,
                     transparent: &[],
                 };
-                let samples = occluded
-                    .query_light(0, 50, Some(source), &receivers)
-                    .unwrap();
-                assert_eq!(samples[0].local, 950.0, "margin {aspect} {font:?} {hour}");
-                assert_eq!(samples[0].directional, 50.0);
-                assert_eq!(samples[1].local, 0.0, "outside aperture");
-                // A wider diagnostic source must still be blocked by the actual
-                // digit silhouettes, then light this receiver when removed.
-                let wide = engine_core::lighting::ApertureSource {
-                    right: layout.bounds_max.x,
-                    ..source
-                };
-                let shadow = occluded.query_light(0, 50, Some(wide), &receivers).unwrap();
-                assert_eq!(shadow[1].local, 0.0);
-                assert!(shadow[1].first_blocker.is_some());
+                let samples = occluded.query_light(0, 50, &sources, &receivers).unwrap();
+                for (index, sample) in samples.iter().take(sources.len()).enumerate() {
+                    assert_eq!(
+                        sample.local, 950.0,
+                        "margin {aspect} {font:?} {hour} opening {index}"
+                    );
+                    assert_eq!(sample.directional, 50.0);
+                }
+                assert_eq!(samples[sources.len()].local, 0.0, "outside every opening");
+                // A diagnostic opening over the whole floor must still be
+                // blocked by the actual digit silhouettes, then light this
+                // receiver when they are removed.
+                let wide = [engine_core::lighting::ApertureSource {
+                    left: span_left,
+                    right: span_right,
+                    ..sources[0]
+                }];
+                let under_digit = [Receiver {
+                    position: Vec2::new(digit_x, layout.floor_y + 10.0),
+                    surface: None,
+                }];
+                let shadow = occluded.query_light(0, 50, &wide, &under_digit).unwrap();
+                assert_eq!(shadow[0].local, 0.0);
+                assert!(shadow[0].first_blocker.is_some());
                 let clear = OpticalScene {
                     footprints: &[],
                     polygons: &[],
                     geometry: None,
                     transparent: &[],
                 }
-                .query_light(0, 50, Some(wide), &receivers)
+                .query_light(0, 50, &wide, &under_digit)
                 .unwrap();
-                assert_eq!(clear[1].local, 950.0);
+                assert_eq!(clear[0].local, 950.0);
             }
         }
     }

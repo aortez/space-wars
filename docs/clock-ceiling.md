@@ -7,22 +7,36 @@ exactly 300 seconds fully open, and 60 seconds closing. Durations consume unpaus
 normal simulation time, independently of plant preview speed and local civil
 Clock readings. Opening and closing settings are tuning defaults.
 
-The aperture occupies the real left margin: its left edge is two world units
-inside the frame and its right edge is two units before the face's 6×9 glyph
-envelope, capped at 48 world units wide on large arenas. This layout-derived
-corridor stays clear of all ordinary hour digits and all four fonts, including
-reading/font transitions; moving actors and event geometry still cast real
-shadows. Seed search begins at this same corridor's center and admits only
-supported dirt contacts inside it. Narrow layouts admit fewer than three seeds
-when the ordinary four-cell spacing does not fit. Existing soil outside the
-corridor cannot redirect admission beneath a digit.
-The previous 14%-centered aperture overlapped the first digit and failed at
-00:34, 08:34, 20:34 and 23:34; the corrected default patch has the same sunlight
-opportunity at those hours as at 12:34.
-It supplies 950 light units alongside the ordinary 50-unit directional room
-source. The shared lighting snapshot gates vertical rays at the aperture and
-ceiling boundaries, retains owner/lifetime identity, refuses stale generations
-and excessive receiver/source counts, and uses canonical solid visibility plus
+Sunlight arrives through one to three openings, planned from the event seed when
+the sequence starts. They are stored as fractions of their seat, so a resize
+moves the same holes rather than cutting new ones. Both corridors beside the
+face can hold them: the left runs from the frame's inner edge to two world units
+before the 6×9 glyph envelope, and the right mirrors it to the opposite frame.
+One opening takes the left corridor, two take one corridor each, and three put
+two in the left and one in the right.
+
+Each corridor is partitioned into equal slots, one per opening seated in it, and
+each opening takes 62% to 98% of its slot at a jittered offset inside it. That
+partition is what keeps openings disjoint, which the lighting publication
+requires rather than prefers. A corridor whose slots would fall below the
+three-cell minimum width seats one opening across the whole corridor instead.
+Closing withdraws light from both edges of every opening together, so patches
+dim in place rather than sliding.
+
+Openings belong beside the face, not over it. The face spans nearly the whole
+arena, and a vertical beam through whichever segments happen to form the current
+hour does not sustain a patch: measured over 180 seconds with openings under the
+face, every organism died. The corridors also stay clear of all ordinary hour
+digits and all four fonts, including reading/font transitions, so no opening is
+shaded by a digit; moving actors and event geometry still cast real shadows. The
+previous 14%-centered aperture overlapped the first digit and failed at 00:34,
+08:34, 20:34 and 23:34.
+Each opening supplies 950 light units alongside the ordinary 50-unit directional
+room source. The shared lighting snapshot carries a bounded list of at most
+eight apertures, refusing overlapping spans and reused identities, and gates
+vertical rays at each opening's edges and the ceiling boundaries, retains
+owner/lifetime identity, refuses stale generations and excessive
+receiver/source counts, and uses canonical solid visibility plus
 retained material, actual shoot triangles and transformed Clock/actor silhouettes.
 The vector and raster clients consume the same RenderFrame primitives. Beam
 intervals follow the upper envelope of current opaque silhouettes, partitioned
@@ -52,15 +66,30 @@ cost of the opening is recorded in the
 [Clock performance lab](clock-performance-lab.md).
 
 Material is planned against actual support, occupancy, retained soil and the
-existing finite external-input budget. Ordinary introductions fill only missing
-eligible cells beneath the aperture, to the existing three-cell target depth.
+existing finite external-input budget. Ordinary introductions fill every missing
+eligible cell across the supported floor, not only the cells beneath an opening,
+to the existing three-cell target depth. The layer is inset: the surface row's
+top is the floor line rather than its bottom, so the walking surface stays at
+`floor_y` and no actor has to climb onto the soil to cross it or to reach a
+door. It stays detectable for root contact, crushing and occupancy queries but
+carries no contact force, because a second surface coplanar with the floor would
+compete with it for the same contact. Growth is bounded by the lit columns of
+the current openings rather than by the extent of the soil, so a whole floor of
+dirt still greens only beneath the holes. See
+[the floor layer design](design/clock-grass-floor-layer.md).
 At most 32 falling parcels reference pending sites. Commitment at the opening
 boundary rechecks support/occupancy and cannot add sites outside that plan.
 Pending sites satisfy `planned = pending + committed + cancelled`; committed
 soil separately satisfies `added = retained + exported`. Cancellation is not
 an external material input. Seeds have finite [30, 30, 30] reserves, at most
-three per delivery (fewer on narrow layouts). An occupied resident population refuses reseeding rather
-than replacing plants or replenishing reserves. The old favorable fixture
+three per delivery (fewer on narrow layouts). That batch is shared between the
+openings rather than repeated at each, so the resident budget is the same
+whether the ceiling broke once or three times, and each opening spaces its own
+share by its own lit width: fixed wide spacing would place side seeds outside a
+narrow patch, where the light meant to feed them never reaches. Each planted
+patch carries its own growth policy, planning inside its own radius. An occupied
+resident population refuses reseeding rather than replacing plants or
+replenishing reserves. The old favorable fixture
 explicitly retains its full-floor/full-room-light conditions; the zero-input
 shortage fixture explicitly suppresses sunlight. Neither is the ordinary
 ceiling reference sequence.
@@ -100,31 +129,36 @@ The deterministic reference uses seed 4242, ordinary room intensity 50, resource
 availability [1000,1000], normal playback, and 60 fixed simulation steps/second.
 Its simulation-time checkpoints are:
 
-| Seconds since request | Phase | Living tissues | Shoots | Stressed tissues | Total health |
-| ---: | --- | ---: | ---: | ---: | ---: |
-| 5 | Open, material committed | 3 | 0 | 0 | 300 |
-| 10 | Open | 8 | 3 | 0 | 800 |
-| 60 | Open | 52 | 13 | 0 | 5200 |
-| 180 | Open | 52 | 13 | 0 | 5200 |
-| 300 | Open | 52 | 13 | 0 | 5200 |
-| 335 | Closing | 52 | 13 | 4 | 5200 |
-| 365 | Closed | 52 | 13 | 35 | 5200 |
-| 425 | Closed, one minute aftermath | 52 | 13 | 49 | 4627 |
-| 485 | Closed, two minutes aftermath | 50 | 11 | 47 | 1813 |
-| 545 | Closed, three minutes aftermath | 3 | 0 | 3 | 300 |
-| 605 | Closed, four minutes aftermath | 3 | 0 | 3 | 175 |
-| 665 | Closed, five minutes aftermath | 1 | 0 | 1 | 13 |
+| Seconds since request | Phase | Living tissues | Shoots | Mature blades | Stressed tissues | Total health |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 5 | Open, material committed | 3 | 0 | 0 | 0 | 300 |
+| 10 | Open | 13 | 5 | 0 | 0 | 1300 |
+| 60 | Open | 64 | 18 | 0 | 0 | 6400 |
+| 180 | Open | 64 | 18 | 18 | 0 | 6400 |
+| 300 | Open | 64 | 18 | 18 | 0 | 6400 |
+| 305 | Closing | 64 | 18 | 18 | 0 | 6400 |
+| 335 | Closing | 64 | 18 | 18 | 4 | 6400 |
+| 365 | Closed | 64 | 18 | 18 | 26 | 6400 |
+| 425 | Closed, one minute aftermath | 64 | 18 | 18 | 61 | 5986 |
+| 485 | Closed, two minutes aftermath | 63 | 17 | 17 | 60 | 2540 |
+| 545 | Closed, three minutes aftermath | 3 | 0 | 0 | 3 | 300 |
+| 605 | Closed, four minutes aftermath | 3 | 0 | 0 | 3 | 201 |
+| 665 | Closed, five minutes aftermath | 2 | 0 | 0 | 2 | 28 |
 
-First shoot: 6 seconds. First stress: 321. First health damage: 381. First tissue
-loss: 480. The narrower aperture shades outer shoots earlier during closing;
-shared physiology rates and the full 300-second hold remain unchanged. Small blades develop during the hold; the first four mature blades
-appear at 305 seconds and all thirteen by 335. This increment does not require a
-mature lawn during sunlight. At 300 seconds each biology tick has nonzero ordinary
-intake [256,256,208] and paid upkeep [81,107,107]; stores are [1308,1282,1282].
-After closing, usable energy drops to 13 per tick against 133 upkeep, then stores
-run out. Shade and shortage accumulate while the grass remains alive; tissue loss
-then develops over minutes. Remaining stressed roots are not a promise of an
-exact whole-population death time. `ceiling-reference.json` emitted by the 12:34, 800×480 fixture
+First shoot: 6 seconds. First stress: 324. First health damage: 384. First
+tissue loss: 483. Stress and damage both fall inside the closing phase and its
+grace period, and loss follows two minutes of decline; shared physiology rates
+and the full 300-second hold remain unchanged. Seed 4242 plans two openings
+here, and the batch of three seeds is split between them. Blades mature during
+the hold rather than after it: none is mature at 60 seconds and all 18 are by
+180. Maturity during sunlight is not a requirement of this increment, only a
+measured outcome of the current seeding. At 300 seconds each biology tick has
+nonzero ordinary intake [336,336,432] and paid upkeep [121,175,175]; stores are
+[2049,1995,1995]. After closing, energy intake drops to 18 per tick against 141
+upkeep, and the energy store is empty by 425 seconds. Shade and shortage
+accumulate while the grass remains alive; tissue loss then develops over
+minutes. Remaining stressed roots are not a promise of an exact whole-population
+death time. `ceiling-reference.json` emitted by the 12:34, 800×480 fixture
 records checkpoints, reserves and per-tick ledgers, and assertions preserve this
 intermediate stress/damage/loss progression.
 
@@ -145,7 +179,7 @@ Those measured delays include store depletion before the shared grace period;
 they are not new universal death deadlines.
 
 Light queries at all six aspects, every font and five readings verify unblocked
-margin sunlight, out-of-aperture rejection, actual glyph occlusion under a
+corridor sunlight, out-of-opening rejection, actual glyph occlusion under a
 diagnostic wider source, and restored light after removing that glyph geometry.
 A paid-growth sweep samples that matrix with full simulations: every font at
 the default aspect, the ordinary hours 00, 08, 10, 12, 13, 20 and 23 with the
@@ -200,19 +234,24 @@ public-client workflows included in the existing `clock::ceiling_opening_`
 selection. They use seed 4242, ordinary 1x playback and the Off event profile,
 request Grass, wait for its independent open phase and trigger the ordinary Duck.
 North takes control of that existing body. Bounded 100 ms controller presses move
-it right of the aperture, left into and across the beam to four units right of
+it right of the first opening, left into and across the beam to four units
+right of
 the midpoint, then reverse right until its whole body has left. The entrance
 wall remains physical; no pose or collider is injected. This avoids relying on
-the automatic Duck, whose entrance spawn lies near the aperture's right edge.
-On approach, a grounded Duck within ten units right of the aperture can use the
-public East jump button (100 ms, at most six attempts) to clear retained soil's
-real six-unit lip. This is ordinary actor input; material/contact/source physics
-are unchanged. Short leases separated by neutral polling gaps can stall against
-that lip, where continuous input had hidden the obstruction by retaining
-momentum. Deterministic coverage models released leases with 50, 200 and 500 ms
-neutral gaps, freezes state through capture/resume boundaries, and requires the
-crossing shadow and restored light. The corrected sequence uses one or two
-jumps in those fixtures. Progress JSON
+the automatic Duck, whose entrance spawn lies near the first opening's right
+edge.
+The retained soil used to stand on the floor and present a real six-unit lip,
+which short released leases could stall against where continuous input had
+hidden the obstruction by retaining momentum. The inset layer removes that lip:
+the walking surface is the floor line, so a crossing needs no jump. The
+fixture's bounded jump path is retained - a grounded Duck within ten units right
+of the first opening may press the public East button, at most six times, as
+ordinary actor input with material/contact/source physics unchanged - but its
+trigger was always a position test rather than a test for the lip, so what it
+now does on a real display has not been re-measured. Deterministic coverage
+models released leases with 50, 200 and 500 ms neutral gaps, freezes state
+through capture/resume boundaries, and requires the crossing shadow and restored
+light. Progress JSON
 records pose, velocity, stage, aperture, simulation/wall time and jump count on
 every iteration; a 30-second stage watchdog leaves useful failure evidence before
 the parent deadline.
@@ -222,8 +261,8 @@ by the Duck's canonical collider, rather than by a course panel or tissue.
 
 Each capture pauses through the public API, reads fresh Clock state, captures the
 actual renderer and verifies identical Clock state afterward before resuming.
-The pause menu remains visible; the left-margin aperture stays outside the central
-menu. Per-pose JSON includes completed simulation tick / optical generation,
+The pause menu remains visible; the corridor openings beside the face stay
+outside the central menu. Per-pose JSON includes completed simulation tick / optical generation,
 source identity and aperture, semantic collider identities and copied Rapier
 handle generations, canonical/material/tissue silhouettes, receiver positions,
 intensity, sunlight and first-blocker identities. These are fresh same-pose

@@ -117,15 +117,17 @@ impl DuckEvent {
                                 .surfaces
                                 .iter()
                                 .position(|s| {
+                                    // The layer is inset, so retained material
+                                    // fills the surface's own top rows: its top
+                                    // is the surface line, never above it.
                                     s.start <= a.min(b) + 0.01
                                         && a.max(b) <= s.end + 0.01
-                                        && min.y >= self.layout.floor_y + s.height - 0.01
-                                        && max.y
-                                            <= self.layout.floor_y
-                                                + s.height
-                                                + crate::grass::SOIL_CELL_SIZE
+                                        && min.y
+                                            >= self.layout.floor_y + s.height
+                                                - crate::grass::SOIL_CELL_SIZE
                                                     * crate::grass::SOIL_DEPTH_CELLS as f32
-                                                + 0.01
+                                                - 0.01
+                                        && max.y <= self.layout.floor_y + s.height + 0.01
                                 })
                                 .map(|owner| (owner, min, max, a.min(b), a.max(b)))
                         })
@@ -166,7 +168,16 @@ impl DuckEvent {
                     }
                     // A real sliver remains collision geometry, but is not a
                     // safe landing interval. Plan across it to a measured-size
-                    // foothold instead of repeatedly selecting an impossible hop.
+                    // foothold instead of repeatedly selecting an impossible hop:
+                    // `planner::plan` refuses a surface narrower than three radii
+                    // as a takeoff as well as a landing, so a runner left standing
+                    // on one could never plan its way off it.
+                    //
+                    // Dropping it does leave the planner blind to solid material,
+                    // which `supported_surface` then reads as debris. An inset
+                    // layer never raises a surface, so nothing reaches this; see
+                    // `clock_grass_contract_navigation_never_hides_material_from_the_planner`,
+                    // which fails if some later habitat mounds material again.
                     let viable: Vec<_> = navigation
                         .surfaces
                         .into_iter()
@@ -333,17 +344,19 @@ mod soil_tests {
             assert!(!duck.soil_supports.is_empty());
             let course = duck.course.as_ref().unwrap();
             let navigation = duck.soil_course.as_ref().unwrap();
+            // An inset layer fills each surface's own top rows, so retained
+            // material never changes the height the planner navigates, and the
+            // runner meets no step where the material begins or ends.
             for (index, surface) in navigation.surfaces.iter().enumerate() {
                 let original = course.surfaces[duck.soil_navigation_owners[index]];
-                let retained = duck.soil_supports.iter().any(|(i, _, _)| *i == index);
-                assert_eq!(surface.height > original.height, retained);
+                assert_eq!(surface.height, original.height);
                 assert!(surface.start >= original.start && surface.end <= original.end);
             }
             assert!(
-                navigation.surfaces.iter().enumerate().any(
-                    |(i, s)| s.height == course.surfaces[duck.soil_navigation_owners[i]].height
-                ),
-                "bare ground retains its own real height"
+                duck.soil_supports.iter().all(|(index, _, max)| {
+                    (max.y - (layout.floor_y + navigation.surfaces[*index].height)).abs() < 0.01
+                }),
+                "mapped material tops out on its own surface line"
             );
             // Settle onto actual dirt through the canonical solver.
             let (index, min, max) = duck.soil_supports[0];
@@ -362,13 +375,113 @@ mod soil_tests {
 
             // Actual support loss must clear mapping even while dirt is retained
             // and falling. Restoring a floor cannot reattach detached columns.
+            // The runner keeps the real floor support it was already standing
+            // on, which never depended on the inset material.
             soil.revalidate(Some(&[]), true);
             soil.advance_loss(std::time::Duration::from_millis(250));
             duck.synchronize_soil(Some(&mut soil));
             assert!(duck.soil_supports.is_empty());
-            assert_eq!(duck.supported_surface(), None);
+            assert_eq!(duck.supported_surface(), Some(index));
             duck.synchronize_soil(None);
             assert!(duck.soil_course.is_none());
         }
+    }
+}
+
+#[cfg(test)]
+mod navigation_contract {
+    use super::*;
+    use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
+    use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
+    use std::time::Duration;
+
+    fn ticks(state: &mut ClockState, count: u64) {
+        for _ in 0..count {
+            ClockScenario::step(state, &[], Duration::from_nanos(16_666_667));
+        }
+    }
+
+    /// `synchronize_soil` drops a navigation surface narrower than three radii,
+    /// because `planner::plan` refuses such a surface as a landing *and* as a
+    /// takeoff, so a runner standing on one could never plan its way off.
+    /// Dropping it leaves the planner blind to geometry that is still solid,
+    /// and `supported_surface` then reads the material as debris.
+    ///
+    /// An inset layer never raises a surface, so no narrow raised segment is
+    /// produced and nothing is ever dropped. This pins that: while material is
+    /// retained, the navigation course covers exactly what the course covers,
+    /// including after an event has opened the floor and exported columns. If
+    /// some later habitat mounds material above a surface again, this fails
+    /// rather than stranding a runner on a sliver the planner cannot see.
+    #[test]
+    fn clock_grass_contract_navigation_never_hides_material_from_the_planner() {
+        let mut checked = 0u32;
+        for aspect in [0.6f32, 4.0 / 3.0, 800.0 / 480.0] {
+            for (seed, disturb) in [
+                (1u64, None),
+                (3, Some(ClockEventKind::Falling)),
+                (5, Some(ClockEventKind::Explosion)),
+            ] {
+                let mut s = ClockScenario::init(
+                    ClockConfig {
+                        aspect_ratio: aspect,
+                        event_profile: ClockEventProfile::Off,
+                        ..Default::default()
+                    },
+                    seed,
+                );
+                ClockScenario::step(
+                    &mut s,
+                    &[
+                        ClockAction::set_reading(ClockReading::new(10, 42, 0).unwrap()),
+                        ClockAction::trigger_event(ClockEventKind::Grass),
+                    ],
+                    Duration::ZERO,
+                );
+                ticks(&mut s, 7 * 60);
+                if let Some(kind) = disturb {
+                    let mut waited = 0;
+                    while !s.can_trigger_event() && waited < 2000 {
+                        ticks(&mut s, 1);
+                        waited += 1;
+                    }
+                    ClockScenario::step(
+                        &mut s,
+                        &[ClockAction::trigger_event(kind)],
+                        Duration::ZERO,
+                    );
+                    ticks(&mut s, 300);
+                }
+                let mut waited = 0;
+                while !s.can_trigger_event() && waited < 4000 {
+                    ticks(&mut s, 1);
+                    waited += 1;
+                }
+                ClockScenario::step(
+                    &mut s,
+                    &[ClockAction::trigger_event(ClockEventKind::Duck)],
+                    Duration::ZERO,
+                );
+                for _ in 0..crate::events::duck::DUCK_TICKS {
+                    ticks(&mut s, 1);
+                    let Some(duck) = s.duck_scene() else { break };
+                    let (Some(course), Some(navigation)) =
+                        (duck.course.as_ref(), duck.soil_course.as_ref())
+                    else {
+                        continue;
+                    };
+                    let navigable: f32 = navigation.surfaces.iter().map(|s| s.end - s.start).sum();
+                    let real: f32 = course.surfaces.iter().map(|s| s.end - s.start).sum();
+                    assert!(
+                        navigable >= real - 0.01,
+                        "aspect={aspect} seed={seed} disturb={disturb:?}: the planner lost \
+                         {:.2} units of real support",
+                        real - navigable
+                    );
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 0, "the navigation course was never built");
     }
 }

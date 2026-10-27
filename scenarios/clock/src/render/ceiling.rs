@@ -63,8 +63,17 @@ impl HostOptics {
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     if state.ceiling.phase == crate::ceiling::Phase::Opening {
         let progress = state.ceiling.fraction();
-        let (left, right) = crate::ceiling::Ceiling::region(layout);
-        let center = (left + right) * 0.5;
+        let openings = state.ceiling.sources(layout);
+        let span = crate::ceiling::Ceiling::span(layout);
+        // Each parcel falls from the opening it is nearest, not from one
+        // shared point, so several holes read as several deliveries.
+        let origin = |x: f32| {
+            openings
+                .iter()
+                .map(|a| (a.left + a.right) * 0.5)
+                .min_by(|a, b| (a - x).abs().total_cmp(&(b - x).abs()))
+                .unwrap_or((span.0 + span.1) * 0.5)
+        };
         // Each displayed parcel references an owned pending site. No decorative
         // rain can imply unbudgeted material; cancellation clears these sites.
         for site in state
@@ -75,6 +84,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
             .take(32)
         {
             let target = (site.min + site.max) * 0.5;
+            let center = origin(target.x);
             let x = center + (target.x - center) * progress;
             let y = layout.canopy_y + (target.y - layout.canopy_y) * progress * progress;
             frame.push_primitive(
@@ -82,60 +92,63 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                 rectangle(
                     RenderPoint::new(x - 0.8, y - 0.8),
                     RenderPoint::new(x + 0.8, y + 0.8),
-                    RenderColor::rgb(0.38, 0.23, 0.10),
+                    super::SOIL_COLOR,
                     None,
                 ),
             );
         }
     }
-    let Some(source) = state
-        .ceiling
-        .source(layout)
-        .filter(|_| state.config.ceiling_sunlight)
-    else {
+    if !state.config.ceiling_sunlight {
         return;
-    };
+    }
+    let sources = state.ceiling.sources(layout);
+    if sources.is_empty() {
+        return;
+    }
     let optics = HostOptics::capture(state);
     // Validate the same bounded publication as physiology before drawing any
     // light. Capacity or invalid-input refusal draws no unverified beam.
-    let validation = optics.scene().query_light(
-        state.simulation_tick(),
-        0,
-        Some(source),
-        &[Receiver {
+    let probes: Vec<_> = sources
+        .iter()
+        .map(|source| Receiver {
             position: Vec2::new((source.left + source.right) * 0.5, layout.floor_y),
             surface: None,
-        }],
-    );
+        })
+        .collect();
+    let validation = optics
+        .scene()
+        .query_light(state.simulation_tick(), 0, &sources, &probes);
     if validation.is_err() {
         return;
     }
     let Ok(silhouettes) = optics.silhouettes() else {
         return;
     };
-    let Some(beam) = beam::polygons(source, layout.floor_y, &silhouettes) else {
-        return;
-    };
-    let points = beam::outline(&beam);
-    if !points.is_empty() {
+    for source in &sources {
+        let Some(beam) = beam::polygons(*source, layout.floor_y, &silhouettes) else {
+            continue;
+        };
+        let points = beam::outline(&beam);
+        if !points.is_empty() {
+            frame.push_primitive(
+                GLOW_LAYER,
+                RenderPrimitive::Polygon(RenderPolygon::filled(
+                    points,
+                    RenderColor::rgba(1.0, 0.87, 0.46, 0.12),
+                )),
+            );
+        }
+        // The actual opening covers the corresponding portion of the canopy.
         frame.push_primitive(
             GLOW_LAYER,
-            RenderPrimitive::Polygon(RenderPolygon::filled(
-                points,
-                RenderColor::rgba(1.0, 0.87, 0.46, 0.12),
-            )),
+            rectangle(
+                RenderPoint::new(source.left, layout.canopy_y),
+                RenderPoint::new(source.right, layout.bounds_max.y),
+                RenderColor::rgb(0.65, 0.77, 0.92),
+                None,
+            ),
         );
     }
-    // The actual opening covers the corresponding portion of the canopy.
-    frame.push_primitive(
-        GLOW_LAYER,
-        rectangle(
-            RenderPoint::new(source.left, layout.canopy_y),
-            RenderPoint::new(source.right, layout.bounds_max.y),
-            RenderColor::rgb(0.65, 0.77, 0.92),
-            None,
-        ),
-    );
 }
 
 #[cfg(test)]
@@ -148,22 +161,30 @@ pub(crate) fn optical_evidence(state: &ClockState) -> Option<engine_common::Cloc
         return None;
     }
     let layout = Layout::new(state.aspect_ratio());
-    let source = state
-        .ceiling
-        .source(layout)
-        .filter(|_| state.config.ceiling_sunlight)?;
+    if !state.config.ceiling_sunlight {
+        return None;
+    }
+    let sources = state.ceiling.sources(layout);
+    let source = *sources.first()?;
     let optics = HostOptics::capture(state);
-    // Fixed grid includes both aperture edges and an outside control. Two rows
-    // expose low moving actors and higher course solids without soil interiors.
+    // Fixed grid spans every opening's edges and an outside control at each.
+    // Two rows expose low moving actors and higher course solids without soil
+    // interiors. The budget is shared, so more openings sample each in less
+    // detail rather than exceeding MAX_RECEIVERS.
+    let per_opening = (32 / sources.len()).max(2);
     let receivers: Vec<_> = [layout.floor_y + 10.0, layout.floor_y + 30.0]
         .into_iter()
         .flat_map(|y| {
-            (0..32).map(move |i| Receiver {
-                position: Vec2::new(
-                    source.left - 2.0 + (source.right - source.left + 4.0) * i as f32 / 31.0,
-                    y,
-                ),
-                surface: None,
+            sources.iter().flat_map(move |source| {
+                (0..per_opening).map(move |i| Receiver {
+                    position: Vec2::new(
+                        source.left - 2.0
+                            + (source.right - source.left + 4.0) * i as f32
+                                / (per_opening - 1) as f32,
+                        y,
+                    ),
+                    surface: None,
+                })
             })
         })
         .collect();
@@ -172,7 +193,7 @@ pub(crate) fn optical_evidence(state: &ClockState) -> Option<engine_common::Cloc
         .query_light(
             state.simulation_tick(),
             state.plants.intensity,
-            Some(source),
+            &sources,
             &receivers,
         )
         .ok()?;
@@ -189,6 +210,13 @@ pub(crate) fn optical_evidence(state: &ClockState) -> Option<engine_common::Cloc
             milli(source.right),
             milli(source.ceiling_y),
         ],
+        apertures: sources
+            .iter()
+            .map(|a| engine_common::ClockCeilingAperture {
+                source_id: [a.id.0, a.id.1],
+                aperture_milli: [milli(a.left), milli(a.right), milli(a.ceiling_y)],
+            })
+            .collect(),
         collider_generations: optics
             .geometry
             .as_ref()

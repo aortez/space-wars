@@ -1828,7 +1828,7 @@ mod tests {
         let color = RenderColor::rgba(1.0, 0.87, 0.46, 0.12);
         let mut renderer = RasterRenderer::new();
         // Opening, fully open with paid tissue, and partial closing. Isolate
-        // only the actual authored beam; every lit pixel must have one blend.
+        // only the actual authored beams; every lit pixel must have one blend.
         for target in [60, 30 * 60, 31 * 60, 32 * 60, 335 * 60] {
             while state.simulation_tick() < target {
                 ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
@@ -1849,7 +1849,13 @@ mod tests {
                 });
                 count += layer.primitives.len();
             }
-            assert_eq!(count, 1, "one coverage outline per frame");
+            // One outline per opening, and the openings are randomised, so
+            // the count is bounded rather than fixed. Two outlines sharing a
+            // pixel would blend it twice, which the band check below refuses.
+            assert!(
+                (1..=scenario_clock::ceiling::MAX_OPENINGS).contains(&count),
+                "one coverage outline per opening, got {count}"
+            );
             for (width, height) in [(320, 180), (853, 480), (1280, 720)] {
                 let image = renderer.image_from_frames_with_layout(
                     &[frame.clone()],

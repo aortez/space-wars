@@ -204,6 +204,7 @@ mod tests {
             };
             assert!(world.contains_entity(PhysicsId::new(SOIL_PHYSICS_ID)));
             let center = soil.terrain.cell_center(CellCoord::new(0, 2)) + soil.origin;
+            let floor_line = soil.floor_y;
             // Current-shape checks include unstepped insertions at paused control boundaries.
             assert!(!world.current_cuboid_is_clear(
                 center,
@@ -225,6 +226,9 @@ mod tests {
                 crate::ActiveEvent::Explosion(e) => e.soil_world().unwrap(),
                 _ => unreachable!(),
             };
+            // The layer is inset, so a ray from above meets the supporting bank
+            // first. The retained cell's own collision geometry is still
+            // canonical: the soil body reaches the floor line and covers it.
             let hit = world
                 .cast_ray(
                     center + Vec2::new(0.0, 5.0),
@@ -235,7 +239,16 @@ mod tests {
                     },
                 )
                 .unwrap();
-            assert_eq!(hit.collider.entity, PhysicsId::new(SOIL_PHYSICS_ID));
+            assert_ne!(hit.collider.entity, PhysicsId::new(SOIL_PHYSICS_ID));
+            let (low, high) = world
+                .body_solid_bounds(BodyId::new(
+                    PhysicsId::new(SOIL_PHYSICS_ID),
+                    BodyRole::PRIMARY,
+                ))
+                .unwrap();
+            assert!(low.x <= center.x && center.x <= high.x);
+            assert!(low.y <= center.y && center.y <= high.y);
+            assert!((high.y - floor_line).abs() < 1e-3);
             s.finish_event();
             ClockScenario::step(&mut s, &[], Duration::ZERO);
             capture(&format!("{kind:?}-floor-restored"), &s);
@@ -270,7 +283,7 @@ mod tests {
             BodyId::new(obstacle, BodyRole::PRIMARY),
             BodySpec {
                 kind: BodyKind::Fixed,
-                position: Vec2::new(layout.bounds_min.x + 1.0, layout.floor_y + 1.0),
+                position: Vec2::new(layout.bounds_min.x + 11.0, layout.floor_y + 1.0),
                 ..Default::default()
             },
             &[ColliderSpec::cuboid(
@@ -281,16 +294,25 @@ mod tests {
         ));
         let supports = [(layout.bounds_min.x, layout.bounds_max.x)];
         let plan = soil.admit(&supports, |site| {
-            !world.current_cuboid_is_clear(
-                (site.min + site.max) * 0.5,
-                0.0,
-                Vec2::new(0.999, 0.999),
-                CollisionGroups::ALL,
-                &[],
-            )
+            site.column == 0
+                || (!site.inside_support(layout.floor_y)
+                    && !world.current_cuboid_is_clear(
+                        (site.min + site.max) * 0.5,
+                        0.0,
+                        Vec2::new(0.999, 0.999),
+                        CollisionGroups::ALL,
+                        &[],
+                    ))
         });
         assert_eq!(plan.sites.len(), 1197);
+        // Protected occupancy is honoured, and leaves the cell unowned.
         assert_eq!(soil.terrain.cell(CellCoord::new(0, 0)), Some(Cell::VOID));
+        // The obstacle rests on the floor above column 5. An inset layer is cut
+        // into solid support, so nothing standing on that support can block it.
+        assert_eq!(
+            soil.terrain.cell(CellCoord::new(5, 2)).map(|c| c.material),
+            Some(CLOCK_DIRT)
+        );
         let mut binding = None;
         soil.bind(&mut world, &mut binding);
         let mut plants = Plants::new(Config::default(), 215).unwrap();
@@ -420,7 +442,9 @@ impl SoilHabitat {
             geometry,
             origin: Vec2::new(
                 layout.bounds_min.x + width as f32 * SOIL_CELL_SIZE * 0.5,
-                layout.floor_y
+                // The soil rows sit inside the floor, so the field starts one
+                // layer depth below the floor line and the shoot rows rise above it.
+                layout.floor_y - SOIL_DEPTH_CELLS as f32 * SOIL_CELL_SIZE
                     + (SOIL_DEPTH_CELLS + super::residents::MAX_SHOOT_HEIGHT_CELLS) as f32
                         * SOIL_CELL_SIZE
                         * 0.5,
@@ -458,6 +482,20 @@ impl SoilHabitat {
             body: SOIL_PHYSICS_ID,
             generation: 1,
         }
+    }
+
+    /// Soil column containing a world x, which may fall outside the field.
+    pub(crate) fn column_at(&self, x: f32) -> i32 {
+        ((x - self.left) / SOIL_CELL_SIZE).floor() as i32
+    }
+
+    /// Inclusive columns lying *entirely* within a world span. An opening's
+    /// edge column is only partly lit, and a shoot grown in the unlit part of
+    /// it receives nothing while still charging its own upkeep.
+    pub(crate) fn columns_within(&self, left: f32, right: f32) -> Option<(i32, i32)> {
+        let low = ((left - self.left) / SOIL_CELL_SIZE).ceil() as i32;
+        let high = ((right - self.left) / SOIL_CELL_SIZE).floor() as i32 - 1;
+        (low <= high).then_some((low, high))
     }
 
     pub(crate) fn surface_at(&self, x: i32) -> Option<super::surfaces::Surface> {
@@ -573,6 +611,12 @@ impl SoilHabitat {
                 // Clock actors supply their own bounded traction, as on the
                 // course floor. Solver friction must not cancel that drive.
                 spec.friction = 0.0;
+                // The layer is inset into solid support, which already holds
+                // actors up. Keep the material detectable for root contact,
+                // crushing and occupancy queries, but let it carry no contact
+                // force: a second surface coplanar with the floor would compete
+                // with it for the same contact and perturb a marginal jump.
+                spec.solver_groups = CollisionGroups::NONE;
                 spec
             })
             .collect();

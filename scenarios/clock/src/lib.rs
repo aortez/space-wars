@@ -554,48 +554,80 @@ impl ClockState {
         };
         self.grass_refusal = refusal;
         if refusal.is_none() {
-            self.admit_soil_with_region(true);
+            self.admit_soil_delivery(true);
             let soil = self.soil.as_ref().unwrap();
             let width = soil.terrain().width() as i32;
             let layout = Layout::new(self.aspect_ratio());
-            let region = ceiling::Ceiling::region(layout);
-            let start = if self.config.favorable_grass_fixture {
-                10
+            // One lit window per opening. The fixture keeps its own fixed
+            // habitat, which no opening geometry decides.
+            let windows: Vec<(f32, f32)> = if self.config.favorable_grass_fixture {
+                vec![(f32::NEG_INFINITY, f32::INFINITY)]
             } else {
-                (((region.0 + region.1) * 0.5 - layout.bounds_min.x) / grass::SOIL_CELL_SIZE) as i32
+                self.ceiling
+                    .sources(layout)
+                    .iter()
+                    .map(|a| (a.left, a.right))
+                    .collect()
             };
-            let offsets = [0, -grass::SEED_SPACING_CELLS, grass::SEED_SPACING_CELLS];
-            let eligible = |x| {
-                let cell = [x, grass::SOIL_DEPTH_CELLS as i32 - 1];
-                soil.terrain()
-                    .cell(engine_terrain::CellCoord::new(cell[0], cell[1]))
-                    .is_some_and(|c| c.material == grass::CLOCK_DIRT)
-                    && soil.world_point(cell).is_some_and(|p| {
-                        self.config.favorable_grass_fixture || (p.x >= region.0 && p.x <= region.1)
-                    })
+            // Seeds are shared between the openings, so the resident budget is
+            // the same whether the ceiling broke once or several times. A lone
+            // opening keeps the original spaced batch.
+            let (sites, found_habitat) = {
+                let eligible = |x, window: (f32, f32)| {
+                    let cell = [x, grass::SOIL_DEPTH_CELLS as i32 - 1];
+                    soil.terrain()
+                        .cell(engine_terrain::CellCoord::new(cell[0], cell[1]))
+                        .is_some_and(|c| c.material == grass::CLOCK_DIRT)
+                        && soil
+                            .world_point(cell)
+                            .is_some_and(|p| p.x >= window.0 && p.x <= window.1)
+                };
+                let mut sites: Vec<i32> = Vec::new();
+                let mut found = false;
+                for (index, window) in windows.iter().enumerate() {
+                    let start = if self.config.favorable_grass_fixture {
+                        10
+                    } else {
+                        soil.column_at((window.0 + window.1) * 0.5)
+                    };
+                    let Some(center) = (0..width)
+                        .map(|i| (start + i).rem_euclid(width))
+                        .find(|x| eligible(*x, *window))
+                    else {
+                        continue;
+                    };
+                    found = true;
+                    let share = grass::SEED_BATCH / windows.len()
+                        + usize::from(index < grass::SEED_BATCH % windows.len());
+                    // Spacing follows the opening's own lit width. Fixed wide
+                    // spacing would place the side seeds outside a narrow
+                    // patch, where the light that has to feed them never
+                    // reaches. A roomy opening keeps the original spacing.
+                    let columns = soil
+                        .columns_within(window.0, window.1)
+                        .map_or(grass::SEED_SPACING_CELLS * 3, |(low, high)| {
+                            high.saturating_sub(low).saturating_add(1)
+                        });
+                    let step = (columns / 3).clamp(1, grass::SEED_SPACING_CELLS);
+                    let chosen: Vec<_> = [0, -step, step]
+                        .into_iter()
+                        .take(share)
+                        .map(|offset| center + offset)
+                        .filter(|x| eligible(*x, *window) && !sites.contains(x))
+                        .collect();
+                    sites.extend(chosen);
+                }
+                (sites, found)
             };
-            let center = (0..width)
-                .map(|i| (start + i) % width)
-                .find(|x| eligible(*x));
-            if let Some(center) = center {
-                // Narrow margins admit fewer finite seeds, rather than placing
-                // the side seeds under digits or outside the planned habitat.
-                let sites: Vec<_> = offsets
-                    .into_iter()
-                    .take(grass::SEED_BATCH)
-                    .map(|offset| center + offset)
-                    .filter(|x| eligible(*x))
-                    .collect();
-                for x in sites {
-                    if self.plant_grass(x).is_ok() {
-                        self.grass_seeded += 1;
-                    }
+            for x in sites {
+                if self.plant_grass(x).is_ok() {
+                    self.grass_seeded += 1;
                 }
-                if self.grass_seeded == 0 {
-                    self.grass_refusal = Some("No seed capacity or safe dirt contact");
-                }
-            } else {
+            }
+            if !found_habitat {
                 self.grass_refusal = Some("No safe dirt habitat fits a seed");
+            } else if self.grass_seeded == 0 {
+                self.grass_refusal = Some("No seed capacity or safe dirt contact");
             }
         }
         self.event_notice = Some((
@@ -662,30 +694,26 @@ impl ClockState {
     /// Material commitment seam for the forthcoming seeding introduction.
     /// Admission alone does not introduce seeds or modify the event schedule.
     pub fn admit_soil(&mut self) -> grass::SoilAdmissionPlan {
-        self.admit_soil_with_region(false)
+        self.admit_soil_delivery(false)
     }
-    fn admit_soil_with_region(&mut self, aperture_only: bool) -> grass::SoilAdmissionPlan {
+    /// The layer covers every actual horizontal support, not a lit region: an
+    /// aperture decides where plants can live, never where material may rest.
+    /// `planned_only` commits just the sites the ceiling planned at its start.
+    fn admit_soil_delivery(&mut self, planned_only: bool) -> grass::SoilAdmissionPlan {
         use engine_rapier::world::{CollisionGroups, PhysicsId};
         let layout = Layout::new(self.aspect_ratio());
         self.synchronize_soil();
         let (surfaces, _) = self.soil_surfaces();
-        let region = ceiling::Ceiling::region(layout);
         let supports: Vec<_> = surfaces
             .iter()
-            .map(|s| {
-                if !aperture_only || self.config.favorable_grass_fixture {
-                    (s.left, s.right)
-                } else {
-                    (s.left.max(region.0), s.right.min(region.1))
-                }
-            })
+            .map(|s| (s.left, s.right))
             .filter(|(a, b)| a < b)
             .collect();
         let world = grass::surfaces::world(&self.active_event, self.duck_visit.as_deref());
         let soil = self
             .soil
             .get_or_insert_with(|| grass::SoilHabitat::new(layout));
-        let allowed = aperture_only.then(|| {
+        let allowed = planned_only.then(|| {
             self.ceiling
                 .material
                 .iter()
@@ -702,6 +730,9 @@ impl ClockState {
             let Some(surface) = surfaces.iter().find(|s| s.covers(site.min.x, site.max.x)) else {
                 return true;
             };
+            if site.inside_support(layout.floor_y) {
+                return false;
+            }
             world.is_some_and(|w| {
                 !w.current_cuboid_is_clear(
                     surface.map((site.min + site.max) * 0.5),
@@ -1136,7 +1167,7 @@ impl ClockState {
             self.cancel_ceiling();
         }
         let seed = self.schedule.start(kind);
-        if kind == ClockEventKind::Grass && self.config.events.grass && self.ceiling.start() {
+        if kind == ClockEventKind::Grass && self.config.events.grass && self.ceiling.start(seed) {
             self.plan_ceiling_material();
             // Delivery belongs to the aperture, not the short notice event.
             self.event_notice = Some(("Ceiling opening", self.schedule.tick + 360));
@@ -1479,6 +1510,8 @@ impl Scenario for ClockScenario {
         let mut plants = grass::ClockPlants::new(seed);
         if config.favorable_grass_fixture {
             plants.intensity = 1000;
+            // Full-sun ambient feeds the whole habitat, so no opening gates it.
+            plants.light_bounded = false;
         }
         ClockState {
             config: config.normalized(),
@@ -1549,10 +1582,11 @@ impl Scenario for ClockScenario {
             soil.advance_loss(dt);
         }
         state.synchronize_soil();
-        state.plants.aperture = state
-            .ceiling
-            .source(Layout::new(state.aspect_ratio()))
-            .filter(|_| state.config.ceiling_sunlight);
+        state.plants.apertures = if state.config.ceiling_sunlight {
+            state.ceiling.sources(Layout::new(state.aspect_ratio()))
+        } else {
+            Vec::new()
+        };
         state.advance_plants(dt);
         StepResult::default()
     }
