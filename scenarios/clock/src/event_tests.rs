@@ -658,6 +658,7 @@ fn capture_frames_for_review() {
         ("05-three-openings", 2, 240, false),
         ("06-duck-on-the-layer", 4242, 240, true),
         ("07-after-closing", 4242, 380, false),
+        ("08-moss-succession", 4242, 560, false),
     ] {
         let mut s = ClockScenario::init(
             ClockConfig {
@@ -698,10 +699,11 @@ fn capture_frames_for_review() {
         let frame = ClockScenario::render_frame(&s);
         let primitives: usize = frame.layers.iter().map(|l| l.primitives.len()).sum();
         println!(
-            "{label}: phase={:?} openings={} living={} primitives={primitives}",
+            "{label}: phase={:?} openings={} living={} moss={} primitives={primitives}",
             s.ceiling.phase,
             s.ceiling.sources(Layout::new(s.aspect_ratio())).len(),
             s.grass_state().living_tissues,
+            s.grass_state().moss_tissues,
         );
         std::fs::write(
             dir.join(format!("{label}.json")),
