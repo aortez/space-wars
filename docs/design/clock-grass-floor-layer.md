@@ -309,12 +309,35 @@ receiver budget is shared between openings rather than exceeding
    seeded beneath each hole with spacing that follows the opening's lit width.
 4. **Done.** Render-only ground cover across the floor, receding to the
    openings, and a soil tone that reads as earth rather than as another plank.
-5. Follow-ups, each independent of the above: the navigation viability filter in
-   `events/duck/shared.rs` deletes patches narrower than `radius*3` from the
-   planner while they remain solid, which stays wrong whenever columns fall away
-   or the drain opens; and the opened flap's inward reach equals the door height,
-   which can swat anything airborne near a doorway and interacts with
-   `flap_detour`, `direct_flap_landing` and `attach_to_flap`.
+5. The navigation viability filter was measured rather than changed, and the
+   opened flap's inward reach remains open. See below.
+
+## The navigation viability filter is inert, not fixed
+
+`synchronize_soil` drops a navigation surface narrower than three radii. The
+concern was that it hides geometry which is still solid, leaving
+`supported_surface` to read real material as debris - the mode that produced
+13/15 exit failures at aspect 1.0 before the layer was inset.
+
+It cannot fire now. Measured over 120 visits across five aspects, eight seeds
+and `{none, Falling, Explosion}`, the navigation course differed from the course
+on 33584 ticks and dropped geometry on none: an inset layer never raises a
+surface, so splitting only ever shifts a height by a float epsilon and spans are
+always preserved. The drain path never builds a navigation course at all.
+
+Removing the filter would not be an improvement either. `planner::plan` applies
+`Surface::inside`, whose threshold is the same `radius * 3`, to the takeoff as
+well as the landing, so a runner left standing on a sliver could never plan its
+way off one. Keeping the filter hides material from the planner; removing it
+strands the runner on material the planner can see. Both are wrong, and neither
+is reachable.
+
+So the invariant that holds today is pinned instead:
+`clock_grass_contract_navigation_never_hides_material_from_the_planner` asserts
+that, while material is retained, the navigation course covers everything the
+course covers, including after an event has opened the floor and exported
+columns. If a later habitat mounds material above a surface again, that fails
+loudly rather than stranding a runner on geometry nobody can see.
 
 ## Not covered
 
