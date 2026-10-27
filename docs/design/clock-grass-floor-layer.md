@@ -120,7 +120,13 @@ unsupported column is refused before the probe. The probe is retained for any
 site whose top rises above the support line.
 
 Rendering needs no layer change: soil quads are pushed to `ARENA_LAYER` after
-the floor, so the inset band draws over the wooden floor's top edge.
+the floor, so the inset band draws over the wooden floor's top edge. It does
+need a colour change. The old soil tone was `rgb(0.38, 0.23, 0.10)` against a
+floor edge of `rgb(0.32, 0.21, 0.12)`, which drew a flat strip that read as
+another plank rather than as earth; measured at one floor pixel, the delivered
+layer showed `(97, 59, 26)` where bare floor showed its own banding of
+`(82, 54, 31)`, `(26, 16, 9)` and `(56, 36, 20)`. `SOIL_COLOR` is now a darker,
+greyer `rgb(0.155, 0.112, 0.082)`, which reads as damp earth cut into wood.
 
 ## The layer carries no contact force
 
@@ -191,11 +197,21 @@ carpet 400 columns, and each tissue is a physiology entity with reserves,
 intake, maintenance and development stepped on a 1000 ms biology tick. Living
 grass everywhere is not affordable and is not attempted.
 
-It is also not wanted. Light reaches only the apertures, so only those columns
-need to be alive: the floor carries soil everywhere and seeds are planted
-beneath each hole. Grass is then visibly where the light is. Ground cover
-elsewhere, if wanted, belongs in rendering as a tint on soil cells, not in
-plant tissues.
+It is also not wanted as simulation. Light reaches only the apertures, so only
+those columns need to be alive: the floor carries soil everywhere and seeds are
+planted beneath each hole.
+
+Grass everywhere is wanted as *appearance*, though, and that is what makes an
+opening legible. Decorative cover greens the whole floor when the material
+arrives and recedes to the openings as unlit soil withers, so a hole reads as
+the thing keeping its own patch alive. It is render-only: no tissue, no
+resources, no physics and no persisted state. Vitality is derived from the
+ceiling's own phase - sunlit columns follow `fraction`, unlit columns fade over
+`COVER_WITHER_SECONDS` measured from delivery through `cover_age` - so the
+cover appears with the material and leaves with the light. One strip is emitted
+per run of columns sharing a vitality band, chunked at `COVER_RUN_COLUMNS`, so
+a full floor costs tens of primitives rather than one per blade: a frame grew
+from 457 primitives to 494 with the whole floor covered.
 
 `ApertureSource` already carries its own `LightId` and is documented as
 "vertical parallel sunlight through a finite horizontal opening", but
@@ -291,7 +307,8 @@ receiver budget is shared between openings rather than exceeding
 3. **Done.** Bounded aperture list in `engine-core` lighting; one to three
    randomised holes in the corridors beside the face; one policy per patch,
    seeded beneath each hole with spacing that follows the opening's lit width.
-4. Render-only ground cover on soil cells.
+4. **Done.** Render-only ground cover across the floor, receding to the
+   openings, and a soil tone that reads as earth rather than as another plank.
 5. Follow-ups, each independent of the above: the navigation viability filter in
    `events/duck/shared.rs` deletes patches narrower than `radius*3` from the
    planner while they remain solid, which stays wrong whenever columns fall away

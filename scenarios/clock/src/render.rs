@@ -35,6 +35,20 @@ pub(crate) const LABEL_LAYER: i32 = 5;
 const BACKGROUND_COLOR: RenderColor = RenderColor::rgb(0.018, 0.025, 0.055);
 const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.22, 0.14, 0.078);
 const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.32, 0.21, 0.12);
+/// Damp earth cut into the floor's own top rows. Darker and greyer than the
+/// surrounding wood, which the old tone was too close to for the layer to read.
+pub(crate) const SOIL_COLOR: RenderColor = RenderColor::rgb(0.155, 0.112, 0.082);
+/// Cover tones from withered to sunlit, indexed by band. Distinct from the
+/// soil and shoot palettes so a frame reader can tell the three apart.
+pub(crate) const COVER_COLORS: [RenderColor; 3] = [
+    RenderColor::rgb(0.38, 0.33, 0.14),
+    RenderColor::rgb(0.33, 0.45, 0.14),
+    RenderColor::rgb(0.20, 0.52, 0.15),
+];
+/// Decorative cover withers to bare soil over this long away from an opening.
+const COVER_WITHER_SECONDS: f32 = 45.0;
+/// Columns per cover strip, which bounds the primitives one floor can add.
+const COVER_RUN_COLUMNS: usize = 24;
 const INACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.032, 0.068, 0.083);
 const LABEL_COLOR: RenderColor = RenderColor::rgb(0.52, 0.72, 0.77);
 
@@ -168,10 +182,11 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
                 ARENA_LAYER,
                 RenderPrimitive::Polygon(RenderPolygon::filled(
                     quad.map(|p| RenderPoint::new(p.x, p.y)).to_vec(),
-                    RenderColor::rgb(0.38, 0.23, 0.10),
+                    SOIL_COLOR,
                 )),
             );
         }
+        ground_cover(&mut frame, state, soil);
         let observation = state.plants.plants.observe();
         for tissue in observation
             .tissues
@@ -251,6 +266,90 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
 /// Filled visible cell geometry, excluding glow shells and UI labels. Shared
 /// renderers supply effect transforms, clipping, reformation and fade state.
 /// Any positive fill opacity is opaque in the first overhead-light model.
+/// Decorative cover on the delivered layer: no tissue, no resources, no
+/// physics and no persisted state. The whole floor greens when the material
+/// arrives and recedes to the openings as unlit soil withers, so a hole reads
+/// as the thing keeping its own patch alive. Simulated grass draws over it.
+fn ground_cover(frame: &mut RenderFrame, state: &ClockState, soil: &crate::grass::SoilHabitat) {
+    use crate::grass::{CLOCK_DIRT, SOIL_CELL_SIZE, SOIL_DEPTH_CELLS};
+    let Some(age) = state.ceiling.cover_age() else {
+        return;
+    };
+    let unlit = (1.0 - age.as_secs_f32() / COVER_WITHER_SECONDS).max(0.0);
+    let sunlit = state.ceiling.fraction();
+    let windows = state.plants.lit_columns.as_deref().unwrap_or_default();
+    let surface_row = SOIL_DEPTH_CELLS as i32 - 1;
+    // Three bands rather than a gradient, so a run of columns shares one strip.
+    let band = |vitality: f32| (vitality * 3.0).ceil().clamp(0.0, 3.0) as u8;
+    let mut run: Vec<(Vec2, f32)> = Vec::new();
+    let mut run_band = 0;
+    let mut flush = |run: &mut Vec<(Vec2, f32)>, band: u8| {
+        if run.len() < 2 || band == 0 {
+            run.clear();
+            return;
+        }
+        let vitality = f32::from(band) / 3.0;
+        let height = SOIL_CELL_SIZE * (0.45 + 0.95 * vitality);
+        let mut points: Vec<RenderPoint> = Vec::with_capacity(run.len() * 2 + 2);
+        for (index, &(base, angle)) in run.iter().enumerate() {
+            // A blade tip and a notch per column give the strip a cut edge
+            // instead of a painted line, without a primitive per blade.
+            let tall = if index % 2 == 0 { height } else { height * 0.62 };
+            for offset in [
+                Vec2::new(-SOIL_CELL_SIZE * 0.25, tall),
+                Vec2::new(SOIL_CELL_SIZE * 0.25, tall * 0.35),
+            ] {
+                let p = base + offset.rotate_radians(angle);
+                points.push(RenderPoint::new(p.x, p.y));
+            }
+        }
+        for &(base, angle) in run.iter().rev() {
+            let p = base + Vec2::new(0.0, -SOIL_CELL_SIZE * 0.1).rotate_radians(angle);
+            points.push(RenderPoint::new(p.x, p.y));
+        }
+        frame.push_primitive(
+            ARENA_LAYER,
+            RenderPrimitive::Polygon(RenderPolygon::filled(
+                points,
+                COVER_COLORS[usize::from(band - 1)],
+            )),
+        );
+        run.clear();
+    };
+    for column in 0..soil.terrain().width() as i32 {
+        let dirt = soil
+            .terrain()
+            .cell(engine_terrain::CellCoord::new(column, surface_row))
+            .is_some_and(|c| c.material == CLOCK_DIRT);
+        let lit = windows
+            .iter()
+            .any(|&(low, high)| (low..=high).contains(&column));
+        let current = band(if lit { sunlit } else { unlit });
+        let seat = dirt
+            .then(|| {
+                Some((
+                    soil.world_point([column, surface_row])?,
+                    soil.surface_at(column)?.angle,
+                ))
+            })
+            .flatten();
+        match seat {
+            Some(seat) if current == run_band && run.len() < COVER_RUN_COLUMNS => run.push(seat),
+            Some(seat) => {
+                flush(&mut run, run_band);
+                run_band = current;
+                run.push(seat);
+            }
+            // A gap in the material also ends the strip, so no cover bridges it.
+            None => {
+                flush(&mut run, run_band);
+                run_band = 0;
+            }
+        }
+    }
+    flush(&mut run, run_band);
+}
+
 pub(crate) fn plant_face_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::default();

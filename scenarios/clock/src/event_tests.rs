@@ -638,3 +638,165 @@ fn clock_grass_contract_randomised_openings_each_grow_their_own_patch() {
         assert!(openings.len() <= CORRIDORS * MAX_OPENINGS);
     }
 }
+
+#[test]
+fn capture_frames_for_review() {
+    let Some(dir) = std::env::var_os("SPACEWARS_CLOCK_FRAMES") else {
+        return;
+    };
+    let dir = std::path::PathBuf::from(dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    for (label, seed, grass_seconds, duck) in [
+        ("01-bare-floor", 4242u64, 0u64, false),
+        ("02-just-delivered", 4242, 7, false),
+        ("03-receding-30s", 4242, 36, false),
+        ("04-settled-two-openings", 4242, 240, false),
+        ("05-three-openings", 2, 240, false),
+        ("06-duck-on-the-layer", 4242, 240, true),
+        ("07-after-closing", 4242, 380, false),
+    ] {
+        let mut s = ClockScenario::init(
+            ClockConfig {
+                aspect_ratio: 800.0 / 480.0,
+                event_profile: ClockEventProfile::Off,
+                ..Default::default()
+            },
+            seed,
+        );
+        ClockScenario::step(
+            &mut s,
+            &[ClockAction::set_reading(ClockReading::new(10, 42, 0).unwrap())],
+            Duration::ZERO,
+        );
+        if grass_seconds > 0 {
+            ClockScenario::step(
+                &mut s,
+                &[ClockAction::trigger_event(ClockEventKind::Grass)],
+                Duration::ZERO,
+            );
+            ticks(&mut s, grass_seconds * 60);
+        }
+        if duck {
+            let mut waited = 0;
+            while !s.can_trigger_event() && waited < 2000 {
+                ticks(&mut s, 1);
+                waited += 1;
+            }
+            ClockScenario::step(
+                &mut s,
+                &[ClockAction::trigger_event(ClockEventKind::Duck)],
+                Duration::ZERO,
+            );
+            ticks(&mut s, 600);
+        }
+        let frame = ClockScenario::render_frame(&s);
+        let primitives: usize = frame.layers.iter().map(|l| l.primitives.len()).sum();
+        println!(
+            "{label}: phase={:?} openings={} living={} primitives={primitives}",
+            s.ceiling.phase,
+            s.ceiling.sources(Layout::new(s.aspect_ratio())).len(),
+            s.grass_state().living_tissues,
+        );
+        std::fs::write(
+            dir.join(format!("{label}.json")),
+            serde_json::to_vec(&serde_json::json!({
+                "label": label, "aspect_ratio": s.aspect_ratio(), "frame": frame,
+                "grass": s.grass_state(),
+                "openings": s.ceiling.sources(Layout::new(s.aspect_ratio()))
+                    .iter().map(|a| [a.left, a.right]).collect::<Vec<_>>(),
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    }
+}
+
+/// Decorative cover is render-only: the delivered layer greens the whole floor
+/// and recedes to the openings as unlit soil withers, so a hole reads as the
+/// thing keeping its own patch alive. It leaves with the light.
+#[test]
+fn clock_grass_contract_ground_cover_greens_the_floor_then_recedes_to_the_openings() {
+    use engine_common::RenderPrimitive;
+    /// Horizontal extent of each cover strip. Strips are disjoint runs of
+    /// columns, so their widths sum to the covered width of the floor.
+    fn cover_strips(state: &ClockState) -> Vec<(f32, f32)> {
+        ClockScenario::render_frame(state)
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.primitives)
+            .filter_map(|primitive| match primitive {
+                RenderPrimitive::Polygon(polygon) => polygon
+                    .fill
+                    .filter(|fill| crate::render::COVER_COLORS.contains(&fill.color))
+                    .map(|_| {
+                        (
+                            polygon.points.iter().map(|p| p.x).fold(f32::MAX, f32::min),
+                            polygon.points.iter().map(|p| p.x).fold(f32::MIN, f32::max),
+                        )
+                    }),
+                _ => None,
+            })
+            .collect()
+    }
+    let covered = |strips: &[(f32, f32)]| strips.iter().map(|(a, b)| b - a).sum::<f32>();
+
+    let mut s = ClockScenario::init(
+        ClockConfig {
+            aspect_ratio: 800.0 / 480.0,
+            event_profile: ClockEventProfile::Off,
+            ..Default::default()
+        },
+        4242,
+    );
+    ClockScenario::step(
+        &mut s,
+        &[
+            ClockAction::set_reading(ClockReading::new(10, 42, 0).unwrap()),
+            ClockAction::trigger_event(ClockEventKind::Grass),
+        ],
+        Duration::ZERO,
+    );
+    // The opening takes five seconds; nothing is covered before it delivers.
+    ticks(&mut s, 3 * 60);
+    assert!(
+        cover_strips(&s).is_empty(),
+        "no cover before the material arrives"
+    );
+
+    ticks(&mut s, 4 * 60);
+    let layout = Layout::new(s.aspect_ratio());
+    let (floor_left, floor_right) = crate::ceiling::Ceiling::span(layout);
+    let floor = floor_right - floor_left;
+    let fresh = covered(&cover_strips(&s));
+    assert!(
+        fresh > floor * 0.9,
+        "the delivered layer greens the whole floor: {fresh} of {floor}"
+    );
+
+    // Unlit cover withers; what remains sits over an opening.
+    ticks(&mut s, 90 * 60);
+    let strips = cover_strips(&s);
+    let settled = covered(&strips);
+    assert!(
+        !strips.is_empty() && settled < fresh * 0.25,
+        "cover receded to the openings: {settled} of {fresh}"
+    );
+    let openings = s.ceiling.sources(layout);
+    for &(low, high) in &strips {
+        assert!(
+            openings
+                .iter()
+                .any(|a| a.left - crate::grass::SOIL_CELL_SIZE <= low
+                    && high <= a.right + crate::grass::SOIL_CELL_SIZE),
+            "a surviving strip ({low}, {high}) lies over no opening"
+        );
+    }
+
+    // The cover leaves with the light rather than outliving the opening.
+    ticks(&mut s, 400 * 60);
+    assert_eq!(s.ceiling.phase, crate::ceiling::Phase::Closed);
+    assert!(
+        cover_strips(&s).is_empty(),
+        "no cover once the ceiling has closed"
+    );
+}

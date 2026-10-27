@@ -92,7 +92,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                 rectangle(
                     RenderPoint::new(x - 0.8, y - 0.8),
                     RenderPoint::new(x + 0.8, y + 0.8),
-                    RenderColor::rgb(0.38, 0.23, 0.10),
+                    super::SOIL_COLOR,
                     None,
                 ),
             );

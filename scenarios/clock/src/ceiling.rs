@@ -125,6 +125,16 @@ impl Ceiling {
         }
         delivered
     }
+    /// Time since this opening delivered its layer, for the decorative cover's
+    /// recession. `None` before delivery and once the ceiling has closed, so
+    /// the cover appears with the material and leaves with the light.
+    pub(crate) fn cover_age(&self) -> Option<Duration> {
+        match self.phase {
+            Phase::Open => Some(self.elapsed),
+            Phase::Closing => Some(OPEN_DURATION + self.elapsed),
+            Phase::Opening | Phase::Closed => None,
+        }
+    }
     pub fn fraction(&self) -> f32 {
         match self.phase {
             Phase::Closed => 0.0,
