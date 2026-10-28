@@ -738,6 +738,9 @@ all cleanup as drainage.
 There are at most 12 steering actors, with no native fish bodies. A bounded
 96×64 navigation grid routes around lit cells, colon, AM/PM and retained course
 geometry. Fish sample water current, scatter gently near the duck, and regroup.
+Their bodies retain a bounded pitch while facing changes through a narrowed
+turn silhouette; clear-path lookahead smooths routes between glyphs. See the
+[swimming review](fish-swimming.md) for behavior and the interactive comparison.
 Time/format edits revalidate routes. A fish embedded or trapped by newly lit
 geometry moves to the nearest reachable clearance point without changing its
 identity; `clearance_corrections` counts these exceptional adjustments. Font

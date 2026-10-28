@@ -3,6 +3,7 @@ use crate::{ActiveEvent, ClockConfig, ClockReading, ClockScenario, ClockState};
 use engine_common::{ClockEventKind, ClockEventProfile, ClockFont, Scenario};
 
 mod duck_contacts;
+mod swimming;
 
 fn ready(aspect: f32, seed: u64, font: ClockFont) -> ClockState {
     let mut state = ClockScenario::init(
@@ -143,6 +144,10 @@ fn same_seed_replays_and_live_readings_revalidate_without_resetting_water() {
         assert_eq!(a.aquarium_state(), b.aquarium_state());
         for (x, y) in event(&a).fish().iter().zip(event(&b).fish()) {
             assert_eq!((x.position, x.velocity), (y.position, y.velocity));
+            assert_eq!(
+                (x.pitch, x.facing, x.tail_phase),
+                (y.pitch, y.facing, y.tail_phase)
+            );
         }
     }
 }

@@ -69,9 +69,12 @@ fn render_fish(frame: &mut RenderFrame, fish: &Fish, layout: Layout) {
         let mut points: Vec<Vec2> = points
             .iter()
             .map(|&(x, y)| {
+                // Foreshorten the side silhouette during a turn through depth.
+                // Retain a sliver at edge-on so polygons never collapse.
+                let direction = if fish.facing < 0.0 { -1.0 } else { 1.0 };
+                let facing = direction * fish.facing.abs().max(0.18);
                 fish.position
-                    + (Vec2::new(x, y * if fish.heading.cos() < 0.0 { -1.0 } else { 1.0 }) * scale)
-                        .rotate_radians(fish.heading)
+                    + (Vec2::new(x * facing, y) * scale).rotate_radians(fish.pitch * direction)
             })
             .collect();
         // Only the side passage is allowed outside the frame; clip at the

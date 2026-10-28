@@ -1,0 +1,154 @@
+<div id="fish-swimming-review">
+  <div class="viz-controls">
+    <label class="form-label">Scene
+      <select class="form-select" data-scene>
+        <option value="0">Quiet swimming</option>
+        <option value="1">Duck visit</option>
+        <option value="2">Departure</option>
+      </select>
+    </label>
+    <label class="form-label">Follow
+      <select class="form-select" data-follow>
+        <option value="-1">Whole aquarium</option>
+        <option value="0" selected>Tetra 1</option><option value="1">Tetra 2</option>
+        <option value="2">Tetra 3</option><option value="3">Tetra 4</option>
+        <option value="4">Tetra 5</option><option value="5">Tetra 6</option>
+        <option value="6">Danio 1</option><option value="7">Danio 2</option>
+        <option value="8">Danio 3</option><option value="9">Danio 4</option>
+        <option value="10">Cory 1</option><option value="11">Cory 2</option>
+      </select>
+    </label>
+    <label class="form-label">Speed
+      <select class="form-select" data-speed>
+        <option value="0.25">¼ speed</option><option value="0.5" selected>½ speed</option>
+        <option value="1">Normal</option>
+      </select>
+    </label>
+    <label class="form-check"><input class="form-check-input" type="checkbox" data-trails checked><span class="form-check-label">Trails</span></label>
+  </div>
+  <div class="fish-comparison">
+    <div><div class="viz-row"><strong>Before</strong><span class="text-muted text-small" data-detail="0"></span></div><canvas data-view="0" role="img" aria-label="Original fish swimming, recorded from the Clock simulation"></canvas></div>
+    <div><div class="viz-row"><strong>After</strong><span class="text-muted text-small" data-detail="1"></span></div><canvas data-view="1" role="img" aria-label="Updated fish swimming, recorded from the Clock simulation"></canvas></div>
+  </div>
+  <div class="viz-row">
+    <button class="btn btn-primary" type="button" data-play>Play</button>
+    <button class="btn" type="button" data-step>Step</button>
+    <label class="form-label fish-timeline">Time <output data-time>8.0 s</output><input class="form-range" aria-label="Playback time in seconds" type="range" min="6" max="51" step="0.1" value="8" data-time-slider></label>
+  </div>
+  <div class="text-small text-muted" data-status aria-live="polite">Seed 177 · recorded simulation · 12/12 exits in both runs</div>
+</div>
+<style>
+#fish-swimming-review .fish-comparison {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:12px 0}
+#fish-swimming-review canvas {display:block;width:100%;aspect-ratio:4/3;margin-top:8px;touch-action:manipulation}
+#fish-swimming-review .fish-timeline {flex:1;min-width:150px}
+#fish-swimming-review output {font-variant-numeric:tabular-nums}
+@media(max-width:560px) {#fish-swimming-review .fish-comparison {grid-template-columns:1fr}#fish-swimming-review canvas {aspect-ratio:16/9}}
+</style>
+<script>
+(() => {
+  const root = document.getElementById('fish-swimming-review');
+  const recordings = /*__FISH_DATA__*/;
+  const scene = root.querySelector('[data-scene]'), follow = root.querySelector('[data-follow]');
+  const speed = root.querySelector('[data-speed]'), trails = root.querySelector('[data-trails]');
+  const slider = root.querySelector('[data-time-slider]'), clock = root.querySelector('[data-time]');
+  const play = root.querySelector('[data-play]'), step = root.querySelector('[data-step]');
+  const canvases = [...root.querySelectorAll('canvas')], details = [...root.querySelectorAll('[data-detail]')];
+  let time = 8, playing = false, last = null, animation = null;
+  const tau = Math.PI * 2;
+  const mix = (a,b,t) => a + (b-a)*t;
+  const angleMix = (a,b,t) => a + ((b-a+Math.PI)%tau+tau)%tau*t - Math.PI*t;
+  function clipFor(version) {return recordings[version][scene.value === '1' ? 1 : 0];}
+  function at(clip) {
+    const n = Math.max(0, Math.min(clip.frames.length-1,(time-clip.start)*clip.fps));
+    const i = Math.floor(n), a = clip.frames[i], b = clip.frames[Math.min(i+1,clip.frames.length-1)], t = n-i;
+    return {index:i, fish:a.fish.map((p,j) => p && b.fish[j] ? p.map((v,k) => (k===2 || k===4) ? angleMix(v,b.fish[j][k],t) : mix(v,b.fish[j][k],t)) : p),
+      duck: a.duck && b.duck ? a.duck.map((v,k)=>mix(v,b.duck[k],t)) : a.duck};
+  }
+  function fish(ctx,p,id,legacy) {
+    const kind = id<6 ? 0 : id<10 ? 1 : 2;
+    const [body,dark,light] = [['#216382','#e01a30','#38ebff'],['#c2bf7a','#143b63','#ebedb8'],['#a38c5c','#3b453d','#e8cf91']][kind];
+    const fin = Math.sin(p[4])*.7;
+    ctx.save();ctx.translate(p[0],p[1]);
+    if(legacy) {ctx.rotate(p[2]);ctx.scale(1,Math.cos(p[2])<0?-1:1);}
+    else {const direction=p[3]<0?-1:1;ctx.rotate(p[2]*direction);ctx.scale(direction*Math.max(.18,Math.abs(p[3])),1);}
+    ctx.scale(.08,.08);
+    const poly=(pts,color)=>{ctx.fillStyle=color;ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fill();};
+    poly([[-5.2,-2+fin],[-2.5,-.4],[-2.5,.4],[-5.2,2+fin]],body);
+    poly([[-2,1.2],[0,2.8],[1.2,1.2]],body);
+    poly([[-3.2,-.6],[-2.2,-1.5],[2.5,-1.5],[4.5,-.5],[4.5,.5],[2.3,1.5],[-2.2,1.5],[-3.2,.6]],body);
+    if(kind===0) {
+      poly([[-3,0],[3.6,0],[3.6,.8],[-3,.8]],light);
+      poly([[-2.9,-.9],[.8,-1.1],[.8,-.05],[-2.9,-.05]],dark);
+      poly([[.8,-1.1],[3,-.9],[3,-.1],[.8,-.1]],'#a3cfcf');
+    } else if(kind===1) {
+      for(const y of [-.9,0,.9]) poly([[-2.8,y-.2],[3.2,y-.2],[3.2,y+.2],[-2.8,y+.2]],dark);
+      poly([[-4.9,-1.2+fin],[-2.8,-.2],[-2.8,.2],[-4.9,.5+fin]],light);
+    } else {
+      poly([[-2,-1.35],[3.2,-1.35],[3.2,-.7],[-2,-.7]],light);
+      for(const x of [-1.8,.2,2]) poly([[x,-.4],[x+.8,-.4],[x+.8,.6],[x,.6]],dark);
+      poly([[3.6,-.6],[5.2,-1.7],[5.4,-1.4],[3.9,-.3]],light);
+      poly([[-.5,-.7],[.8,-2.5],[1.5,-2.2],[1,-.6]],body);
+    }
+    poly([[2.7,.1],[3.7,.1],[3.7,1.05],[2.7,1.05]],light);
+    poly([[3.1,.25],[3.7,.25],[3.7,.85],[3.1,.85]],'#03090b');
+    ctx.restore();
+  }
+  function draw(version) {
+    const canvas=canvases[version], ctx=canvas.getContext('2d'), clip=clipFor(version), frame=at(clip);
+    const width=canvas.clientWidth, height=canvas.clientHeight, dpr=Math.min(window.devicePixelRatio||1,2);
+    if(!width||!height) return;
+    if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);}
+    ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#061c29';ctx.fillRect(0,0,width,height);
+    const [left,bottom,right,top]=clip.bounds, selected=Number(follow.value), p=frame.fish[selected];
+    const zoom=p?3.4:1, scale=Math.min(width/(right-left+1),height/(top-bottom+1))*zoom;
+    const cx=p?p[0]:(left+right)/2, cy=p?p[1]:(bottom+top)/2;
+    const screen=(x,y)=>[width/2+(x-cx)*scale,height/2-(y-cy)*scale];
+    canvas.fishReviewView={scale,cx,cy,width,height,frame};
+    ctx.save();ctx.translate(width/2,height/2);ctx.scale(scale,-scale);ctx.translate(-cx,-cy);
+    ctx.fillStyle='#083349';ctx.fillRect(left,bottom,right-left,top-bottom);
+    ctx.fillStyle='#d6d3bf';for(const [x,y,X,Y] of clip.obstacles)ctx.fillRect(x,y,X-x,Y-y);
+    ctx.strokeStyle='#5fa9c0';ctx.lineWidth=1/scale;ctx.beginPath();ctx.moveTo(left,top);ctx.lineTo(right,top);ctx.stroke();
+    ctx.fillStyle='#65777a';ctx.fillRect(left,bottom-.2,right-left,.2);
+    if(trails.checked) {
+      for(let id=0;id<12;id++) {
+        if(selected>=0 && id!==selected)continue;
+        ctx.strokeStyle=selected>=0?'#a5d9e6':'#58899a';ctx.lineWidth=1.2/scale;ctx.beginPath();let pen=false;
+        for(let j=Math.max(0,frame.index-20);j<=frame.index;j++) {
+          const point=clip.frames[j].fish[id];if(!point){pen=false;continue;}
+          if(pen)ctx.lineTo(point[0],point[1]);else ctx.moveTo(point[0],point[1]);pen=true;
+        }ctx.stroke();
+      }
+    }
+    if(frame.duck) {
+      const [x,y,r]=frame.duck;ctx.fillStyle='#f6c84f';ctx.beginPath();ctx.arc(x,y,r,0,tau);ctx.fill();
+    }
+    for(let id=0;id<12;id++) if(frame.fish[id]) fish(ctx,frame.fish[id],id,clip.pose==='heading');
+    ctx.restore();
+    ctx.font='12px system-ui';ctx.fillStyle='#e9f7fa';
+    if(frame.duck){const [x,y,r]=frame.duck;const [sx,sy]=screen(x,y+r+.3);if(sx>=0&&sx<=width&&sy>=0&&sy<=height)ctx.fillText('Duck body',Math.max(5,Math.min(width-75,sx-30)),Math.max(16,sy));}
+    if(selected>=0 && !p)ctx.fillText(time>38?'Selected fish has exited':'Selected fish is entering',12,22);
+    if(p) {
+      const degrees=clip.pose==='heading'?Math.asin(Math.sin(p[2]))*180/Math.PI:p[2]*180/Math.PI;
+      details[version].textContent=`pitch ${Math.round(degrees)}°`;
+    } else details[version].textContent=`${frame.fish.filter(Boolean).length} fish visible`;
+  }
+  function render(){slider.value=time;clock.textContent=`${time.toFixed(1)} s`;draw(0);draw(1);}
+  function pause(){playing=false;play.textContent='Play';if(animation!==null)cancelAnimationFrame(animation);animation=null;last=null;}
+  function animate(stamp){if(!playing)return;if(last!==null)time=Math.min(51,time+(stamp-last)/1000*Number(speed.value));last=stamp;render();if(time>=51){pause();return;}animation=requestAnimationFrame(animate);}
+  play.addEventListener('click',()=>{if(playing){pause();return;}if(time>=51)time=scene.value==='2'?38:6;playing=true;play.textContent='Pause';last=null;animation=requestAnimationFrame(animate);});
+  step.addEventListener('click',()=>{pause();time=Math.min(51,time+.1);render();});
+  slider.addEventListener('input',()=>{pause();time=Number(slider.value);render();});
+  scene.addEventListener('change',()=>{pause();time=scene.value==='2'?38:scene.value==='1'?12:8;render();});
+  follow.addEventListener('change',render);trails.addEventListener('change',render);
+  canvases.forEach(canvas=>canvas.addEventListener('click',event=>{
+    const v=canvas.fishReviewView;if(!v)return;const rect=canvas.getBoundingClientRect();
+    const x=v.cx+(event.clientX-rect.left-v.width/2)/v.scale,y=v.cy-(event.clientY-rect.top-v.height/2)/v.scale;
+    let nearest=-1,distance=1.5;
+    v.frame.fish.forEach((p,id)=>{if(p){const d=Math.hypot(p[0]-x,p[1]-y);if(d<distance){nearest=id;distance=d;}}});
+    if(nearest>=0){follow.value=String(nearest);render();}
+  }));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+  new ResizeObserver(render).observe(root);
+  render();
+})();
+</script>
