@@ -2009,6 +2009,74 @@ no concurrent scheduler events: affected-area metadata does not permit overlap.
 Marquee composes presentation passes *inside* one event; it does not opt out of
 the shared scheduling or cleanup rules.
 
+### Returning digit cells to their places
+
+Several events take the reading apart, and every one of them has to put it back
+by moving matter. A step where the cells vanish and re-materialize in place reads
+as a glitch rather than an animation, however short it is.
+`events/explosion/reassembly.rs` is the reference implementation, and states the
+rules in its own comments:
+
+- A cell travels from where it actually is to where it belongs. It never appears
+  at the goal.
+- A surplus cell joins a neighbour and shrinks, rather than fading out.
+- A shortfall splits a new cell from existing debris and grows it from zero size.
+- A reading that changes mid-animation retargets without restarting trajectories,
+  so a colon blink or a new second does not jerk the whole face.
+- The dim anchors are the substrate. They stay put while the lit cells move.
+
+`SegmentRepresentation::Reforming` carries the rule in the type. Its payload is a
+`Reformation` whose fields are private and which only
+`SegmentState::begin_reforming` can build, from the segment's actual position,
+angle and lit state. There is no way to describe a segment as reforming at its
+own anchor having never been lit, which is precisely the case that renders as a
+reading appearing at the goal out of nothing.
+
+A reading's light-blocking geometry is the reading. `render::plant_face_polygons`
+and the visible frame both go through `render_marquee_face`, so a digit carried
+off stops shading the plants it used to stand over, and one part way across
+shades what it is actually over.
+
+Conformance, measured rather than read:
+
+| Event | How the reading returns | Standard |
+| --- | --- | --- |
+| Exploding digits | Flights easing position, angle and size together, retargeting in flight | Reference |
+| Falling digits | Reforms from each segment's real landing pose, cross-fading the old shape into the new | Met |
+| Cell swaps | Per-cell quadratic bezier with opposing bow; the 15-tick fade only corrects a reading that changed mid-swap | Met |
+| Digit Slide | The old glyph slides out and the new one slides in, clipped per cell | Met |
+| Meltdown | Cells liquefy on real floor contact, and the face refills bottom-up and row-staggered as the puddle drains | Met by refill |
+| Aquarium | The face stays anchored and solid throughout; nothing comes apart | Not applicable |
+| Marquee, clock recipes | The reading dissolves into its own animation, which opens on the anchored pose | Met |
+| Marquee, text recipes | The reading is carried clear of the frame and brought back the same way | Met |
+
+Meltdown is the one sanctioned departure, and it is worth being exact about why.
+Its cells do not travel home: each one grows upward from its own bottom edge at
+its final position, row by row. What travels is the matter, through the water -
+a cell becomes liquid on real contact with the panel top, its area is ledgered
+into the pool, and the pool is reclaimed over exactly the ticks the face refills
+in. A digit climbing back out of a draining puddle reads as the melt running
+backwards, which is what the event is about. Any new event wanting this
+treatment owes the same thing: a physical account of where the matter went and a
+return coupled to it, not an alpha ramp standing in for one.
+
+The measurements behind that table, at a 800x480 face with seed 7. Meltdown's
+solid cells are all gone by tick 180, which is 240 ticks before the reform starts
+at 420, so none is ever discarded on screen when the reform begins; across the 90
+reform ticks the reading's ink climbs from 2.14 to 96.10 while the puddle drains
+from 97 parcels to none, and the ink is 96.12 on both the last reform tick and
+the first anchored tick, so the hand back is seamless. The marquee used to drop
+the reading's ink from 95.40 to 0.00 by tick 45 with its geometry never moving at
+all, and Clock spin and Digit spin compounded that by drawing their copy at a
+rotation-fitted scale that landed on none of the face's 88 lit cells and on one
+of them respectively. All four clock recipes now open on 88 of 88 cells with a
+cell side equal to the face's own 18.77 px. Through a clock recipe's handover the
+two copies of the reading sum to the face's full ink: Clock wave and Clock spin
+hold 90.00 of 90 for the whole visit, while Clock chase and Digit spin floor at
+49.93 and 48.26, which is their own chase and sweep patterns dimming cells to
+half rather than anything being put out. `render::face_handover_contract` holds
+all of this, with the floor set at 45% of the face's ink.
+
 ### Composed Marquee effects
 
 Choose **Recipe** in the launcher or live Clock Controls, select **Marquee** as
@@ -2028,8 +2096,12 @@ Explicit previews work even with the Marquee switch or profile Off.
 
 The active recipe and message are captured when the event starts. A setting change is saved
 for the next event; Preview deliberately replaces the current one. Each event
-lasts 720 fixed ticks (12 seconds). The ordinary face crossfades out/in over
-45 ticks at either end. Pause freezes playback. Time continues to be authoritative:
+lasts 720 fixed ticks (12 seconds), with 45-tick handovers at either end. A clock
+recipe animates the face's own cells, so it opens on the anchored pose and the
+reading dissolves into its own animation; a text recipe brings its own content,
+so the reading is carried clear of the frame and comes back the same way, as
+["Returning digit cells to their places"](#returning-digit-cells-to-their-places)
+requires. The dim anchors stay put throughout either one. Pause freezes playback. Time continues to be authoritative:
 clock recipes rebuild their lit cells from the latest supplied reading, including
 the colon and AM/PM, without advancing playback. Text never replaces the actual
 time state. Completion, resize, restart, and preview replacement restore the

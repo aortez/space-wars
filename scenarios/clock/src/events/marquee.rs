@@ -83,6 +83,12 @@ impl MarqueeEvent {
                 ..Recipe::default()
             },
         };
+        // A clock preset animates the face's own cells, so it has to open on the
+        // face's pose. A text takeover brings its own content instead.
+        let recipe = Recipe {
+            handover: uses_clock,
+            ..recipe
+        };
         Self {
             tick: 0,
             preset,
@@ -110,6 +116,25 @@ impl MarqueeEvent {
     pub fn step(&mut self) -> bool {
         self.tick += 1;
         self.tick >= MARQUEE_TICKS
+    }
+
+    /// How far the anchored face has travelled, as a signed fraction of the
+    /// clearance it needs. A text takeover carries the lit cells off the way the
+    /// message travels and returns them the same way, so the reading moves
+    /// instead of dissolving where it stands. A clock preset animates those
+    /// same cells and never sweeps them, so it reports nothing to move.
+    pub fn face_sweep(&self) -> Option<f32> {
+        if self.uses_clock {
+            return None;
+        }
+        // The message always travels left, so the face leaves to the left and
+        // comes back from the right rather than retreating the way it went.
+        let strength = self.playback().strength;
+        Some(if self.tick * 2 < MARQUEE_TICKS {
+            -strength
+        } else {
+            strength
+        })
     }
 
     pub fn playback(&self) -> Playback {
