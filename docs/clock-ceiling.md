@@ -88,23 +88,24 @@ whether the ceiling broke once or three times, and each opening spaces its own
 share by its own lit width: fixed wide spacing would place side seeds outside a
 narrow patch, where the light meant to feed them never reaches. Each planted
 patch carries its own growth policy, planning inside its own radius. An occupied
-resident population refuses reseeding rather than replacing plants or
-replenishing reserves. The old favorable fixture
+grass population refuses reseeding rather than replacing plants or replenishing
+reserves; a retained moss mat is not that occupancy, so it never refuses a later
+delivery or batch. The old favorable fixture
 explicitly retains its full-floor/full-room-light conditions; the zero-input
 shortage fixture explicitly suppresses sunlight. Neither is the ordinary
 ceiling reference sequence.
 
-| Event/category | Ceiling outcome |
-| --- | --- |
-| Falling, Color Cycle, Explosion | Coexist; actual moving solids and floor changes still shade, crush or remove support |
-| Duck, Crow | Coexist as independent residents with existing world/step ownership |
-| Marquee, Digit Slide, Cell Swap | Coexist; transformed face geometry shades normally |
-| Rain | Coexist with its actual course or responsive floor |
-| Meltdown, Aquarium (including water lab replacements) | Cancel sunlight and pending delivery; preserve committed soil/residents |
-| Another active Grass request | Refuse without extending the hold or admitting more inputs |
-| Next/skip, explicit cancellation, resize | Retire source and pending work once; retain committed habitat under real support rules |
-| Disable Grass | Prevent pending/future admission; an existing sunlight phase may finish |
-| Restart/exit | New/dropped scenario clears all owned state |
+| Event/category | Ceiling outcome | Retained mat outcome |
+| --- | --- | --- |
+| Falling, Color Cycle, Explosion | Coexist; actual moving solids and floor changes still shade, crush or remove support | Same crush and support rules as a blade; a mat has no soil above it, so a silhouette over its cell damages it outright |
+| Duck, Crow | Coexist as independent residents with existing world/step ownership | Contact damages mat cells, and an exported door interval retires them; a duck visit took a full mat from 18 cells to 7, regrowing to 17 |
+| Marquee, Digit Slide, Cell Swap | Coexist; transformed face geometry shades normally | A mat receives light like a blade, so geometry over its cell removes the room light it lives on; it stresses and recovers on the shared rates |
+| Rain | Coexist with its actual course or responsive floor | Retained with its soil; a course or responsive floor moves the mat through the same habitat adapters |
+| Meltdown, Aquarium (including water lab replacements) | Cancel sunlight and pending delivery; preserve committed soil/residents | Retained and still paid: these retire the opening, never the material. No cell lost or dead over two further minutes |
+| Another active Grass request | Refuse without extending the hold or admitting more inputs | Unaffected; a mat is not grass occupancy, so the refusal is the ceiling's own |
+| Next/skip, explicit cancellation, resize | Retire source and pending work once; retain committed habitat under real support rules | A cancelled ceiling never reaches the closing boundary, so it leaves no mat; an existing mat is retained habitat |
+| Disable Grass | Prevent pending/future admission; an existing sunlight phase may finish | Refused exactly as the seed batch is refused, and no corridor window is retained |
+| Restart/exit | New/dropped scenario clears all owned state | Cleared with it. A mat is retained state, not a saved setting |
 
 Ordinary closed floor, open drains, fixed courses and responsive/event-owned
 floors continue through the retained habitat adapters. Unsupported columns fall
@@ -129,21 +130,25 @@ The deterministic reference uses seed 4242, ordinary room intensity 50, resource
 availability [1000,1000], normal playback, and 60 fixed simulation steps/second.
 Its simulation-time checkpoints are:
 
-| Seconds since request | Phase | Living tissues | Shoots | Mature blades | Stressed tissues | Total health |
-| ---: | --- | ---: | ---: | ---: | ---: | ---: |
-| 5 | Open, material committed | 3 | 0 | 0 | 0 | 300 |
-| 10 | Open | 13 | 5 | 0 | 0 | 1300 |
-| 60 | Open | 64 | 18 | 0 | 0 | 6400 |
-| 180 | Open | 64 | 18 | 18 | 0 | 6400 |
-| 300 | Open | 64 | 18 | 18 | 0 | 6400 |
-| 305 | Closing | 64 | 18 | 18 | 0 | 6400 |
-| 335 | Closing | 64 | 18 | 18 | 4 | 6400 |
-| 365 | Closed | 64 | 18 | 18 | 26 | 6400 |
-| 425 | Closed, one minute aftermath | 64 | 18 | 18 | 61 | 5986 |
-| 485 | Closed, two minutes aftermath | 63 | 17 | 17 | 60 | 2540 |
-| 545 | Closed, three minutes aftermath | 3 | 0 | 0 | 3 | 300 |
-| 605 | Closed, four minutes aftermath | 3 | 0 | 0 | 3 | 201 |
-| 665 | Closed, five minutes aftermath | 2 | 0 | 0 | 2 | 28 |
+Grass columns count the lit patch only. A retained moss mat shares the same
+runtime from the closing boundary onward and is counted on its own, so the grass
+figures below are the same ones the patch recorded before succession existed.
+
+| Seconds since request | Phase | Living tissues | Shoots | Mature blades | Stressed tissues | Total health | Mat cells |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 5 | Open, material committed | 3 | 0 | 0 | 0 | 300 | 0 |
+| 10 | Open | 13 | 5 | 0 | 0 | 1300 | 0 |
+| 60 | Open | 64 | 18 | 0 | 0 | 6400 | 0 |
+| 180 | Open | 64 | 18 | 18 | 0 | 6400 | 0 |
+| 300 | Open | 64 | 18 | 18 | 0 | 6400 | 0 |
+| 305 | Closing | 64 | 18 | 18 | 0 | 6400 | 0 |
+| 335 | Closing | 64 | 18 | 18 | 4 | 6400 | 0 |
+| 365 | Closed | 64 | 18 | 18 | 26 | 6400 | 2 |
+| 425 | Closed, one minute aftermath | 64 | 18 | 18 | 61 | 5986 | 6 |
+| 485 | Closed, two minutes aftermath | 63 | 17 | 17 | 60 | 2540 | 6 |
+| 545 | Closed, three minutes aftermath | 3 | 0 | 0 | 3 | 300 | 18 |
+| 605 | Closed, four minutes aftermath | 3 | 0 | 0 | 3 | 201 | 18 |
+| 665 | Closed, five minutes aftermath | 2 | 0 | 0 | 2 | 28 | 18 |
 
 First shoot: 6 seconds. First stress: 324. First health damage: 384. First
 tissue loss: 483. Stress and damage both fall inside the closing phase and its
@@ -155,9 +160,12 @@ the hold rather than after it: none is mature at 60 seconds and all 18 are by
 measured outcome of the current seeding. At 300 seconds each biology tick has
 nonzero ordinary intake [336,336,432] and paid upkeep [121,175,175]; stores are
 [2049,1995,1995]. After closing, energy intake drops to 18 per tick against 141
-upkeep, and the energy store is empty by 425 seconds. Shade and shortage
-accumulate while the grass remains alive; tissue loss then develops over
-minutes. Remaining stressed roots are not a promise of an exact whole-population
+upkeep. From that boundary the ledger is shared with the mat, which is why
+intake rises to [348,348,30] by 425 seconds while the grass is dying: the extra
+is the mat's own surface supply and the energy the dim room still pays it, and
+the 138 units left in the energy store are the mat's, not the patch's. Shade and
+shortage accumulate while the grass remains alive; tissue loss then develops
+over minutes. Remaining stressed roots are not a promise of an exact whole-population
 death time. `ceiling-reference.json` emitted by the 12:34, 800×480 fixture
 records checkpoints, reserves and per-tick ledgers, and assertions preserve this
 intermediate stress/damage/loss progression.
@@ -188,6 +196,98 @@ default font, and 00/12 with a leading-zero hour transition at aspect ratios
 development at 180 and 304 seconds, without extra light or reserves. Existing
 moving-solid/tissue contracts remain required.
 
+## Moss succession on the retained floor
+
+When the ceiling finishes closing, each former opening keeps one bounded moss
+mat on the retained soil it exposed. The dim room is what makes that work: its
+own directional light is 50 units, which is exactly moss's saturation level and
+twice its 25-unit deficit threshold, while a grass shoot needs 250 before it
+stops accruing shade. The same closed room that shades a blade out saturates a
+mat, so the corridor keeps low cover instead of returning to bare dirt. Every
+mat cell reads light 50 with the ceiling closed, in surface contact and with no
+stress; the organism, its passive surface supply and its shade tolerance all
+belong to Core, and the Clock adds no survival exemption.
+
+A mat lies in the first air row above the floor line, row 3 of the 11-row
+habitat. Its own cell has to be clear of solid geometry with the inset soil
+surface row beneath it as its contact, which is also the row a grass shoot rises
+into. The two organisms therefore meet by ordinary occupancy: a mat cell refuses
+a shoot and a shoot cell refuses a mat, with no replacement and no recharge. A
+seed is still planted into the dirt below a mat, because that is a different
+cell; what the mat refuses is the shoot that seed would raise. Each mat is
+placed at the near edge of its opening's lit span rather than the centre where
+the seed batch lands, so the two organisms compete at their margins.
+
+A mat attaches to retained soil, not to the floor slab beneath it. Surface
+contact is a terrain-geometry test, and the floor is not part of the soil
+terrain, so a column needs actual dirt in its surface row to carry a mat. Since
+an opening delivers an even layer over every actual support, retained soil is
+present wherever the supported floor is, and that narrowing costs no coverage
+in practice.
+
+Bounds are the mat's own. Eighteen cells cover every patch together, the way
+grass's trait bounds all of its seeds at once: the moss policy recognises its
+own tissue by policy and support, so each mat counts the others. Placement
+answers to that same total, so a later ceiling cannot seat a fresh mat once the
+retained ones fill it, and at most one mat is admitted per opening. Spread is
+confined to the corridors the openings are cut through, captured when a ceiling
+first closes and held as two ranges however many ceilings come and go. That is
+deliberately not the grass window, which is rebuilt from the live apertures and
+dropped once all tissue is gone: a mat outlives the patch it succeeded, so
+sharing one window would either strand it or let it creep across unlit floor.
+
+Grass keeps its own 64-tissue bound and moss its 18, over a shared runtime
+capacity of 82. Each organism's growth intents are trimmed to its own remaining
+room before the tick, because policies plan independently against the same
+observation: without that, three grass seeds would each propose the
+sixty-fourth cell in one tick and the patch would overshoot. Shoots and mats
+also share lighting's 64-receiver budget. A grass shoot can only sit one row
+above a soil-row parent, so grass holds at most one per column, and the mat
+total leaves that headroom.
+
+Spread is paid and slow. A new cell costs 20 of each resource while a mat cell
+nets one of each per tick, so a mat accelerates as it grows rather than arriving
+whole. In the reference sequence seed 4242 admits two mats at the closing
+boundary, one per corridor; they hold 6 cells one minute later and the full 18
+by about 540 seconds, roughly 175 seconds after admission. These are measured
+outcomes of the current tuning, not a promised schedule.
+
+Light response is measured on the same fixture. Dropping the room to zero
+accrues shade on every cell within 10 seconds without damaging any of them;
+damage begins only after the shared 60-tick grace, and restoring 50 units clears
+the deficit and heals every survivor to full health. Held dark, the mat dies,
+and returning light never brings a dead cell back.
+
+A later opening therefore helps a mat differently than it helps grass. Moss
+energy is proportional to light up to its saturation level and flat above it, so
+a mat on clear floor is already paid in full by the dim room and an opening's
+950 units buy it nothing there. What an opening restores is light to cells the
+room does not reach, under moved face geometry or a visiting actor: those
+recover on the shared rates rather than growing faster. Only a blade gains
+outright from the extra.
+
+Once the grass is gone a later Grass request delivers its layer and plants the
+full batch of three with no refusal while the mat keeps all 18 cells, and
+closing again leaves the openings that already carry moss alone.
+
+Presentation draws one low cushion strip per cell on the arena layer, beneath
+the blades, with a top edge that alternates by column so neighbouring cells
+interlock rather than reading as a painted band. The fill is deeper and duller
+than a blade, so a mat never reads as grass at a glance, and living, stressed
+and dead states use the same health blend a blade does. A mat raises no
+silhouette, so unlike a shoot it is never an occluder and claims no surface
+identity: it owns no polygon that could block its own ray or shade a neighbour.
+A full mat therefore costs at most 18 further arena polygons per frame and 18
+further receivers per biological tick, and no further occluders at all. That is
+the bound the design carries, not a measurement: the opening's cost on the
+cabinet belongs to Picade qualification, which is still outstanding.
+
+The grass state publishes `moss_tissues`, `moss_stressed` and `moss_dead`
+separately from the grass counts, and the inspection cutaway names the role and
+draws a focused mat in its own colour. Moss carries its own named Core tuning
+for intake, energy, saturation and deficit threshold; the shared grass
+physiology v3 constants are unchanged.
+
 ## Moving-solid beam regression
 
 The aligned seed-4242 regression uses aspect 16:9, ordinary ambient 50, static
@@ -214,7 +314,11 @@ These are deterministic geometry observations, not normal-speed UI screenshots.
 `raster` workflow run the complete ordinary-speed sequence through 666 seconds.
 They record opening, arrival, early/paid growth, hold end, partial closing, closed
 state and five aftermath checkpoints, assert changing readings and gradual
-loss, and check restart cleanup. Metadata includes seed/configuration, simulation
+loss, and check restart cleanup. They also show the succession in both
+renderers: no mat while the ceiling is still closing, a mat admitted at the
+closing boundary with the lit patch still whole, growth through the aftermath
+with nothing dead, and then a later opening that reseeds the full batch over the
+retained mat. Metadata includes seed/configuration, simulation
 and wall times, executable SHA-256, source commit and a digest/list of workspace
 Rust/Slint sources and Cargo manifests. These two long cases are full-only in the
 coverage manifest; the existing two Grass admission/pause/disable/restart smoke
@@ -224,8 +328,10 @@ PR smoke filter is unchanged.
 Normal-speed vector/raster images, matched moving-blocker beam/exposure
 inspection, readable digits and host runtime measurements come from those
 registered workflows on a real display; headless tests do not establish them.
-Moss admission, floor succession and the full artificial-light rollout remain
-later work.
+Moss admission and floor succession are covered by the deterministic
+`clock_moss_contract_*` contracts and by those two workflows. Picade
+qualification of the opening and the full artificial-light rollout remain later
+work.
 
 ## Moving-solid presentation verification
 

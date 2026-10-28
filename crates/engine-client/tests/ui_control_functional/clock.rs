@@ -2305,6 +2305,7 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
         let mut history = Vec::new();
         let mut readings = std::collections::BTreeSet::new();
         let mut hold_shoots = 0;
+        let mut mat_at_close = 0;
         loop {
             let current = h.clock_state();
             let g = current.grass.as_ref().unwrap();
@@ -2314,6 +2315,8 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
             assert_eq!(g.optical_refusals, 0);
             assert_eq!(g.soil_added, g.soil_retained as u64 + g.soil_exported);
             assert!(g.living_tissues <= 64 && g.soil_retained <= 2880);
+            // Grass and the retained mat each answer to their own budget.
+            assert!(g.moss_tissues + g.moss_dead <= 18);
             assert_eq!(
                 g.ceiling_planned_material,
                 g.ceiling_pending_material as u64
@@ -2338,12 +2341,24 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
                 if label == "partial-closing" {
                     assert_eq!(g.ceiling_phase, "closing");
                     assert!((100..900).contains(&g.ceiling_opening_milli));
+                    // Nothing is admitted while the ceiling is still closing.
+                    assert_eq!(g.moss_tissues, 0);
                 }
                 if at >= 366 {
                     assert_eq!(g.ceiling_phase, "closed");
                 }
+                if label == "closed" {
+                    // Succession is admitted at the boundary the hold ends on,
+                    // one mat per opening, while the lit patch is still whole.
+                    assert!(g.moss_tissues > 0);
+                    assert_eq!(g.living_tissues, 64);
+                    mat_at_close = g.moss_tissues;
+                }
                 if label == "aftermath-60" {
                     assert!(g.shoots > 0 && g.stressed_tissues > 0);
+                    // Checkpoints are sampled against a real clock, so growth
+                    // is only required to hold, not to have advanced yet.
+                    assert!(g.moss_tissues >= mat_at_close);
                 }
                 if label == "aftermath-120" {
                     assert!(g.shoots > 0 && g.stressed_tissues > 0);
@@ -2352,7 +2367,11 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
                     assert_eq!(g.shoots, 0);
                 }
                 if label == "aftermath-300" {
+                    // The grass is gone and the mat is what the floor keeps:
+                    // the dim room saturates moss where it shades a blade out.
                     assert!(g.shoots < hold_shoots);
+                    assert!(g.moss_tissues > mat_at_close && g.moss_dead == 0);
+                    assert!(g.living_tissues < 64);
                 }
                 let capture = format!("ceiling-{renderer}-{at:03}-{label}.png");
                 h.capture_screenshot(&capture);
@@ -2387,6 +2406,50 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
             readings.len() >= 5,
             "Clock readings must continue through sunlight and aftermath"
         );
+        // A retained mat is not grass occupancy, so the next opening still
+        // delivers its layer and still plants its batch over the cover the
+        // last one left. Only the admission is sampled at this speed; the
+        // deterministic sequence belongs to the scenario contracts.
+        // Reseeding answers to grass occupancy, and the patch still holds its
+        // last tissues at the final checkpoint, so wait for it to retire
+        // first. Otherwise the refusal under test is the old patch's, not the
+        // mat's, and the mat outliving the patch is the claim being made here.
+        let cleared = Instant::now();
+        let mats = loop {
+            let current = h.clock_state();
+            let g = current.grass.as_ref().unwrap();
+            if g.living_tissues == 0 {
+                assert!(
+                    g.moss_tissues > 0,
+                    "the mat must outlive the patch it succeeded"
+                );
+                break g.moss_tissues;
+            }
+            assert!(
+                cleared.elapsed() < Duration::from_secs(240),
+                "the grass patch must retire before the mat is asked to share"
+            );
+            thread::sleep(Duration::from_millis(100));
+        };
+        let succeeded = h.clock_state();
+        h.clock_trigger_event(&succeeded, ClockEventKind::Grass);
+        let reseed = Instant::now();
+        loop {
+            let current = h.clock_state();
+            let g = current.grass.as_ref().unwrap();
+            if g.ceiling_sequence == 2 && g.ceiling_deliveries == 2 && g.seeded > 0 {
+                assert_eq!(g.seeded, 3);
+                assert_eq!(g.refusal, None);
+                assert!(g.moss_tissues >= mats);
+                h.capture_screenshot(&format!("ceiling-{renderer}-reseeded.png"));
+                break;
+            }
+            assert!(
+                reseed.elapsed() < Duration::from_secs(120),
+                "a later opening must reseed over the retained mat"
+            );
+            thread::sleep(Duration::from_millis(100));
+        }
         let before = h.clock_state();
         let gameplay = h.state();
         h.activate_guarded("gameplay.clock-controls", &gameplay);

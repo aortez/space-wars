@@ -483,6 +483,12 @@ pub struct ClockState {
 impl ClockState {
     pub fn grass_state(&self) -> engine_common::ClockGrassState {
         let o = self.plants.plants.observe();
+        // The two organisms share one runtime, so every per-tissue count names
+        // which one it is about. Only the resource ledger below stays a runtime
+        // total, because intake and upkeep are pooled before they are spent.
+        let is_moss = |t: &&engine_core::plants::Tissue| t.role == engine_core::plants::Role::Moss;
+        let grass = o.tissues.iter().filter(move |t| !is_moss(t));
+        let moss = o.tissues.iter().filter(is_moss);
         let soil = self
             .soil
             .as_ref()
@@ -500,27 +506,30 @@ impl ClockState {
             ceiling_planned_material: self.ceiling.planned_material,
             ceiling_committed_material: self.ceiling.committed_material,
             ceiling_cancelled_material: self.ceiling.cancelled_material,
-            stressed_tissues: o
-                .tissues
-                .iter()
+            stressed_tissues: grass
+                .clone()
                 .filter(|t| t.health > 0 && (t.shade_ticks > 0 || t.shortage_ticks > 0))
                 .count(),
-            dead_tissues: o.tissues.iter().filter(|t| t.health == 0).count(),
+            dead_tissues: grass.clone().filter(|t| t.health == 0).count(),
+            moss_tissues: moss.clone().filter(|t| t.health > 0).count(),
+            moss_stressed: moss
+                .clone()
+                .filter(|t| t.health > 0 && (t.shade_ticks > 0 || t.shortage_ticks > 0))
+                .count(),
+            moss_dead: moss.clone().filter(|t| t.health == 0).count(),
             biology_tick: o.tick,
             soil_added: soil.added,
             soil_retained: soil.retained,
             soil_exported: soil.exported,
-            living_tissues: o.tissues.iter().filter(|t| t.health > 0).count(),
-            mature_blades: o
-                .tissues
-                .iter()
+            living_tissues: grass.clone().filter(|t| t.health > 0).count(),
+            mature_blades: grass
+                .clone()
                 .filter(|t| {
                     t.role == engine_core::plants::Role::Shoot && t.size >= 3 && t.health > 0
                 })
                 .count(),
-            shoots: o
-                .tissues
-                .iter()
+            shoots: grass
+                .clone()
                 .filter(|t| t.role == engine_core::plants::Role::Shoot && t.health > 0)
                 .count(),
             organisms: o
@@ -547,7 +556,7 @@ impl ClockState {
         self.grass_seeded = 0;
         let refusal = if !self.config.events.grass {
             Some("Future grass seeding is disabled")
-        } else if !self.plants.plants.observe().tissues.is_empty() {
+        } else if self.plants.grass_tissues() > 0 {
             Some("Grass resident capacity is occupied")
         } else {
             None
@@ -1551,6 +1560,7 @@ impl Scenario for ClockScenario {
                 ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
         }
+        let closing = state.ceiling.phase == ceiling::Phase::Closing;
         if state.ceiling.advance(dt) {
             let before = state
                 .soil
@@ -1568,6 +1578,11 @@ impl Scenario for ClockScenario {
             state.ceiling.cancelled_material +=
                 (state.ceiling.material.len() as u64).saturating_sub(added);
             state.ceiling.material.clear();
+        }
+        // Succession runs at the natural end of the hold. A cancelled ceiling
+        // is already Closed before this point, so it never seeds a mat.
+        if closing && state.ceiling.phase == ceiling::Phase::Closed {
+            state.introduce_moss();
         }
         state.synchronize_soil();
         // The fixed-timestep host supplies one tick per call. Zero duration is

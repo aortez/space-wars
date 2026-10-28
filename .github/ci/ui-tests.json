@@ -64,7 +64,7 @@
     },
     {
       "test": "clock::ceiling_opening_raster_normal_speed_and_aftermath",
-      "reason": "Complete 300-second unpaused sunlight hold, closing and five-minute aftermath at 1x; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
+      "reason": "Complete 300-second unpaused sunlight hold, closing, five-minute aftermath and moss succession at 1x, then a later opening reseeding over the retained mat; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
     },
     {
       "test": "clock::ceiling_opening_vector_moving_blocker_evidence",
@@ -72,7 +72,7 @@
     },
     {
       "test": "clock::ceiling_opening_vector_normal_speed_and_aftermath",
-      "reason": "Complete 300-second unpaused sunlight hold, closing and five-minute aftermath at 1x; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
+      "reason": "Complete 300-second unpaused sunlight hold, closing, five-minute aftermath and moss succession at 1x, then a later opening reseeding over the retained mat; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
     },
     {
       "test": "clock::demo_profile_automatically_runs_multiple_bounded_events",

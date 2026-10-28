@@ -5,6 +5,7 @@ use engine_core::{
     plants::{
         self, Environment, Exposure, Plants, Role, Support, Tissue,
         grass::{Grass, Traits},
+        moss::Moss,
     },
 };
 use engine_rapier::{
@@ -14,9 +15,15 @@ use engine_rapier::{
 use std::{collections::BTreeMap, time::Duration};
 
 pub const BIOLOGY_TICK_MS: u64 = 1000;
-pub const MAX_PLANT_TISSUES: usize = 64;
+/// Grass's own population bound, which the measured reference sequence fills.
+/// Moss holds a separate budget, so a retained mat never shrinks a grass patch.
+pub const MAX_GRASS_TISSUES: usize = 64;
+/// Shared runtime capacity for both organisms. Grass is bounded by its own
+/// trait rather than by this total, so raising it leaves the reference intact.
+pub const MAX_PLANT_TISSUES: usize = MAX_GRASS_TISSUES + super::MAX_MOSS_TISSUES;
 pub const MAX_BIOLOGY_STEPS_PER_UPDATE: usize = 16;
-pub const MAX_PLANT_ORGANISMS: usize = 4;
+/// Grass seeds plus retained moss mats, each one its own organism.
+pub const MAX_PLANT_ORGANISMS: usize = super::SEED_BATCH + super::MAX_MOSS_PATCHES;
 pub const MAX_SHOOT_HEIGHT_CELLS: usize = 8;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -34,13 +41,31 @@ impl PlantPlayback {
     }
 }
 
+/// One growth policy per planted patch, of either organism. Both plan against
+/// the whole shared observation and recognise their own tissue by policy and
+/// support, so the runtime keeps them in one list and spends one work slot.
+pub(crate) enum Policy {
+    Grass(Grass),
+    Moss(Moss),
+}
+impl Policy {
+    fn plan(&self, o: &plants::Observation, env: &impl Environment) -> plants::Plan {
+        match self {
+            Self::Grass(grass) => grass.plan(o, env),
+            Self::Moss(moss) => moss.plan(o, env),
+        }
+    }
+}
+
 pub struct ClockPlants {
     pub plants: Plants,
-    /// One policy per planted patch. A policy bounds spread to its own origin
-    /// and radius while planning for every tissue on the shared soil support,
-    /// so a single retained policy would refuse all growth in a second lit
-    /// patch and leave its seed to starve.
-    pub(crate) policies: Vec<Grass>,
+    /// One policy per planted patch, grass or moss. A grass policy bounds
+    /// spread to its own origin and radius while planning for every tissue on
+    /// the shared soil support, so a single retained policy would refuse all
+    /// growth in a second lit patch and leave its seed to starve. A moss
+    /// policy carries no radius: contiguity and the retained corridor bound a
+    /// mat instead.
+    pub(crate) policies: Vec<Policy>,
     pub playback: PlantPlayback,
     /// Real incident source intensity; the ordinary room stays dim.
     pub intensity: u16,
@@ -55,6 +80,11 @@ pub struct ClockPlants {
     /// A fixture that supplies its own full-sun habitat is not aperture-gated,
     /// so its establishment timing stays a controlled reference.
     pub(crate) light_bounded: bool,
+    /// Inclusive soil column ranges a mat may spread along, captured from the
+    /// openings when the ceiling finished closing. Moss outlives the grass that
+    /// shared its corridor, so it cannot borrow `lit_columns`: that window is
+    /// rebuilt from the live apertures and dropped once all tissue is gone.
+    pub(crate) moss_columns: Option<Vec<(i32, i32)>>,
     pub availability: [u16; 2],
     pub exposure: BTreeMap<u64, Exposure>,
     pub admitted_at: BTreeMap<u64, u64>,
@@ -75,6 +105,7 @@ impl ClockPlants {
             apertures: Vec::new(),
             lit_columns: None,
             light_bounded: true,
+            moss_columns: None,
             intensity: engine_rapier::plant_light::DIM_ROOM as u16,
             availability: [1000; 2],
             exposure: BTreeMap::new(),
@@ -95,10 +126,10 @@ impl ClockPlants {
     ) -> Result<u64, plants::Rejection> {
         // A seed's placement is chosen against the live opening by the host.
         // The lit window bounds later spread, never the deliberate planting.
-        let env = HostEnvironment::new(soil, self.availability, BTreeMap::new(), None);
+        let env = HostEnvironment::new(soil, self.availability, BTreeMap::new(), None, None);
         let grass = Grass::new(
             Traits {
-                max_tissues: MAX_PLANT_TISSUES,
+                max_tissues: MAX_GRASS_TISSUES,
                 radius: 6,
                 starting_reserves: super::SEED_STARTING_RESERVES,
                 ..Traits::default()
@@ -111,8 +142,69 @@ impl ClockPlants {
         let observation = self.plants.observe();
         let tissue = observation.tissues.iter().find(|t| t.id == id).unwrap();
         self.admitted_at.insert(tissue.organism, observation.tick);
-        self.policies.push(grass);
+        self.policies.push(Policy::Grass(grass));
         Ok(id)
+    }
+    /// A mat is placed in the first air row above the floor line, where its own
+    /// cell is clear of solid geometry and the soil surface row beneath it
+    /// supplies passive contact. Placement itself is the host's decision, so
+    /// the retained corridor bounds only the spread that follows.
+    pub(crate) fn plant_moss(
+        &mut self,
+        soil: &SoilHabitat,
+        column: i32,
+    ) -> Result<u64, plants::Rejection> {
+        // The mat budget bounds placement as well as spread. The shared runtime
+        // capacity is larger, so without this a later ceiling could seat a
+        // fresh mat in an opening while the retained ones already fill it.
+        let mats = self
+            .plants
+            .observe()
+            .tissues
+            .iter()
+            .filter(|t| t.role == Role::Moss)
+            .count();
+        if mats >= super::MAX_MOSS_TISSUES {
+            return Err(plants::Rejection::TissueLimit);
+        }
+        let env = HostEnvironment::new(soil, self.availability, BTreeMap::new(), None, None);
+        let moss = Moss::new(
+            plants::moss::Traits {
+                growth_interval_ticks: super::MOSS_GROWTH_INTERVAL_TICKS,
+                max_tissues: super::MAX_MOSS_TISSUES,
+                starting_reserves: super::MOSS_STARTING_RESERVES,
+                ..plants::moss::Traits::default()
+            },
+            [column, super::MOSS_ROW],
+            soil.material_support(),
+        )?;
+        let id = moss.place(&mut self.plants, &env)?;
+        let observation = self.plants.observe();
+        let tissue = observation.tissues.iter().find(|t| t.id == id).unwrap();
+        self.admitted_at.insert(tissue.organism, observation.tick);
+        self.policies.push(Policy::Moss(moss));
+        Ok(id)
+    }
+    /// Living mat cells, which outlast the grass they succeed.
+    pub fn moss_tissues(&self) -> usize {
+        self.plants
+            .observe()
+            .tissues
+            .iter()
+            .filter(|t| t.role == Role::Moss && t.health > 0)
+            .count()
+    }
+    /// Grass tissue of any health, the resident the Grass event introduces and
+    /// the occupancy its soil delivery and seed batch answer to. A retained mat
+    /// is deliberately excluded: moss outlives the patch it succeeded, so
+    /// counting it would refuse every later opening and every later seed.
+    pub fn grass_tissues(&self) -> usize {
+        self.plants
+            .observe()
+            .tissues
+            .iter()
+            .filter(|t| t.role != Role::Moss)
+            .count()
     }
     pub(crate) fn revalidate(&mut self, soil: &SoilHabitat) {
         let env = HostEnvironment::new(
@@ -120,6 +212,7 @@ impl ClockPlants {
             self.availability,
             BTreeMap::new(),
             self.lit_columns.as_deref(),
+            self.moss_columns.as_deref(),
         );
         engine_rapier::grass::detach_invalid(&mut self.plants, &env)
             .expect("bounded material attachment loss");
@@ -143,9 +236,23 @@ impl ClockPlants {
         let current = self.plants.observe();
         self.admitted_at
             .retain(|id, _| current.tissues.iter().any(|t| t.organism == *id));
-        if current.tissues.is_empty() {
-            self.policies.clear();
-        }
+        // A policy is retired with the last tissue of its own organism. Grass
+        // policies share one policy identity and support, so they cannot be
+        // told apart individually and retire together, as they always have.
+        // Retiring them by organism matters now that a mat outlives them:
+        // otherwise every later Grass event would stack three more dead
+        // policies onto a list that is planned through on every tick.
+        let living = |moss: bool| {
+            current
+                .tissues
+                .iter()
+                .any(|t| (t.role == Role::Moss) == moss)
+        };
+        let (grass, moss) = (living(false), living(true));
+        self.policies.retain(|policy| match policy {
+            Policy::Grass(_) => grass,
+            Policy::Moss(_) => moss,
+        });
     }
     /// Lightweight crushing affects exposed tissue, using current canonical
     /// actor shapes. Roots remain protected by actual soil rather than proximity.
@@ -235,7 +342,12 @@ impl ClockPlants {
         if optical_overflow {
             footprints.clear();
         }
-        if self.plants.observe().tissues.is_empty() {
+        // The lit window belongs to one grass patch's growth. A retained mat
+        // outlives that patch and carries its own corridor window, so it must
+        // not hold a stale aperture window open: the next ceiling widens this
+        // one per opening index, which would merge two unrelated openings into
+        // a span reaching across floor that neither of them lit.
+        if self.grass_tissues() == 0 {
             self.lit_columns = None;
         }
         if self.light_bounded && !self.apertures.is_empty() {
@@ -272,7 +384,7 @@ impl ClockPlants {
             );
             polygons.extend(tissue_polygons(&before, soil));
             let mut receivers = Vec::new();
-            let mut shoots = Vec::new();
+            let mut sampled = Vec::new();
             // Receivers sit at the same paid-development tips that are drawn
             // and that occlude neighbours.
             for t in before
@@ -285,9 +397,33 @@ impl ClockPlants {
                         position: polygon[2],
                         surface: Some(LightId(SOIL_PHYSICS_ID, t.id)),
                     });
-                    shoots.push(t.id);
+                    sampled.push(t.id);
                 }
             }
+            // A mat reads the light at its own cell center, half a cell above
+            // the floor line and so clear of the soil beneath it. It raises no
+            // silhouette, which is why it claims no surface identity: it owns
+            // no polygon that could block its own ray or shade a neighbour.
+            for t in before
+                .tissues
+                .iter()
+                .filter(|t| t.role == Role::Moss && t.health > 0)
+            {
+                if let Some(center) = soil.world_point(t.cell) {
+                    receivers.push(Receiver {
+                        position: center,
+                        surface: None,
+                    });
+                    sampled.push(t.id);
+                }
+            }
+            // Shoots rise one row above a soil-row parent, so grass holds at
+            // most one per column, and the mat budget leaves that headroom.
+            debug_assert!(
+                receivers.len() <= lighting::MAX_RECEIVERS,
+                "shoots and mats share the receiver budget: {}",
+                receivers.len()
+            );
             let samples = if optical_overflow {
                 Err(lighting::LightingError::Capacity)
             } else {
@@ -309,13 +445,18 @@ impl ClockPlants {
             if optical_overflow || samples.is_err() {
                 self.optical_refusals += 1;
             }
-            let light = shoots
+            let light = sampled
                 .into_iter()
                 .zip(samples.unwrap_or_default())
                 .map(|(id, e)| (id, e.intensity.floor() as u16))
                 .collect();
-            let env =
-                HostEnvironment::new(soil, self.availability, light, self.lit_columns.as_deref());
+            let env = HostEnvironment::new(
+                soil,
+                self.availability,
+                light,
+                self.lit_columns.as_deref(),
+                self.moss_columns.as_deref(),
+            );
             self.exposure = before
                 .tissues
                 .iter()
@@ -326,7 +467,7 @@ impl ClockPlants {
             let mut intents: Vec<_> = self
                 .policies
                 .iter()
-                .flat_map(|g| g.plan(&before, &env).intents)
+                .flat_map(|policy| policy.plan(&before, &env).intents)
                 .collect();
             intents.retain(|intent| match intent {
                 plants::Intent::Grow { parent, cell, .. } => before
@@ -334,6 +475,32 @@ impl ClockPlants {
                     .iter()
                     .find(|t| t.id == *parent)
                     .is_some_and(|t| connected(soil, t.cell, *cell)),
+                _ => true,
+            });
+            // Each organism answers to its own total, which the shared runtime
+            // capacity no longer does for it. Policies plan independently
+            // against the same observation, so without this three grass seeds
+            // would each propose the sixty-fourth cell in one tick and the
+            // patch would overshoot its bound. Order is the policies' own, so
+            // the earliest proposal still wins the last place.
+            let moss = before
+                .tissues
+                .iter()
+                .filter(|t| t.role == Role::Moss)
+                .count();
+            let mut room = [
+                MAX_GRASS_TISSUES.saturating_sub(before.tissues.len() - moss),
+                super::MAX_MOSS_TISSUES.saturating_sub(moss),
+            ];
+            intents.retain(|intent| match intent {
+                plants::Intent::Grow { role, .. } => {
+                    let budget = &mut room[usize::from(*role == Role::Moss)];
+                    *budget = match budget.checked_sub(1) {
+                        Some(left) => left,
+                        None => return false,
+                    };
+                    true
+                }
                 _ => true,
             });
             self.plants
@@ -368,6 +535,36 @@ pub(crate) fn shoot_polygon(
             Vec2::new(-0.5, -1.0),
             Vec2::new(0.5, -1.0),
             Vec2::new(0.0, height),
+        ]
+        .map(|p| center + p.rotate_radians(surface.angle))
+        .to_vec(),
+    )
+}
+/// Presentation only. A mat lies flat on the floor line and raises no
+/// silhouette, so unlike a shoot it never becomes an occluder. Its own cell
+/// center is half a cell above that line, so the drawn strip sits below the
+/// center rather than around it.
+pub(crate) fn moss_polygon(t: &Tissue, soil: &SoilHabitat) -> Option<Vec<Vec2>> {
+    let center = soil.world_point(t.cell)?;
+    let surface = soil.surface_at(t.cell[0])?;
+    let half = SOIL_CELL_SIZE * 0.5;
+    // A bumpy top edge reads as cushion rather than a painted band, and the
+    // bump alternates by column so neighbouring cells interlock.
+    let raised = if t.cell[0].rem_euclid(2) == 0 {
+        0.38
+    } else {
+        0.28
+    };
+    let tall = SOIL_CELL_SIZE * raised - half;
+    let low = SOIL_CELL_SIZE * 0.18 - half;
+    Some(
+        [
+            Vec2::new(-half, -half),
+            Vec2::new(half, -half),
+            Vec2::new(half, low),
+            Vec2::new(half * 0.5, tall),
+            Vec2::new(-half * 0.5, tall),
+            Vec2::new(-half, low),
         ]
         .map(|p| center + p.rotate_radians(surface.angle))
         .to_vec(),
@@ -447,6 +644,7 @@ struct HostEnvironment<'a> {
     roots: MaterialUptake<'a>,
     light: BTreeMap<u64, u16>,
     lit_columns: Option<&'a [(i32, i32)]>,
+    moss_columns: Option<&'a [(i32, i32)]>,
 }
 impl<'a> HostEnvironment<'a> {
     fn new(
@@ -454,10 +652,12 @@ impl<'a> HostEnvironment<'a> {
         availability: [u16; 2],
         light: BTreeMap<u64, u16>,
         lit_columns: Option<&'a [(i32, i32)]>,
+        moss_columns: Option<&'a [(i32, i32)]>,
     ) -> Self {
         Self {
             soil,
             lit_columns,
+            moss_columns,
             roots: MaterialUptake {
                 terrain: soil.terrain(),
                 geometry: soil.geometry(),
@@ -484,10 +684,19 @@ impl Environment for HostEnvironment<'_> {
         self.roots.support_valid(support, cell) && self.soil.surface_at(cell[0]).is_some()
     }
     fn space_available(&self, cell: [i32; 2], role: Role, size: u16) -> bool {
+        // Each organism answers to its own retained window: grass to the lit
+        // width of the live openings, moss to the corridor a closed ceiling
+        // left behind. A mat outlives those openings, so sharing one window
+        // would either strand it or let it spread across unlit floor.
+        let windows = if role == Role::Moss {
+            self.moss_columns
+        } else {
+            self.lit_columns
+        };
         self.support_valid(Some(self.roots.support), cell)
             && self.roots.space_available(cell, role, size)
             && cell[1] < (SOIL_DEPTH_CELLS + MAX_SHOOT_HEIGHT_CELLS) as i32
-            && self.lit_columns.is_none_or(|windows| {
+            && windows.is_none_or(|windows| {
                 windows
                     .iter()
                     .any(|&(low, high)| (low..=high).contains(&cell[0]))

@@ -17,6 +17,27 @@ pub const SEED_BATCH: usize = 3;
 pub const SEED_SPACING_CELLS: i32 = 4;
 pub const SEED_STARTING_RESERVES: [u64; 3] = [30; 3];
 
+/// Moss succession. One bounded mat per opening is admitted when the ceiling
+/// finishes closing, so a wider break leaves more cover behind as the lit grass
+/// withers.
+pub const MAX_MOSS_PATCHES: usize = crate::ceiling::MAX_OPENINGS;
+/// Mat cells across every patch together, the way grass's trait bounds all of
+/// its seeds at once: the moss policy recognises its own tissue by policy and
+/// support, so each mat counts the others. Six cells a patch at the widest
+/// break. The total stays small because every mat cell is also a light
+/// receiver, and shoots and mats together have to fit `MAX_RECEIVERS`.
+pub const MAX_MOSS_TISSUES: usize = 18;
+/// A mat waits longer between growth opportunities than grass does. The dim
+/// room saturates moss, but it pays only two energy a tick against upkeep, so
+/// a cell takes many ticks to fund the twenty a neighbour costs.
+pub const MOSS_GROWTH_INTERVAL_TICKS: u16 = 4;
+pub const MOSS_STARTING_RESERVES: [u64; 3] = [24; 3];
+/// Moss lies in the first air row above the floor line: its own cell has to be
+/// outside solid geometry, with the soil surface row beneath it as its contact.
+/// That is also the row a grass shoot rises into, so the two organisms compete
+/// by ordinary occupancy rather than through any moss-specific exemption.
+pub const MOSS_ROW: i32 = SOIL_DEPTH_CELLS as i32;
+
 #[derive(Default)]
 pub(crate) struct Introduction {
     pub tick: u64,
@@ -33,13 +54,16 @@ mod contracts;
 mod habitat;
 pub(crate) mod inspection;
 pub(crate) mod residents;
+#[cfg(test)]
+mod succession_contracts;
 pub(crate) mod surfaces;
 pub use habitat::{
     CLOCK_DIRT, MAX_SOIL_BODIES, MAX_SOIL_CHUNK_COLLIDERS, MAX_SOIL_EXPORTS_PER_UPDATE,
     MAX_SOIL_EXTERNAL_INPUT, SOIL_PHYSICS_ID, SoilAccounting, SoilHabitat, SoilSupportState,
 };
 pub use residents::{
-    BIOLOGY_TICK_MS, ClockPlants, MAX_BIOLOGY_STEPS_PER_UPDATE, MAX_PLANT_TISSUES, PlantPlayback,
+    BIOLOGY_TICK_MS, ClockPlants, MAX_BIOLOGY_STEPS_PER_UPDATE, MAX_GRASS_TISSUES,
+    MAX_PLANT_TISSUES, PlantPlayback,
 };
 
 /// World units; three rows leave finite underground runner/root space, cut into
