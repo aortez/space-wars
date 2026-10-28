@@ -2410,9 +2410,28 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
         // delivers its layer and still plants its batch over the cover the
         // last one left. Only the admission is sampled at this speed; the
         // deterministic sequence belongs to the scenario contracts.
+        // Reseeding answers to grass occupancy, and the patch still holds its
+        // last tissues at the final checkpoint, so wait for it to retire
+        // first. Otherwise the refusal under test is the old patch's, not the
+        // mat's, and the mat outliving the patch is the claim being made here.
+        let cleared = Instant::now();
+        let mats = loop {
+            let current = h.clock_state();
+            let g = current.grass.as_ref().unwrap();
+            if g.living_tissues == 0 {
+                assert!(
+                    g.moss_tissues > 0,
+                    "the mat must outlive the patch it succeeded"
+                );
+                break g.moss_tissues;
+            }
+            assert!(
+                cleared.elapsed() < Duration::from_secs(240),
+                "the grass patch must retire before the mat is asked to share"
+            );
+            thread::sleep(Duration::from_millis(100));
+        };
         let succeeded = h.clock_state();
-        let mats = succeeded.grass.as_ref().unwrap().moss_tissues;
-        assert!(mats > 0, "the aftermath must leave a mat to reseed over");
         h.clock_trigger_event(&succeeded, ClockEventKind::Grass);
         let reseed = Instant::now();
         loop {
