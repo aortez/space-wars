@@ -1064,18 +1064,36 @@ impl<B: Backend> Runner<B> {
         let admitted = self.backend.admit(&token, &request);
         let now = self.backend.clock()?;
         let latest = self.backend.network(&now);
-        if admitted.is_err()
-            || now.ms >= active.admission_deadline_ms
-            || !control.active()
-            || offer.is_some_and(|o| !o.valid(&now))
-            || latest.as_ref().is_none_or(|n| {
-                n.epoch != network.epoch
-                    || !available_policy(n)
-                    || request
+        // Every refusal reports the same reason, so log which condition failed.
+        let refusal = if let Err(error) = &admitted {
+            Some(format!("admission refused: {error}"))
+        } else if now.ms >= active.admission_deadline_ms {
+            Some("admission deadline passed".to_owned())
+        } else if !control.active() {
+            Some("attempt cancelled".to_owned())
+        } else if offer.is_some_and(|o| !o.valid(&now)) {
+            Some("time offer expired".to_owned())
+        } else {
+            match latest.as_ref() {
+                None => Some("network observation unavailable".to_owned()),
+                Some(n) if n.epoch != network.epoch => Some("network changed".to_owned()),
+                Some(n) if !available_policy(n) => Some(policy_refusal(n)),
+                Some(n)
+                    if request
                         .mode_generation
-                        .is_some_and(|m| status_of(n).mode_generation != m)
-            })
-        {
+                        .is_some_and(|m| status_of(n).mode_generation != m) =>
+                {
+                    Some("network mode changed".to_owned())
+                }
+                Some(_) => None,
+            }
+        };
+        if let Some(refusal) = refusal {
+            tracing::warn!(
+                attempt_id = active.id,
+                %refusal,
+                "update download admission failed"
+            );
             let _ = self.backend.release(&token);
             self.admitting = None;
             self.schedule.finish(&now, active.id, Completion::Failed)?;
@@ -1225,6 +1243,23 @@ fn available_policy(network: &Snapshot) -> bool {
             .actual
             .as_ref()
             .is_some_and(|r| r.networking_enabled && !r.startup)
+}
+/// Names the first condition that makes `available_policy` false.
+fn policy_refusal(network: &Snapshot) -> String {
+    let status = &network.status;
+    if status.pending.is_some() {
+        "a radio command is pending".to_owned()
+    } else if let Some(suspension) = status.suspended {
+        format!("network control is suspended ({suspension:?})")
+    } else if let Some(deferred) = status.deferred {
+        format!("network control is deferred ({deferred:?})")
+    } else {
+        match status.actual.as_ref() {
+            None => "no radio observation".to_owned(),
+            Some(radio) if !radio.networking_enabled => "networking is disabled".to_owned(),
+            Some(_) => "NetworkManager is starting".to_owned(),
+        }
+    }
 }
 fn connected(network: &Snapshot) -> bool {
     available_policy(network)

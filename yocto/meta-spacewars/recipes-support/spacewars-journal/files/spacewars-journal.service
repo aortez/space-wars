@@ -1,0 +1,20 @@
+[Unit]
+Description=Mount the shared persistent system journal
+DefaultDependencies=no
+Requires=data.mount
+After=data.mount systemd-remount-fs.service
+RequiresMountsFor=/var/log/journal
+Before=systemd-journal-flush.service shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+UMask=0027
+ExecStartPre=/usr/sbin/spacewars-journal-prepare
+# Different root images have different machine IDs. Bind the same flat store
+# at the current ID so journald rotates all retained files under one budget.
+ExecStart=/bin/mount --bind /data/spacewars-journal /var/log/journal/%m
+ExecStop=/bin/umount /var/log/journal/%m
+RemainAfterExit=yes
+TimeoutStartSec=30
+TimeoutStopSec=30

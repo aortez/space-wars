@@ -136,4 +136,5 @@ IMAGE_INSTALL:append = " \
     spacewars-hardware \
     spacewars-bluetooth \
     spacewars-ssh-host-keys \
+    spacewars-journal \
 "
