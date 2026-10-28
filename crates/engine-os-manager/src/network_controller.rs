@@ -352,8 +352,11 @@ impl<B: Backend> Controller<B> {
             && (state.owned_off || state.pending.as_ref().is_some_and(|p| !p.enabled));
         state.witness = Some(Witness::new(&snapshot.clock, &snapshot.radio));
         state.pending = None;
-        state.suspended = None;
+        let cleared = state.suspended.take();
         self.policy.save_radio(state, &snapshot.clock)?;
+        if let Some(suspension) = cleared {
+            tracing::warn!(?suspension, "owner resume cleared the network suspension");
+        }
         self.policy.reset_quiet();
         self.tick()
     }
@@ -429,6 +432,7 @@ impl<B: Backend> Controller<B> {
                 state.pending = None;
                 state.suspended = Some(Suspension::CommandRejected);
                 self.policy.save_radio(state, &clock)?;
+                tracing::warn!(enabled, "radio command rejected; network control suspended");
                 self.actual = None;
                 self.deferred = Some(Deferred::Suspended);
             }
@@ -439,9 +443,14 @@ impl<B: Backend> Controller<B> {
                 self.deferred = Some(Deferred::ObservationUnavailable);
                 self.policy.reset_quiet();
             }
-            Err(_) => {
+            Err(error) => {
                 state.suspended = Some(Suspension::CommandUncertain);
                 self.policy.save_radio(state, &clock)?;
+                tracing::warn!(
+                    enabled,
+                    %error,
+                    "radio command outcome unknown; network control suspended"
+                );
                 self.actual = None;
                 self.deferred = Some(Deferred::CommandUncertain);
             }
@@ -491,6 +500,7 @@ impl<B: Backend> Controller<B> {
             return Ok(None);
         };
         let mut state = self.policy.radio(&snapshot.clock)?;
+        let previous = state.suspended;
         let observed = Witness::new(&snapshot.clock, &snapshot.radio);
         let mut awaiting = false;
         if state.suspended.is_none() {
@@ -531,6 +541,15 @@ impl<B: Backend> Controller<B> {
             }
         }
         self.policy.save_radio(state.clone(), &snapshot.clock)?;
+        if previous.is_none()
+            && let Some(suspension) = state.suspended
+        {
+            // Only an owner resume clears it, so this marks when it began.
+            tracing::warn!(
+                ?suspension,
+                "network control suspended until an owner resume"
+            );
+        }
         self.deferred = if awaiting {
             Some(Deferred::ReadbackPending)
         } else if state.pending.is_some() {

@@ -240,6 +240,7 @@ struct World {
     radio_observed: bool,
     network_stale: bool,
     radio_startup: bool,
+    suspended: Option<network_controller::Suspension>,
     time: bool,
     work: Work,
     fail_prepare: bool,
@@ -272,6 +273,7 @@ impl Fake {
             radio_observed: true,
             network_stale: false,
             radio_startup: false,
+            suspended: None,
             time: true,
             work: Work::Finish,
             fail_prepare: false,
@@ -357,9 +359,12 @@ impl Inputs for Fake {
                 }),
                 owned_off: false,
                 pending: None,
-                suspended: None,
-                deferred: (!w.radio_observed)
-                    .then_some(network_controller::Deferred::ObservationUnavailable),
+                suspended: w.suspended,
+                deferred: if !w.radio_observed {
+                    Some(network_controller::Deferred::ObservationUnavailable)
+                } else {
+                    w.suspended.map(|_| network_controller::Deferred::Suspended)
+                },
             },
         })
     }
@@ -1151,6 +1156,34 @@ fn runtime_preparation_admission_and_network_failures_wait_for_next_daily_opport
         assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1);
         assert!(f.handle.status().unwrap().reason.is_some());
     }
+}
+
+#[test]
+fn suspended_network_fails_admission_and_names_the_suspension() {
+    let mut f = Fixture::new();
+    f.fake.edit(|w| {
+        w.partial = false;
+        w.suspended = Some(network_controller::Suspension::ProfilesChanged);
+    });
+    f.step();
+    f.until(|f| f.runner.job.is_none());
+    let status = f.handle.status().unwrap();
+    assert_eq!(status.reason, Some(Reason::NetworkUnavailable));
+    assert_eq!(
+        status.schedule.unwrap().completion,
+        Some(Completion::Failed)
+    );
+    let ms = {
+        let w = f.fake.0.lock().unwrap();
+        assert_eq!(w.prepares, 1);
+        w.ms
+    };
+    // Release the world lock first; the fake's network read takes it again.
+    let snapshot = f.fake.network(&clock(ms)).unwrap();
+    assert_eq!(
+        policy_refusal(&snapshot),
+        "network control is suspended (ProfilesChanged)"
+    );
 }
 
 #[test]
