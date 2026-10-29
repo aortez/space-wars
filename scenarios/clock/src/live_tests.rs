@@ -51,6 +51,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                             aquarium: bits & 512 != 0,
                             cell_swap: bits & 1024 != 0,
                             grass: bits & 2048 != 0,
+                            slot_machine: bits & 4096 != 0,
                         },
                     };
                     assert_eq!(
@@ -118,7 +119,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
     for (offset, invalid) in [
         (2, 13),
         (3, 3),
-        (5, 16),
+        (5, 32),
         (6, 255),
         (7, 4),
         (8, 2),
@@ -174,6 +175,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
             aquarium: false,
             cell_swap: false,
             grass: false,
+            slot_machine: false,
         },
         marquee_preset: ClockMarqueePreset::default(),
         rain_amount: ClockRainAmount::Varied,

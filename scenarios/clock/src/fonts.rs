@@ -32,21 +32,30 @@ pub(crate) fn glyph(font: ClockFont, digit: Option<u8>) -> CellMask {
             .into_iter()
             .filter(|kind| digits::digit_mask(digit) & (1 << *kind as u8) != 0)
             .fold(0, |mask, kind| mask | region(font, kind).0),
-        ClockFont::Matrix => {
-            let rows = crate::presentation::font::glyph(b'0' + digit).unwrap();
-            let mut mask = 0;
-            for y in 0..9 {
-                for x in 0..6 {
-                    if rows[(8 - y) * 7 / 9] & (1 << (4 - x * 5 / 6)) != 0 {
-                        mask |= 1 << (y * 6 + x);
-                    }
-                }
-            }
-            mask
-        }
+        ClockFont::Matrix => sampled(b'0' + digit).0,
         ClockFont::Sans => SANS[digit as usize],
         ClockFont::Serif => SERIF[digit as usize],
     })
+}
+
+/// Samples the code-native 5x7 text font into a digit slot's 6x9 grid. The
+/// Matrix face is built from this, and it is also the only route by which a
+/// glyph that is not a digit can appear in a slot: Classic composes itself from
+/// seven bar regions, and the Sans and Serif tables `build.rs` samples from the
+/// bundled outlines cover `'0'..='9'` alone.
+pub(crate) fn sampled(byte: u8) -> CellMask {
+    let Some(rows) = crate::presentation::font::glyph(byte) else {
+        return CellMask(0);
+    };
+    let mut mask = 0;
+    for y in 0..9 {
+        for x in 0..6 {
+            if rows[(8 - y) * 7 / 9] & (1 << (4 - x * 5 / 6)) != 0 {
+                mask |= 1 << (y * 6 + x);
+            }
+        }
+    }
+    CellMask(mask)
 }
 
 pub(crate) fn guides(font: ClockFont) -> CellMask {

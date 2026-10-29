@@ -617,6 +617,43 @@ pub struct ClockDigitSlideState {
     pub preview: bool,
 }
 
+/// Reel phase and lock progress for the Slot Machine event. `retargets` counts
+/// the readings adopted mid-spin, which is how the event proves it lands on live
+/// time rather than on a snapshot taken when it started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockSlotMachineState {
+    pub phase: ClockSlotMachinePhase,
+    pub target_digits: [Option<u8>; 4],
+    pub locked_slots: [bool; 4],
+    /// Thousandths of a glyph each reel has travelled past its last whole stop.
+    pub reel_offset_milli: [u32; 4],
+    pub glyphs_passed: [u32; 4],
+    pub retargets: u32,
+    /// Manual previews spin the live reading, without fabricating a time.
+    pub preview: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSlotMachinePhase {
+    #[default]
+    SpinUp,
+    Spinning,
+    Settling,
+    Payout,
+}
+
+impl ClockSlotMachinePhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SpinUp => "spin-up",
+            Self::Spinning => "spinning",
+            Self::Settling => "settling",
+            Self::Payout => "payout",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[repr(u8)]
@@ -633,10 +670,11 @@ pub enum ClockEventKind {
     Aquarium = 9,
     CellSwap = 10,
     Grass = 11,
+    SlotMachine = 12,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -649,6 +687,7 @@ impl ClockEventKind {
         Self::Aquarium,
         Self::CellSwap,
         Self::Grass,
+        Self::SlotMachine,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -665,6 +704,7 @@ impl ClockEventKind {
             Self::Aquarium => "aquarium",
             Self::CellSwap => "cell-swap",
             Self::Grass => "grass",
+            Self::SlotMachine => "slot-machine",
         }
     }
 
@@ -682,6 +722,7 @@ impl ClockEventKind {
             Self::Aquarium => "Aquarium",
             Self::CellSwap => "Cell Swap",
             Self::Grass => "Grass",
+            Self::SlotMachine => "Slot Machine",
         }
     }
 }
@@ -702,6 +743,7 @@ pub struct ClockEvents {
     pub aquarium: bool,
     pub cell_swap: bool,
     pub grass: bool,
+    pub slot_machine: bool,
 }
 
 impl Default for ClockEvents {
@@ -719,6 +761,7 @@ impl Default for ClockEvents {
             aquarium: true,
             cell_swap: true,
             grass: true,
+            slot_machine: true,
         }
     }
 }
@@ -738,6 +781,7 @@ impl ClockEvents {
             ClockEventKind::Aquarium => self.aquarium,
             ClockEventKind::CellSwap => self.cell_swap,
             ClockEventKind::Grass => self.grass,
+            ClockEventKind::SlotMachine => self.slot_machine,
         }
     }
 }

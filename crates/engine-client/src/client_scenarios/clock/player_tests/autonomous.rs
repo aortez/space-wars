@@ -16,6 +16,7 @@ fn automatic_duck_rain_and_recovery_render_in_all_layouts() {
         let mut scene = scenario(viewport);
         let mut settings = scene.state.settings();
         settings.rain_amount = ClockRainAmount::Heavy;
+        settings.events.slot_machine = false;
         scene.step(
             &[
                 ClockAction::configure(settings),

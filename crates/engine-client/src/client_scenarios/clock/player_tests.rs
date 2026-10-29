@@ -357,6 +357,7 @@ fn player_joins_live_rain_and_keeps_visible_panels_through_cleanup_in_all_layout
         let mut scene = scenario(viewport);
         let mut settings = scene.state.settings();
         settings.rain_amount = ClockRainAmount::Heavy;
+        settings.events.slot_machine = false;
         scene.step(
             &[
                 ClockAction::configure(settings),

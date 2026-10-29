@@ -170,6 +170,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_digit_slide_enabled: bool,
     pub(crate) clock_cell_swap_enabled: bool,
     pub(crate) clock_grass_enabled: bool,
+    pub(crate) clock_slot_machine_enabled: bool,
     pub(crate) clock_rain: String,
     pub(crate) clock_marquee_preset: String,
     pub(crate) nes_cartridge_name: String,
@@ -821,6 +822,10 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     "launcher.settings.clock.digit-slide",
                     context.clock_digit_slide_enabled,
                 ),
+                (
+                    "launcher.settings.clock.slot-machine",
+                    context.clock_slot_machine_enabled,
+                ),
             ] {
                 push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
             }
@@ -1185,6 +1190,15 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
         ),
     );
     controls.push(
+        UiControl::new("pause.clock.slot-machine", "Slot Machine", true).with_value(
+            if context.clock_slot_machine_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    controls.push(
         UiControl::new("pause.clock.grass", "Grass", true).with_value(
             if context.clock_grass_enabled {
                 "On"
@@ -1246,6 +1260,8 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.fonts",
                 "pause.clock.aquarium",
                 "pause.clock.cell-swap",
+                "pause.clock.grass",
+                "pause.clock.slot-machine",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -1309,6 +1325,7 @@ mod tests {
             clock_digit_slide_enabled: true,
             clock_cell_swap_enabled: true,
             clock_grass_enabled: true,
+            clock_slot_machine_enabled: true,
             clock_rain: "Varied".into(),
             clock_marquee_preset: engine_common::ClockMarqueePreset::default().label().into(),
             nes_cartridge_name: "Demo Cartridge".into(),
@@ -1577,7 +1594,7 @@ mod tests {
                 "launcher.settings.spacewars.player-2",
             ),
             ("pizza", 14, "launcher.settings.pizza.live-ball-limit"),
-            ("clock", 39, "launcher.settings.clock.duck"),
+            ("clock", 41, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
                 "spacewars-surface-blocks",
@@ -1821,7 +1838,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 25);
+        assert_eq!(inventory.controls.len(), 26);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

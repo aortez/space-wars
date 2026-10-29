@@ -7,6 +7,7 @@ pub(crate) mod explosion;
 pub(crate) mod falling;
 pub(crate) mod marquee;
 pub(crate) mod meltdown;
+pub(crate) mod slot_machine;
 #[cfg(test)]
 mod tests;
 
@@ -23,6 +24,7 @@ use falling::FallingEvent;
 pub use falling::{FALLING_TICKS, REFORMING_TICKS};
 use marquee::{MARQUEE_TICKS, MarqueeEvent};
 use meltdown::{DRAINING_TICKS, MELTING_TICKS, MeltdownEvent};
+use slot_machine::{SLOT_MACHINE_TICKS, SlotMachineEvent};
 
 pub const FIXED_HZ: u32 = 60;
 pub const COOLDOWN_TICKS: u64 = 120;
@@ -57,6 +59,7 @@ pub enum EventPhase {
     Resetting,
     Presenting,
     Sliding,
+    Spinning,
     Swapping,
     Reconciling,
     Raining,
@@ -81,6 +84,7 @@ impl EventPhase {
             Self::Resetting => "resetting",
             Self::Presenting => "presenting",
             Self::Sliding => "sliding",
+            Self::Spinning => "spinning",
             Self::Swapping => "swapping",
             Self::Reconciling => "reconciling",
             Self::Raining => "raining",
@@ -222,6 +226,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: crate::grass::INTRODUCTION_TICKS,
         cooldown_ticks: crate::grass::SEED_COOLDOWN_TICKS,
     },
+    EventDefinition {
+        kind: ClockEventKind::SlotMachine,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::DigitGeometry,
+        duration_ticks: SLOT_MACHINE_TICKS,
+        cooldown_ticks: 30 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -240,6 +251,7 @@ pub(super) enum ActiveEvent {
     Meltdown(Box<MeltdownEvent>),
     Marquee(Box<MarqueeEvent>),
     DigitSlide(DigitSlideEvent),
+    SlotMachine(Box<SlotMachineEvent>),
     CellSwap(Box<cell_swap::CellSwapEvent>),
     Rain(Box<crate::rain::RainEvent>),
     Explosion(ExplosionEvent),
@@ -292,6 +304,11 @@ impl ActiveEvent {
             ClockEventKind::DigitSlide => {
                 Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
             }
+            ClockEventKind::SlotMachine => Self::SlotMachine(Box::new(SlotMachineEvent::new(
+                context.display,
+                seed,
+                previous_display.is_none(),
+            ))),
             ClockEventKind::CellSwap => Self::CellSwap(Box::new(cell_swap::CellSwapEvent::new(
                 context.display,
                 seed,
@@ -315,6 +332,7 @@ impl ActiveEvent {
             Self::Meltdown(_) => ClockEventKind::Meltdown,
             Self::Marquee(_) => ClockEventKind::Marquee,
             Self::DigitSlide(_) => ClockEventKind::DigitSlide,
+            Self::SlotMachine(_) => ClockEventKind::SlotMachine,
             Self::CellSwap(_) => ClockEventKind::CellSwap,
             Self::Rain(_) => ClockEventKind::Rain,
         }
@@ -404,6 +422,7 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.step(context),
             Self::Marquee(event) => event.step(),
             Self::DigitSlide(event) => event.step(),
+            Self::SlotMachine(event) => event.step(),
             Self::CellSwap(event) => event.step(),
             Self::Rain(event) => {
                 event.synchronize(context.display, context.segments);
@@ -422,6 +441,7 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.phase(),
             Self::Marquee(_) => EventPhase::Presenting,
             Self::DigitSlide(_) => EventPhase::Sliding,
+            Self::SlotMachine(_) => EventPhase::Spinning,
             Self::CellSwap(event) => {
                 if event.tick < cell_swap::CELL_SWAP_TICKS {
                     EventPhase::Swapping
@@ -443,6 +463,7 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.phase_tick(),
             Self::Marquee(event) => event.tick,
             Self::DigitSlide(event) => event.tick,
+            Self::SlotMachine(event) => event.phase_tick(),
             Self::CellSwap(event) => {
                 event
                     .tick
@@ -463,9 +484,11 @@ impl ActiveEvent {
             Self::Falling(event) => event.physics_counts(),
             Self::Explosion(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),
-            Self::ColorCycle(_) | Self::Marquee(_) | Self::DigitSlide(_) | Self::CellSwap(_) => {
-                (0, 0)
-            }
+            Self::ColorCycle(_)
+            | Self::Marquee(_)
+            | Self::DigitSlide(_)
+            | Self::SlotMachine(_)
+            | Self::CellSwap(_) => (0, 0),
             Self::Rain(event) => event.physics_counts(),
         }
     }

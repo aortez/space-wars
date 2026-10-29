@@ -1002,6 +1002,10 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     key(&window, Key::DownArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 12);
     key(&window, Key::DownArrow);
+    // Slot Machine has a row to itself below Rain. Like Date it toggles on
+    // Left/Right rather than moving, so the row is left by going down.
+    assert_eq!(window.get_ingame_clock_focus_index(), 20);
+    key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 3);
     key(&window, Key::Return);
@@ -1561,6 +1565,7 @@ fn pump_worker_until(window: &MainWindow, predicate: impl Fn() -> bool) {
     }
 }
 
+#[track_caller]
 fn pump_until(predicate: impl Fn() -> bool) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     while !predicate() {

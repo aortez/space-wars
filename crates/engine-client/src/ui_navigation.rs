@@ -128,20 +128,22 @@ pub(crate) fn moved_clock_selection(current: i32, action: UiAction) -> i32 {
     // Keep existing control indices stable: the event row is [2, 3, 7, 8, 11],
     // followed by preview/Crow/Explosion [4, 14, 15], Marquee/recipe [9, 10], actions [5, 6].
     // Rain (12), Date (13) and Cell Swap (18) share a row. Up/Down visit
-    // each; Left/Right on Rain continues to adjust its amount.
-    let current = current.clamp(0, 19) as usize;
+    // each; Left/Right on Rain continues to adjust its amount. Slot Machine (20)
+    // has a row of its own, reached below Rain, and like Date it toggles on
+    // Left/Right rather than moving, so only Up/Down route through here.
+    let current = current.clamp(0, 20) as usize;
     match action {
         UiAction::Up => [
-            5, 0, 12, 12, 2, 9, 10, 12, 12, 17, 17, 18, 18, 16, 4, 14, 1, 15, 13, 18,
+            5, 0, 20, 12, 2, 9, 10, 12, 12, 17, 17, 18, 18, 16, 4, 14, 1, 15, 13, 18, 12,
         ][current],
         UiAction::Down => [
-            1, 16, 4, 4, 14, 0, 0, 4, 4, 5, 6, 4, 2, 18, 15, 17, 13, 9, 12, 2,
+            1, 16, 4, 4, 14, 0, 0, 4, 4, 5, 6, 4, 20, 18, 15, 17, 13, 9, 12, 2, 2,
         ][current],
         UiAction::Left => [
-            0, 1, 11, 2, 4, 6, 5, 3, 7, 10, 17, 8, 12, 13, 4, 14, 1, 9, 13, 18,
+            0, 1, 11, 2, 4, 6, 5, 3, 7, 10, 17, 8, 12, 13, 4, 14, 1, 9, 13, 18, 20,
         ][current],
         UiAction::Right => [
-            0, 1, 3, 7, 4, 6, 5, 8, 11, 17, 10, 2, 12, 13, 15, 4, 0, 10, 19, 12,
+            0, 1, 3, 7, 4, 6, 5, 8, 11, 17, 10, 2, 12, 13, 15, 4, 0, 10, 19, 12, 20,
         ][current],
         _ => current as i32,
     }
@@ -181,7 +183,10 @@ mod tests {
         assert_eq!(moved_clock_selection(18, UiAction::Down), 12);
         assert_eq!(moved_clock_selection(18, UiAction::Up), 13);
         assert_eq!(moved_clock_selection(13, UiAction::Up), 16);
-        assert_eq!(moved_clock_selection(12, UiAction::Down), 2);
+        assert_eq!(moved_clock_selection(12, UiAction::Down), 20);
+        assert_eq!(moved_clock_selection(20, UiAction::Down), 2);
+        assert_eq!(moved_clock_selection(20, UiAction::Up), 12);
+        assert_eq!(moved_clock_selection(2, UiAction::Up), 20);
         assert_eq!(moved_clock_selection(12, UiAction::Up), 18);
         assert_eq!(moved_clock_selection(4, UiAction::Down), 14);
         assert_eq!(moved_clock_selection(14, UiAction::Down), 15);
