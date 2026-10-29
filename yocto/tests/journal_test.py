@@ -50,7 +50,13 @@ class JournalTest(unittest.TestCase):
         self.fixture_config = self.root / "fixture.conf"
         self.fixture_config.write_text("[Journal]\nReadKMsg=no\nRateLimitIntervalSec=0\n")
 
-    def sandbox(self, command, mounted=True, bind_journal=False, timeout=30):
+    def sandbox(self, command, mounted=True, bind_journal=False, volatile="ready", timeout=30):
+        volatile_args = {
+            # The device mounts an empty tmpfs; systemd-tmpfiles adds log/ only after the flush.
+            "empty": ["--tmpfs", "/var/volatile"],
+            "ready": ["--tmpfs", "/var/volatile", "--dir", "/var/volatile/log"],
+            "unmounted": ["--dir", "/var/volatile"],
+        }[volatile]
         args = [
             self.bwrap, "--clearenv", "--setenv", "PATH", "/usr/bin:/bin", "--setenv", "LC_ALL", "C",
             "--ro-bind", "/usr", "/usr", "--ro-bind", "/lib", "/lib",
@@ -64,7 +70,7 @@ class JournalTest(unittest.TestCase):
             "--proc", "/proc", "--dev", "/dev", "--ro-bind", "/sys", "/sys",
             "--ro-bind", str(self.boot_id), "/proc/sys/kernel/random/boot_id",
             "--tmpfs", "/run", "--tmpfs", "/tmp", "--tmpfs", "/var/tmp",
-            "--dir", "/var/volatile/log", "--symlink", "volatile/log", "/var/log",
+            *volatile_args, "--symlink", "volatile/log", "/var/log",
             "--ro-bind", str(FILES / "spacewars-journal-prepare.sh"), "/prepare.sh",
             "--ro-bind", str(Path(__file__).with_name("journal_fixture.py")), "/fixture.py",
         ]
@@ -77,7 +83,7 @@ class JournalTest(unittest.TestCase):
     def boot(self, machine, number, crash=False, flood=False):
         self.machine.write_text(machine + "\n")
         self.boot_id.write_text(f"{number:08x}-1111-1111-1111-111111111111\n")
-        prepared = self.sandbox(["sh", "/prepare.sh"])
+        prepared = self.sandbox(["sh", "/prepare.sh"], volatile="empty")
         self.assertEqual(prepared.returncode, 0, prepared.stderr)
         result = self.sandbox(
             ["python3", "/fixture.py", f"boot-{number}", "crash" if crash else "clean", "flood" if flood else "quiet"],
@@ -131,10 +137,22 @@ class JournalTest(unittest.TestCase):
         self.assertEqual(expired.stdout, "")
         self.read("--verify")
 
+    def test_prepare_creates_volatile_log_before_tmpfiles(self):
+        paths = f"/var/volatile/log /var/log/journal /var/log/journal/{MACHINE_A}"
+        result = self.sandbox(["sh", "-c", f"sh /prepare.sh && stat -c '%a %u %g %n' {paths}"], volatile="empty")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            "755 0 0 /var/volatile/log", "750 0 0 /var/log/journal", f"750 0 0 /var/log/journal/{MACHINE_A}",
+        ])
+
     def test_missing_mount_invalid_identity_and_unsafe_paths_fail(self):
         result = self.sandbox(["sh", "/prepare.sh"], mounted=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("requires mounted /data", result.stderr)
+        self.assertEqual(list(self.data.iterdir()), [])
+        result = self.sandbox(["sh", "/prepare.sh"], volatile="unmounted")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires mounted /var/volatile", result.stderr)
         self.assertEqual(list(self.data.iterdir()), [])
         for machine in ("", "0" * 32, "../bad", "a" * 31, "g" * 32):
             self.machine.write_text(machine)
@@ -173,9 +191,13 @@ class JournalPackagingTest(unittest.TestCase):
         self.assertTrue(os.access(self.root / "usr/sbin/spacewars-journal-prepare", os.X_OK))
         config = self.root / "etc/systemd/journald.conf.d/spacewars-journal.conf"
         self.assertEqual(config.read_bytes(), (FILES / "spacewars-journal.conf").read_bytes())
+        settings = dict(line.split("=", 1) for line in config.read_text().splitlines() if "=" in line and line[0] != "#")
+        # Boots start at the build-time clock, so time limits would judge each boot's first file as old.
+        self.assertEqual((settings["MaxRetentionSec"], settings["MaxFileSec"]), ("0", "0"))
         unit = (self.units / "spacewars-journal.service").read_text()
         self.assertIn("Requires=data.mount", unit)
         self.assertIn("After=data.mount", unit)
+        self.assertIn("RequiresMountsFor=/var/log/journal /var/volatile/log", unit)
         self.assertIn("--bind /data/spacewars-journal /var/log/journal/%m", unit)
         flush = (self.units / "systemd-journal-flush.service.d/spacewars-persistent-journal.conf").read_text()
         self.assertIn("Requires=spacewars-journal.service", flush)

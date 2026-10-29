@@ -521,9 +521,11 @@ Images containing `spacewars-journal` keep the system journal in the root-owned
 `/data/spacewars-journal` directory, separate from kiosk-owned settings and the
 A/B root filesystems. Early boot logs stay in RAM. The journal flush service
 requires `/data` and the journal bind mount to succeed before copying those
-entries to disk. If preparation fails, journald continues using its bounded
-RAM store. On orderly shutdown it syncs and relinquishes the persistent store
-before unmounting it.
+entries to disk. `/var/log` links into the `/var/volatile` tmpfs, and
+`systemd-tmpfiles` creates `/var/volatile/log` only after the flush, so
+preparation creates that directory itself. If preparation fails, journald
+continues using its bounded RAM store. On orderly shutdown it syncs and
+relinquishes the persistent store before unmounting it.
 
 Each slot binds the **same flat store** at `/var/log/journal/<current-machine-id>`.
 The system machine ID is unchanged. Journald opens a new file when the previous
@@ -540,8 +542,11 @@ kiosk account.
 | Maximum file size | 8 MiB | 2 MiB |
 | Maximum files | 32 | 16 |
 
-Compression is enabled. Files rotate after at most one day, and retention is
-at most 14 days, with busy devices dropping old history sooner. These are
+Compression is enabled. Only the size and file-count limits remove history,
+so busy devices drop old history sooner. Each boot starts at the image's
+build-time clock until timesyncd or NTP sets it. Time-based rotation and
+retention would therefore delete every boot's first file by its old start
+time, which is how generation 19 lost each boot's early entries. These are
 [journald retention limits](https://www.freedesktop.org/software/systemd/man/255/journald.conf.html),
 not a filesystem quota: rotation removes archived files and active-file
 allocation can temporarily exceed a target. Normal-priority messages sync
@@ -567,7 +572,7 @@ be recovered.
 Installation requires a normal rootfs image update; `--fast` does not install
 the journal configuration or units. No kernel or boot partition change is
 needed. Check `systemctl status spacewars-journal systemd-journal-flush` and
-`findmnt -T /data/spacewars-journal` when diagnosing missing persistent logs.
+`grep /journal/ /proc/self/mountinfo` when diagnosing missing persistent logs.
 
 `yocto/tests/journal_test.py` runs real journald in disposable mount/PID
 namespaces. It covers early RAM logging and flush, clean restarts, changed slot
@@ -575,13 +580,16 @@ machine IDs, a synced abrupt daemon kill followed by rollback, previous-boot
 queries, journal integrity, and rotation after flooding both slots. Boot IDs
 are simulated; this does not replace a real image boot and device reboot/trial
 qualification. The fixture never starts or stops the host's journal service.
-The five journal tests passed on systemd 255.4 (Ubuntu 24.04 container) and
-259.5 (workstation). The combined-slot flood fixture submits over 384 MiB of
+Preparation runs against an empty `/var/volatile` tmpfs, as on the device.
+Generation 19's first device boots found that an earlier fixture had created
+`/var/volatile/log` in advance, which hid the failure. The six journal tests
+passed on systemd 259.5 (workstation). The combined-slot flood fixture submits over 384 MiB of
 unique message payloads, checks usage at each batch against 128 MiB, and
 verifies that old entries expire while the latest synced marker remains.
-The full Yocto helper suite also passed: 70 Node tests and 118 Python tests,
-with one pre-existing skip in each suite. A full Yocto image build and physical
-device reboot/rollback qualification have not been run for this change.
+With the preparation fix, the full Yocto helper suite ran 71 Node tests and 120
+Python tests, with one pre-existing skip in each suite. Generation 19 was the
+first device boot of this feature. The fix still needs an image build and a
+device trial that reads the trial boot back from the store.
 
 ### Fast application updates
 
