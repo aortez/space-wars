@@ -5,7 +5,7 @@ use super::{
     duck::{DuckEvent, VisitArena},
 };
 use crate::{
-    SegmentRepresentation, digits,
+    digits,
     meridiem::{Glyph, LetterState},
     physics::{FallingBodies, FallingWorld},
 };
@@ -190,15 +190,7 @@ impl FallingEvent {
         }
         if reform {
             for segment in context.segments.iter_mut() {
-                let (position, angle) = match segment.representation {
-                    SegmentRepresentation::Rigid { position, angle } => (position, angle),
-                    _ => (context.layout.segment_center(segment.id), 0.0),
-                };
-                segment.representation = SegmentRepresentation::Reforming {
-                    position,
-                    angle,
-                    was_lit: segment.lit,
-                };
+                segment.begin_reforming(context.layout.segment_center(segment.id));
             }
             self.phase = EventPhase::Reforming;
             self.tick = 0;

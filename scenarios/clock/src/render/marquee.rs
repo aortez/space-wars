@@ -14,18 +14,25 @@ pub(super) fn viewport(layout: Layout) -> Bounds {
     }
 }
 
+/// Where the recipe lays its content out. A clock preset's content is the face's
+/// own reading, so this opens at the face's pitch and the recipe eases any fit
+/// of its own in from there.
+pub(super) fn placement(event: &MarqueeEvent, layout: Layout) -> Placement {
+    Placement {
+        content: event.content.bounds,
+        viewport: viewport(layout),
+        center: Vec2::new(0.0, layout.face_origin.y + 4.5 * layout.pitch),
+        pitch: layout.pitch * if event.uses_clock { 1.0 } else { 0.7 },
+    }
+}
+
 pub(super) fn render(frame: &mut RenderFrame, event: &MarqueeEvent, layout: Layout) {
     let playback = event.playback();
     if playback.strength <= 0.0 {
         return;
     }
     let bounds = viewport(layout);
-    let placement = Placement {
-        content: event.content.bounds,
-        viewport: bounds,
-        center: Vec2::new(0.0, layout.face_origin.y + 4.5 * layout.pitch),
-        pitch: layout.pitch * if event.uses_clock { 1.0 } else { 0.7 },
-    };
+    let placement = placement(event, layout);
     for cell in &event.content.cells {
         let quad = event.recipe.quad(*cell, placement, playback);
         let (points, count) = clip_quad(quad, bounds);

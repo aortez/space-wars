@@ -16,6 +16,8 @@ mod crow;
 mod digit_slide;
 mod duck;
 mod explosion;
+#[cfg(test)]
+mod face_handover_contract;
 mod floor;
 mod frame;
 mod glow;
@@ -249,29 +251,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         grass_inspection::render(&mut frame, &view, layout);
     }
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
-        let opacity = 1.0 - event.playback().strength;
-        if opacity > 0.0 {
-            render_segments(&mut frame, state, layout);
-            render_colon(&mut frame, state, layout);
-            render_meridiem(&mut frame, state, layout);
-            // Fade only newly generated face primitives, never physical state
-            // or arena/background. No offscreen image or extra frame allocation.
-            for layer in &mut frame.layers {
-                if !(GLOW_LAYER..=LABEL_LAYER).contains(&layer.z) {
-                    continue;
-                }
-                for primitive in &mut layer.primitives {
-                    if let RenderPrimitive::Polygon(polygon) = primitive {
-                        if let Some(fill) = &mut polygon.fill {
-                            fill.color.a *= opacity;
-                        }
-                        if let Some(stroke) = &mut polygon.stroke {
-                            stroke.color.a *= opacity;
-                        }
-                    }
-                }
-            }
-        }
+        render_marquee_face(&mut frame, state, layout, event);
         marquee::render(&mut frame, event, layout);
         render_player_and_course(&mut frame, state, layout);
         return frame;
@@ -383,15 +363,94 @@ fn ground_cover(frame: &mut RenderFrame, state: &ClockState, soil: &crate::grass
     flush(&mut run, run_band);
 }
 
+/// Draws the anchored reading beneath a marquee, carried by whatever sweep is in
+/// progress. A clock preset crossfades the face into its animated recipe.
+/// A text takeover brings its own content, so the lit cells travel
+/// clear of the frame and return the same way instead of dissolving where they
+/// stand. The visible frame and the plant lighting occluders have to agree about
+/// where those cells are, so both go through here.
+fn render_marquee_face(
+    frame: &mut RenderFrame,
+    state: &ClockState,
+    layout: Layout,
+    event: &crate::events::marquee::MarqueeEvent,
+) {
+    let before: Vec<usize> = frame.layers.iter().map(|l| l.primitives.len()).collect();
+    render_segments(frame, state, layout);
+    render_colon(frame, state, layout);
+    render_meridiem(frame, state, layout);
+    let strength = event.playback().strength;
+    // Anchored lit cells replace their dim guides in the ordinary face. Once
+    // the handover starts, expose those guides at the original positions too.
+    // At admission keep the draw list identical to the ordinary face.
+    let anchors: Vec<_> = frame
+        .layers
+        .iter()
+        .enumerate()
+        .filter(|(_, layer)| strength > 0.0 && layer.z == ACTIVE_CELL_LAYER)
+        .flat_map(|(index, layer)| &layer.primitives[before.get(index).copied().unwrap_or(0)..])
+        .filter_map(|primitive| match primitive {
+            RenderPrimitive::Polygon(polygon) => Some(RenderPrimitive::Polygon(
+                RenderPolygon::filled(polygon.points.clone(), INACTIVE_CELL_COLOR),
+            )),
+            _ => None,
+        })
+        .collect();
+    // Hand over only the lit cells these three calls just drew. The dim anchors
+    // keep their places as the substrate, just as a fall or an explosion leaves
+    // them, and the arena, the floor and a visiting duck are never carried
+    // along. No offscreen image or extra frame allocation.
+    let sweep = event.face_sweep();
+    let clearance = layout.bounds_max.x - layout.bounds_min.x + layout.pitch;
+    let opacity = 1.0 - strength;
+    let gone = sweep.map_or(opacity <= 0.0, |sweep| sweep.abs() >= 1.0);
+    for (index, layer) in frame.layers.iter_mut().enumerate() {
+        if layer.z == INACTIVE_CELL_LAYER {
+            continue;
+        }
+        let start = before.get(index).copied().unwrap_or(0);
+        if gone {
+            // The reading is clear of the frame, or the recipe has taken it over
+            // outright. Either way the face has nothing lit left to contribute.
+            layer.primitives.truncate(start);
+            continue;
+        }
+        for primitive in &mut layer.primitives[start..] {
+            let RenderPrimitive::Polygon(polygon) = primitive else {
+                continue;
+            };
+            match sweep {
+                // A text takeover carries the reading out the way the message
+                // travels, at full brightness for the whole journey.
+                Some(sweep) => {
+                    for point in &mut polygon.points {
+                        point.x += sweep * clearance;
+                    }
+                }
+                // A clock recipe animates these same cells and opens on the
+                // face's own pose, so the two are one reading dissolving into
+                // itself rather than into a differently placed copy of itself.
+                None => {
+                    if let Some(fill) = &mut polygon.fill {
+                        fill.color.a *= opacity;
+                    }
+                    if let Some(stroke) = &mut polygon.stroke {
+                        stroke.color.a *= opacity;
+                    }
+                }
+            }
+        }
+    }
+    for anchor in anchors {
+        frame.push_primitive(INACTIVE_CELL_LAYER, anchor);
+    }
+}
+
 pub(crate) fn plant_face_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::default();
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
-        if event.playback().strength < 1.0 {
-            render_segments(&mut frame, state, layout);
-            render_colon(&mut frame, state, layout);
-            render_meridiem(&mut frame, state, layout);
-        }
+        render_marquee_face(&mut frame, state, layout, event);
         marquee::render(&mut frame, event, layout);
     } else {
         render_segments(&mut frame, state, layout);
@@ -552,21 +611,14 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
         let (position, angle, was_lit, mix) = match segment.representation {
             SegmentRepresentation::Anchored | SegmentRepresentation::Disintegrated => continue,
             SegmentRepresentation::Rigid { position, angle } => (position, angle, true, 0.0),
-            SegmentRepresentation::Reforming {
-                position,
-                angle,
-                was_lit,
-            } => (
-                position + (anchor - position) * progress,
-                angle * (1.0 - progress),
-                was_lit,
+            SegmentRepresentation::Reforming(reformation) => (
+                reformation.position() + (anchor - reformation.position()) * progress,
+                reformation.angle() * (1.0 - progress),
+                reformation.was_lit(),
                 progress,
             ),
         };
-        let previous = if matches!(
-            segment.representation,
-            SegmentRepresentation::Reforming { .. }
-        ) {
+        let previous = if matches!(segment.representation, SegmentRepresentation::Reforming(_)) {
             segment.previous_shape
         } else {
             segment.shape

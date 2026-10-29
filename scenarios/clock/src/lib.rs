@@ -47,8 +47,8 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
 pub use digits::{
-    DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, SegmentId, SegmentKind, SegmentRepresentation,
-    SegmentState,
+    DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
+    SegmentRepresentation, SegmentState,
 };
 
 use engine_common::{

@@ -109,6 +109,9 @@ pub(crate) struct Recipe {
     pub rotation: Option<Rotation>,
     pub wave: Option<Wave>,
     pub lighting: Lighting,
+    /// The content is the anchored face itself rather than a separate message,
+    /// so the opening pose has to be the face's own.
+    pub handover: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -156,6 +159,12 @@ impl Recipe {
             pitch = pitch
                 .min(available.x / (size.x + padding))
                 .min(available.y / (size.y + padding + wave_margin));
+        }
+        if self.handover {
+            // The content is the anchored face, so open on the face's own scale
+            // and ease into the fitted pose. A rotation fit that shrinks the
+            // reading must not snap it smaller on the first tick.
+            pitch = placement.pitch + (pitch - placement.pitch) * playback.strength;
         }
         let mut center = placement.center;
         if self.scroll {

@@ -48,11 +48,34 @@ pub enum SegmentRepresentation {
         position: Vec2,
         angle: f32,
     },
-    Reforming {
-        position: Vec2,
-        angle: f32,
-        was_lit: bool,
-    },
+    /// Built only by `SegmentState::begin_reforming`, so a segment can come back
+    /// only from where it actually is, as what it actually was.
+    Reforming(Reformation),
+}
+
+/// Where a segment is returning from. The fields are private so that no event
+/// can describe a reading as reforming at its own anchor having never been lit.
+/// That combination renders as the face appearing at the goal out of nothing,
+/// which is the one thing the return of digit cells may not be.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Reformation {
+    position: Vec2,
+    angle: f32,
+    was_lit: bool,
+}
+
+impl Reformation {
+    pub fn position(self) -> Vec2 {
+        self.position
+    }
+
+    pub fn angle(self) -> f32 {
+        self.angle
+    }
+
+    pub fn was_lit(self) -> bool {
+        self.was_lit
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -66,6 +89,23 @@ pub struct SegmentState {
 }
 
 impl SegmentState {
+    /// Starts this segment's return from wherever it actually is, as whatever it
+    /// actually was. A segment that never left reforms from its anchor, but it
+    /// still reforms as itself, so its cells travel and cross-fade into the new
+    /// shape instead of appearing there out of nothing. Call this before the new
+    /// reading is applied, while `lit` still describes the old one.
+    pub(crate) fn begin_reforming(&mut self, anchor: Vec2) {
+        let (position, angle) = match self.representation {
+            SegmentRepresentation::Rigid { position, angle } => (position, angle),
+            _ => (anchor, 0.0),
+        };
+        self.representation = SegmentRepresentation::Reforming(Reformation {
+            position,
+            angle,
+            was_lit: self.lit,
+        });
+    }
+
     pub fn cells(&self) -> impl Iterator<Item = GridCell> + Clone {
         self.shape.cells()
     }

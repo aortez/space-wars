@@ -326,11 +326,7 @@ impl MeltdownEvent {
             self.cells = Vec::new();
             if !self.lab {
                 for segment in context.segments.iter_mut() {
-                    segment.representation = SegmentRepresentation::Reforming {
-                        position: context.layout.segment_center(segment.id),
-                        angle: 0.0,
-                        was_lit: false,
-                    };
+                    segment.begin_reforming(context.layout.segment_center(segment.id));
                 }
             }
             digits::apply_snapshot(context.segments, context.display);
