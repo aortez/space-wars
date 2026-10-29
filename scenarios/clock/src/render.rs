@@ -364,9 +364,8 @@ fn ground_cover(frame: &mut RenderFrame, state: &ClockState, soil: &crate::grass
 }
 
 /// Draws the anchored reading beneath a marquee, carried by whatever sweep is in
-/// progress. A clock preset animates the face's own cells through the recipe, so
-/// there is no second copy of the reading to lay underneath and crossfade
-/// against. A text takeover brings its own content, so the lit cells travel
+/// progress. A clock preset crossfades the face into its animated recipe.
+/// A text takeover brings its own content, so the lit cells travel
 /// clear of the frame and return the same way instead of dissolving where they
 /// stand. The visible frame and the plant lighting occluders have to agree about
 /// where those cells are, so both go through here.
@@ -380,13 +379,30 @@ fn render_marquee_face(
     render_segments(frame, state, layout);
     render_colon(frame, state, layout);
     render_meridiem(frame, state, layout);
+    let strength = event.playback().strength;
+    // Anchored lit cells replace their dim guides in the ordinary face. Once
+    // the handover starts, expose those guides at the original positions too.
+    // At admission keep the draw list identical to the ordinary face.
+    let anchors: Vec<_> = frame
+        .layers
+        .iter()
+        .enumerate()
+        .filter(|(_, layer)| strength > 0.0 && layer.z == ACTIVE_CELL_LAYER)
+        .flat_map(|(index, layer)| &layer.primitives[before.get(index).copied().unwrap_or(0)..])
+        .filter_map(|primitive| match primitive {
+            RenderPrimitive::Polygon(polygon) => Some(RenderPrimitive::Polygon(
+                RenderPolygon::filled(polygon.points.clone(), INACTIVE_CELL_COLOR),
+            )),
+            _ => None,
+        })
+        .collect();
     // Hand over only the lit cells these three calls just drew. The dim anchors
     // keep their places as the substrate, just as a fall or an explosion leaves
     // them, and the arena, the floor and a visiting duck are never carried
     // along. No offscreen image or extra frame allocation.
     let sweep = event.face_sweep();
     let clearance = layout.bounds_max.x - layout.bounds_min.x + layout.pitch;
-    let opacity = 1.0 - event.playback().strength;
+    let opacity = 1.0 - strength;
     let gone = sweep.map_or(opacity <= 0.0, |sweep| sweep.abs() >= 1.0);
     for (index, layer) in frame.layers.iter_mut().enumerate() {
         if layer.z == INACTIVE_CELL_LAYER {
@@ -424,6 +440,9 @@ fn render_marquee_face(
                 }
             }
         }
+    }
+    for anchor in anchors {
+        frame.push_primitive(INACTIVE_CELL_LAYER, anchor);
     }
 }
 

@@ -191,7 +191,7 @@ fn clock_face_contract_a_text_takeover_carries_the_reading_clear_and_back() {
             let drawn = cells(&frame, ACTIVE_CELL_LAYER, side);
             assert_eq!(
                 cells(&frame, INACTIVE_CELL_LAYER, side).len(),
-                anchors.len(),
+                anchors.len() + if tick == 0 { 0 } else { places.len() },
                 "{} keeps every dim anchor at tick {tick}",
                 preset.as_str()
             );
@@ -262,6 +262,96 @@ fn clock_face_contract_a_text_takeover_carries_the_reading_clear_and_back() {
             "{} lands the reading exactly where it started",
             preset.as_str()
         );
+    }
+}
+
+/// Every guide remains visible when its lit cell leaves, including through a
+/// live reading change. Admission still draws the exact ordinary face.
+#[test]
+fn clock_face_contract_every_vacated_cell_exposes_a_stationary_dim_anchor() {
+    for font in crate::ClockFont::ALL {
+        for preset in presets() {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: ASPECT,
+                    event_profile: ClockEventProfile::Off,
+                    marquee_preset: preset,
+                    fonts: crate::ClockFontSettings {
+                        selected: font,
+                        rotate: false,
+                        ..Default::default()
+                    },
+                    ..ClockConfig::default()
+                },
+                SEED,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(reading())],
+                Duration::ZERO,
+            );
+            let side = Layout::new(ASPECT).pitch * 0.8;
+            let original = render_frame(&state);
+            let expected: Vec<_> = cells(&original, INACTIVE_CELL_LAYER, side)
+                .into_iter()
+                .chain(cells(&original, ACTIVE_CELL_LAYER, side))
+                .map(|(center, _)| center)
+                .collect();
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Marquee)],
+                Duration::ZERO,
+            );
+            assert_eq!(render_frame(&state), original);
+            for tick in [1, 22, 45, 360, 675, 698, 719] {
+                let Some(crate::events::ActiveEvent::Marquee(event)) = &mut state.active_event
+                else {
+                    panic!("expected a marquee");
+                };
+                event.tick = tick;
+                if tick == 360 {
+                    // A new digit pattern and colon blink must not change the
+                    // substrate while the reading is elsewhere.
+                    ClockScenario::step(
+                        &mut state,
+                        &[ClockAction::set_reading(
+                            ClockReading::new(12, 34, 1).unwrap(),
+                        )],
+                        Duration::ZERO,
+                    );
+                }
+                let frame = render_frame(&state);
+                let anchors = cells(&frame, INACTIVE_CELL_LAYER, side);
+                assert_eq!(
+                    anchors.len(),
+                    expected.len(),
+                    "{font:?} {preset:?} tick {tick}"
+                );
+                for center in &expected {
+                    assert_eq!(
+                        anchors
+                            .iter()
+                            .filter(|(at, _)| (*at - *center).length() < side * 0.01)
+                            .count(),
+                        1,
+                        "{font:?} {preset:?} tick {tick}: missing or duplicate anchor at {center:?}"
+                    );
+                }
+                for primitive in &frame
+                    .layers
+                    .iter()
+                    .find(|layer| layer.z == INACTIVE_CELL_LAYER)
+                    .unwrap()
+                    .primitives
+                {
+                    let RenderPrimitive::Polygon(polygon) = primitive else {
+                        panic!("expected a dim cell");
+                    };
+                    assert_eq!(polygon.fill.as_ref().unwrap().color, INACTIVE_CELL_COLOR);
+                    assert!(polygon.stroke.is_none());
+                }
+            }
+        }
     }
 }
 
