@@ -349,6 +349,38 @@ impl ActiveEvent {
         }
     }
 
+    /// The rigid world this event is simulating, if it has one. A shared-arena
+    /// event answers through the visit that owns the world, so the caller must
+    /// pass the live player when there is one. Rain's floats are its own world
+    /// and are canonical only while no visit has taken over.
+    pub fn canonical_world<'a>(
+        &'a self,
+        duck: Option<&'a duck::DuckEvent>,
+    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
+        match self {
+            Self::Falling(event) => event.canonical_world(duck),
+            Self::Explosion(event) => event.canonical_world(duck),
+            Self::Meltdown(event) => event.canonical_world(duck),
+            Self::Aquarium(event) => event.canonical_world(duck),
+            Self::Rain(event) if duck.is_none() => event.canonical_world(),
+            _ => duck.and_then(duck::DuckEvent::existing_world),
+        }
+    }
+
+    pub fn canonical_world_mut<'a>(
+        &'a mut self,
+        duck: Option<&'a mut duck::DuckEvent>,
+    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
+        match self {
+            Self::Falling(event) => event.canonical_world_mut(duck),
+            Self::Explosion(event) => event.canonical_world_mut(duck),
+            Self::Meltdown(event) => event.canonical_world_mut(duck),
+            Self::Aquarium(event) => event.canonical_world_mut(duck),
+            Self::Rain(event) if duck.is_none() => event.canonical_world_mut(),
+            _ => duck.and_then(duck::DuckEvent::existing_world_mut),
+        }
+    }
+
     pub fn join_arena(
         &mut self,
         layout: Layout,

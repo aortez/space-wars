@@ -15,6 +15,36 @@
 //! contract, and its ranges must be disjoint apart from the two aliases it
 //! declares.
 
+use engine_rapier::world::PhysicsWorld;
+
+use crate::events::{ActiveEvent, duck::DuckEvent};
+
+/// The one rigid world this run is simulating, whoever currently owns it.
+///
+/// Ownership is still the visit's: a shared-arena event answers through the duck
+/// that holds the world, so both the event and the live player have to be passed
+/// in. They are taken as separate borrows rather than through `ClockState`
+/// because callers hold the soil and the plants at the same time.
+pub(crate) fn canonical_world<'a>(
+    event: &'a Option<ActiveEvent>,
+    duck: Option<&'a DuckEvent>,
+) -> Option<&'a PhysicsWorld> {
+    match event {
+        Some(event) => event.canonical_world(duck),
+        None => duck.and_then(DuckEvent::existing_world),
+    }
+}
+
+pub(crate) fn canonical_world_mut<'a>(
+    event: &'a mut Option<ActiveEvent>,
+    duck: Option<&'a mut DuckEvent>,
+) -> Option<&'a mut PhysicsWorld> {
+    match event {
+        Some(event) => event.canonical_world_mut(duck),
+        None => duck.and_then(DuckEvent::existing_world_mut),
+    }
+}
+
 pub(crate) mod ids {
     /// The one shared arena, which the visit and its leasing events all insert
     /// into. Disjoint except for the aliases noted below, which the

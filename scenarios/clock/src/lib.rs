@@ -677,7 +677,7 @@ impl ClockState {
         let Some(soil) = self.soil.as_ref() else {
             return;
         };
-        let world = grass::surfaces::world(&self.active_event, self.duck_visit.as_deref());
+        let world = arena::canonical_world(&self.active_event, self.duck_visit.as_deref());
         if let Some(world) = world {
             self.plants.crush(soil, world);
         }
@@ -719,7 +719,7 @@ impl ClockState {
             .map(|s| (s.left, s.right))
             .filter(|(a, b)| a < b)
             .collect();
-        let world = grass::surfaces::world(&self.active_event, self.duck_visit.as_deref());
+        let world = arena::canonical_world(&self.active_event, self.duck_visit.as_deref());
         let soil = self
             .soil
             .get_or_insert_with(|| grass::SoilHabitat::new(layout));
@@ -827,7 +827,7 @@ impl ClockState {
         let soil = self.soil.as_mut().unwrap();
         soil.set_surfaces(surfaces, kind);
         if let Some(world) =
-            grass::surfaces::world_mut(&mut self.active_event, self.duck_visit.as_deref_mut())
+            arena::canonical_world_mut(&mut self.active_event, self.duck_visit.as_deref_mut())
         {
             soil.bind_current(world);
         }
