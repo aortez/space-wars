@@ -26,13 +26,15 @@ function fixture(t) {
   return { directory, image, payload, save };
 }
 
-function report(stage, phase, good, candidate) {
-  return JSON.stringify({ recovery: { report: { progress: { stage, phase, good_build_id: good, candidate_build_id: candidate, detail: null } }, fresh: true, error: null } });
+function report(stage, phase, good, candidate, detail = null) {
+  return JSON.stringify({ recovery: { report: { progress: { stage, phase, good_build_id: good, candidate_build_id: candidate, detail } }, fresh: true, error: null } });
 }
 
 // A unit reachable only through the shared connection, as the script promises.
-function unit({ enabled = true, normalBoot = true, outcome = 'committed', refuse = false } = {}) {
-  const state = { boot: 0, master: false, logins: 0, polls: 0, commands: [] };
+// As with its install lock, development commands refuse while startup recovery
+// runs, which reports `startup` times after each boot before it finishes.
+function unit({ enabled = true, normalBoot = true, outcome = 'committed', refuse = false, startup = 0, blocked = false } = {}) {
+  const state = { boot: 0, master: false, logins: 0, polls: 0, starting: startup, installed: false, commands: [] };
   const execute = async (program, args, settings = {}) => {
     if (program !== 'ssh') {
       state.commands.push({ program, args });
@@ -54,6 +56,7 @@ function unit({ enabled = true, normalBoot = true, outcome = 'committed', refuse
     state.commands.push({ command, settings });
     if (command.includes('boot_id')) return BOOTS[state.boot];
     if (command.includes('maintenance development status')) {
+      if (state.starting > 0) throw new Error('ssh exited with code 1');
       return JSON.stringify({ enabled, normal_boot: normalBoot, good_generation: 21, good_build_id: PREVIOUS, highest_attempted_generation: 21 });
     }
     if (command.includes('network status') || command.includes('network deployment')) {
@@ -62,18 +65,27 @@ function unit({ enabled = true, normalBoot = true, outcome = 'committed', refuse
     if (command.includes('systemctl reboot')) {
       state.boot++;
       state.master = false;
+      state.starting = startup;
       normalBoot = true;
       throw new Error('ssh exited with code 255');
     }
     if (command.includes('mktemp -d')) return STAGE;
     if (command.includes('df -B1')) return String(1024 ** 3);
     if (command.includes('maintenance development install')) {
-      if (refuse) throw new Error('ssh exited with code 1');
+      if (refuse || state.starting > 0) throw new Error('ssh exited with code 1');
+      state.installed = true;
       state.boot++;
       state.master = false;
       throw new Error('ssh exited with code 255');
     }
     if (command.includes('/usr/bin/engine-os-manager status')) {
+      if (!state.installed) {
+        if (state.starting > 0) {
+          state.starting--;
+          return report('starting', null, null, null);
+        }
+        return blocked ? report('blocked', null, PREVIOUS, null, 'fixture detail') : report('healthy', 'committed', PREVIOUS, PREVIOUS);
+      }
       state.polls++;
       if (state.polls === 1) return report('observing', 'observing', PREVIOUS, BUILD);
       if (outcome === 'committed') return report('healthy', 'committed', BUILD, BUILD);
@@ -144,13 +156,21 @@ test('an image the unit refuses leaves no staged files', async t => {
 });
 
 test('a unit still on its last trial boot restarts normally before the install', async t => {
-  const { device, lines, done } = run(t, { normalBoot: false });
+  // Each boot's startup recovery holds the install lock for two reports.
+  const { device, lines, done } = run(t, { normalBoot: false, startup: 2 });
   await done;
   assert.ok(lines.some(line => line.includes('Rebooting it normally first')));
   assert.equal(device.state.logins, 4);
   const reboot = device.state.commands.findIndex(call => call.command?.includes('systemctl reboot'));
   const install = device.state.commands.findIndex(call => call.command?.includes('maintenance development install'));
   assert.ok(reboot >= 0 && reboot < install);
+});
+
+test('a unit whose recovery is blocked is refused before any build', async t => {
+  const { device, packed, done } = run(t, { blocked: true }, []);
+  await assert.rejects(done, /Recovery is blocked on sw-picade-2.local: fixture detail/);
+  assert.equal(packed.length, 0);
+  assert.ok(!device.state.commands.some(call => call.command?.includes('maintenance development')));
 });
 
 test('arguments need an explicit target and an operator account', () => {

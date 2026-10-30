@@ -95,11 +95,14 @@ export function parseUnitStatus(text) {
   return status;
 }
 
+// From `engine-os-manager status`, which reports only the current boot's recovery.
+function recoveryProgress(text) {
+  try { return JSON.parse(text)?.recovery?.report?.progress ?? null; } catch { return null; }
+}
+
 /** Reads `engine-os-manager status`. The build ID identifies this install's transaction. */
 export function trialOutcome(text, build) {
-  let status = null;
-  try { status = JSON.parse(text); } catch {}
-  const progress = status?.recovery?.report?.progress;
+  const progress = recoveryProgress(text);
   if (!progress) return { state: 'waiting', stage: null };
   if (progress.stage === 'reboot-requested') return { state: 'rebooting' };
   if (progress.stage === 'blocked') return { state: 'blocked', detail: progress.detail ?? null };
@@ -149,6 +152,20 @@ export async function developmentUpdate(options, {
     return boot;
   };
   const unitStatus = async () => parseUnitStatus(await ssh(`${BINARY} maintenance development status`));
+  // Startup recovery holds the install lock until this boot's report finishes,
+  // and development commands refuse a held lock rather than wait for it.
+  const recovered = async () => {
+    const deadline = now() + 5 * 60_000;
+    for (;;) {
+      const progress = recoveryProgress(await ssh(`${BINARY} status`));
+      if (progress?.stage === 'healthy') return;
+      if (progress?.stage === 'blocked') throw new Error(`Recovery is blocked on ${options.host}: ${progress.detail ?? 'no detail'}.`);
+      if (now() >= deadline) {
+        throw new Error(`Recovery on ${options.host} has not finished (${progress?.stage ?? 'no report for this boot'}). Check: sudo ${BINARY} status`);
+      }
+      await wait(5_000);
+    }
+  };
   // Waits for any boot other than `previous` (null accepts the current one).
   // While the old boot is still up, it polls over one connection to it.
   const reconnect = async (previous, minutes) => {
@@ -175,6 +192,7 @@ export async function developmentUpdate(options, {
   try {
     try { await open(); }
     catch (error) { throw new Error(`Cannot connect to ${target}: ${error.message}`); }
+    await recovered();
     let status;
     try { status = await unitStatus(); }
     catch (error) {
@@ -205,6 +223,7 @@ export async function developmentUpdate(options, {
     await open();
     let boot = await bootId();
     await protect({ target, execute: operatorExecute }, async hold => {
+      await recovered();
       status = await unitStatus();
       if (!status.enabled) throw new Error(`Development installs were turned off on ${options.host}.`);
       if (!status.normal_boot) {
@@ -214,6 +233,7 @@ export async function developmentUpdate(options, {
         await close();
         boot = await reconnect(boot, 10);
         await hold.reconnected();
+        await recovered();
         status = await unitStatus();
         if (!status.normal_boot) throw new Error(`${options.host} came back on a trial boot.`);
       }

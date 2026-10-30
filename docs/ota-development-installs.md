@@ -67,6 +67,11 @@ for the reboot. If the install stopped with the connection, the next boot
 records it as interrupted before the trial, and the previous image keeps
 running.
 
+Before each status check, and so before the install, the script waits up to
+five minutes for this boot's recovery report to say `healthy`. Until then,
+startup recovery holds the install lock, and the unit's commands refuse a held
+lock rather than wait for it. A blocked recovery stops the update.
+
 App-only changes should keep using `--fast`. It takes seconds rather than a full
 image write.
 
