@@ -165,6 +165,38 @@ impl ImageTools {
         Ok(image)
     }
 
+    /// A development trial's record is schema 3. Older images refuse it, so
+    /// they could never finish the trial; refuse them before writing a slot.
+    pub(crate) fn check_development(&mut self, file: &File) -> Result<ImageIdentity> {
+        let image = self.check(file)?;
+        let mut inspect = Command::new("/usr/sbin/debugfs");
+        inspect.args([
+            "-R",
+            "cat /etc/spacewars/development-runtime.json",
+            &format!("/proc/self/fd/{}", file.as_raw_fd()),
+        ]);
+        let bytes = self
+            .command
+            .run(inspect, file, Duration::from_secs(10), 1024)?;
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Runtime {
+            schema: u32,
+            protocol: u32,
+        }
+        match serde_json::from_slice::<Runtime>(&bytes) {
+            Ok(runtime)
+                if runtime.schema == 1
+                    && runtime.protocol == crate::development::DEVELOPMENT_PROTOCOL =>
+            {
+                Ok(image)
+            }
+            _ => Err(crate::Error::Install(
+                "image cannot finish a development trial; build it from a source with development installs".into(),
+            )),
+        }
+    }
+
     pub(crate) fn check(&mut self, file: &File) -> Result<ImageIdentity> {
         let path = format!("/proc/self/fd/{}", file.as_raw_fd());
         let mut fsck = Command::new("/usr/sbin/e2fsck");

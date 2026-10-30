@@ -1,14 +1,15 @@
 //! Verified, fixed-target inactive-root writer. It cannot select a boot slot or
 //! reboot. The service must revalidate metadata/time/admission before beginning
 //! the journal transaction; this worker rechecks opened bytes and actual devices.
-use crate::boot_linux::BootController;
+use crate::boot_linux::{BootController, BootEvidence};
+use crate::development::DevelopmentImage;
 use crate::image_tools::ImageTools;
 use crate::owned_fs::{open_at, open_directory, owned, unchanged};
 use crate::recovery::{Action, FailureReason};
 use crate::recovery_linux::{DeviceNumber, DiskLayout, Partition};
 use crate::staging_linux::{staging_directory, staging_lock};
 use crate::{
-    Blob, Error, ImageDescriptor, ImageIdentity, RecoveryStore, Result, VerifiedCandidate,
+    Blob, Error, ImageDescriptor, ImageIdentity, RecoveryStore, Result, Sha256, VerifiedCandidate,
     verify_blob,
 };
 use serde::Serialize;
@@ -63,6 +64,12 @@ impl StagedPayload {
         )
     }
 
+    /// A development payload in the root operator's private staging directory,
+    /// under the same fixed hash-derived name and ownership checks.
+    pub fn development(directory: File, expected: Blob) -> Result<Self> {
+        Self::under(directory, 0, expected)
+    }
+
     fn under(directory: File, owner: u32, expected: Blob) -> Result<Self> {
         owned(&directory.metadata()?, true, owner, true)?;
         let lock = staging_lock(&directory, owner)?;
@@ -105,13 +112,13 @@ impl StagedPayload {
         Ok(())
     }
 
-    fn verify(&mut self, image: &ImageDescriptor) -> Result<()> {
-        if self.expected != image.compressed {
+    fn verify(&mut self, compressed: &Blob) -> Result<()> {
+        if &self.expected != compressed {
             return Err(Error::CandidateChanged);
         }
         self.check()?;
         self.file.rewind()?;
-        verify_blob(&mut self.file, &image.compressed)?;
+        verify_blob(&mut self.file, compressed)?;
         self.check()?;
         self.file.rewind()?;
         Ok(())
@@ -126,44 +133,94 @@ pub fn write_inactive(
     store: &mut RecoveryStore,
     candidate: &VerifiedCandidate,
     payload: &mut StagedPayload,
-    mut report: impl FnMut(WriteProgress),
+    report: impl FnMut(WriteProgress),
 ) -> Result<Action> {
     let image = candidate.image();
+    write_authorized(
+        boot,
+        store,
+        payload,
+        (&image.compressed, &image.expanded),
+        |boot, store| boot.authorize_write(store, image),
+        |source, target, report| {
+            let mut tools = ImageTools::default();
+            write_image(
+                image,
+                source,
+                target,
+                |file| tools.check(file),
+                &mut |progress| report(progress),
+            )
+        },
+        report,
+    )
+}
+
+/// The same sequence for a development transaction. The written image must
+/// match its development descriptor and declare it can finish the trial.
+pub fn write_development(
+    boot: &BootController<'_>,
+    store: &mut RecoveryStore,
+    image: &DevelopmentImage,
+    payload: &mut StagedPayload,
+    report: impl FnMut(WriteProgress),
+) -> Result<Action> {
+    write_authorized(
+        boot,
+        store,
+        payload,
+        (&image.compressed, &image.expanded),
+        |boot, store| boot.authorize_development_write(store, image),
+        |source, target, report| {
+            let mut tools = ImageTools::default();
+            write_checked_ext4(
+                &image.compressed,
+                &image.expanded,
+                source,
+                target,
+                |file| image.matches_identity(&tools.check_development(file)?),
+                &mut |progress| report(progress),
+            )
+        },
+        report,
+    )
+}
+
+/// Authorizes against the journal before and after each step, and commits the
+/// Written transition only after readback and the caller's image checks.
+fn write_authorized(
+    boot: &BootController<'_>,
+    store: &mut RecoveryStore,
+    payload: &mut StagedPayload,
+    (compressed, expanded): (&Blob, &Blob),
+    authorize: impl Fn(&BootController<'_>, &RecoveryStore) -> Result<(Sha256, BootEvidence)>,
+    write: impl FnOnce(&mut File, &mut BlockTarget, &mut dyn FnMut(WriteProgress)) -> Result<()>,
+    mut report: impl FnMut(WriteProgress),
+) -> Result<Action> {
     // Do not quarantine some other transaction for a stale/wrong caller.
-    let (transaction, initial) = boot.authorize_write(store, image)?;
+    let (transaction, initial) = authorize(boot, store)?;
     let result = (|| {
-        report(progress(WriteStage::CheckingPayload, 0, &image.expanded));
-        payload.verify(image)?;
-        let (_, current) = boot.authorize_write(store, image)?;
+        report(progress(WriteStage::CheckingPayload, 0, expanded));
+        payload.verify(compressed)?;
+        let (_, current) = authorize(boot, store)?;
         if current.layout != initial.layout {
             return Err(invalid("layout changed before writing"));
         }
-        let mut target = BlockTarget::open(&current.layout, image.expanded.bytes)?;
-        boot.authorize_write(store, image)?;
-        let mut tools = ImageTools::default();
-        write_image(
-            image,
-            &mut payload.file,
-            &mut target,
-            |file| tools.check(file),
-            &mut report,
-        )?;
+        let mut target = BlockTarget::open(&current.layout, expanded.bytes)?;
+        authorize(boot, store)?;
+        write(&mut payload.file, &mut target, &mut report)?;
         payload.check()?;
-        let (_, final_boot) = boot.authorize_write(store, image)?;
+        let (_, final_boot) = authorize(boot, store)?;
         target.check(&final_boot.layout)?;
         let action = store.advance(|record| {
             record.written(
                 transaction,
-                image.compressed.sha256,
-                image.expanded.sha256,
+                compressed.sha256,
+                expanded.sha256,
                 &final_boot.observation,
             )
         })?;
-        report(progress(
-            WriteStage::Prepared,
-            image.expanded.bytes,
-            &image.expanded,
-        ));
+        report(progress(WriteStage::Prepared, expanded.bytes, expanded));
         Ok(action)
     })();
     if let Err(error) = &result {

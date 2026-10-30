@@ -81,6 +81,28 @@ pub fn import_admin_keys() -> Result<engine_ota::access_linux::AccessStatus> {
     Ok(engine_ota::access_linux::import_admin_key(&lock)?)
 }
 
+/// Development trials use the same one-shot systemd reboot handshake as signed ones.
+pub fn request_development_reboot(
+    permit: &mut engine_ota::native_install::TrialPermit<'_, '_>,
+) -> engine_ota::Result<()> {
+    crate::bootstrap_activation::request_trial(permit)
+}
+
+/// Development admission needs the clear handoff official admission needs. A
+/// unit that never ran an official install has no journal, so nothing is created.
+pub fn require_clear_handoff(
+    lock: &InstallLock,
+    recovery: &RecoveryStore,
+) -> engine_ota::Result<()> {
+    (|| -> Result<()> {
+        match crate::install_handoff::journal::Journal::existing_native()? {
+            Some(mut journal) => journal.require_clear(lock, recovery),
+            None => Ok(()),
+        }
+    })()
+    .map_err(|error| engine_ota::Error::Install(error.to_string()))
+}
+
 fn authorize(lock: &InstallLock) -> Result<()> {
     engine_ota::bootstrap::require_no_active_bootstrap(lock)?;
     // New, unprovisioned development images may use the operator tools. Once

@@ -802,6 +802,11 @@ application without flashing or rebooting. One normal update is needed first
 to install the restricted helper. See [fast updates](docs/pi-kiosk.md#fast-application-updates)
 for compatibility checks and recovery details.
 
+For OS-level iteration on a unit that allows it, use
+`./update.sh --development --target sw-picade-2.local`. It installs the full
+image into the inactive slot as a trial, with the OTA watchdog and automatic
+return. See [development installs](docs/ota-development-installs.md).
+
 ## History
 
 - **2008**: Original Java + JOGL game. Binary, assets, and report preserved under
