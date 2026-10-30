@@ -415,6 +415,18 @@ impl<'a> BootController<'a> {
         Ok((transaction, boot))
     }
 
+    pub(crate) fn authorize_development_write(
+        &self,
+        journal: &RecoveryStore,
+        image: &crate::development::DevelopmentImage,
+    ) -> Result<(Sha256, BootEvidence)> {
+        let boot = self.observe()?;
+        let transaction = journal
+            .durable_record()?
+            .inactive_development_write(image, &boot.observation)?;
+        Ok((transaction, boot))
+    }
+
     pub fn apply(&mut self, journal: &RecoveryStore, action: &Action) -> Result<BootEvidence> {
         let before = self.observe()?;
         let record = journal.durable_record()?;

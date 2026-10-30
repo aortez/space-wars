@@ -976,3 +976,216 @@ fn journal_rejects_world_readable_state_and_symlinked_files() {
     symlink("real.json", &state).unwrap();
     assert!(crate::RecoveryStore::open(&path).is_err());
 }
+
+fn development(name: &str) -> DevelopmentImage {
+    let official = descriptor(2);
+    DevelopmentImage {
+        schema: crate::development::DEVELOPMENT_SCHEMA,
+        source_commit: "d".repeat(40),
+        source_dirty: true,
+        // The shared health samples report build-2.
+        build_id: "build-2".into(),
+        machine: official.machine,
+        architecture: official.architecture,
+        layout: official.layout,
+        format: official.format,
+        compressed: Blob {
+            bytes: 40,
+            sha256: digest(&format!("{name}-compressed")),
+        },
+        expanded: Blob {
+            bytes: 400,
+            sha256: digest(&format!("{name}-expanded")),
+        },
+        boot_identity: official.boot_identity,
+        min_updater_protocol: 1,
+        min_recovery_protocol: RECOVERY_PROTOCOL,
+        data: official.data,
+    }
+}
+
+/// Writes a development image from the baseline and requests its trial.
+fn development_requested(image: &DevelopmentImage) -> (RecoveryRecord, BootObservation, Sha256) {
+    let (record, boot, _) = baseline();
+    let plan = record.begin_development(image, &boot).unwrap();
+    let id = plan.record.transaction().unwrap().id;
+    assert_eq!(
+        plan.action,
+        Action::WriteInactive {
+            slot: Slot::B,
+            transaction: id
+        }
+    );
+    assert_eq!(
+        plan.record
+            .inactive_development_write(image, &boot)
+            .unwrap(),
+        id
+    );
+    let written = plan
+        .record
+        .written(id, image.compressed.sha256, image.expanded.sha256, &boot)
+        .unwrap()
+        .record;
+    let requested = written.trial_prepared(id, &boot).unwrap().record;
+    let mut trial = boot;
+    trial.boot_id = TRIAL_BOOT.into();
+    trial.uptime_ms = 20_000;
+    trial.actual_slot = Some(Slot::B);
+    trial.actual_build_id = Some("build-2".into());
+    trial.tryboot = true;
+    trial.trial_id = Some(id);
+    (requested, trial, id)
+}
+
+#[test]
+fn development_image_commits_without_a_generation_and_official_images_still_install() {
+    let image = development("first");
+    let (requested, mut trial, id) = development_requested(&image);
+    assert_eq!(requested.schema, 3);
+    assert!(requested.transaction().unwrap().development());
+    assert_eq!(requested.image_history().highest_attempted_generation, 1);
+    reopen(&requested);
+    let observing = requested.reconcile(&trial).unwrap().record;
+    let proof = healthy(&observing, &mut trial);
+    let promoting = observing.health_confirmed(proof, &trial).unwrap().record;
+    trial.default_slot = Some(Slot::B);
+    let committed = promoting.finish_promotion(&trial).unwrap().record;
+    assert_eq!(committed.good().slot, Slot::B);
+    assert_eq!(committed.good().generation, 0);
+    assert_eq!(committed.retained_good().unwrap().generation, 1);
+    assert_eq!(committed.transaction().unwrap().id, id);
+    let history = reopen(&committed).image_history();
+    assert_eq!(history.installed_sha256, Some(image.compressed.sha256));
+    assert_eq!(history.highest_attempted_generation, 1);
+    assert!(history.failed_images.is_empty());
+
+    // Another development image follows from the committed trial boot.
+    let (_, _, cap) = baseline();
+    let again = committed
+        .begin_development(&development("second"), &trial)
+        .unwrap()
+        .record;
+    assert_eq!(again.schema, 3);
+    assert_eq!(again.transaction().unwrap().previous_good.generation, 0);
+
+    // The next official generation installs over the development image and
+    // returns the record to the schema that older images read.
+    let official = committed
+        .begin_descriptor(&descriptor(2), &trial, &cap, false)
+        .unwrap()
+        .record;
+    assert_eq!(official.schema, 2);
+    assert_eq!(official.transaction().unwrap().candidate.slot, Slot::A);
+    assert_eq!(official.image_history().highest_attempted_generation, 2);
+    reopen(&official);
+}
+
+#[test]
+fn failed_development_trial_returns_without_quarantine_and_may_be_installed_again() {
+    let image = development("broken");
+    let (requested, trial, id) = development_requested(&image);
+    let mut late = trial.clone();
+    late.uptime_ms = TRIAL_DEADLINE_MS;
+    let plan = requested.reconcile(&late).unwrap();
+    assert_eq!(plan.action, Action::RebootPreviousGood { transaction: id });
+    let pending = reopen(&plan.record);
+    assert_eq!(pending.transaction().unwrap().phase, Phase::RollbackPending);
+    assert!(pending.image_history().failed_images.is_empty());
+
+    let (_, mut good, cap) = baseline();
+    good.boot_id = NEXT_BOOT.into();
+    let rolled = pending.reconcile(&good).unwrap().record;
+    let tx = rolled.transaction().unwrap();
+    assert_eq!(tx.phase, Phase::RolledBack);
+    assert_eq!(tx.failure, Some(FailureReason::HealthTimeout));
+    assert_eq!(rolled.schema, 3);
+    let history = reopen(&rolled).image_history();
+    assert!(history.failed_images.is_empty());
+    assert_eq!(history.highest_attempted_generation, 1);
+    assert_eq!(rolled.good().generation, 1);
+
+    // The same bytes may be tried again, and official images are unaffected.
+    rolled.begin_development(&image, &good).unwrap();
+    let official = rolled
+        .begin_descriptor(&descriptor(2), &good, &cap, false)
+        .unwrap()
+        .record;
+    assert_eq!(official.schema, 2);
+}
+
+#[test]
+fn development_images_need_this_units_boot_files_protocol_data_and_new_bytes() {
+    let (record, boot, cap) = baseline();
+    for fault in 0..5 {
+        let mut image = development("refused");
+        match fault {
+            0 => image.boot_identity = digest("other boot"),
+            1 => image.min_recovery_protocol += 1,
+            2 => {
+                image.data = DataCompatibility {
+                    reads: SchemaRange { min: 2, max: 2 },
+                    writes: 2,
+                }
+            }
+            3 => image.compressed.sha256 = record.good().payload,
+            _ => image.source_commit = "unknown".into(),
+        }
+        assert_eq!(
+            record.begin_development(&image, &boot).unwrap_err(),
+            RecoveryError::Ineligible,
+            "fault {fault}"
+        );
+    }
+    let writing = record
+        .begin_descriptor(&descriptor(2), &boot, &cap, false)
+        .unwrap()
+        .record;
+    assert_eq!(
+        writing
+            .begin_development(&development("busy"), &boot)
+            .unwrap_err(),
+        RecoveryError::Busy
+    );
+    let mut unknown = boot;
+    unknown.actual_slot = Some(Slot::B);
+    assert!(
+        record
+            .begin_development(&development("x"), &unknown)
+            .is_err()
+    );
+}
+
+#[test]
+fn record_schema_follows_whether_the_transaction_is_a_development_install() {
+    let (record, boot, cap) = baseline();
+    let mut wrong = record.clone();
+    wrong.schema = 3;
+    assert!(wrong.validate().is_err());
+    let image = development("schema");
+    let development = record.begin_development(&image, &boot).unwrap().record;
+    let mut wrong = development.clone();
+    wrong.schema = 2;
+    assert!(wrong.validate().is_err());
+    let mut wrong = development.clone();
+    wrong.transaction.as_mut().unwrap().attempt = 2;
+    assert!(wrong.validate().is_err());
+    // Writer checks are bound to one kind of transaction and exact bytes.
+    assert!(development.inactive_write(&descriptor(2), &boot).is_err());
+    assert!(
+        development
+            .inactive_development_write(&development_image_variant(&image), &boot)
+            .is_err()
+    );
+    let official = record
+        .begin_descriptor(&descriptor(2), &boot, &cap, false)
+        .unwrap()
+        .record;
+    assert!(official.inactive_development_write(&image, &boot).is_err());
+}
+
+fn development_image_variant(image: &DevelopmentImage) -> DevelopmentImage {
+    let mut changed = image.clone();
+    changed.source_dirty = !changed.source_dirty;
+    changed
+}

@@ -7,7 +7,7 @@ generation number. It is the full-image counterpart of
 [fast application updates](pi-kiosk.md#fast-application-updates), and the
 intended loop for OS-level development on the Nightly test unit.
 
-Status: design. Nothing described here is implemented yet.
+Status: implemented, and not yet installed on a unit. See [Rollout](#rollout).
 
 ## Why a separate path
 
@@ -36,23 +36,36 @@ path, which this route doesn't use.
 ## Workflow
 
 ```sh
-./update.sh --target sw-picade-2.local
+./update.sh --development --target sw-picade-2.local
 ```
 
-On a managed unit, the full-image path becomes a development install:
+The flag and the target are explicit; there is no default unit. A unit that
+hasn't enabled development installs refuses before anything is built.
 
-1. Build the image as today (`npm run build`).
-2. Pack it with `image_candidate pack-development`. This runs the existing
-   structural checks (filesystem, embedded records, executable headers, boot
-   manifest) without the clean-source policy. It writes a single-frame
-   `image.ext4.zst` and a `development.json` descriptor: the signed descriptor's
-   fields without generation or channel, plus the source's dirty flag.
-3. Copy both into a private root-owned staging directory over the owner's SSH
-   connection, as fast mode does, after checking free space.
-4. Run `sudo engine-os-manager maintenance development install STAGE PAYLOAD_SHA256`.
+1. Ask the unit whether development installs are enabled.
+2. Build the image as for any full update (`npm run build`).
+3. Pack it with `image_candidate pack-development`. This runs the release
+   packer's structural checks (filesystem, embedded records, executable headers,
+   boot manifest) without the release policy, so any source state, builder and
+   provenance is accepted. It writes a single-frame `image.ext4.zst` and a
+   `development.json` descriptor: the signed descriptor's fields without
+   generation or channel, plus the source's dirty flag.
+4. Copy both into a private root-owned directory in the unit's `/tmp` through
+   `swadmin`'s sudo, as fast mode does, after checking free space. The trial
+   reboot clears it.
+5. Run `sudo engine-os-manager maintenance development install STAGE PAYLOAD_SHA256`.
    The unit writes the inactive slot and requests the trial reboot.
-5. Wait for the unit to return, then report whether the trial committed or the
-   unit returned to the previous image.
+6. Wait for the unit, then report from its recovery record whether the trial
+   committed or the unit returned to the previous image. A return exits with an
+   error.
+
+Every command, including the deployment network hold, shares one SSH connection
+per boot. A fresh login makes the unit record a network admission, which a slow
+USB stick can stall, so a command that finds no shared connection fails instead
+of logging in again. If the connection drops during the write, the script waits
+for the reboot. If the install stopped with the connection, the next boot
+records it as interrupted before the trial, and the previous image keeps
+running.
 
 App-only changes should keep using `--fast`. It takes seconds rather than a full
 image write.
@@ -61,10 +74,12 @@ image write.
 
 The command runs only as root and only with development installs enabled. It
 holds the shared install lock and refuses during bootstrap, a trial or any
-unfinished transaction, as fast mode does. It also requires a confirmed normal
-boot, or a committed trial whose watchdog has finished. Provisioning must be
-complete, and the owner's install approval must validate, because a broken
-image is only safe where tryboot and the watchdog were qualified.
+unfinished transaction, as fast mode does. Like an official install, it starts
+only from a confirmed normal boot, so a normal boot has proven the promoted
+default before another trial relies on it. After a committed trial, the script
+reboots the unit once before the next install. Provisioning must be complete,
+and the owner's install approval must validate, because a broken image is only
+safe where tryboot and the watchdog were qualified.
 
 Before writing, the unit checks the descriptor and payload against itself:
 
@@ -106,22 +121,28 @@ misreading it.
 ## Opt-in and status
 
 `sudo engine-os-manager maintenance development enable|disable|status` manages a
-root-owned marker under `/data/spacewars-system`, bound to this unit. Only
-sw-picade-2 enables it. A mistyped target is refused by the unit.
+root-owned marker in `/data/spacewars-system`. The marker is bound to the unit's
+device, layout, boot files and hardware profile, so a USB reflash with other
+boot files turns it off. Enabling needs a valid install approval, as installing
+does. Only sw-picade-2 enables it.
 
-`engine-os-manager status` reports whether development installs are enabled and
-whether the running image is unpublished (generation 0). Update checks continue
+`status` reports whether development installs are enabled, whether the unit is
+on a normal boot, and the good image's build and generation. The recovery
+report in `engine-os-manager status` also carries the good and candidate
+generations, where generation 0 is an unpublished image. Update checks continue
 as usual, and the owner's Install press still governs official images.
 
 ## Rollout
 
-1. A PR with host tests for the record, checks, opt-in and workstation script.
+1. A PR with host tests for the record, checks, opt-in, packer and workstation
+   script.
 2. The feature reaches sw-picade-2 in a normal signed Nightly generation that
    the owner installs. A failed development trial returns to that image, so it
    must already read schema 3.
 3. Enable development installs on sw-picade-2.
 4. Two supervised runs, each recorded: one image that commits, and one whose
-   app fails health so the unit returns.
+   app fails health so the unit returns. The first run also confirms that the
+   kiosk's update screen clears after the commit.
 
 ## Limits
 
@@ -132,5 +153,8 @@ as usual, and the owner's Install press still governs official images.
   development install of a build from main.
 - An image that breaks the update service or this command, but still passes the
   trial, needs a USB reflash or repair over SSH.
+- While a development trial runs, the kiosk's update screen waits for the device
+  installation service, as during supervised installs. It clears when the trial
+  commits or returns.
 - On the Picade, expect about fifteen minutes per cycle with warm caches. Most
   of that is the build and the slow USB flush.

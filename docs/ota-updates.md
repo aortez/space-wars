@@ -1696,6 +1696,16 @@ instead of treating the old image record as proof of the replacement binary.
 [Source and execution evidence](data/ota-maintenance-20261015.json) records
 this boundary without claiming completed bootstrap or automatic updates.
 
+### Development image installs
+
+`./update.sh --development --target HOST` installs a locally built full image on
+a unit that has enabled development installs. The unit checks the image against
+itself, writes the inactive slot with the verified writer, and boots it as a
+normal trial with the early watchdog and automatic return. The image is
+unsigned and gets generation 0, so it neither raises the generation floor nor
+enters the quarantine map. The [design and limits](ota-development-installs.md)
+cover the opt-in, the record change and the rollout.
+
 ### Clean image integration check
 
 A full Yocto build from clean commit `b400523` succeeds. The actual ext4 image

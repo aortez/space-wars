@@ -81,6 +81,13 @@ pub fn import_admin_keys() -> Result<engine_ota::access_linux::AccessStatus> {
     Ok(engine_ota::access_linux::import_admin_key(&lock)?)
 }
 
+/// Development trials use the same one-shot systemd reboot handshake as signed ones.
+pub fn request_development_reboot(
+    permit: &mut engine_ota::native_install::TrialPermit<'_, '_>,
+) -> engine_ota::Result<()> {
+    crate::bootstrap_activation::request_trial(permit)
+}
+
 fn authorize(lock: &InstallLock) -> Result<()> {
     engine_ota::bootstrap::require_no_active_bootstrap(lock)?;
     // New, unprovisioned development images may use the operator tools. Once
