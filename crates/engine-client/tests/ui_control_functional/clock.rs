@@ -1681,6 +1681,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.grass.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
+            "launcher.settings.clock.slot-machine.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);

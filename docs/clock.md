@@ -2109,6 +2109,7 @@ Conformance, measured rather than read:
 | Falling digits | Reforms from each segment's real landing pose, cross-fading the old shape into the new | Met |
 | Cell swaps | Per-cell quadratic bezier with opposing bow; the 15-tick fade only corrects a reading that changed mid-swap | Met |
 | Digit Slide | The old glyph slides out and the new one slides in, clipped per cell | Met |
+| Slot Machine | Every reel opens on the glyph the face was showing and turns, clipped to its own slot, onto a whole stop; nothing is faded on | Met |
 | Meltdown | Cells liquefy on real floor contact, and the face refills bottom-up and row-staggered as the puddle drains | Met by refill |
 | Aquarium | The face stays anchored and solid throughout; nothing comes apart | Not applicable |
 | Marquee, clock recipes | The reading dissolves into its own animation, which opens on the anchored pose | Met |
