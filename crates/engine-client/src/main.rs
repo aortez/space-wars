@@ -1649,7 +1649,13 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 }
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
-    match window.get_launcher_scenario().as_str() {
+    launcher_settings_item_count_for(window.get_launcher_scenario().as_str())
+}
+
+/// Confirm leaves the settings page on the final index, so this count decides
+/// where Back sits. The focus order in `ui_inventory` has to agree with it.
+pub(crate) fn launcher_settings_item_count_for(scenario: &str) -> i32 {
+    match scenario {
         "spacewars" => 11,
         "spacewars-classic" => 8,
         "pizza" => 7,

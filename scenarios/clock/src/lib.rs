@@ -1130,7 +1130,7 @@ impl ClockState {
             if kind != ClockEventKind::Crow {
                 self.finish_event();
             }
-            self.start_event(kind);
+            self.start_preview(kind);
         }
     }
 
@@ -1164,13 +1164,20 @@ impl ClockState {
     }
 
     fn start_event(&mut self, kind: ClockEventKind) {
-        self.start_event_from(kind, None);
+        self.start_event_from(kind, None, false);
+    }
+
+    /// A person asked for this one. Only the admission knows that, so events
+    /// that report it cannot infer it from the absence of a previous reading.
+    fn start_preview(&mut self, kind: ClockEventKind) {
+        self.start_event_from(kind, None, true);
     }
 
     fn start_event_from(
         &mut self,
         kind: ClockEventKind,
         previous_display: Option<DisplaySnapshot>,
+        preview: bool,
     ) {
         debug_assert!(!self.event_blocked(kind));
         self.last_started_event = Some(kind);
@@ -1280,6 +1287,7 @@ impl ClockState {
             seed,
             self.config,
             previous_display,
+            preview,
         ));
     }
 
@@ -1501,7 +1509,7 @@ impl ClockState {
             digits::apply_snapshot(&mut self.segments, self.display);
         }
         if slide && let Some(kind) = self.schedule.time_change_event() {
-            self.start_event_from(kind, Some(previous));
+            self.start_event_from(kind, Some(previous), false);
         }
     }
 }

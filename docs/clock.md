@@ -286,7 +286,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, and **Cell Swap** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, and **Slot Machine** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -930,7 +930,10 @@ on until the ordinary face takes over at completion. A blank leading digit in
 12-hour mode is a real stop, so that reel still turns and still locks.
 
 Preview spins and lands on the current reading and never fabricates a different
-time, works with the switch or profile Off, and reports `preview: true`. The
+time, works with the switch or profile Off, and reports `preview: true`. A
+scheduled admission reports `false`: a periodic event has no previous reading
+either, so unlike Digit Slide's time-change roll the flag has to come from the
+admission rather than from the snapshot. The
 event creates no physics. Its measured worst frame is **1028 draw primitives**
 across wide, narrow and portrait, held at 1100 by the contract below. That is
 well above Digit Slide's documented sub-300 for a comparable transition, and the

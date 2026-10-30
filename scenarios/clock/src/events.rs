@@ -280,6 +280,7 @@ impl ActiveEvent {
         seed: u64,
         config: super::ClockConfig,
         previous_display: Option<DisplaySnapshot>,
+        preview: bool,
     ) -> Self {
         match kind {
             ClockEventKind::Grass => Self::Grass(crate::grass::Introduction::default()),
@@ -304,10 +305,12 @@ impl ActiveEvent {
             ClockEventKind::DigitSlide => {
                 Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
             }
+            // A periodic event has no previous reading either, so the
+            // admission has to say whether a person asked for this one.
             ClockEventKind::SlotMachine => Self::SlotMachine(Box::new(SlotMachineEvent::new(
                 context.display,
                 seed,
-                previous_display.is_none(),
+                preview,
             ))),
             ClockEventKind::CellSwap => Self::CellSwap(Box::new(cell_swap::CellSwapEvent::new(
                 context.display,

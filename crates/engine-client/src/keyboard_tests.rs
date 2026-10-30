@@ -999,12 +999,16 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(window.get_ingame_clock_focus_index(), 18);
     key(&window, Key::Return);
     assert_eq!(adjusted.get(), Some((18, 1)));
-    key(&window, Key::DownArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 12);
-    key(&window, Key::DownArrow);
-    // Slot Machine has a row to itself below Rain. Like Date it toggles on
-    // Left/Right rather than moving, so the row is left by going down.
+    // Grass and Slot Machine finish the switch row, so Right walks out to them
+    // and wraps back to Rain where the row starts.
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 19);
+    key(&window, Key::RightArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 20);
+    key(&window, Key::Return);
+    assert_eq!(adjusted.get(), Some((20, 1)));
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 12);
     key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 3);
@@ -1054,11 +1058,15 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     window.on_clock_fonts_open(move || opened.set(true));
     click(&window, 649.0, 110.0);
     assert!(fonts_opened.get());
-    click(&window, 649.0, 166.0);
+    // The switch row has the same five columns as the event row below it, so
+    // Slot Machine is hittable at the far end rather than buried under Falling.
+    click(&window, 625.0, 166.0);
+    assert_eq!(adjusted.get(), Some((20, 1)));
+    click(&window, 512.0, 166.0);
     assert_eq!(adjusted.get(), Some((19, 1)));
-    click(&window, 470.0, 166.0);
+    click(&window, 400.0, 166.0);
     assert_eq!(adjusted.get(), Some((18, 1)));
-    click(&window, 326.0, 166.0);
+    click(&window, 287.0, 166.0);
     assert_eq!(adjusted.get(), Some((13, 1)));
     click(&window, 175.0, 166.0);
     assert_eq!(adjusted.get(), Some((12, 1)));
@@ -1079,14 +1087,20 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(window.get_launcher_settings_focus_index(), 3);
     key(&window, Key::DownArrow);
     assert_eq!(window.get_launcher_settings_focus_index(), 4);
+    // This row now has the same five columns as the one below it, so its
+    // coordinates match, and its last column is Slot Machine.
     assert!(window.get_launcher_clock_cell_swap_enabled());
-    click(&window, 470.0, 272.0);
+    click(&window, 400.0, 272.0);
     assert!(!window.get_launcher_clock_cell_swap_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 17);
     assert!(window.get_launcher_clock_grass_enabled());
-    click(&window, 649.0, 272.0);
+    click(&window, 525.0, 272.0);
     assert!(!window.get_launcher_clock_grass_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 18);
+    assert!(window.get_launcher_clock_slot_machine_enabled());
+    click(&window, 649.0, 272.0);
+    assert!(!window.get_launcher_clock_slot_machine_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 19);
     assert!(window.get_launcher_clock_meltdown_enabled());
     click(&window, 175.0, 324.0);
     assert!(!window.get_launcher_clock_meltdown_enabled());

@@ -254,7 +254,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))
         }
         UiAction::Left | UiAction::Right => {
-            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 17 | 18 | 19) {
+            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 17 | 18 | 19 | 20) {
                 window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
                     index, action,
                 ));

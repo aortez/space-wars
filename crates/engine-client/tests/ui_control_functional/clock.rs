@@ -1336,12 +1336,14 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             page.selected_control.as_deref(),
             Some("pause.clock.cell-swap")
         );
-        let page = harness.press_guarded(UiAction::Down, &page);
-        let page = harness.press_guarded(UiAction::Down, &page);
+        let page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.grass"));
+        let page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
             page.selected_control.as_deref(),
             Some("pause.clock.slot-machine")
         );
+        let page = harness.press_guarded(UiAction::Right, &page);
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
