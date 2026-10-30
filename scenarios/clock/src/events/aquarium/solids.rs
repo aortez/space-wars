@@ -7,7 +7,7 @@ use engine_rapier::world::{
     PhysicsId,
 };
 
-const DIGITS: PhysicsId = PhysicsId::new(6100);
+const DIGITS: PhysicsId = PhysicsId::new(crate::arena::ids::canonical::AQUARIUM_DIGITS.start);
 
 pub(super) struct DigitSolids {
     cells: Vec<Obstacle>,

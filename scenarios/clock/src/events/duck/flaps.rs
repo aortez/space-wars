@@ -86,7 +86,10 @@ pub(super) struct Flaps {
 }
 
 pub(super) fn body(side: usize) -> BodyId {
-    BodyId::new(PhysicsId::new(2100 + side as u64), BodyRole::PRIMARY)
+    BodyId::new(
+        PhysicsId::new(crate::arena::ids::canonical::FLAPS.start + side as u64),
+        BodyRole::PRIMARY,
+    )
 }
 
 fn collider(side: usize) -> ColliderId {

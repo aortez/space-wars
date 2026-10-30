@@ -54,7 +54,10 @@ pub(crate) struct ExplosionEvent {
 
 fn body_id(index: usize) -> BodyId {
     // Disjoint from duck, course, Falling bars and Meltdown cells.
-    BodyId::new(PhysicsId::new(5001 + index as u64), BodyRole::PRIMARY)
+    BodyId::new(
+        PhysicsId::new(crate::arena::ids::canonical::EXPLOSION_CELLS.start + index as u64),
+        BodyRole::PRIMARY,
+    )
 }
 
 impl ExplosionEvent {

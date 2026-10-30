@@ -1,5 +1,6 @@
 //! Deterministic low-resolution clock scenario.
 
+mod arena;
 #[cfg(test)]
 mod autonomous_tests;
 mod calendar;

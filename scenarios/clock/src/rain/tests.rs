@@ -247,7 +247,10 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                                 let m = floats
                                     .world
                                     .motion(engine_rapier::world::BodyId::new(
-                                        engine_rapier::world::PhysicsId::new(1001 + side as u64),
+                                        engine_rapier::world::PhysicsId::new(
+                                            crate::arena::ids::canonical::RESPONSIVE_PANELS.start
+                                                + side as u64,
+                                        ),
                                         engine_rapier::world::BodyRole::PRIMARY,
                                     ))
                                     .unwrap();

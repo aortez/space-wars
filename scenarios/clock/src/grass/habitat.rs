@@ -15,7 +15,7 @@ use engine_terrain::{
 
 pub const CLOCK_DIRT: MaterialId = MaterialId(1);
 /// Reserved outside Clock's actors, panels, walls and digit batches.
-pub const SOIL_PHYSICS_ID: u64 = 900_001;
+pub const SOIL_PHYSICS_ID: u64 = crate::arena::ids::canonical::SOIL.start;
 pub const MAX_SOIL_BODIES: usize = 1;
 pub const MAX_SOIL_CHUNK_COLLIDERS: usize = 30;
 pub const MAX_SOIL_EXPORTS_PER_UPDATE: usize = MAX_SOIL_CELLS;

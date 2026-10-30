@@ -322,7 +322,7 @@ impl ResponsiveFloor {
 
     /// The passive and player duck use identical panel poses and persistent IDs.
     pub fn insert_panels(&self, world: &mut PhysicsWorld) {
-        self.insert_panels_at(world, 1001);
+        self.insert_panels_at(world, crate::arena::ids::canonical::RESPONSIVE_PANELS.start);
     }
 
     pub fn insert_panels_at(&self, world: &mut PhysicsWorld, first_id: u64) {
@@ -348,7 +348,7 @@ impl ResponsiveFloor {
     }
 
     pub fn move_panels(&self, world: &mut PhysicsWorld) {
-        self.move_panels_at(world, 1001);
+        self.move_panels_at(world, crate::arena::ids::canonical::RESPONSIVE_PANELS.start);
     }
 
     pub fn move_panels_at(&self, world: &mut PhysicsWorld, first_id: u64) {

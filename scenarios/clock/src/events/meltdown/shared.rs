@@ -2,6 +2,7 @@
 //! Standalone Meltdown keeps its cheaper ballistic cells. Both use the same
 //! release schedule, material budget, water solver and reformation lifecycle.
 use super::*;
+use crate::arena::ids::canonical;
 use crate::events::duck::VisitArena;
 use engine_rapier::world::{
     BodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId, PhysicsWorld,
@@ -28,9 +29,11 @@ impl SharedMeltdown {
     pub fn new(player: &mut DuckEvent, count: usize) -> Self {
         assert!(count <= MAX_MELTDOWN_CELLS);
         let supports = if player.responsive_floor().is_some() {
-            1001..1003
+            canonical::RESPONSIVE_PANELS
         } else {
-            1000..1000 + player.course.as_ref().expect("duck course").surfaces.len() as u64
+            canonical::COURSE.start
+                ..canonical::COURSE.start
+                    + player.course.as_ref().expect("duck course").surfaces.len() as u64
         };
         let arena = VisitArena::claim(player);
         player.arena_world_mut().reserve(count, count, 0);
@@ -39,7 +42,10 @@ impl SharedMeltdown {
             bodies: CellBodies {
                 cells: (0..count)
                     .map(|i| CellBody {
-                        id: BodyId::new(PhysicsId::new(4001 + i as u64), BodyRole::PRIMARY),
+                        id: BodyId::new(
+                            PhysicsId::new(canonical::MELTDOWN_CELLS.start + i as u64),
+                            BodyRole::PRIMARY,
+                        ),
                         released: false,
                     })
                     .collect(),

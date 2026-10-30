@@ -115,7 +115,10 @@ impl DuckEvent {
         for edge in edges(self).into_iter().flatten() {
             self.ledge.automatic.stats.candidates_checked += 1;
             if edge.outward * self.direction * direction >= 0.0
-                || target.is_some_and(|index| edge.body.entity.value() != 1000 + index as u64)
+                || target.is_some_and(|index| {
+                    edge.body.entity.value()
+                        != crate::arena::ids::canonical::COURSE.start + index as u64
+                })
                 || !edge.in_reach(self)
             {
                 continue;

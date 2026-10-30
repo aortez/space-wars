@@ -50,6 +50,8 @@ use player_control::PlayerControl;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::EventPhase;
+// Imported by name: `arena` already denotes this module's own course geometry.
+use crate::arena::ids::canonical;
 use crate::floor::responsive::ResponsiveFloor;
 use crate::layout::Layout;
 
@@ -58,7 +60,7 @@ const EXIT_DELAY_TICKS: u64 = 20 * 60;
 const OPENING_TICKS: u64 = 36;
 const RESET_TICKS: u64 = 30;
 const DT: f32 = 1.0 / 60.0;
-const DUCK_ENTITY: PhysicsId = PhysicsId::new(1);
+const DUCK_ENTITY: PhysicsId = PhysicsId::new(canonical::DUCK.start);
 const DUCK_BODY: BodyId = BodyId::new(DUCK_ENTITY, BodyRole::PRIMARY);
 pub(crate) const DUCK_COLLIDER: ColliderId = ColliderId::new(DUCK_ENTITY, ColliderRole::PRIMARY, 0);
 const DUCK_DENSITY: f32 = 0.45;
@@ -405,8 +407,13 @@ impl DuckEvent {
             ]
         };
         for (index, (start, end, bottom, top)) in geometry.into_iter().enumerate() {
-            let entity =
-                PhysicsId::new(if self.course.is_some() { 1000 } else { 100 } + index as u64);
+            let entity = PhysicsId::new(
+                if self.course.is_some() {
+                    canonical::COURSE.start
+                } else {
+                    canonical::HURDLES.start
+                } + index as u64,
+            );
             let mut collider = ColliderSpec::cuboid(
                 ColliderId::new(entity, ColliderRole::PRIMARY, 0),
                 (end - start) * 0.5,
@@ -434,7 +441,7 @@ impl DuckEvent {
     fn insert_entrance_wall(&mut self) {
         // A physical screen-edge wall replaces the bot's turnaround rule.
         // The far end remains open so the player can walk through the exit.
-        let entity = PhysicsId::new(2000);
+        let entity = PhysicsId::new(canonical::ENTRANCE_WALL.start);
         let id = BodyId::new(entity, BodyRole::PRIMARY);
         if self.world.as_ref().unwrap().motion(id).is_some() {
             return;
@@ -559,7 +566,11 @@ impl DuckEvent {
                             .then_some(*index)
                     });
                 }
-                let index = contact.collider.entity.value().checked_sub(1000)? as usize;
+                let index = contact
+                    .collider
+                    .entity
+                    .value()
+                    .checked_sub(canonical::COURSE.start)? as usize;
                 if index >= course.surfaces.len() {
                     return None;
                 }

@@ -33,7 +33,7 @@ pub const CLEAR_TICKS: u64 = 3 * 60;
 pub const AQUARIUM_TICKS: u64 = FILL_TICKS + SWIM_TICKS + EXIT_TICKS + DRAIN_TICKS + CLEAR_TICKS;
 const DRAIN_AT: u64 = FILL_TICKS + SWIM_TICKS + EXIT_TICKS;
 const DT: f32 = 1.0 / 60.0;
-const LINER_ID: u64 = 6001;
+const LINER_ID: u64 = crate::arena::ids::canonical::AQUARIUM_LINER.start;
 
 struct SharedAquarium {
     arena: VisitArena,

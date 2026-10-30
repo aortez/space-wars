@@ -70,7 +70,10 @@ pub(super) fn edges(duck: &DuckEvent) -> [Option<Edge>; MAX_EDGES] {
         && let Some(course) = &duck.course
     {
         for index in 0..course.surfaces.len().min(planner::MAX_SURFACES) {
-            let body = BodyId::new(PhysicsId::new(1000 + index as u64), BodyRole::PRIMARY);
+            let body = BodyId::new(
+                PhysicsId::new(crate::arena::ids::canonical::COURSE.start + index as u64),
+                BodyRole::PRIMARY,
+            );
             let Some(motion) = world.motion(body) else {
                 continue;
             };

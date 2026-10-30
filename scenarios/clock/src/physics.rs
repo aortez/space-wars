@@ -7,6 +7,7 @@ use rand::{Rng, rngs::StdRng};
 
 use crate::{
     SegmentId, SegmentRepresentation, SegmentState,
+    arena::ids::canonical,
     floor::DrainGeometry,
     layout::Layout,
     meridiem::{LetterState, PIXEL_SIZE},
@@ -18,20 +19,26 @@ pub(crate) struct FallingWorld {
 }
 
 /// One bounded batch, reusable in the standalone arena or a player's world.
-/// These IDs never overlap the duck (1), course/panels (1000s), or wall (2000).
+/// Its identities come from `arena::ids::canonical`, which is what keeps them
+/// clear of the duck, the course, the panels and the walls.
 pub(crate) struct FallingBodies {
     entities: Vec<PhysicsId>,
 }
 
 pub(crate) fn body_id(id: SegmentId) -> BodyId {
     BodyId::new(
-        PhysicsId::new(3001 + u64::from(id.digit_slot) * 7 + id.kind as u64),
+        PhysicsId::new(
+            canonical::FALLING_SEGMENTS.start + u64::from(id.digit_slot) * 7 + id.kind as u64,
+        ),
         BodyRole::PRIMARY,
     )
 }
 
 fn letter_body_id(slot: usize) -> BodyId {
-    BodyId::new(PhysicsId::new(3032 + slot as u64), BodyRole::PRIMARY)
+    BodyId::new(
+        PhysicsId::new(canonical::FALLING_LETTERS.start + slot as u64),
+        BodyRole::PRIMARY,
+    )
 }
 
 impl FallingWorld {
@@ -82,11 +89,12 @@ impl FallingWorld {
             ])
             .enumerate()
         {
-            // Shared arenas use 1000s for supporting terrain, 2000s for walls.
+            // The two banks are addressed as course surfaces by a drain-joined
+            // player, and the walls are the boundary such a player inherits.
             let entity = PhysicsId::new(if index < 2 {
-                1000 + index as u64
+                canonical::DRAIN_BANKS.start + index as u64
             } else {
-                2000 + (index - 2) as u64
+                canonical::FALLING_WALLS.start + (index - 2) as u64
             });
             assert!(world.insert_body(
                 BodyId::new(entity, BodyRole::PRIMARY),
