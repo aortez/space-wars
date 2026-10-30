@@ -544,6 +544,73 @@ fn lost_terminal_reply_is_retained_until_a_fresh_unfenced_host_is_observed() {
 }
 
 #[test]
+fn admission_waits_until_the_kiosk_releases_the_handoff() {
+    // Admission replaces the recovery transaction. A handoff still naming the
+    // old one could never match again, so every unreleased handoff refuses.
+    let mut f = Fixture::new();
+    assert!(
+        f.journal
+            .as_mut()
+            .unwrap()
+            .require_clear_inner(&f.before)
+            .is_ok()
+    );
+    f.prepare();
+    f.arm();
+    for phase in [Phase::Writing, Phase::Committed] {
+        let current = f.current(phase);
+        assert!(
+            f.journal
+                .as_mut()
+                .unwrap()
+                .require_clear_inner(&current)
+                .is_err()
+        );
+    }
+    let host = f.context.host.clone().unwrap();
+    let committed = f.current(Phase::Committed);
+    f.journal
+        .as_mut()
+        .unwrap()
+        .release_inner(&committed, &f.prepare.ticket, &host, 100, 105)
+        .unwrap();
+    f.reopen();
+    assert!(
+        f.journal
+            .as_mut()
+            .unwrap()
+            .require_clear_inner(&committed)
+            .is_ok()
+    );
+
+    // The first refusal aborts an abandoned preparation, which then also
+    // refuses until it is released.
+    let mut f = Fixture::new();
+    f.prepare();
+    for _ in 0..2 {
+        assert!(
+            f.journal
+                .as_mut()
+                .unwrap()
+                .require_clear_inner(&f.before)
+                .is_err()
+        );
+    }
+    f.journal
+        .as_mut()
+        .unwrap()
+        .release_inner(&f.before, &f.prepare.ticket, &host, 100, 105)
+        .unwrap();
+    assert!(
+        f.journal
+            .as_mut()
+            .unwrap()
+            .require_clear_inner(&f.before)
+            .is_ok()
+    );
+}
+
+#[test]
 fn stale_release_ticket_cannot_abort_a_new_preparation() {
     let mut f = Fixture::new();
     f.prepare();

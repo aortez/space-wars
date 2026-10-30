@@ -449,6 +449,7 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                             let transaction = development::install(
                                 &stage,
                                 digest,
+                                engine_os_manager::maintenance::require_clear_handoff,
                                 |progress| {
                                     let percent = (progress.bytes * 100)
                                         .checked_div(progress.total)

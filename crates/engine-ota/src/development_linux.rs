@@ -129,9 +129,12 @@ fn enabled(system: &File, owner: u32, binding: &BootBinding) -> Result<bool> {
 
 /// Writes the inactive slot and requests the trial reboot. `payload` is the
 /// operator's selected digest; the staged descriptor must name the same bytes.
+/// `handoff` refuses while an official install's handoff still names the
+/// recovery transaction that admission replaces.
 pub fn install(
     stage: &Path,
     payload: Sha256,
+    handoff: impl FnOnce(&InstallLock, &RecoveryStore) -> Result<()>,
     report: impl FnMut(WriteProgress),
     reboot: impl FnOnce(&mut TrialPermit<'_, '_>) -> Result<()>,
 ) -> Result<Sha256> {
@@ -140,6 +143,7 @@ pub fn install(
     let mut recovery = RecoveryStore::open(Path::new(RECOVERY))?;
     let mut boot = BootController::open(&lock)?;
     boot.authorize_maintenance(&recovery)?;
+    handoff(&lock, &recovery)?;
     let evidence = boot.observe()?;
     // As for official installs, a normal boot must prove the promoted default
     // before another trial relies on it to return.

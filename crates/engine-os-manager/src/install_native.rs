@@ -144,10 +144,7 @@ impl Backend for Native {
             let boot = BootController::open(&lock)?;
             let recovery =
                 RecoveryStore::open(Path::new(crate::recovery_service::RECOVERY_DIRECTORY))?;
-            let mut journal = journal::Journal::open_native()?;
-            if journal.reconcile(&lock, &recovery)? != journal::Resolution::Clear {
-                return Err(invalid("previous handoff is unresolved"));
-            }
+            journal::Journal::open_native()?.require_clear(&lock, &recovery)?;
             boot.plan_install(&recovery, &selected.candidate)?;
             Ok(())
         })();

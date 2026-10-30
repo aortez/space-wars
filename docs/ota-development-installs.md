@@ -74,12 +74,16 @@ image write.
 
 The command runs only as root and only with development installs enabled. It
 holds the shared install lock and refuses during bootstrap, a trial or any
-unfinished transaction, as fast mode does. Like an official install, it starts
-only from a confirmed normal boot, so a normal boot has proven the promoted
-default before another trial relies on it. After a committed trial, the script
-reboots the unit once before the next install. Provisioning must be complete,
-and the owner's install approval must validate, because a broken image is only
-safe where tryboot and the watchdog were qualified.
+unfinished transaction, as fast mode does. As official admission does, it also
+refuses until the kiosk has released the last official install's handoff.
+Admission replaces the recovery transaction that handoff names, and a handoff
+left unable to match would block the kiosk and later official installs. Like an
+official install, it starts only from a confirmed normal boot, so a normal boot
+has proven the promoted default before another trial relies on it. After a
+committed trial, the script reboots the unit once before the next install.
+Provisioning must be complete, and the owner's install approval must validate,
+because a broken image is only safe where tryboot and the watchdog were
+qualified.
 
 Before writing, the unit checks the descriptor and payload against itself:
 
