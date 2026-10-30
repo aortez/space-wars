@@ -146,6 +146,7 @@ fn filtered_schedule_has_no_backlog_and_reconfigures_without_changing_saved_enab
     settings.events.color_cycle = false;
     settings.events.marquee = false;
     settings.events.digit_slide = false;
+    settings.events.slot_machine = false;
     state.configure(settings);
     assert!(state.automatic_events_suspended());
     ticks(&mut state, 6000);

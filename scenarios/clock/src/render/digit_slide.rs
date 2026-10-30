@@ -59,7 +59,15 @@ pub(super) fn render(
     }
 }
 
-fn clipped_cell(frame: &mut RenderFrame, center: Vec2, layout: Layout, palette: DigitPalette) {
+/// Clips one cell to the slot band, with the fill and the edge clipped apart so
+/// the boundary neither gains a false stroke nor lets half a stroke escape. The
+/// Slot Machine's reels travel through the same band and share this.
+pub(super) fn clipped_cell(
+    frame: &mut RenderFrame,
+    center: Vec2,
+    layout: Layout,
+    palette: DigitPalette,
+) {
     let lower = layout.face_origin.y;
     let upper = lower + 9.0 * layout.pitch;
     let half = layout.pitch * 0.4;

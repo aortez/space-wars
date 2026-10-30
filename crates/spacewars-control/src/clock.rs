@@ -69,6 +69,8 @@ pub struct ClockState {
     pub rain: Option<engine_common::ClockRainState>,
     #[serde(default)]
     pub aquarium: Option<engine_common::ClockAquariumState>,
+    #[serde(default)]
+    pub slot_machine: Option<engine_common::ClockSlotMachineState>,
     pub reading: Option<[u8; 3]>,
     /// Host-supplied local civil date, [year, month, day].
     pub date: Option<[u16; 3]>,
@@ -427,6 +429,7 @@ mod tests {
             grass: None,
             rain: None,
             aquarium: None,
+            slot_machine: None,
             reading: Some([12, 34, 56]),
             date: Some([2026, 9, 25]),
             date_label: Some("FRIDAY · SEPTEMBER 25".into()),

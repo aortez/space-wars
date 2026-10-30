@@ -217,6 +217,7 @@ fn crow_only_schedule_blocks_duplicates_then_obeys_departure_cooldown() {
         marquee: false,
         digit_slide: false,
         rain: false,
+        slot_machine: false,
     };
     state.configure(settings);
     assert!(state.automatic_events_suspended());

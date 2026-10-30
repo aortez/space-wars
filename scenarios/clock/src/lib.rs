@@ -46,6 +46,13 @@ pub mod water_fixture;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
+/// The switch bitfield's high byte may only carry bits the catalog defines, so
+/// this is derived from the catalog rather than written out: a new event kind
+/// that widened the field without widening this check would make every
+/// `configure` fail to decode, and the dropped action would leave the client
+/// waiting on a request the host never applied.
+const MAX_EVENT_FLAGS_HIGH_BYTE: u8 = (((1u16 << ClockEventKind::ALL.len()) - 1) >> 8) as u8;
+
 pub use digits::{
     DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
     SegmentRepresentation, SegmentState,
@@ -239,7 +246,9 @@ impl ClockAction {
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
             (CLOCK_ACTION_CONFIGURE, 14..=MAX_CONFIGURE_BYTES)
-                if payload[5] <= 15 && payload[8] <= 1 && payload[10] <= 1 =>
+                if payload[5] <= MAX_EVENT_FLAGS_HIGH_BYTE
+                    && payload[8] <= 1
+                    && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
                     fonts: ClockFontSettings {
@@ -271,6 +280,7 @@ impl ClockAction {
                         aquarium: payload[5] & 2 != 0,
                         cell_swap: payload[5] & 4 != 0,
                         grass: payload[5] & 8 != 0,
+                        slot_machine: payload[5] & 16 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
@@ -1060,6 +1070,12 @@ impl ClockState {
             _ => None,
         }
     }
+    pub fn slot_machine_state(&self) -> Option<engine_common::ClockSlotMachineState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::SlotMachine(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
     pub fn can_trigger_event(&self) -> bool {
         self.reading.is_some() && self.lifecycle() == EventLifecycle::Idle
     }
@@ -1114,7 +1130,7 @@ impl ClockState {
             if kind != ClockEventKind::Crow {
                 self.finish_event();
             }
-            self.start_event(kind);
+            self.start_preview(kind);
         }
     }
 
@@ -1148,13 +1164,20 @@ impl ClockState {
     }
 
     fn start_event(&mut self, kind: ClockEventKind) {
-        self.start_event_from(kind, None);
+        self.start_event_from(kind, None, false);
+    }
+
+    /// A person asked for this one. Only the admission knows that, so events
+    /// that report it cannot infer it from the absence of a previous reading.
+    fn start_preview(&mut self, kind: ClockEventKind) {
+        self.start_event_from(kind, None, true);
     }
 
     fn start_event_from(
         &mut self,
         kind: ClockEventKind,
         previous_display: Option<DisplaySnapshot>,
+        preview: bool,
     ) {
         debug_assert!(!self.event_blocked(kind));
         self.last_started_event = Some(kind);
@@ -1264,6 +1287,7 @@ impl ClockState {
             seed,
             self.config,
             previous_display,
+            preview,
         ));
     }
 
@@ -1463,6 +1487,9 @@ impl ClockState {
         if let Some(ActiveEvent::CellSwap(event)) = &mut self.active_event {
             event.synchronize(self.display);
         }
+        if let Some(ActiveEvent::SlotMachine(event)) = &mut self.active_event {
+            event.synchronize(self.display);
+        }
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);
         }
@@ -1482,7 +1509,7 @@ impl ClockState {
             digits::apply_snapshot(&mut self.segments, self.display);
         }
         if slide && let Some(kind) = self.schedule.time_change_event() {
-            self.start_event_from(kind, Some(previous));
+            self.start_event_from(kind, Some(previous), false);
         }
     }
 }

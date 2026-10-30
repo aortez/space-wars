@@ -1620,6 +1620,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
             clock_cell_swap_enabled: window.get_launcher_clock_cell_swap_enabled(),
             clock_grass_enabled: window.get_launcher_clock_grass_enabled(),
+            clock_slot_machine_enabled: window.get_launcher_clock_slot_machine_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
                 window.get_launcher_clock_rain_amount().to_string()
             } else {

@@ -286,7 +286,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, and **Cell Swap** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, and **Slot Machine** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -884,6 +884,67 @@ events, including slides. With only Digit Slide enabled there is no periodic tim
 Manual `digit-slide` triggers and **Preview & Resume** roll the *current* digits
 out and back in. They never fabricate a different clock reading. This preview
 works even with the switch/profile Off and is reported as `preview: true`.
+
+### Slot Machine
+
+The four digit slots turn like reels, scramble through glyphs, then decelerate
+and lock left to right onto the live reading, with a chase over the settled time.
+It is a periodic spectacle and not a replacement for the minute transition: Digit
+Slide keeps the quiet `TimeChange` roll it already owns, and the catalog does not
+permit two events over the digits at once.
+
+The 300 ticks (5 seconds) are allocated as named engineering defaults:
+
+| Phase | Ticks | What happens |
+| --- | --- | --- |
+| `spin-up` | 60 | Every reel accelerates from rest. |
+| `spinning` | 120 | Full speed, one glyph passing every 6 ticks. |
+| `settling` | 90 | Slots 0 to 3 begin stopping 22 ticks apart and each eases down over 24. |
+| `payout` | 30 | The settled reading runs a chase. |
+
+A reel's position is sampled from the tick rather than accumulated, so a replay
+is identical and a paused event cannot drift. The natural distance a reel covers
+is rounded to a whole stop and the profile scaled to it, about one percent of its
+speed, so every reel comes to rest on a glyph instead of between two. Cells
+travel and are clipped to their own slot, reusing Digit Slide's clipping, which
+separates the fill from the edge so the slot boundary neither gains a false
+stroke nor leaks half a stroke into the arena. The dim slot anchors stay fixed
+throughout, and the colon and AM/PM follow the latest reading without spinning.
+
+**The reels scramble, they do not spell.** This is a measured limit:
+`fonts::glyph` composes Classic, the default font, from seven bar regions, so a
+seven-segment face cannot express most letters; `build.rs` samples the bundled
+DejaVu outlines for `'0'..='9'` alone; and at 6x9 cells O/0, D/Q, I/1, S/5, B/8
+and Z/2 are indistinguishable anyway. Every scramble frame is therefore drawn
+through `fonts::sampled`, the 5x7 upsample the Matrix face is built from, whoever
+the selected face font is. The **first** frame of each reel is the digit the face
+was showing, so the takeover begins by moving rather than by replacing, and the
+**last two** stops before each lock are digits in the face's own font, so a reel
+resolves out of noise into legitimate readings and never comes to rest on a
+letter.
+
+The reels land on live time. A reel still turning adopts a newer reading without
+restarting, so a minute rolling over mid-spin is invisible and is counted as a
+`retargets` in diagnostics; a slot that has already locked keeps what it landed
+on until the ordinary face takes over at completion. A blank leading digit in
+12-hour mode is a real stop, so that reel still turns and still locks.
+
+Preview spins and lands on the current reading and never fabricates a different
+time, works with the switch or profile Off, and reports `preview: true`. A
+scheduled admission reports `false`: a periodic event has no previous reading
+either, so unlike Digit Slide's time-change roll the flag has to come from the
+admission rather than from the snapshot. The
+event creates no physics. Its measured worst frame is **1028 draw primitives**
+across wide, narrow and portrait, held at 1100 by the contract below. That is
+well above Digit Slide's documented sub-300 for a comparable transition, and the
+difference is real rather than waste: a slide moves only the slots whose digit
+changed, through one step, while every reel here turns continuously with two
+glyph frames in its window. A cell is drawn through the cheaper unclipped path
+unless it straddles the band's edge, which also gives it a proper stroke instead
+of two rectangles. The clock's own frame ceiling is 1800.
+`render::slot_machine_contract` holds the travel, the anchors, the brightness and
+that budget; `events::slot_machine::tests` holds the phase partition, the lock
+order, retargeting and replay.
 
 Falling releases the illuminated digit pieces as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
@@ -2048,6 +2109,7 @@ Conformance, measured rather than read:
 | Falling digits | Reforms from each segment's real landing pose, cross-fading the old shape into the new | Met |
 | Cell swaps | Per-cell quadratic bezier with opposing bow; the 15-tick fade only corrects a reading that changed mid-swap | Met |
 | Digit Slide | The old glyph slides out and the new one slides in, clipped per cell | Met |
+| Slot Machine | Every reel opens on the glyph the face was showing and turns, clipped to its own slot, onto a whole stop; nothing is faded on | Met |
 | Meltdown | Cells liquefy on real floor contact, and the face refills bottom-up and row-staggered as the puddle drains | Met by refill |
 | Aquarium | The face stays anchored and solid throughout; nothing comes apart | Not applicable |
 | Marquee, clock recipes | The reading dissolves into its own animation, which opens on the anchored pose | Met |

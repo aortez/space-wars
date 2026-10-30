@@ -19,6 +19,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 aquarium: false,
                 cell_swap: false,
                 grass: false,
+                slot_machine: false,
             },
             ..ClockConfig::default()
         },
@@ -806,5 +807,62 @@ fn clock_grass_contract_ground_cover_greens_the_floor_then_recedes_to_the_openin
     assert!(
         cover_strips(&s).is_empty(),
         "no cover once the ceiling has closed"
+    );
+}
+
+/// The Slot Machine reports whether a person asked for it. A periodic
+/// admission has no previous reading either, so unlike Digit Slide's
+/// time-change roll the flag cannot be inferred from the snapshot.
+#[test]
+fn slot_machine_reports_a_preview_only_when_a_person_asked_for_one() {
+    let only_slot_machine = ClockEvents {
+        falling: false,
+        color_cycle: false,
+        meltdown: false,
+        duck: false,
+        marquee: false,
+        digit_slide: false,
+        rain: false,
+        crow: false,
+        explosion: false,
+        aquarium: false,
+        cell_swap: false,
+        grass: false,
+        slot_machine: true,
+    };
+    let mut state = ready(ClockEventProfile::Demo, 7);
+    let mut settings = state.settings();
+    settings.events = only_slot_machine;
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::configure(settings)],
+        Duration::ZERO,
+    );
+    let mut automatic = None;
+    for _ in 0..60 * 60 * 30 {
+        ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        if let Some(slot) = state.slot_machine_state() {
+            automatic = Some(slot);
+            break;
+        }
+    }
+    let automatic = automatic.expect("the schedule admits the only enabled event");
+    assert!(
+        !automatic.preview,
+        "the scheduler started this one, nobody asked for it"
+    );
+
+    let mut state = ready(ClockEventProfile::Off, 7);
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::SlotMachine)],
+        Duration::ZERO,
+    );
+    assert!(
+        state
+            .slot_machine_state()
+            .expect("an explicit preview admits the event")
+            .preview,
+        "a deliberate preview is a preview even with the switch off"
     );
 }
