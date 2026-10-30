@@ -1336,6 +1336,23 @@ impl PhysicsWorld {
         from_rapier(self.raw.gravity)
     }
 
+    /// Retune the solver's length scale on a world that outlives the geometry
+    /// it was built for. A world whose characteristic size has changed keeps the
+    /// construction-time scale otherwise, which leaves its tolerances calibrated
+    /// for the old one. Rejected without mutating unless finite and positive, to
+    /// match the construction-time normalization.
+    pub fn set_length_unit(&mut self, length_unit: f32) -> bool {
+        if !length_unit.is_finite() || length_unit <= 0.0 {
+            return false;
+        }
+        self.raw.integration_parameters.length_unit = length_unit;
+        true
+    }
+
+    pub fn length_unit(&self) -> f32 {
+        self.raw.integration_parameters.length_unit
+    }
+
     pub fn step(&mut self, dt_seconds: f32) -> PhysicsStepMetrics {
         self.step_with_surface_drives(dt_seconds, &[])
     }
@@ -3159,6 +3176,23 @@ mod tests {
 
     const BALL_ROLE: BodyRole = BodyRole::new(1);
     const BALL_COLLIDER: ColliderRole = ColliderRole::new(1);
+
+    #[test]
+    fn the_length_unit_is_retunable_and_rejects_what_construction_would_reject() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            length_unit: 4.0,
+            ..PhysicsWorldConfig::default()
+        });
+        assert_eq!(world.length_unit(), 4.0);
+        assert!(world.set_length_unit(12.5));
+        assert_eq!(world.length_unit(), 12.5);
+        // The same values normalized_world_config would replace with a
+        // fallback are refused here, and leave the live scale alone.
+        for refused in [0.0, -3.0, f32::NAN, f32::INFINITY] {
+            assert!(!world.set_length_unit(refused), "accepted {refused}");
+            assert_eq!(world.length_unit(), 12.5);
+        }
+    }
 
     #[test]
     fn standalone_shape_centroid_uses_local_geometry_and_rejects_invalid_shapes() {
