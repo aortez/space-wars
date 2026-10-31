@@ -30,6 +30,10 @@
 //! by landing in each other stay where they are instead, with the floor they
 //! stood on, and the arena takes nothing that uses the floor until a resize
 //! they fit or their leaving.
+//!
+//! The run ends exactly once. Leaving Clock or starting it again drops every
+//! world the run held, once each, and the new run starts with no residents,
+//! no claims and no world. Nothing of a run is kept on disk.
 
 use crate::{
     ArenaAccounting, ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState,
@@ -41,7 +45,7 @@ use crate::{
 };
 use engine_common::{Action, ClockEventKind, ClockEventProfile, ClockEvents, Scenario};
 use engine_core::Vec2;
-use engine_rapier::world::physics_activity;
+use engine_rapier::world::{PhysicsActivity, physics_activity};
 use std::time::Duration;
 
 const ASPECT: f32 = 800.0 / 480.0;
@@ -1107,6 +1111,71 @@ fn arena_contract_a_declined_resize_ends_with_the_residents_that_did_not_fit() {
     );
     keep(&mut state, 1, "the soil alone");
     assert_eq!(floor_reach(&state), None);
+}
+
+/// A run whose arena holds soil and the fixture while Falling goes on: in a
+/// world of its own, or, once a player has joined and left, in the arena,
+/// where the player's terrain stays.
+fn busy(joined: bool) -> ClockState {
+    let mut state = plain();
+    state.admit_soil();
+    let fixture = state.default_arena_fixture();
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
+    state.preview_event(ClockEventKind::Falling);
+    keep(&mut state, 30, "Falling beside the fixture");
+    if joined {
+        toggle(&mut state, 1);
+        keep(&mut state, 30, "a player in Falling");
+        toggle(&mut state, 1);
+        while state.duck_visit.is_some() {
+            keep(&mut state, 1, "the player leaving");
+        }
+        assert!(state.arena.vacant.is_some());
+    }
+    assert_eq!(state.arena_accounting().residents, 2);
+    state
+}
+
+#[test]
+fn arena_contract_a_restart_or_exit_ends_the_run_once() {
+    // Leaving Clock drops the arena's world and Falling's own.
+    let state = busy(false);
+    let before = physics_activity();
+    drop(state);
+    assert_eq!(
+        physics_activity(),
+        PhysicsActivity {
+            dropped: before.dropped + 2,
+            ..before
+        }
+    );
+
+    // A restart builds the new run before the old one goes, as the host
+    // does. The old run's one world, the arena with the vacant terrain in
+    // it, goes once, and the new run has built none.
+    let state = busy(true);
+    let before = physics_activity();
+    let mut restarted = plain();
+    drop(state);
+    assert_eq!(
+        physics_activity(),
+        PhysicsActivity {
+            dropped: before.dropped + 1,
+            ..before
+        }
+    );
+    assert_eq!(restarted.arena_accounting(), ArenaAccounting::default());
+    assert!(restarted.arena_fixtures().is_empty());
+    assert!(restarted.soil.is_none());
+    assert!(restarted.arena.idle() && restarted.arena.vacant.is_none());
+    advance(&mut restarted, 60, 0, 0, "nothing carried over");
+    // Its first resident builds its first world.
+    assert_eq!(
+        restarted.admit_arena_fixture(&[at_rest(resting(0.0))]),
+        Ok(0)
+    );
+    assert!(keep(&mut restarted, 10, "the new run's fixture").is_empty());
+    assert_eq!(restarted.arena_accounting().worlds, 1);
 }
 
 /// Debug builds audit the arena before each step.

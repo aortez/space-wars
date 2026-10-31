@@ -764,14 +764,28 @@ struct PhysicsSnapshot {
 /// Calling-thread counters for detecting accidental worlds/steps in consumers.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PhysicsActivity {
+    /// Worlds built by `PhysicsWorld::new`.
     pub worlds: u64,
     pub steps: u64,
+    /// Worlds dropped, clones and loaded snapshots included.
+    pub dropped: u64,
 }
 thread_local! {
-    static PHYSICS_ACTIVITY: std::cell::Cell<PhysicsActivity> = const { std::cell::Cell::new(PhysicsActivity { worlds: 0, steps: 0 }) };
+    static PHYSICS_ACTIVITY: std::cell::Cell<PhysicsActivity> = const { std::cell::Cell::new(PhysicsActivity { worlds: 0, steps: 0, dropped: 0 }) };
 }
 pub fn physics_activity() -> PhysicsActivity {
     PHYSICS_ACTIVITY.get()
+}
+
+impl Drop for PhysicsWorld {
+    fn drop(&mut self) {
+        // A world dropped while the thread shuts down goes uncounted.
+        let _ = PHYSICS_ACTIVITY.try_with(|cell| {
+            let mut c = cell.get();
+            c.dropped += 1;
+            cell.set(c);
+        });
+    }
 }
 
 impl PhysicsWorld {
@@ -3550,6 +3564,30 @@ mod tests {
         assert_eq!(
             world.motions().map(|motion| motion.id).collect::<Vec<_>>(),
             vec![first, third]
+        );
+    }
+
+    #[test]
+    fn activity_counts_built_and_dropped_worlds() {
+        let before = physics_activity();
+        let world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let clone = world.clone();
+        assert_eq!(
+            physics_activity(),
+            PhysicsActivity {
+                worlds: before.worlds + 1,
+                ..before
+            }
+        );
+        drop(world);
+        drop(clone);
+        assert_eq!(
+            physics_activity(),
+            PhysicsActivity {
+                worlds: before.worlds + 1,
+                dropped: before.dropped + 2,
+                ..before
+            }
         );
     }
 
