@@ -2167,7 +2167,8 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   development arena fixtures. The first claim builds the world and the last to
   let go takes it away. Each owner's bodies take identities from its own
   ranges in `arena::ids::canonical`, and an owner that lets go takes only
-  those.
+  those. A visit brings its own gravity and solver scale while it holds the
+  arena, and the residents' own return once it has gone.
 - **Claims are bounded.** Each owner declares a budget of bodies, colliders
   and joints. The arena holds at most **255 bodies / 288 colliders** and no
   joints: a visit, the largest event, soil and one fixture together, so
@@ -2271,6 +2272,12 @@ Known limits:
   lifts the resident out.
 - A declined resize lasts until a resize the residents fit, or until they leave.
 - Standalone Falling and Explosion meet residents only after a player joins.
+- While an event simulates apart from the arena (standalone Falling,
+  Explosion, Meltdown or Aquarium, or Rain's floats), plants, the ceiling's
+  light and soil delivery see only that event's world, if it has one. A
+  fixture's balls neither crush plants nor block light or soil meanwhile. Soil,
+  the one resident Clock ships, is unaffected, because those checks treat it
+  separately.
 
 ### Composed Marquee effects
 
@@ -2519,9 +2526,11 @@ to the existing time/format fields; an absent date is four zero bytes.
 The `arena` object reports the run's shared rigid arena. Its `accounting` gives
 the owners holding the arena now (`claims`, of which `residents`), the bodies,
 colliders and joints in its world, and over the run the claims `granted`,
-`released` and `refused` (refused also counts events the arena declined), its
-`steps` and `worlds`, `layout_incompatible`, and `last_remap` (`exact`,
-`clamped` with the number `moved`, or `declined`). `claims` lists each owner in
+`released` and `refused`, its `steps` and `worlds`, `layout_incompatible`, and
+`last_remap` (`exact`, `clamped` with the number `moved`, or `declined`).
+`refused` counts the previews, player joins and fixtures the arena turned away.
+The schedule leaves out events the arena would refuse, and `clock trigger` fails
+one before it reaches the arena, so neither counts. `claims` lists each owner in
 the order it claimed the arena (`visit`, `event` with its kind, `soil`, or
 `fixture` with its index), whether it is a resident, and its bodies and colliders
 beside its budget. `floor` counts the floor the arena keeps under resting

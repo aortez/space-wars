@@ -1304,6 +1304,12 @@ impl ClockState {
             "Waiting for the duck to leave"
         } else if self.crow_visit.is_some() && self.config.events.crow {
             "Crow is already visiting"
+        } else if let Some(unavailable) = ClockEventKind::ALL
+            .into_iter()
+            .filter(|kind| self.config.events.enabled(*kind))
+            .find_map(|kind| self.event_blocked_by_arena(kind))
+        {
+            unavailable.notice()
         } else {
             "No events enabled"
         };
@@ -1532,9 +1538,12 @@ impl ClockState {
             self.arena.bind_soil(soil, layout);
         }
         // So does the floor under resting residents, which keeps the layout
-        // they last fitted while they do not fit the view.
-        let floor = self.floor.geometry(self.arena.floor_layout(layout));
-        self.arena.bind_floor(self.active_event.as_ref(), floor);
+        // they last fitted while they do not fit the view, and so do the
+        // world's settings once a visit has gone.
+        let fitted = self.arena.floor_layout(layout);
+        self.arena
+            .bind_floor(self.active_event.as_ref(), self.floor.geometry(fitted));
+        self.arena.bind_settings(fitted);
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
         // Fixture balls that fell out of the view leave the arena, and a

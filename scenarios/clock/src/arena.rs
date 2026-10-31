@@ -301,7 +301,7 @@ impl PanelAuthority {
 
 /// The settings every arena world is built with. Whoever builds it chooses its
 /// gravity and the solver's length scale, and a visit that enters it later
-/// sets its own.
+/// sets its own until it leaves.
 pub(crate) fn world_config(gravity: Vec2, length_unit: f32) -> PhysicsWorldConfig {
     PhysicsWorldConfig {
         gravity,
@@ -317,8 +317,8 @@ pub(crate) fn world_config(gravity: Vec2, length_unit: f32) -> PhysicsWorldConfi
 /// scale theirs to keep this one.
 pub(crate) const MECHANICS_GRAVITY: f32 = 400.0;
 
-/// The settings of a world no visit has entered: a standalone Falling or
-/// Explosion world, or the one residents build.
+/// The settings of a world no visit holds: a standalone Falling or Explosion
+/// world, or the residents' own.
 pub(crate) fn mechanics_config(layout: Layout) -> PhysicsWorldConfig {
     world_config(Vec2::new(0.0, -MECHANICS_GRAVITY), layout.pitch)
 }
@@ -657,7 +657,9 @@ impl ClockArena {
         let slabs: Vec<_> = floor.support().collect();
         // Each body that moves lands clear of the floor and of every body that
         // moves otherwise. Bodies that move together, as a stack does, keep
-        // their places to each other.
+        // their places to each other. Boxes stand in for shapes, so a remap
+        // can decline balls that would have come in clear, but never lands
+        // one in another.
         fits &= bodies.iter().filter(|body| body.3 != 0.0).all(|moving| {
             let place = landed(moving);
             !slabs.iter().any(|slab| meet(place, *slab))
@@ -740,6 +742,21 @@ impl ClockArena {
         }
     }
 
+    /// While only residents hold the arena, its world has the settings they
+    /// would build it with: Clock's own gravity, and the length scale of
+    /// `layout`, the one they last fitted. A visit that entered set its own
+    /// for as long as it held the arena. The run calls this once per tick that
+    /// moves time, just before the arena's step.
+    pub fn bind_settings(&mut self, layout: Layout) {
+        let Some(world) = &mut self.world else {
+            return;
+        };
+        if self.owners.iter().all(|owner| owner.resident()) {
+            let config = mechanics_config(layout);
+            assert!(world.set_gravity(config.gravity) && world.set_length_unit(config.length_unit));
+        }
+    }
+
     /// How much a resting resident scales the world's gravity by to fall at
     /// Clock's own, whoever set the world's.
     pub fn resident_gravity_scale(&self) -> f32 {
@@ -750,8 +767,9 @@ impl ClockArena {
 
     /// The arena's one rigid step this tick, whoever holds it, residents with
     /// nobody else included. Nothing else steps the arena's world. A visit
-    /// that entered brings its own gravity, so resting residents rescale theirs
-    /// first and fall as they did before it came.
+    /// brings its own gravity for as long as it holds the arena, so resting
+    /// residents first rescale theirs whenever the world's has changed, and
+    /// fall at Clock's own throughout.
     pub fn step(&mut self, dt: f32) {
         let scale = self.resident_gravity_scale();
         let Some(world) = &mut self.world else {

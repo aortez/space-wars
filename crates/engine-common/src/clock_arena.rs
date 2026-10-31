@@ -165,7 +165,9 @@ pub struct ClockArenaAccounting {
     pub granted: u64,
     /// Claims let go over the run.
     pub released: u64,
-    /// Claims and events the arena refused over the run.
+    /// Previews, player joins and fixtures the arena turned away over the
+    /// run. Events the schedule leaves out, and `clock trigger` requests the
+    /// client fails, never reach it.
     pub refused: u64,
     /// Rigid steps over the run. Exactly one per positive tick while a world
     /// exists.

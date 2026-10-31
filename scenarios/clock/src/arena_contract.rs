@@ -260,6 +260,19 @@ fn own_floor(state: &ClockState) -> usize {
     })
 }
 
+/// The arena world's gravity and solver length unit.
+fn settings(state: &ClockState) -> Option<(Vec2, f32)> {
+    state
+        .arena
+        .world()
+        .map(|world| (world.gravity(), world.length_unit()))
+}
+
+/// The settings residents build the arena's world with at `aspect_ratio`.
+fn residents_settings(aspect_ratio: f32) -> Option<(Vec2, f32)> {
+    Some((Vec2::new(0.0, -GRAVITY), Layout::new(aspect_ratio).pitch))
+}
+
 /// One frame with `actions`, in which every fixture's every ball keeps its
 /// identity and moves on from where it was, never further than its speed
 /// takes it, give or take half its radius of contact correction. A ball
@@ -477,12 +490,23 @@ fn arena_contract_fixture_stands_on_a_visits_course_and_stays_when_it_departs() 
     keep(&mut state, 120, "a player's course");
     assert_eq!(slots(&state), [0, 1, 2], "ground under every ball");
     assert_eq!(own_floor(&state), 0, "the course is the floor");
+    let radius = state.duck_visit.as_ref().expect("a player's visit").radius;
+    assert_eq!(
+        settings(&state).map(|(_, unit)| unit),
+        Some(radius),
+        "the visit's own scale"
+    );
     toggle(&mut state, 1);
     while state.duck_visit.is_some() {
         keep(&mut state, 1, "the player departing");
     }
     keep(&mut state, 60, "the closed floor again");
     assert_eq!(own_floor(&state), 1);
+    assert_eq!(
+        settings(&state),
+        residents_settings(ASPECT),
+        "the visit's settings went with it"
+    );
     for ball in balls(&state) {
         assert!(ball.position.distance_to(landed[ball.slot].position) < 0.1);
     }
@@ -553,6 +577,11 @@ fn arena_contract_fixture_stays_when_an_automatic_visit_departs() {
     assert!(first.position.distance_to(level) < 0.1);
     assert!(second.position.distance_to(resting(raised.x)) < 0.1);
     assert_eq!(state.arena_accounting().claims, 1, "only the fixture");
+    assert_eq!(
+        settings(&state),
+        residents_settings(ASPECT),
+        "the world the visit built is the residents' own now"
+    );
 }
 
 #[test]
@@ -639,6 +668,26 @@ fn arena_contract_fixture_falls_at_clocks_gravity_in_a_visits_world() {
         panic!("one ball");
     };
     assert!((ball.velocity.y + GRAVITY * 10.0 * DT).abs() < 1e-3);
+
+    // The player leaves, and the visit's settings go with it. The ball falls
+    // on at Clock's gravity throughout.
+    toggle(&mut state, 1);
+    let mut falling = 10;
+    while state.duck_visit.is_some() {
+        keep(&mut state, 1, "the player departing");
+        falling += 1;
+    }
+    keep(&mut state, 1, "the residents' own world");
+    falling += 1;
+    assert_eq!(settings(&state), residents_settings(1.0));
+    let [ball] = balls(&state)[..] else {
+        panic!("one ball");
+    };
+    assert!(
+        (ball.velocity.y + GRAVITY * falling as f32 * DT).abs() < 1e-3,
+        "{:?} after {falling} ticks",
+        ball.velocity
+    );
 }
 
 #[test]
@@ -802,6 +851,59 @@ fn arena_contract_refuses_an_event_it_has_no_room_for_before_anything_changes() 
     state.preview_event(ClockEventKind::Explosion);
     assert!(state.arena.holds(Owner::Event(ClockEventKind::Explosion)));
     keep(&mut state, 30, "Explosion beside the fixture");
+}
+
+#[test]
+fn arena_contract_a_refused_preview_leaves_the_event_it_would_replace() {
+    let mut state = plain();
+    state.admit_soil();
+    let fixture = state.default_arena_fixture();
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
+    assert_eq!(state.admit_arena_fixture(&second_fixture()), Ok(1));
+    keep(&mut state, 60, "two fixtures and soil");
+    state.preview_event(ClockEventKind::Duck);
+    keep(&mut state, 1, "the visit claiming the arena");
+    // Falling's batch fits beside the visit, and Meltdown's cells would not,
+    // even in its place.
+    state.preview_event(ClockEventKind::Falling);
+    assert!(state.arena.holds(Owner::Event(ClockEventKind::Falling)));
+    keep(&mut state, 30, "Falling beside the visit");
+    assert_eq!(
+        state.event_blocked_by_arena(ClockEventKind::Meltdown),
+        Some(Unavailable::Capacity)
+    );
+
+    let running = |state: &ClockState| {
+        (
+            untouched(state),
+            state.event_phase(),
+            state.phase_tick(),
+            state.event_id(),
+            state.segments().to_vec(),
+            (state.body_count(), state.collider_count()),
+        )
+    };
+    let before = running(&state);
+    let arena = state.arena_accounting();
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Meltdown)],
+        Duration::ZERO,
+    );
+    assert_eq!(running(&state), before, "Falling goes on as it was");
+    assert_eq!(
+        state.arena_accounting(),
+        ArenaAccounting {
+            refused: arena.refused + 1,
+            ..arena
+        }
+    );
+    assert_eq!(
+        state.event_notice.map(|(notice, _)| notice),
+        Some(Unavailable::Capacity.notice())
+    );
+    keep(&mut state, 30, "Falling going on");
+    assert!(state.arena.holds(Owner::Event(ClockEventKind::Falling)));
 }
 
 #[test]
@@ -1091,6 +1193,13 @@ fn arena_contract_schedule_starts_nothing_that_uses_the_floor_while_residents_do
     state.set_aspect_ratio(NARROW);
     assert!(state.arena_accounting().layout_incompatible);
     assert_eq!(state.next_event_tick(), None, "nothing to wait for");
+    // Next has nothing to start either, and says why.
+    ClockScenario::step(&mut state, &[ClockAction::next_event()], Duration::ZERO);
+    assert_eq!(state.event_kind(), None);
+    assert_eq!(
+        state.event_notice.map(|(notice, _)| notice),
+        Some(Unavailable::LayoutIncompatible.notice())
+    );
     // The schedule starts Falling every six to ten seconds otherwise.
     assert!(keep(&mut state, 11 * 60, "no Falling").is_empty());
     assert_eq!(state.event_kind(), None);

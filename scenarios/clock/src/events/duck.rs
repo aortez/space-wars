@@ -381,7 +381,7 @@ impl DuckEvent {
         } else {
             // The visit's movement is calibrated for its own gravity, and the
             // solver's tolerances for its character's size, as in a world it
-            // built.
+            // built. Residents take their own back once it has gone.
             let world = arena.claim(Owner::Visit);
             assert!(world.set_gravity(gravity) && world.set_length_unit(self.radius));
             world

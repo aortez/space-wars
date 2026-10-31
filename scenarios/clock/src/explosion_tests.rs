@@ -1,7 +1,9 @@
 use super::*;
 use engine_common::ClockFloorMode;
 use engine_core::Vec2;
-use engine_rapier::world::{BodyId, BodyRole, ColliderId, ColliderRole, PhysicsId};
+use engine_rapier::world::{
+    BodyId, BodyRole, ColliderId, ColliderRole, PhysicsId, physics_activity,
+};
 use events::explosion::{BURST_TICKS, EXPLOSION_TICKS, MAX_EXPLOSION_CELLS, WARNING_TICKS};
 
 fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
@@ -209,7 +211,13 @@ fn shared_world_steps_once_through_release_reformation_and_final_tick() {
     }
     state.preview_event(ClockEventKind::Explosion);
     for tick in 1..=EXPLOSION_TICKS + 1 {
+        let steps = physics_activity().steps;
         ticks(&mut state, 1);
+        assert_eq!(
+            physics_activity().steps,
+            steps + 1,
+            "tick={tick}: one world step in all, the arena's"
+        );
         ticks(&mut baseline, 1);
         if tick == WARNING_TICKS {
             // Park this event's bodies away from the arena to isolate stepping
