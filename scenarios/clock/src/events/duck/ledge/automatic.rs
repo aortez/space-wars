@@ -116,8 +116,7 @@ impl DuckEvent {
             self.ledge.automatic.stats.candidates_checked += 1;
             if edge.outward * self.direction * direction >= 0.0
                 || target.is_some_and(|index| {
-                    edge.body.entity.value()
-                        != crate::arena::ids::canonical::COURSE.start + index as u64
+                    edge.body.entity != crate::arena::ids::canonical::course_surface(index)
                 })
                 || !edge.in_reach(self)
             {

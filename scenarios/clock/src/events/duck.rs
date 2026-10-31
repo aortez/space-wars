@@ -407,13 +407,11 @@ impl DuckEvent {
             ]
         };
         for (index, (start, end, bottom, top)) in geometry.into_iter().enumerate() {
-            let entity = PhysicsId::new(
-                if self.course.is_some() {
-                    canonical::COURSE.start
-                } else {
-                    canonical::HURDLES.start
-                } + index as u64,
-            );
+            let entity = if self.course.is_some() {
+                canonical::course_surface(index)
+            } else {
+                PhysicsId::new(canonical::HURDLES.start + index as u64)
+            };
             let mut collider = ColliderSpec::cuboid(
                 ColliderId::new(entity, ColliderRole::PRIMARY, 0),
                 (end - start) * 0.5,
@@ -566,11 +564,7 @@ impl DuckEvent {
                             .then_some(*index)
                     });
                 }
-                let index = contact
-                    .collider
-                    .entity
-                    .value()
-                    .checked_sub(canonical::COURSE.start)? as usize;
+                let index = canonical::course_surface_index(contact.collider.entity)?;
                 if index >= course.surfaces.len() {
                     return None;
                 }

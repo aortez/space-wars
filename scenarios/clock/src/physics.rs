@@ -6,7 +6,7 @@ use engine_rapier::world::{
 use rand::{Rng, rngs::StdRng};
 
 use crate::{
-    SegmentId, SegmentRepresentation, SegmentState,
+    SegmentId, SegmentKind, SegmentRepresentation, SegmentState,
     arena::ids::canonical,
     floor::DrainGeometry,
     layout::Layout,
@@ -26,15 +26,16 @@ pub(crate) struct FallingBodies {
 }
 
 pub(crate) fn body_id(id: SegmentId) -> BodyId {
+    let stride = SegmentKind::ALL.len() as u64;
     BodyId::new(
         PhysicsId::new(
-            canonical::FALLING_SEGMENTS.start + u64::from(id.digit_slot) * 7 + id.kind as u64,
+            canonical::FALLING_SEGMENTS.start + u64::from(id.digit_slot) * stride + id.kind as u64,
         ),
         BodyRole::PRIMARY,
     )
 }
 
-fn letter_body_id(slot: usize) -> BodyId {
+pub(crate) fn letter_body_id(slot: usize) -> BodyId {
     BodyId::new(
         PhysicsId::new(canonical::FALLING_LETTERS.start + slot as u64),
         BodyRole::PRIMARY,

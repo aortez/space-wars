@@ -31,9 +31,7 @@ impl SharedMeltdown {
         let supports = if player.responsive_floor().is_some() {
             canonical::RESPONSIVE_PANELS
         } else {
-            canonical::COURSE.start
-                ..canonical::COURSE.start
-                    + player.course.as_ref().expect("duck course").surfaces.len() as u64
+            canonical::course_surfaces(player.course.as_ref().expect("duck course").surfaces.len())
         };
         let arena = VisitArena::claim(player);
         player.arena_world_mut().reserve(count, count, 0);

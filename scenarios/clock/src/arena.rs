@@ -52,6 +52,8 @@ pub(crate) mod ids {
     pub(crate) mod canonical {
         use std::ops::Range;
 
+        use engine_rapier::world::PhysicsId;
+
         use crate::{
             digits::{DIGIT_SLOT_COUNT, SegmentKind},
             events::{
@@ -99,15 +101,39 @@ pub(crate) mod ids {
         /// Retained soil, the one resident today that outlives its admitting
         /// event.
         pub(crate) const SOIL: Range<u64> = 900_001..900_002;
+
+        /// The body of course surface `index`.
+        pub(crate) fn course_surface(index: usize) -> PhysicsId {
+            debug_assert!(index < MAX_SURFACES, "course surface {index}");
+            PhysicsId::new(COURSE.start + index as u64)
+        }
+
+        /// The ids of a course's first `count` surfaces, for asking whether a
+        /// contact is with the real floor.
+        pub(crate) fn course_surfaces(count: usize) -> Range<u64> {
+            debug_assert!(count <= MAX_SURFACES, "{count} course surfaces");
+            COURSE.start..COURSE.start + count as u64
+        }
+
+        /// Which course surface `entity` is, if any. The drain banks read as
+        /// surfaces 0 and 1, which is what lets a drain-joined player stand on
+        /// them.
+        pub(crate) fn course_surface_index(entity: PhysicsId) -> Option<usize> {
+            COURSE
+                .contains(&entity.value())
+                .then(|| (entity.value() - COURSE.start) as usize)
+        }
     }
 
     #[cfg(test)]
     mod tests {
         use std::ops::Range;
 
+        use engine_rapier::world::PhysicsId;
+
         use super::canonical::*;
         use crate::{
-            digits::{DIGIT_SLOT_COUNT, SegmentKind},
+            digits::{DIGIT_SLOT_COUNT, SegmentId, SegmentKind},
             events::duck::planner::MAX_SURFACES,
         };
 
@@ -169,33 +195,54 @@ pub(crate) mod ids {
         }
 
         #[test]
-        fn a_course_surface_index_round_trips_through_its_body_id() {
-            // Four sites convert one of these into the other; this is their
-            // shared premise, including for the aliased drain banks.
+        fn course_surfaces_and_their_bodies_convert_both_ways() {
+            // The course producer, both ledge paths, supported_surface and
+            // Meltdown's floor test all go through these three functions.
             for index in 0..MAX_SURFACES {
-                let id = COURSE.start + index as u64;
-                assert!(COURSE.contains(&id));
-                assert_eq!(id.checked_sub(COURSE.start), Some(index as u64));
+                let id = course_surface(index);
+                assert_eq!(course_surface_index(id), Some(index));
+                assert!(course_surfaces(index + 1).contains(&id.value()));
+                assert!(!course_surfaces(index).contains(&id.value()));
             }
             for bank in DRAIN_BANKS {
                 assert!(
-                    COURSE.contains(&bank),
+                    course_surface_index(PhysicsId::new(bank)).is_some(),
                     "a drain bank must read as a course surface"
                 );
+            }
+            for (name, range) in CANONICAL {
+                if *range == COURSE || *range == DRAIN_BANKS {
+                    continue;
+                }
+                for id in range.clone() {
+                    assert_eq!(
+                        course_surface_index(PhysicsId::new(id)),
+                        None,
+                        "{name} entity {id} reads as a course surface"
+                    );
+                }
             }
         }
 
         #[test]
-        fn falling_covers_every_slot_and_segment_it_allocates() {
+        fn falling_gives_every_slot_and_segment_its_own_id_inside_its_ranges() {
+            let mut seen = std::collections::BTreeSet::new();
             for slot in 0..DIGIT_SLOT_COUNT {
-                for kind in 0..SegmentKind::ALL.len() {
-                    let id = 3001 + (slot * SegmentKind::ALL.len() + kind) as u64;
+                for kind in SegmentKind::ALL {
+                    let digit_slot = slot as u8;
+                    let id = crate::physics::body_id(SegmentId { digit_slot, kind }).entity;
                     assert!(
-                        FALLING_SEGMENTS.contains(&id),
-                        "slot {slot} segment {kind} falls outside the declared range"
+                        FALLING_SEGMENTS.contains(&id.value()),
+                        "slot {slot} {kind:?} falls outside the declared range"
                     );
+                    assert!(seen.insert(id), "slot {slot} {kind:?} reuses {id:?}");
                 }
-                assert!(FALLING_LETTERS.contains(&(3032 + slot as u64)));
+                let id = crate::physics::letter_body_id(slot).entity;
+                assert!(
+                    FALLING_LETTERS.contains(&id.value()),
+                    "letter {slot} falls outside the declared range"
+                );
+                assert!(seen.insert(id), "letter {slot} reuses {id:?}");
             }
         }
     }
