@@ -135,39 +135,55 @@ impl FallingEvent {
         }
     }
 
-    pub fn step(
-        &mut self,
-        mut context: EventContext<'_>,
-        player: Option<&mut DuckEvent>,
-        arena: &mut ClockArena,
-    ) -> bool {
-        let soil = context.soil.take();
-        let letters = self
-            .letters
-            .as_mut()
-            .map_or(&mut [][..], |l| l.as_mut_slice());
+    /// The event's tick up to the arena's step. A standalone Falling steps its
+    /// own world and finishes its tick here; a shared one reads the arena back
+    /// in `observe`. Returns true when the event has finished.
+    pub fn step(&mut self, context: EventContext<'_>) -> bool {
         self.tick += 1;
-        let reform = self.phase == EventPhase::Falling && self.tick >= FALLING_TICKS;
-        match &mut self.mechanics {
-            Mechanics::Standalone(own) => {
-                if let Some(own) = own {
-                    own.step(context.segments, letters);
-                }
-                if reform {
-                    *own = None;
-                }
-            }
-            Mechanics::Shared { bodies } => {
-                duck::step_leased(player, arena, None, false, soil);
-                let world = arena.world_mut().expect("leased arena");
-                if let Some(bodies) = bodies {
-                    bodies.synchronize(world, context.segments, letters);
-                }
-                if reform && let Some(bodies) = bodies.take() {
-                    bodies.remove(world);
-                }
-            }
+        let reform = self.reforms();
+        let Mechanics::Standalone(own) = &mut self.mechanics else {
+            return false;
+        };
+        if let Some(own) = own {
+            let letters = self
+                .letters
+                .as_mut()
+                .map_or(&mut [][..], |l| l.as_mut_slice());
+            own.step(context.segments, letters);
         }
+        if reform {
+            *own = None;
+        }
+        self.finish_tick(context, reform)
+    }
+
+    /// The shared bars after the arena's step: their poses, and their removal
+    /// once they stop falling. Returns true when the event has finished.
+    pub fn observe(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+        let reform = self.reforms();
+        let Mechanics::Shared { bodies } = &mut self.mechanics else {
+            unreachable!("only a shared Falling reads the arena back");
+        };
+        let world = arena.world_mut().expect("leased arena");
+        if let Some(bodies) = bodies {
+            let letters = self
+                .letters
+                .as_mut()
+                .map_or(&mut [][..], |l| l.as_mut_slice());
+            bodies.synchronize(world, context.segments, letters);
+        }
+        if reform && let Some(bodies) = bodies.take() {
+            bodies.remove(world);
+        }
+        self.finish_tick(context, reform)
+    }
+
+    /// Whether the bars stop falling this tick and start to reform.
+    fn reforms(&self) -> bool {
+        self.phase == EventPhase::Falling && self.tick >= FALLING_TICKS
+    }
+
+    fn finish_tick(&mut self, context: EventContext<'_>, reform: bool) -> bool {
         if reform {
             for segment in context.segments.iter_mut() {
                 segment.begin_reforming(context.layout.segment_center(segment.id));

@@ -166,13 +166,11 @@ fn changed_readings_reassemble_the_latest_face_before_the_final_handoff() {
                 };
                 assert!(event.step(
                     events::EventContext {
-                        soil: None,
                         segments: &mut state.segments,
                         display: state.display,
                         layout,
                         floor,
                     },
-                    None,
                     &mut state.arena
                 ));
                 let visible = event
@@ -234,6 +232,11 @@ fn shared_world_steps_once_through_release_reformation_and_final_tick() {
             state.player_duck_state(),
             baseline.player_duck_state(),
             "tick={tick}"
+        );
+        assert_eq!(
+            state.arena_accounting().steps,
+            baseline.arena_accounting().steps,
+            "tick={tick}: one arena step, as without the event"
         );
     }
     assert!(state.explosion_state().is_none());

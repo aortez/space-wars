@@ -2,6 +2,8 @@
 
 mod arena;
 #[cfg(test)]
+mod arena_contract;
+#[cfg(test)]
 mod autonomous_tests;
 mod calendar;
 #[cfg(test)]
@@ -47,6 +49,7 @@ pub mod water_fixture;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
+pub use arena::ArenaAccounting;
 pub use digits::{
     DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
     SegmentRepresentation, SegmentState,
@@ -1003,6 +1006,17 @@ impl ClockState {
             .map_or(0, |event| event.physics_counts().1)
             + self.arena.world().map_or(0, |world| world.collider_count())
     }
+
+    /// The run's arena alone: its claims and population now, and its steps
+    /// over the run.
+    pub fn arena_accounting(&self) -> ArenaAccounting {
+        self.arena.accounting()
+    }
+
+    /// Timings and populations from the arena's last step.
+    pub fn last_arena_step_metrics(&self) -> engine_rapier::world::PhysicsStepMetrics {
+        self.arena.metrics()
+    }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
             ActiveEvent::Meltdown(event) => Some(event.diagnostics()),
@@ -1235,7 +1249,6 @@ impl ClockState {
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
-                soil: self.soil.as_mut(),
             };
             let arena = &mut self.arena;
             self.active_event = Some(match kind {
@@ -1263,7 +1276,6 @@ impl ClockState {
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
-                soil: self.soil.as_mut(),
             },
             seed,
             self.config,
@@ -1309,13 +1321,12 @@ impl ClockState {
             self.event_notice = None;
         }
         let layout = Layout::new(self.aspect_ratio());
-        let panels_advanced = matches!(&self.active_event, Some(ActiveEvent::Rain(rain)) if rain.responsive_floor().is_some());
         let hull = self.duck_scene().and_then(|duck| duck.clearance_hull());
         if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event {
             rain.set_duck_hull(hull);
         }
-        let visit_advanced = if self.active_event.is_some() {
-            self.step_active_event(layout)
+        let stepping = if self.active_event.is_some() {
+            true
         } else {
             if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
                 self.trigger_event(kind);
@@ -1323,15 +1334,15 @@ impl ClockState {
             // A newly inserted shared batch must be advanced/read back with
             // the character this tick too; otherwise the rendered bars lag
             // their colliders until the first regular event step.
-            if self
-                .active_event
+            self.active_event
                 .as_ref()
                 .is_some_and(ActiveEvent::shares_visit_arena)
-            {
-                self.step_active_event(layout)
-            } else {
-                false
-            }
+        };
+        let panels = arena::PanelAuthority::of(self.active_event.as_ref());
+        let shared = if stepping {
+            self.step_active_event(layout)
+        } else {
+            None
         };
         // Water advances once, then the one duck mechanics world samples it.
         // No second character world or frame-rate dependent force application.
@@ -1344,20 +1355,31 @@ impl ClockState {
                 }
                 Some(&rain.water)
             }
+            Some(ActiveEvent::Aquarium(event)) if shared.is_some() => Some(&event.water),
+            Some(ActiveEvent::Meltdown(event)) if shared.is_some() => Some(&event.water),
             _ => None,
         };
-        if let Some(duck) = &mut self.duck_visit
-            && if visit_advanced {
-                duck.visit_finished()
-            } else {
-                duck.step_with_soil(
-                    &mut self.arena,
-                    water,
-                    panels_advanced || water.is_some(),
-                    self.soil.as_mut(),
-                )
+        let visit = match &mut self.duck_visit {
+            Some(duck) => Some(duck.pre_step(&mut self.arena, water, panels, self.soil.as_mut())),
+            None => {
+                if self.arena.vacant.is_some() {
+                    events::duck::prepare_vacant(&mut self.arena, panels, self.soil.as_mut());
+                }
+                None
             }
+        };
+        // The arena's one rigid step this tick, whoever holds it.
+        self.arena.step(events::duck::DT);
+        let visit_finished = match (&mut self.duck_visit, visit) {
+            (Some(duck), Some(step)) => duck.post_step(&mut self.arena, water, step),
+            _ => false,
+        };
+        if let Some(finished) = shared
+            && (self.observe_active_event(layout) || finished)
         {
+            self.finish_event();
+        }
+        if visit_finished {
             self.finish_duck_visit();
         }
         self.update_crow(true);
@@ -1400,32 +1422,41 @@ impl ClockState {
         }
     }
 
-    /// Reports whether the event already stepped the visit's mechanics world.
-    /// This remains true on its final tick, after cleanup removes the event.
-    fn step_active_event(&mut self, layout: Layout) -> bool {
+    /// The active event's part of the tick before the arena's step. Any event
+    /// but one sharing the arena finishes its tick here. One sharing it reads
+    /// the arena back after the step, so this returns whether it has finished
+    /// so far.
+    fn step_active_event(&mut self, layout: Layout) -> Option<bool> {
         self.synchronize_soil();
         let event = self.active_event.as_mut().expect("active event");
-        let visit_advanced = event.shares_visit_arena();
+        let shared = event.shares_visit_arena();
         let context = EventContext {
             segments: &mut self.segments,
             display: self.display,
             layout,
             floor: self.floor.geometry(layout),
-            soil: self.soil.as_mut(),
         };
-        let visit = self.duck_visit.as_deref_mut();
-        let arena = &mut self.arena;
-        let finished = match event {
-            ActiveEvent::Aquarium(event) => event.step(context, visit, arena),
-            ActiveEvent::Falling(falling) => falling.step(context, visit, arena),
-            ActiveEvent::Explosion(explosion) => explosion.step(context, visit, arena),
-            ActiveEvent::Meltdown(meltdown) => meltdown.step_with_visit(context, visit, arena),
-            _ => event.step(context, arena),
-        };
+        let finished = event.step(context, self.duck_visit.as_deref_mut(), &mut self.arena);
+        if shared {
+            return Some(finished);
+        }
         if finished {
             self.finish_event();
         }
-        visit_advanced
+        None
+    }
+
+    /// What the event sharing the arena reads back after the arena's step.
+    /// Returns true when it has finished.
+    fn observe_active_event(&mut self, layout: Layout) -> bool {
+        let event = self.active_event.as_mut().expect("active event");
+        let context = EventContext {
+            segments: &mut self.segments,
+            display: self.display,
+            layout,
+            floor: self.floor.geometry(layout),
+        };
+        event.observe(context, self.duck_visit.as_deref(), &mut self.arena)
     }
 
     fn apply_reading(&mut self, reading: ClockReading, animate: bool) {

@@ -12,10 +12,11 @@ use super::{
     duck::{self, DuckEvent},
 };
 use crate::{
-    SegmentRepresentation,
+    DisplaySnapshot, SegmentRepresentation,
     arena::ClockArena,
     digits,
     floor::DrainGeometry,
+    layout::Layout,
     meridiem::{self, Glyph, PIXEL_SIZE},
     physics::FallingWorld,
 };
@@ -291,13 +292,10 @@ impl ExplosionEvent {
         self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS
     }
 
-    pub fn step(
-        &mut self,
-        mut context: EventContext<'_>,
-        player: Option<&mut DuckEvent>,
-        arena: &mut ClockArena,
-    ) -> bool {
-        let soil = context.soil.take();
+    /// The event's tick up to the arena's step. A standalone Explosion steps its
+    /// own world and finishes its tick here; a shared one reads the arena back
+    /// in `observe`. Returns true when the event has finished.
+    pub fn step(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
         // Reading/control updates do not move paused debris. On the next tick,
         // redirect only changed destinations from their current visible poses.
         if let Some(reassembly) = &mut self.reassembly {
@@ -306,32 +304,41 @@ impl ExplosionEvent {
         let display = context.display;
         let layout = context.layout;
         let finished = self.advance_phase(context, arena);
-        let world = match &mut self.mechanics {
-            Mechanics::Standalone(world) => world.as_deref_mut().map(|world| {
+        if let Mechanics::Standalone(world) = &mut self.mechanics {
+            let world = world.as_deref_mut().map(|world| {
                 world.step(1.0 / 60.0);
                 &*world
-            }),
-            Mechanics::Shared => {
-                duck::step_leased(player, arena, None, false, soil);
-                arena.world()
-            }
-        };
-        if self.live_bodies
-            && let Some(world) = world
-        {
-            for (i, cell) in self.cells.iter_mut().enumerate() {
+            });
+            Self::read_back(&mut self.cells, self.live_bodies, world);
+            self.sample_reassembly(display, layout);
+        }
+        finished
+    }
+
+    /// The shared cells after the arena's step.
+    pub fn observe(&mut self, context: EventContext<'_>, arena: &ClockArena) {
+        Self::read_back(&mut self.cells, self.live_bodies, arena.world());
+        self.sample_reassembly(context.display, context.layout);
+    }
+
+    /// Live cells take their bodies' poses.
+    fn read_back(cells: &mut [Cell], live_bodies: bool, world: Option<&PhysicsWorld>) {
+        if live_bodies && let Some(world) = world {
+            for (i, cell) in cells.iter_mut().enumerate() {
                 let motion = world.motion(body_id(i)).expect("live Explosion cell");
                 cell.position = motion.position;
                 cell.angle = motion.angle;
             }
         }
+    }
+
+    fn sample_reassembly(&mut self, display: DisplaySnapshot, layout: Layout) {
         if self.phase == EventPhase::Reforming {
             let reassembly = self
                 .reassembly
                 .get_or_insert_with(|| Reassembly::new(&mut self.cells, display, layout));
             reassembly.sample(&mut self.cells, self.tick);
         }
-        finished
     }
 
     fn remove_bodies(world: &mut PhysicsWorld, cells: &[Cell]) {

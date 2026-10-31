@@ -1,7 +1,8 @@
 //! A visit's physical arena can outlive its character while a timed event uses
 //! it. When the character leaves, the run's `ClockArena` keeps the terrain it
 //! stood on, still under the visit's claim, and a player who rejoins gets a new
-//! character on that terrain. There is one world and one step in either case.
+//! character on that terrain. There is one world and one step in either case,
+//! the arena's own.
 use super::*;
 use engine_common::ClockEventKind;
 
@@ -18,26 +19,16 @@ pub(crate) fn leased_terrain<'a>(
     }
 }
 
-/// Step a leased arena with its character, or without one once it has left.
-/// Returns the character, if there is one.
-pub(crate) fn step_leased<'a>(
-    player: Option<&'a mut DuckEvent>,
+/// The terrain a leased arena's character left, before the arena's step.
+pub(crate) fn prepare_vacant(
     arena: &mut ClockArena,
-    water: Option<&WaterWorld>,
-    panels_advanced: bool,
+    panels: PanelAuthority,
     soil: Option<&mut crate::grass::SoilHabitat>,
-) -> Option<&'a mut DuckEvent> {
-    if let Some(duck) = player {
-        assert!(arena.vacant.is_none());
-        duck.step_with_soil(arena, water, panels_advanced, soil);
-        return Some(duck);
-    }
+) {
     let (terrain, world) = arena.vacant_with_world().expect("one shared arena owner");
-    terrain.advance_panels(Some(world), panels_advanced, None);
+    terrain.advance_panels(Some(world), panels, None);
     terrain.synchronize_soil(Some(world), soil);
     world.clear_forces();
-    world.step(DT);
-    None
 }
 
 /// `kind` ends its lease. A character still in the arena keeps the world until

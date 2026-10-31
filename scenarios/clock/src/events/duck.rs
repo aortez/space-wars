@@ -27,7 +27,7 @@ mod responsive;
 #[cfg(test)]
 mod responsive_tests;
 mod shared;
-pub(crate) use shared::{end_lease, leased_terrain, step_leased};
+pub(crate) use shared::{end_lease, leased_terrain, prepare_vacant};
 #[cfg(test)]
 mod takeover_tests;
 mod terrain;
@@ -59,7 +59,7 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::EventPhase;
 // Imported by name: `arena` already denotes this module's own course geometry.
-use crate::arena::{ClockArena, Owner, ids::canonical};
+use crate::arena::{ClockArena, Owner, PanelAuthority, ids::canonical};
 use crate::floor::responsive::ResponsiveFloor;
 use crate::layout::Layout;
 
@@ -67,7 +67,7 @@ pub const DUCK_TICKS: u64 = 35 * 60;
 const EXIT_DELAY_TICKS: u64 = 20 * 60;
 const OPENING_TICKS: u64 = 36;
 const RESET_TICKS: u64 = 30;
-const DT: f32 = 1.0 / 60.0;
+pub(crate) const DT: f32 = 1.0 / 60.0;
 const DUCK_ENTITY: PhysicsId = PhysicsId::new(canonical::DUCK.start);
 const DUCK_BODY: BodyId = BodyId::new(DUCK_ENTITY, BodyRole::PRIMARY);
 pub(crate) const DUCK_COLLIDER: ColliderId = ColliderId::new(DUCK_ENTITY, ColliderRole::PRIMARY, 0);
@@ -83,6 +83,19 @@ pub(crate) struct Obstacle {
     pub end: f32,
     /// Zero is the pit; positive heights are solid hurdles.
     pub height: f32,
+}
+
+/// What a visit's tick did before the arena's step, which decides what it does
+/// after.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum VisitStep {
+    /// The doors are opening, and the character appears after the step that
+    /// finishes them.
+    Opening,
+    /// The character drove itself, or a ledge moved it.
+    Running { ledge_driven: bool },
+    /// No character moves: the visit is resetting while its doors close.
+    Idle,
 }
 
 pub(crate) struct DuckEvent {
@@ -532,7 +545,9 @@ impl DuckEvent {
         })
     }
 
-    fn run(&mut self, world: &mut PhysicsWorld, water: Option<&WaterWorld>) {
+    /// The character's decisions and drive this tick, up to the arena's step.
+    /// Returns whether a ledge moved it instead of its controller.
+    fn run(&mut self, world: &mut PhysicsWorld, water: Option<&WaterWorld>) -> bool {
         world.clear_forces();
         self.water_report = match (&self.buoyant, water) {
             (Some(hull), Some(water)) => hull
@@ -568,10 +583,7 @@ impl DuckEvent {
                 player.jump_pending = false;
                 player.diving = false;
             }
-            world.step(DT);
-            self.finish_ledge_step(world);
-            self.observe_automatic_ledge();
-            return;
+            return true;
         }
         let grounded = self.grounded(world);
         let support = self.supported_surface(world);
@@ -686,7 +698,15 @@ impl DuckEvent {
             self.jumps += 1;
         }
         world.apply_velocity_delta(DUCK_BODY, delta, true);
-        world.step(DT);
+        false
+    }
+
+    /// After the arena's step, a ledge that moved the character lets it go.
+    fn finish_run(&mut self, world: &mut PhysicsWorld, ledge_driven: bool) {
+        if ledge_driven {
+            self.finish_ledge_step(world);
+            self.observe_automatic_ledge();
+        }
     }
 
     fn enter(&mut self, phase: EventPhase) {
@@ -714,20 +734,21 @@ impl DuckEvent {
         self.enter(EventPhase::Resetting);
     }
 
-    /// Advance the visit one tick in `arena`, building the world if this is
-    /// its first step and letting it go once the visit no longer needs it.
-    pub fn step_with_soil(
+    /// The visit's tick up to the arena's one step: it builds or enters the
+    /// arena on its first, moves its panels and flaps, and decides and drives
+    /// its character.
+    pub fn pre_step(
         &mut self,
         arena: &mut ClockArena,
         water: Option<&WaterWorld>,
-        panels_advanced: bool,
+        panels: PanelAuthority,
         soil: Option<&mut crate::grass::SoilHabitat>,
-    ) -> bool {
+    ) -> VisitStep {
         let hull = arena
             .held(Owner::Visit)
             .and_then(|world| self.clearance_hull(world));
         self.terrain
-            .advance_panels(arena.held_mut(Owner::Visit), panels_advanced, hull);
+            .advance_panels(arena.held_mut(Owner::Visit), panels, hull);
         self.tick += 1;
         self.phase_tick += 1;
         if self.phase != EventPhase::Resetting {
@@ -736,19 +757,8 @@ impl DuckEvent {
         self.terrain
             .synchronize_soil(arena.held_mut(Owner::Visit), soil);
         if self.phase == EventPhase::Opening {
-            let world = arena.held_mut(Owner::Visit).unwrap();
-            self.advance_flaps(world);
-            world.step(DT);
-            // Preserve the actor's first simulation tick. Shared scenery steps
-            // once before spawning, just as it does before a visit joins.
-            if self.phase_tick >= OPENING_TICKS {
-                if self.terrain.responsive_floor.is_some() {
-                    self.prepare_responsive_spawn(water);
-                }
-                self.spawn(arena);
-                self.enter(EventPhase::Running);
-            }
-            return false;
+            self.advance_flaps(arena.held_mut(Owner::Visit).unwrap());
+            return VisitStep::Opening;
         }
         if self.phase == EventPhase::Running && self.exit_visible() {
             self.enter(EventPhase::Exiting);
@@ -761,7 +771,43 @@ impl DuckEvent {
                 let world = arena
                     .held_mut(Owner::Visit)
                     .expect("a running visit's arena");
-                self.run(world, water);
+                VisitStep::Running {
+                    ledge_driven: self.run(world, water),
+                }
+            }
+            _ => VisitStep::Idle,
+        }
+    }
+
+    /// The visit's tick after the arena's step: the character appears once the
+    /// doors have opened, and one that fell, left or ran out of time resets.
+    /// Returns true once the visit has finished, letting the arena go when it
+    /// no longer needs it.
+    pub fn post_step(
+        &mut self,
+        arena: &mut ClockArena,
+        water: Option<&WaterWorld>,
+        step: VisitStep,
+    ) -> bool {
+        match step {
+            VisitStep::Opening => {
+                // Preserve the actor's first simulation tick. Shared scenery
+                // steps once before spawning, just as it does before a visit
+                // joins.
+                if self.phase_tick >= OPENING_TICKS {
+                    if self.terrain.responsive_floor.is_some() {
+                        self.prepare_responsive_spawn(water);
+                    }
+                    self.spawn(arena);
+                    self.enter(EventPhase::Running);
+                }
+                return false;
+            }
+            VisitStep::Running { ledge_driven } => {
+                let world = arena
+                    .held_mut(Owner::Visit)
+                    .expect("a running visit's arena");
+                self.finish_run(world, ledge_driven);
                 let position = self.position(world).expect("running duck");
                 if !position.x.is_finite()
                     || !position.y.is_finite()
@@ -790,11 +836,7 @@ impl DuckEvent {
                     self.reset(Some(world), ClockDuckOutcome::TimedOut);
                 }
             }
-            _ => {
-                if let Some(world) = arena.held_mut(Owner::Visit) {
-                    world.step(DT);
-                }
-            }
+            VisitStep::Idle => {}
         }
         if self.phase == EventPhase::Resetting
             && !self.arena_claimed

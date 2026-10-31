@@ -159,6 +159,11 @@ fn falling_steps_the_player_once_even_at_entry_and_the_last_event_tick() {
                     baseline.player_duck_state(),
                     "aspect={aspect} opening={opening} tick={elapsed}: no doubled gravity/movement"
                 );
+                assert_eq!(
+                    composed.arena_accounting().steps,
+                    baseline.arena_accounting().steps,
+                    "aspect={aspect} opening={opening} tick={elapsed}: one arena step"
+                );
             }
         }
     }

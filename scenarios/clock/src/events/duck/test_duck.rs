@@ -78,26 +78,17 @@ impl TestDuck {
         self.step_with_water(None)
     }
 
+    /// One tick as `ClockState` runs it. An event with water moves the panels
+    /// itself, as Rain does.
     pub fn step_with_water(&mut self, water: Option<&WaterWorld>) -> bool {
-        self.step_with_environment(water, water.is_some())
-    }
-
-    pub fn step_with_environment(
-        &mut self,
-        water: Option<&WaterWorld>,
-        panels_advanced: bool,
-    ) -> bool {
-        self.step_with_soil(water, panels_advanced, None)
-    }
-
-    pub fn step_with_soil(
-        &mut self,
-        water: Option<&WaterWorld>,
-        panels_advanced: bool,
-        soil: Option<&mut crate::grass::SoilHabitat>,
-    ) -> bool {
-        self.duck
-            .step_with_soil(&mut self.arena, water, panels_advanced, soil)
+        let panels = if water.is_some() {
+            PanelAuthority::Event(ClockEventKind::Rain)
+        } else {
+            PanelAuthority::Visit
+        };
+        let step = self.duck.pre_step(&mut self.arena, water, panels, None);
+        self.arena.step(DT);
+        self.duck.post_step(&mut self.arena, water, step)
     }
 
     pub fn spawn(&mut self) {
@@ -180,9 +171,15 @@ impl TestDuck {
         Self { duck, arena }
     }
 
+    /// The character's part of a tick and the arena's step, without the
+    /// visit's panels, flaps or phase.
     pub fn run(&mut self, water: Option<&WaterWorld>) {
-        self.duck
+        let ledge_driven = self
+            .duck
             .run(self.arena.world_mut().expect("visit arena"), water);
+        self.arena.step(DT);
+        self.duck
+            .finish_run(self.arena.world_mut().expect("visit arena"), ledge_driven);
     }
 
     pub fn decide_automatic_ledge(&mut self) {

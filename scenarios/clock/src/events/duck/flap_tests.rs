@@ -312,7 +312,8 @@ fn retiring_flaps_removes_only_the_visits_bodies_and_claims() {
     assert_eq!(world.motion(id), foreign_motion);
     assert_eq!(flap_body_count(Some(world)), 0);
     let gravity = world.gravity().y;
-    assert!(step_leased(None, &mut arena, None, false, None).is_none());
+    prepare_vacant(&mut arena, PanelAuthority::Visit, None);
+    arena.step(DT);
     let after = arena.world().unwrap().motion(id).unwrap();
     assert!(
         (after.linear_velocity.y - gravity * DT).abs() < 0.001,

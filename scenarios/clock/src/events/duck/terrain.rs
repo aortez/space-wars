@@ -198,11 +198,11 @@ impl ArenaTerrain {
     pub(super) fn advance_panels(
         &mut self,
         world: Option<&mut PhysicsWorld>,
-        already_advanced: bool,
+        panels: PanelAuthority,
         hull: Option<(Vec2, f64)>,
     ) {
         if let Some(floor) = &mut self.responsive_floor {
-            if !already_advanced {
+            if panels == PanelAuthority::Visit {
                 floor.step_dry(f64::from(DT), hull);
             }
             if let Some(world) = world {

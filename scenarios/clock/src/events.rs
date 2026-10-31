@@ -229,7 +229,6 @@ pub(super) struct EventContext<'a> {
     pub display: DisplaySnapshot,
     pub layout: Layout,
     pub floor: crate::floor::FloorGeometry,
-    pub soil: Option<&'a mut crate::grass::SoilHabitat>,
 }
 
 /// An event owns its local phase and temporary resources. Dropping the variant
@@ -401,16 +400,23 @@ impl ActiveEvent {
         }
     }
 
-    /// Returns true when the event has finished. A shared-arena event steps
-    /// `arena` here only once its character has left.
-    pub fn step(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+    /// The event's tick up to the arena's one step. A standalone event steps its
+    /// own world here and finishes its tick; one sharing the arena reads it
+    /// back in `observe` after the step. Returns true when the event has
+    /// finished.
+    pub fn step(
+        &mut self,
+        context: EventContext<'_>,
+        visit: Option<&mut duck::DuckEvent>,
+        arena: &mut ClockArena,
+    ) -> bool {
         match self {
             Self::Grass(event) => event.step(),
-            Self::Aquarium(event) => event.step(context, None, arena),
-            Self::Falling(event) => event.step(context, None, arena),
-            Self::Explosion(event) => event.step(context, None, arena),
+            Self::Aquarium(event) => event.step(context, visit, arena),
+            Self::Falling(event) => event.step(context),
+            Self::Explosion(event) => event.step(context, arena),
             Self::ColorCycle(event) => event.step(),
-            Self::Meltdown(event) => event.step_with_visit(context, None, arena),
+            Self::Meltdown(event) => event.step_with_visit(context, visit, arena),
             Self::Marquee(event) => event.step(),
             Self::DigitSlide(event) => event.step(),
             Self::CellSwap(event) => event.step(),
@@ -418,6 +424,27 @@ impl ActiveEvent {
                 event.synchronize(context.display, context.segments);
                 event.step()
             }
+        }
+    }
+
+    /// What an event sharing the arena reads back after the arena's step.
+    /// Returns true when the event has finished.
+    pub fn observe(
+        &mut self,
+        context: EventContext<'_>,
+        visit: Option<&duck::DuckEvent>,
+        arena: &mut ClockArena,
+    ) -> bool {
+        debug_assert!(self.shares_visit_arena());
+        match self {
+            Self::Aquarium(event) => event.observe(visit, arena),
+            Self::Falling(event) => event.observe(context, arena),
+            Self::Explosion(event) => {
+                event.observe(context, arena);
+                false
+            }
+            Self::Meltdown(event) => event.observe(context, arena),
+            _ => unreachable!("only the shared events read the arena back"),
         }
     }
 

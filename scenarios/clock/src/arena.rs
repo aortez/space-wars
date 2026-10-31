@@ -25,7 +25,7 @@ use std::ops::Range;
 
 use engine_common::ClockEventKind;
 use engine_core::Vec2;
-use engine_rapier::world::{PhysicsId, PhysicsWorld, PhysicsWorldConfig};
+use engine_rapier::world::{PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig};
 
 use crate::{
     events::{ActiveEvent, duck::ArenaTerrain},
@@ -47,6 +47,12 @@ pub(crate) enum Owner {
 }
 
 impl Owner {
+    /// A resident keeps the arena for the rest of the run, whoever else comes
+    /// and goes.
+    fn resident(self) -> bool {
+        matches!(self, Self::Soil)
+    }
+
     /// The identities this owner's bodies take. While other owners keep the
     /// world, letting go removes whatever is left in them.
     fn ranges(self) -> &'static [Range<u64>] {
@@ -69,6 +75,53 @@ impl Owner {
             Self::Soil => &[SOIL],
         }
     }
+}
+
+/// Who moves the arena's responsive panels this tick. It is decided once per
+/// tick, before anything steps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PanelAuthority {
+    /// The visit's terrain, or the terrain its character left.
+    Visit,
+    /// An event that moves them with its own water.
+    Event(ClockEventKind),
+}
+
+impl PanelAuthority {
+    /// Rain moves the panels it rains on, and an event sharing the arena with
+    /// its own water moves the panels that water sits on.
+    pub(crate) fn of(event: Option<&ActiveEvent>) -> Self {
+        match event {
+            Some(ActiveEvent::Rain(_)) => Self::Event(ClockEventKind::Rain),
+            Some(event @ (ActiveEvent::Aquarium(_) | ActiveEvent::Meltdown(_)))
+                if event.shares_visit_arena() =>
+            {
+                Self::Event(event.kind())
+            }
+            _ => Self::Visit,
+        }
+    }
+}
+
+/// What the arena holds now, and what it has done over the run.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ArenaAccounting {
+    /// Owners holding the arena now.
+    pub claims: usize,
+    /// Those of them that are residents.
+    pub residents: usize,
+    pub bodies: usize,
+    pub colliders: usize,
+    pub joints: usize,
+    /// Claims granted over the run.
+    pub granted: u64,
+    /// Claims let go over the run.
+    pub released: u64,
+    /// Rigid steps over the run. Exactly one per positive tick while a world
+    /// exists.
+    pub steps: u64,
+    /// Worlds the arena has held over the run.
+    pub worlds: u64,
 }
 
 /// The settings every arena world is built with. Whoever builds it chooses its
@@ -101,6 +154,12 @@ pub(crate) struct ClockArena {
     /// The terrain of a visit whose character left while an event held the
     /// arena. The visit's claim stays with it.
     pub vacant: Option<ArenaTerrain>,
+    /// The last step's timings and populations.
+    metrics: PhysicsStepMetrics,
+    granted: u64,
+    released: u64,
+    steps: u64,
+    worlds: u64,
 }
 
 impl ClockArena {
@@ -139,6 +198,8 @@ impl ClockArena {
     pub fn build(&mut self, owner: Owner, world: PhysicsWorld) -> &mut PhysicsWorld {
         assert!(self.idle(), "the arena has one world");
         self.owners.push(owner);
+        self.granted += 1;
+        self.worlds += 1;
         self.world.insert(world)
     }
 
@@ -150,6 +211,7 @@ impl ClockArena {
             .as_mut()
             .expect("a claim joins an existing world");
         self.owners.push(owner);
+        self.granted += 1;
         world
     }
 
@@ -177,6 +239,8 @@ impl ClockArena {
             }
         }
         self.owners.push(owner);
+        self.granted += 1;
+        self.worlds += 1;
         self.world.insert(world)
     }
 
@@ -191,6 +255,7 @@ impl ClockArena {
         }
         let held = self.holds(owner);
         self.owners.retain(|other| *other != owner);
+        self.released += u64::from(held);
         if self.owners.is_empty() {
             assert!(
                 self.vacant.is_none(),
@@ -210,6 +275,35 @@ impl ClockArena {
     /// The vacant terrain and the world it stands in, borrowed together.
     pub fn vacant_with_world(&mut self) -> Option<(&mut ArenaTerrain, &mut PhysicsWorld)> {
         Some((self.vacant.as_mut()?, self.world.as_mut()?))
+    }
+
+    /// The arena's one rigid step this tick, whoever holds it, residents with
+    /// nobody else included. Nothing else steps the arena's world.
+    pub fn step(&mut self, dt: f32) {
+        if let Some(world) = &mut self.world {
+            self.metrics = world.step(dt);
+            self.steps += 1;
+        }
+    }
+
+    /// The last step's timings and populations.
+    pub fn metrics(&self) -> PhysicsStepMetrics {
+        self.metrics
+    }
+
+    pub fn accounting(&self) -> ArenaAccounting {
+        let world = self.world.as_ref();
+        ArenaAccounting {
+            claims: self.owners.len(),
+            residents: self.owners.iter().filter(|owner| owner.resident()).count(),
+            bodies: world.map_or(0, PhysicsWorld::body_count),
+            colliders: world.map_or(0, PhysicsWorld::collider_count),
+            joints: world.map_or(0, PhysicsWorld::joint_count),
+            granted: self.granted,
+            released: self.released,
+            steps: self.steps,
+            worlds: self.worlds,
+        }
     }
 }
 

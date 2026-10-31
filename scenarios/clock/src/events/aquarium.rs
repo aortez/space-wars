@@ -199,13 +199,15 @@ impl AquariumEvent {
         self.school.set_obstacles(obstacles, &self.water, self.port);
     }
 
+    /// The event's tick up to the arena's step. A standalone Aquarium finishes
+    /// its tick here; a shared one reads the arena back in `observe`. Returns
+    /// true when the event has finished.
     pub fn step(
         &mut self,
-        mut context: EventContext<'_>,
+        context: EventContext<'_>,
         mut player: Option<&mut DuckEvent>,
         arena: &mut ClockArena,
     ) -> bool {
-        let soil = context.soil.take();
         self.synchronize(context.display, context.segments);
         self.tick += 1;
         const INLET_TICKS: u64 = FILL_TICKS - 30;
@@ -264,22 +266,30 @@ impl AquariumEvent {
                 duck::leased_terrain(player.as_deref_mut(), &mut arena.vacant)
                     .sync_responsive_floor(&self.floor);
             }
-            let duck = duck::step_leased(player, arena, Some(&self.water), true, soil);
-            self.native_steps += 1;
-            if self.tick < DRAIN_AT {
-                self.school.step(
-                    &self.water,
-                    self.layout,
-                    self.port,
-                    self.tick,
-                    duck.zip(arena.world())
-                        .and_then(|(duck, world)| duck.clearance_hull(world)),
-                );
-            }
             self.shared = Some(shared);
-        } else if self.tick < DRAIN_AT {
+            return false;
+        }
+        if self.tick < DRAIN_AT {
             self.school
                 .step(&self.water, self.layout, self.port, self.tick, None);
+        }
+        self.tick >= AQUARIUM_TICKS
+    }
+
+    /// A shared Aquarium after the arena's step: the school keeps clear of
+    /// where the character now is. Returns true when the event has finished.
+    pub fn observe(&mut self, player: Option<&DuckEvent>, arena: &ClockArena) -> bool {
+        self.native_steps += 1;
+        if self.tick < DRAIN_AT {
+            self.school.step(
+                &self.water,
+                self.layout,
+                self.port,
+                self.tick,
+                player
+                    .zip(arena.world())
+                    .and_then(|(duck, world)| duck.clearance_hull(world)),
+            );
         }
         self.tick >= AQUARIUM_TICKS
     }

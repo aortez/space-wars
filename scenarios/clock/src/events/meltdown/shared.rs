@@ -122,13 +122,14 @@ impl MeltdownEvent {
         }
     }
 
+    /// A shared Meltdown's tick up to the arena's step: its floor and water
+    /// move, and cells due to fall join the arena.
     pub(super) fn step_shared(
         &mut self,
-        mut context: EventContext<'_>,
+        context: EventContext<'_>,
         mut player: Option<&mut DuckEvent>,
         arena: &mut ClockArena,
-    ) -> bool {
-        let soil = context.soil.take();
+    ) {
         // Move the small batch handles temporarily, not the world or its
         // allocations. This lets both material paths share reformation code.
         let mut shared = self.shared.take().expect("shared Meltdown");
@@ -159,17 +160,23 @@ impl MeltdownEvent {
             }
             self.reform(context);
         }
-        duck::step_leased(player, arena, Some(&self.water), true, soil);
-        if material {
+        self.shared = Some(shared);
+    }
+
+    /// A shared Meltdown's cells after the arena's step: they take their
+    /// bodies' poses, and those on real floor melt. Returns true when the event
+    /// has finished.
+    pub(crate) fn observe(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+        if self.tick < MELTING_TICKS + DRAINING_TICKS {
+            let shared = self.shared.as_mut().expect("shared Meltdown");
             self.exited_solid_area += shared.bodies.synchronize(
                 arena.world_mut().expect("leased arena"),
                 &mut self.cells,
                 &mut self.water,
-                layout,
+                context.layout,
                 self.cell_area,
             );
         }
-        self.shared = Some(shared);
         self.tick >= MELTING_TICKS + DRAINING_TICKS + REFORMING_TICKS
     }
 }

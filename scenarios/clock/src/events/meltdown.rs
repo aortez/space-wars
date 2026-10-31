@@ -282,6 +282,9 @@ impl MeltdownEvent {
             }
     }
 
+    /// The event's tick up to the arena's step. A standalone Meltdown finishes
+    /// its tick here; a shared one reads the arena back in `observe`. Returns
+    /// true when the event has finished.
     pub fn step_with_visit(
         &mut self,
         context: EventContext<'_>,
@@ -289,7 +292,8 @@ impl MeltdownEvent {
         arena: &mut ClockArena,
     ) -> bool {
         if self.shared.is_some() {
-            return self.step_shared(context, player, arena);
+            self.step_shared(context, player, arena);
+            return false;
         }
         self.tick += 1;
         if let Some(floats) = &mut self.floats {
