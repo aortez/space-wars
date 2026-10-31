@@ -18,6 +18,9 @@ mod crow_tests;
 pub use calendar::ClockDate;
 #[cfg(test)]
 mod digit_slide_tests;
+#[cfg(test)]
+mod digit_surface_tests;
+pub mod digit_surfaces;
 mod digits;
 #[cfg(test)]
 mod event_tests;
@@ -61,6 +64,10 @@ pub use arena::{
 /// waiting on a request the host never applied.
 const MAX_EVENT_FLAGS_HIGH_BYTE: u8 = (((1u16 << ClockEventKind::ALL.len()) - 1) >> 8) as u8;
 
+pub use digit_surfaces::{
+    DigitSurface, Footprint, Retirement, SurfaceAccounting, SurfaceChange, SurfaceChangeKind,
+    SurfaceId, SurfaceSource,
+};
 pub use digits::{
     DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
     SegmentRepresentation, SegmentState,
@@ -481,6 +488,9 @@ pub struct ClockState {
     date_label: Option<String>,
     display: DisplaySnapshot,
     segments: Vec<SegmentState>,
+    // Who the lit digit cells are and what has happened to them. The face
+    // and the active event say where they are.
+    surfaces: digit_surfaces::SurfaceLedger,
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
     floor: floor::FloorManager,
@@ -940,6 +950,34 @@ impl ClockState {
         &self.segments
     }
 
+    /// Every lit digit cell as a surface something can attach to, where it
+    /// stands after the last step: the face's slots in order, then the pieces
+    /// of whatever event holds the rest.
+    pub fn digit_surfaces(&self) -> Vec<DigitSurface> {
+        digit_surfaces::publish(self)
+    }
+
+    /// The lifecycle changes the ledger still retains, oldest first. A
+    /// consumer that finds a gap in their sequence numbers has missed some,
+    /// and catches up from `digit_surfaces`: a surface it holds that is not
+    /// published there has been retired.
+    pub fn surface_changes(&self) -> impl ExactSizeIterator<Item = &SurfaceChange> + Clone {
+        self.surfaces.changes()
+    }
+
+    pub fn surface_accounting(&self) -> SurfaceAccounting {
+        self.surfaces.accounting()
+    }
+
+    /// Brings the face's surfaces up to what it draws and records what this
+    /// step's publication shows, before anything reads the step.
+    fn settle_surfaces(&mut self) {
+        self.surfaces
+            .reconcile(&self.segments, SurfaceSource::Anchored);
+        let published = self.digit_surfaces();
+        self.surfaces.observe(&published);
+    }
+
     pub fn time_format(&self) -> ClockTimeFormat {
         self.config.time_format
     }
@@ -1396,6 +1434,7 @@ impl ClockState {
                 )
             };
             self.active_event = Some(ActiveEvent::Rain(Box::new(rain)));
+            self.hold_event_surfaces();
             return;
         }
         if matches!(
@@ -1429,6 +1468,7 @@ impl ClockState {
                 )),
                 _ => unreachable!(),
             });
+            self.hold_event_surfaces();
             return;
         }
         self.floor.acquire(kind);
@@ -1445,6 +1485,21 @@ impl ClockState {
             previous_display,
             preview,
         ));
+        self.hold_event_surfaces();
+    }
+
+    /// An event that moves the face's cells but does not yet publish them
+    /// holds every slot with nothing in it.
+    fn hold_event_surfaces(&mut self) {
+        if self
+            .active_event
+            .as_ref()
+            .is_some_and(ActiveEvent::vacates_face)
+        {
+            for slot in 0..DIGIT_SLOT_COUNT {
+                self.surfaces.vacate(slot, Retirement::Interrupted);
+            }
+        }
     }
 
     fn finish_event(&mut self) {
@@ -1459,6 +1514,11 @@ impl ClockState {
                 && let Some(duck) = &mut self.duck_visit
             {
                 duck.terrain.sync_responsive_floor(floor);
+            }
+            for slot in 0..DIGIT_SLOT_COUNT {
+                if self.surfaces.held(slot) {
+                    self.surfaces.release(slot);
+                }
             }
             drop(event);
             debug_assert!(
@@ -1478,6 +1538,7 @@ impl ClockState {
 
     fn advance_tick(&mut self) {
         self.schedule.advance_tick();
+        self.surfaces.set_tick(self.schedule.tick);
         if self
             .event_notice
             .is_some_and(|(_, until)| self.schedule.tick >= until)
@@ -1755,6 +1816,7 @@ impl Scenario for ClockScenario {
             date_label: None,
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),
+            surfaces: digit_surfaces::SurfaceLedger::new(),
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
             floor: floor::FloorManager::default(),
@@ -1785,6 +1847,7 @@ impl Scenario for ClockScenario {
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
+        state.surfaces.set_tick(state.schedule.tick);
         for action in actions.iter().filter_map(ClockAction::decode) {
             match action {
                 ClockAction::SetReading(reading) => state.apply_reading(reading, !dt.is_zero()),
@@ -1839,6 +1902,7 @@ impl Scenario for ClockScenario {
             Vec::new()
         };
         state.advance_plants(dt);
+        state.settle_surfaces();
         StepResult::default()
     }
 

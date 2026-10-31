@@ -1,0 +1,669 @@
+//! Identity, lifetime and geometry for the lit cells of the four digits, so a
+//! resident attached to a digit can follow the piece it is attached to. One
+//! surface is one lit glyph cell. The colon only blinks in place and the AM/PM
+//! pixels are too small to carry anything, so neither is a surface.
+//!
+//! Identity is an admission serial that a run never reuses. Where a surface was
+//! admitted is provenance, not identity: a swapped cell keeps its identity at a
+//! new place, and a replaced glyph's cells are new surfaces even where they
+//! overlap the old ones. A surface is admitted once, handed off between
+//! geometry sources any number of times, departs at most once and is retired
+//! once with a reason. Nothing comes back from departing or retired.
+//!
+//! Publication is a read of the state that also draws the face: the face table
+//! for slots no event holds, and the event's own pieces for slots it does.
+//! Rendering never changes it. The ledger records admissions and retirements as
+//! they happen and finds hand-offs and departures by comparing each step's
+//! publication with the last, so a consumer reading after a step never sees a
+//! surface in a state the ledger has not recorded.
+
+use std::{
+    collections::{BTreeMap, VecDeque},
+    num::NonZeroU32,
+};
+
+use engine_common::ClockFont;
+use engine_core::Vec2;
+use engine_rapier::world::BodyId;
+
+use crate::{
+    ClockState, DIGIT_SLOT_COUNT, GridCell, SegmentRepresentation, SegmentState, fonts::CellMask,
+    layout::Layout,
+};
+
+/// Half the side of a lit cell in grid units. Every face renderer draws one as
+/// a square of 0.8 pitch about its centre.
+pub const CELL_HALF: f32 = 0.4;
+/// Surfaces alive at once: an outgoing and an incoming glyph in every slot, and
+/// room for the departing cells a retargeted cross-fade can stack on a cell.
+pub const MAX_SURFACES: usize = 3 * crate::fonts::MAX_DIGIT_CELLS;
+/// Lifecycle changes kept for consumers that read less often than every step.
+/// One step records at most a retirement and an admission per live surface.
+pub const MAX_RETAINED_CHANGES: usize = 2 * MAX_SURFACES;
+pub(crate) const GRID_CELLS: usize = 54;
+
+/// A surface's identity: the serial it was admitted with, which a run never
+/// reuses. A restart is a new run, with a new ledger, and carries nothing over.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SurfaceId(NonZeroU32);
+
+impl SurfaceId {
+    pub fn get(self) -> u32 {
+        self.0.get()
+    }
+}
+
+/// What is moving a surface this step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SurfaceSource {
+    /// At rest on its place in the face.
+    Anchored,
+    /// Digit Slide's authored slide through its slot.
+    Slide,
+    /// A rigid body in the event's canonical world, named by the surface.
+    Rigid,
+    /// Standalone Meltdown's ballistic step, which has no rigid world.
+    Ballistic,
+    /// An authored path back to the face after physical motion.
+    Return,
+    /// Meltdown's refill, which grows each new cell upward where it belongs.
+    Refill,
+    /// Cell Swap's exchange paths and its correcting fade.
+    Swap,
+    /// A Slot Machine reel.
+    Reel,
+    /// A Marquee carrying the face with its own transform.
+    Marquee,
+}
+
+impl SurfaceSource {
+    pub const ALL: [Self; 9] = [
+        Self::Anchored,
+        Self::Slide,
+        Self::Rigid,
+        Self::Ballistic,
+        Self::Return,
+        Self::Refill,
+        Self::Swap,
+        Self::Reel,
+        Self::Marquee,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Anchored => "anchored",
+            Self::Slide => "slide",
+            Self::Rigid => "rigid",
+            Self::Ballistic => "ballistic",
+            Self::Return => "return",
+            Self::Refill => "refill",
+            Self::Swap => "swap",
+            Self::Reel => "reel",
+            Self::Marquee => "marquee",
+        }
+    }
+}
+
+/// Why a surface stopped existing. Support is lost with it: nothing attached
+/// to a retired surface moves to another one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Retirement {
+    /// Its glyph gave way to another reading, font or format.
+    Replaced,
+    /// The event moving it ended early, away from its place in the face.
+    Interrupted,
+    /// A surplus Explosion block that shrank into its neighbour.
+    MergedAway,
+    /// Melted into water on contact with the floor.
+    Melted,
+    /// Left the view as a solid.
+    Exited,
+    /// Solid material Meltdown reclaimed when the face refilled.
+    Reclaimed,
+}
+
+impl Retirement {
+    pub const ALL: [Self; 6] = [
+        Self::Replaced,
+        Self::Interrupted,
+        Self::MergedAway,
+        Self::Melted,
+        Self::Exited,
+        Self::Reclaimed,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Replaced => "replaced",
+            Self::Interrupted => "interrupted",
+            Self::MergedAway => "merged-away",
+            Self::Melted => "melted",
+            Self::Exited => "exited",
+            Self::Reclaimed => "reclaimed",
+        }
+    }
+}
+
+/// The supporting rectangle in a surface's own frame, in grid units.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Footprint {
+    pub min: Vec2,
+    pub max: Vec2,
+}
+
+impl Footprint {
+    /// A whole lit cell.
+    pub const CELL: Self = Self::square(CELL_HALF);
+
+    pub const fn square(half: f32) -> Self {
+        Self {
+            min: Vec2::new(-half, -half),
+            max: Vec2::new(half, half),
+        }
+    }
+
+    pub fn contains(self, point: Vec2) -> bool {
+        (self.min.x..=self.max.x).contains(&point.x) && (self.min.y..=self.max.y).contains(&point.y)
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.max.x <= self.min.x || self.max.y <= self.min.y
+    }
+}
+
+/// One surface as it stands after a step. The frame maps a local point `p` in
+/// grid units to `origin + rotate(p * scale, angle)`, so a local point survives
+/// a resize, while a shrinking or growing footprint changes which local points
+/// are supported rather than moving them.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DigitSurface {
+    pub id: SurfaceId,
+    /// The digit slot it was admitted in.
+    pub slot: u8,
+    /// The cell it was admitted at.
+    pub cell: GridCell,
+    pub origin: Vec2,
+    pub angle: f32,
+    /// World units per grid unit.
+    pub scale: f32,
+    pub footprint: Footprint,
+    pub source: SurfaceSource,
+    /// The canonical rigid body carrying it, while one does.
+    pub body: Option<BodyId>,
+    pub departing: bool,
+    /// Presentation only: how much of the surface's ink is drawn. A surface
+    /// can be invisible and still exist, and several surfaces sharing one
+    /// drawn cell sum to its ink.
+    pub opacity: f32,
+    /// Presentation only: the world band of y it is drawn within.
+    pub clip: Option<[f32; 2]>,
+}
+
+/// Where an event or the face has a surface this step, and how it is drawn.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct SurfacePose {
+    pub origin: Vec2,
+    pub angle: f32,
+    pub scale: f32,
+    pub footprint: Footprint,
+    pub source: SurfaceSource,
+    pub body: Option<BodyId>,
+    pub departing: bool,
+    pub opacity: f32,
+    pub clip: Option<[f32; 2]>,
+}
+
+impl SurfacePose {
+    /// A whole cell resting at its place in the face.
+    pub fn anchored(layout: Layout, slot: usize, cell: GridCell) -> Self {
+        Self {
+            origin: layout.slot_cell_center(slot, cell),
+            angle: 0.0,
+            scale: layout.pitch,
+            footprint: Footprint::CELL,
+            source: SurfaceSource::Anchored,
+            body: None,
+            departing: false,
+            opacity: 1.0,
+            clip: None,
+        }
+    }
+}
+
+impl DigitSurface {
+    pub(crate) fn new(id: SurfaceId, slot: u8, cell: GridCell, pose: SurfacePose) -> Self {
+        let SurfacePose {
+            origin,
+            angle,
+            scale,
+            footprint,
+            source,
+            body,
+            departing,
+            opacity,
+            clip,
+        } = pose;
+        Self {
+            id,
+            slot,
+            cell,
+            origin,
+            angle,
+            scale,
+            footprint,
+            source,
+            body,
+            departing,
+            opacity,
+            clip,
+        }
+    }
+
+    pub fn world(&self, local: Vec2) -> Vec2 {
+        self.origin + (local * self.scale).rotate_radians(self.angle)
+    }
+
+    pub fn local(&self, world: Vec2) -> Vec2 {
+        (world - self.origin).rotate_radians(-self.angle) / self.scale
+    }
+
+    pub fn supports(&self, local: Vec2) -> bool {
+        self.footprint.contains(local)
+    }
+
+    /// Whether something new may attach. A departing surface still carries what
+    /// is already on it until it is retired.
+    pub fn eligible(&self) -> bool {
+        !self.departing && !self.footprint.is_empty()
+    }
+
+    pub fn corners(&self) -> [Vec2; 4] {
+        let Footprint { min, max } = self.footprint;
+        [min, Vec2::new(max.x, min.y), max, Vec2::new(min.x, max.y)].map(|local| self.world(local))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SurfaceChange {
+    /// Counts every change the run has recorded, so a consumer that reads less
+    /// often than the ledger retains can tell it missed some.
+    pub sequence: u64,
+    pub tick: u64,
+    pub id: SurfaceId,
+    pub kind: SurfaceChangeKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SurfaceChangeKind {
+    Admitted {
+        slot: u8,
+        cell: GridCell,
+        source: SurfaceSource,
+    },
+    HandedOff {
+        from: SurfaceSource,
+        to: SurfaceSource,
+    },
+    Departing,
+    Retired(Retirement),
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SurfaceAccounting {
+    pub admitted: u64,
+    pub handed_off: u64,
+    pub departed: u64,
+    /// Indexed like `Retirement::ALL`.
+    pub retired: [u64; Retirement::ALL.len()],
+    pub live: usize,
+    pub peak_live: usize,
+    /// The last change's sequence number.
+    pub sequence: u64,
+}
+
+impl SurfaceAccounting {
+    pub fn retired(&self, reason: Retirement) -> u64 {
+        self.retired[reason as usize]
+    }
+
+    pub fn total_retired(&self) -> u64 {
+        self.retired.iter().sum()
+    }
+}
+
+/// The lit cells of one slot as a font draws them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Glyph {
+    pub font: ClockFont,
+    pub mask: CellMask,
+}
+
+impl Glyph {
+    pub fn new(font: ClockFont, digit: Option<u8>) -> Self {
+        Self {
+            font,
+            mask: crate::fonts::glyph(font, digit),
+        }
+    }
+
+    /// What the anchored face draws in a slot.
+    pub fn anchored(segments: &[SegmentState], slot: usize) -> Self {
+        let mut glyph = Self {
+            font: ClockFont::Classic,
+            mask: CellMask(0),
+        };
+        for segment in segments
+            .iter()
+            .filter(|segment| usize::from(segment.id.digit_slot) == slot)
+        {
+            glyph.font = segment.font;
+            if segment.lit && segment.representation == SegmentRepresentation::Anchored {
+                glyph.mask.0 |= segment.shape.0;
+            }
+        }
+        glyph
+    }
+}
+
+pub(crate) fn bit(cell: GridCell) -> usize {
+    cell.y as usize * 6 + cell.x as usize
+}
+
+/// Surface identities by grid bit, for one slot.
+pub(crate) type SlotIds = [Option<SurfaceId>; GRID_CELLS];
+
+#[derive(Debug, Clone, Copy)]
+struct FaceSlot {
+    /// The glyph `ids` belong to. None after an event released the slot with
+    /// nothing settled, so the next reconciliation admits the face afresh.
+    glyph: Option<Glyph>,
+    held: bool,
+    ids: SlotIds,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Record {
+    slot: u8,
+    cell: GridCell,
+    source: SurfaceSource,
+    departing: bool,
+}
+
+/// Who exists, and what has happened to them. Poses are not stored here; they
+/// are read from the state each time they are published.
+pub(crate) struct SurfaceLedger {
+    next: u32,
+    tick: u64,
+    face: [FaceSlot; DIGIT_SLOT_COUNT],
+    live: BTreeMap<SurfaceId, Record>,
+    changes: VecDeque<SurfaceChange>,
+    accounting: SurfaceAccounting,
+}
+
+impl SurfaceLedger {
+    pub fn new() -> Self {
+        Self {
+            next: 0,
+            tick: 0,
+            face: [FaceSlot {
+                glyph: None,
+                held: false,
+                ids: [None; GRID_CELLS],
+            }; DIGIT_SLOT_COUNT],
+            live: BTreeMap::new(),
+            changes: VecDeque::with_capacity(MAX_RETAINED_CHANGES),
+            accounting: SurfaceAccounting::default(),
+        }
+    }
+
+    /// The simulation tick the following changes belong to.
+    pub fn set_tick(&mut self, tick: u64) {
+        self.tick = tick;
+    }
+
+    pub fn admit(&mut self, slot: u8, cell: GridCell, source: SurfaceSource) -> SurfaceId {
+        self.next += 1;
+        let id = SurfaceId(NonZeroU32::new(self.next).expect("a run admits fewer than 2^32"));
+        self.live.insert(
+            id,
+            Record {
+                slot,
+                cell,
+                source,
+                departing: false,
+            },
+        );
+        debug_assert!(self.live.len() <= MAX_SURFACES, "surfaces stay bounded");
+        self.accounting.admitted += 1;
+        self.accounting.live = self.live.len();
+        self.accounting.peak_live = self.accounting.peak_live.max(self.live.len());
+        self.record(id, SurfaceChangeKind::Admitted { slot, cell, source });
+        id
+    }
+
+    pub fn retire(&mut self, id: SurfaceId, reason: Retirement) {
+        let removed = self.live.remove(&id);
+        debug_assert!(removed.is_some(), "only a live surface retires");
+        if removed.is_none() {
+            return;
+        }
+        self.accounting.retired[reason as usize] += 1;
+        self.accounting.live = self.live.len();
+        self.record(id, SurfaceChangeKind::Retired(reason));
+    }
+
+    pub fn retire_all(&mut self, ids: impl IntoIterator<Item = SurfaceId>, reason: Retirement) {
+        for id in ids {
+            self.retire(id, reason);
+        }
+    }
+
+    pub fn is_live(&self, id: SurfaceId) -> bool {
+        self.live.contains_key(&id)
+    }
+
+    fn record(&mut self, id: SurfaceId, kind: SurfaceChangeKind) {
+        self.accounting.sequence += 1;
+        if self.changes.len() == MAX_RETAINED_CHANGES {
+            self.changes.pop_front();
+        }
+        self.changes.push_back(SurfaceChange {
+            sequence: self.accounting.sequence,
+            tick: self.tick,
+            id,
+            kind,
+        });
+    }
+
+    /// Hands one slot's face to an event that will draw `glyph` there. The
+    /// face's own surfaces carry on when they are that glyph. Otherwise they
+    /// are replaced, and so are any cells the face has no surface for yet.
+    pub fn take(&mut self, slot: usize, glyph: Glyph, source: SurfaceSource) -> SlotIds {
+        let face = self.face[slot];
+        debug_assert!(!face.held, "one event holds a slot at a time");
+        self.face[slot] = FaceSlot {
+            glyph: None,
+            held: true,
+            ids: [None; GRID_CELLS],
+        };
+        let mut ids = [None; GRID_CELLS];
+        let keep = face.glyph == Some(glyph);
+        for (bit, id) in face.ids.into_iter().enumerate() {
+            match id {
+                Some(id) if keep => ids[bit] = Some(id),
+                Some(id) => self.retire(id, Retirement::Replaced),
+                None => (),
+            }
+        }
+        for cell in glyph.mask.cells() {
+            if ids[bit(cell)].is_none() {
+                ids[bit(cell)] = Some(self.admit(slot as u8, cell, source));
+            }
+        }
+        ids
+    }
+
+    /// Gives a slot back to the face with the surfaces an event settled in it,
+    /// which have to be cells of `glyph`. The face admits the rest of whatever
+    /// it draws there at the end of the step.
+    pub fn hand_back(&mut self, slot: usize, glyph: Glyph, ids: SlotIds) {
+        debug_assert!(self.face[slot].held, "only a held slot comes back");
+        debug_assert!(
+            ids.iter()
+                .enumerate()
+                .all(|(bit, id)| id.is_none() || glyph.mask.0 & (1 << bit) != 0),
+            "a settled surface is a cell of the glyph it settled in"
+        );
+        self.face[slot] = FaceSlot {
+            glyph: Some(glyph),
+            held: false,
+            ids,
+        };
+    }
+
+    /// Gives a slot back with nothing settled in it.
+    pub fn release(&mut self, slot: usize) {
+        debug_assert!(self.face[slot].held, "only a held slot comes back");
+        self.face[slot] = FaceSlot {
+            glyph: None,
+            held: false,
+            ids: [None; GRID_CELLS],
+        };
+    }
+
+    /// Takes a slot from the face for an event that publishes no surfaces of
+    /// its own there, retiring what the face had.
+    pub fn vacate(&mut self, slot: usize, reason: Retirement) {
+        let ids = self.face[slot].ids;
+        debug_assert!(!self.face[slot].held, "one event holds a slot at a time");
+        self.face[slot] = FaceSlot {
+            glyph: None,
+            held: true,
+            ids: [None; GRID_CELLS],
+        };
+        self.retire_all(ids.into_iter().flatten(), reason);
+    }
+
+    pub fn held(&self, slot: usize) -> bool {
+        self.face[slot].held
+    }
+
+    /// Brings the slots no event holds up to what the face draws: a changed
+    /// glyph replaces every surface in its slot, and a cell without a surface
+    /// gets a new one. Seconds, the colon and colours change none of this.
+    pub fn reconcile(&mut self, segments: &[SegmentState], source: SurfaceSource) {
+        for slot in 0..DIGIT_SLOT_COUNT {
+            if self.face[slot].held {
+                continue;
+            }
+            let glyph = Glyph::anchored(segments, slot);
+            if self.face[slot].glyph != Some(glyph) {
+                let ids = std::mem::replace(&mut self.face[slot].ids, [None; GRID_CELLS]);
+                self.retire_all(ids.into_iter().flatten(), Retirement::Replaced);
+                self.face[slot].glyph = Some(glyph);
+            }
+            for cell in glyph.mask.cells() {
+                if self.face[slot].ids[bit(cell)].is_none() {
+                    let id = self.admit(slot as u8, cell, source);
+                    self.face[slot].ids[bit(cell)] = Some(id);
+                }
+            }
+        }
+    }
+
+    /// The face's own surfaces in a slot no event holds, in cell order.
+    pub fn face(&self, slot: usize) -> impl Iterator<Item = (GridCell, SurfaceId)> + '_ {
+        let face = &self.face[slot];
+        (!face.held).then_some(()).into_iter().flat_map(move |()| {
+            face.ids.iter().enumerate().filter_map(|(bit, id)| {
+                id.map(|id| {
+                    (
+                        GridCell {
+                            x: (bit % 6) as i8,
+                            y: (bit / 6) as i8,
+                        },
+                        id,
+                    )
+                })
+            })
+        })
+    }
+
+    /// Records the hand-offs and departures one step's publication shows, so
+    /// that every change is on the ledger before anything reads the step.
+    pub fn observe(&mut self, surfaces: &[DigitSurface]) {
+        if cfg!(debug_assertions) {
+            let mut published: Vec<_> = surfaces.iter().map(|surface| surface.id).collect();
+            published.sort_unstable();
+            let live: Vec<_> = self.live.keys().copied().collect();
+            assert_eq!(
+                published, live,
+                "every live surface is published exactly once"
+            );
+        }
+        for surface in surfaces {
+            let Some(record) = self.live.get_mut(&surface.id) else {
+                continue;
+            };
+            let Record {
+                source, departing, ..
+            } = *record;
+            debug_assert!(
+                !departing || surface.departing,
+                "a departing surface never comes back"
+            );
+            record.source = surface.source;
+            record.departing = departing || surface.departing;
+            if source != surface.source {
+                self.accounting.handed_off += 1;
+                self.record(
+                    surface.id,
+                    SurfaceChangeKind::HandedOff {
+                        from: source,
+                        to: surface.source,
+                    },
+                );
+            }
+            if surface.departing && !departing {
+                self.accounting.departed += 1;
+                self.record(surface.id, SurfaceChangeKind::Departing);
+            }
+        }
+    }
+
+    /// Where a live surface was admitted.
+    fn provenance(&self, id: SurfaceId) -> (u8, GridCell) {
+        let record = self.live.get(&id);
+        debug_assert!(record.is_some(), "only a live surface is published");
+        record.map_or((0, GridCell { x: 0, y: 0 }), |record| {
+            (record.slot, record.cell)
+        })
+    }
+
+    pub fn changes(&self) -> impl ExactSizeIterator<Item = &SurfaceChange> + Clone {
+        self.changes.iter()
+    }
+
+    pub fn accounting(&self) -> SurfaceAccounting {
+        self.accounting
+    }
+}
+
+/// Every surface in a fixed order: the slots no event holds, slot by slot in
+/// cell order, then the active event's pieces in the event's own order.
+pub(crate) fn publish(state: &ClockState) -> Vec<DigitSurface> {
+    let layout = Layout::new(state.aspect_ratio());
+    let mut poses = Vec::with_capacity(state.surfaces.accounting().live);
+    for slot in 0..DIGIT_SLOT_COUNT {
+        for (cell, id) in state.surfaces.face(slot) {
+            poses.push((id, SurfacePose::anchored(layout, slot, cell)));
+        }
+    }
+    poses
+        .into_iter()
+        .map(|(id, pose)| {
+            let (slot, cell) = state.surfaces.provenance(id);
+            DigitSurface::new(id, slot, cell, pose)
+        })
+        .collect()
+}

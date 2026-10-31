@@ -491,6 +491,39 @@ pub(crate) fn plant_actor_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
     polygons
 }
 
+/// The lit digit cells alone, with their alpha: no colon, label, water or glow.
+/// What the surface contract checks the published surfaces against.
+#[cfg(test)]
+pub(crate) fn digit_cell_polygons(state: &ClockState) -> Vec<(Vec<Vec2>, f32)> {
+    let layout = Layout::new(state.aspect_ratio());
+    let mut frame = RenderFrame::default();
+    render_segments(&mut frame, state, layout);
+    filled_polygons_with_alpha(&frame, ACTIVE_CELL_LAYER)
+}
+
+/// Every filled polygon on one layer, with its fill alpha.
+#[cfg(test)]
+pub(crate) fn filled_polygons_with_alpha(frame: &RenderFrame, z: i32) -> Vec<(Vec<Vec2>, f32)> {
+    frame
+        .layers
+        .iter()
+        .filter(|layer| layer.z == z)
+        .flat_map(|layer| &layer.primitives)
+        .filter_map(|primitive| {
+            let RenderPrimitive::Polygon(polygon) = primitive else {
+                return None;
+            };
+            let alpha = polygon.fill.as_ref()?.color.a;
+            (alpha > 0.0).then(|| {
+                (
+                    polygon.points.iter().map(|p| Vec2::new(p.x, p.y)).collect(),
+                    alpha,
+                )
+            })
+        })
+        .collect()
+}
+
 fn filled_polygons(frame: RenderFrame, z: i32) -> Vec<Vec<Vec2>> {
     frame
         .layers

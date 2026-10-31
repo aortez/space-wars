@@ -554,6 +554,20 @@ impl ActiveEvent {
         }
     }
 
+    /// Events whose moving pieces are not published as surfaces yet.
+    pub fn vacates_face(&self) -> bool {
+        match self {
+            Self::Meltdown(event) => !event.lab,
+            Self::DigitSlide(_)
+            | Self::Falling(_)
+            | Self::Explosion(_)
+            | Self::CellSwap(_)
+            | Self::SlotMachine(_)
+            | Self::Marquee(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn holds_lit_segments(&self) -> bool {
         matches!(self, Self::Rain(_) | Self::Aquarium(_))
             || matches!(
