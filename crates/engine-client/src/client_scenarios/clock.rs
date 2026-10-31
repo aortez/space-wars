@@ -269,6 +269,7 @@ impl ClientScenario for ClockClientScenario {
             grass: Some(self.state.grass_state()),
             rain: self.state.rain_state(),
             aquarium: self.state.aquarium_state(),
+            slot_machine: self.state.slot_machine_state(),
             reading: self
                 .state
                 .reading()

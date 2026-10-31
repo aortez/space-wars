@@ -384,6 +384,23 @@ impl Journal {
         }
     }
 
+    /// Official and development admission both replace the recovery transaction.
+    /// A handoff still naming the old one could never match again, so admission
+    /// waits until the kiosk has released it.
+    pub fn require_clear(&mut self, lock: &InstallLock, recovery: &RecoveryStore) -> Result<()> {
+        lock.check()?;
+        self.require_clear_inner(&RecoveryView::read(recovery)?)
+    }
+
+    fn require_clear_inner(&mut self, recovery: &RecoveryView) -> Result<()> {
+        if self.reconcile_inner(recovery)? != Resolution::Clear {
+            return Err(invalid(
+                "an earlier install's handoff is unresolved; wait until the kiosk releases it",
+            ));
+        }
+        Ok(())
+    }
+
     /// Retain a terminal decision until an authenticated observation made AFTER
     /// that decision proves the fence is gone. The callback must query the active
     /// systemd kiosk instance, never return cached evidence or request JSON.

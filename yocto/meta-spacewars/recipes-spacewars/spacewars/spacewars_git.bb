@@ -171,6 +171,7 @@ python () {
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-system.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-recovery.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/bootstrap-runtime.json:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/development-runtime.json:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-install.conf:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-rtc-capture.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-kiosk.service:True",
@@ -230,6 +231,7 @@ do_install() {
     install -m 0644 ${WORKDIR}/spacewars-recovery.service ${D}${systemd_system_unitdir}/spacewars-recovery.service
     install -d ${D}${sysconfdir}/spacewars
     install -m 0644 ${WORKDIR}/bootstrap-runtime.json ${D}${sysconfdir}/spacewars/bootstrap-runtime.json
+    install -m 0644 ${WORKDIR}/development-runtime.json ${D}${sysconfdir}/spacewars/development-runtime.json
     install -d ${D}${nonarch_libdir}/tmpfiles.d
     install -m 0644 ${WORKDIR}/spacewars-install.conf ${D}${nonarch_libdir}/tmpfiles.d/spacewars-install.conf
     install -m 0644 ${WORKDIR}/spacewars-rtc-capture.service ${D}${systemd_system_unitdir}/spacewars-rtc-capture.service
@@ -257,6 +259,7 @@ SRC_URI += " \
     file://spacewars-system.service \
     file://spacewars-recovery.service \
     file://bootstrap-runtime.json \
+    file://development-runtime.json \
     file://spacewars-install.conf \
     file://spacewars-rtc-capture.service \
     file://spacewars-kiosk.service \
@@ -281,7 +284,8 @@ python write_spacewars_fast_compatibility() {
         "spacewars-access.service", "spacewars-sshd-access.conf", "sshd-spacewars-access.conf",
         "sshd-spacewars-network.conf",
         "spacewars-system.service", "spacewars-rtc-capture.service",
-        "spacewars-recovery.service", "bootstrap-runtime.json", "spacewars-install.conf",
+        "spacewars-recovery.service", "bootstrap-runtime.json", "development-runtime.json",
+        "spacewars-install.conf",
         "spacewars-kiosk.service", "spacewars-seatd.service", "spacewars-fast-update.sh",
         "spacewars-fast-update-wrapper.sh",
         "spacewars-logs.sh", "spacewars-logs.sudoers",
@@ -363,6 +367,7 @@ FILES:${PN} = " \
     ${systemd_system_unitdir}/spacewars-system.service \
     ${systemd_system_unitdir}/spacewars-recovery.service \
     ${sysconfdir}/spacewars/bootstrap-runtime.json \
+    ${sysconfdir}/spacewars/development-runtime.json \
     ${sysconfdir}/spacewars/ota-bootstrap.json \
     ${nonarch_libdir}/tmpfiles.d/spacewars-install.conf \
     ${systemd_system_unitdir}/spacewars-rtc-capture.service \

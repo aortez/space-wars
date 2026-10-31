@@ -255,6 +255,7 @@ fn disabled_events_and_off_profile_do_not_disable_player_visits_or_change_prefer
         aquarium: false,
         cell_swap: false,
         grass: false,
+        slot_machine: false,
     };
     ClockScenario::step(
         &mut state,

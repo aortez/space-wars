@@ -51,7 +51,7 @@ pub(crate) fn compatible_event(kind: engine_common::ClockEventKind) -> bool {
     match kind {
         Meltdown | Aquarium => false,
         Falling | ColorCycle | Explosion | Duck | Marquee | DigitSlide | Rain | Crow | CellSwap
-        | Grass => true,
+        | Grass | SlotMachine => true,
     }
 }
 impl Ceiling {

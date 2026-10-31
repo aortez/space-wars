@@ -126,6 +126,27 @@ enum MaintenanceCommand {
     },
     /// Change the fixed experimental renderer under the OTA lock.
     Renderer { renderer: String },
+    /// Opt-in installs of locally built images over SSH, with the OTA trial and recovery.
+    Development {
+        #[command(subcommand)]
+        operation: DevelopmentCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum DevelopmentCommand {
+    /// Allow development installs on this unit.
+    Enable,
+    /// Refuse development installs again; the installed image is unchanged.
+    Disable,
+    /// Report whether development installs are enabled and what is installed.
+    Status,
+    /// Write a staged image to the inactive slot and request its trial reboot.
+    Install {
+        /// Private root-owned directory with development.json and <sha256>.ext4.zst.
+        stage: std::path::PathBuf,
+        payload_sha256: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -409,6 +430,57 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                 ),
                 MaintenanceCommand::Fast { arguments } => run(Request::fast(arguments)?)?,
                 MaintenanceCommand::Renderer { renderer } => run(Request::renderer(renderer)?)?,
+                MaintenanceCommand::Development { operation } => {
+                    use engine_ota::development_linux as development;
+                    let status = match operation {
+                        DevelopmentCommand::Enable => development::enable()?,
+                        DevelopmentCommand::Disable => development::disable()?,
+                        DevelopmentCommand::Status => development::status()?,
+                        DevelopmentCommand::Install {
+                            stage,
+                            payload_sha256,
+                        } => {
+                            use std::io::Write;
+                            let digest = engine_ota::Sha256::try_from(payload_sha256)
+                                .map_err(|error| engine_os_manager::Error::Invalid(error.into()))?;
+                            // Output errors are ignored: a dropped SSH connection
+                            // must not stop a write the journal already owns.
+                            let mut shown = None;
+                            let transaction = development::install(
+                                &stage,
+                                digest,
+                                engine_os_manager::maintenance::require_clear_handoff,
+                                |progress| {
+                                    let percent = (progress.bytes * 100)
+                                        .checked_div(progress.total)
+                                        .unwrap_or(100);
+                                    let step = (progress.stage, percent / 10 * 10);
+                                    if shown != Some(step) {
+                                        shown = Some(step);
+                                        let stage = serde_json::to_value(progress.stage)
+                                            .ok()
+                                            .and_then(|value| value.as_str().map(str::to_owned))
+                                            .unwrap_or_default();
+                                        let _ = writeln!(
+                                            std::io::stderr(),
+                                            "{stage}: {}% of {} MiB",
+                                            step.1,
+                                            progress.total >> 20
+                                        );
+                                    }
+                                },
+                                engine_os_manager::maintenance::request_development_reboot,
+                            )?;
+                            let _ = writeln!(
+                                std::io::stdout(),
+                                "{}",
+                                serde_json::json!({"transaction": transaction, "reboot_requested": true})
+                            );
+                            return Ok(());
+                        }
+                    };
+                    println!("{}", serde_json::to_string(&status)?);
+                }
             }
         }
         Command::CaptureRtc => {

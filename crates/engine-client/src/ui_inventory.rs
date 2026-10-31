@@ -170,6 +170,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_digit_slide_enabled: bool,
     pub(crate) clock_cell_swap_enabled: bool,
     pub(crate) clock_grass_enabled: bool,
+    pub(crate) clock_slot_machine_enabled: bool,
     pub(crate) clock_rain: String,
     pub(crate) clock_marquee_preset: String,
     pub(crate) nes_cartridge_name: String,
@@ -821,6 +822,10 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     "launcher.settings.clock.digit-slide",
                     context.clock_digit_slide_enabled,
                 ),
+                (
+                    "launcher.settings.clock.slot-machine",
+                    context.clock_slot_machine_enabled,
+                ),
             ] {
                 push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
             }
@@ -864,6 +869,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.aquarium",
                 "launcher.settings.clock.cell-swap",
                 "launcher.settings.clock.grass",
+                "launcher.settings.clock.slot-machine",
                 "launcher.settings.back",
             ]
         }
@@ -1185,6 +1191,15 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
         ),
     );
     controls.push(
+        UiControl::new("pause.clock.slot-machine", "Slot Machine", true).with_value(
+            if context.clock_slot_machine_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    controls.push(
         UiControl::new("pause.clock.grass", "Grass", true).with_value(
             if context.clock_grass_enabled {
                 "On"
@@ -1246,6 +1261,8 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.fonts",
                 "pause.clock.aquarium",
                 "pause.clock.cell-swap",
+                "pause.clock.grass",
+                "pause.clock.slot-machine",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -1309,6 +1326,7 @@ mod tests {
             clock_digit_slide_enabled: true,
             clock_cell_swap_enabled: true,
             clock_grass_enabled: true,
+            clock_slot_machine_enabled: true,
             clock_rain: "Varied".into(),
             clock_marquee_preset: engine_common::ClockMarqueePreset::default().label().into(),
             nes_cartridge_name: "Demo Cartridge".into(),
@@ -1577,7 +1595,7 @@ mod tests {
                 "launcher.settings.spacewars.player-2",
             ),
             ("pizza", 14, "launcher.settings.pizza.live-ball-limit"),
-            ("clock", 39, "launcher.settings.clock.duck"),
+            ("clock", 41, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
                 "spacewars-surface-blocks",
@@ -1628,6 +1646,85 @@ mod tests {
                 control_ids(&inventory)[control_count - 2..],
                 ["launcher.settings.back", "launcher.settings.start"]
             );
+        }
+    }
+
+    /// Every index the Clock page's navigation can reach must name one control,
+    /// or a focused row reports nothing and the page cannot say where it is.
+    #[test]
+    fn pause_clock_focus_order_names_every_reachable_index() {
+        let mut reachable = vec![0];
+        let mut visited = 0;
+        while visited < reachable.len() {
+            let current = reachable[visited];
+            for action in [
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Left,
+                UiAction::Right,
+            ] {
+                let next = crate::ui_navigation::moved_clock_selection(current, action);
+                if !reachable.contains(&next) {
+                    reachable.push(next);
+                }
+            }
+            visited += 1;
+        }
+        let mut context = context("clock");
+        let mut named = Vec::new();
+        for focus in &reachable {
+            context.ingame_clock_focus_index = *focus;
+            named.push(
+                pause_clock_inventory(&context)
+                    .selected_control
+                    .unwrap_or_else(|| panic!("clock focus {focus} names no control")),
+            );
+        }
+        let mut unique = named.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(
+            unique.len(),
+            reachable.len(),
+            "two reachable indices share one control"
+        );
+    }
+
+    /// Confirm leaves the settings page only on its final index, so the focus
+    /// order must name one control for every index the launcher can reach and
+    /// end on Back. A missing entry slides Back onto a switch, which then both
+    /// reports and toggles the wrong control.
+    #[test]
+    fn launcher_settings_focus_order_names_every_index_and_ends_on_back() {
+        for scenario in [
+            "clock",
+            "nes",
+            "pizza",
+            "spacewars",
+            "spacewars-classic",
+            "spacewars-terrain-combat",
+            "spacewars-terrain-travel",
+            "surface-expedition",
+        ] {
+            let mut context = context(scenario);
+            let mut named = Vec::new();
+            for focus in 0..crate::launcher_settings_item_count_for(scenario) {
+                context.launcher_settings_focus_index = focus;
+                named.push(
+                    launcher_settings_inventory(&context)
+                        .selected_control
+                        .unwrap_or_else(|| panic!("{scenario} index {focus} names no control")),
+                );
+            }
+            assert_eq!(
+                named.last().map(String::as_str),
+                Some("launcher.settings.back"),
+                "{scenario} must end on Back"
+            );
+            let mut unique = named.clone();
+            unique.sort();
+            unique.dedup();
+            assert_eq!(unique.len(), named.len(), "{scenario} repeats a control");
         }
     }
 
@@ -1821,7 +1918,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 25);
+        assert_eq!(inventory.controls.len(), 26);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

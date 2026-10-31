@@ -1269,6 +1269,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.aquarium", "Off", &page);
         page = harness.change_clock_setting("pause.clock.cell-swap", "Off", &page);
         page = harness.change_clock_setting("pause.clock.grass", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.slot-machine", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -1335,7 +1336,14 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             page.selected_control.as_deref(),
             Some("pause.clock.cell-swap")
         );
-        let page = harness.press_guarded(UiAction::Down, &page);
+        let page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.grass"));
+        let page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.slot-machine")
+        );
+        let page = harness.press_guarded(UiAction::Right, &page);
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
@@ -1631,7 +1639,8 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
                 ClockEventKind::Grass
                 | ClockEventKind::ColorCycle
                 | ClockEventKind::Marquee
-                | ClockEventKind::CellSwap => {
+                | ClockEventKind::CellSwap
+                | ClockEventKind::SlotMachine => {
                     assert_eq!((active.body_count, active.collider_count), (0, 0));
                 }
                 ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::DigitSlide => {
@@ -1672,6 +1681,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.grass.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
+            "launcher.settings.clock.slot-machine.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);

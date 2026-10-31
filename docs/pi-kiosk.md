@@ -643,6 +643,11 @@ destination slot. If SSH is lost during installation, reconnect and check
 `spacewars-cli status`/service health before retrying; do not assume success
 from a dropped connection.
 
+For OS, service or device-manager changes, a unit that allows them takes a
+[development image install](ota-development-installs.md) instead:
+`./update.sh --development --target sw-picade-2.local` writes the full image to
+the inactive slot and boots it as a trial that returns automatically on failure.
+
 After boot, [App Settings → Network](network-setup.md) can scan and connect using
 the cabinet, controller or touch input. Its timed trial restores the previous
 configuration unless the new connection is explicitly kept. NetworkManager

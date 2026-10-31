@@ -100,6 +100,7 @@ impl ClockState {
             aquarium: enabled(ClockEventKind::Aquarium),
             cell_swap: enabled(ClockEventKind::CellSwap),
             grass: enabled(ClockEventKind::Grass),
+            slot_machine: enabled(ClockEventKind::SlotMachine),
         };
         self.schedule
             .configure(self.config.event_profile, effective);

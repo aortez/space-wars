@@ -195,12 +195,17 @@ impl<'a> Session<'a> {
 pub struct TrialPermit<'a, 'b> {
     boot: &'a BootController<'b>,
     recovery: &'a mut RecoveryStore,
-    trust: &'a mut TrustStore,
-    time: &'a mut dyn FnMut() -> Result<UsableTime>,
-    expires: jiff::Timestamp,
+    /// Signed candidates recheck trusted time and metadata expiry before each
+    /// reboot step. A development image has no metadata to expire.
+    signed: Option<SignedTime<'a>>,
     transaction: Sha256,
     consumed: bool,
     queued: bool,
+}
+struct SignedTime<'a> {
+    trust: &'a mut TrustStore,
+    time: &'a mut dyn FnMut() -> Result<UsableTime>,
+    expires: jiff::Timestamp,
 }
 impl<'a, 'b> TrialPermit<'a, 'b> {
     pub(crate) fn new(
@@ -214,16 +219,35 @@ impl<'a, 'b> TrialPermit<'a, 'b> {
         Self {
             boot,
             recovery,
-            trust,
-            time,
-            expires,
+            signed: Some(SignedTime {
+                trust,
+                time,
+                expires,
+            }),
+            transaction,
+            consumed: false,
+            queued: false,
+        }
+    }
+    pub(crate) fn development(
+        boot: &'a BootController<'b>,
+        recovery: &'a mut RecoveryStore,
+        transaction: Sha256,
+    ) -> Self {
+        Self {
+            boot,
+            recovery,
+            signed: None,
             transaction,
             consumed: false,
             queued: false,
         }
     }
     fn time(&mut self) -> Result<()> {
-        admit_reboot_time(self.trust, (self.time)(), self.expires)
+        match &mut self.signed {
+            Some(signed) => admit_reboot_time(signed.trust, (signed.time)(), signed.expires),
+            None => Ok(()),
+        }
     }
     pub fn begin(&mut self) -> Result<()> {
         if self.consumed {

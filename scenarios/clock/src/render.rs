@@ -26,6 +26,9 @@ mod marquee;
 mod meltdown;
 mod meridiem;
 mod rain;
+mod slot_machine;
+#[cfg(test)]
+mod slot_machine_contract;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
@@ -602,6 +605,10 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
     }
     if let Some(crate::events::ActiveEvent::DigitSlide(event)) = &state.active_event {
         digit_slide::render(frame, event, layout, state.palette());
+        return;
+    }
+    if let Some(crate::events::ActiveEvent::SlotMachine(event)) = &state.active_event {
+        slot_machine::render(frame, event, layout, state.palette());
         return;
     }
     if matches!(&state.active_event, Some(crate::events::ActiveEvent::Meltdown(event))

@@ -124,6 +124,7 @@ fn takeover_retires_only_the_automatic_slot_and_dismissal_restores_its_schedule(
     settings.events.color_cycle = false;
     settings.events.marquee = false;
     settings.events.digit_slide = false;
+    settings.events.slot_machine = false;
     state.configure(settings);
     state.finish_event();
     toggle(&mut state, 1);

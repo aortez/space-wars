@@ -1083,6 +1083,7 @@ fn arena_contract_schedule_starts_nothing_that_uses_the_floor_while_residents_do
             aquarium: false,
             cell_swap: false,
             grass: false,
+            slot_machine: false,
         },
         ..ClockConfig::default()
     });

@@ -143,7 +143,7 @@ export function checkRemoteOtaPrivilege(utils, remoteTarget) {
   ].join('; ');
   const state = utils.ssh(remoteTarget, probe);
   if (state === 'managed') {
-    throw new Error('This image uses the verified device updater. Legacy unsigned A/B installation is disabled; use supervised root bootstrap while installer integration is in progress.');
+    throw new Error('This image uses the verified device updater. Legacy unsigned A/B installation is disabled. Use --fast for app changes, or --development on a unit that allows development installs.');
   }
   return state === 'legacy';
 }
