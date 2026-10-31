@@ -1,6 +1,7 @@
 //! One duck visit owns its course/panels independently of the timed scheduler.
 //! Player input is a command source, not a different actor or physics world.
 use super::*;
+use arena::Owner;
 use events::duck::{DuckEvent, DuckView};
 
 /// A complete setpoint, guarded against another controller or an old visit.
@@ -107,7 +108,7 @@ impl ClockState {
     /// The live visit, read together with the arena it moves in.
     pub(crate) fn duck_scene(&self) -> Option<DuckView<'_>> {
         let duck = self.duck_visit.as_deref()?;
-        Some(DuckView::new(duck, self.arena.as_ref()))
+        Some(DuckView::new(duck, self.arena.world()))
     }
 
     pub(super) fn toggle_player_duck(&mut self, player: u8) {
@@ -120,9 +121,9 @@ impl ClockState {
                 .player_session()
                 .is_some_and(|(_, owner)| owner == player)
             {
-                duck.dismiss_player(self.arena.as_mut());
+                duck.dismiss_player(self.arena.world_mut());
             }
-            if duck.take_control(self.arena.as_mut(), session, player) {
+            if duck.take_control(self.arena.world_mut(), session, player) {
                 self.player_duck_sequence = session;
                 self.schedule.retire(ClockEventKind::Duck);
                 self.announce_player(player);
@@ -156,7 +157,7 @@ impl ClockState {
         }
         self.player_duck_sequence += 1;
         self.floor.acquire_visit();
-        assert!(self.arena.is_none(), "a new visit builds its own arena");
+        assert!(self.arena.idle(), "a new visit builds its own arena");
         let duck = if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event
             && let Some(floor) = rain.responsive_floor().cloned()
         {
@@ -215,13 +216,13 @@ impl ClockState {
     pub(super) fn finish_duck_visit(&mut self) {
         if let Some(duck) = self.duck_visit.take() {
             self.schedule.retire(ClockEventKind::Duck);
-            if let Some(event) = &mut self.active_event
+            if let Some(event) = &self.active_event
                 && event.shares_visit_arena()
             {
-                event.retain_arena(duck, self.arena.as_mut().expect("leased arena"));
+                duck.leave_arena(&mut self.arena);
             } else {
-                // Unless an event retains it, the arena leaves with its visit.
-                self.arena = None;
+                // Unless an event still holds it, the arena leaves with its visit.
+                self.arena.release(Owner::Visit);
             }
             self.floor.release_visit();
             self.sync_event_schedule();

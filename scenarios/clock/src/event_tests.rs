@@ -493,7 +493,7 @@ fn clock_grass_contract_floor_layer_is_inset_and_never_supports_a_runner() {
             for _ in 0..crate::events::duck::DUCK_TICKS + 200 {
                 ticks(&mut s, 1);
                 if let Some(duck) = s.duck_scene()
-                    && let Some(world) = s.arena.as_ref()
+                    && let Some(world) = s.arena.world()
                 {
                     let mut ground = world
                         .surface_contacts(crate::events::duck::DUCK_COLLIDER)

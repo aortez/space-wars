@@ -24,7 +24,7 @@ impl DuckEvent {
     /// the entrance, instead of walking a fresh one in.
     pub fn adopt_passive_actor(
         &mut self,
-        arena: &mut Option<PhysicsWorld>,
+        arena: &mut ClockArena,
         (mut position, velocity): (Vec2, Vec2),
     ) {
         // Preserve an existing floating actor in place. When it is already

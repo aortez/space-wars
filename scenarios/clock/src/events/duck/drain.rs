@@ -3,14 +3,14 @@ use super::*;
 use crate::floor::DrainGeometry;
 
 impl DuckEvent {
-    /// `world` is the event's own, which becomes the run's `arena` here
-    /// rather than being replaced by a new one.
+    /// `world` is the event's own, which the visit builds the run's `arena`
+    /// from here rather than replacing it with a new one.
     pub fn new_drain_player(
         drain: DrainGeometry,
         seed: u64,
         session: u64,
         seat: u8,
-        arena: &mut Option<PhysicsWorld>,
+        arena: &mut ClockArena,
         mut world: PhysicsWorld,
     ) -> Self {
         let layout = drain.layout();
@@ -38,11 +38,7 @@ impl DuckEvent {
         // its body's gravity scales; the duck keeps its calibrated acceleration
         // and density-based buoyancy if a later event brings water here.
         assert!(world.set_gravity(Vec2::new(0.0, -duck.movement.gravity)));
-        assert!(
-            arena.is_none(),
-            "a standalone event's world is the only one"
-        );
-        *arena = Some(world);
+        arena.build(Owner::Visit, world);
         duck.terrain.drain_floor = Some(drain);
         duck.preserve_arena_opacity(1.0);
         // Both old walls stay physical for the bars. The far backstage door

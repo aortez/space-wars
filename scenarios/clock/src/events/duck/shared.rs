@@ -1,95 +1,59 @@
 //! A visit's physical arena can outlive its character while a timed event uses
-//! it. The world itself stays in the run's `arena` slot. When the character
-//! leaves, the event's lease keeps only the terrain it stood on, and a player
-//! who rejoins gets a new character on that terrain. There is one world and
-//! one step in either case.
+//! it. When the character leaves, the run's `ClockArena` keeps the terrain it
+//! stood on, still under the visit's claim, and a player who rejoins gets a new
+//! character on that terrain. There is one world and one step in either case.
 use super::*;
+use engine_common::ClockEventKind;
 
-/// A physical event leases a visit's arena, keeping its terrain if the
-/// character leaves. It never creates a second world or owns the visit's
-/// controller/lifetime.
-pub(crate) struct VisitArena {
-    vacant: Option<ArenaTerrain>,
+/// The leased arena's terrain, under its character or left vacant.
+pub(crate) fn leased_terrain<'a>(
+    player: Option<&'a mut DuckEvent>,
+    vacant: &'a mut Option<ArenaTerrain>,
+) -> &'a mut ArenaTerrain {
+    if let Some(player) = player {
+        assert!(vacant.is_none());
+        &mut player.terrain
+    } else {
+        vacant.as_mut().expect("one shared arena owner")
+    }
 }
 
-impl VisitArena {
-    pub fn claim(player: &mut DuckEvent, arena: &mut Option<PhysicsWorld>) -> Self {
-        player.claim_arena(arena);
-        Self { vacant: None }
+/// Step a leased arena with its character, or without one once it has left.
+/// Returns the character, if there is one.
+pub(crate) fn step_leased<'a>(
+    player: Option<&'a mut DuckEvent>,
+    arena: &mut ClockArena,
+    water: Option<&WaterWorld>,
+    panels_advanced: bool,
+    soil: Option<&mut crate::grass::SoilHabitat>,
+) -> Option<&'a mut DuckEvent> {
+    if let Some(duck) = player {
+        assert!(arena.vacant.is_none());
+        duck.step_with_soil(arena, water, panels_advanced, soil);
+        return Some(duck);
     }
+    let (terrain, world) = arena.vacant_with_world().expect("one shared arena owner");
+    terrain.advance_panels(Some(world), panels_advanced, None);
+    terrain.synchronize_soil(Some(world), soil);
+    world.clear_forces();
+    world.step(DT);
+    None
+}
 
-    /// The arena's terrain, under its character or left vacant.
-    pub fn terrain_mut<'a>(
-        &'a mut self,
-        player: Option<&'a mut DuckEvent>,
-    ) -> &'a mut ArenaTerrain {
-        if let Some(player) = player {
-            assert!(self.vacant.is_none());
-            &mut player.terrain
-        } else {
-            self.vacant.as_mut().expect("one shared arena owner")
-        }
-    }
-
-    pub fn vacant(&self) -> Option<&ArenaTerrain> {
-        self.vacant.as_ref()
-    }
-
-    pub fn retain(&mut self, duck: Box<DuckEvent>, world: &mut PhysicsWorld) {
-        assert!(self.vacant.is_none());
-        self.vacant = Some(duck.leave_arena(world));
-    }
-
-    /// A new player character on the vacant terrain. The arena fades in from
-    /// `opacity`, the opacity the event shows it at.
-    pub fn rejoin(
-        &mut self,
-        arena: &mut Option<PhysicsWorld>,
-        opacity: f32,
-        session: u64,
-        seat: u8,
-    ) -> Option<Box<DuckEvent>> {
-        let terrain = self.vacant.take()?;
-        let world = arena.as_mut().expect("leased arena");
-        Some(Box::new(DuckEvent::rejoin_arena(
-            terrain, world, opacity, session, seat,
-        )))
-    }
-
-    /// Step the arena with its character, or without one once it has left.
-    /// Returns the character, if there is one.
-    pub fn step_with_soil<'a>(
-        &mut self,
-        player: Option<&'a mut DuckEvent>,
-        arena: &mut Option<PhysicsWorld>,
-        water: Option<&WaterWorld>,
-        panels_advanced: bool,
-        soil: Option<&mut crate::grass::SoilHabitat>,
-    ) -> Option<&'a mut DuckEvent> {
-        if let Some(duck) = player {
-            assert!(self.vacant.is_none());
-            duck.step_with_soil(arena, water, panels_advanced, soil);
-            return Some(duck);
-        }
-        let terrain = self.vacant.as_mut().expect("one shared arena owner");
-        let world = arena.as_mut().expect("leased arena");
-        terrain.advance_panels(Some(world), panels_advanced, None);
-        terrain.synchronize_soil(Some(world), soil);
-        world.clear_forces();
-        world.step(DT);
-        None
-    }
-
-    /// End the lease. A character still in the arena keeps the world until its
-    /// own reset has finished with it; a vacant arena's world goes now.
-    pub fn release(&mut self, player: Option<&mut DuckEvent>, arena: &mut Option<PhysicsWorld>) {
-        if let Some(player) = player {
-            assert!(self.vacant.is_none());
-            player.release_arena(arena);
-        } else {
-            assert!(self.vacant.is_some(), "one shared arena owner");
-            *arena = None;
-        }
+/// `kind` ends its lease. A character still in the arena keeps the world until
+/// its own reset has finished with it; a vacant arena's terrain goes now.
+pub(crate) fn end_lease(
+    player: Option<&mut DuckEvent>,
+    arena: &mut ClockArena,
+    kind: ClockEventKind,
+) {
+    arena.release(Owner::Event(kind));
+    if let Some(player) = player {
+        assert!(arena.vacant.is_none());
+        player.release_arena(arena);
+    } else {
+        assert!(arena.vacant.take().is_some(), "one shared arena owner");
+        arena.release(Owner::Visit);
     }
 }
 
@@ -98,39 +62,45 @@ impl DuckEvent {
         self.buoyant.as_ref().map(BuoyantBody::body)
     }
 
-    pub fn claim_arena(&mut self, arena: &mut Option<PhysicsWorld>) {
+    /// `kind` leases the visit's arena, which the visit builds now if it has
+    /// not stepped yet.
+    pub fn claim_arena(&mut self, arena: &mut ClockArena, kind: ClockEventKind) {
         assert!(!self.arena_claimed);
         self.ensure_world(arena);
+        arena.claim(Owner::Event(kind));
         self.arena_claimed = true;
     }
 
-    /// Drops the world as well when the visit has already finished with it.
-    pub fn release_arena(&mut self, arena: &mut Option<PhysicsWorld>) {
+    /// Lets the arena go as well when the visit has already finished with it.
+    pub fn release_arena(&mut self, arena: &mut ClockArena) {
         assert!(self.arena_claimed);
         self.arena_claimed = false;
         if self.phase == EventPhase::Resetting && self.door_panels().iter().all(Option::is_none) {
-            *arena = None;
+            arena.release(Owner::Visit);
         }
     }
 
     /// The character leaves an arena an event still holds. Its body and flaps
-    /// go with it, and the terrain stays behind for the event.
-    pub fn leave_arena(mut self, world: &mut PhysicsWorld) -> ArenaTerrain {
-        assert!(self.arena_claimed);
+    /// go with it, and the terrain stays behind with the visit's claim.
+    pub fn leave_arena(mut self, arena: &mut ClockArena) {
+        assert!(self.arena_claimed && arena.vacant.is_none());
+        let world = arena.world_mut().expect("leased arena");
         world.remove_entity(DUCK_ENTITY);
         self.remove_flaps(world);
-        self.terrain
+        arena.vacant = Some(self.terrain);
     }
 
-    /// A player's new character on terrain a departed one left, entering an
-    /// arena an event still holds.
-    fn rejoin_arena(
-        terrain: ArenaTerrain,
-        world: &mut PhysicsWorld,
+    /// A player's new character on the vacant terrain, if there is one. It
+    /// takes the visit's claim back, and the arena fades in from `opacity`,
+    /// the opacity the event shows it at.
+    pub fn rejoin_arena(
+        arena: &mut ClockArena,
         opacity: f32,
         session_id: u64,
         seat: u8,
-    ) -> Self {
+    ) -> Option<Self> {
+        let terrain = arena.vacant.take()?;
+        let world = arena.world_mut().expect("leased arena");
         let mut duck = Self::with_player(Self::on_terrain(terrain), session_id, seat);
         duck.arena_claimed = true;
         duck.preserve_arena_opacity(opacity);
@@ -139,7 +109,7 @@ impl DuckEvent {
             // needs the same entrance boundary as an ordinary player spawn.
             duck.insert_entrance_wall(world);
         }
-        duck
+        Some(duck)
     }
 
     pub fn player_finished(&self) -> bool {
@@ -214,7 +184,7 @@ mod soil_tests {
             // Settle onto actual dirt through the canonical solver.
             let (index, min, max) = duck.terrain.soil_supports[0];
             let rest = Vec2::new((min.x + max.x) * 0.5, max.y + duck.radius);
-            let world = duck.world.as_mut().unwrap();
+            let world = duck.arena.world_mut().unwrap();
             world.set_pose(DUCK_BODY, rest, 0.0, true);
             for _ in 0..30 {
                 world.step(DT);

@@ -22,11 +22,11 @@ fn player(aspect: f32, responsive: bool) -> ClockState {
 }
 
 fn world(state: &ClockState) -> &engine_rapier::world::PhysicsWorld {
-    state.arena.as_ref().expect("shared world expected")
+    state.arena.world().expect("shared world expected")
 }
 
 fn world_mut(state: &mut ClockState) -> &mut engine_rapier::world::PhysicsWorld {
-    state.arena.as_mut().expect("shared world expected")
+    state.arena.world_mut().expect("shared world expected")
 }
 
 fn batch(state: &ClockState) -> Vec<(BodyId, Vec2)> {

@@ -293,10 +293,10 @@ mod handoff_tests {
                 .collect::<Vec<_>>();
             let collider_count = falling.world.collider_count();
             let (world, bodies) = falling.into_parts();
-            let mut arena = None;
+            let mut arena = crate::arena::ClockArena::default();
             DuckEvent::new_drain_player(drain, 42, 1, 1, &mut arena, world);
-            bodies.match_gravity(arena.as_mut().unwrap());
-            let world = arena.as_ref().unwrap();
+            bodies.match_gravity(arena.world_mut().unwrap());
+            let world = arena.world().unwrap();
             assert_eq!(world.motions().collect::<Vec<_>>(), motions);
             assert_eq!(world.collider_count(), collider_count);
             assert_eq!(

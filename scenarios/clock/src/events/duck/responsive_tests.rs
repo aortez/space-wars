@@ -41,8 +41,8 @@ fn moving_panel_grounding_and_single_edge_jump_work_in_both_directions() {
         duck.step();
         assert_eq!(duck.jumps, 1);
         assert!(
-            duck.world
-                .as_ref()
+            duck.arena
+                .world()
                 .unwrap()
                 .motion(DUCK_BODY)
                 .unwrap()

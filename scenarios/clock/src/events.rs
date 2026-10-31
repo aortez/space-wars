@@ -13,7 +13,7 @@ mod tests;
 use engine_common::{ClockEventKind, ClockEventProfile, ClockEventTrigger, ClockEvents};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-use crate::{DisplaySnapshot, SegmentState, layout::Layout};
+use crate::{DisplaySnapshot, SegmentState, arena::ClockArena, layout::Layout};
 use color_cycle::ColorCycle;
 pub use color_cycle::{COLOR_CYCLE_TICKS, DigitPalette};
 use digit_slide::{DIGIT_SLIDE_TICKS, DigitSlideEvent};
@@ -330,17 +330,8 @@ impl ActiveEvent {
         }
     }
 
-    /// The terrain of a leased arena whose character has left.
-    pub fn vacant_arena(&self) -> Option<&duck::ArenaTerrain> {
-        match self {
-            Self::Aquarium(event) => event.vacant_arena(),
-            Self::Falling(event) => event.vacant_arena(),
-            Self::Explosion(event) => event.vacant_arena(),
-            Self::Meltdown(event) => event.vacant_arena(),
-            _ => None,
-        }
-    }
-
+    /// How opaque this event shows the arena once its character has left. A
+    /// player who rejoins sees the arena fade in from here.
     pub fn arena_opacity(&self) -> f32 {
         match self {
             Self::Falling(event) => event.arena_opacity(),
@@ -385,50 +376,32 @@ impl ActiveEvent {
         }
     }
 
+    /// A player's character in this event's arena: a new one on the terrain a
+    /// departed character left, or the first, which the event's own world
+    /// becomes the arena for.
     pub fn join_arena(
         &mut self,
-        arena: &mut Option<engine_rapier::world::PhysicsWorld>,
+        arena: &mut ClockArena,
         layout: Layout,
         seed: u64,
         session: u64,
         seat: u8,
     ) -> Option<Box<duck::DuckEvent>> {
+        if let Some(duck) =
+            duck::DuckEvent::rejoin_arena(arena, self.arena_opacity(), session, seat)
+        {
+            return Some(Box::new(duck));
+        }
         match self {
-            Self::Aquarium(event) => event
-                .rejoin(arena, session, seat)
-                .or_else(|| event.join_player(arena, seed, session, seat)),
-            Self::Falling(event) => event
-                .rejoin(arena, session, seat)
-                .or_else(|| event.join_player(arena, seed, session, seat)),
-            Self::Explosion(event) => event
-                .rejoin(arena, session, seat)
-                .or_else(|| event.join_player(arena, seed, session, seat)),
-            Self::Meltdown(event) => event
-                .rejoin(arena, session, seat)
-                .or_else(|| event.join_player(arena, layout, seed, session, seat)),
+            Self::Aquarium(event) => event.join_player(arena, seed, session, seat),
+            Self::Falling(event) => event.join_player(arena, seed, session, seat),
+            Self::Explosion(event) => event.join_player(arena, seed, session, seat),
+            Self::Meltdown(event) => event.join_player(arena, layout, seed, session, seat),
             _ => None,
         }
     }
 
-    pub fn retain_arena(
-        &mut self,
-        duck: Box<duck::DuckEvent>,
-        world: &mut engine_rapier::world::PhysicsWorld,
-    ) {
-        match self {
-            Self::Aquarium(event) => event.retain_arena(duck, world),
-            Self::Falling(event) => event.retain_arena(duck, world),
-            Self::Explosion(event) => event.retain_arena(duck, world),
-            Self::Meltdown(event) => event.retain_arena(duck, world),
-            _ => unreachable!("only leased mechanics arenas outlive the visit"),
-        }
-    }
-
-    pub fn release_arena(
-        &mut self,
-        player: Option<&mut duck::DuckEvent>,
-        arena: &mut Option<engine_rapier::world::PhysicsWorld>,
-    ) {
+    pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>, arena: &mut ClockArena) {
         match self {
             Self::Aquarium(event) => event.release(player, arena),
             Self::Falling(event) => event.release(player, arena),
@@ -440,11 +413,7 @@ impl ActiveEvent {
 
     /// Returns true when the event has finished. A shared-arena event steps
     /// `arena` here only once its character has left.
-    pub fn step(
-        &mut self,
-        context: EventContext<'_>,
-        arena: &mut Option<engine_rapier::world::PhysicsWorld>,
-    ) -> bool {
+    pub fn step(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
         match self {
             Self::Grass(event) => event.step(),
             Self::Aquarium(event) => event.step(context, None, arena),

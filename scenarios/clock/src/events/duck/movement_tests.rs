@@ -75,8 +75,8 @@ fn run_is_faster_but_does_not_raise_jump_height_on_any_target_layout() {
                     duck.step();
                 }
                 let speed = duck
-                    .world
-                    .as_ref()
+                    .arena
+                    .world()
                     .unwrap()
                     .motion(DUCK_BODY)
                     .unwrap()
@@ -347,8 +347,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
     for run in [false, true] {
         let (mut duck, mut water) = floating();
         let y = duck
-            .world
-            .as_ref()
+            .arena
+            .world()
             .unwrap()
             .motion(DUCK_BODY)
             .unwrap()
@@ -357,8 +357,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
         // A left-high surface makes a right-going current through the real
         // water solver. The player paddles left against it; no synthetic flow.
         let start = Vec2::new(-duck.radius * 3.0, y);
-        duck.world
-            .as_mut()
+        duck.arena
+            .world_mut()
             .unwrap()
             .set_pose(DUCK_BODY, start, 0.0, true);
         let left = water.pools()[0]
@@ -381,8 +381,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
         assert!(!duck.grounded());
         assert!(duck.feet_moving(), "paddling against a current animates");
         speeds.push(
-            duck.world
-                .as_ref()
+            duck.arena
+                .world()
                 .unwrap()
                 .motion(DUCK_BODY)
                 .unwrap()
@@ -392,8 +392,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
         // Releasing the stick stops propulsion, not buoyancy/current coupling.
         duck.set_player_input(0, false, run, false);
         let before = duck
-            .world
-            .as_ref()
+            .arena
+            .world()
             .unwrap()
             .motion(DUCK_BODY)
             .unwrap()
@@ -402,8 +402,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
         duck.step_with_water(Some(&water));
         assert!(!duck.feet_moving(), "releasing the stick stops paddling");
         let after = duck
-            .world
-            .as_ref()
+            .arena
+            .world()
             .unwrap()
             .motion(DUCK_BODY)
             .unwrap()

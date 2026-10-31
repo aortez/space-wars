@@ -110,7 +110,7 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
             }
             let mut contacted = std::collections::HashSet::new();
             for step in 0..35 {
-                let world = joined.arena.as_ref().unwrap();
+                let world = joined.arena.world().unwrap();
                 for id in world.collider_ids() {
                     if world.surface_contacts(id).next().is_some() {
                         contacted.insert(id.entity);
@@ -122,7 +122,7 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
                     (joined.event_kind(), joined.phase_tick()),
                     (baseline.event_kind(), baseline.phase_tick())
                 );
-                let world = joined.arena.as_ref().unwrap();
+                let world = joined.arena.world().unwrap();
                 for id in world.collider_ids() {
                     if world.surface_contacts(id).next().is_some() {
                         contacted.insert(id.entity);
@@ -219,7 +219,7 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
                     duck.layout.floor_y + duck.radius * 1.01,
                 ));
                 let direction = duck.direction;
-                let world = state.arena.as_mut().unwrap();
+                let world = state.arena.world_mut().unwrap();
                 world.set_pose(body, position, 0.0, true);
                 world.set_velocity(body, Vec2::ZERO, 0.0, true);
                 let action = input(&state, (direction * 1000.0) as i16, false);

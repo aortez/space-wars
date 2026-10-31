@@ -1,4 +1,8 @@
-//! Who owns which physical identity in the Clock.
+//! The run's shared rigid arena, and who owns which physical identity in it.
+//!
+//! A visit and the events that lease its arena all simulate in one world,
+//! [`ClockArena`]. The world exists exactly while an [`Owner`] holds it: the
+//! first owner to need it builds it, and the last to let go takes it away.
 //!
 //! Every body, collider and joint in a Clock world is addressed by a
 //! scenario-chosen `PhysicsId`. Those numbers used to be reserved in comments
@@ -15,13 +19,87 @@
 //! contract, and its ranges must be disjoint apart from the two aliases it
 //! declares.
 
+use engine_common::ClockEventKind;
 use engine_rapier::world::PhysicsWorld;
 
-use crate::events::ActiveEvent;
+use crate::events::{ActiveEvent, duck::ArenaTerrain};
+
+/// Who holds the shared arena.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Owner {
+    /// A visit's terrain and character. While an event holds the arena, the
+    /// claim stays with the terrain after the character leaves, and a player
+    /// who rejoins takes it back.
+    Visit,
+    /// An event leasing the visit's arena.
+    Event(ClockEventKind),
+}
+
+/// The world a visit and its leasing events simulate in, the owners that keep
+/// it, and the terrain a visit's character left while an event held it.
+#[derive(Default)]
+pub(crate) struct ClockArena {
+    world: Option<PhysicsWorld>,
+    owners: Vec<Owner>,
+    /// The terrain of a visit whose character left while an event held the
+    /// arena. The visit's claim stays with it.
+    pub vacant: Option<ArenaTerrain>,
+}
+
+impl ClockArena {
+    pub fn world(&self) -> Option<&PhysicsWorld> {
+        self.world.as_ref()
+    }
+
+    pub fn world_mut(&mut self) -> Option<&mut PhysicsWorld> {
+        self.world.as_mut()
+    }
+
+    /// Nobody holds the arena, so there is no world.
+    pub fn idle(&self) -> bool {
+        self.owners.is_empty()
+    }
+
+    pub fn holds(&self, owner: Owner) -> bool {
+        self.owners.contains(&owner)
+    }
+
+    /// `owner` is the first to need a world and brings `world` with it.
+    pub fn build(&mut self, owner: Owner, world: PhysicsWorld) -> &mut PhysicsWorld {
+        assert!(self.idle(), "the arena has one world");
+        self.owners.push(owner);
+        self.world.insert(world)
+    }
+
+    /// `owner` joins the world another owner built.
+    pub fn claim(&mut self, owner: Owner) {
+        assert!(self.world.is_some(), "a claim joins an existing world");
+        assert!(!self.holds(owner), "{owner:?} already holds the arena");
+        self.owners.push(owner);
+    }
+
+    /// `owner` lets go, if it held the arena. The last owner to leave takes the
+    /// world with it.
+    pub fn release(&mut self, owner: Owner) {
+        self.owners.retain(|held| *held != owner);
+        if self.owners.is_empty() {
+            assert!(
+                self.vacant.is_none(),
+                "vacant terrain keeps its visit's claim"
+            );
+            self.world = None;
+        }
+    }
+
+    /// The vacant terrain and the world it stands in, borrowed together.
+    pub fn vacant_with_world(&mut self) -> Option<(&mut ArenaTerrain, &mut PhysicsWorld)> {
+        Some((self.vacant.as_mut()?, self.world.as_mut()?))
+    }
+}
 
 /// The one rigid world this run is simulating, whoever is using it.
 ///
-/// That is the run's `arena` whenever a visit holds it or an event leases it,
+/// That is the run's arena whenever a visit holds it or an event leases it,
 /// and otherwise a standalone event's own world: Falling's or Explosion's
 /// before a player joins, Meltdown's water lab, or Rain's floats. `visit` says
 /// whether a visit exists, because Rain's floats stop being canonical as soon
@@ -31,22 +109,22 @@ use crate::events::ActiveEvent;
 pub(crate) fn canonical_world<'a>(
     event: &'a Option<ActiveEvent>,
     visit: bool,
-    arena: &'a Option<PhysicsWorld>,
+    arena: &'a ClockArena,
 ) -> Option<&'a PhysicsWorld> {
     match event {
         Some(event) if event.simulates_apart(visit) => event.own_world(),
-        _ => arena.as_ref(),
+        _ => arena.world(),
     }
 }
 
 pub(crate) fn canonical_world_mut<'a>(
     event: &'a mut Option<ActiveEvent>,
     visit: bool,
-    arena: &'a mut Option<PhysicsWorld>,
+    arena: &'a mut ClockArena,
 ) -> Option<&'a mut PhysicsWorld> {
     match event {
         Some(event) if event.simulates_apart(visit) => event.own_world_mut(),
-        _ => arena.as_mut(),
+        _ => arena.world_mut(),
     }
 }
 

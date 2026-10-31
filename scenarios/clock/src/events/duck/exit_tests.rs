@@ -74,14 +74,14 @@ fn exit_turns_and_near_wall_tags_replay_on_all_target_layouts() {
                             ClockScenario::step(&mut state, &[], STEP);
                             if at_opportunity(
                                 state.duck_visit.as_ref().unwrap(),
-                                state.arena.as_ref().unwrap(),
+                                state.arena.world().unwrap(),
                                 near_wall,
                             ) {
                                 break;
                             }
                         }
                         let duck = state.duck_visit.as_mut().unwrap();
-                        let world = state.arena.as_ref().unwrap();
+                        let world = state.arena.world().unwrap();
                         assert!(
                             at_opportunity(duck, world, near_wall),
                             "{name}: {:?}",
@@ -206,17 +206,17 @@ fn near_wall_allowance_has_a_body_scaled_boundary_in_both_controller_paths() {
                 duck.skip_flap_detour_for_fixture();
                 for _ in 0..EXIT_DELAY_TICKS {
                     duck.step();
-                    if at_opportunity(&duck, duck.world.as_ref().unwrap(), true) {
+                    if at_opportunity(&duck, duck.arena.world().unwrap(), true) {
                         break;
                     }
                 }
-                assert!(at_opportunity(&duck, duck.world.as_ref().unwrap(), true));
+                assert!(at_opportunity(&duck, duck.arena.world().unwrap(), true));
                 // Put this boundary fixture just inside/outside the threshold
                 // on the same flat physical bank, after real calibration.
                 let position = duck
                     .physics_position(Vec2::new(duck.radius * radii, duck.position().unwrap().y));
                 let velocity = Vec2::new(-direction * duck.radius * 2.0, 0.0);
-                let world = duck.world.as_mut().unwrap();
+                let world = duck.arena.world_mut().unwrap();
                 world.set_pose(DUCK_BODY, position, 0.0, true);
                 world.set_velocity(DUCK_BODY, velocity, 0.0, true);
                 duck.tick = OPENING_TICKS + EXIT_DELAY_TICKS - 1;

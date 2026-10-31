@@ -1,5 +1,5 @@
 use super::*;
-use engine_common::ClockDuckFlapHold;
+use engine_common::{ClockDuckFlapHold, ClockEventKind};
 use engine_rapier::world::RayCastOptions;
 
 fn flap_body_count(world: Option<&PhysicsWorld>) -> usize {
@@ -10,7 +10,7 @@ fn flap_body_count(world: Option<&PhysicsWorld>) -> usize {
 
 impl TestDuck {
     pub(crate) fn flap_body_count(&self) -> usize {
-        flap_body_count(self.world.as_ref())
+        flap_body_count(self.arena.world())
     }
 }
 
@@ -18,7 +18,7 @@ impl crate::ClockState {
     /// The live visit's flaps; a vacant arena's were removed on retirement.
     pub(crate) fn flap_body_count(&self) -> usize {
         if self.duck_visit.is_some() {
-            flap_body_count(self.arena.as_ref())
+            flap_body_count(self.arena.world())
         } else {
             0
         }
@@ -36,7 +36,7 @@ fn open_player(aspect: f32, direction: f32) -> TestDuck {
 }
 
 fn place(duck: &mut TestDuck, position: Vec2) {
-    let world = duck.world.as_mut().unwrap();
+    let world = duck.arena.world_mut().unwrap();
     assert!(world.set_pose(DUCK_BODY, position, 0.0, true));
     assert!(world.set_velocity(DUCK_BODY, Vec2::ZERO, 0.0, true));
 }
@@ -55,8 +55,8 @@ fn land_on_flap(duck: &mut TestDuck) {
     }
     assert!(duck.grounded());
     assert!(
-        duck.world
-            .as_ref()
+        duck.arena
+            .world()
             .unwrap()
             .surface_contacts(DUCK_COLLIDER)
             .any(|c| c.collider.entity == flaps::body(0).entity && c.normal.y > 0.7)
@@ -70,13 +70,13 @@ fn rigid_flaps_hold_real_standing_support_then_release_after_a_jump() {
             let mut duck = open_player(aspect, direction);
             land_on_flap(&mut duck);
             let body = flaps::body(0);
-            let start = duck.world.as_ref().unwrap().motion(body).unwrap();
+            let start = duck.arena.world().unwrap().motion(body).unwrap();
             for _ in 0..100 {
                 duck.step();
                 assert!(duck.grounded());
                 assert_eq!(duck.door_openness().0, 1.0);
                 assert_eq!(
-                    duck.world.as_ref().unwrap().motion(body).unwrap().position,
+                    duck.arena.world().unwrap().motion(body).unwrap().position,
                     start.position
                 );
             }
@@ -91,8 +91,8 @@ fn rigid_flaps_hold_real_standing_support_then_release_after_a_jump() {
             duck.step();
             assert_eq!(duck.jumps, 1);
             let v = duck
-                .world
-                .as_ref()
+                .arena
+                .world()
                 .unwrap()
                 .motion(DUCK_BODY)
                 .unwrap()
@@ -112,7 +112,7 @@ fn rigid_flaps_hold_real_standing_support_then_release_after_a_jump() {
                 previous = open;
             }
             assert_eq!(duck.door_openness().0, 0.0);
-            assert!(!duck.world.as_ref().unwrap().contains_body(body));
+            assert!(!duck.arena.world().unwrap().contains_body(body));
             assert!(duck.door_panels()[0].is_none());
             assert_eq!(duck.door_openness().1, 1.0, "an empty exit remains open");
         }
@@ -129,8 +129,8 @@ fn attachment_is_bounded_by_live_geometry_reach_and_visit_identity() {
     let radius = duck.radius;
     place(&mut duck, hand + Vec2::new(0.0, -radius * 2.0));
     // A stationary attachment fixture stands in for the later ledge controller.
-    duck.world
-        .as_mut()
+    duck.arena
+        .world_mut()
         .unwrap()
         .set_body_kind(DUCK_BODY, BodyKind::KinematicPosition, true);
     let handle = duck.flap_handle(0).unwrap();
@@ -189,8 +189,8 @@ fn a_duck_in_the_closing_sweep_holds_the_last_safe_pose_without_snapping() {
             + Vec2::new(-panel.inward * (half.x + duck.radius * 1.02), 0.0)
                 .rotate_radians(panel.angle);
         place(&mut duck, position);
-        duck.world
-            .as_mut()
+        duck.arena
+            .world_mut()
             .unwrap()
             .set_body_kind(DUCK_BODY, BodyKind::KinematicPosition, true);
         let open = duck.door_openness().0;
@@ -202,8 +202,8 @@ fn a_duck_in_the_closing_sweep_holds_the_last_safe_pose_without_snapping() {
                 Some(ClockDuckFlapHold::Obstructed)
             );
             assert_eq!(
-                duck.world
-                    .as_ref()
+                duck.arena
+                    .world()
                     .unwrap()
                     .motion(flaps::body(0))
                     .unwrap()
@@ -231,7 +231,7 @@ fn flap_render_geometry_matches_rays_bounds_and_motion_in_every_layout() {
                 duck.step();
                 for (side, panel) in duck.door_panels().into_iter().enumerate() {
                     let Some(panel) = panel else { continue };
-                    let world = duck.world.as_ref().unwrap();
+                    let world = duck.arena.world().unwrap();
                     let motion = world.motion(flaps::body(side)).unwrap();
                     assert!((motion.position - panel.center()).length() < 0.0001);
                     assert!((motion.angle - panel.angle).abs() < 0.0001);
@@ -282,12 +282,11 @@ fn retiring_flaps_removes_only_the_visits_bodies_and_claims() {
     let mut duck = open_player(5.0 / 3.0, 1.0);
     land_on_flap(&mut duck);
     let TestDuck {
-        duck,
-        world: mut arena,
+        mut duck,
+        mut arena,
     } = duck;
-    let mut duck = Box::new(duck);
-    let mut lease = VisitArena::claim(&mut duck, &mut arena);
-    let world = arena.as_mut().unwrap();
+    duck.claim_arena(&mut arena, ClockEventKind::Falling);
+    let world = arena.world_mut().unwrap();
     let foreign = PhysicsId::new(3001);
     let id = BodyId::new(foreign, BodyRole::PRIMARY);
     assert!(world.insert_body(
@@ -303,8 +302,8 @@ fn retiring_flaps_removes_only_the_visits_bodies_and_claims() {
     ));
     let count = world.body_count();
     let foreign_motion = world.motion(id);
-    lease.retain(duck, world);
-    let world = arena.as_ref().unwrap();
+    duck.leave_arena(&mut arena);
+    let world = arena.world().unwrap();
     assert_eq!(
         world.body_count(),
         count - 2,
@@ -313,19 +312,15 @@ fn retiring_flaps_removes_only_the_visits_bodies_and_claims() {
     assert_eq!(world.motion(id), foreign_motion);
     assert_eq!(flap_body_count(Some(world)), 0);
     let gravity = world.gravity().y;
-    assert!(
-        lease
-            .step_with_soil(None, &mut arena, None, false, None)
-            .is_none()
-    );
-    let after = arena.as_ref().unwrap().motion(id).unwrap();
+    assert!(step_leased(None, &mut arena, None, false, None).is_none());
+    let after = arena.world().unwrap().motion(id).unwrap();
     assert!(
         (after.linear_velocity.y - gravity * DT).abs() < 0.001,
         "one shared step"
     );
-    lease.release(None, &mut arena);
+    end_lease(None, &mut arena, ClockEventKind::Falling);
     assert!(
-        arena.is_none(),
+        arena.idle() && arena.world().is_none(),
         "the finished visit's arena goes with the lease"
     );
 }
@@ -334,7 +329,7 @@ fn retiring_flaps_removes_only_the_visits_bodies_and_claims() {
 fn a_jump_uses_the_support_points_incoming_motion() {
     let mut duck = open_player(5.0 / 3.0, 1.0);
     land_on_flap(&mut duck);
-    let world = duck.world.as_mut().unwrap();
+    let world = duck.arena.world_mut().unwrap();
     let motion = world.motion(flaps::body(0)).unwrap();
     world.set_next_kinematic_pose(
         flaps::body(0),
@@ -344,8 +339,8 @@ fn a_jump_uses_the_support_points_incoming_motion() {
     duck.set_player_input(0, true, false, false);
     duck.run(None);
     let v = duck
-        .world
-        .as_ref()
+        .arena
+        .world()
         .unwrap()
         .motion(DUCK_BODY)
         .unwrap()
@@ -385,8 +380,8 @@ fn a_player_can_jump_onto_a_rigid_flap_from_the_real_course_floor() {
                 duck.step();
                 if duck.jumps == 1
                     && duck
-                        .world
-                        .as_ref()
+                        .arena
+                        .world()
                         .unwrap()
                         .surface_contacts(DUCK_COLLIDER)
                         .any(|c| {

@@ -103,7 +103,7 @@ fn direct_flap_refuses_a_gap_inside_the_return_bodys_bounds() {
         piece.local_position = duck.render_position(Vec2::new(center * r, duck.layout.floor_y - r));
         pieces.push(piece);
     }
-    let world = duck.world.as_mut().unwrap();
+    let world = duck.arena.world_mut().unwrap();
     world.remove_entity(entity);
     assert!(world.insert_body(
         BodyId::new(entity, BodyRole::PRIMARY),
@@ -175,8 +175,8 @@ fn direct_flap_late_or_disrupted_landing_ends_without_retry() {
             duck.ledge.detour.age = 100;
         } else {
             let delta = Vec2::new(duck.radius * 50.0, 0.0);
-            duck.world
-                .as_mut()
+            duck.arena
+                .world_mut()
                 .unwrap()
                 .apply_velocity_delta(DUCK_BODY, delta, true);
         }
@@ -201,8 +201,8 @@ fn direct_flap_handles_water_timeout_deadline_and_lost_support() {
             1 => duck.ledge.detour.stats.ticks = flap_detour::BUDGET_TICKS - 1,
             2 => duck.tick = DUCK_TICKS - RESET_TICKS - u64::from(flap_detour::BUDGET_TICKS),
             _ => {
-                duck.world
-                    .as_mut()
+                duck.arena
+                    .world_mut()
                     .unwrap()
                     .remove_entity(PhysicsId::new(1000));
             }
@@ -235,9 +235,9 @@ fn direct_flap_takeover_preserves_motion_at_each_stage() {
     ] {
         let mut duck = direct(ASPECTS[0], -1.0);
         until(&mut duck, |d| d.ledge.detour.stats.phase == stage);
-        let before = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let before = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert!(duck.take_control(9, 1));
-        let after = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let after = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert_eq!(before.position, after.position);
         assert_eq!(before.linear_velocity, after.linear_velocity);
         assert_eq!(duck.ledge.detour.stats.outcome, Some(Outcome::TakenOver));

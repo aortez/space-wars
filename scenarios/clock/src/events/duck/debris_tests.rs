@@ -50,7 +50,7 @@ fn perched(
         radius,
     );
     collider.restitution = 0.0;
-    let world = duck.world.as_mut().unwrap();
+    let world = duck.arena.world_mut().unwrap();
     assert!(world.insert_body(
         body,
         BodySpec {
@@ -93,9 +93,9 @@ fn duck_leaves_settled_debris_and_recovers_without_removing_it() {
                     "{profile:?} mirror={direction} width={half_width}: {:?} position={:?} debris={:?} contacts={:?}",
                     duck.controller.recovery,
                     duck.position(),
-                    duck.world.as_ref().unwrap().motion(debris),
-                    duck.world
-                        .as_ref()
+                    duck.arena.world().unwrap().motion(debris),
+                    duck.arena
+                        .world()
                         .unwrap()
                         .surface_contacts(DUCK_COLLIDER)
                         .collect::<Vec<_>>()
@@ -104,7 +104,7 @@ fn duck_leaves_settled_debris_and_recovers_without_removing_it() {
                 assert!(
                     (duck.position().unwrap().x - start).abs() > duck.radius * (half_width + 0.5)
                 );
-                assert!(duck.world.as_ref().unwrap().motion(debris).is_some());
+                assert!(duck.arena.world().unwrap().motion(debris).is_some());
                 assert_eq!(duck.controller.profile, profile);
                 assert!(duck.controller.recovery.stats.escape_jumps <= 1);
                 let recovered_at = duck.phase_tick;
@@ -134,7 +134,7 @@ fn removed_debris_does_not_leave_the_duck_stuck_on_a_phantom_support() {
         duck.step();
     }
     assert!(duck.controller.recovery.stats.active);
-    assert!(duck.world.as_mut().unwrap().remove_entity(debris.entity));
+    assert!(duck.arena.world_mut().unwrap().remove_entity(debris.entity));
     for _ in 0..120 {
         duck.step();
         if duck.controller.recovery.stats.recoveries > 0 {
@@ -155,5 +155,5 @@ fn clock_grass_contract_foreign_debris_stays_foreign_with_retained_soil() {
     // Existing physical contacts are with the foreign body, not the dirt below.
     assert!(duck.grounded());
     assert_eq!(duck.supported_surface(), None);
-    assert!(duck.world.as_ref().unwrap().motion(debris).is_some());
+    assert!(duck.arena.world().unwrap().motion(debris).is_some());
 }

@@ -531,7 +531,7 @@ fn shared_mechanics_arena(state: &ClockState) -> Option<&crate::events::duck::Ar
                 .duck_visit
                 .as_deref()
                 .map(|duck| &duck.terrain)
-                .or(event.vacant_arena())
+                .or(state.arena.vacant.as_ref())
         })
         .flatten()
 }

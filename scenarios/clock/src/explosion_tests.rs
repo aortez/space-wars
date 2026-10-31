@@ -35,7 +35,7 @@ fn cells(state: &ClockState) -> &[events::explosion::Cell] {
     &event.cells
 }
 fn world(state: &ClockState) -> &engine_rapier::world::PhysicsWorld {
-    state.arena.as_ref().expect("shared arena")
+    state.arena.world().expect("shared arena")
 }
 fn toggle(state: &mut ClockState, seat: u8) {
     ClockScenario::step(
@@ -217,7 +217,7 @@ fn shared_world_steps_once_through_release_reformation_and_final_tick() {
             // Park this event's bodies away from the arena to isolate stepping
             // from physical contact; collision behavior has a separate test.
             let count = cells(&state).len();
-            let world = state.arena.as_mut().unwrap();
+            let world = state.arena.world_mut().unwrap();
             for i in 0..count {
                 let id = BodyId::new(PhysicsId::new(5001 + i as u64), BodyRole::PRIMARY);
                 assert!(world.set_pose(
@@ -494,7 +494,7 @@ fn explosion_steps_the_visit_once_and_real_cells_can_hit_the_duck() {
     ticks(&mut state, 1);
     let character = BodyId::new(PhysicsId::new(1), BodyRole::PRIMARY);
     let target = BodyId::new(PhysicsId::new(5001), BodyRole::PRIMARY);
-    let physics = state.arena.as_mut().unwrap();
+    let physics = state.arena.world_mut().unwrap();
     let position = physics.motion(character).unwrap().position;
     physics.set_pose(target, position + Vec2::new(0.0, 40.0), 0.0, true);
     physics.set_velocity(target, Vec2::new(0.0, -150.0), 0.0, true);

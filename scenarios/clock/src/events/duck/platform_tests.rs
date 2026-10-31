@@ -98,7 +98,7 @@ fn run_stats(mut event: TestDuck, label: &str) -> RunStats {
         let navigation = after.navigation.unwrap();
         let planning = navigation.planning.unwrap();
         if last_landing.is_some()
-            && let Some(motion) = event.world.as_ref().and_then(|w| w.motion(DUCK_BODY))
+            && let Some(motion) = event.arena.world().and_then(|w| w.motion(DUCK_BODY))
         {
             moving_since_landing &=
                 motion.linear_velocity.x.abs() > event.movement.run_speed * 0.05;
@@ -109,8 +109,8 @@ fn run_stats(mut event: TestDuck, label: &str) -> RunStats {
             } else if after.grounded
                 && navigation.speed_samples == 9
                 && event
-                    .world
-                    .as_ref()
+                    .arena
+                    .world()
                     .unwrap()
                     .motion(DUCK_BODY)
                     .unwrap()
@@ -135,8 +135,8 @@ fn run_stats(mut event: TestDuck, label: &str) -> RunStats {
                         && previous.next_target == Some(plan.target)
                 }) && moving_since_landing;
                 let speed = event
-                    .world
-                    .as_ref()
+                    .arena
+                    .world()
                     .unwrap()
                     .motion(DUCK_BODY)
                     .unwrap()
@@ -491,7 +491,7 @@ fn forced_bad_landings_are_classified_using_real_supports_not_proximity() {
         };
         let world_x = event.physics_position(Vec2::new(x, 0.0)).x;
         let mut y = floor + radius * 1.2;
-        let world = event.world.as_mut().unwrap();
+        let world = event.arena.world_mut().unwrap();
         if kind == 2 {
             // A foreign collider at the intended X coordinate: landing nearby
             // must not count as landing on the intended platform.
@@ -771,7 +771,7 @@ fn failed_running_takeoff_brakes_and_finishes_with_careful_fallback() {
     let plan = event.controller.navigator.plan.unwrap();
     let before = event.controller.navigator.flowing_fallbacks;
     let takeoff_x = event.physics_position(Vec2::new(plan.takeoff.x, 0.0)).x;
-    let world = event.world.as_mut().unwrap();
+    let world = event.arena.world_mut().unwrap();
     let motion = world.motion(DUCK_BODY).unwrap();
     world.set_pose(
         DUCK_BODY,

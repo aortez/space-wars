@@ -473,10 +473,10 @@ pub struct ClockState {
     // One physical visit, independent of the event scheduler and command source.
     // Automatic ducks keep their own bounded lifetime; players may stay longer.
     duck_visit: Option<Box<events::duck::DuckEvent>>,
-    // The shared rigid world. A visit builds it on its first step or when an
-    // event claims it, and it stays here while that visit or an event leasing
-    // it needs it. Standalone events keep their own worlds.
-    arena: Option<engine_rapier::world::PhysicsWorld>,
+    // The shared rigid world and who holds it. A visit builds it on its first
+    // step or when an event claims it, and it stays while that visit or an
+    // event leasing it needs it. Standalone events keep their own worlds.
+    arena: arena::ClockArena,
     crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -770,11 +770,7 @@ impl ClockState {
             .duck_visit
             .as_deref()
             .map(|visit| &visit.terrain)
-            .or_else(|| {
-                self.active_event
-                    .as_ref()
-                    .and_then(ActiveEvent::vacant_arena)
-            });
+            .or(self.arena.vacant.as_ref());
         if let Some(terrain) = terrain {
             let authoritative = match &self.active_event {
                 Some(ActiveEvent::Rain(e)) => e.responsive_floor(),
@@ -994,16 +990,13 @@ impl ClockState {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().0)
-            + self.arena.as_ref().map_or(0, |world| world.body_count())
+            + self.arena.world().map_or(0, |world| world.body_count())
     }
     pub fn collider_count(&self) -> usize {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().1)
-            + self
-                .arena
-                .as_ref()
-                .map_or(0, |world| world.collider_count())
+            + self.arena.world().map_or(0, |world| world.collider_count())
     }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
@@ -1188,7 +1181,7 @@ impl ClockState {
                 events::duck::DuckEvent::new_course(layout, seed, self.config.duck_course_pattern);
             duck.select_jump_profile(self.config.duck_jump_profile);
             duck.select_direct_flap_landing(self.config.duck_direct_flap_landing);
-            assert!(self.arena.is_none(), "a new visit builds its own arena");
+            assert!(self.arena.idle(), "a new visit builds its own arena");
             self.floor.acquire_visit();
             self.duck_visit = Some(Box::new(duck));
             // Admission uses the ordinary cadence/cooldown, but does not hold
@@ -1284,10 +1277,10 @@ impl ClockState {
                 duck.terrain.sync_responsive_floor(floor);
             }
             drop(event);
-            // An arena the event kept after its visit left goes with it.
-            if self.duck_visit.is_none() {
-                self.arena = None;
-            }
+            debug_assert!(
+                self.duck_visit.is_some() || self.arena.idle(),
+                "an arena the event kept after its visit left went with its lease"
+            );
             self.schedule.finish(kind);
             self.floor.release(kind);
         }
@@ -1546,7 +1539,7 @@ impl Scenario for ClockScenario {
             last_started_event: None,
             event_notice: None,
             duck_visit: None,
-            arena: None,
+            arena: arena::ClockArena::default(),
             crow_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,

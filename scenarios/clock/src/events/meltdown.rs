@@ -8,7 +8,9 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::{EventContext, EventPhase, REFORMING_TICKS, duck::DuckEvent};
 use crate::{
-    ClockWaterLab, SegmentRepresentation, digits,
+    ClockWaterLab, SegmentRepresentation,
+    arena::ClockArena,
+    digits,
     floor::responsive::{FloorShape, ResponsiveFloor},
     layout::Layout,
 };
@@ -64,16 +66,16 @@ impl MeltdownEvent {
         context: EventContext<'_>,
         seed: u64,
         player: &mut DuckEvent,
-        world: &mut Option<PhysicsWorld>,
+        arena: &mut ClockArena,
     ) -> Self {
-        Self::in_arena(context, seed, ClockWaterLab::Off, Some((player, world)))
+        Self::in_arena(context, seed, ClockWaterLab::Off, Some((player, arena)))
     }
 
     fn in_arena(
         context: EventContext<'_>,
         seed: u64,
         mode: ClockWaterLab,
-        visit: Option<(&mut DuckEvent, &mut Option<PhysicsWorld>)>,
+        visit: Option<(&mut DuckEvent, &mut ClockArena)>,
     ) -> Self {
         let lab = mode != ClockWaterLab::Off;
         let mut rng = StdRng::seed_from_u64(seed);
@@ -170,7 +172,7 @@ impl MeltdownEvent {
         }
         let floats = lab.then(|| water_lab::WaterLab::new(&water, context.layout, mode));
         let shared =
-            visit.map(|(duck, world)| shared::SharedMeltdown::new(duck, world, cells.len()));
+            visit.map(|(duck, arena)| shared::SharedMeltdown::new(duck, arena, cells.len()));
         Self {
             tick: 0,
             initial_cells,
@@ -287,10 +289,10 @@ impl MeltdownEvent {
         &mut self,
         context: EventContext<'_>,
         player: Option<&mut DuckEvent>,
-        world: &mut Option<PhysicsWorld>,
+        arena: &mut ClockArena,
     ) -> bool {
         if self.shared.is_some() {
-            return self.step_shared(context, player, world);
+            return self.step_shared(context, player, arena);
         }
         self.tick += 1;
         if let Some(floats) = &mut self.floats {

@@ -278,7 +278,7 @@ fn joining_leaving_and_rejoining_keep_the_same_water_fish_and_native_world() {
     let session = state.player_duck_session().unwrap();
     assert_eq!(event(&state).diagnostics().native_steps, 180);
     state.finish_duck_visit();
-    assert!(event(&state).vacant_arena().is_some());
+    assert!(state.arena.vacant.is_some());
     assert_eq!(physics_activity().worlds, worlds);
     assert!(state.body_count() > 0);
     for _ in 0..60 {

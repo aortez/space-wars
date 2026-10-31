@@ -53,8 +53,8 @@ fn player_hold_catches_release_hangs_and_fresh_press_climbs_without_auto_hop() {
                 assert_eq!(duck.ledge_state().climbs, 0, "launch hold cannot climb");
             }
             let counts = (
-                duck.world.as_ref().unwrap().body_count(),
-                duck.world.as_ref().unwrap().collider_count(),
+                duck.arena.world().unwrap().body_count(),
+                duck.arena.world().unwrap().collider_count(),
             );
             duck.set_player_input(0, false, false, false);
             for _ in 0..3_600 {
@@ -68,8 +68,8 @@ fn player_hold_catches_release_hangs_and_fresh_press_climbs_without_auto_hop() {
                 assert!(duck.ledge_state().clearance_queries <= 64);
                 assert_eq!(
                     (
-                        duck.world.as_ref().unwrap().body_count(),
-                        duck.world.as_ref().unwrap().collider_count()
+                        duck.arena.world().unwrap().body_count(),
+                        duck.arena.world().unwrap().collider_count()
                     ),
                     counts
                 );
@@ -116,10 +116,10 @@ fn player_down_beats_a_fresh_climb_and_held_jump_cannot_cancel_the_drop() {
             duck.set_player_input(0, false, false, false);
             duck.step();
         }
-        let before = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let before = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         duck.set_player_input(0, true, false, true);
         duck.step();
-        let after = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let after = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert_eq!(duck.ledge_state().reason, Some(Reason::Released));
         assert_eq!(duck.ledge_state().climbs, 0);
         assert_eq!(duck.ledge_state().releases, 1);

@@ -269,8 +269,8 @@ fn a_disturbed_warmup_is_discarded_and_retried() {
     // the same floor, this is not an uncontaminated vertical calibration.
     let delta = Vec2::new(event.radius * 20.0 * event.direction, 0.0);
     event
-        .world
-        .as_mut()
+        .arena
+        .world_mut()
         .unwrap()
         .apply_velocity_delta(DUCK_BODY, delta, true);
     while event.controller.heights.count < 2 {
@@ -376,7 +376,7 @@ fn a_fall_and_a_blocked_runner_recover_within_the_catalog_bound() {
         ));
         let obstruction =
             event.physics_position(Vec2::new(event.width * 0.15, event.layout.floor_y + 100.0));
-        let world = state.arena.as_mut().unwrap();
+        let world = state.arena.world_mut().unwrap();
         if fall {
             world.set_pose(DUCK_BODY, fallen, 0.0, true);
         } else {

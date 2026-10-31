@@ -29,7 +29,7 @@ pub(super) fn until(duck: &mut TestDuck, predicate: impl Fn(&TestDuck) -> bool) 
 
 pub(super) fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) {
     let entity = PhysicsId::new(9000);
-    assert!(duck.world.as_mut().unwrap().insert_body(
+    assert!(duck.arena.world_mut().unwrap().insert_body(
         BodyId::new(entity, BodyRole::PRIMARY),
         BodySpec {
             kind: BodyKind::Fixed,
@@ -90,7 +90,7 @@ fn flap_detour_runs_from_ordinary_spawn() {
                 assert!(duck.ledge.detour.stats.ticks < flap_detour::BUDGET_TICKS);
                 assert_eq!(duck.ledge.automatic.stats.hang_ticks, automatic::HANG_TICKS);
                 assert_eq!(
-                    duck.world.as_ref().unwrap().body_kind(DUCK_BODY),
+                    duck.arena.world().unwrap().body_kind(DUCK_BODY),
                     Some(BodyKind::Dynamic)
                 );
                 while duck.phase != EventPhase::Resetting && duck.tick < DUCK_TICKS {
@@ -144,7 +144,9 @@ fn detours_are_seeded_occasional_and_do_not_reroll_the_course() {
 fn blocked_perch_and_return_are_refused_without_a_door_claim() {
     for return_block in [false, true] {
         let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[0]);
-        until(&mut duck, |d| d.world.is_some() && d.position().is_some());
+        until(&mut duck, |d| {
+            d.arena.world().is_some() && d.position().is_some()
+        });
         let r = duck.radius;
         let tip = anchor(&duck);
         let point = if return_block {
@@ -236,22 +238,22 @@ fn wet_interruption_timeout_deadline_and_lost_support_release_the_detour() {
     for case in 0..5 {
         let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[1]);
         until(&mut duck, |d| d.ledge.stats.phase == Phase::Hanging);
-        let mass = duck.world.as_ref().unwrap().body_mass(DUCK_BODY);
+        let mass = duck.arena.world().unwrap().body_mass(DUCK_BODY);
         let mut water = None;
         match case {
             0 => water = Some(flood(&duck)),
             1 => duck.ledge.detour.stats.ticks = flap_detour::BUDGET_TICKS - 1,
             2 => duck.tick = DUCK_TICKS - RESET_TICKS - u64::from(flap_detour::BUDGET_TICKS),
             3 => {
-                duck.world
-                    .as_mut()
+                duck.arena
+                    .world_mut()
                     .unwrap()
                     .remove_entity(PhysicsId::new(1000));
             }
             _ => {
                 let delta = Vec2::new(duck.radius * 40.0, 0.0);
-                duck.world
-                    .as_mut()
+                duck.arena
+                    .world_mut()
                     .unwrap()
                     .apply_velocity_delta(DUCK_BODY, delta, true);
             }
@@ -275,7 +277,7 @@ fn wet_interruption_timeout_deadline_and_lost_support_release_the_detour() {
         );
         assert!(!duck.ledge_attached());
         assert!(!duck.ledge.automatic.stats.active);
-        assert_eq!(duck.world.as_ref().unwrap().body_mass(DUCK_BODY), mass);
+        assert_eq!(duck.arena.world().unwrap().body_mass(DUCK_BODY), mass);
         assert_eq!(duck.controller.heights.count, 0);
     }
 }
@@ -290,10 +292,10 @@ fn takeover_and_arena_retirement_keep_body_ownership_and_clear_autonomous_intent
     ] {
         let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[0]);
         until(&mut duck, |d| d.ledge.detour.stats.phase == stage);
-        let before = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let before = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         let ledge = duck.ledge_state();
         assert!(duck.take_control(9, 1));
-        let after = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let after = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert_eq!(before.position, after.position);
         assert_eq!(before.linear_velocity, after.linear_velocity);
         assert_eq!(duck.ledge_state(), ledge);

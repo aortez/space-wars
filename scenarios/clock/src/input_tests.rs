@@ -161,7 +161,7 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
             );
             assert_eq!(
                 state.body_count(),
-                state.arena.as_ref().unwrap().body_count()
+                state.arena.world().unwrap().body_count()
             );
         } else {
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));

@@ -53,7 +53,7 @@ fn event_mut(state: &mut ClockState) -> &mut MeltdownEvent {
 }
 
 fn world(state: &ClockState) -> &PhysicsWorld {
-    state.arena.as_ref().expect("shared arena")
+    state.arena.world().expect("shared arena")
 }
 
 fn isolate_block(state: &mut ClockState, position: Vec2, velocity: Vec2) {
@@ -185,7 +185,7 @@ fn shared_meltdown_final_owner_cleans_up_from_every_material_phase() {
             toggle(&mut state, 1);
             ticks(&mut state, 30);
             assert!(state.player_duck_session().is_none());
-            assert!(event(&state).vacant_arena().is_some());
+            assert!(state.arena.vacant.is_some());
             for _ in stop_at + 30..510 {
                 conserved(&state);
                 tick(&mut state);
@@ -463,7 +463,7 @@ fn shared_meltdown_survives_pause_dismiss_rejoin_reading_changes_and_replacement
         toggle(&mut state, 1);
         ticks(&mut state, 30);
         assert!(state.player_duck_session().is_none());
-        assert!(event(&state).vacant_arena().is_some());
+        assert!(state.arena.vacant.is_some());
         let cells = event(&state).cells.clone();
         let water = event(&state).diagnostics();
         toggle(&mut state, 2);

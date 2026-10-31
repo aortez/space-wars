@@ -311,7 +311,7 @@ fn run(case: Case) -> Row {
         check_state(&state, case, tick);
         if metrics.outcome.is_none()
             && let Some(duck) = state.duck_visit.as_ref()
-            && let Some(world) = state.arena.as_ref()
+            && let Some(world) = state.arena.world()
             && let Some(sample) = duck.trace_sample(world)
         {
             if trace.len() == 120 {

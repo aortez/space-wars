@@ -27,7 +27,7 @@ mod responsive;
 #[cfg(test)]
 mod responsive_tests;
 mod shared;
-pub(crate) use shared::VisitArena;
+pub(crate) use shared::{end_lease, leased_terrain, step_leased};
 #[cfg(test)]
 mod takeover_tests;
 mod terrain;
@@ -59,7 +59,7 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::EventPhase;
 // Imported by name: `arena` already denotes this module's own course geometry.
-use crate::arena::ids::canonical;
+use crate::arena::{ClockArena, Owner, ids::canonical};
 use crate::floor::responsive::ResponsiveFloor;
 use crate::layout::Layout;
 
@@ -335,10 +335,11 @@ impl DuckEvent {
     }
 
     /// The visit builds the arena on its first step, or when an event claims
-    /// it first. The world itself lives in the run's `arena` slot.
-    fn ensure_world<'w>(&self, arena: &'w mut Option<PhysicsWorld>) -> &'w mut PhysicsWorld {
-        if arena.is_some() {
-            return arena.as_mut().unwrap();
+    /// it first, and holds it as its owner.
+    fn ensure_world<'w>(&self, arena: &'w mut ClockArena) -> &'w mut PhysicsWorld {
+        if arena.world().is_some() {
+            debug_assert!(arena.holds(Owner::Visit), "a visit builds its own arena");
+            return arena.world_mut().unwrap();
         }
         let mut world = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -self.movement.gravity),
@@ -369,7 +370,7 @@ impl DuckEvent {
         };
         world.reserve(count + 2, count + 2, 0);
         self.terrain.insert_bodies(&mut world);
-        let world = arena.insert(world);
+        let world = arena.build(Owner::Visit, world);
         if self.player.is_some() {
             self.insert_entrance_wall(world);
         }
@@ -406,7 +407,7 @@ impl DuckEvent {
         ));
     }
 
-    fn spawn(&mut self, arena: &mut Option<PhysicsWorld>) {
+    fn spawn(&mut self, arena: &mut ClockArena) {
         let world = self.ensure_world(arena);
         let floor = self.layout.floor_y;
         let (position, linear_velocity) = self.spawn_motion.take().unwrap_or_else(|| {
@@ -710,25 +711,25 @@ impl DuckEvent {
     }
 
     /// Advance the visit one tick in `arena`, building the world if this is
-    /// its first step and dropping it once nothing still needs it.
+    /// its first step and letting it go once the visit no longer needs it.
     pub fn step_with_soil(
         &mut self,
-        arena: &mut Option<PhysicsWorld>,
+        arena: &mut ClockArena,
         water: Option<&WaterWorld>,
         panels_advanced: bool,
         soil: Option<&mut crate::grass::SoilHabitat>,
     ) -> bool {
-        let hull = arena.as_ref().and_then(|world| self.clearance_hull(world));
+        let hull = arena.world().and_then(|world| self.clearance_hull(world));
         self.terrain
-            .advance_panels(arena.as_mut(), panels_advanced, hull);
+            .advance_panels(arena.world_mut(), panels_advanced, hull);
         self.tick += 1;
         self.phase_tick += 1;
         if self.phase != EventPhase::Resetting {
             self.ensure_world(arena);
         }
-        self.terrain.synchronize_soil(arena.as_mut(), soil);
+        self.terrain.synchronize_soil(arena.world_mut(), soil);
         if self.phase == EventPhase::Opening {
-            let world = arena.as_mut().unwrap();
+            let world = arena.world_mut().unwrap();
             self.advance_flaps(world);
             world.step(DT);
             // Preserve the actor's first simulation tick. Shared scenery steps
@@ -745,12 +746,12 @@ impl DuckEvent {
         if self.phase == EventPhase::Running && self.exit_visible() {
             self.enter(EventPhase::Exiting);
         }
-        if let Some(world) = arena {
+        if let Some(world) = arena.world_mut() {
             self.advance_flaps(world);
         }
         match self.phase {
             EventPhase::Running | EventPhase::Exiting => {
-                let world = arena.as_mut().expect("a running visit's arena");
+                let world = arena.world_mut().expect("a running visit's arena");
                 self.run(world, water);
                 let position = self.position(world).expect("running duck");
                 if !position.x.is_finite()
@@ -781,7 +782,7 @@ impl DuckEvent {
                 }
             }
             _ => {
-                if let Some(world) = arena {
+                if let Some(world) = arena.world_mut() {
                     world.step(DT);
                 }
             }
@@ -790,7 +791,7 @@ impl DuckEvent {
             && !self.arena_claimed
             && self.door_panels().iter().all(Option::is_none)
         {
-            *arena = None;
+            arena.release(Owner::Visit);
         }
         // Keep the catalog's fixed envelope even after an early recovery. The
         // course and doors finish closing, and live time continues.

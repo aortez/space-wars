@@ -3,13 +3,13 @@
 //! release schedule, material budget, water solver and reformation lifecycle.
 use super::*;
 use crate::arena::ids::canonical;
-use crate::events::duck::{ArenaTerrain, VisitArena};
+use crate::events::duck;
+use engine_common::ClockEventKind;
 use engine_rapier::world::{
     BodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId, PhysicsWorld,
 };
 
 pub(super) struct SharedMeltdown {
-    pub arena: VisitArena,
     bodies: CellBodies,
 }
 
@@ -26,7 +26,7 @@ struct CellBodies {
 }
 
 impl SharedMeltdown {
-    pub fn new(player: &mut DuckEvent, world: &mut Option<PhysicsWorld>, count: usize) -> Self {
+    pub fn new(player: &mut DuckEvent, arena: &mut ClockArena, count: usize) -> Self {
         assert!(count <= MAX_MELTDOWN_CELLS);
         let supports = if player.terrain.responsive_floor().is_some() {
             canonical::RESPONSIVE_PANELS
@@ -41,13 +41,12 @@ impl SharedMeltdown {
                     .len(),
             )
         };
-        let arena = VisitArena::claim(player, world);
-        world
-            .as_mut()
+        player.claim_arena(arena, ClockEventKind::Meltdown);
+        arena
+            .world_mut()
             .expect("claimed arena")
             .reserve(count, count, 0);
         Self {
-            arena,
             bodies: CellBodies {
                 cells: (0..count)
                     .map(|i| CellBody {
@@ -67,7 +66,7 @@ impl SharedMeltdown {
 impl MeltdownEvent {
     pub fn join_player(
         &mut self,
-        arena: &mut Option<PhysicsWorld>,
+        arena: &mut ClockArena,
         layout: Layout,
         seed: u64,
         session: u64,
@@ -95,7 +94,7 @@ impl MeltdownEvent {
         // current pose and velocity. Neither water nor either clock advances.
         // Unreleased cells retain their seeded release times; liquid is untouched.
         shared.bodies.release_due(
-            arena.as_mut().expect("claimed arena"),
+            arena.world_mut().expect("claimed arena"),
             &self.cells,
             layout,
             self.tick,
@@ -108,43 +107,18 @@ impl MeltdownEvent {
         self.shared.is_some()
     }
 
-    pub fn vacant_arena(&self) -> Option<&ArenaTerrain> {
-        self.shared.as_ref()?.arena.vacant()
-    }
-
+    /// How opaque the event shows a vacant arena: its panels fade with the
+    /// floor it would show on its own.
     pub fn arena_opacity(&self) -> f32 {
-        if self.vacant_arena().is_some() {
-            self.floor_opacity()
-        } else {
-            1.0
-        }
+        self.floor_opacity()
     }
 
-    pub fn retain_arena(&mut self, duck: Box<DuckEvent>, world: &mut PhysicsWorld) {
-        self.shared
-            .as_mut()
-            .expect("shared Meltdown")
-            .arena
-            .retain(duck, world);
-    }
-
-    pub fn rejoin(
-        &mut self,
-        world: &mut Option<PhysicsWorld>,
-        session: u64,
-        seat: u8,
-    ) -> Option<Box<DuckEvent>> {
-        let opacity = self.arena_opacity();
-        self.shared
-            .as_mut()?
-            .arena
-            .rejoin(world, opacity, session, seat)
-    }
-
-    pub fn release(&mut self, player: Option<&mut DuckEvent>, world: &mut Option<PhysicsWorld>) {
+    pub fn release(&mut self, player: Option<&mut DuckEvent>, arena: &mut ClockArena) {
         if let Some(shared) = &mut self.shared {
-            shared.bodies.remove(world.as_mut().expect("leased arena"));
-            shared.arena.release(player, world);
+            shared
+                .bodies
+                .remove(arena.world_mut().expect("leased arena"));
+            duck::end_lease(player, arena, ClockEventKind::Meltdown);
         }
     }
 
@@ -152,21 +126,19 @@ impl MeltdownEvent {
         &mut self,
         mut context: EventContext<'_>,
         mut player: Option<&mut DuckEvent>,
-        world: &mut Option<PhysicsWorld>,
+        arena: &mut ClockArena,
     ) -> bool {
         let soil = context.soil.take();
-        // Move the small lease/batch handles temporarily, not the world or its
+        // Move the small batch handles temporarily, not the world or its
         // allocations. This lets both material paths share reformation code.
         let mut shared = self.shared.take().expect("shared Meltdown");
         self.tick += 1;
         let hull = player
             .as_deref()
-            .and_then(|duck| duck.clearance_hull(world.as_ref().expect("leased arena")));
+            .and_then(|duck| duck.clearance_hull(arena.world().expect("leased arena")));
         if let Some(floor) = &mut self.floor {
             floor.step(&mut self.water, f64::from(DT), hull);
-            shared
-                .arena
-                .terrain_mut(player.as_deref_mut())
+            duck::leased_terrain(player.as_deref_mut(), &mut arena.vacant)
                 .sync_responsive_floor(floor);
         }
         let material = self.tick < MELTING_TICKS + DRAINING_TICKS;
@@ -174,23 +146,23 @@ impl MeltdownEvent {
         if material {
             self.water.step(1.0 / 60.0).expect("fixed water step");
             shared.bodies.release_due(
-                world.as_mut().expect("leased arena"),
+                arena.world_mut().expect("leased arena"),
                 &self.cells,
                 layout,
                 self.tick,
             );
         } else {
             if self.tick == MELTING_TICKS + DRAINING_TICKS {
-                shared.bodies.remove(world.as_mut().expect("leased arena"));
+                shared
+                    .bodies
+                    .remove(arena.world_mut().expect("leased arena"));
             }
             self.reform(context);
         }
-        shared
-            .arena
-            .step_with_soil(player, world, Some(&self.water), true, soil);
+        duck::step_leased(player, arena, Some(&self.water), true, soil);
         if material {
             self.exited_solid_area += shared.bodies.synchronize(
-                world.as_mut().expect("leased arena"),
+                arena.world_mut().expect("leased arena"),
                 &mut self.cells,
                 &mut self.water,
                 layout,
