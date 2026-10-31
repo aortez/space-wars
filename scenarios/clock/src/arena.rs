@@ -25,10 +25,14 @@ use std::ops::Range;
 
 use engine_common::ClockEventKind;
 use engine_core::Vec2;
-use engine_rapier::world::{PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig};
+use engine_rapier::world::{
+    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
+    PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
+};
 
 use crate::{
     events::{ActiveEvent, duck::ArenaTerrain},
+    floor::{FloorGeometry, responsive::ResponsiveFloor},
     grass::SoilHabitat,
     layout::Layout,
 };
@@ -45,13 +49,22 @@ pub(crate) enum Owner {
     /// Retained soil. It is a resident: once it has material it keeps the
     /// arena for the rest of the run, with or without a visit.
     Soil,
+    /// The arena fixture's balls, a resident that rests on whatever actually
+    /// supports it.
+    Fixture,
 }
 
 impl Owner {
     /// A resident keeps the arena for the rest of the run, whoever else comes
     /// and goes.
     fn resident(self) -> bool {
-        matches!(self, Self::Soil)
+        matches!(self, Self::Soil | Self::Fixture)
+    }
+
+    /// A resident that rests on the floor, so the arena keeps a floor under it
+    /// while no visit's terrain is one. Soil is fixed in place and needs none.
+    fn rests(self) -> bool {
+        matches!(self, Self::Fixture)
     }
 
     /// The identities this owner's bodies take. While other owners keep the
@@ -74,8 +87,28 @@ impl Owner {
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
             Self::Event(_) => &[],
             Self::Soil => &[SOIL],
+            Self::Fixture => &[FIXTURE_BALLS],
         }
     }
+}
+
+/// What actually supports a resting resident while no visit's terrain is the
+/// floor.
+#[derive(Clone, Copy)]
+enum Support<'a> {
+    /// Fixed slabs, as `FloorGeometry::slabs` or a course gives them.
+    Slabs(&'a [(Vec2, Vec2)]),
+    /// A standalone event's moving panels.
+    Panels(&'a ResponsiveFloor),
+}
+
+/// The floor the arena last built under its resting residents.
+#[derive(Default)]
+enum KeptFloor {
+    #[default]
+    None,
+    Slabs(Vec<(Vec2, Vec2)>),
+    Panels,
 }
 
 /// Who moves the arena's responsive panels this tick. It is decided once per
@@ -138,11 +171,53 @@ pub(crate) fn world_config(gravity: Vec2, length_unit: f32) -> PhysicsWorldConfi
     }
 }
 
+/// The downward acceleration Clock's own mechanics are tuned to. A visit
+/// brings its character's own, and the bodies of others that share its world
+/// scale theirs to keep this one.
+pub(crate) const MECHANICS_GRAVITY: f32 = 400.0;
+
 /// The settings of a world no visit has entered: a standalone Falling or
-/// Explosion world, or the one residents build. Clock's own mechanics are
-/// tuned to this gravity.
+/// Explosion world, or the one residents build.
 pub(crate) fn mechanics_config(layout: Layout) -> PhysicsWorldConfig {
-    world_config(Vec2::new(0.0, -400.0), layout.pitch)
+    world_config(Vec2::new(0.0, -MECHANICS_GRAVITY), layout.pitch)
+}
+
+fn remove_floor(world: &mut PhysicsWorld) {
+    for id in ids::canonical::ARENA_FLOOR {
+        world.remove_entity(PhysicsId::new(id));
+    }
+}
+
+/// The arena's own floor as `support` shapes it: fixed slabs, as Falling's
+/// banks are, or moving panels.
+fn insert_floor(world: &mut PhysicsWorld, support: Option<Support<'_>>) -> KeptFloor {
+    match support {
+        None => KeptFloor::None,
+        Some(Support::Slabs(slabs)) => {
+            assert!(slabs.len() <= ids::canonical::ARENA_FLOOR.count());
+            for (index, (min, max)) in slabs.iter().enumerate() {
+                let entity = PhysicsId::new(ids::canonical::ARENA_FLOOR.start + index as u64);
+                assert!(world.insert_body(
+                    BodyId::new(entity, BodyRole::PRIMARY),
+                    BodySpec {
+                        kind: BodyKind::Fixed,
+                        position: (*min + *max) * 0.5,
+                        ..BodySpec::default()
+                    },
+                    &[ColliderSpec::cuboid(
+                        ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+                        (max.x - min.x) * 0.5,
+                        (max.y - min.y) * 0.5
+                    )],
+                ));
+            }
+            KeptFloor::Slabs(slabs.to_vec())
+        }
+        Some(Support::Panels(floor)) => {
+            floor.insert_panels_at(world, ids::canonical::ARENA_FLOOR.start);
+            KeptFloor::Panels
+        }
+    }
 }
 
 /// The world a visit, the events leasing its arena and the run's residents
@@ -155,6 +230,10 @@ pub(crate) struct ClockArena {
     /// The terrain of a visit whose character left while an event held the
     /// arena. The visit's claim stays with it.
     pub vacant: Option<ArenaTerrain>,
+    /// The floor kept under resting residents, as last built.
+    floor: KeptFloor,
+    /// The world gravity resting residents' bodies were last scaled against.
+    resident_gravity: Option<f32>,
     /// The last step's timings and populations.
     metrics: PhysicsStepMetrics,
     granted: u64,
@@ -198,6 +277,8 @@ impl ClockArena {
     /// `owner` is the first to need a world and brings `world` with it.
     pub fn build(&mut self, owner: Owner, world: PhysicsWorld) -> &mut PhysicsWorld {
         assert!(self.idle(), "the arena has one world");
+        self.floor = KeptFloor::None;
+        self.resident_gravity = None;
         self.owners.push(owner);
         self.granted += 1;
         self.worlds += 1;
@@ -249,12 +330,18 @@ impl ClockArena {
         if let Some(mut kept) = self.world.take() {
             let entities: Vec<_> = kept.entity_ids().collect();
             for entity in entities {
+                // The adopted world brings its own floor.
+                if ids::canonical::ARENA_FLOOR.contains(&entity.value()) {
+                    continue;
+                }
                 assert!(
                     kept.transfer_entity(entity, &mut world),
                     "{entity:?} moves into the adopted world"
                 );
             }
         }
+        self.floor = KeptFloor::None;
+        self.resident_gravity = None;
         self.owners.push(owner);
         self.granted += 1;
         self.worlds += 1;
@@ -279,12 +366,18 @@ impl ClockArena {
                 "vacant terrain keeps its visit's claim"
             );
             self.world = None;
+            self.floor = KeptFloor::None;
+            self.resident_gravity = None;
         } else if held {
             let world = self.world.as_mut().expect("a held arena");
             for range in owner.ranges() {
                 for id in range.clone() {
                     world.remove_entity(PhysicsId::new(id));
                 }
+            }
+            if owner.rests() && !self.owners.iter().any(|owner| owner.rests()) {
+                remove_floor(world);
+                self.floor = KeptFloor::None;
             }
         }
     }
@@ -294,13 +387,92 @@ impl ClockArena {
         Some((self.vacant.as_mut()?, self.world.as_mut()?))
     }
 
-    /// The arena's one rigid step this tick, whoever holds it, residents with
-    /// nobody else included. Nothing else steps the arena's world.
-    pub fn step(&mut self, dt: f32) {
-        if let Some(world) = &mut self.world {
-            self.metrics = world.step(dt);
-            self.steps += 1;
+    /// A resting resident holds the arena, which keeps a floor under it.
+    pub fn keeps_floor(&self) -> bool {
+        self.owners.iter().any(|owner| owner.rests())
+    }
+
+    /// The floor under resting residents takes the shape of what actually
+    /// supports them now. The run calls this once per tick that moves time,
+    /// just before the arena's step. A visit's terrain is the floor while the
+    /// visit holds the arena, so the arena keeps none of its own. Otherwise
+    /// an event with its own floor is the floor: Rain's course or panels, or
+    /// Meltdown's or Aquarium's panels. Otherwise the ordinary `floor` is,
+    /// open at the drain or closed. A floor that closes at once, as Rain's
+    /// panels do when Rain finishes part-way open, can appear under a resident
+    /// resting below its surface, and the solver lifts the resident out.
+    pub fn bind_floor(&mut self, event: Option<&ActiveEvent>, floor: FloorGeometry) {
+        if !self.keeps_floor() {
+            return;
         }
+        let slabs: Vec<_>;
+        let support = if self.holds(Owner::Visit) {
+            None
+        } else {
+            match event {
+                Some(ActiveEvent::Rain(rain)) => match rain.course() {
+                    Some(course) => {
+                        slabs = course.slabs();
+                        Some(Support::Slabs(&slabs))
+                    }
+                    None => rain.responsive_floor().map(Support::Panels),
+                },
+                Some(ActiveEvent::Meltdown(event)) => event.floor.as_ref().map(Support::Panels),
+                Some(ActiveEvent::Aquarium(event)) => Some(Support::Panels(&event.floor)),
+                _ => {
+                    slabs = floor.support().collect();
+                    Some(Support::Slabs(&slabs))
+                }
+            }
+        };
+        let world = self.world.as_mut().expect("a held arena");
+        match (support, &self.floor) {
+            (None, KeptFloor::None) | (Some(Support::Panels(_)), KeptFloor::Panels) => {}
+            (Some(Support::Slabs(slabs)), KeptFloor::Slabs(kept)) if slabs == kept.as_slice() => {}
+            _ => {
+                remove_floor(world);
+                self.floor = insert_floor(world, support);
+                return;
+            }
+        }
+        if let Some(Support::Panels(floor)) = support {
+            floor.move_panels_at(world, ids::canonical::ARENA_FLOOR.start);
+        }
+    }
+
+    /// How much a resting resident scales the world's gravity by to fall at
+    /// Clock's own, whoever set the world's.
+    pub fn resident_gravity_scale(&self) -> f32 {
+        self.world
+            .as_ref()
+            .map_or(1.0, |world| MECHANICS_GRAVITY / -world.gravity().y)
+    }
+
+    /// The arena's one rigid step this tick, whoever holds it, residents with
+    /// nobody else included. Nothing else steps the arena's world. A visit
+    /// that entered brings its own gravity, so resting residents rescale theirs
+    /// first and fall as they did before it came.
+    pub fn step(&mut self, dt: f32) {
+        let scale = self.resident_gravity_scale();
+        let Some(world) = &mut self.world else {
+            return;
+        };
+        let gravity = world.gravity().y;
+        if self.resident_gravity != Some(gravity) {
+            for owner in self.owners.iter().filter(|owner| owner.rests()) {
+                for range in owner.ranges() {
+                    for id in range.clone() {
+                        let body = BodyId::new(PhysicsId::new(id), BodyRole::PRIMARY);
+                        if world.contains_body(body) {
+                            assert!(world.set_gravity_scale(body, scale, false));
+                        }
+                    }
+                }
+            }
+            self.resident_gravity = Some(gravity);
+        }
+        self.metrics = world.step(dt);
+        self.steps += 1;
     }
 
     /// The last step's timings and populations.
@@ -365,6 +537,9 @@ pub(crate) mod ids {
         pub(crate) const DUCK: Range<u64> = 1..2;
         /// Default pit and hurdle geometry, used when there is no course.
         pub(crate) const HURDLES: Range<u64> = 100..100 + MAX_SURFACES as u64;
+        /// The floor the arena keeps under resting residents while no visit's
+        /// terrain is one: slabs, a course's surfaces or two moving panels.
+        pub(crate) const ARENA_FLOOR: Range<u64> = 800..800 + MAX_SURFACES as u64;
         /// Obstacle-course surfaces. A surface's index is recovered by
         /// subtracting this range's start, so the two must stay adjacent.
         pub(crate) const COURSE: Range<u64> = 1000..1000 + MAX_SURFACES as u64;
@@ -397,6 +572,8 @@ pub(crate) mod ids {
         pub(crate) const AQUARIUM_LINER: Range<u64> = 6001..6003;
         /// Aquarium's solid digit compound.
         pub(crate) const AQUARIUM_DIGITS: Range<u64> = 6100..6101;
+        /// The arena fixture's balls.
+        pub(crate) const FIXTURE_BALLS: Range<u64> = 7001..7005;
         /// Retained soil, the one resident today that outlives its admitting
         /// event.
         pub(crate) const SOIL: Range<u64> = 900_001..900_002;
@@ -445,6 +622,7 @@ pub(crate) mod ids {
         const CANONICAL: &[(&str, Range<u64>)] = &[
             ("DUCK", DUCK),
             ("HURDLES", HURDLES),
+            ("ARENA_FLOOR", ARENA_FLOOR),
             ("COURSE", COURSE),
             ("DRAIN_BANKS", DRAIN_BANKS),
             ("RESPONSIVE_PANELS", RESPONSIVE_PANELS),
@@ -457,6 +635,7 @@ pub(crate) mod ids {
             ("EXPLOSION_CELLS", EXPLOSION_CELLS),
             ("AQUARIUM_LINER", AQUARIUM_LINER),
             ("AQUARIUM_DIGITS", AQUARIUM_DIGITS),
+            ("FIXTURE_BALLS", FIXTURE_BALLS),
             ("SOIL", SOIL),
         ];
 

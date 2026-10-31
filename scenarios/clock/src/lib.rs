@@ -3,6 +3,7 @@
 mod arena;
 #[cfg(test)]
 mod arena_contract;
+pub mod arena_fixture;
 #[cfg(test)]
 mod autonomous_tests;
 mod calendar;
@@ -480,6 +481,9 @@ pub struct ClockState {
     // step or when an event claims it, and it stays while that visit or an
     // event leasing it needs it. Standalone events keep their own worlds.
     arena: arena::ClockArena,
+    // A resident of the arena for checking its standard, admitted only on
+    // request.
+    arena_fixture: Option<arena_fixture::ArenaFixture>,
     crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -1008,6 +1012,35 @@ impl ClockState {
     pub fn last_arena_step_metrics(&self) -> engine_rapier::world::PhysicsStepMetrics {
         self.arena.metrics()
     }
+
+    /// The arena fixture's ordinary balls at this layout: one to each side of
+    /// the face and one over the drain.
+    pub fn default_arena_fixture(&self) -> Vec<arena_fixture::FixtureBall> {
+        arena_fixture::ArenaFixture::default_balls(Layout::new(self.aspect_ratio()))
+    }
+
+    /// Admits the arena fixture's `balls`, which keep the arena as a resident
+    /// until the last of them falls out of the view. Returns false, changing
+    /// nothing, while the fixture is already in the arena.
+    pub fn admit_arena_fixture(&mut self, balls: &[arena_fixture::FixtureBall]) -> bool {
+        if self.arena_fixture.is_some() {
+            return false;
+        }
+        let layout = Layout::new(self.aspect_ratio());
+        self.arena_fixture = Some(arena_fixture::ArenaFixture::admit(
+            &mut self.arena,
+            layout,
+            balls,
+        ));
+        true
+    }
+
+    /// The arena fixture's balls, while it has any.
+    pub fn arena_fixture(&self) -> Option<arena_fixture::ArenaFixtureState> {
+        self.arena_fixture
+            .as_ref()
+            .map(|fixture| fixture.state(&self.arena))
+    }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
             ActiveEvent::Meltdown(event) => Some(event.diagnostics()),
@@ -1364,8 +1397,17 @@ impl ClockState {
         if let Some(soil) = &mut self.soil {
             self.arena.bind_soil(soil, layout);
         }
+        // So does the floor under resting residents.
+        self.arena
+            .bind_floor(self.active_event.as_ref(), self.floor.geometry(layout));
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
+        // Fixture balls that fell out of the view leave the arena.
+        if let Some(fixture) = &mut self.arena_fixture
+            && fixture.observe(&mut self.arena, layout)
+        {
+            self.arena_fixture = None;
+        }
         let visit_finished = match (&mut self.duck_visit, visit) {
             (Some(duck), Some(step)) => duck.post_step(&mut self.arena, water, step),
             _ => false,
@@ -1575,6 +1617,7 @@ impl Scenario for ClockScenario {
             event_notice: None,
             duck_visit: None,
             arena: arena::ClockArena::default(),
+            arena_fixture: None,
             crow_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,

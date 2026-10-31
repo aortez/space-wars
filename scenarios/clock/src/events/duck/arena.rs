@@ -29,6 +29,21 @@ impl CourseGeometry {
         Vec2::new((p.x - self.width * 0.5) * self.direction, p.y)
     }
 
+    /// The course's solid columns, from the bottom of the view up to each
+    /// surface, as a visit's terrain inserts them.
+    pub fn slabs(&self) -> Vec<(Vec2, Vec2)> {
+        self.course
+            .surfaces
+            .iter()
+            .map(|surface| {
+                let a = self.screen_position(Vec2::new(surface.start, self.layout.bounds_min.y));
+                let b = self
+                    .screen_position(Vec2::new(surface.end, self.layout.floor_y + surface.height));
+                (Vec2::new(a.x.min(b.x), a.y), Vec2::new(a.x.max(b.x), b.y))
+            })
+            .collect()
+    }
+
     /// Exactly the visible/collidable top of each slab, with gaps left open.
     /// Higher adjacent slabs are spill lips, not permeable vertical walls.
     pub fn water_pools(&self) -> Vec<PoolSpec> {
