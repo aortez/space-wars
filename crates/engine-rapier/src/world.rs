@@ -845,6 +845,11 @@ impl PhysicsWorld {
         self.entities.contains_key(&id)
     }
 
+    /// Every entity in the world, in identity order.
+    pub fn entity_ids(&self) -> impl ExactSizeIterator<Item = PhysicsId> + '_ {
+        self.entities.keys().copied()
+    }
+
     pub fn contains_body(&self, id: BodyId) -> bool {
         self.body_indices.contains_key(&id)
     }
@@ -986,6 +991,72 @@ impl PhysicsWorld {
             self.remove_collider_mapping(collider);
         }
         self.entities.remove(&entity);
+        true
+    }
+
+    /// Move `entity` into `target` as it is. Its bodies keep their pose,
+    /// velocity, mass, sleep state and gravity scale, its colliders keep every
+    /// property, and all of them keep their identities. Only contact history
+    /// stays behind, as it would for a body inserted there. Refused, changing
+    /// neither world, when the entity has joints, when `target` already has
+    /// it, or when the two worlds differ in collecting contact events, which
+    /// each collider is built for.
+    pub fn transfer_entity(&mut self, entity: PhysicsId, target: &mut PhysicsWorld) -> bool {
+        let Some(record) = self.entities.get(&entity) else {
+            return false;
+        };
+        if !record.joints.is_empty()
+            || target.entities.contains_key(&entity)
+            || self.collect_events != target.collect_events
+        {
+            return false;
+        }
+        let record = self.entities.remove(&entity).expect("a checked entity");
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        target.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        if let Some(loading) = &mut self.loading {
+            loading.retire_entity(entity);
+        }
+        for body in record.bodies {
+            let handle = self.body_handle(body).expect("an entity's body");
+            // Reattach in the body's own order, which its mass is summed in.
+            let attached = self.raw.bodies[handle].colliders().to_vec();
+            let mut colliders = Vec::with_capacity(attached.len());
+            for collider_handle in attached {
+                let id = record
+                    .colliders
+                    .iter()
+                    .copied()
+                    .find(|id| self.collider_handle(*id) == Some(collider_handle))
+                    .expect("an entity's collider");
+                let collider = self
+                    .raw
+                    .colliders
+                    .remove(
+                        collider_handle,
+                        &mut self.raw.islands,
+                        &mut self.raw.bodies,
+                        false,
+                    )
+                    .expect("a registered collider");
+                self.remove_collider_mapping(id);
+                colliders.push((id, collider));
+            }
+            let moved = self.raw.remove_body(handle).expect("a registered body");
+            self.remove_body_mapping(body);
+            let handle = target.raw.insert_body(moved);
+            target.body_indices.insert(body, target.bodies.len());
+            target.bodies.push(BodyEntry { id: body, handle });
+            target.entities.entry(entity).or_default().bodies.push(body);
+            for (id, collider) in colliders {
+                let collider_handle = target.raw.insert_collider(collider, Some(handle));
+                target.register_collider(id, body, collider_handle);
+            }
+            // Attaching adds each collider's mass to what the body already
+            // carried. Count it again from the colliders, as a step would.
+            target.raw.bodies[handle]
+                .recompute_mass_properties_from_colliders(&target.raw.colliders);
+        }
         true
     }
 
@@ -3261,6 +3332,83 @@ mod tests {
         assert_eq!(motion.linear_velocity.x, before.linear_velocity.x);
         assert_eq!(motion.angular_velocity, before.angular_velocity);
         assert_eq!((world.body_count(), world.collider_count()), (1, 1));
+    }
+
+    #[test]
+    fn a_transferred_entity_moves_on_as_though_it_had_stayed() {
+        let config = PhysicsWorldConfig {
+            gravity: Vec2::new(0.0, -10.0),
+            ..PhysicsWorldConfig::default()
+        };
+        let mut source = PhysicsWorld::new(config);
+        let (entity, body, ball) = ball_ids(1);
+        let mut block = ColliderSpec::cuboid(ColliderId::new(entity, BALL_COLLIDER, 1), 0.5, 0.25);
+        block.density = 3.0;
+        assert!(source.insert_body(
+            body,
+            BodySpec {
+                position: Vec2::new(2.0, 3.0),
+                angle: 0.3,
+                linear_velocity: Vec2::new(1.0, 4.0),
+                angular_velocity: -2.0,
+                gravity_scale: 0.5,
+                can_sleep: false,
+                ..BodySpec::default()
+            },
+            &[ColliderSpec::ball(ball, 0.25), block],
+        ));
+        let other = insert_ball(&mut source, 2, Vec2::new(-50.0, 0.0));
+        for _ in 0..5 {
+            source.step(1.0 / 60.0);
+        }
+        // The same world left alone, to hold the moved entity against.
+        let mut stayed = source.clone();
+        let mut target = PhysicsWorld::new(config);
+        let mass = source.body_mass(body);
+        assert!(source.transfer_entity(entity, &mut target));
+        assert!(!source.contains_entity(entity));
+        assert!(source.motion(other).is_some());
+        assert_eq!((source.body_count(), source.collider_count()), (1, 1));
+        assert_eq!((target.body_count(), target.collider_count()), (1, 2));
+        assert_eq!(target.entity_ids().collect::<Vec<_>>(), vec![entity]);
+        assert_eq!(target.body_mass(body), mass);
+        assert_eq!(target.motion(body), stayed.motion(body));
+        for _ in 0..30 {
+            target.step(1.0 / 60.0);
+            stayed.step(1.0 / 60.0);
+            assert_eq!(target.motion(body), stayed.motion(body));
+        }
+
+        // Each refusal leaves both worlds as they were.
+        let mut quiet = PhysicsWorld::new(PhysicsWorldConfig {
+            collect_events: false,
+            ..config
+        });
+        assert!(
+            !target.transfer_entity(entity, &mut quiet),
+            "event collection"
+        );
+        assert!(
+            !target.transfer_entity(entity, &mut stayed),
+            "a taken identity"
+        );
+        assert!(
+            !target.transfer_entity(other.entity, &mut stayed),
+            "no such entity"
+        );
+        assert_eq!((target.body_count(), target.collider_count()), (1, 2));
+        assert_eq!((quiet.entity_count(), stayed.entity_count()), (0, 2));
+        let a = insert_ball(&mut source, 3, Vec2::ZERO);
+        assert!(source.insert_raw_joint(
+            JointId::new(a.entity, JointRole::PRIMARY),
+            a,
+            other,
+            GenericJoint::default()
+        ));
+        for jointed in [a.entity, other.entity] {
+            assert!(!source.transfer_entity(jointed, &mut target), "a joint");
+        }
+        assert_eq!((source.entity_count(), target.entity_count()), (2, 1));
     }
 
     #[test]
