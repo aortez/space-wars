@@ -2196,7 +2196,9 @@ from the launcher, each time finding the fixtures alone in a fresh world.
 both render adapters; set `SPACEWARS_CLOCK_ARTIFACTS=DIR` to keep its PNG and
 SVG captures. The `residents`
 [benchmark fixture](clock-performance-lab.md#fixed-workload-benchmarks) is idle
-Clock with the same two owners, and measures what residents cost at rest.
+Clock with the same two owners, and measures what residents cost at rest;
+[Idle arena residents](clock-performance-lab.md#idle-arena-residents-2026-10-31)
+records it.
 
 Known limits:
 

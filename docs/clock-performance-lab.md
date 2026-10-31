@@ -495,6 +495,43 @@ matching the earlier idle 2× observation. These are CPU-only headless samples,
 not displayed FPS; raw reports are retained under
 `target/clock-benchmarks/run.lSUiHORH/`.
 
+## Idle arena residents (2026-10-31)
+
+The `residents` fixture is `idle` with the development arena fixture's two
+owners in the run's arena: five balls dropped onto the closed floor as the run
+starts, all asleep within three seconds, in an arena that steps every tick while
+nothing else happens. It measures what idle residents cost: that step, the floor
+the arena keeps under them and five filled circles. Workstation (AMD Ryzen 7
+9800X3D, Linux 7.0.0-38-generic, powersave governor), release client
+`5e3ad018…` built with Rust 1.89 from `0f0b3dc8`, headless 1024×768 raster,
+seed 7, two warm-up seconds, 60 measured seconds, three processes per
+combination. Values are medians of per-run means; p95 is the worst row of any
+run:
+
+| Case | Scale | Step ms | Scene ms | Prepare ms | Total ms/frame | Worst row p95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| idle | 1 | 0.000 | 0.010 | 1.668 | 1.678 | 2.743 |
+| residents | 1 | 0.002 | 0.011 | 1.670 | 1.683 | 1.962 |
+| idle | 2 | 0.000 | 0.011 | 5.353 | 5.364 | 6.068 |
+| residents | 2 | 0.002 | 0.011 | 5.353 | 5.365 | 5.770 |
+
+Residents add about 2 µs of simulation per frame, which is the arena's step with
+every ball asleep, and under 1 µs of scene generation. Raster preparation
+differs by no more than it varies between runs, and so do the worst p95 rows.
+While the balls drop, the step takes 3 µs; leaving out those first three seconds
+changes no median above by more than 1 µs. The arena holds 6 bodies and 6
+colliders throughout: the five balls and the floor kept under them. These are
+CPU-only headless samples, not displayed FPS; raw reports are retained under
+`target/clock-benchmarks/run.Oa2hOXuL/`.
+
+The Pi 4 profile of the same fixture is owed. Collect it as in the [Picade
+procedure](#picade-procedure), with a client built from the same source:
+
+```sh
+bash /tmp/benchmark-clock.sh --client /tmp/engine-client \
+  --cases idle,residents --seconds 60 --repeats 3 --output /tmp/clock-benchmarks
+```
+
 ## Live CPU timings
 
 ```sh
