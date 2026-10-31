@@ -22,17 +22,11 @@ fn player(aspect: f32, responsive: bool) -> ClockState {
 }
 
 fn world(state: &ClockState) -> &engine_rapier::world::PhysicsWorld {
-    if let Some(duck) = &state.duck_visit {
-        duck.arena_world()
-    } else if let Some(ActiveEvent::Falling(event)) = &state.active_event {
-        event.vacant_arena().unwrap().arena_world()
-    } else {
-        panic!("shared world expected");
-    }
+    state.arena.world().expect("shared world expected")
 }
 
 fn world_mut(state: &mut ClockState) -> &mut engine_rapier::world::PhysicsWorld {
-    state.duck_visit.as_mut().unwrap().arena_world_mut()
+    state.arena.world_mut().expect("shared world expected")
 }
 
 fn batch(state: &ClockState) -> Vec<(BodyId, Vec2)> {
@@ -64,7 +58,7 @@ fn falling_shares_one_world_through_dismiss_rejoin_reformation_and_completion() 
         for responsive in [false, true] {
             let mut state = player(aspect, responsive);
             let before = state.player_duck_state().unwrap();
-            let base = state.duck_visit.as_ref().unwrap().physics_counts();
+            let base = (world(&state).body_count(), world(&state).collider_count());
             let base_flaps = state.flap_body_count();
             state.preview_event(ClockEventKind::Falling);
             assert_eq!(state.player_duck_state(), Some(before.clone()));
@@ -165,6 +159,11 @@ fn falling_steps_the_player_once_even_at_entry_and_the_last_event_tick() {
                     baseline.player_duck_state(),
                     "aspect={aspect} opening={opening} tick={elapsed}: no doubled gravity/movement"
                 );
+                assert_eq!(
+                    composed.arena_accounting().steps,
+                    baseline.arena_accounting().steps,
+                    "aspect={aspect} opening={opening} tick={elapsed}: one arena step"
+                );
             }
         }
     }
@@ -222,7 +221,7 @@ fn contact_fixture() -> (ClockState, BodyId) {
     state.configure(settings);
     toggle(&mut state, 1);
     let duck = state.duck_visit.as_mut().unwrap();
-    duck.course.as_mut().unwrap().surfaces = vec![Surface {
+    duck.terrain.course.as_mut().unwrap().surfaces = vec![Surface {
         start: 0.0,
         end: duck.width,
         height: 0.0,

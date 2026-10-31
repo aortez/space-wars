@@ -1,11 +1,22 @@
 use super::*;
 
 fn standalone(kind: ClockEventKind, elapsed: usize, aspect: f32) -> ClockState {
+    standalone_beside(kind, elapsed, aspect, false)
+}
+
+/// `soil` admits a layer first, which then keeps the arena as a resident while
+/// the event runs apart from it.
+fn standalone_beside(kind: ClockEventKind, elapsed: usize, aspect: f32, soil: bool) -> ClockState {
     let mut state = ready(aspect, 42);
     let mut settings = state.settings();
     settings.event_profile = ClockEventProfile::Off;
     settings.time_format = engine_common::ClockTimeFormat::TwelveHour;
     state.configure(settings);
+    if soil {
+        // Delivered soil enters the arena with the next tick that moves time.
+        state.admit_soil();
+        tick(&mut state, &[]);
+    }
     state.preview_event(kind);
     ticks(&mut state, elapsed);
     state
@@ -94,13 +105,47 @@ fn joining_keeps_the_visible_scene_identical_before_time_advances_including_refo
 
 #[test]
 fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
+    use engine_rapier::world::PhysicsId;
+    let soil_colliders = |state: &ClockState| {
+        let world = state.arena.world().unwrap();
+        let soil = PhysicsId::new(crate::grass::SOIL_PHYSICS_ID);
+        world.collider_ids().filter(|id| id.entity == soil).count()
+    };
     let mut free_flight_samples = 0;
-    for aspect in [4.0 / 3.0, 5.0 / 3.0, 0.6] {
+    let mut contacts_kept = 0;
+    // Soil keeps the arena as a resident once it has material. The event's
+    // world still becomes the arena, contacts and all, and the soil moves in.
+    for (aspect, soil) in [4.0 / 3.0, 5.0 / 3.0, 0.6]
+        .into_iter()
+        .flat_map(|aspect| [(aspect, false), (aspect, true)])
+    {
         for elapsed in [0, 60, 150, 208, 260] {
-            let mut baseline = standalone(ClockEventKind::Falling, elapsed, aspect);
-            let mut joined = standalone(ClockEventKind::Falling, elapsed, aspect);
+            let mut baseline = standalone_beside(ClockEventKind::Falling, elapsed, aspect, soil);
+            let mut joined = standalone_beside(ClockEventKind::Falling, elapsed, aspect, soil);
             let bodies = baseline.body_count();
+            let resident = soil.then(|| {
+                assert!(joined.arena.holds(arena::Owner::Soil));
+                assert!(!joined.arena.holds(arena::Owner::Visit));
+                soil_colliders(&joined)
+            });
             toggle(&mut joined, 1);
+            if let Some(colliders) = resident {
+                assert!(joined.arena.holds(arena::Owner::Soil));
+                assert!(joined.arena.holds(arena::Owner::Visit));
+                assert_eq!(soil_colliders(&joined), colliders, "soil is untouched");
+                // Bodies moved between worlds would touch nothing until the
+                // next step. These are the event's, still in contact.
+                let arena = joined.arena.world().unwrap();
+                if let Some(own) = baseline.active_event.as_ref().unwrap().own_world() {
+                    let mut touching = 0;
+                    for id in own.collider_ids() {
+                        assert!(arena.surface_contacts(id).eq(own.surface_contacts(id)));
+                        touching += own.surface_contacts(id).count();
+                    }
+                    assert!(own.motions().all(|r| arena.motion(r.id) == Some(r.motion)));
+                    contacts_kept += touching;
+                }
+            }
             if elapsed < 210 {
                 assert_eq!(
                     joined.body_count(),
@@ -110,7 +155,7 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
             }
             let mut contacted = std::collections::HashSet::new();
             for step in 0..35 {
-                let world = joined.duck_visit.as_ref().unwrap().arena_world();
+                let world = joined.arena.world().unwrap();
                 for id in world.collider_ids() {
                     if world.surface_contacts(id).next().is_some() {
                         contacted.insert(id.entity);
@@ -122,7 +167,14 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
                     (joined.event_kind(), joined.phase_tick()),
                     (baseline.event_kind(), baseline.phase_tick())
                 );
-                let world = joined.duck_visit.as_ref().unwrap().arena_world();
+                // The soil's body changes how a pile settles from then on, even
+                // where nothing touches it, so a segment that misses the pile in
+                // one run can graze it in the other. The first step after the
+                // handoff still shows any reset or extra step.
+                if soil && step > 0 {
+                    continue;
+                }
+                let world = joined.arena.world().unwrap();
                 for id in world.collider_ids() {
                     if world.surface_contacts(id).next().is_some() {
                         contacted.insert(id.entity);
@@ -172,6 +224,7 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
         free_flight_samples > 100,
         "exercise actual falling trajectories"
     );
+    assert!(contacts_kept > 0, "exercise a pile that keeps its contacts");
 }
 
 #[test]
@@ -193,9 +246,9 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
             }
             assert_eq!(state.event_kind(), None);
             assert_eq!(opacity, 1.0);
-            assert!(state.duck_visit.as_ref().unwrap().grounded());
+            assert!(state.duck_scene().unwrap().grounded());
             assert!(state.body_count() <= 5 + state.flap_body_count());
-            let duck = state.duck_visit.as_ref().unwrap();
+            let duck = state.duck_scene().unwrap();
             let start_y = duck.position().unwrap().y;
             let radius = duck.radius;
             let jump = input(&state, 0, true);
@@ -203,25 +256,25 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
             let mut peak = start_y;
             for _ in 0..80 {
                 tick(&mut state, &[]);
-                peak = peak.max(state.duck_visit.as_ref().unwrap().position().unwrap().y);
+                peak = peak.max(state.duck_scene().unwrap().position().unwrap().y);
             }
             assert!(
                 (radius * 3.5..radius * 5.5).contains(&(peak - start_y)),
                 "calibrated jump survives adopted solver settings"
             );
-            assert!(state.duck_visit.as_ref().unwrap().grounded());
+            assert!(state.duck_scene().unwrap().grounded());
             if kind == ClockEventKind::Falling {
                 // Both original walls stay for the bars; the actor exits at the
                 // far door's threshold instead of getting stuck behind it.
-                let duck = state.duck_visit.as_mut().unwrap();
+                let duck = state.duck_visit.as_ref().unwrap();
                 let position = duck.render_position(Vec2::new(
                     duck.width - duck.radius * 2.5,
                     duck.layout.floor_y + duck.radius * 1.01,
                 ));
                 let direction = duck.direction;
-                duck.arena_world_mut().set_pose(body, position, 0.0, true);
-                duck.arena_world_mut()
-                    .set_velocity(body, Vec2::ZERO, 0.0, true);
+                let world = state.arena.world_mut().unwrap();
+                world.set_pose(body, position, 0.0, true);
+                world.set_velocity(body, Vec2::ZERO, 0.0, true);
                 let action = input(&state, (direction * 1000.0) as i16, false);
                 tick(&mut state, &[action]);
                 ticks(&mut state, 15);

@@ -1,6 +1,6 @@
 //! Immutable course geometry shared by character collision, rain supports and
 //! rendering. Copies happen only at event/visit boundaries, never per tick.
-use super::{DuckEvent, planner::Course};
+use super::{ArenaTerrain, planner::Course};
 use crate::layout::Layout;
 use engine_core::Vec2;
 use engine_water::{Boundary, PoolSpec};
@@ -15,18 +15,33 @@ pub(crate) struct CourseGeometry {
 }
 
 impl CourseGeometry {
-    pub fn from_duck(duck: &DuckEvent) -> Self {
+    pub fn from_terrain(terrain: &ArenaTerrain) -> Self {
         Self {
-            layout: duck.layout,
-            width: duck.width,
-            radius: duck.radius,
-            direction: duck.direction,
-            course: duck.course.clone().expect("duck course"),
+            layout: terrain.layout,
+            width: terrain.width,
+            radius: terrain.radius,
+            direction: terrain.direction,
+            course: terrain.course.clone().expect("duck course"),
         }
     }
 
     pub fn screen_position(&self, p: Vec2) -> Vec2 {
         Vec2::new((p.x - self.width * 0.5) * self.direction, p.y)
+    }
+
+    /// The course's solid columns, from the bottom of the view up to each
+    /// surface, as a visit's terrain inserts them.
+    pub fn slabs(&self) -> Vec<(Vec2, Vec2)> {
+        self.course
+            .surfaces
+            .iter()
+            .map(|surface| {
+                let a = self.screen_position(Vec2::new(surface.start, self.layout.bounds_min.y));
+                let b = self
+                    .screen_position(Vec2::new(surface.end, self.layout.floor_y + surface.height));
+                (Vec2::new(a.x.min(b.x), a.y), Vec2::new(a.x.max(b.x), b.y))
+            })
+            .collect()
     }
 
     /// Exactly the visible/collidable top of each slab, with gaps left open.

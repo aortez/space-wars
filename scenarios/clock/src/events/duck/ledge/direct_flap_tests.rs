@@ -4,13 +4,13 @@ use engine_common::{
     ClockDuckFlapDetourOutcome as Outcome, ClockDuckFlapDetourPhase as DetourPhase,
 };
 
-fn direct(aspect: f32, direction: f32) -> DuckEvent {
+fn direct(aspect: f32, direction: f32) -> TestDuck {
     let mut duck = ordinary(aspect, direction, PROFILES[0]);
     duck.select_direct_flap_landing(true);
     duck
 }
 
-fn finished(duck: &DuckEvent) -> bool {
+fn finished(duck: &TestDuck) -> bool {
     duck.ledge.detour.stats.phase == DetourPhase::Finished
 }
 
@@ -67,8 +67,8 @@ fn direct_flap_lands_perches_returns_and_resumes_from_normal_spawn() {
 fn direct_flap_keeps_seeded_selection_and_course_geometry() {
     assert!(!crate::ClockConfig::default().duck_direct_flap_landing);
     for seed in 0..40 {
-        let mut duck = DuckEvent::new_course(Layout::new(ASPECTS[0]), seed, None);
-        let surfaces = duck.course.as_ref().unwrap().surfaces.clone();
+        let mut duck = TestDuck::new_course(Layout::new(ASPECTS[0]), seed, None);
+        let surfaces = duck.terrain.course.as_ref().unwrap().surfaces.clone();
         let direction = duck.direction;
         duck.select_direct_flap_landing(true);
         until(&mut duck, finished);
@@ -82,7 +82,7 @@ fn direct_flap_keeps_seeded_selection_and_course_geometry() {
             "seed={seed}: {:?}",
             duck.diagnostics()
         );
-        assert_eq!(duck.course.as_ref().unwrap().surfaces, surfaces);
+        assert_eq!(duck.terrain.course.as_ref().unwrap().surfaces, surfaces);
         assert_eq!(duck.direction, direction);
     }
 }
@@ -103,7 +103,7 @@ fn direct_flap_refuses_a_gap_inside_the_return_bodys_bounds() {
         piece.local_position = duck.render_position(Vec2::new(center * r, duck.layout.floor_y - r));
         pieces.push(piece);
     }
-    let world = duck.world.as_mut().unwrap();
+    let world = duck.arena.world_mut().unwrap();
     world.remove_entity(entity);
     assert!(world.insert_body(
         BodyId::new(entity, BodyRole::PRIMARY),
@@ -174,11 +174,11 @@ fn direct_flap_late_or_disrupted_landing_ends_without_retry() {
         if late {
             duck.ledge.detour.age = 100;
         } else {
-            duck.world.as_mut().unwrap().apply_velocity_delta(
-                DUCK_BODY,
-                Vec2::new(duck.radius * 50.0, 0.0),
-                true,
-            );
+            let delta = Vec2::new(duck.radius * 50.0, 0.0);
+            duck.arena
+                .world_mut()
+                .unwrap()
+                .apply_velocity_delta(DUCK_BODY, delta, true);
         }
         until(&mut duck, finished);
         assert_eq!(duck.ledge.detour.stats.outcome, Some(Outcome::Expired));
@@ -201,8 +201,8 @@ fn direct_flap_handles_water_timeout_deadline_and_lost_support() {
             1 => duck.ledge.detour.stats.ticks = flap_detour::BUDGET_TICKS - 1,
             2 => duck.tick = DUCK_TICKS - RESET_TICKS - u64::from(flap_detour::BUDGET_TICKS),
             _ => {
-                duck.world
-                    .as_mut()
+                duck.arena
+                    .world_mut()
                     .unwrap()
                     .remove_entity(PhysicsId::new(1000));
             }
@@ -235,9 +235,9 @@ fn direct_flap_takeover_preserves_motion_at_each_stage() {
     ] {
         let mut duck = direct(ASPECTS[0], -1.0);
         until(&mut duck, |d| d.ledge.detour.stats.phase == stage);
-        let before = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let before = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert!(duck.take_control(9, 1));
-        let after = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let after = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert_eq!(before.position, after.position);
         assert_eq!(before.linear_velocity, after.linear_velocity);
         assert_eq!(duck.ledge.detour.stats.outcome, Some(Outcome::TakenOver));
@@ -260,7 +260,7 @@ fn direct_flap_accepts_closed_responsive_floor_and_refuses_moving_support() {
                 if moving {
                     floor.opening = 0.9;
                 }
-                duck.responsive_floor = Some(floor);
+                duck.terrain.responsive_floor = Some(floor);
                 until(&mut duck, finished);
                 if moving {
                     assert!(matches!(

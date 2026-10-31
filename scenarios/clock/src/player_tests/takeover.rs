@@ -20,7 +20,7 @@ fn taking_over_an_automatic_duck_preserves_the_actor_course_and_phase() {
             before.navigation = None;
             let duck = state.duck_scene().unwrap();
             let phase = (duck.phase, duck.phase_tick, duck.tick);
-            let surfaces = duck.course.as_ref().unwrap().surfaces.clone();
+            let surfaces = duck.terrain.course.as_ref().unwrap().surfaces.clone();
             let frame = join::visible_polygons(&state);
             let time = state.simulation_tick();
             let event_id = state.event_id();
@@ -31,7 +31,7 @@ fn taking_over_an_automatic_duck_preserves_the_actor_course_and_phase() {
             assert_eq!(player.facing_right, facing);
             let duck = state.duck_visit.as_ref().unwrap();
             assert_eq!((duck.phase, duck.phase_tick, duck.tick), phase);
-            assert_eq!(duck.course.as_ref().unwrap().surfaces, surfaces);
+            assert_eq!(duck.terrain.course.as_ref().unwrap().surfaces, surfaces);
             assert_eq!(join::visible_polygons(&state), frame);
             assert_eq!(state.simulation_tick(), time);
             assert_eq!(state.event_id(), event_id, "not a new automatic event");
@@ -50,13 +50,15 @@ fn taken_over_visit_composes_with_events_and_cleans_up_across_dismissal_and_resi
         ClockEventKind::Meltdown,
     ] {
         let mut state = automatic(4.0 / 3.0, 42, 70);
-        let world = state.duck_scene().unwrap().arena_world() as *const _;
+        let activity = engine_rapier::world::physics_activity();
+        let worlds = state.arena_accounting().worlds;
         toggle(&mut state, 1);
         assert_eq!(
-            state.duck_visit.as_ref().unwrap().arena_world() as *const _,
-            world,
-            "the world is moved, not reconstructed"
+            engine_rapier::world::physics_activity(),
+            activity,
+            "the world is moved, not reconstructed, stepped or dropped"
         );
+        assert_eq!(state.arena_accounting().worlds, worlds, "the same arena");
         let player = state.player_duck_state().unwrap();
         let frame = ClockScenario::render_frame(&state);
         ClockScenario::step(&mut state, &[], Duration::ZERO);

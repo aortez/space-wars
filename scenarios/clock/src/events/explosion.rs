@@ -1,5 +1,6 @@
 //! A bounded batch of individual digit/AM-PM blocks in the existing mechanics
 //! arena. The event owns only its batch, never the duck or its controller.
+use engine_common::ClockEventKind;
 use engine_core::Vec2;
 use engine_rapier::world::{
     BodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId, PhysicsWorld,
@@ -8,11 +9,14 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::{
     EventContext, EventPhase, REFORMING_TICKS,
-    duck::{DuckEvent, VisitArena},
+    duck::{self, DuckEvent},
 };
 use crate::{
-    SegmentRepresentation, digits,
+    DisplaySnapshot, SegmentRepresentation,
+    arena::ClockArena,
+    digits,
     floor::DrainGeometry,
+    layout::Layout,
     meridiem::{self, Glyph, PIXEL_SIZE},
     physics::FallingWorld,
 };
@@ -38,7 +42,7 @@ pub(crate) struct Cell {
 
 enum Mechanics {
     Standalone(Option<Box<PhysicsWorld>>),
-    Shared(VisitArena),
+    Shared,
 }
 
 pub(crate) struct ExplosionEvent {
@@ -54,33 +58,19 @@ pub(crate) struct ExplosionEvent {
 
 fn body_id(index: usize) -> BodyId {
     // Disjoint from duck, course, Falling bars and Meltdown cells.
-    BodyId::new(PhysicsId::new(5001 + index as u64), BodyRole::PRIMARY)
+    BodyId::new(
+        PhysicsId::new(crate::arena::ids::canonical::EXPLOSION_CELLS.start + index as u64),
+        BodyRole::PRIMARY,
+    )
 }
 
 impl ExplosionEvent {
-    pub fn canonical_world<'a>(
-        &'a self,
-        player: Option<&'a DuckEvent>,
-    ) -> Option<&'a PhysicsWorld> {
+    /// The standalone world, before any player joins. Shared debris lives in
+    /// the run's arena instead.
+    pub fn own_world(&self) -> Option<&PhysicsWorld> {
         match &self.mechanics {
             Mechanics::Standalone(world) => world.as_deref(),
-            Mechanics::Shared(arena) => Some(arena.get(player).arena_world()),
-        }
-    }
-    pub fn canonical_world_mut<'a>(
-        &'a mut self,
-        player: Option<&'a mut DuckEvent>,
-    ) -> Option<&'a mut PhysicsWorld> {
-        match &mut self.mechanics {
-            Mechanics::Standalone(world) => world.as_deref_mut(),
-            Mechanics::Shared(arena) => Some(arena.get_mut(player).arena_world_mut()),
-        }
-    }
-    #[cfg(test)]
-    pub fn soil_world(&self) -> Option<&PhysicsWorld> {
-        match &self.mechanics {
-            Mechanics::Standalone(world) => world.as_deref(),
-            _ => None,
+            Mechanics::Shared => None,
         }
     }
 
@@ -94,13 +84,14 @@ impl ExplosionEvent {
         )
     }
 
-    pub fn with_visit(context: EventContext<'_>, seed: u64, duck: &mut DuckEvent) -> Self {
-        Self::build(
-            context,
-            seed,
-            Mechanics::Shared(VisitArena::claim(duck)),
-            None,
-        )
+    pub fn with_visit(
+        context: EventContext<'_>,
+        seed: u64,
+        duck: &mut DuckEvent,
+        arena: &mut ClockArena,
+    ) -> Self {
+        duck.claim_arena(arena, ClockEventKind::Explosion);
+        Self::build(context, seed, Mechanics::Shared, None)
     }
 
     fn build(
@@ -197,35 +188,25 @@ impl ExplosionEvent {
     }
 
     pub fn shares_visit_arena(&self) -> bool {
-        matches!(self.mechanics, Mechanics::Shared(_))
+        matches!(self.mechanics, Mechanics::Shared)
     }
-    pub fn vacant_arena(&self) -> Option<&DuckEvent> {
-        match &self.mechanics {
-            Mechanics::Shared(arena) => arena.vacant(),
-            _ => None,
-        }
-    }
+    /// How opaque the event shows a vacant arena: it fades out at the end of
+    /// reformation.
     pub fn arena_opacity(&self) -> f32 {
-        if self.vacant_arena().is_some() && self.phase == EventPhase::Reforming {
+        if self.phase == EventPhase::Reforming {
             ((REFORMING_TICKS - self.tick) as f32 / 30.0).min(1.0)
         } else {
             1.0
         }
     }
-    pub fn retain_arena(&mut self, duck: Box<DuckEvent>) {
-        let Mechanics::Shared(arena) = &mut self.mechanics else {
-            panic!("shared Explosion arena")
-        };
-        arena.retain(duck);
-    }
-    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
-        match &mut self.mechanics {
-            Mechanics::Shared(arena) => arena.rejoin(session, seat),
-            _ => None,
-        }
-    }
 
-    pub fn join_player(&mut self, seed: u64, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
+    pub fn join_player(
+        &mut self,
+        arena: &mut ClockArena,
+        seed: u64,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
         let Mechanics::Standalone(world) = &mut self.mechanics else {
             return None;
         };
@@ -234,28 +215,29 @@ impl ExplosionEvent {
             .take()
             .map_or_else(|| FallingWorld::arena(drain), |w| *w);
         let mut duck = Box::new(DuckEvent::new_drain_player(
-            drain, seed, session, seat, world,
+            drain, seed, session, seat, arena, world,
         ));
         if self.live_bodies {
-            let world = duck.arena_world_mut();
+            let world = arena.world_mut().unwrap();
             let scale = self.gravity / -world.gravity().y;
             for i in 0..self.cells.len() {
                 assert!(world.set_gravity_scale(body_id(i), scale, false));
             }
         }
-        self.mechanics = Mechanics::Shared(VisitArena::claim(&mut duck));
+        duck.claim_arena(arena, ClockEventKind::Explosion);
+        self.mechanics = Mechanics::Shared;
         Some(duck)
     }
 
     /// One world step, including during warning/reformation when no debris is
     /// live. Only the event's bodies are retired; duck motion keeps advancing.
-    fn advance_phase(&mut self, context: EventContext<'_>, duck: Option<&mut DuckEvent>) -> bool {
+    fn advance_phase(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
         self.tick += 1;
         let burst = self.phase == EventPhase::Warning && self.tick >= WARNING_TICKS;
         let reform = self.phase == EventPhase::Exploding && self.tick >= BURST_TICKS;
         let world = match &mut self.mechanics {
             Mechanics::Standalone(world) => world.as_deref_mut(),
-            Mechanics::Shared(arena) => Some(arena.get_mut(duck).arena_world_mut()),
+            Mechanics::Shared => Some(arena.world_mut().expect("leased arena")),
         };
         if let Some(world) = world {
             if burst {
@@ -310,12 +292,10 @@ impl ExplosionEvent {
         self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS
     }
 
-    pub fn step(
-        &mut self,
-        mut context: EventContext<'_>,
-        mut duck: Option<&mut DuckEvent>,
-    ) -> bool {
-        let soil = context.soil.take();
+    /// The event's tick up to the arena's step. A standalone Explosion steps its
+    /// own world and finishes its tick here; a shared one reads the arena back
+    /// in `observe`. Returns true when the event has finished.
+    pub fn step(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
         // Reading/control updates do not move paused debris. On the next tick,
         // redirect only changed destinations from their current visible poses.
         if let Some(reassembly) = &mut self.reassembly {
@@ -323,32 +303,42 @@ impl ExplosionEvent {
         }
         let display = context.display;
         let layout = context.layout;
-        let finished = self.advance_phase(context, duck.as_deref_mut());
-        let world = match &mut self.mechanics {
-            Mechanics::Standalone(world) => world.as_deref_mut().map(|world| {
+        let finished = self.advance_phase(context, arena);
+        if let Mechanics::Standalone(world) = &mut self.mechanics {
+            let world = world.as_deref_mut().map(|world| {
                 world.step(1.0 / 60.0);
                 &*world
-            }),
-            Mechanics::Shared(arena) => {
-                Some(arena.step_with_soil(duck, None, false, soil).arena_world())
-            }
-        };
-        if self.live_bodies
-            && let Some(world) = world
-        {
-            for (i, cell) in self.cells.iter_mut().enumerate() {
+            });
+            Self::read_back(&mut self.cells, self.live_bodies, world);
+            self.sample_reassembly(display, layout);
+        }
+        finished
+    }
+
+    /// The shared cells after the arena's step.
+    pub fn observe(&mut self, context: EventContext<'_>, arena: &ClockArena) {
+        Self::read_back(&mut self.cells, self.live_bodies, arena.world());
+        self.sample_reassembly(context.display, context.layout);
+    }
+
+    /// Live cells take their bodies' poses.
+    fn read_back(cells: &mut [Cell], live_bodies: bool, world: Option<&PhysicsWorld>) {
+        if live_bodies && let Some(world) = world {
+            for (i, cell) in cells.iter_mut().enumerate() {
                 let motion = world.motion(body_id(i)).expect("live Explosion cell");
                 cell.position = motion.position;
                 cell.angle = motion.angle;
             }
         }
+    }
+
+    fn sample_reassembly(&mut self, display: DisplaySnapshot, layout: Layout) {
         if self.phase == EventPhase::Reforming {
             let reassembly = self
                 .reassembly
                 .get_or_insert_with(|| Reassembly::new(&mut self.cells, display, layout));
             reassembly.sample(&mut self.cells, self.tick);
         }
-        finished
     }
 
     fn remove_bodies(world: &mut PhysicsWorld, cells: &[Cell]) {
@@ -359,14 +349,13 @@ impl ExplosionEvent {
             );
         }
     }
-    pub fn release(&mut self, duck: Option<&mut DuckEvent>) {
-        if let Mechanics::Shared(arena) = &mut self.mechanics {
-            let duck = arena.get_mut(duck);
+    pub fn release(&mut self, player: Option<&mut DuckEvent>, arena: &mut ClockArena) {
+        if let Mechanics::Shared = self.mechanics {
             if self.live_bodies {
-                Self::remove_bodies(duck.arena_world_mut(), &self.cells);
+                Self::remove_bodies(arena.world_mut().expect("leased arena"), &self.cells);
                 self.live_bodies = false;
             }
-            duck.release_arena();
+            duck::end_lease(player, arena, ClockEventKind::Explosion);
         }
     }
     pub fn physics_counts(&self) -> (usize, usize) {
@@ -374,7 +363,8 @@ impl ExplosionEvent {
             Mechanics::Standalone(world) => world
                 .as_ref()
                 .map_or((0, 0), |w| (w.body_count(), w.collider_count())),
-            Mechanics::Shared(arena) => arena.vacant().map_or((0, 0), DuckEvent::physics_counts),
+            // A shared world is the run's arena, which ClockState counts once.
+            Mechanics::Shared => (0, 0),
         }
     }
 }

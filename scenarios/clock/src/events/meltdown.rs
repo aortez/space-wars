@@ -2,12 +2,15 @@
 //! its world-space area; digit animation and event cleanup remain scenario-owned.
 use engine_common::ClockMeltdownState;
 use engine_core::Vec2;
+use engine_rapier::world::PhysicsWorld;
 use engine_water::{Boundary, Parcel, PoolSpec, WaterConfig, WaterWorld};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::{EventContext, EventPhase, REFORMING_TICKS, duck::DuckEvent};
 use crate::{
-    ClockWaterLab, SegmentRepresentation, digits,
+    ClockWaterLab, SegmentRepresentation,
+    arena::ClockArena,
+    digits,
     floor::responsive::{FloorShape, ResponsiveFloor},
     layout::Layout,
 };
@@ -48,39 +51,28 @@ pub(crate) struct MeltdownEvent {
 }
 
 impl MeltdownEvent {
-    pub fn canonical_world<'a>(
-        &'a self,
-        player: Option<&'a DuckEvent>,
-    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
-        if let Some(shared) = &self.shared {
-            Some(shared.arena.get(player).arena_world())
-        } else {
-            self.floats.as_ref().map(|f| &f.world)
-        }
-    }
-    pub fn canonical_world_mut<'a>(
-        &'a mut self,
-        player: Option<&'a mut DuckEvent>,
-    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
-        if let Some(shared) = &mut self.shared {
-            Some(shared.arena.get_mut(player).arena_world_mut())
-        } else {
-            self.floats.as_mut().map(|f| &mut f.world)
-        }
+    /// The water lab's own world. Shared cells live in the run's arena instead.
+    pub fn own_world(&self) -> Option<&PhysicsWorld> {
+        self.floats.as_ref().map(|f| &f.world)
     }
     pub fn new(context: EventContext<'_>, seed: u64, mode: ClockWaterLab) -> Self {
         Self::in_arena(context, seed, mode, None)
     }
 
-    pub fn with_visit(context: EventContext<'_>, seed: u64, player: &mut DuckEvent) -> Self {
-        Self::in_arena(context, seed, ClockWaterLab::Off, Some(player))
+    pub fn with_visit(
+        context: EventContext<'_>,
+        seed: u64,
+        player: &mut DuckEvent,
+        arena: &mut ClockArena,
+    ) -> Self {
+        Self::in_arena(context, seed, ClockWaterLab::Off, Some((player, arena)))
     }
 
     fn in_arena(
         context: EventContext<'_>,
         seed: u64,
         mode: ClockWaterLab,
-        player: Option<&mut DuckEvent>,
+        visit: Option<(&mut DuckEvent, &mut ClockArena)>,
     ) -> Self {
         let lab = mode != ClockWaterLab::Off;
         let mut rng = StdRng::seed_from_u64(seed);
@@ -123,8 +115,9 @@ impl MeltdownEvent {
             }
         }
         let cell_area = (Self::water_pitch(context.layout, mode) * 0.8).powi(2);
-        let floor = match player.as_deref() {
-            Some(duck) => duck.responsive_floor().cloned(),
+        let player = visit.as_ref().map(|(duck, _)| &**duck);
+        let floor = match player {
+            Some(duck) => duck.terrain.responsive_floor().cloned(),
             None => (!lab).then(|| ResponsiveFloor::new(FloorShape::clock(context.layout), 0.0)),
         };
         let mut water = if lab {
@@ -133,7 +126,7 @@ impl MeltdownEvent {
             let pools = if let Some(floor) = &floor {
                 floor.shape.pools_at(floor.opening).into()
             } else {
-                super::duck::arena::CourseGeometry::from_duck(player.as_deref().unwrap())
+                super::duck::arena::CourseGeometry::from_terrain(&player.unwrap().terrain)
                     .water_pools()
             };
             let mut water = WaterWorld::new(
@@ -175,7 +168,8 @@ impl MeltdownEvent {
             }
         }
         let floats = lab.then(|| water_lab::WaterLab::new(&water, context.layout, mode));
-        let shared = player.map(|duck| shared::SharedMeltdown::new(duck, cells.len()));
+        let shared =
+            visit.map(|(duck, arena)| shared::SharedMeltdown::new(duck, arena, cells.len()));
         Self {
             tick: 0,
             initial_cells,
@@ -288,17 +282,18 @@ impl MeltdownEvent {
             }
     }
 
-    pub fn step(&mut self, context: EventContext<'_>) -> bool {
-        self.step_with_visit(context, None)
-    }
-
+    /// The event's tick up to the arena's step. A standalone Meltdown finishes
+    /// its tick here; a shared one reads the arena back in `observe`. Returns
+    /// true when the event has finished.
     pub fn step_with_visit(
         &mut self,
         context: EventContext<'_>,
         player: Option<&mut DuckEvent>,
+        arena: &mut ClockArena,
     ) -> bool {
         if self.shared.is_some() {
-            return self.step_shared(context, player);
+            self.step_shared(context, player, arena);
+            return false;
         }
         self.tick += 1;
         if let Some(floats) = &mut self.floats {
@@ -351,12 +346,9 @@ impl MeltdownEvent {
     }
 
     pub fn physics_counts(&self) -> (usize, usize) {
-        if let Some(shared) = &self.shared {
-            // ClockState counts the occupied world with its player, once.
-            return shared
-                .arena
-                .vacant()
-                .map_or((0, 0), DuckEvent::physics_counts);
+        if self.shared.is_some() {
+            // A shared world is the run's arena, which ClockState counts once.
+            return (0, 0);
         }
         self.floats
             .as_ref()

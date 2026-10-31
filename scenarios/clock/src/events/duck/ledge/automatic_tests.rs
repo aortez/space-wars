@@ -9,7 +9,7 @@ const PROFILES: [ClockDuckJumpProfile; 2] =
 /// Let the real controller calibrate and launch, then stage a repeatable
 /// disrupted flight beside its selected target. This is a near-miss fixture,
 /// not evidence that an unperturbed seeded run normally misses this jump.
-fn near_miss(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> (DuckEvent, Edge) {
+fn near_miss(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> (TestDuck, Edge) {
     near_miss_toward(aspect, direction, profile, 1.0)
 }
 
@@ -18,9 +18,9 @@ fn near_miss_toward(
     direction: f32,
     profile: ClockDuckJumpProfile,
     route: f32,
-) -> (DuckEvent, Edge) {
-    let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
-    duck.direction = direction;
+) -> (TestDuck, Edge) {
+    let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
+    duck.face(direction);
     duck.controller.profile = profile;
     for _ in 0..EXIT_DELAY_TICKS {
         duck.step();
@@ -32,7 +32,7 @@ fn near_miss_toward(
             && duck.controller.direction == route
         {
             let target = duck.controller.navigator.plan.unwrap().target;
-            let edge = edges(&duck)
+            let edge = edges(&duck, duck.arena.world().unwrap())
                 .into_iter()
                 .flatten()
                 .find(|edge| {
@@ -47,9 +47,9 @@ fn near_miss_toward(
     panic!("no ordinary takeoff: {:?}", duck.diagnostics());
 }
 
-fn stage_miss(duck: &mut DuckEvent, edge: Edge) {
+fn stage_miss(duck: &mut TestDuck, edge: Edge) {
     let r = duck.radius;
-    let world = duck.world.as_mut().unwrap();
+    let world = duck.arena.world_mut().unwrap();
     let anchor = edge.anchor(world).unwrap();
     world.set_pose(
         DUCK_BODY,
@@ -60,7 +60,7 @@ fn stage_miss(duck: &mut DuckEvent, edge: Edge) {
     world.set_velocity(DUCK_BODY, Vec2::new(-edge.outward * r * 3.0, -r), 0.0, true);
 }
 
-fn wait_for_hang(duck: &mut DuckEvent) {
+fn wait_for_hang(duck: &mut TestDuck) {
     for _ in 0..40 {
         duck.step();
         if duck.ledge_state().phase == Phase::Hanging {
@@ -70,9 +70,9 @@ fn wait_for_hang(duck: &mut DuckEvent) {
     panic!("no automatic hang: {:?}", duck.diagnostics());
 }
 
-fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) -> PhysicsId {
-    let id = PhysicsId::new(9000);
-    assert!(duck.world.as_mut().unwrap().insert_body(
+fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) -> PhysicsId {
+    let id = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
+    assert!(duck.arena.world_mut().unwrap().insert_body(
         BodyId::new(id, BodyRole::PRIMARY),
         BodySpec {
             kind: BodyKind::Fixed,
@@ -97,7 +97,7 @@ fn both_profiles_recover_near_misses_then_resume_and_exit_in_all_target_layouts(
                 let caps = duck.controller.capabilities().unwrap();
                 let samples = (duck.controller.heights.count, duck.controller.speeds.count);
                 let confirmed = duck.controller.navigator.confirmed;
-                let mass = duck.world.as_ref().unwrap().body_mass(DUCK_BODY);
+                let mass = duck.arena.world().unwrap().body_mass(DUCK_BODY);
                 let count = duck.physics_counts();
                 let jumps = duck.jumps;
                 wait_for_hang(&mut duck);
@@ -128,7 +128,7 @@ fn both_profiles_recover_near_misses_then_resume_and_exit_in_all_target_layouts(
                     duck.supported_surface().map(|i| i as u64 + 1000),
                     Some(edge.body.entity.value())
                 );
-                assert_eq!(duck.world.as_ref().unwrap().body_mass(DUCK_BODY), mass);
+                assert_eq!(duck.arena.world().unwrap().body_mass(DUCK_BODY), mass);
                 assert_eq!(duck.physics_counts(), count);
                 assert_eq!(duck.jumps, jumps, "no airborne rescue jump");
                 assert_eq!(
@@ -163,7 +163,7 @@ fn ordinary_clearable_jumps_calibration_and_wrong_way_edges_do_not_request_catch
     for profile in PROFILES {
         let (mut duck, _) = near_miss(ASPECTS[0], 1.0, profile);
         let r = duck.radius;
-        duck.world.as_mut().unwrap().set_velocity(
+        duck.arena.world_mut().unwrap().set_velocity(
             DUCK_BODY,
             Vec2::new(r * 3.0, r * 20.0),
             0.0,
@@ -230,7 +230,7 @@ fn blocked_climbs_release_once_and_do_not_wait_forever() {
 fn catch_refusals_have_a_cooldown_and_a_visit_attempt_limit() {
     let (mut duck, edge) = near_miss(ASPECTS[0], 1.0, PROFILES[0]);
     let r = duck.radius;
-    let anchor = edge.anchor(duck.world.as_ref().unwrap()).unwrap();
+    let anchor = edge.anchor(duck.arena.world().unwrap()).unwrap();
     block(
         &mut duck,
         anchor + Vec2::new(-edge.outward * r * 1.5, r * 1.5),
@@ -238,7 +238,7 @@ fn catch_refusals_have_a_cooldown_and_a_visit_attempt_limit() {
     );
     // Hold only the fixture's physical observation constant while exercising
     // repeated controller decisions. Actual movement/blocked climbs are above.
-    duck.world.as_mut().unwrap().step(DT);
+    duck.arena.world_mut().unwrap().step(DT);
     for tick in 0..COOLDOWN_TICKS * (MAX_ATTEMPTS + 2) {
         duck.decide_automatic_ledge();
         assert!(!duck.drive_ledge());
@@ -263,9 +263,9 @@ fn takeover_keeps_a_hang_or_committed_climb_and_stops_automatic_decisions() {
             assert_eq!(duck.ledge_state().phase, Phase::Climbing);
         }
         let anchor = duck.ledge_anchor();
-        let motion = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let motion = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert!(duck.take_control(99, 2));
-        let taken = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let taken = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert_eq!(taken.position, motion.position);
         assert_eq!(taken.linear_velocity, motion.linear_velocity);
         assert_eq!(duck.ledge_anchor(), anchor);
@@ -299,7 +299,7 @@ fn water_timeout_support_loss_and_visit_deadline_cancel_automatic_intent() {
     for interruption in 0..5 {
         let (mut duck, edge) = near_miss(ASPECTS[0], 1.0, PROFILES[0]);
         wait_for_hang(&mut duck);
-        let mass = duck.world.as_ref().unwrap().body_mass(DUCK_BODY);
+        let mass = duck.arena.world().unwrap().body_mass(DUCK_BODY);
         let expected = match interruption {
             0 => {
                 duck.water_report.submerged_fraction = 0.5;
@@ -310,12 +310,15 @@ fn water_timeout_support_loss_and_visit_deadline_cancel_automatic_intent() {
                 Outcome::TimedOut
             }
             2 => {
-                duck.world.as_mut().unwrap().remove_entity(edge.body.entity);
+                duck.arena
+                    .world_mut()
+                    .unwrap()
+                    .remove_entity(edge.body.entity);
                 Outcome::Interrupted
             }
             3 => {
                 let r = duck.radius;
-                duck.world.as_mut().unwrap().apply_velocity_delta(
+                duck.arena.world_mut().unwrap().apply_velocity_delta(
                     DUCK_BODY,
                     Vec2::new(r * 40.0, 0.0),
                     true,
@@ -333,7 +336,7 @@ fn water_timeout_support_loss_and_visit_deadline_cancel_automatic_intent() {
         assert!(!duck.ledge_attached());
         assert_eq!(duck.ledge.automatic.stats.outcome, Some(expected));
         assert_eq!(duck.ledge.automatic.stats.failed, 1);
-        assert_eq!(duck.world.as_ref().unwrap().body_mass(DUCK_BODY), mass);
+        assert_eq!(duck.arena.world().unwrap().body_mass(DUCK_BODY), mass);
     }
 }
 
@@ -342,8 +345,8 @@ fn clean_seeded_visits_keep_their_normal_jumps_without_ledge_attempts() {
     for aspect in ASPECTS {
         for direction in [-1.0, 1.0] {
             for profile in PROFILES {
-                let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
-                duck.direction = direction;
+                let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
+                duck.face(direction);
                 duck.controller.profile = profile;
                 for _ in 0..DUCK_TICKS {
                     duck.step();
@@ -418,9 +421,9 @@ fn a_fully_open_exit_flap_is_local_recovery_support_and_retires_with_its_arena()
             for tick in 1..=25 {
                 duck.phase_tick = tick;
                 duck.advance_flaps();
-                duck.world.as_mut().unwrap().step(DT);
+                duck.arena.world_mut().unwrap().step(DT);
             }
-            let edge = edges(&duck)
+            let edge = edges(&duck, duck.arena.world().unwrap())
                 .into_iter()
                 .flatten()
                 .find(|e| e.flap.is_some_and(|(side, _)| side == 1))
@@ -457,13 +460,8 @@ fn a_fully_open_exit_flap_is_local_recovery_support_and_retires_with_its_arena()
                 );
                 continue;
             }
-            let mut arena = VisitArena::claim(&mut duck);
-            arena.retain(Box::new(duck));
-            let vacant = arena.vacant().unwrap();
-            assert!(!vacant.ledge_attached());
-            assert!(!vacant.ledge.automatic.stats.active);
-            assert!(vacant.door_panels().iter().all(Option::is_none));
-            let rejoined = arena.rejoin(10, 1).unwrap();
+            let rejoined = duck.rejoin(10, 1);
+            assert!(!rejoined.ledge_attached());
             assert_eq!(rejoined.ledge.automatic.stats, Default::default());
         }
     }
@@ -499,7 +497,7 @@ fn automatic_ledge_scene_fixtures_replay_pause_and_render_at_target_sizes() {
                         )],
                         Duration::ZERO,
                     );
-                    state.duck_visit = Some(Box::new(duck));
+                    duck.admit(&mut state);
                     let mut frames = Vec::new();
                     for _ in 0..ATTEMPT_TICKS {
                         ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));

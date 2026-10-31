@@ -32,6 +32,7 @@ struct Prediction {
 impl DuckEvent {
     pub(super) fn decide_direct_flap_approach(
         &mut self,
+        world: &PhysicsWorld,
         water: Option<&WaterWorld>,
     ) -> Option<Command> {
         let still = || Command {
@@ -44,10 +45,10 @@ impl DuckEvent {
                 self.finish_flap_detour(Outcome::Expired);
                 return None;
             }
-            if self.ledge.detour.age < SETTLE_TICKS || !self.grounded() {
+            if self.ledge.detour.age < SETTLE_TICKS || !self.grounded(world) {
                 return Some(still());
             }
-            let Some((plan, landing)) = self.plan_direct_flap(water) else {
+            let Some((plan, landing)) = self.plan_direct_flap(world, water) else {
                 self.finish_flap_detour(Outcome::Unsafe);
                 return None;
             };
@@ -67,27 +68,27 @@ impl DuckEvent {
             return None;
         }
 
-        plan.contacts = if self.ledge.detour.launched && self.standing_on(flaps::body(0)) {
+        plan.contacts = if self.ledge.detour.launched && self.standing_on(world, flaps::body(0)) {
             plan.contacts + 1
         } else {
             0
         };
         self.ledge.detour.direct = Some(plan);
         if plan.contacts >= STABLE_CONTACT_TICKS {
-            let motion = self.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+            let motion = world.motion(DUCK_BODY).unwrap();
             plan.perch_x = motion.position.x;
             self.ledge.detour.direct = Some(plan);
             self.ledge.detour.stats.phase = DetourPhase::Perching;
             self.controller.direction = 1.0;
-            return Some(self.direct_position_command(plan.perch_x, false));
+            return Some(self.direct_position_command(world, plan.perch_x, false));
         }
         let jump = self.ledge.detour.age == plan.launch;
         if jump {
             let landing = self.ledge.detour.landing.unwrap();
-            if !self.grounded()
+            if !self.grounded(world)
                 || self
-                    .predict_direct(plan)
-                    .is_none_or(|p| !self.direct_route_clear(&p, landing))
+                    .predict_direct(world, plan)
+                    .is_none_or(|p| !self.direct_route_clear(world, &p, landing))
             {
                 self.finish_flap_detour(Outcome::Blocked);
                 return None;
@@ -97,14 +98,14 @@ impl DuckEvent {
         let command = if self.ledge.detour.age < plan.approach {
             Command { jump, ..still() }
         } else {
-            self.direct_position_command(plan.target_x, jump)
+            self.direct_position_command(world, plan.target_x, jump)
         };
         if self.ledge.detour.launched {
-            let motion = self.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+            let motion = world.motion(DUCK_BODY).unwrap();
             let mut velocity = motion.linear_velocity;
             let next = self.direct_flight_step(motion.position, &mut velocity, &command);
-            if !self.direct_clear_segment(motion.position, next, self.ledge.detour.landing.unwrap())
-            {
+            let landing = self.ledge.detour.landing.unwrap();
+            if !self.direct_clear_segment(world, motion.position, next, landing) {
                 self.finish_flap_detour(Outcome::Blocked);
                 return None;
             }
@@ -112,17 +113,13 @@ impl DuckEvent {
         Some(command)
     }
 
-    pub(super) fn direct_position_command(&self, target: f32, jump: bool) -> Command {
-        self.direct_command(
-            self.world
-                .as_ref()
-                .unwrap()
-                .motion(DUCK_BODY)
-                .unwrap()
-                .position,
-            target,
-            jump,
-        )
+    pub(super) fn direct_position_command(
+        &self,
+        world: &PhysicsWorld,
+        target: f32,
+        jump: bool,
+    ) -> Command {
+        self.direct_command(world.motion(DUCK_BODY).unwrap().position, target, jump)
     }
 
     fn direct_command(&self, position: Vec2, target: f32, jump: bool) -> Command {
@@ -134,8 +131,11 @@ impl DuckEvent {
         }
     }
 
-    fn direct_support(&mut self, water: Option<&WaterWorld>) -> Option<Return> {
-        let world = self.world.as_ref()?;
+    fn direct_support(
+        &mut self,
+        world: &PhysicsWorld,
+        water: Option<&WaterWorld>,
+    ) -> Option<Return> {
         let motion = world.motion(DUCK_BODY)?;
         let r = self.radius;
         let contact = world
@@ -149,7 +149,7 @@ impl DuckEvent {
             Some(BodyKind::Fixed | BodyKind::KinematicPosition)
         ) || pose.angle.abs() > 0.001
             || motion.linear_velocity.length() > r * 0.1
-            || !(5.7 * r..=6.3 * r).contains(&self.position()?.x)
+            || !(5.7 * r..=6.3 * r).contains(&self.position(world)?.x)
         {
             return None;
         }
@@ -181,13 +181,17 @@ impl DuckEvent {
         };
         (center.x > min.x + r * 2.0
             && center.x < max.x - r * 2.0
-            && landing.valid(self)
+            && landing.valid(self, world)
             && landing.dry(water, r))
         .then_some(landing)
     }
 
-    fn plan_direct_flap(&mut self, water: Option<&WaterWorld>) -> Option<(Plan, Return)> {
-        let landing = self.direct_support(water)?;
+    fn plan_direct_flap(
+        &mut self,
+        world: &PhysicsWorld,
+        water: Option<&WaterWorld>,
+    ) -> Option<(Plan, Return)> {
+        let landing = self.direct_support(world, water)?;
         let panel = self.panel_at(0, 2.0 / 24.0);
         let half = panel.half_extents();
         // The upward cap near the hinge is reachable once the flap is almost
@@ -210,9 +214,9 @@ impl DuckEvent {
                     perch_x: target_x,
                     contacts: 0,
                 };
-                if let Some(prediction) = self.predict_direct(plan) {
+                if let Some(prediction) = self.predict_direct(world, plan) {
                     return self
-                        .direct_route_clear(&prediction, landing)
+                        .direct_route_clear(world, &prediction, landing)
                         .then_some((prediction.plan, landing));
                 }
             }
@@ -220,8 +224,8 @@ impl DuckEvent {
         None
     }
 
-    fn predict_direct(&self, mut plan: Plan) -> Option<Prediction> {
-        let motion = self.world.as_ref()?.motion(DUCK_BODY)?;
+    fn predict_direct(&self, world: &PhysicsWorld, mut plan: Plan) -> Option<Prediction> {
+        let motion = world.motion(DUCK_BODY)?;
         let mut position = motion.position;
         let mut velocity = motion.linear_velocity;
         let mut open = self.door_openness().0;
@@ -306,7 +310,12 @@ impl DuckEvent {
             - Vec2::Y * (self.movement.gravity * DT * DT / (2.0 * steps))
     }
 
-    fn direct_route_clear(&mut self, prediction: &Prediction, landing: Return) -> bool {
+    fn direct_route_clear(
+        &mut self,
+        world: &PhysicsWorld,
+        prediction: &Prediction,
+        landing: Return,
+    ) -> bool {
         let mut previous = prediction.points[0];
         for (i, point) in prediction.points[..prediction.len]
             .iter()
@@ -315,7 +324,7 @@ impl DuckEvent {
             .skip(1)
         {
             if i % 4 == 0 || i == prediction.len - 1 {
-                if !self.direct_clear_segment(previous, point, landing) {
+                if !self.direct_clear_segment(world, previous, point, landing) {
                     return false;
                 }
                 previous = point;
@@ -328,7 +337,7 @@ impl DuckEvent {
             let command = self.detour_return_command(position, landing, tick == 0);
             position = self.direct_flight_step(position, &mut velocity, &command);
             if tick % 4 == 3 || (velocity.y < 0.0 && position.y <= landing.center.y) {
-                if !self.direct_clear_segment(previous, position, landing) {
+                if !self.direct_clear_segment(world, previous, position, landing) {
                     return false;
                 }
                 previous = position;
@@ -340,22 +349,25 @@ impl DuckEvent {
         false
     }
 
-    fn direct_clear_segment(&mut self, from: Vec2, to: Vec2, landing: Return) -> bool {
+    fn direct_clear_segment(
+        &mut self,
+        world: &PhysicsWorld,
+        from: Vec2,
+        to: Vec2,
+        landing: Return,
+    ) -> bool {
         let queries = &mut self.ledge.detour.stats.clearance_queries;
         if *queries >= geometry::MAX_QUERIES {
             return false;
         }
         *queries += 1;
         let delta = to - from;
-        self.world
-            .as_ref()
-            .unwrap()
-            .capsule_clearance_test_excluding(
-                delta.length() * 0.5,
-                self.radius * 1.03,
-                CollisionGroups::ALL,
-                vec![DUCK_ENTITY, flaps::body(0).entity, landing.body.entity],
-            )(
+        world.capsule_clearance_test_excluding(
+            delta.length() * 0.5,
+            self.radius * 1.03,
+            CollisionGroups::ALL,
+            vec![DUCK_ENTITY, flaps::body(0).entity, landing.body.entity],
+        )(
             (from + to) * 0.5,
             delta.y.atan2(delta.x) - std::f32::consts::FRAC_PI_2,
         )

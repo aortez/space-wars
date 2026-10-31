@@ -1,7 +1,9 @@
 use super::*;
 use engine_common::ClockFloorMode;
 use engine_core::Vec2;
-use engine_rapier::world::{BodyId, BodyRole, ColliderId, ColliderRole, PhysicsId};
+use engine_rapier::world::{
+    BodyId, BodyRole, ColliderId, ColliderRole, PhysicsId, physics_activity,
+};
 use events::explosion::{BURST_TICKS, EXPLOSION_TICKS, MAX_EXPLOSION_CELLS, WARNING_TICKS};
 
 fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
@@ -35,17 +37,7 @@ fn cells(state: &ClockState) -> &[events::explosion::Cell] {
     &event.cells
 }
 fn world(state: &ClockState) -> &engine_rapier::world::PhysicsWorld {
-    state
-        .duck_visit
-        .as_deref()
-        .or_else(|| {
-            state
-                .active_event
-                .as_ref()
-                .and_then(ActiveEvent::vacant_arena)
-        })
-        .expect("shared arena")
-        .arena_world()
+    state.arena.world().expect("shared arena")
 }
 fn toggle(state: &mut ClockState, seat: u8) {
     ClockScenario::step(
@@ -176,13 +168,12 @@ fn changed_readings_reassemble_the_latest_face_before_the_final_handoff() {
                 };
                 assert!(event.step(
                     events::EventContext {
-                        soil: None,
                         segments: &mut state.segments,
                         display: state.display,
                         layout,
                         floor,
                     },
-                    None
+                    &mut state.arena
                 ));
                 let visible = event
                     .cells
@@ -220,13 +211,19 @@ fn shared_world_steps_once_through_release_reformation_and_final_tick() {
     }
     state.preview_event(ClockEventKind::Explosion);
     for tick in 1..=EXPLOSION_TICKS + 1 {
+        let steps = physics_activity().steps;
         ticks(&mut state, 1);
+        assert_eq!(
+            physics_activity().steps,
+            steps + 1,
+            "tick={tick}: one world step in all, the arena's"
+        );
         ticks(&mut baseline, 1);
         if tick == WARNING_TICKS {
             // Park this event's bodies away from the arena to isolate stepping
             // from physical contact; collision behavior has a separate test.
             let count = cells(&state).len();
-            let world = state.duck_visit.as_mut().unwrap().arena_world_mut();
+            let world = state.arena.world_mut().unwrap();
             for i in 0..count {
                 let id = BodyId::new(PhysicsId::new(5001 + i as u64), BodyRole::PRIMARY);
                 assert!(world.set_pose(
@@ -243,6 +240,11 @@ fn shared_world_steps_once_through_release_reformation_and_final_tick() {
             state.player_duck_state(),
             baseline.player_duck_state(),
             "tick={tick}"
+        );
+        assert_eq!(
+            state.arena_accounting().steps,
+            baseline.arena_accounting().steps,
+            "tick={tick}: one arena step, as without the event"
         );
     }
     assert!(state.explosion_state().is_none());
@@ -503,7 +505,7 @@ fn explosion_steps_the_visit_once_and_real_cells_can_hit_the_duck() {
     ticks(&mut state, 1);
     let character = BodyId::new(PhysicsId::new(1), BodyRole::PRIMARY);
     let target = BodyId::new(PhysicsId::new(5001), BodyRole::PRIMARY);
-    let physics = state.duck_visit.as_mut().unwrap().arena_world_mut();
+    let physics = state.arena.world_mut().unwrap();
     let position = physics.motion(character).unwrap().position;
     physics.set_pose(target, position + Vec2::new(0.0, 40.0), 0.0, true);
     physics.set_velocity(target, Vec2::new(0.0, -150.0), 0.0, true);

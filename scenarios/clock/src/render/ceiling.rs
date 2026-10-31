@@ -19,7 +19,11 @@ pub(crate) struct HostOptics {
 }
 impl HostOptics {
     pub(crate) fn capture(state: &ClockState) -> Self {
-        let world = crate::grass::surfaces::world(&state.active_event, state.duck_visit.as_deref());
+        let world = crate::arena::canonical_world(
+            &state.active_event,
+            state.duck_visit.is_some(),
+            &state.arena,
+        );
         let mut quads = plant_face_polygons(state);
         quads.extend(plant_actor_polygons(state));
         if let Some(soil) = &state.soil {
@@ -199,7 +203,11 @@ pub(crate) fn optical_evidence(state: &ClockState) -> Option<engine_common::Cloc
         .ok()?;
     let silhouettes = optics.silhouettes().ok()?;
     let milli = |v: f32| (v * 1000.0).round() as i32;
-    let world = crate::grass::surfaces::world(&state.active_event, state.duck_visit.as_deref());
+    let world = crate::arena::canonical_world(
+        &state.active_event,
+        state.duck_visit.is_some(),
+        &state.arena,
+    );
     Some(engine_common::ClockCeilingOptics {
         simulation_tick: state.simulation_tick(),
         // query_light publishes generation == completed simulation tick.

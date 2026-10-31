@@ -26,7 +26,7 @@ fn ready(aspect: f32, seed: u64) -> ClockState {
     // Keep the first wall-tag/hurdle course as a frozen geometry/controller
     // regression baseline; platform tests exercise the new default separately.
     let event_seed = state.duck_state().unwrap().navigation.unwrap().course_seed;
-    state.duck_visit = Some(Box::new(DuckEvent::new(Layout::new(aspect), event_seed)));
+    TestDuck::new(Layout::new(aspect), event_seed).admit(&mut state);
     state
         .duck_visit
         .as_mut()
@@ -197,7 +197,7 @@ fn seeded_courses_jump_all_obstacles_exit_and_release_every_body() {
 fn warmup_measures_real_jump_and_running_motion_instead_of_assuming_tuning() {
     for aspect in [0.25, 800.0 / 480.0, 4.0] {
         for scale in [0.85, 1.0, 1.15] {
-            let mut event = DuckEvent::new(Layout::new(aspect), 42);
+            let mut event = TestDuck::new(Layout::new(aspect), 42);
             event.movement.run_speed *= scale;
             event.movement.jump_height *= scale;
             event.movement.gravity *= 1.1;
@@ -260,18 +260,19 @@ fn sample_window_rejects_invalid_values_and_does_not_retain_speed_spikes() {
 
 #[test]
 fn a_disturbed_warmup_is_discarded_and_retried() {
-    let mut event = DuckEvent::new(Layout::new(800.0 / 480.0), 42);
+    let mut event = TestDuck::new(Layout::new(800.0 / 480.0), 42);
     while event.jumps == 0 {
         assert!(event.tick < 100);
         event.step();
     }
     // Disturb the real body during its first flight. Even if it returns to
     // the same floor, this is not an uncontaminated vertical calibration.
-    event.world.as_mut().unwrap().apply_velocity_delta(
-        DUCK_BODY,
-        Vec2::new(event.radius * 20.0 * event.direction, 0.0),
-        true,
-    );
+    let delta = Vec2::new(event.radius * 20.0 * event.direction, 0.0);
+    event
+        .arena
+        .world_mut()
+        .unwrap()
+        .apply_velocity_delta(DUCK_BODY, delta, true);
     while event.controller.heights.count < 2 {
         assert!(event.tick < 300, "warm-up never recovered");
         event.step();
@@ -291,7 +292,7 @@ fn speed_measurement_excludes_airborne_blocked_and_accelerating_motion() {
             controller.heights.push(35.0);
             controller.flight_ticks.push(51.0);
         }
-        let event = DuckEvent::new(Layout::new(800.0 / 480.0), 42);
+        let event = TestDuck::new(Layout::new(800.0 / 480.0), 42);
         for tick in 0..15 {
             controller.decide(
                 Observation {
@@ -310,7 +311,7 @@ fn speed_measurement_excludes_airborne_blocked_and_accelerating_motion() {
                     blocked,
                     support: None,
                 },
-                &event.obstacles,
+                &event.terrain.obstacles,
                 event.width,
                 event.radius,
             );
@@ -368,19 +369,19 @@ fn a_fall_and_a_blocked_runner_recover_within_the_catalog_bound() {
     for fall in [false, true] {
         let mut state = ready(800.0 / 480.0, 5);
         ticks(&mut state, OPENING_TICKS);
-        let event = state.duck_visit.as_mut().unwrap();
+        let event = state.duck_visit.as_ref().unwrap();
         let fallen = event.physics_position(Vec2::new(
             event.width * 0.5,
             event.layout.floor_y - event.radius * 6.0,
         ));
         let obstruction =
             event.physics_position(Vec2::new(event.width * 0.15, event.layout.floor_y + 100.0));
-        let world = event.world.as_mut().unwrap();
+        let world = state.arena.world_mut().unwrap();
         if fall {
             world.set_pose(DUCK_BODY, fallen, 0.0, true);
         } else {
             // A real unjumpable obstruction, not a mock of the completion path.
-            let id = PhysicsId::new(999);
+            let id = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
             world.insert_body(
                 BodyId::new(id, BodyRole::PRIMARY),
                 BodySpec {

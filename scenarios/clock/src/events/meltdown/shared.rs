@@ -2,13 +2,14 @@
 //! Standalone Meltdown keeps its cheaper ballistic cells. Both use the same
 //! release schedule, material budget, water solver and reformation lifecycle.
 use super::*;
-use crate::events::duck::VisitArena;
+use crate::arena::ids::canonical;
+use crate::events::duck;
+use engine_common::ClockEventKind;
 use engine_rapier::world::{
     BodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId, PhysicsWorld,
 };
 
 pub(super) struct SharedMeltdown {
-    pub arena: VisitArena,
     bodies: CellBodies,
 }
 
@@ -25,21 +26,34 @@ struct CellBodies {
 }
 
 impl SharedMeltdown {
-    pub fn new(player: &mut DuckEvent, count: usize) -> Self {
+    pub fn new(player: &mut DuckEvent, arena: &mut ClockArena, count: usize) -> Self {
         assert!(count <= MAX_MELTDOWN_CELLS);
-        let supports = if player.responsive_floor().is_some() {
-            1001..1003
+        let supports = if player.terrain.responsive_floor().is_some() {
+            canonical::RESPONSIVE_PANELS
         } else {
-            1000..1000 + player.course.as_ref().expect("duck course").surfaces.len() as u64
+            canonical::course_surfaces(
+                player
+                    .terrain
+                    .course
+                    .as_ref()
+                    .expect("duck course")
+                    .surfaces
+                    .len(),
+            )
         };
-        let arena = VisitArena::claim(player);
-        player.arena_world_mut().reserve(count, count, 0);
+        player.claim_arena(arena, ClockEventKind::Meltdown);
+        arena
+            .world_mut()
+            .expect("claimed arena")
+            .reserve(count, count, 0);
         Self {
-            arena,
             bodies: CellBodies {
                 cells: (0..count)
                     .map(|i| CellBody {
-                        id: BodyId::new(PhysicsId::new(4001 + i as u64), BodyRole::PRIMARY),
+                        id: BodyId::new(
+                            PhysicsId::new(canonical::MELTDOWN_CELLS.start + i as u64),
+                            BodyRole::PRIMARY,
+                        ),
                         released: false,
                     })
                     .collect(),
@@ -52,6 +66,7 @@ impl SharedMeltdown {
 impl MeltdownEvent {
     pub fn join_player(
         &mut self,
+        arena: &mut ClockArena,
         layout: Layout,
         seed: u64,
         session: u64,
@@ -72,16 +87,18 @@ impl MeltdownEvent {
             seat,
             if seed.is_multiple_of(2) { 1.0 } else { -1.0 },
             floor,
-            None,
         ));
-        let mut shared = SharedMeltdown::new(&mut duck, self.cells.len());
+        let mut shared = SharedMeltdown::new(&mut duck, arena, self.cells.len());
         duck.preserve_arena_opacity(self.floor_opacity());
         // Promote only the surviving, already-released cells at their exact
         // current pose and velocity. Neither water nor either clock advances.
         // Unreleased cells retain their seeded release times; liquid is untouched.
-        shared
-            .bodies
-            .release_due(duck.arena_world_mut(), &self.cells, layout, self.tick);
+        shared.bodies.release_due(
+            arena.world_mut().expect("claimed arena"),
+            &self.cells,
+            layout,
+            self.tick,
+        );
         self.shared = Some(shared);
         Some(duck)
     }
@@ -90,54 +107,39 @@ impl MeltdownEvent {
         self.shared.is_some()
     }
 
-    pub fn vacant_arena(&self) -> Option<&DuckEvent> {
-        self.shared.as_ref()?.arena.vacant()
-    }
-
+    /// How opaque the event shows a vacant arena: its panels fade with the
+    /// floor it would show on its own.
     pub fn arena_opacity(&self) -> f32 {
-        if self.vacant_arena().is_some() {
-            self.floor_opacity()
-        } else {
-            1.0
-        }
+        self.floor_opacity()
     }
 
-    pub fn retain_arena(&mut self, duck: Box<DuckEvent>) {
-        self.shared
-            .as_mut()
-            .expect("shared Meltdown")
-            .arena
-            .retain(duck);
-    }
-
-    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
-        self.shared.as_mut()?.arena.rejoin(session, seat)
-    }
-
-    pub fn release(&mut self, player: Option<&mut DuckEvent>) {
+    pub fn release(&mut self, player: Option<&mut DuckEvent>, arena: &mut ClockArena) {
         if let Some(shared) = &mut self.shared {
-            let duck = shared.arena.get_mut(player);
-            shared.bodies.remove(duck.arena_world_mut());
-            duck.release_arena();
+            shared
+                .bodies
+                .remove(arena.world_mut().expect("leased arena"));
+            duck::end_lease(player, arena, ClockEventKind::Meltdown);
         }
     }
 
+    /// A shared Meltdown's tick up to the arena's step: its floor and water
+    /// move, and cells due to fall join the arena.
     pub(super) fn step_shared(
         &mut self,
-        mut context: EventContext<'_>,
+        context: EventContext<'_>,
         mut player: Option<&mut DuckEvent>,
-    ) -> bool {
-        let soil = context.soil.take();
-        // Move the small lease/batch handles temporarily, not the world or its
+        arena: &mut ClockArena,
+    ) {
+        // Move the small batch handles temporarily, not the world or its
         // allocations. This lets both material paths share reformation code.
         let mut shared = self.shared.take().expect("shared Meltdown");
         self.tick += 1;
-        let hull = shared.arena.get(player.as_deref()).clearance_hull();
+        let hull = player
+            .as_deref()
+            .and_then(|duck| duck.clearance_hull(arena.world().expect("leased arena")));
         if let Some(floor) = &mut self.floor {
             floor.step(&mut self.water, f64::from(DT), hull);
-            shared
-                .arena
-                .get_mut(player.as_deref_mut())
+            duck::leased_terrain(player.as_deref_mut(), &mut arena.vacant)
                 .sync_responsive_floor(floor);
         }
         let material = self.tick < MELTING_TICKS + DRAINING_TICKS;
@@ -145,38 +147,36 @@ impl MeltdownEvent {
         if material {
             self.water.step(1.0 / 60.0).expect("fixed water step");
             shared.bodies.release_due(
-                shared
-                    .arena
-                    .get_mut(player.as_deref_mut())
-                    .arena_world_mut(),
+                arena.world_mut().expect("leased arena"),
                 &self.cells,
                 layout,
                 self.tick,
             );
         } else {
             if self.tick == MELTING_TICKS + DRAINING_TICKS {
-                shared.bodies.remove(
-                    shared
-                        .arena
-                        .get_mut(player.as_deref_mut())
-                        .arena_world_mut(),
-                );
+                shared
+                    .bodies
+                    .remove(arena.world_mut().expect("leased arena"));
             }
             self.reform(context);
         }
-        let duck = shared
-            .arena
-            .step_with_soil(player, Some(&self.water), true, soil);
-        if material {
+        self.shared = Some(shared);
+    }
+
+    /// A shared Meltdown's cells after the arena's step: they take their
+    /// bodies' poses, and those on real floor melt. Returns true when the event
+    /// has finished.
+    pub(crate) fn observe(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+        if self.tick < MELTING_TICKS + DRAINING_TICKS {
+            let shared = self.shared.as_mut().expect("shared Meltdown");
             self.exited_solid_area += shared.bodies.synchronize(
-                duck.arena_world_mut(),
+                arena.world_mut().expect("leased arena"),
                 &mut self.cells,
                 &mut self.water,
-                layout,
+                context.layout,
                 self.cell_area,
             );
         }
-        self.shared = Some(shared);
         self.tick >= MELTING_TICKS + DRAINING_TICKS + REFORMING_TICKS
     }
 }

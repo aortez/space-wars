@@ -121,8 +121,8 @@ impl DuckEvent {
         self.ledge.stats
     }
 
-    pub fn ledge_anchor(&self) -> Option<Vec2> {
-        self.ledge.attachment?.edge.anchor(self.world.as_ref()?)
+    pub fn ledge_anchor(&self, world: &PhysicsWorld) -> Option<Vec2> {
+        self.ledge.attachment?.edge.anchor(world)
     }
 
     fn drop_ledge(&mut self, reason: Reason) {
@@ -142,7 +142,7 @@ impl DuckEvent {
 
     /// True consumes this tick's movement action, including a release tick.
     /// Buoyancy has already been applied; the caller performs the single solve.
-    pub(super) fn drive_ledge(&mut self) -> bool {
+    pub(super) fn drive_ledge(&mut self, world: &mut PhysicsWorld) -> bool {
         let command = std::mem::take(&mut self.ledge.command);
         let catch_target = self.ledge.catch_target.take();
         let stats = &mut self.ledge.stats;
@@ -161,12 +161,12 @@ impl DuckEvent {
             if command != LedgeCommand::Catch
                 || stats.rearm_required
                 || stats.cooldown_ticks > 0
-                || self.grounded()
+                || self.grounded(world)
             {
                 return false;
             }
             self.ledge.stats.phase = Phase::Reaching;
-            self.try_catch(catch_target);
+            self.try_catch(world, catch_target);
         }
         let Some(mut attachment) = self.ledge.attachment else {
             return false;
@@ -175,11 +175,10 @@ impl DuckEvent {
             self.drop_ledge(Reason::Released);
             return true;
         }
-        if !attachment.edge.valid(self) {
+        if !attachment.edge.valid(self, world) {
             self.drop_ledge(Reason::SupportLost);
             return true;
         }
-        let world = self.world.as_ref().unwrap();
         let motion = world.motion(DUCK_BODY).unwrap();
         let edge = attachment.edge;
         let anchor = edge.anchor(world).unwrap();
@@ -262,7 +261,7 @@ impl DuckEvent {
         let desired =
             limited((target - motion.position) * DRIVE_GAIN, r * MAX_SPEED_RADII) + support;
         let delta = desired + Vec2::new(0.0, self.movement.gravity * DT) - motion.linear_velocity;
-        self.world.as_mut().unwrap().apply_velocity_delta(
+        world.apply_velocity_delta(
             DUCK_BODY,
             limited(delta, r * MAX_ACCELERATION_RADII * DT),
             true,
@@ -287,8 +286,7 @@ impl DuckEvent {
         true
     }
 
-    fn try_catch(&mut self, target: Option<Edge>) {
-        let world = self.world.as_ref().unwrap();
+    fn try_catch(&mut self, world: &PhysicsWorld, target: Option<Edge>) {
         let motion = world.motion(DUCK_BODY).unwrap();
         let r = self.radius;
         self.ledge.stats.reason = Some(Reason::NoEligibleEdge);
@@ -297,12 +295,12 @@ impl DuckEvent {
             candidates[0] = Some(target);
             candidates
         } else {
-            edges(self)
+            edges(self, world)
         };
         for edge in candidates.into_iter().flatten() {
             self.ledge.stats.candidates_checked += 1;
             let anchor = edge.anchor(world).unwrap();
-            if !edge.in_reach(self) {
+            if !edge.in_reach(self, world) {
                 continue;
             }
             let hang = anchor + Vec2::new(edge.outward * 1.12 * r, -0.9 * r);
@@ -315,9 +313,9 @@ impl DuckEvent {
                 self.ledge.stats.reason = Some(Reason::Obstructed);
                 continue;
             }
-            // Registration validates the same local anchor and visit generation.
+            // Registration validates the same local anchor and flap generation.
             if let Some((_, handle)) = edge.flap
-                && !self.attach_to_flap(handle, edge.local_anchor)
+                && !self.attach_to_flap(world, handle, edge.local_anchor)
             {
                 return;
             }
@@ -334,11 +332,10 @@ impl DuckEvent {
         }
     }
 
-    pub(super) fn finish_ledge_step(&mut self) {
+    pub(super) fn finish_ledge_step(&mut self, world: &PhysicsWorld) {
         let Some(attachment) = self.ledge.attachment else {
             return;
         };
-        let world = self.world.as_ref().unwrap();
         self.ledge.stats.anchor_milli = attachment.edge.anchor(world).map(|anchor| {
             [
                 (anchor.x * 1000.0).round() as i32,

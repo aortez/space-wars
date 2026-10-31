@@ -163,6 +163,10 @@ impl FloorGeometry {
         }
     }
 
+    pub fn layout(self) -> Layout {
+        self.layout
+    }
+
     /// The same bounds are consumed by rendering and event colliders.
     pub fn slabs(self) -> impl Iterator<Item = (Vec2, Vec2)> {
         let layout = self.layout;
@@ -190,6 +194,20 @@ impl FloorGeometry {
             ClockFloorMode::EventOwned => [None, None],
         };
         slabs.into_iter().flatten()
+    }
+
+    /// What the ordinary floor puts under residents while no event's colliders
+    /// stand in for it: the banks while the drain is open, and otherwise the
+    /// closed floor. A floor an event owns has no slabs, and an event that
+    /// still has its colliders in play brings its own support. One that has
+    /// none, as a visit after its terrain has left the arena, leaves the
+    /// closed floor it fades back to.
+    pub fn support(self) -> impl Iterator<Item = (Vec2, Vec2)> {
+        let mode = match self.mode {
+            ClockFloorMode::EventOwned => ClockFloorMode::Closed,
+            mode => mode,
+        };
+        Self { mode, ..self }.slabs()
     }
 
     /// Proof that this event has acquired the ordinary drain. Event-local worlds

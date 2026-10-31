@@ -76,6 +76,7 @@ impl DuckEvent {
 
     pub(in crate::events::duck) fn decide_flap_detour(
         &mut self,
+        world: &PhysicsWorld,
         water: Option<&WaterWorld>,
     ) -> Option<Command> {
         self.ledge.detour.stats.clearance_queries = 0;
@@ -83,7 +84,7 @@ impl DuckEvent {
             return None;
         }
         self.ledge.detour.age += 1;
-        if self.ledge.detour.stats.phase == DetourPhase::Pending && !selected(self.seed) {
+        if self.ledge.detour.stats.phase == DetourPhase::Pending && !selected(self.terrain.seed) {
             self.finish_flap_detour(Outcome::NotSelected);
             return None;
         }
@@ -108,7 +109,7 @@ impl DuckEvent {
                 return None;
             }
             let landing = self.ledge.detour.landing.unwrap();
-            if !landing.valid(self) || !landing.dry(water, self.radius) {
+            if !landing.valid(self, world) || !landing.dry(water, self.radius) {
                 self.finish_flap_detour(Outcome::Blocked);
                 return None;
             }
@@ -124,7 +125,7 @@ impl DuckEvent {
                 DetourPhase::Pending | DetourPhase::Approaching
             )
         {
-            return self.decide_direct_flap_approach(water);
+            return self.decide_direct_flap_approach(world, water);
         }
         match self.ledge.detour.stats.phase {
             DetourPhase::Pending => {
@@ -134,10 +135,10 @@ impl DuckEvent {
                     self.finish_flap_detour(Outcome::Expired);
                     return None;
                 }
-                if !self.grounded() {
+                if !self.grounded(world) {
                     return Some(still());
                 }
-                let Some((edge, landing)) = self.plan_flap_detour(water) else {
+                let Some((edge, landing)) = self.plan_flap_detour(world, water) else {
                     self.finish_flap_detour(Outcome::Unsafe);
                     return None;
                 };
@@ -167,22 +168,22 @@ impl DuckEvent {
         match self.ledge.detour.stats.phase {
             DetourPhase::Approaching => {
                 let edge = self.ledge.detour.edge.unwrap();
-                if !edge.valid(self) || self.ledge.detour.age > 20 {
+                if !edge.valid(self, world) || self.ledge.detour.age > 20 {
                     self.finish_flap_detour(Outcome::Expired);
                     return None;
                 }
-                if edge.in_reach(self) && !self.grounded() {
+                if edge.in_reach(self, world) && !self.grounded(world) {
                     self.start_automatic_ledge(edge);
                     self.ledge.detour.stats.phase = DetourPhase::Recovering;
                     return Some(still());
                 }
                 self.controller.direction = -1.0;
-                let jump = !self.ledge.detour.launched && self.grounded();
+                let jump = !self.ledge.detour.launched && self.grounded(world);
                 self.ledge.detour.launched |= jump;
-                Some(self.detour_approach(self.position().unwrap(), jump))
+                Some(self.detour_approach(self.position(world).unwrap(), jump))
             }
             DetourPhase::Perching => {
-                if !self.standing_on(flaps::body(0)) {
+                if !self.standing_on(world, flaps::body(0)) {
                     self.finish_flap_detour(Outcome::Interrupted);
                     return None;
                 }
@@ -190,12 +191,17 @@ impl DuckEvent {
                 self.ledge.detour.stats.perch_ticks += 1;
                 if !departing && self.ledge.detour.stats.perch_ticks < PERCH_TICKS {
                     if let Some(plan) = self.ledge.detour.direct {
-                        return Some(self.direct_position_command(plan.perch_x, false));
+                        return Some(self.direct_position_command(world, plan.perch_x, false));
                     }
                     return Some(still());
                 }
-                let motion = self.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
-                if !self.detour_return_clear(motion.position, motion.linear_velocity, landing) {
+                let motion = world.motion(DUCK_BODY).unwrap();
+                if !self.detour_return_clear(
+                    world,
+                    motion.position,
+                    motion.linear_velocity,
+                    landing,
+                ) {
                     self.finish_flap_detour(Outcome::Blocked);
                     return None;
                 }
@@ -204,10 +210,10 @@ impl DuckEvent {
             }
             DetourPhase::Returning => {
                 let landing = self.ledge.detour.landing.unwrap();
-                self.ledge.detour.return_airborne |= !self.grounded();
-                let motion = self.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
-                if self.ledge.detour.return_airborne && self.grounded() {
-                    let success = self.standing_on(landing.body)
+                self.ledge.detour.return_airborne |= !self.grounded(world);
+                let motion = world.motion(DUCK_BODY).unwrap();
+                if self.ledge.detour.return_airborne && self.grounded(world) {
+                    let success = self.standing_on(world, landing.body)
                         && (motion.position.x - landing.center.x).abs() < self.radius;
                     self.finish_flap_detour(if success {
                         Outcome::Returned
@@ -222,13 +228,11 @@ impl DuckEvent {
         }
     }
 
-    fn standing_on(&self, body: BodyId) -> bool {
-        self.world.as_ref().is_some_and(|world| {
-            world.surface_contacts(DUCK_COLLIDER).any(|c| {
-                c.collider.entity == body.entity
-                    && c.normal.y > 0.95
-                    && c.separation <= self.radius * 0.05
-            })
+    fn standing_on(&self, world: &PhysicsWorld, body: BodyId) -> bool {
+        world.surface_contacts(DUCK_COLLIDER).any(|c| {
+            c.collider.entity == body.entity
+                && c.normal.y > 0.95
+                && c.separation <= self.radius * 0.05
         })
     }
 

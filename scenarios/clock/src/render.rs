@@ -1,6 +1,6 @@
 use engine_common::{
-    Camera2, Fill, RenderColor, RenderFrame, RenderPoint, RenderPolygon, RenderPrimitive,
-    RenderText, Stroke, TextAnchor,
+    Camera2, Fill, RenderCircle, RenderColor, RenderFrame, RenderPoint, RenderPolygon,
+    RenderPrimitive, RenderText, Stroke, TextAnchor,
 };
 
 use crate::{
@@ -43,6 +43,9 @@ const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.32, 0.21, 0.12);
 /// Damp earth cut into the floor's own top rows. Darker and greyer than the
 /// surrounding wood, which the old tone was too close to for the layer to read.
 pub(crate) const SOIL_COLOR: RenderColor = RenderColor::rgb(0.155, 0.112, 0.082);
+/// The arena fixture's balls: pale, like the wood they rest on, so they read
+/// as objects in the room rather than as the face.
+const FIXTURE_COLOR: RenderColor = RenderColor::rgb(0.74, 0.66, 0.52);
 /// Cover tones from withered to sunlit, indexed by band. Distinct from the
 /// soil and shoot palettes so a frame reader can tell the three apart.
 pub(crate) const COVER_COLORS: [RenderColor; 3] = [
@@ -116,13 +119,12 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         aquarium::water(&mut frame, event);
         floor::responsive(&mut frame, &event.floor, layout, 1.0);
     }
-    if let Some(event) = shared_mechanics_arena(state) {
-        let opacity = if state.duck_visit.is_some() {
-            event.arena_opacity()
-        } else {
-            state.active_event.as_ref().unwrap().arena_opacity()
+    if let Some(terrain) = shared_mechanics_arena(state) {
+        let opacity = match &state.duck_visit {
+            Some(duck) => duck.arena_opacity(),
+            None => state.active_event.as_ref().unwrap().arena_opacity(),
         };
-        if let Some(panels) = event.responsive_floor() {
+        if let Some(panels) = terrain.responsive_floor() {
             floor::responsive(&mut frame, panels, layout, opacity);
         } else {
             render_floor(
@@ -131,7 +133,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
                 layout.pitch,
                 1.0 - opacity,
             );
-            duck::render_arena(&mut frame, event, opacity);
+            duck::render_arena(&mut frame, terrain, opacity);
         }
     } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event
         && let Some(course) = event.course()
@@ -162,7 +164,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             },
         );
     } else if let Some(duck) = &state.duck_visit
-        && let Some(panels) = duck.responsive_floor()
+        && let Some(panels) = duck.terrain.responsive_floor()
     {
         floor::responsive(&mut frame, panels, layout, duck.arena_opacity());
     } else if let Some(event) = state.duck_scene() {
@@ -248,6 +250,18 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
                     )),
                 );
             }
+        }
+    }
+    for fixture in state.arena_fixtures() {
+        for ball in &fixture.balls {
+            frame.push_primitive(
+                ARENA_LAYER,
+                RenderPrimitive::Circle(RenderCircle::filled(
+                    RenderPoint::new(ball.position.x, ball.position.y),
+                    fixture.radius,
+                    FIXTURE_COLOR,
+                )),
+            );
         }
     }
     if let Some(view) = crate::grass::inspection::snapshot(state) {
@@ -501,10 +515,13 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     // retain their own opacity and geometry while clock content transforms.
     if let Some(event) = state.duck_scene() {
         let shared = matches!(&state.active_event, Some(crate::events::ActiveEvent::Rain(rain)) if rain.course().is_some());
-        if shared || shared_mechanics_arena(state).is_some() || event.responsive_floor().is_some() {
-            duck::render_with_course(frame, event, state.config.duck_debug_overlay, false);
+        if shared
+            || shared_mechanics_arena(state).is_some()
+            || event.terrain.responsive_floor().is_some()
+        {
+            duck::render_with_course(frame, &event, state.config.duck_debug_overlay, false);
         } else {
-            duck::render(frame, event, state.config.duck_debug_overlay);
+            duck::render(frame, &event, state.config.duck_debug_overlay);
         }
     }
     if let Some((_, player)) = state.player_duck_session() {
@@ -521,11 +538,19 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     }
 }
 
-fn shared_mechanics_arena(state: &ClockState) -> Option<&crate::events::duck::DuckEvent> {
+/// The terrain of the arena a shared-mechanics event leases, with or without
+/// its character.
+fn shared_mechanics_arena(state: &ClockState) -> Option<&crate::events::duck::ArenaTerrain> {
     let event = state.active_event.as_ref()?;
     event
         .shares_visit_arena()
-        .then(|| state.duck_visit.as_deref().or(event.vacant_arena()))
+        .then(|| {
+            state
+                .duck_visit
+                .as_deref()
+                .map(|duck| &duck.terrain)
+                .or(state.arena.vacant.as_ref())
+        })
         .flatten()
 }
 

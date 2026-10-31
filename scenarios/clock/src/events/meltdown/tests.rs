@@ -624,8 +624,15 @@ fn assert_volume(state: &ClockState) {
     let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event else {
         panic!()
     };
+    // Soil an earlier event delivered keeps the arena as a resident, apart
+    // from the standalone meltdown's own bodies.
+    assert!(
+        !state
+            .arena
+            .holds(crate::arena::Owner::Event(ClockEventKind::Meltdown))
+    );
     assert_eq!(
-        (state.body_count(), state.collider_count()),
+        event.physics_counts(),
         if event
             .floats
             .as_ref()

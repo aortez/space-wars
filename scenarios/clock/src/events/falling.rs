@@ -1,10 +1,13 @@
+use engine_common::ClockEventKind;
+use engine_rapier::world::PhysicsWorld;
 use rand::{SeedableRng, rngs::StdRng};
 
 use super::{
     EventContext, EventPhase,
-    duck::{DuckEvent, VisitArena},
+    duck::{self, DuckEvent},
 };
 use crate::{
+    arena::ClockArena,
     digits,
     meridiem::{Glyph, LetterState},
     physics::{FallingBodies, FallingWorld},
@@ -15,10 +18,7 @@ pub const REFORMING_TICKS: u64 = 90;
 
 enum Mechanics {
     Standalone(Option<Box<FallingWorld>>),
-    Shared {
-        bodies: Option<FallingBodies>,
-        arena: VisitArena,
-    },
+    Shared { bodies: Option<FallingBodies> },
 }
 
 pub(crate) struct FallingEvent {
@@ -30,29 +30,12 @@ pub(crate) struct FallingEvent {
 }
 
 impl FallingEvent {
-    pub fn canonical_world<'a>(
-        &'a self,
-        player: Option<&'a DuckEvent>,
-    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
+    /// The standalone world, before any player joins. A shared batch lives
+    /// in the run's arena instead.
+    pub fn own_world(&self) -> Option<&PhysicsWorld> {
         match &self.mechanics {
             Mechanics::Standalone(world) => world.as_ref().map(|w| w.world()),
-            Mechanics::Shared { arena, .. } => Some(arena.get(player).arena_world()),
-        }
-    }
-    pub fn canonical_world_mut<'a>(
-        &'a mut self,
-        player: Option<&'a mut DuckEvent>,
-    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
-        match &mut self.mechanics {
-            Mechanics::Standalone(world) => world.as_mut().map(|w| w.world_mut()),
-            Mechanics::Shared { arena, .. } => Some(arena.get_mut(player).arena_world_mut()),
-        }
-    }
-    #[cfg(test)]
-    pub fn soil_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
-        match &self.mechanics {
-            Mechanics::Standalone(world) => world.as_ref().map(|w| w.world()),
-            _ => None,
+            Mechanics::Shared { .. } => None,
         }
     }
 
@@ -73,11 +56,16 @@ impl FallingEvent {
         }
     }
 
-    pub fn with_visit(context: EventContext<'_>, seed: u64, player: &mut DuckEvent) -> Self {
+    pub fn with_visit(
+        context: EventContext<'_>,
+        seed: u64,
+        player: &mut DuckEvent,
+        arena: &mut ClockArena,
+    ) -> Self {
         let letters = Self::letters_for(&context);
-        let arena = VisitArena::claim(player);
+        player.claim_arena(arena, ClockEventKind::Falling);
         let bodies = FallingBodies::insert(
-            player.arena_world_mut(),
+            arena.world_mut().expect("claimed arena"),
             context.layout,
             context.segments,
             letters.as_ref().map_or(&[], |l| l.as_slice()),
@@ -88,14 +76,19 @@ impl FallingEvent {
             tick: 0,
             mechanics: Mechanics::Shared {
                 bodies: Some(bodies),
-                arena,
             },
             letters,
             standalone_floor: None,
         }
     }
 
-    pub fn join_player(&mut self, seed: u64, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
+    pub fn join_player(
+        &mut self,
+        arena: &mut ClockArena,
+        seed: u64,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
         let Mechanics::Standalone(world) = &mut self.mechanics else {
             return None;
         };
@@ -112,13 +105,13 @@ impl FallingEvent {
             None => (FallingWorld::arena(drain), None),
         };
         let mut duck = Box::new(DuckEvent::new_drain_player(
-            drain, seed, session, seat, world,
+            drain, seed, session, seat, arena, world,
         ));
         if let Some(bodies) = &bodies {
-            bodies.match_gravity(duck.arena_world_mut());
+            bodies.match_gravity(arena.world_mut().unwrap());
         }
-        let arena = VisitArena::claim(&mut duck);
-        self.mechanics = Mechanics::Shared { bodies, arena };
+        duck.claim_arena(arena, ClockEventKind::Falling);
+        self.mechanics = Mechanics::Shared { bodies };
         Some(duck)
     }
 
@@ -132,62 +125,65 @@ impl FallingEvent {
         matches!(self.mechanics, Mechanics::Shared { .. })
     }
 
-    pub fn retain_arena(&mut self, duck: Box<DuckEvent>) {
-        let Mechanics::Shared { arena, .. } = &mut self.mechanics else {
-            panic!("shared Falling arena");
-        };
-        arena.retain(duck);
-    }
-
-    pub fn vacant_arena(&self) -> Option<&DuckEvent> {
-        match &self.mechanics {
-            Mechanics::Shared { arena, .. } => arena.vacant(),
-            _ => None,
-        }
-    }
-
+    /// How opaque the event shows a vacant arena: it fades out at the end of
+    /// reformation.
     pub fn arena_opacity(&self) -> f32 {
-        if self.vacant_arena().is_some() && self.phase == EventPhase::Reforming {
+        if self.phase == EventPhase::Reforming {
             ((REFORMING_TICKS - self.tick) as f32 / 30.0).min(1.0)
         } else {
             1.0
         }
     }
 
-    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
-        let Mechanics::Shared { arena, .. } = &mut self.mechanics else {
-            return None;
+    /// The event's tick up to the arena's step. A standalone Falling steps its
+    /// own world and finishes its tick here; a shared one reads the arena back
+    /// in `observe`. Returns true when the event has finished.
+    pub fn step(&mut self, context: EventContext<'_>) -> bool {
+        self.tick += 1;
+        let reform = self.reforms();
+        let Mechanics::Standalone(own) = &mut self.mechanics else {
+            return false;
         };
-        arena.rejoin(session, seat)
+        if let Some(own) = own {
+            let letters = self
+                .letters
+                .as_mut()
+                .map_or(&mut [][..], |l| l.as_mut_slice());
+            own.step(context.segments, letters);
+        }
+        if reform {
+            *own = None;
+        }
+        self.finish_tick(context, reform)
     }
 
-    pub fn step(&mut self, mut context: EventContext<'_>, player: Option<&mut DuckEvent>) -> bool {
-        let soil = context.soil.take();
-        let letters = self
-            .letters
-            .as_mut()
-            .map_or(&mut [][..], |l| l.as_mut_slice());
-        self.tick += 1;
-        let reform = self.phase == EventPhase::Falling && self.tick >= FALLING_TICKS;
-        match &mut self.mechanics {
-            Mechanics::Standalone(world) => {
-                if let Some(world) = world {
-                    world.step(context.segments, letters);
-                }
-                if reform {
-                    *world = None;
-                }
-            }
-            Mechanics::Shared { bodies, arena } => {
-                let duck = arena.step_with_soil(player, None, false, soil);
-                if let Some(bodies) = bodies {
-                    bodies.synchronize(duck.arena_world(), context.segments, letters);
-                }
-                if reform && let Some(bodies) = bodies.take() {
-                    bodies.remove(duck.arena_world_mut());
-                }
-            }
+    /// The shared bars after the arena's step: their poses, and their removal
+    /// once they stop falling. Returns true when the event has finished.
+    pub fn observe(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+        let reform = self.reforms();
+        let Mechanics::Shared { bodies } = &mut self.mechanics else {
+            unreachable!("only a shared Falling reads the arena back");
+        };
+        let world = arena.world_mut().expect("leased arena");
+        if let Some(bodies) = bodies {
+            let letters = self
+                .letters
+                .as_mut()
+                .map_or(&mut [][..], |l| l.as_mut_slice());
+            bodies.synchronize(world, context.segments, letters);
         }
+        if reform && let Some(bodies) = bodies.take() {
+            bodies.remove(world);
+        }
+        self.finish_tick(context, reform)
+    }
+
+    /// Whether the bars stop falling this tick and start to reform.
+    fn reforms(&self) -> bool {
+        self.phase == EventPhase::Falling && self.tick >= FALLING_TICKS
+    }
+
+    fn finish_tick(&mut self, context: EventContext<'_>, reform: bool) -> bool {
         if reform {
             for segment in context.segments.iter_mut() {
                 segment.begin_reforming(context.layout.segment_center(segment.id));
@@ -201,13 +197,12 @@ impl FallingEvent {
 
     /// Only the event's batch is removed; the live player's floor and character
     /// survive replacement, reformation and completion unchanged.
-    pub fn release(&mut self, player: Option<&mut DuckEvent>) {
-        if let Mechanics::Shared { bodies, arena } = &mut self.mechanics {
-            let duck = arena.get_mut(player);
+    pub fn release(&mut self, player: Option<&mut DuckEvent>, arena: &mut ClockArena) {
+        if let Mechanics::Shared { bodies } = &mut self.mechanics {
             if let Some(bodies) = bodies.take() {
-                bodies.remove(duck.arena_world_mut());
+                bodies.remove(arena.world_mut().expect("leased arena"));
             }
-            duck.release_arena();
+            duck::end_lease(player, arena, ClockEventKind::Falling);
         }
     }
 
@@ -226,10 +221,8 @@ impl FallingEvent {
             Mechanics::Standalone(world) => world
                 .as_ref()
                 .map_or((0, 0), |w| (w.body_count(), w.collider_count())),
-            // An occupied shared world is counted by ClockState's player.
-            Mechanics::Shared { arena, .. } => {
-                arena.vacant().map_or((0, 0), |d| d.physics_counts())
-            }
+            // A shared world is the run's arena, which ClockState counts once.
+            Mechanics::Shared { .. } => (0, 0),
         }
     }
 }

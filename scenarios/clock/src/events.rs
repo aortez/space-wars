@@ -14,7 +14,7 @@ mod tests;
 use engine_common::{ClockEventKind, ClockEventProfile, ClockEventTrigger, ClockEvents};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-use crate::{DisplaySnapshot, SegmentState, layout::Layout};
+use crate::{DisplaySnapshot, SegmentState, arena::ClockArena, layout::Layout};
 use color_cycle::ColorCycle;
 pub use color_cycle::{COLOR_CYCLE_TICKS, DigitPalette};
 use digit_slide::{DIGIT_SLIDE_TICKS, DigitSlideEvent};
@@ -240,7 +240,6 @@ pub(super) struct EventContext<'a> {
     pub display: DisplaySnapshot,
     pub layout: Layout,
     pub floor: crate::floor::FloorGeometry,
-    pub soil: Option<&'a mut crate::grass::SoilHabitat>,
 }
 
 /// An event owns its local phase and temporary resources. Dropping the variant
@@ -351,16 +350,22 @@ impl ActiveEvent {
         }
     }
 
-    pub fn vacant_arena(&self) -> Option<&duck::DuckEvent> {
+    /// Whether a player who joins this event brings it into the arena, so
+    /// the arena takes the event's claim with the visit's. Joining a
+    /// standalone Falling, Explosion, Meltdown or Aquarium does, except
+    /// Meltdown's water lab, which a player never joins.
+    pub fn joins_into_arena(&self) -> bool {
         match self {
-            Self::Aquarium(event) => event.vacant_arena(),
-            Self::Falling(event) => event.vacant_arena(),
-            Self::Explosion(event) => event.vacant_arena(),
-            Self::Meltdown(event) => event.vacant_arena(),
-            _ => None,
+            Self::Meltdown(event) if event.lab => false,
+            Self::Aquarium(_) | Self::Falling(_) | Self::Explosion(_) | Self::Meltdown(_) => {
+                !self.shares_visit_arena()
+            }
+            _ => false,
         }
     }
 
+    /// How opaque this event shows the arena once its character has left. A
+    /// player who rejoins sees the arena fade in from here.
     pub fn arena_opacity(&self) -> f32 {
         match self {
             Self::Falling(event) => event.arena_opacity(),
@@ -370,67 +375,112 @@ impl ActiveEvent {
         }
     }
 
+    /// Whether the rigid world the run is simulating is this event's own
+    /// rather than the arena. A shared-arena event's never is, and Rain's
+    /// floats stop being canonical as soon as a visit exists, before its first
+    /// step has built the arena.
+    pub fn simulates_apart(&self, visit: bool) -> bool {
+        match self {
+            Self::Falling(_) | Self::Explosion(_) | Self::Meltdown(_) | Self::Aquarium(_) => {
+                !self.shares_visit_arena()
+            }
+            Self::Rain(_) => !visit,
+            _ => false,
+        }
+    }
+
+    /// The rigid world this event owns apart from the arena, if it has one.
+    pub fn own_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
+        match self {
+            Self::Falling(event) => event.own_world(),
+            Self::Explosion(event) => event.own_world(),
+            Self::Meltdown(event) => event.own_world(),
+            Self::Rain(event) => event.own_world(),
+            _ => None,
+        }
+    }
+
+    /// A player's character in this event's arena: a new one on the terrain a
+    /// departed character left, or the first, which the event's own world
+    /// becomes the arena for.
     pub fn join_arena(
         &mut self,
+        arena: &mut ClockArena,
         layout: Layout,
         seed: u64,
         session: u64,
         seat: u8,
     ) -> Option<Box<duck::DuckEvent>> {
+        if let Some(duck) =
+            duck::DuckEvent::rejoin_arena(arena, self.arena_opacity(), session, seat)
+        {
+            return Some(Box::new(duck));
+        }
         match self {
-            Self::Aquarium(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
-            Self::Falling(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
-            Self::Explosion(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
-            Self::Meltdown(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(layout, seed, session, seat)),
+            Self::Aquarium(event) => event.join_player(arena, seed, session, seat),
+            Self::Falling(event) => event.join_player(arena, seed, session, seat),
+            Self::Explosion(event) => event.join_player(arena, seed, session, seat),
+            Self::Meltdown(event) => event.join_player(arena, layout, seed, session, seat),
             _ => None,
         }
     }
 
-    pub fn retain_arena(&mut self, duck: Box<duck::DuckEvent>) {
+    pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>, arena: &mut ClockArena) {
         match self {
-            Self::Aquarium(event) => event.retain_arena(duck),
-            Self::Falling(event) => event.retain_arena(duck),
-            Self::Explosion(event) => event.retain_arena(duck),
-            Self::Meltdown(event) => event.retain_arena(duck),
-            _ => unreachable!("only leased mechanics arenas outlive the visit"),
-        }
-    }
-
-    pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>) {
-        match self {
-            Self::Aquarium(event) => event.release(player),
-            Self::Falling(event) => event.release(player),
-            Self::Explosion(event) => event.release(player),
-            Self::Meltdown(event) => event.release(player),
+            Self::Aquarium(event) => event.release(player, arena),
+            Self::Falling(event) => event.release(player, arena),
+            Self::Explosion(event) => event.release(player, arena),
+            Self::Meltdown(event) => event.release(player, arena),
             _ => (),
         }
     }
 
-    /// Returns true when the event has finished.
-    pub fn step(&mut self, context: EventContext<'_>) -> bool {
+    /// The event's tick up to the arena's one step. A standalone event steps its
+    /// own world here and finishes its tick; one sharing the arena reads it
+    /// back in `observe` after the step. Returns true when the event has
+    /// finished.
+    pub fn step(
+        &mut self,
+        context: EventContext<'_>,
+        visit: Option<&mut duck::DuckEvent>,
+        arena: &mut ClockArena,
+    ) -> bool {
         match self {
             Self::Grass(event) => event.step(),
-            Self::Aquarium(event) => event.step(context, None),
-            Self::Falling(event) => event.step(context, None),
-            Self::Explosion(event) => event.step(context, None),
+            Self::Aquarium(event) => event.step(context, visit, arena),
+            Self::Falling(event) => event.step(context),
+            Self::Explosion(event) => event.step(context, arena),
             Self::ColorCycle(event) => event.step(),
-            Self::Meltdown(event) => event.step(context),
+            Self::Meltdown(event) => event.step_with_visit(context, visit, arena),
             Self::Marquee(event) => event.step(),
             Self::DigitSlide(event) => event.step(),
             Self::SlotMachine(event) => event.step(),
             Self::CellSwap(event) => event.step(),
             Self::Rain(event) => {
                 event.synchronize(context.display, context.segments);
-                event.step_with_soil(context.soil)
+                event.step()
             }
+        }
+    }
+
+    /// What an event sharing the arena reads back after the arena's step.
+    /// Returns true when the event has finished.
+    pub fn observe(
+        &mut self,
+        context: EventContext<'_>,
+        visit: Option<&duck::DuckEvent>,
+        arena: &mut ClockArena,
+    ) -> bool {
+        debug_assert!(self.shares_visit_arena());
+        match self {
+            Self::Aquarium(event) => event.observe(visit, arena),
+            Self::Falling(event) => event.observe(context, arena),
+            Self::Explosion(event) => {
+                event.observe(context, arena);
+                false
+            }
+            Self::Meltdown(event) => event.observe(context, arena),
+            _ => unreachable!("only the shared events read the arena back"),
         }
     }
 
@@ -480,10 +530,11 @@ impl ActiveEvent {
         }
     }
 
+    /// Only an event's own world. The arena is counted once by `ClockState`,
+    /// whoever is using it, and a standalone Aquarium has no rigid world.
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
-            Self::Grass(_) => (0, 0),
-            Self::Aquarium(event) => event.physics_counts(),
+            Self::Grass(_) | Self::Aquarium(_) => (0, 0),
             Self::Falling(event) => event.physics_counts(),
             Self::Explosion(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),

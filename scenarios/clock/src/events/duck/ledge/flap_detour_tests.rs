@@ -9,15 +9,15 @@ pub(super) const PROFILES: [ClockDuckJumpProfile; 2] =
     [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing];
 const SEED: u64 = 3;
 
-pub(super) fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> DuckEvent {
+pub(super) fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> TestDuck {
     assert!(flap_detour::selected(SEED));
-    let mut duck = DuckEvent::new_platforms(Layout::new(aspect), SEED);
-    duck.direction = direction;
+    let mut duck = TestDuck::new_platforms(Layout::new(aspect), SEED);
+    duck.face(direction);
     duck.controller.profile = profile;
     duck
 }
 
-pub(super) fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool) {
+pub(super) fn until(duck: &mut TestDuck, predicate: impl Fn(&TestDuck) -> bool) {
     for _ in 0..400 {
         if predicate(duck) {
             return;
@@ -27,9 +27,9 @@ pub(super) fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool
     panic!("stage not reached: {:?}", duck.diagnostics());
 }
 
-pub(super) fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) {
-    let entity = PhysicsId::new(9000);
-    assert!(duck.world.as_mut().unwrap().insert_body(
+pub(super) fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) {
+    let entity = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
+    assert!(duck.arena.world_mut().unwrap().insert_body(
         BodyId::new(entity, BodyRole::PRIMARY),
         BodySpec {
             kind: BodyKind::Fixed,
@@ -44,7 +44,7 @@ pub(super) fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) {
     ));
 }
 
-fn anchor(duck: &DuckEvent) -> Vec2 {
+fn anchor(duck: &TestDuck) -> Vec2 {
     let panel = duck.door_panels()[0].unwrap();
     panel.point(Vec2::new(
         panel.hinge.x + panel.inward * panel.width,
@@ -90,7 +90,7 @@ fn flap_detour_runs_from_ordinary_spawn() {
                 assert!(duck.ledge.detour.stats.ticks < flap_detour::BUDGET_TICKS);
                 assert_eq!(duck.ledge.automatic.stats.hang_ticks, automatic::HANG_TICKS);
                 assert_eq!(
-                    duck.world.as_ref().unwrap().body_kind(DUCK_BODY),
+                    duck.arena.world().unwrap().body_kind(DUCK_BODY),
                     Some(BodyKind::Dynamic)
                 );
                 while duck.phase != EventPhase::Resetting && duck.tick < DUCK_TICKS {
@@ -119,13 +119,13 @@ fn detours_are_seeded_occasional_and_do_not_reroll_the_course() {
     assert!((160..=240).contains(&selected), "{selected}");
     assert!(!flap_detour::selected(42));
     for seed in 0..40 {
-        let mut duck = DuckEvent::new_course(Layout::new(ASPECTS[0]), seed, None);
-        let surfaces = duck.course.as_ref().unwrap().surfaces.clone();
+        let mut duck = TestDuck::new_course(Layout::new(ASPECTS[0]), seed, None);
+        let surfaces = duck.terrain.course.as_ref().unwrap().surfaces.clone();
         let direction = duck.direction;
         until(&mut duck, |d| {
             d.ledge.detour.stats.phase == DetourPhase::Finished
         });
-        assert_eq!(duck.course.as_ref().unwrap().surfaces, surfaces);
+        assert_eq!(duck.terrain.course.as_ref().unwrap().surfaces, surfaces);
         assert_eq!(duck.direction, direction);
         assert_eq!(
             duck.ledge.detour.stats.outcome,
@@ -144,7 +144,9 @@ fn detours_are_seeded_occasional_and_do_not_reroll_the_course() {
 fn blocked_perch_and_return_are_refused_without_a_door_claim() {
     for return_block in [false, true] {
         let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[0]);
-        until(&mut duck, |d| d.world.is_some() && d.position().is_some());
+        until(&mut duck, |d| {
+            d.arena.world().is_some() && d.position().is_some()
+        });
         let r = duck.radius;
         let tip = anchor(&duck);
         let point = if return_block {
@@ -207,7 +209,7 @@ fn changed_flap_failed_catch_and_late_return_block_end_the_single_attempt() {
     }
 }
 
-pub(super) fn flood(duck: &DuckEvent) -> WaterWorld {
+pub(super) fn flood(duck: &TestDuck) -> WaterWorld {
     use engine_water::{Boundary, PoolSpec, WaterConfig};
     let mut water = WaterWorld::new(
         WaterConfig::default(),
@@ -236,24 +238,24 @@ fn wet_interruption_timeout_deadline_and_lost_support_release_the_detour() {
     for case in 0..5 {
         let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[1]);
         until(&mut duck, |d| d.ledge.stats.phase == Phase::Hanging);
-        let mass = duck.world.as_ref().unwrap().body_mass(DUCK_BODY);
+        let mass = duck.arena.world().unwrap().body_mass(DUCK_BODY);
         let mut water = None;
         match case {
             0 => water = Some(flood(&duck)),
             1 => duck.ledge.detour.stats.ticks = flap_detour::BUDGET_TICKS - 1,
             2 => duck.tick = DUCK_TICKS - RESET_TICKS - u64::from(flap_detour::BUDGET_TICKS),
             3 => {
-                duck.world
-                    .as_mut()
+                duck.arena
+                    .world_mut()
                     .unwrap()
                     .remove_entity(PhysicsId::new(1000));
             }
             _ => {
-                duck.world.as_mut().unwrap().apply_velocity_delta(
-                    DUCK_BODY,
-                    Vec2::new(duck.radius * 40.0, 0.0),
-                    true,
-                );
+                let delta = Vec2::new(duck.radius * 40.0, 0.0);
+                duck.arena
+                    .world_mut()
+                    .unwrap()
+                    .apply_velocity_delta(DUCK_BODY, delta, true);
             }
         }
         for _ in 0..3 {
@@ -275,7 +277,7 @@ fn wet_interruption_timeout_deadline_and_lost_support_release_the_detour() {
         );
         assert!(!duck.ledge_attached());
         assert!(!duck.ledge.automatic.stats.active);
-        assert_eq!(duck.world.as_ref().unwrap().body_mass(DUCK_BODY), mass);
+        assert_eq!(duck.arena.world().unwrap().body_mass(DUCK_BODY), mass);
         assert_eq!(duck.controller.heights.count, 0);
     }
 }
@@ -290,10 +292,10 @@ fn takeover_and_arena_retirement_keep_body_ownership_and_clear_autonomous_intent
     ] {
         let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[0]);
         until(&mut duck, |d| d.ledge.detour.stats.phase == stage);
-        let before = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let before = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         let ledge = duck.ledge_state();
         assert!(duck.take_control(9, 1));
-        let after = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+        let after = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
         assert_eq!(before.position, after.position);
         assert_eq!(before.linear_velocity, after.linear_velocity);
         assert_eq!(duck.ledge_state(), ledge);
@@ -306,13 +308,8 @@ fn takeover_and_arena_retirement_keep_body_ownership_and_clear_autonomous_intent
     }
     let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[0]);
     until(&mut duck, |d| d.ledge.stats.phase == Phase::Hanging);
-    let mut arena = VisitArena::claim(&mut duck);
-    arena.retain(Box::new(duck));
-    let vacant = arena.vacant().unwrap();
-    assert!(!vacant.ledge_attached());
-    assert!(vacant.world.as_ref().unwrap().motion(DUCK_BODY).is_none());
-    assert_eq!(vacant.door_openness(), (0.0, 0.0));
-    let mut rejoined = arena.rejoin(2, 1).unwrap();
+    let mut rejoined = duck.rejoin(2, 1);
+    assert!(!rejoined.ledge_attached());
     for _ in 0..100 {
         rejoined.step();
     }
@@ -325,7 +322,8 @@ fn stationary_responsive_support_can_return_but_moving_slopes_are_skipped() {
     for aspect in ASPECTS {
         for direction in [-1.0, 1.0] {
             let mut duck = ordinary(aspect, direction, PROFILES[0]);
-            duck.responsive_floor = Some(ResponsiveFloor::new(FloorShape::clock(duck.layout), 0.0));
+            duck.terrain.responsive_floor =
+                Some(ResponsiveFloor::new(FloorShape::clock(duck.layout), 0.0));
             until(&mut duck, |d| {
                 d.ledge.detour.stats.phase == DetourPhase::Finished
             });
@@ -338,7 +336,7 @@ fn stationary_responsive_support_can_return_but_moving_slopes_are_skipped() {
             let mut duck = ordinary(aspect, direction, PROFILES[1]);
             let mut floor = ResponsiveFloor::new(FloorShape::clock(duck.layout), 0.0);
             floor.opening = 0.9;
-            duck.responsive_floor = Some(floor);
+            duck.terrain.responsive_floor = Some(floor);
             until(&mut duck, |d| {
                 d.ledge.detour.stats.phase == DetourPhase::Finished
             });

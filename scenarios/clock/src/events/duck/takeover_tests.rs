@@ -1,12 +1,12 @@
 use super::*;
 use engine_common::ClockDuckJumpProfile;
 
-fn at_moment(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, moment: u8) -> DuckEvent {
-    let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
-    duck.direction = direction;
+fn at_moment(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, moment: u8) -> TestDuck {
+    let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
+    duck.face(direction);
     duck.select_jump_profile(Some(profile));
     loop {
-        let motion = duck.world.as_ref().and_then(|w| w.motion(DUCK_BODY));
+        let motion = duck.arena.world().and_then(|w| w.motion(DUCK_BODY));
         let ready = match moment {
             0 => duck.tick == 15,
             1 => duck.grounded() && motion.is_some_and(|m| m.linear_velocity.x.abs() > 1.0),
@@ -41,11 +41,11 @@ fn takeover_keeps_every_existing_body_mass_contact_and_clock_in_both_directions(
             for profile in [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing] {
                 for moment in 0..5 {
                     let mut duck = at_moment(aspect, direction, profile, moment);
-                    let motions = duck.world.as_ref().map(|w| w.motions().collect::<Vec<_>>());
-                    let mass = duck.world.as_ref().and_then(|w| w.body_mass(DUCK_BODY));
+                    let motions = duck.arena.world().map(|w| w.motions().collect::<Vec<_>>());
+                    let mass = duck.arena.world().and_then(|w| w.body_mass(DUCK_BODY));
                     let contacts = duck
-                        .world
-                        .as_ref()
+                        .arena
+                        .world()
                         .map(|w| w.surface_contacts(DUCK_COLLIDER).collect::<Vec<_>>());
                     let phase = (duck.phase, duck.phase_tick, duck.tick);
                     let facing = duck.facing();
@@ -67,17 +67,17 @@ fn takeover_keeps_every_existing_body_mass_contact_and_clock_in_both_directions(
                         doors
                     );
                     assert_eq!(
-                        duck.world.as_ref().and_then(|w| w.body_mass(DUCK_BODY)),
+                        duck.arena.world().and_then(|w| w.body_mass(DUCK_BODY)),
                         mass
                     );
                     assert_eq!(
-                        duck.world
-                            .as_ref()
+                        duck.arena
+                            .world()
                             .map(|w| w.surface_contacts(DUCK_COLLIDER).collect::<Vec<_>>()),
                         contacts
                     );
                     if let Some(motions) = motions {
-                        let world = duck.world.as_ref().unwrap();
+                        let world = duck.arena.world().unwrap();
                         assert_eq!(
                             world.body_count(),
                             motions.len() + 1,
@@ -92,7 +92,7 @@ fn takeover_keeps_every_existing_body_mass_contact_and_clock_in_both_directions(
                             "preserve the actor's spawn boundary"
                         );
                     } else {
-                        assert!(duck.world.is_none(), "opening does not spawn early");
+                        assert!(duck.arena.world().is_none(), "opening does not spawn early");
                     }
                     assert!(!duck.take_control(8, 1), "cannot steal an owned actor");
                     assert!(duck.debug_arc().is_none(), "no stale AI plan overlay");
@@ -107,13 +107,13 @@ fn airborne_takeover_has_one_gravity_step_bounded_braking_and_no_extra_jump() {
     for direction in [-1.0, 1.0] {
         for moment in [2, 3] {
             let mut duck = at_moment(4.0 / 3.0, direction, ClockDuckJumpProfile::Flowing, moment);
-            let motion = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+            let motion = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
             let jumps = duck.jumps;
             let tick = duck.tick;
             assert!(duck.take_control(1, 1));
             duck.set_player_input(0, true, false, false);
             duck.step();
-            let after = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+            let after = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
             assert_eq!(duck.tick, tick + 1);
             assert_eq!(duck.jumps, jumps, "an in-air press does not add a jump");
             let acceleration = duck.movement.run_speed * DT * 6.0;

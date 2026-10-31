@@ -1238,6 +1238,13 @@ fn validate_clock_trigger(
             ControlFailureCode::ActionUnavailable,
             "A crow is already visiting; wait for departure",
         ))
+    } else if let Some(unavailable) = clock
+        .events
+        .iter()
+        .find(|event| event.kind == request.event)
+        .and_then(|event| event.blocked_by_arena)
+    {
+        Some((ControlFailureCode::ActionUnavailable, unavailable.notice()))
     } else if !clock.can_trigger {
         Some((
             ControlFailureCode::ActionUnavailable,
@@ -1762,6 +1769,22 @@ mod tests {
             &clock,
         )
         .unwrap();
+        // Whatever the run's arena would refuse is unavailable, for its reason.
+        let mut refused = clock.clone();
+        let rain = refused
+            .events
+            .iter_mut()
+            .find(|event| event.kind == ClockEventKind::Rain)
+            .unwrap();
+        rain.blocked_by_arena = Some(engine_common::ClockArenaUnavailable::LayoutIncompatible);
+        let request = ClockTriggerRequest::new(&refused, ClockEventKind::Rain);
+        let failure = validate_clock_trigger(&request, &ui, &refused).unwrap_err();
+        assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+        assert_eq!(
+            failure.message,
+            engine_common::ClockArenaUnavailable::LayoutIncompatible.notice()
+        );
+        assert_eq!(failure.current_clock_state, Some(refused));
         let request = ClockTriggerRequest::new(&clock, ClockEventKind::Marquee);
         ui.screen = UiScreen::PauseMain;
         assert_eq!(

@@ -72,11 +72,8 @@ pub(crate) struct RainEvent {
 }
 
 impl RainEvent {
-    pub fn canonical_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
+    pub fn own_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
         self.floats.as_ref().map(|f| &f.world)
-    }
-    pub fn canonical_world_mut(&mut self) -> Option<&mut engine_rapier::world::PhysicsWorld> {
-        self.floats.as_mut().map(|f| &mut f.world)
     }
     pub fn new(
         layout: Layout,
@@ -392,7 +389,7 @@ impl RainEvent {
         }
     }
 
-    fn update_duck(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) {
+    fn update_duck(&mut self) {
         if self.duck_joined {
             return;
         }
@@ -439,13 +436,6 @@ impl RainEvent {
         }
         if let Some(floats) = &mut self.floats {
             floats.move_floor(floor);
-            if let Some(soil) = soil {
-                soil.set_surfaces(
-                    crate::grass::surfaces::responsive(self.layout, floor),
-                    crate::grass::SoilSupportState::Responsive,
-                );
-                soil.bind_current(&mut floats.world);
-            }
             floats.step(&self.water, 5.0);
             if floats.position().unwrap().y + floats.half_extents.length()
                 < self.layout.bounds_min.y
@@ -457,11 +447,7 @@ impl RainEvent {
         }
     }
 
-    #[cfg(test)]
     pub fn step(&mut self) -> bool {
-        self.step_with_soil(None)
-    }
-    pub fn step_with_soil(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) -> bool {
         if self.tick >= RAIN_TICKS {
             return true;
         }
@@ -489,7 +475,7 @@ impl RainEvent {
                 .reclaim_fraction(1.0 / (RAIN_TICKS - self.tick + 1) as f64)
                 .expect("bounded rain cleanup");
         } else {
-            self.update_duck(soil);
+            self.update_duck();
         }
         self.tick >= RAIN_TICKS
     }
