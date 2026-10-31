@@ -89,6 +89,11 @@ fn create(
             water_lab: scenario_clock::ClockWaterLab::from_override(
                 std::env::var("SPACEWARS_CLOCK_WATER_LAB").ok().as_deref(),
             ),
+            arena_fixture: scenario_clock::arena_fixture::FixtureStart::from_override(
+                std::env::var("SPACEWARS_CLOCK_ARENA_FIXTURE")
+                    .ok()
+                    .as_deref(),
+            ),
             duck_debug_overlay: std::env::var("SPACEWARS_CLOCK_DUCK_DEBUG")
                 .is_ok_and(|value| value == "1"),
             duck_direct_flap_landing: std::env::var("SPACEWARS_CLOCK_DUCK_FLAP_DETOUR")

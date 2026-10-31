@@ -1922,7 +1922,16 @@ impl FunctionalHarness {
     }
 
     fn clock_trigger_failure(&mut self, state: &ClockState, code: ControlFailureCode) {
-        let request = ClockTriggerRequest::new(state, ClockEventKind::Falling);
+        let failure = self.clock_trigger_refusal(state, ClockEventKind::Falling);
+        assert_eq!(failure.code, code);
+    }
+
+    fn clock_trigger_refusal(
+        &mut self,
+        state: &ClockState,
+        event: ClockEventKind,
+    ) -> ControlFailure {
+        let request = ClockTriggerRequest::new(state, event);
         let error = self
             .client
             .clock_trigger_before(&request, request_deadline())
@@ -1931,7 +1940,7 @@ impl FunctionalHarness {
             &format!("clock trigger {request:?} (expected rejection)"),
             &error,
         );
-        assert_eq!(error.failure().unwrap().code, code);
+        error.failure().unwrap().clone()
     }
 
     fn require_clock(
@@ -2250,6 +2259,154 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         assert_eq!(relaunched.duck, None);
         assert_eq!(relaunched.body_count, 0);
         assert!(!relaunched.settings.events.duck);
+    });
+}
+
+/// Each owner holding the arena, in the order it claimed it, and whether it
+/// is a resident.
+fn arena_owners(state: &ClockState) -> Vec<(engine_common::ClockArenaOwner, bool)> {
+    state
+        .arena
+        .as_ref()
+        .expect("Clock publishes its arena")
+        .claims
+        .iter()
+        .map(|claim| (claim.owner, claim.resident))
+        .collect()
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run() {
+    use engine_common::{ClockArenaOwner, ClockArenaUnavailable};
+    // The harness starts every clock-arena run with the arena fixture's two
+    // owners: the ordinary three balls, and two more near the walls, where
+    // every visit's course has ground.
+    run_functional_test("clock-arena-residents", |harness| {
+        let fixtures = [
+            (ClockArenaOwner::Fixture { index: 0 }, true),
+            (ClockArenaOwner::Fixture { index: 1 }, true),
+        ];
+        // A run's arena as it starts: the fixtures alone, with all their
+        // balls, in the run's one world.
+        let fresh = |state: &ClockState| {
+            assert_eq!(arena_owners(state), fixtures);
+            let arena = state.arena.as_ref().unwrap();
+            let balls: Vec<_> = arena
+                .claims
+                .iter()
+                .map(|claim| claim.population.bodies)
+                .collect();
+            assert_eq!(balls, [3, 2]);
+            let run = arena.accounting;
+            assert_eq!(
+                (run.granted, run.released, run.refused, run.worlds),
+                (2, 0, 0, 1)
+            );
+        };
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        let state =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.event-profile.next"),
+            Some("Off")
+        );
+        harness.activate_guarded("launcher.settings.start", &state);
+        harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        fresh(&initial);
+
+        // Idle, the residents keep the arena with all they had while it steps
+        // under them.
+        let steps = initial.arena.as_ref().unwrap().accounting.steps + 120;
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        let resting = loop {
+            let state = harness.clock_state();
+            if state.arena.as_ref().unwrap().accounting.steps >= steps {
+                break state;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the arena stopped stepping: {state:?}"
+            );
+            thread::sleep(POLL_INTERVAL);
+        };
+        fresh(&resting);
+        let arena = resting.arena.as_ref().unwrap();
+        assert_eq!(arena.claims, initial.arena.as_ref().unwrap().claims);
+        assert!(arena.last_step.is_some());
+        assert!(
+            resting
+                .events
+                .iter()
+                .all(|event| event.blocked_by_arena.is_none())
+        );
+        harness.capture_screenshot("clock-arena-residents.png");
+
+        // A visit joins their world. Beside it, the two leave no room for the
+        // largest events, and the client refuses Meltdown for that reason.
+        harness.clock_trigger_event(&resting, ClockEventKind::Duck);
+        let predicate = ClockStatePredicate {
+            scenario_revision: resting.scenario_revision,
+            lifecycle: None,
+            event_kind: Some(ClockEventKind::Duck),
+            phase: None,
+            event_id: Some(1),
+            min_phase_tick: 0,
+        };
+        let result = harness
+            .client
+            .wait_for_clock_state(&predicate, TRANSITION_TIMEOUT);
+        let visiting = harness.require_clock(&format!("clock wait {predicate:?}"), result);
+        let refusal = harness.clock_trigger_refusal(&visiting, ClockEventKind::Meltdown);
+        assert_eq!(refusal.code, ControlFailureCode::ActionUnavailable);
+        assert_eq!(refusal.message, ClockArenaUnavailable::Capacity.notice());
+        // The client refused from what Clock published, so the arena was
+        // never asked.
+        let refused = refusal
+            .current_clock_state
+            .expect("the state it refused in");
+        let owners = arena_owners(&refused);
+        assert_eq!(owners[..2], fixtures);
+        assert!(owners.contains(&(ClockArenaOwner::Visit, false)));
+        let run = refused.arena.as_ref().unwrap().accounting;
+        assert_eq!((run.refused, run.worlds), (0, 1));
+        for event in &refused.events {
+            let largest = matches!(
+                event.kind,
+                ClockEventKind::Aquarium | ClockEventKind::Explosion | ClockEventKind::Meltdown
+            );
+            assert_eq!(
+                event.blocked_by_arena,
+                largest.then_some(ClockArenaUnavailable::Capacity),
+                "{:?}",
+                event.kind
+            );
+        }
+        harness.capture_screenshot("clock-arena-visit.png");
+
+        // A restart ends the run with its residents and the visit, and the
+        // next starts anew, as does a new start from the launcher.
+        let gameplay = harness.state();
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert_ne!(restarted.scenario_revision, initial.scenario_revision);
+        assert_eq!(restarted.duck, None);
+        fresh(&restarted);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.return-to-launcher", &menu);
+        let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        harness.activate_guarded("launcher.start", &launcher);
+        harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        let relaunched = harness.clock_state();
+        assert_ne!(relaunched.scenario_revision, restarted.scenario_revision);
+        fresh(&relaunched);
     });
 }
 

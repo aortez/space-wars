@@ -385,6 +385,8 @@ pub struct ClockConfig {
     pub duck_direct_flap_landing: bool,
     /// Development-only water fixtures using the Meltdown lifecycle.
     pub water_lab: ClockWaterLab,
+    /// Development-only arena fixtures, residents from the run's start.
+    pub arena_fixture: arena_fixture::FixtureStart,
     /// Explicit reproducible full-sun fixture; ordinary Clock remains dim.
     pub favorable_grass_fixture: bool,
     /// Isolate the pre-existing zero-input physiology fixture from sunlight.
@@ -417,6 +419,7 @@ impl Default for ClockConfig {
             duck_debug_overlay: false,
             duck_direct_flap_landing: false,
             water_lab: ClockWaterLab::Off,
+            arena_fixture: arena_fixture::FixtureStart::None,
             favorable_grass_fixture: false,
             ceiling_sunlight: true,
             ceiling_optics: false,
@@ -443,6 +446,7 @@ impl ClockConfig {
             duck_debug_overlay: self.duck_debug_overlay,
             duck_direct_flap_landing: self.duck_direct_flap_landing,
             water_lab: self.water_lab,
+            arena_fixture: self.arena_fixture,
             favorable_grass_fixture: self.favorable_grass_fixture,
             ceiling_sunlight: self.ceiling_sunlight,
             ceiling_optics: self.ceiling_optics,
@@ -1709,7 +1713,7 @@ impl Scenario for ClockScenario {
             // Full-sun ambient feeds the whole habitat, so no opening gates it.
             plants.light_bounded = false;
         }
-        ClockState {
+        let mut state = ClockState {
             config: config.normalized(),
             reading: None,
             date_label: None,
@@ -1734,7 +1738,14 @@ impl Scenario for ClockScenario {
             font_rng: StdRng::seed_from_u64(seed ^ 0x464f_4e54),
             font_change_pending: true,
             font_rotation_pending: false,
+        };
+        let layout = Layout::new(state.aspect_ratio());
+        for balls in state.config.arena_fixture.owners(layout) {
+            state
+                .admit_arena_fixture(&balls)
+                .expect("an empty arena takes the fixtures a run starts with");
         }
+        state
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {

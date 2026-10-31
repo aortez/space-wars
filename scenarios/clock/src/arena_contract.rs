@@ -40,7 +40,7 @@ use crate::{
     ClockState, EVENT_CATALOG, MAX_ARENA_CLAIMS, MAX_RESIDENT_CLAIMS, Population, Remap,
     Unavailable,
     arena::{Owner, ids::canonical::ARENA_FLOOR},
-    arena_fixture::{ArenaFixture, FixtureBall, FixtureBallState},
+    arena_fixture::{ArenaFixture, FixtureBall, FixtureBallState, FixtureStart},
     events::{COOLDOWN_TICKS, EventLifecycle, EventPhase, duck::arena::CourseGeometry},
     layout::Layout,
 };
@@ -1192,6 +1192,65 @@ fn arena_contract_a_restart_or_exit_ends_the_run_once() {
     );
     assert!(keep(&mut restarted, 10, "the new run's fixture").is_empty());
     assert_eq!(restarted.arena_accounting().worlds, 1);
+}
+
+#[test]
+fn arena_contract_a_run_can_start_with_its_fixtures() {
+    assert_eq!(
+        FixtureStart::from_override(Some("default")),
+        FixtureStart::Default
+    );
+    assert_eq!(
+        FixtureStart::from_override(Some("two-owners")),
+        FixtureStart::TwoOwners
+    );
+    for value in [None, Some(""), Some("three")] {
+        assert_eq!(FixtureStart::from_override(value), FixtureStart::None);
+    }
+    assert!(plain().arena.idle(), "ordinary Clock starts with none");
+
+    let mut state = ready(ClockConfig {
+        aspect_ratio: ASPECT,
+        event_profile: ClockEventProfile::Off,
+        arena_fixture: FixtureStart::TwoOwners,
+        ..ClockConfig::default()
+    });
+    assert_eq!(state.arena.owners(), [Owner::Fixture(0), Owner::Fixture(1)]);
+    let balls: Vec<_> = state
+        .arena_fixtures()
+        .iter()
+        .map(|fixture| fixture.balls.len())
+        .collect();
+    assert_eq!(balls, [3, 2]);
+    assert!(keep(&mut state, 120, "the fixtures settling").is_empty());
+    for (ball, at) in every_ball(&state) {
+        assert!(
+            (at.position.y - resting(0.0).y).abs() < 0.1 && at.velocity.length() < 0.01,
+            "{ball:?} at rest on the closed floor: {at:?}"
+        );
+    }
+    // Beside a visit, the two leave no room for the largest events.
+    state.preview_event(ClockEventKind::Duck);
+    keep(&mut state, 1, "the visit claiming the arena");
+    for kind in ClockEventKind::ALL {
+        let largest = matches!(
+            kind,
+            ClockEventKind::Aquarium | ClockEventKind::Explosion | ClockEventKind::Meltdown
+        );
+        assert_eq!(
+            state.event_blocked_by_arena(kind),
+            largest.then_some(Unavailable::Capacity),
+            "{kind:?}"
+        );
+    }
+    // The visit runs its course in their world. Its duck may push a ball out
+    // through its door, but once it has gone, the residents hold the arena
+    // alone in the world they started in.
+    while state.duck_visit.is_some() {
+        keep(&mut state, 1, "the visit");
+    }
+    assert_eq!(state.arena.owners(), [Owner::Fixture(0), Owner::Fixture(1)]);
+    assert_eq!(state.arena_accounting().worlds, 1);
 }
 
 /// The claims and the floor together, which is everything in the world.

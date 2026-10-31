@@ -4,6 +4,7 @@
     "attached::attached_workflows_preserve_launcher_running_and_paused_sessions",
     "autostart::autostart_clock_launch_and_disable_smoke",
     "clock::aquarium_preview_pause_enablement_and_restart_use_the_public_ui",
+    "clock::arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run",
     "clock::cell_swap_preview_and_saved_switch_use_the_public_controls",
     "clock::clock_fonts_save_live_choices_and_survive_restart",
     "clock::color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunch",

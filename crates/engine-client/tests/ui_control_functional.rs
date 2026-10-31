@@ -782,6 +782,14 @@ impl FunctionalHarness {
                     "0"
                 },
             )
+            .env(
+                "SPACEWARS_CLOCK_ARENA_FIXTURE",
+                if test_name.starts_with("clock-arena") {
+                    "two-owners"
+                } else {
+                    ""
+                },
+            )
             // These UI workflows must not reach the host's NetworkManager or
             // BlueZ. Wire-protocol tests supply their own private D-Bus daemon.
             .env(

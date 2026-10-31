@@ -23,6 +23,43 @@ pub const MAX_FIXTURE_BALLS: usize = 4;
 /// refuses another.
 pub const MAX_FIXTURES: usize = MAX_RESIDENT_CLAIMS;
 
+/// The arena fixtures a run starts with, so that the real client shows
+/// residents. Ordinary Clock starts with none.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FixtureStart {
+    #[default]
+    None,
+    /// The ordinary fixture's three balls.
+    Default,
+    /// The ordinary fixture and a second owner with two balls of its own.
+    /// Beside a visit they leave no room for Meltdown, Explosion or Aquarium.
+    TwoOwners,
+}
+
+impl FixtureStart {
+    /// The fixtures `SPACEWARS_CLOCK_ARENA_FIXTURE` names: `default` or
+    /// `two-owners`.
+    pub fn from_override(value: Option<&str>) -> Self {
+        match value {
+            Some("default") => Self::Default,
+            Some("two-owners") => Self::TwoOwners,
+            _ => Self::None,
+        }
+    }
+
+    /// Each owner's balls at `layout`, in the order they are admitted.
+    pub(crate) fn owners(self, layout: Layout) -> Vec<Vec<FixtureBall>> {
+        match self {
+            Self::None => Vec::new(),
+            Self::Default => vec![ArenaFixture::default_balls(layout)],
+            Self::TwoOwners => vec![
+                ArenaFixture::default_balls(layout),
+                ArenaFixture::outer_balls(layout),
+            ],
+        }
+    }
+}
+
 /// A ball to admit: where it starts and how it moves.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FixtureBall {
@@ -77,13 +114,26 @@ impl ArenaFixture {
     /// Three balls dropped onto the floor, one to each side of the face and
     /// one over the drain, which falls when the floor opens under it.
     pub fn default_balls(layout: Layout) -> Vec<FixtureBall> {
+        Self::dropped(layout, &[-0.55, 0.0, 0.55])
+    }
+
+    /// Two balls dropped onto the floor nearer the view's edges than the
+    /// ordinary ones, where every visit's course has ground.
+    pub fn outer_balls(layout: Layout) -> Vec<FixtureBall> {
+        Self::dropped(layout, &[-0.85, 0.85])
+    }
+
+    /// Balls at rest a little above the floor, at `across` fractions of the
+    /// view's half width.
+    fn dropped(layout: Layout, across: &[f32]) -> Vec<FixtureBall> {
         let height = layout.floor_y + Self::radius(layout) * 6.0;
-        [-0.55, 0.0, 0.55]
+        across
+            .iter()
             .map(|x| FixtureBall {
                 position: Vec2::new(layout.bounds_max.x * x, height),
                 velocity: Vec2::ZERO,
             })
-            .to_vec()
+            .collect()
     }
 
     /// Claims the arena as fixture `index` and puts `balls` in it. They fall

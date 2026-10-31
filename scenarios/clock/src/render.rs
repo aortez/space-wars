@@ -1,6 +1,6 @@
 use engine_common::{
-    Camera2, Fill, RenderColor, RenderFrame, RenderPoint, RenderPolygon, RenderPrimitive,
-    RenderText, Stroke, TextAnchor,
+    Camera2, Fill, RenderCircle, RenderColor, RenderFrame, RenderPoint, RenderPolygon,
+    RenderPrimitive, RenderText, Stroke, TextAnchor,
 };
 
 use crate::{
@@ -40,6 +40,9 @@ const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.32, 0.21, 0.12);
 /// Damp earth cut into the floor's own top rows. Darker and greyer than the
 /// surrounding wood, which the old tone was too close to for the layer to read.
 pub(crate) const SOIL_COLOR: RenderColor = RenderColor::rgb(0.155, 0.112, 0.082);
+/// The arena fixture's balls: pale, like the wood they rest on, so they read
+/// as objects in the room rather than as the face.
+const FIXTURE_COLOR: RenderColor = RenderColor::rgb(0.74, 0.66, 0.52);
 /// Cover tones from withered to sunlit, indexed by band. Distinct from the
 /// soil and shoot palettes so a frame reader can tell the three apart.
 pub(crate) const COVER_COLORS: [RenderColor; 3] = [
@@ -244,6 +247,18 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
                     )),
                 );
             }
+        }
+    }
+    for fixture in state.arena_fixtures() {
+        for ball in &fixture.balls {
+            frame.push_primitive(
+                ARENA_LAYER,
+                RenderPrimitive::Circle(RenderCircle::filled(
+                    RenderPoint::new(ball.position.x, ball.position.y),
+                    fixture.radius,
+                    FIXTURE_COLOR,
+                )),
+            );
         }
     }
     if let Some(view) = crate::grass::inspection::snapshot(state) {
