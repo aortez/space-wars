@@ -1448,6 +1448,7 @@ impl ClockState {
             self.floor.acquire_visit_event(kind);
             let context = EventContext {
                 segments: &mut self.segments,
+                surfaces: &mut self.surfaces,
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
@@ -1476,6 +1477,7 @@ impl ClockState {
             kind,
             EventContext {
                 segments: &mut self.segments,
+                surfaces: &mut self.surfaces,
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
@@ -1515,6 +1517,7 @@ impl ClockState {
             {
                 duck.terrain.sync_responsive_floor(floor);
             }
+            event.release_surfaces(&mut self.surfaces);
             for slot in 0..DIGIT_SLOT_COUNT {
                 if self.surfaces.held(slot) {
                     self.surfaces.release(slot);
@@ -1678,6 +1681,7 @@ impl ClockState {
         let shared = event.shares_visit_arena();
         let context = EventContext {
             segments: &mut self.segments,
+            surfaces: &mut self.surfaces,
             display: self.display,
             layout,
             floor: self.floor.geometry(layout),
@@ -1698,6 +1702,7 @@ impl ClockState {
         let event = self.active_event.as_mut().expect("active event");
         let context = EventContext {
             segments: &mut self.segments,
+            surfaces: &mut self.surfaces,
             display: self.display,
             layout,
             floor: self.floor.geometry(layout),

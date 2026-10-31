@@ -71,6 +71,15 @@ impl Layout {
         )
     }
 
+    /// The band of y a slot's glyph occupies, which the slides and reels that
+    /// carry glyphs through a slot are clipped to.
+    pub fn digit_band(self) -> [f32; 2] {
+        [
+            self.face_origin.y,
+            self.face_origin.y + FACE_HEIGHT_UNITS * self.pitch,
+        ]
+    }
+
     pub fn segment_center(self, id: SegmentId) -> Vec2 {
         let cells = digits::cells(id.kind);
         (self.cell_center(id, cells[0]) + self.cell_center(id, cells[cells.len() - 1])) * 0.5

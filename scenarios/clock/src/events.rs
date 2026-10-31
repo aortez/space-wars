@@ -237,6 +237,7 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
 
 pub(super) struct EventContext<'a> {
     pub segments: &'a mut [SegmentState],
+    pub surfaces: &'a mut crate::digit_surfaces::SurfaceLedger,
     pub display: DisplaySnapshot,
     pub layout: Layout,
     pub floor: crate::floor::FloorGeometry,
@@ -301,9 +302,11 @@ impl ActiveEvent {
                 config.marquee_message,
                 context.display,
             ))),
-            ClockEventKind::DigitSlide => {
-                Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
-            }
+            ClockEventKind::DigitSlide => Self::DigitSlide(DigitSlideEvent::new(
+                previous_display,
+                context.display,
+                context.surfaces,
+            )),
             // A periodic event has no previous reading either, so the
             // admission has to say whether a person asked for this one.
             ClockEventKind::SlotMachine => Self::SlotMachine(Box::new(SlotMachineEvent::new(
@@ -453,7 +456,7 @@ impl ActiveEvent {
             Self::ColorCycle(event) => event.step(),
             Self::Meltdown(event) => event.step_with_visit(context, visit, arena),
             Self::Marquee(event) => event.step(),
-            Self::DigitSlide(event) => event.step(),
+            Self::DigitSlide(event) => event.step(context.surfaces),
             Self::SlotMachine(event) => event.step(),
             Self::CellSwap(event) => event.step(),
             Self::Rain(event) => {
@@ -554,12 +557,30 @@ impl ActiveEvent {
         }
     }
 
+    /// The surfaces of the slots this event holds, in its own order.
+    pub fn surfaces(
+        &self,
+        layout: Layout,
+        out: &mut Vec<(crate::SurfaceId, crate::digit_surfaces::SurfacePose)>,
+    ) {
+        if let Self::DigitSlide(event) = self {
+            event.surfaces(layout, out);
+        }
+    }
+
+    /// Gives the slots this event holds back to the face, with whatever it
+    /// settled there, and retires the rest of its pieces.
+    pub fn release_surfaces(&mut self, surfaces: &mut crate::digit_surfaces::SurfaceLedger) {
+        if let Self::DigitSlide(event) = self {
+            event.release_surfaces(surfaces);
+        }
+    }
+
     /// Events whose moving pieces are not published as surfaces yet.
     pub fn vacates_face(&self) -> bool {
         match self {
             Self::Meltdown(event) => !event.lab,
-            Self::DigitSlide(_)
-            | Self::Falling(_)
+            Self::Falling(_)
             | Self::Explosion(_)
             | Self::CellSwap(_)
             | Self::SlotMachine(_)

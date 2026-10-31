@@ -565,3 +565,236 @@ fn surface_contract_a_restart_admits_a_new_face_and_replays_identically() {
         "a fixed input sequence records the same lifecycle"
     );
 }
+
+/// No automatic event but the one a test is about.
+pub(crate) fn only(kind: ClockEventKind) -> ClockEvents {
+    ClockEvents {
+        falling: kind == ClockEventKind::Falling,
+        color_cycle: kind == ClockEventKind::ColorCycle,
+        meltdown: kind == ClockEventKind::Meltdown,
+        duck: kind == ClockEventKind::Duck,
+        marquee: kind == ClockEventKind::Marquee,
+        digit_slide: kind == ClockEventKind::DigitSlide,
+        rain: kind == ClockEventKind::Rain,
+        crow: kind == ClockEventKind::Crow,
+        explosion: kind == ClockEventKind::Explosion,
+        aquarium: kind == ClockEventKind::Aquarium,
+        cell_swap: kind == ClockEventKind::CellSwap,
+        grass: kind == ClockEventKind::Grass,
+        slot_machine: kind == ClockEventKind::SlotMachine,
+    }
+}
+
+/// A face whose minute changes slide, and nothing else happens on its own.
+fn sliding(aspect: f32, font: ClockFont, at: ClockReading) -> ClockState {
+    let mut state = ClockScenario::init(
+        ClockConfig {
+            event_profile: ClockEventProfile::Calm,
+            events: only(ClockEventKind::DigitSlide),
+            ..config(aspect, font, ClockTimeFormat::TwentyFourHour)
+        },
+        7,
+    );
+    sync(&mut state, &[ClockAction::set_reading(at)]);
+    state
+}
+
+#[test]
+fn surface_contract_an_outgoing_digit_carries_its_markers_out_and_the_new_one_is_new() {
+    for font in FONTS {
+        for aspect in ASPECTS {
+            let context = format!("{font:?} at {aspect}");
+            let mut state = sliding(aspect, font, reading(12, 34, 59));
+            let layout = Layout::new(aspect);
+            let local = Vec2::new(0.2, -0.25);
+            let mut markers = Markers::attach(&state, |_| Some(local));
+            let before = state.digit_surfaces();
+            tick(&mut state, &[ClockAction::set_reading(reading(12, 35, 0))]);
+            assert_eq!(
+                state.event_kind(),
+                Some(ClockEventKind::DigitSlide),
+                "{context}"
+            );
+            let opening = markers.follow(&state);
+            let incoming: Vec<_> = opening
+                .iter()
+                .filter(|surface| surface.slot == 3 && !surface.departing)
+                .map(|surface| surface.id)
+                .collect();
+            assert_eq!(incoming.len(), lit_cells(&state)[3], "{context}");
+            assert!(
+                incoming
+                    .iter()
+                    .all(|id| before.iter().all(|old| old.id != *id)),
+                "{context}: the new glyph is new surfaces where it overlaps the old"
+            );
+            let mut lost = 0;
+            for step in 1..=DIGIT_SLIDE_TICKS {
+                let surfaces = assert_face_agreement(&state, &format!("{context}, tick {step}"));
+                let [outgoing, _] = match &state.active_event {
+                    Some(crate::events::ActiveEvent::DigitSlide(event)) => event.offsets(),
+                    _ => [-9.0, 0.0],
+                };
+                for marker in &markers.markers {
+                    let old = before.iter().find(|s| s.id == marker.surface).unwrap();
+                    let home = layout.slot_cell_center(usize::from(old.slot), old.cell)
+                        + local * layout.pitch;
+                    if old.slot != 3 {
+                        assert!(
+                            marker.lost.is_none(),
+                            "{context}: unchanged digits keep theirs"
+                        );
+                        assert_eq!(marker.world, home, "{context}");
+                        continue;
+                    }
+                    match marker.lost {
+                        None => {
+                            let surface = surfaces.iter().find(|s| s.id == marker.surface).unwrap();
+                            assert!(surface.departing, "{context}");
+                            assert_eq!(surface.source, SurfaceSource::Slide, "{context}");
+                            let expected = home + Vec2::new(0.0, outgoing * layout.pitch);
+                            assert!(
+                                (marker.world - expected).length() < 1e-3,
+                                "{context}: the marker keeps its local point on the slide"
+                            );
+                            assert!(
+                                surface.origin.y + 0.4 * layout.pitch > layout.digit_band()[0],
+                                "{context}: a cell is retired as soon as it is out"
+                            );
+                        }
+                        Some(loss) => {
+                            assert_eq!(loss, Loss::Retired(Retirement::Replaced), "{context}");
+                            let cell_top = layout.slot_cell_center(3, old.cell).y
+                                + (0.4 + outgoing) * layout.pitch;
+                            assert!(
+                                cell_top <= layout.digit_band()[0] + 1e-3,
+                                "{context}: a marker leaves only with its cell out of view"
+                            );
+                        }
+                    }
+                }
+                lost = markers.markers.iter().filter(|m| m.lost.is_some()).count();
+                tick(&mut state, &[]);
+                markers.follow(&state);
+            }
+            assert_eq!(state.event_kind(), None, "{context}");
+            let after = assert_face_agreement(&state, &context);
+            assert_eq!(
+                lost,
+                before.iter().filter(|s| s.slot == 3).count(),
+                "{context}: every outgoing marker left with its digit"
+            );
+            let mut settled: Vec<_> = after
+                .iter()
+                .filter(|surface| surface.slot == 3)
+                .map(|surface| surface.id)
+                .collect();
+            settled.sort_unstable();
+            let mut incoming = incoming.clone();
+            incoming.sort_unstable();
+            assert_eq!(
+                settled, incoming,
+                "{context}: the slid-in glyph is the face"
+            );
+            assert!(after.iter().all(|s| s.source == SurfaceSource::Anchored));
+            assert!(
+                after
+                    .iter()
+                    .filter(|s| s.slot != 3)
+                    .all(|s| before.iter().any(|old| old.id == s.id)),
+                "{context}"
+            );
+        }
+    }
+}
+
+#[test]
+fn surface_contract_a_slide_cut_short_retires_its_pieces_instead_of_snapping_them() {
+    let mut state = sliding(800.0 / 480.0, ClockFont::Sans, reading(12, 34, 59));
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+    tick(&mut state, &[ClockAction::set_reading(reading(12, 35, 0))]);
+    markers.follow(&state);
+    let first = state.digit_surfaces();
+    let first_incoming: Vec<_> = first
+        .iter()
+        .filter(|s| s.slot == 3 && !s.departing)
+        .map(|s| s.id)
+        .collect();
+    for _ in 0..20 {
+        tick(&mut state, &[]);
+        markers.follow(&state);
+    }
+    // The next minute arrives mid-slide: the slide ends at once, and the
+    // cooldown it leaves lets the newer reading snap in.
+    tick(&mut state, &[ClockAction::set_reading(reading(12, 36, 0))]);
+    let surfaces = markers.follow(&state);
+    assert_eq!(state.event_kind(), None);
+    assert_face_agreement(&state, "after the slide was cut short");
+    let changes: Vec<_> = state.surface_changes().copied().collect();
+    for id in &first_incoming {
+        assert!(
+            changes
+                .iter()
+                .any(|c| c.id == *id
+                    && c.kind == SurfaceChangeKind::Retired(Retirement::Interrupted)),
+            "a glyph cut off part way in is retired, not carried home"
+        );
+        assert!(surfaces.iter().all(|s| s.id != *id));
+    }
+    assert!(
+        surfaces
+            .iter()
+            .filter(|s| s.slot == 3)
+            .all(|s| first.iter().all(|old| old.id != s.id)),
+        "the reading that snapped in is new surfaces"
+    );
+    let lost: Vec<_> = markers.markers.iter().filter_map(|m| m.lost).collect();
+    assert_eq!(lost.len(), first.iter().filter(|s| s.departing).count());
+    assert!(
+        lost.iter()
+            .all(|loss| *loss == Loss::Retired(Retirement::Replaced)),
+        "the markers on the outgoing glyph left with it"
+    );
+    assert!(markers.attached().all(|m| m.moved == 0.0), "no piece jumps");
+    let accounting = state.surface_accounting();
+    assert_eq!(accounting.live, surfaces.len());
+    assert!(accounting.peak_live <= 2 * crate::fonts::MAX_DIGIT_CELLS);
+}
+
+#[test]
+fn surface_contract_a_previewed_slide_carries_the_face_out_and_brings_a_new_one_in() {
+    let mut state = clock(
+        800.0 / 480.0,
+        ClockFont::Serif,
+        ClockTimeFormat::TwelveHour,
+        reading(9, 41, 0),
+    );
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::new(-0.1, 0.1)));
+    let before = state.digit_surfaces();
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::DigitSlide)],
+    );
+    let opening = markers.follow(&state);
+    assert_face_agreement(&state, "preview");
+    // A blank hour slot has nothing to slide; every other glyph leaves as
+    // itself and comes back as new surfaces.
+    assert_eq!(opening.iter().filter(|s| s.departing).count(), before.len());
+    assert!(
+        before
+            .iter()
+            .all(|old| opening.iter().any(|s| s.id == old.id && s.departing))
+    );
+    for _ in 0..DIGIT_SLIDE_TICKS {
+        tick(&mut state, &[]);
+        markers.follow(&state);
+    }
+    let after = assert_face_agreement(&state, "after the preview");
+    assert_eq!(after.len(), before.len());
+    assert!(
+        after
+            .iter()
+            .all(|s| before.iter().all(|old| old.id != s.id))
+    );
+    assert_eq!(markers.attached().count(), 0);
+}

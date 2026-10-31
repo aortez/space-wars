@@ -659,6 +659,9 @@ pub(crate) fn publish(state: &ClockState) -> Vec<DigitSurface> {
             poses.push((id, SurfacePose::anchored(layout, slot, cell)));
         }
     }
+    if let Some(event) = &state.active_event {
+        event.surfaces(layout, &mut poses);
+    }
     poses
         .into_iter()
         .map(|(id, pose)| {
