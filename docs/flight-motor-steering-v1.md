@@ -18,9 +18,12 @@ navigation network refitted over that motor, with the planner's
 straight-line waypoint, completes the retained stack. On seeds 25 to 36,
 which no candidate was selected on, its first legs are level with the
 native transfer law's (9 faster, 9 within five percent and 5 slower of 23),
-and its seats hand off 67 times against the native seats' 65. The LF-090
-stack, run on the same seeds, was faster on 3 legs and slower on 7, handed
-off 63 times and refused 37 ticks.
+and its seats hand off 67 times against the 65 of the native seats in their
+place, though their native opponents in the same matches handed off 73
+times. The LF-090 stack, run on the same seeds, was faster on 3 legs and
+slower on 7, handed off 63 times and refused 37 ticks.
+[LF-092](flight-transfer-confirmation-v1.md) plays the retained stack in
+whole matches, with asteroids and loose dirt.
 
 ## Measuring the swing where the motor can be judged
 
@@ -256,7 +259,11 @@ stack:
 | retained | 9 | 9 | 5 | 1212 against 1181 | 1175 against 1211 | 0.97 | 67 against 65 | 2071 | 4 | 0.30 |
 
 The retained stack had one deadline and two budget replans on these seeds,
-and the LF-090 stack none.
+and the LF-090 stack none. The handoff columns count the native seats of the
+native-only matches, the seats the learned seats replace; the native
+opponents in the learned seats' own matches handed off 73 times, so the
+learned seats keep pace with the native law in their place but not with the
+opponent beside them ([LF-092](flight-transfer-confirmation-v1.md)).
 
 ## The retained stack
 

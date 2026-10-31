@@ -16,6 +16,33 @@ pub(super) fn encode(
     let solar = state.solar_hazard();
     let mut bodies: Vec<_> = world.motions().filter(|r| r.id.entity != own).collect();
     bodies.sort_by_key(|r| r.id);
+    // Over capacity, the planets, sun and edge stay and the other bodies with
+    // the nearest surfaces fill the remaining records, so a crowded scene such
+    // as an asteroid stream keeps its closest obstacles instead of refusing.
+    // A scene within capacity is encoded exactly as before.
+    let global = |entity| {
+        matches!(
+            physics::classify_entity(entity),
+            Some(MechanicalEntity::Body(BodyId::Planet(_) | BodyId::Sun) | MechanicalEntity::World)
+        )
+    };
+    let mut others: Vec<_> = bodies
+        .iter()
+        .filter(|r| !global(r.id.entity))
+        .filter_map(|r| {
+            let radius = world.body_solid_radius(r.id)?;
+            Some((
+                (r.motion.position - flight.ship.position).length() - radius,
+                r.id,
+            ))
+        })
+        .collect();
+    let globals = bodies.iter().filter(|r| global(r.id.entity)).count();
+    if globals + others.len() > OBJECT_CAPACITY {
+        others.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        others.truncate(OBJECT_CAPACITY.saturating_sub(globals));
+        bodies.retain(|r| global(r.id.entity) || others.iter().any(|(_, id)| *id == r.id));
+    }
     let mut objects = Vec::with_capacity(OBJECT_CAPACITY);
     let mut sources = Vec::with_capacity(OBJECT_CAPACITY);
     let mut planets = std::collections::BTreeSet::new();

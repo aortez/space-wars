@@ -171,7 +171,7 @@ fn polar_surface_motion_and_com_origin_frames_match_physics() {
 }
 
 #[test]
-fn current_shapes_additions_and_capacity_are_not_silently_dropped() {
+fn current_shapes_additions_and_the_nearest_crowded_objects_are_encoded() {
     let mut env = FlightEnvironment::new(FlightTask::default()).unwrap();
     let initial = env.policy_observation().unwrap();
     let position = env.frame.origin + Vec2::new(20.0, 0.0);
@@ -231,28 +231,39 @@ fn current_shapes_additions_and_capacity_are_not_silently_dropped() {
         .iter()
         .filter(|id| id.is_some())
         .count();
-    for i in 0..(OBJECT_CAPACITY - count) {
-        insert_box(
-            &mut env,
-            9_300_000 + i as u64,
-            Vec2::new(2000.0 + i as f32 * 5.0, 2000.0),
-        );
-    }
+    let row: Vec<_> = (0..(OBJECT_CAPACITY - count))
+        .map(|i| {
+            insert_box(
+                &mut env,
+                9_300_000 + i as u64,
+                Vec2::new(2000.0 + i as f32 * 5.0, 2000.0),
+            )
+        })
+        .collect();
     env.step(FlightAction::default()).unwrap();
+    let full = env.policy_observation().unwrap();
     assert_eq!(
-        env.policy_observation()
-            .unwrap()
+        full.object_sources.iter().filter(|id| id.is_some()).count(),
+        OBJECT_CAPACITY
+    );
+    // Past capacity the farthest other bodies give way; the globals stay.
+    let far = insert_box(&mut env, 9_400_000, Vec2::new(2500.0, 2500.0));
+    env.step(FlightAction::default()).unwrap();
+    let crowded = env.policy_observation().unwrap();
+    assert_eq!(crowded.object_sources, full.object_sources);
+    let near = insert_box(&mut env, 9_400_001, position);
+    env.step(FlightAction::default()).unwrap();
+    let nearer = env.policy_observation().unwrap();
+    let kept = |id: PhysicsBodyId| nearer.object_sources.contains(&Some(id));
+    assert!(kept(near) && kept(planet) && kept(row[0]));
+    assert!(!kept(far) && !kept(*row.last().unwrap()));
+    assert_eq!(
+        nearer
             .object_sources
             .iter()
             .filter(|id| id.is_some())
             .count(),
         OBJECT_CAPACITY
-    );
-    insert_box(&mut env, 9_400_000, Vec2::new(2500.0, 2500.0));
-    env.step(FlightAction::default()).unwrap();
-    assert_eq!(
-        env.policy_observation().unwrap_err(),
-        "flight object capacity exceeded"
     );
 }
 

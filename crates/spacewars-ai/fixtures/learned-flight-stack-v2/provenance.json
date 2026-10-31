@@ -19,7 +19,7 @@
       "held_out": "68 of 72 tasks: 24 transfers at seed 7700102 and 12 of each practice family at seed 7700003",
       "law_held_out": "69 of 72 for the law the network imitates, with the LF-091 straight-line planner waypoint, flying the LF-091 motor network",
       "native_parity": "3.3e-6 maximum head difference against the Python fit",
-      "matches": "seeds 1 to 24 against the recovery bot in both seat orders: of 48 identical first legs 9 faster than the native transfer law, 27 within five percent and 12 slower, the typical ratio 1.00; 128 handoffs against the native seats' 108; selected over a second fit by the same matches and validated on seeds 25 to 36: 9 faster, 9 within, 5 slower of 23, the typical ratio 0.97, 67 handoffs against 65",
+      "matches": "seeds 1 to 24 against the recovery bot in both seat orders: of 48 identical first legs 9 faster than the native transfer law, 27 within five percent and 12 slower, the typical ratio 1.00; 128 handoffs against the native-only seats' 108; selected over a second fit by the same matches and validated on seeds 25 to 36: 9 faster, 9 within, 5 slower of 23, the typical ratio 0.97, 67 handoffs against the native-only seats' 65 and the same matches' native opponents' 73",
       "predecessor": "LF-090 fit 9852ed042a5b3c792b081f1dd83bd3c80a538598bbbc241b74e93427726aa6fc over the LF-087 motor: on seeds 25 to 36 3 faster, 13 within and 7 slower of 23, 63 handoffs against 65, 37 refused ticks"
     }
   },

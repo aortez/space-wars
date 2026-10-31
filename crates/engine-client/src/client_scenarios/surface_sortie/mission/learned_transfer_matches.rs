@@ -10,7 +10,11 @@
 //! `SPACEWARS_LEARNED_NAVIGATION=<export>` or `SPACEWARS_LEARNED_MOTOR=<export>`
 //! the learned seats fly a candidate navigation or motor export with the
 //! retained other network instead of the retained stack, so a fit can be
-//! measured in matches before it is retained.
+//! measured in matches before it is retained. The matches are three-minute
+//! prefixes under the default settings; `SPACEWARS_MATCH_SECONDS=<seconds>`
+//! plays longer, `SPACEWARS_MATCH_ASTEROIDS=<seconds>` adds an asteroid
+//! stream at that mean interval and `SPACEWARS_MATCH_DIRT=<mode>` turns on
+//! loose dirt of that mode, such as `round`.
 use super::*;
 use engine_common::SpacewarsController::{self, LearnedFlightBot, RecoveryBot};
 use serde::Serialize;
@@ -31,6 +35,27 @@ fn seeds() -> Vec<u64> {
 }
 const SECONDS: u64 = 180;
 const BUDGET_REASON: &str = "transfer exhausted its progress budget";
+
+/// The seconds to play: `SPACEWARS_MATCH_SECONDS` or a three-minute prefix.
+fn seconds() -> u64 {
+    std::env::var("SPACEWARS_MATCH_SECONDS").map_or(SECONDS, |seconds| seconds.parse().unwrap())
+}
+
+/// The default settings with these controllers, plus the asteroid stream and
+/// loose dirt the environment asks for.
+fn settings(controllers: [SpacewarsController; 2]) -> Settings {
+    let mut settings = Settings::default();
+    settings.spacewars.player_1_controller = controllers[0];
+    settings.spacewars.player_2_controller = controllers[1];
+    if let Ok(seconds) = std::env::var("SPACEWARS_MATCH_ASTEROIDS") {
+        settings.material_combat.asteroids.interval_seconds = seconds.parse().unwrap();
+    }
+    if let Ok(mode) = std::env::var("SPACEWARS_MATCH_DIRT") {
+        settings.material_combat.loose_dirt = true;
+        settings.material_combat.dirt_mode = serde_json::from_value(mode.into()).unwrap();
+    }
+    settings
+}
 
 #[derive(Debug, Clone, Serialize)]
 struct SeatReport {
@@ -95,12 +120,9 @@ fn candidate_host() -> Option<spacewars_ai::mission_learned_transfer::LearnedTra
 }
 
 fn run(seed: u64, controllers: [SpacewarsController; 2]) -> MatchReport {
-    let mut settings = Settings::default();
-    settings.spacewars.player_1_controller = controllers[0];
-    settings.spacewars.player_2_controller = controllers[1];
     let mut client = create_match(
         seed,
-        &settings,
+        &settings(controllers),
         Viewport::new(800.0, 480.0),
         ScenarioStartMode::Normal,
         &ScenarioAsset::None,
@@ -115,7 +137,7 @@ fn run(seed: u64, controllers: [SpacewarsController; 2]) -> MatchReport {
             host.learned = Some(candidate);
         }
     }
-    for _ in 0..SECONDS * 60 {
+    for _ in 0..seconds() * 60 {
         client.step(&[], STEP);
         if client.is_game_over() {
             break;
@@ -243,12 +265,9 @@ fn trace_learned_transfer_seat() {
         .unwrap_or(0);
     let mut controllers = [RecoveryBot; 2];
     controllers[seat] = LearnedFlightBot;
-    let mut settings = Settings::default();
-    settings.spacewars.player_1_controller = controllers[0];
-    settings.spacewars.player_2_controller = controllers[1];
     let mut client = create_match(
         seed,
-        &settings,
+        &settings(controllers),
         Viewport::new(800.0, 480.0),
         ScenarioStartMode::Normal,
         &ScenarioAsset::None,
@@ -289,7 +308,7 @@ fn trace_learned_transfer_seat() {
         file
     });
     writeln!(out, "tick\tgoal\treason\ttarget\tframe\taltitude\tleg\tflying\tattempt\telapsed\tdistance\tspeed_error\tship_speed\toutcome\tcommand_speed\tcommand_heading\theat_clearance\tsurface_clearance\tsteering\tthrust\tbrake\tspin\theading_error\tnavigation_tick\tlocation\tship_form\tship_health\tpilot_health\topponent_distance").unwrap();
-    for _ in 0..SECONDS * 60 {
+    for _ in 0..seconds() * 60 {
         client.step(&[], STEP);
         let host = client
             .as_any()

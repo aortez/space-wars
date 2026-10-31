@@ -137,7 +137,9 @@ pub struct FlightPolicyInputs {
     pub rays: Vec<[f32; 4]>,
     pub nearest: [f32; 6],
     /// Always 32 records; empty slots are all zero, including presence mask.
-    /// Consume as a masked set, never as semantic numbered slots.
+    /// Consume as a masked set, never as semantic numbered slots. A crowded
+    /// scene keeps the planets, sun and edge and the other bodies with the
+    /// nearest surfaces.
     pub objects: Vec<[f32; 16]>,
 }
 
