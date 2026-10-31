@@ -1,0 +1,2280 @@
+{
+ "experiment": "recovery-guidance-varied-worlds-v1",
+ "plan_sha256": "37cea2bbde885c80dd09a0ef3defbdeed51a56a67eda60b5a8c1abf24417b5dc",
+ "runtime": "diagnostic_v1/linux/x86_64/c7e7a63e9733aa6553f08c892a5f89bf9a21bd89b617ac7bfad4b278a9059428",
+ "discovery": {
+  "known_starts_rebuilt": 482,
+  "plan_sha256": "37cea2bbde885c80dd09a0ef3defbdeed51a56a67eda60b5a8c1abf24417b5dc",
+  "preflight_seconds": 18.698760026,
+  "sets": {
+   "holdout": {
+    "cells": {
+     "nosun2": {
+      "first": 61,
+      "low_margin": 0,
+      "starts": 61,
+      "worlds": 21
+     },
+     "nosun3": {
+      "first": 64,
+      "low_margin": 0,
+      "starts": 64,
+      "worlds": 15
+     },
+     "nosun5": {
+      "first": 61,
+      "low_margin": 0,
+      "starts": 61,
+      "worlds": 16
+     },
+     "nosun8": {
+      "first": 61,
+      "low_margin": 0,
+      "starts": 61,
+      "worlds": 15
+     },
+     "sun2": {
+      "first": 54,
+      "low_margin": 7,
+      "starts": 61,
+      "worlds": 20
+     },
+     "sun3": {
+      "first": 228,
+      "low_margin": 12,
+      "starts": 240,
+      "worlds": 54
+     },
+     "sun3-edge": {
+      "first": 59,
+      "low_margin": 4,
+      "starts": 63,
+      "worlds": 15
+     },
+     "sun5": {
+      "first": 64,
+      "low_margin": 2,
+      "starts": 66,
+      "worlds": 13
+     },
+     "sun8": {
+      "first": 59,
+      "low_margin": 2,
+      "starts": 61,
+      "worlds": 11
+     }
+    },
+    "seconds": 90.479291128,
+    "starts": 738,
+    "worlds": 180
+   },
+   "training": {
+    "cells": {
+     "nosun2": {
+      "first": 151,
+      "low_margin": 0,
+      "starts": 151,
+      "worlds": 51
+     },
+     "nosun3": {
+      "first": 152,
+      "low_margin": 0,
+      "starts": 152,
+      "worlds": 39
+     },
+     "nosun5": {
+      "first": 152,
+      "low_margin": 0,
+      "starts": 152,
+      "worlds": 29
+     },
+     "nosun8": {
+      "first": 153,
+      "low_margin": 0,
+      "starts": 153,
+      "worlds": 27
+     },
+     "sun2": {
+      "first": 134,
+      "low_margin": 20,
+      "starts": 154,
+      "worlds": 38
+     },
+     "sun3": {
+      "first": 137,
+      "low_margin": 13,
+      "starts": 150,
+      "worlds": 34
+     },
+     "sun3-edge": {
+      "first": 141,
+      "low_margin": 10,
+      "starts": 151,
+      "worlds": 36
+     },
+     "sun5": {
+      "first": 141,
+      "low_margin": 10,
+      "starts": 151,
+      "worlds": 28
+     },
+     "sun8": {
+      "first": 148,
+      "low_margin": 8,
+      "starts": 156,
+      "worlds": 24
+     }
+    },
+    "seconds": 145.389950678,
+    "starts": 1370,
+    "worlds": 306
+   }
+  },
+  "standard_worlds_matched": 4
+ },
+ "baselines": {
+  "plan_sha256": "37cea2bbde885c80dd09a0ef3defbdeed51a56a67eda60b5a8c1abf24417b5dc",
+  "sets": {
+   "holdout": {
+    "cells": {
+     "all": {
+      "native": {
+       "completed": 683,
+       "median_ticks": 45.0,
+       "starts": 738,
+       "total_ticks": 47706
+      }
+     },
+     "nosun2": {
+      "native": {
+       "completed": 61,
+       "median_ticks": 41.0,
+       "starts": 61,
+       "total_ticks": 2620
+      }
+     },
+     "nosun3": {
+      "native": {
+       "completed": 63,
+       "median_ticks": 42.0,
+       "starts": 64,
+       "total_ticks": 3064
+      }
+     },
+     "nosun5": {
+      "native": {
+       "completed": 60,
+       "median_ticks": 41.0,
+       "starts": 61,
+       "total_ticks": 2748
+      }
+     },
+     "nosun8": {
+      "native": {
+       "completed": 61,
+       "median_ticks": 41.0,
+       "starts": 61,
+       "total_ticks": 2505
+      }
+     },
+     "sun2": {
+      "native": {
+       "completed": 55,
+       "median_ticks": 45.0,
+       "starts": 61,
+       "total_ticks": 4385
+      }
+     },
+     "sun3": {
+      "native": {
+       "completed": 209,
+       "median_ticks": 47.0,
+       "starts": 240,
+       "total_ticks": 19355
+      }
+     },
+     "sun3-edge": {
+      "native": {
+       "completed": 55,
+       "median_ticks": 46.0,
+       "starts": 63,
+       "total_ticks": 4926
+      }
+     },
+     "sun5": {
+      "native": {
+       "completed": 62,
+       "median_ticks": 46.5,
+       "starts": 66,
+       "total_ticks": 4066
+      }
+     },
+     "sun8": {
+      "native": {
+       "completed": 57,
+       "median_ticks": 48.0,
+       "starts": 61,
+       "total_ticks": 4037
+      }
+     }
+    },
+    "drivers": [
+     "native"
+    ],
+    "seconds": 38.746382561
+   },
+   "training": {
+    "cells": {
+     "all": {
+      "e03d3e29": {
+       "completed": 1287,
+       "median_ticks": 52.0,
+       "native_failures_completed": 43,
+       "native_successes_lost": 35,
+       "shared": {
+        "faster": 429,
+        "median_ticks": 52.0,
+        "native_median_ticks": 43.0,
+        "slower": 767,
+        "starts": 1244
+       },
+       "starts": 1370,
+       "time_saved_against_native": -6709,
+       "total_ticks": 91495
+      },
+      "e0f25b68": {
+       "completed": 1288,
+       "median_ticks": 53.0,
+       "native_failures_completed": 43,
+       "native_successes_lost": 34,
+       "shared": {
+        "faster": 424,
+        "median_ticks": 53.0,
+        "native_median_ticks": 43.0,
+        "slower": 778,
+        "starts": 1245
+       },
+       "starts": 1370,
+       "time_saved_against_native": -7500,
+       "total_ticks": 92286
+      },
+      "native": {
+       "completed": 1279,
+       "median_ticks": 43.0,
+       "starts": 1370,
+       "total_ticks": 84786
+      }
+     },
+     "nosun2": {
+      "e03d3e29": {
+       "completed": 146,
+       "median_ticks": 53.0,
+       "native_failures_completed": 0,
+       "native_successes_lost": 1,
+       "shared": {
+        "faster": 41,
+        "median_ticks": 53.0,
+        "native_median_ticks": 41.0,
+        "slower": 98,
+        "starts": 146
+       },
+       "starts": 151,
+       "time_saved_against_native": -1835,
+       "total_ticks": 9155
+      },
+      "e0f25b68": {
+       "completed": 146,
+       "median_ticks": 53.0,
+       "native_failures_completed": 0,
+       "native_successes_lost": 1,
+       "shared": {
+        "faster": 40,
+        "median_ticks": 53.0,
+        "native_median_ticks": 41.0,
+        "slower": 99,
+        "starts": 146
+       },
+       "starts": 151,
+       "time_saved_against_native": -1946,
+       "total_ticks": 9266
+      },
+      "native": {
+       "completed": 147,
+       "median_ticks": 41.0,
+       "starts": 151,
+       "total_ticks": 7320
+      }
+     },
+     "nosun3": {
+      "e03d3e29": {
+       "completed": 148,
+       "median_ticks": 56.0,
+       "native_failures_completed": 1,
+       "native_successes_lost": 0,
+       "shared": {
+        "faster": 35,
+        "median_ticks": 56.0,
+        "native_median_ticks": 41.0,
+        "slower": 110,
+        "starts": 147
+       },
+       "starts": 152,
+       "time_saved_against_native": -1644,
+       "total_ticks": 9210
+      },
+      "e0f25b68": {
+       "completed": 148,
+       "median_ticks": 56.0,
+       "native_failures_completed": 1,
+       "native_successes_lost": 0,
+       "shared": {
+        "faster": 34,
+        "median_ticks": 56.0,
+        "native_median_ticks": 41.0,
+        "slower": 110,
+        "starts": 147
+       },
+       "starts": 152,
+       "time_saved_against_native": -1849,
+       "total_ticks": 9415
+      },
+      "native": {
+       "completed": 147,
+       "median_ticks": 41.0,
+       "starts": 152,
+       "total_ticks": 7566
+      }
+     },
+     "nosun5": {
+      "e03d3e29": {
+       "completed": 150,
+       "median_ticks": 57.5,
+       "native_failures_completed": 0,
+       "native_successes_lost": 0,
+       "shared": {
+        "faster": 29,
+        "median_ticks": 57.5,
+        "native_median_ticks": 41.0,
+        "slower": 116,
+        "starts": 150
+       },
+       "starts": 152,
+       "time_saved_against_native": -1958,
+       "total_ticks": 8975
+      },
+      "e0f25b68": {
+       "completed": 150,
+       "median_ticks": 59.0,
+       "native_failures_completed": 0,
+       "native_successes_lost": 0,
+       "shared": {
+        "faster": 29,
+        "median_ticks": 59.0,
+        "native_median_ticks": 41.0,
+        "slower": 119,
+        "starts": 150
+       },
+       "starts": 152,
+       "time_saved_against_native": -2133,
+       "total_ticks": 9150
+      },
+      "native": {
+       "completed": 150,
+       "median_ticks": 41.0,
+       "starts": 152,
+       "total_ticks": 7017
+      }
+     },
+     "nosun8": {
+      "e03d3e29": {
+       "completed": 151,
+       "median_ticks": 52.0,
+       "native_failures_completed": 0,
+       "native_successes_lost": 0,
+       "shared": {
+        "faster": 39,
+        "median_ticks": 52.0,
+        "native_median_ticks": 41.0,
+        "slower": 106,
+        "starts": 151
+       },
+       "starts": 153,
+       "time_saved_against_native": -1564,
+       "total_ticks": 8496
+      },
+      "e0f25b68": {
+       "completed": 151,
+       "median_ticks": 53.0,
+       "native_failures_completed": 0,
+       "native_successes_lost": 0,
+       "shared": {
+        "faster": 38,
+        "median_ticks": 53.0,
+        "native_median_ticks": 41.0,
+        "slower": 106,
+        "starts": 151
+       },
+       "starts": 153,
+       "time_saved_against_native": -1705,
+       "total_ticks": 8637
+      },
+      "native": {
+       "completed": 151,
+       "median_ticks": 41.0,
+       "starts": 153,
+       "total_ticks": 6932
+      }
+     },
+     "sun2": {
+      "e03d3e29": {
+       "completed": 129,
+       "median_ticks": 48.0,
+       "native_failures_completed": 12,
+       "native_successes_lost": 14,
+       "shared": {
+        "faster": 66,
+        "median_ticks": 48.0,
+        "native_median_ticks": 49.0,
+        "slower": 44,
+        "starts": 117
+       },
+       "starts": 154,
+       "time_saved_against_native": -488,
+       "total_ticks": 14170
+      },
+      "e0f25b68": {
+       "completed": 129,
+       "median_ticks": 49.0,
+       "native_failures_completed": 12,
+       "native_successes_lost": 14,
+       "shared": {
+        "faster": 66,
+        "median_ticks": 49.0,
+        "native_median_ticks": 49.0,
+        "slower": 47,
+        "starts": 117
+       },
+       "starts": 154,
+       "time_saved_against_native": -395,
+       "total_ticks": 14077
+      },
+      "native": {
+       "completed": 131,
+       "median_ticks": 49.0,
+       "starts": 154,
+       "total_ticks": 13682
+      }
+     },
+     "sun3": {
+      "e03d3e29": {
+       "completed": 136,
+       "median_ticks": 48.5,
+       "native_failures_completed": 5,
+       "native_successes_lost": 4,
+       "shared": {
+        "faster": 55,
+        "median_ticks": 49.0,
+        "native_median_ticks": 46.0,
+        "slower": 67,
+        "starts": 131
+       },
+       "starts": 150,
+       "time_saved_against_native": -17,
+       "total_ticks": 10868
+      },
+      "e0f25b68": {
+       "completed": 135,
+       "median_ticks": 50.0,
+       "native_failures_completed": 5,
+       "native_successes_lost": 5,
+       "shared": {
+        "faster": 57,
+        "median_ticks": 50.0,
+        "native_median_ticks": 46.0,
+        "slower": 68,
+        "starts": 130
+       },
+       "starts": 150,
+       "time_saved_against_native": -417,
+       "total_ticks": 11268
+      },
+      "native": {
+       "completed": 135,
+       "median_ticks": 46.0,
+       "starts": 150,
+       "total_ticks": 10851
+      }
+     },
+     "sun3-edge": {
+      "e03d3e29": {
+       "completed": 132,
+       "median_ticks": 49.5,
+       "native_failures_completed": 13,
+       "native_successes_lost": 11,
+       "shared": {
+        "faster": 54,
+        "median_ticks": 49.0,
+        "native_median_ticks": 47.0,
+        "slower": 62,
+        "starts": 119
+       },
+       "starts": 151,
+       "time_saved_against_native": 297,
+       "total_ticks": 12207
+      },
+      "e0f25b68": {
+       "completed": 133,
+       "median_ticks": 50.0,
+       "native_failures_completed": 13,
+       "native_successes_lost": 10,
+       "shared": {
+        "faster": 52,
+        "median_ticks": 50.0,
+        "native_median_ticks": 47.0,
+        "slower": 63,
+        "starts": 120
+       },
+       "starts": 151,
+       "time_saved_against_native": 450,
+       "total_ticks": 12054
+      },
+      "native": {
+       "completed": 130,
+       "median_ticks": 47.0,
+       "starts": 151,
+       "total_ticks": 12504
+      }
+     },
+     "sun5": {
+      "e03d3e29": {
+       "completed": 143,
+       "median_ticks": 49.0,
+       "native_failures_completed": 4,
+       "native_successes_lost": 4,
+       "shared": {
+        "faster": 57,
+        "median_ticks": 49.0,
+        "native_median_ticks": 45.0,
+        "slower": 76,
+        "starts": 139
+       },
+       "starts": 151,
+       "time_saved_against_native": -504,
+       "total_ticks": 9291
+      },
+      "e0f25b68": {
+       "completed": 144,
+       "median_ticks": 49.0,
+       "native_failures_completed": 4,
+       "native_successes_lost": 3,
+       "shared": {
+        "faster": 58,
+        "median_ticks": 49.0,
+        "native_median_ticks": 45.0,
+        "slower": 76,
+        "starts": 140
+       },
+       "starts": 151,
+       "time_saved_against_native": -362,
+       "total_ticks": 9149
+      },
+      "native": {
+       "completed": 143,
+       "median_ticks": 45.0,
+       "starts": 151,
+       "total_ticks": 8787
+      }
+     },
+     "sun8": {
+      "e03d3e29": {
+       "completed": 152,
+       "median_ticks": 53.0,
+       "native_failures_completed": 8,
+       "native_successes_lost": 1,
+       "shared": {
+        "faster": 53,
+        "median_ticks": 53.0,
+        "native_median_ticks": 47.0,
+        "slower": 88,
+        "starts": 144
+       },
+       "starts": 156,
+       "time_saved_against_native": 1004,
+       "total_ticks": 9123
+      },
+      "e0f25b68": {
+       "completed": 152,
+       "median_ticks": 54.0,
+       "native_failures_completed": 8,
+       "native_successes_lost": 1,
+       "shared": {
+        "faster": 50,
+        "median_ticks": 54.0,
+        "native_median_ticks": 47.0,
+        "slower": 90,
+        "starts": 144
+       },
+       "starts": 156,
+       "time_saved_against_native": 857,
+       "total_ticks": 9270
+      },
+      "native": {
+       "completed": 145,
+       "median_ticks": 47.0,
+       "starts": 156,
+       "total_ticks": 10127
+      }
+     }
+    },
+    "drivers": [
+     "native",
+     "e0f25b68",
+     "e03d3e29"
+    ],
+    "seconds": 90.855000285
+   }
+  }
+ },
+ "analysis": {
+  "plan_sha256": "37cea2bbde885c80dd09a0ef3defbdeed51a56a67eda60b5a8c1abf24417b5dc",
+  "training": {
+   "coverage": {
+    "sun2": {
+     "starts": 154,
+     "low_margin_starts": 20,
+     "sun_margin_bands": {
+      ">=30": 104,
+      "<5": 13,
+      "<0": 28,
+      "<15": 3,
+      "<30": 6
+     },
+     "planet_margin_bands": {
+      ">=30": 148,
+      "<30": 6
+     },
+     "climb_margin_bands": {
+      ">=30": 118,
+      "<30": 29,
+      "<15": 3,
+      "<5": 4
+     },
+     "edge_distance": {
+      "n": 154,
+      "min": 96.9676513671875,
+      "p10": 294.10894775390625,
+      "median": 449.45306396484375,
+      "p90": 635.825439453125,
+      "max": 772.6502685546875
+     },
+     "destination_radius": {
+      "n": 154,
+      "min": 18.650545120239258,
+      "p10": 29.981388092041016,
+      "median": 91.1536636352539,
+      "p90": 130.286865234375,
+      "max": 147.88153076171875
+     },
+     "destination_speed": {
+      "n": 154,
+      "min": 13.265595403733483,
+      "p10": 14.054533649563908,
+      "median": 18.01610714172339,
+      "p90": 19.770699729692208,
+      "max": 21.321054821653433
+     },
+     "entry_distance": {
+      "n": 154,
+      "min": 0.2545325756072998,
+      "p10": 21.52886390686035,
+      "median": 34.71649932861328,
+      "p90": 34.948829650878906,
+      "max": 34.99961853027344
+     },
+     "relative_speed": {
+      "n": 154,
+      "min": 12.723933219909668,
+      "p10": 23.068593978881836,
+      "median": 28.615066528320312,
+      "p90": 31.950075149536133,
+      "max": 57.69841384887695
+     },
+     "bodies": {
+      "4": 154
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "sun3": {
+     "starts": 150,
+     "low_margin_starts": 13,
+     "sun_margin_bands": {
+      ">=30": 115,
+      "<30": 4,
+      "<0": 20,
+      "<5": 8,
+      "<15": 3
+     },
+     "planet_margin_bands": {
+      ">=30": 149,
+      "<30": 1
+     },
+     "climb_margin_bands": {
+      ">=30": 124,
+      "<30": 25,
+      "<5": 1
+     },
+     "edge_distance": {
+      "n": 150,
+      "min": 191.7196044921875,
+      "p10": 347.0697021484375,
+      "median": 549.26171875,
+      "p90": 868.3623046875,
+      "max": 1047.1492919921875
+     },
+     "destination_radius": {
+      "n": 150,
+      "min": 16.854490280151367,
+      "p10": 28.561914443969727,
+      "median": 87.25250244140625,
+      "p90": 139.8046875,
+      "max": 149.6687469482422
+     },
+     "destination_speed": {
+      "n": 150,
+      "min": 11.214337683757892,
+      "p10": 12.418057957939634,
+      "median": 16.765039488684213,
+      "p90": 19.871825163191147,
+      "max": 21.604096820052654
+     },
+     "entry_distance": {
+      "n": 150,
+      "min": 7.883593559265137,
+      "p10": 30.07721519470215,
+      "median": 34.686065673828125,
+      "p90": 34.9273681640625,
+      "max": 34.98149871826172
+     },
+     "relative_speed": {
+      "n": 150,
+      "min": 12.467581748962402,
+      "p10": 24.543663024902344,
+      "median": 28.736082077026367,
+      "p90": 32.890045166015625,
+      "max": 40.0583610534668
+     },
+     "bodies": {
+      "5": 150
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "sun5": {
+     "starts": 151,
+     "low_margin_starts": 10,
+     "sun_margin_bands": {
+      ">=30": 126,
+      "<0": 17,
+      "<5": 2,
+      "<30": 2,
+      "<15": 4
+     },
+     "planet_margin_bands": {
+      ">=30": 148,
+      "<30": 3
+     },
+     "climb_margin_bands": {
+      ">=30": 117,
+      "<30": 32,
+      "<15": 1,
+      "<5": 1
+     },
+     "edge_distance": {
+      "n": 151,
+      "min": 278.97894287109375,
+      "p10": 402.8587646484375,
+      "median": 833.6265869140625,
+      "p90": 1203.00927734375,
+      "max": 1448.5252685546875
+     },
+     "destination_radius": {
+      "n": 151,
+      "min": 17.216426849365234,
+      "p10": 32.36132049560547,
+      "median": 79.63065338134766,
+      "p90": 131.09864807128906,
+      "max": 148.43365478515625
+     },
+     "destination_speed": {
+      "n": 151,
+      "min": 9.837908387736132,
+      "p10": 10.79670242043963,
+      "median": 14.591285846383455,
+      "p90": 19.674262794623672,
+      "max": 20.280983260492228
+     },
+     "entry_distance": {
+      "n": 151,
+      "min": 1.3041411638259888,
+      "p10": 25.04362678527832,
+      "median": 34.66474914550781,
+      "p90": 34.894161224365234,
+      "max": 34.98808670043945
+     },
+     "relative_speed": {
+      "n": 151,
+      "min": 9.864029884338379,
+      "p10": 25.215330123901367,
+      "median": 28.60268783569336,
+      "p90": 33.00333786010742,
+      "max": 38.696311950683594
+     },
+     "bodies": {
+      "7": 151
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "sun8": {
+     "starts": 156,
+     "low_margin_starts": 8,
+     "sun_margin_bands": {
+      ">=30": 135,
+      "<30": 5,
+      "<5": 2,
+      "<0": 9,
+      "<15": 5
+     },
+     "planet_margin_bands": {
+      ">=30": 153,
+      "<15": 1,
+      "<30": 2
+     },
+     "climb_margin_bands": {
+      ">=30": 133,
+      "<30": 18,
+      "<5": 2,
+      "<15": 3
+     },
+     "edge_distance": {
+      "n": 156,
+      "min": 368.784423828125,
+      "p10": 879.7222290039062,
+      "median": 1328.0064697265625,
+      "p90": 1825.87939453125,
+      "max": 2066.5927734375
+     },
+     "destination_radius": {
+      "n": 156,
+      "min": 15.53139877319336,
+      "p10": 29.55216407775879,
+      "median": 78.45838928222656,
+      "p90": 129.07415771484375,
+      "max": 149.54547119140625
+     },
+     "destination_speed": {
+      "n": 156,
+      "min": 8.0697994822111,
+      "p10": 9.97059432520524,
+      "median": 14.153088825759333,
+      "p90": 19.115722087295143,
+      "max": 20.276421062026802
+     },
+     "entry_distance": {
+      "n": 156,
+      "min": 0.743827760219574,
+      "p10": 30.32884407043457,
+      "median": 34.7234001159668,
+      "p90": 34.94825744628906,
+      "max": 34.9983024597168
+     },
+     "relative_speed": {
+      "n": 156,
+      "min": 18.42803382873535,
+      "p10": 25.938936233520508,
+      "median": 28.602130889892578,
+      "p90": 31.91707992553711,
+      "max": 38.124755859375
+     },
+     "bodies": {
+      "10": 156
+     },
+     "starts_leaving_bodies_out": 156,
+     "omitted_kinds": {
+      "Planet": 254,
+      "Edge": 58
+     },
+     "omitted_clearance": {
+      "n": 312,
+      "min": 1044.731689453125,
+      "p10": 1390.975830078125,
+      "median": 1817.821044921875,
+      "p90": 2336.41455078125,
+      "max": 2998.338623046875
+     },
+     "farthest_kept_when_omitting": {
+      "n": 156,
+      "min": 876.0956420898438,
+      "p10": 1108.40283203125,
+      "median": 1415.5797119140625,
+      "p90": 1800.341064453125,
+      "max": 2345.82666015625
+     }
+    },
+    "nosun2": {
+     "starts": 151,
+     "low_margin_starts": 0,
+     "sun_margin_bands": {},
+     "planet_margin_bands": {
+      ">=30": 151
+     },
+     "climb_margin_bands": {
+      ">=30": 128,
+      "<30": 21,
+      "<15": 1,
+      "<5": 1
+     },
+     "edge_distance": {
+      "n": 151,
+      "min": 148.16217041015625,
+      "p10": 313.46453857421875,
+      "median": 437.54058837890625,
+      "p90": 621.9363403320312,
+      "max": 825.2591552734375
+     },
+     "destination_radius": {
+      "n": 151,
+      "min": 18.439708709716797,
+      "p10": 22.756675720214844,
+      "median": 83.50455474853516,
+      "p90": 133.3729248046875,
+      "max": 144.7866973876953
+     },
+     "destination_speed": {
+      "n": 151,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 0.0,
+      "p90": 0.0011286733233759729,
+      "max": 0.005853180235635448
+     },
+     "entry_distance": {
+      "n": 151,
+      "min": 3.3714606761932373,
+      "p10": 30.859512329101562,
+      "median": 34.746829986572266,
+      "p90": 34.95976638793945,
+      "max": 34.99909210205078
+     },
+     "relative_speed": {
+      "n": 151,
+      "min": 12.2544527053833,
+      "p10": 24.097877502441406,
+      "median": 28.360502243041992,
+      "p90": 30.8780517578125,
+      "max": 37.83967971801758
+     },
+     "bodies": {
+      "3": 151
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "nosun3": {
+     "starts": 152,
+     "low_margin_starts": 0,
+     "sun_margin_bands": {},
+     "planet_margin_bands": {
+      ">=30": 152
+     },
+     "climb_margin_bands": {
+      ">=30": 137,
+      "<30": 15
+     },
+     "edge_distance": {
+      "n": 152,
+      "min": 168.00946044921875,
+      "p10": 324.15802001953125,
+      "median": 552.7359619140625,
+      "p90": 777.4088134765625,
+      "max": 1163.11865234375
+     },
+     "destination_radius": {
+      "n": 152,
+      "min": 15.060896873474121,
+      "p10": 32.2811279296875,
+      "median": 102.8914566040039,
+      "p90": 138.60867309570312,
+      "max": 149.34188842773438
+     },
+     "destination_speed": {
+      "n": 152,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 0.0,
+      "p90": 8.573002761922604e-06,
+      "max": 0.007287410733542672
+     },
+     "entry_distance": {
+      "n": 152,
+      "min": 20.23889923095703,
+      "p10": 32.8658561706543,
+      "median": 34.773075103759766,
+      "p90": 34.964378356933594,
+      "max": 34.99263000488281
+     },
+     "relative_speed": {
+      "n": 152,
+      "min": 14.310964584350586,
+      "p10": 26.24386978149414,
+      "median": 28.393169403076172,
+      "p90": 29.67292594909668,
+      "max": 38.00737762451172
+     },
+     "bodies": {
+      "4": 152
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "nosun5": {
+     "starts": 152,
+     "low_margin_starts": 0,
+     "sun_margin_bands": {},
+     "planet_margin_bands": {
+      ">=30": 152
+     },
+     "climb_margin_bands": {
+      ">=30": 142,
+      "<30": 10
+     },
+     "edge_distance": {
+      "n": 152,
+      "min": 333.19677734375,
+      "p10": 505.43572998046875,
+      "median": 786.6273193359375,
+      "p90": 1134.8890380859375,
+      "max": 1467.0810546875
+     },
+     "destination_radius": {
+      "n": 152,
+      "min": 16.177961349487305,
+      "p10": 28.95243263244629,
+      "median": 84.99292755126953,
+      "p90": 130.11106872558594,
+      "max": 149.85162353515625
+     },
+     "destination_speed": {
+      "n": 152,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 0.0,
+      "p90": 0.0,
+      "max": 0.007054819020817017
+     },
+     "entry_distance": {
+      "n": 152,
+      "min": 20.819047927856445,
+      "p10": 34.54893493652344,
+      "median": 34.760223388671875,
+      "p90": 34.94977569580078,
+      "max": 34.997520446777344
+     },
+     "relative_speed": {
+      "n": 152,
+      "min": 18.643239974975586,
+      "p10": 28.031919479370117,
+      "median": 28.3331241607666,
+      "p90": 29.44598388671875,
+      "max": 38.0379753112793
+     },
+     "bodies": {
+      "6": 152
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "nosun8": {
+     "starts": 153,
+     "low_margin_starts": 0,
+     "sun_margin_bands": {},
+     "planet_margin_bands": {
+      ">=30": 153
+     },
+     "climb_margin_bands": {
+      ">=30": 138,
+      "<30": 15
+     },
+     "edge_distance": {
+      "n": 153,
+      "min": 361.0389404296875,
+      "p10": 860.168701171875,
+      "median": 1337.90380859375,
+      "p90": 1816.1343994140625,
+      "max": 2102.60205078125
+     },
+     "destination_radius": {
+      "n": 153,
+      "min": 15.055730819702148,
+      "p10": 29.379467010498047,
+      "median": 77.94044494628906,
+      "p90": 137.35260009765625,
+      "max": 149.4912872314453
+     },
+     "destination_speed": {
+      "n": 153,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 0.0,
+      "p90": 0.0,
+      "max": 0.00622609620931592
+     },
+     "entry_distance": {
+      "n": 153,
+      "min": 20.159423828125,
+      "p10": 34.494911193847656,
+      "median": 34.736934661865234,
+      "p90": 34.933868408203125,
+      "max": 34.992515563964844
+     },
+     "relative_speed": {
+      "n": 153,
+      "min": 18.158388137817383,
+      "p10": 27.997983932495117,
+      "median": 28.392213821411133,
+      "p90": 30.68878746032715,
+      "max": 37.89006423950195
+     },
+     "bodies": {
+      "9": 153
+     },
+     "starts_leaving_bodies_out": 153,
+     "omitted_kinds": {
+      "Planet": 124,
+      "Edge": 29
+     },
+     "omitted_clearance": {
+      "n": 153,
+      "min": 1172.9449462890625,
+      "p10": 1520.8768310546875,
+      "median": 1924.35546875,
+      "p90": 2525.529052734375,
+      "max": 3238.326416015625
+     },
+     "farthest_kept_when_omitting": {
+      "n": 153,
+      "min": 1150.5306396484375,
+      "p10": 1305.0791015625,
+      "median": 1644.8289794921875,
+      "p90": 2182.4033203125,
+      "max": 2800.353759765625
+     }
+    },
+    "sun3-edge": {
+     "starts": 151,
+     "low_margin_starts": 10,
+     "sun_margin_bands": {
+      "<30": 12,
+      ">=30": 111,
+      "<5": 9,
+      "<0": 9,
+      "<15": 10
+     },
+     "planet_margin_bands": {
+      ">=30": 148,
+      "<30": 3
+     },
+     "climb_margin_bands": {
+      ">=30": 120,
+      "<30": 23,
+      "<5": 3,
+      "<15": 5
+     },
+     "edge_distance": {
+      "n": 151,
+      "min": 260.557373046875,
+      "p10": 370.58538818359375,
+      "median": 550.75537109375,
+      "p90": 855.444580078125,
+      "max": 1021.3544311523438
+     },
+     "destination_radius": {
+      "n": 151,
+      "min": 15.068799018859863,
+      "p10": 26.384014129638672,
+      "median": 73.1114501953125,
+      "p90": 129.89620971679688,
+      "max": 149.73489379882812
+     },
+     "destination_speed": {
+      "n": 151,
+      "min": 10.91427448268185,
+      "p10": 12.529599175519209,
+      "median": 16.868609142216453,
+      "p90": 20.584599480008823,
+      "max": 21.735095823760318
+     },
+     "entry_distance": {
+      "n": 151,
+      "min": 2.76503586769104,
+      "p10": 25.327011108398438,
+      "median": 34.6943359375,
+      "p90": 34.937076568603516,
+      "max": 34.99767303466797
+     },
+     "relative_speed": {
+      "n": 151,
+      "min": 12.415318489074707,
+      "p10": 25.03911781311035,
+      "median": 28.726383209228516,
+      "p90": 35.11600875854492,
+      "max": 42.860416412353516
+     },
+     "bodies": {
+      "5": 151
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "all": {
+     "starts": 1370,
+     "low_margin_starts": 61,
+     "sun_margin_bands": {
+      ">=30": 591,
+      "<5": 34,
+      "<0": 83,
+      "<15": 25,
+      "<30": 29
+     },
+     "planet_margin_bands": {
+      ">=30": 1354,
+      "<30": 15,
+      "<15": 1
+     },
+     "climb_margin_bands": {
+      ">=30": 1157,
+      "<30": 188,
+      "<15": 13,
+      "<5": 12
+     },
+     "edge_distance": {
+      "n": 1370,
+      "min": 96.9676513671875,
+      "p10": 352.93572998046875,
+      "median": 639.6759033203125,
+      "p90": 1401.7303466796875,
+      "max": 2102.60205078125
+     },
+     "destination_radius": {
+      "n": 1370,
+      "min": 15.055730819702148,
+      "p10": 29.141448974609375,
+      "median": 84.53579711914062,
+      "p90": 132.5150146484375,
+      "max": 149.85162353515625
+     },
+     "destination_speed": {
+      "n": 1370,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 11.434512029298082,
+      "p90": 19.043852631156764,
+      "max": 21.735095823760318
+     },
+     "entry_distance": {
+      "n": 1370,
+      "min": 0.2545325756072998,
+      "p10": 30.077112197875977,
+      "median": 34.71928405761719,
+      "p90": 34.94614028930664,
+      "max": 34.99961853027344
+     },
+     "relative_speed": {
+      "n": 1370,
+      "min": 9.864029884338379,
+      "p10": 25.162826538085938,
+      "median": 28.40951919555664,
+      "p90": 31.950075149536133,
+      "max": 57.69841384887695
+     },
+     "bodies": {
+      "4": 306,
+      "5": 301,
+      "7": 151,
+      "10": 156,
+      "3": 151,
+      "6": 152,
+      "9": 153
+     },
+     "starts_leaving_bodies_out": 309,
+     "omitted_kinds": {
+      "Planet": 378,
+      "Edge": 87
+     },
+     "omitted_clearance": {
+      "n": 465,
+      "min": 1044.731689453125,
+      "p10": 1400.7391357421875,
+      "median": 1837.0462646484375,
+      "p90": 2461.53564453125,
+      "max": 3238.326416015625
+     },
+     "farthest_kept_when_omitting": {
+      "n": 309,
+      "min": 876.0956420898438,
+      "p10": 1178.685546875,
+      "median": 1532.76513671875,
+      "p90": 2031.9227294921875,
+      "max": 2800.353759765625
+     }
+    }
+   },
+   "failures": {
+    "native": {
+     "sun2": {
+      "climb": 16,
+      "avoid sun": 4,
+      "contact": 2,
+      "host hunt": 1
+     },
+     "all": {
+      "climb": 48,
+      "avoid sun": 12,
+      "contact": 3,
+      "host hunt": 11,
+      "frame_changed": 1,
+      "avoid planet": 7,
+      "damaged": 8,
+      "lost_control": 1
+     },
+     "sun3": {
+      "frame_changed": 1,
+      "climb": 6,
+      "avoid sun": 4,
+      "host hunt": 2,
+      "avoid planet": 2
+     },
+     "sun5": {
+      "host hunt": 1,
+      "avoid sun": 2,
+      "climb": 4,
+      "damaged": 1
+     },
+     "sun8": {
+      "contact": 1,
+      "host hunt": 1,
+      "climb": 9
+     },
+     "nosun2": {
+      "host hunt": 1,
+      "avoid planet": 1,
+      "lost_control": 1,
+      "damaged": 1
+     },
+     "nosun3": {
+      "damaged": 3,
+      "host hunt": 2
+     },
+     "nosun5": {
+      "damaged": 2
+     },
+     "nosun8": {
+      "host hunt": 1,
+      "avoid planet": 1
+     },
+     "sun3-edge": {
+      "avoid planet": 3,
+      "climb": 13,
+      "host hunt": 2,
+      "avoid sun": 2,
+      "damaged": 1
+     }
+    },
+    "e0f25b68": {
+     "sun2": {
+      "avoid sun": 17,
+      "climb": 4,
+      "contact": 3,
+      "host hunt": 1
+     },
+     "all": {
+      "avoid sun": 39,
+      "climb": 13,
+      "contact": 5,
+      "host hunt": 10,
+      "frame_changed": 1,
+      "avoid planet": 6,
+      "damaged": 7,
+      "lost_control": 1
+     },
+     "sun3": {
+      "frame_changed": 1,
+      "climb": 4,
+      "avoid sun": 6,
+      "host hunt": 2,
+      "avoid planet": 2
+     },
+     "sun5": {
+      "host hunt": 1,
+      "avoid sun": 5,
+      "damaged": 1
+     },
+     "sun8": {
+      "contact": 1,
+      "avoid sun": 1,
+      "climb": 2
+     },
+     "nosun2": {
+      "host hunt": 1,
+      "contact": 1,
+      "avoid planet": 1,
+      "lost_control": 1,
+      "damaged": 1
+     },
+     "nosun3": {
+      "damaged": 2,
+      "host hunt": 2
+     },
+     "nosun5": {
+      "damaged": 2
+     },
+     "nosun8": {
+      "host hunt": 1,
+      "avoid planet": 1
+     },
+     "sun3-edge": {
+      "climb": 3,
+      "avoid sun": 10,
+      "host hunt": 2,
+      "avoid planet": 2,
+      "damaged": 1
+     }
+    },
+    "e03d3e29": {
+     "sun2": {
+      "avoid sun": 17,
+      "contact": 3,
+      "climb": 4,
+      "host hunt": 1
+     },
+     "all": {
+      "avoid sun": 39,
+      "contact": 4,
+      "climb": 15,
+      "host hunt": 10,
+      "frame_changed": 1,
+      "avoid planet": 6,
+      "damaged": 7,
+      "lost_control": 1
+     },
+     "sun3": {
+      "frame_changed": 1,
+      "climb": 4,
+      "avoid sun": 5,
+      "host hunt": 2,
+      "avoid planet": 2
+     },
+     "sun5": {
+      "avoid sun": 6,
+      "host hunt": 1,
+      "damaged": 1
+     },
+     "sun8": {
+      "contact": 1,
+      "avoid sun": 1,
+      "climb": 2
+     },
+     "nosun2": {
+      "host hunt": 1,
+      "climb": 1,
+      "avoid planet": 1,
+      "lost_control": 1,
+      "damaged": 1
+     },
+     "nosun3": {
+      "damaged": 2,
+      "host hunt": 2
+     },
+     "nosun5": {
+      "damaged": 2
+     },
+     "nosun8": {
+      "host hunt": 1,
+      "avoid planet": 1
+     },
+     "sun3-edge": {
+      "climb": 4,
+      "avoid sun": 10,
+      "host hunt": 2,
+      "avoid planet": 2,
+      "damaged": 1
+     }
+    }
+   }
+  },
+  "holdout": {
+   "coverage": {
+    "sun2": {
+     "starts": 61,
+     "low_margin_starts": 7,
+     "sun_margin_bands": {
+      ">=30": 41,
+      "<0": 10,
+      "<15": 5,
+      "<30": 3,
+      "<5": 2
+     },
+     "planet_margin_bands": {
+      ">=30": 58,
+      "<5": 1,
+      "<30": 2
+     },
+     "climb_margin_bands": {
+      ">=30": 47,
+      "<30": 9,
+      "<5": 4,
+      "<15": 1
+     },
+     "edge_distance": {
+      "n": 61,
+      "min": 102.248046875,
+      "p10": 282.88507080078125,
+      "median": 407.52899169921875,
+      "p90": 623.0579833984375,
+      "max": 667.6087646484375
+     },
+     "destination_radius": {
+      "n": 61,
+      "min": 17.204437255859375,
+      "p10": 33.11918640136719,
+      "median": 83.37553405761719,
+      "p90": 137.50393676757812,
+      "max": 144.8335418701172
+     },
+     "destination_speed": {
+      "n": 61,
+      "min": 13.453202071874173,
+      "p10": 13.879401195393717,
+      "median": 17.056216244027638,
+      "p90": 19.93592213011866,
+      "max": 21.049141833780894
+     },
+     "entry_distance": {
+      "n": 61,
+      "min": 7.5170416831970215,
+      "p10": 20.503488540649414,
+      "median": 34.65853500366211,
+      "p90": 34.94098663330078,
+      "max": 34.991302490234375
+     },
+     "relative_speed": {
+      "n": 61,
+      "min": 14.171154022216797,
+      "p10": 21.455753326416016,
+      "median": 28.063806533813477,
+      "p90": 32.8548583984375,
+      "max": 38.29918670654297
+     },
+     "bodies": {
+      "4": 61
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "sun3": {
+     "starts": 240,
+     "low_margin_starts": 12,
+     "sun_margin_bands": {
+      ">=30": 198,
+      "<15": 8,
+      "<30": 11,
+      "<5": 3,
+      "<0": 20
+     },
+     "planet_margin_bands": {
+      ">=30": 228,
+      "<30": 7,
+      "<15": 4,
+      "<5": 1
+     },
+     "climb_margin_bands": {
+      ">=30": 197,
+      "<5": 10,
+      "<15": 3,
+      "<30": 30
+     },
+     "edge_distance": {
+      "n": 240,
+      "min": 176.74560546875,
+      "p10": 348.68499755859375,
+      "median": 533.8076171875,
+      "p90": 806.735107421875,
+      "max": 1005.2646484375
+     },
+     "destination_radius": {
+      "n": 240,
+      "min": 15.313158988952637,
+      "p10": 33.76835632324219,
+      "median": 86.13931274414062,
+      "p90": 136.092041015625,
+      "max": 149.46575927734375
+     },
+     "destination_speed": {
+      "n": 240,
+      "min": 11.209279726051214,
+      "p10": 12.396160816011514,
+      "median": 15.511868965015532,
+      "p90": 19.724832100559325,
+      "max": 21.656200818016664
+     },
+     "entry_distance": {
+      "n": 240,
+      "min": 0.06760381162166595,
+      "p10": 27.539888381958008,
+      "median": 34.708709716796875,
+      "p90": 34.93543243408203,
+      "max": 34.99853515625
+     },
+     "relative_speed": {
+      "n": 240,
+      "min": 10.192337989807129,
+      "p10": 25.707462310791016,
+      "median": 28.723262786865234,
+      "p90": 33.05335998535156,
+      "max": 49.076881408691406
+     },
+     "bodies": {
+      "5": 240
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "sun5": {
+     "starts": 66,
+     "low_margin_starts": 2,
+     "sun_margin_bands": {
+      ">=30": 61,
+      "<0": 2,
+      "<15": 1,
+      "<30": 2
+     },
+     "planet_margin_bands": {
+      ">=30": 66
+     },
+     "climb_margin_bands": {
+      ">=30": 58,
+      "<30": 8
+     },
+     "edge_distance": {
+      "n": 66,
+      "min": 314.00506591796875,
+      "p10": 434.21875,
+      "median": 696.7525634765625,
+      "p90": 1012.7782592773438,
+      "max": 1463.582763671875
+     },
+     "destination_radius": {
+      "n": 66,
+      "min": 17.299243927001953,
+      "p10": 24.402467727661133,
+      "median": 72.7978286743164,
+      "p90": 142.7003173828125,
+      "max": 149.13768005371094
+     },
+     "destination_speed": {
+      "n": 66,
+      "min": 9.329400746701767,
+      "p10": 11.30870891392583,
+      "median": 14.594917651466911,
+      "p90": 19.651746489019644,
+      "max": 20.86337048393293
+     },
+     "entry_distance": {
+      "n": 66,
+      "min": 16.348787307739258,
+      "p10": 29.422698974609375,
+      "median": 34.708892822265625,
+      "p90": 34.91438293457031,
+      "max": 34.97478103637695
+     },
+     "relative_speed": {
+      "n": 66,
+      "min": 5.860764026641846,
+      "p10": 25.6765193939209,
+      "median": 28.523235321044922,
+      "p90": 30.12974739074707,
+      "max": 33.99065399169922
+     },
+     "bodies": {
+      "7": 66
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "sun8": {
+     "starts": 61,
+     "low_margin_starts": 2,
+     "sun_margin_bands": {
+      ">=30": 54,
+      "<0": 1,
+      "<15": 2,
+      "<30": 2,
+      "<5": 2
+     },
+     "planet_margin_bands": {
+      ">=30": 60,
+      "<30": 1
+     },
+     "climb_margin_bands": {
+      ">=30": 55,
+      "<30": 5,
+      "<5": 1
+     },
+     "edge_distance": {
+      "n": 61,
+      "min": 333.505615234375,
+      "p10": 701.6939697265625,
+      "median": 1343.698974609375,
+      "p90": 1918.146484375,
+      "max": 2127.257080078125
+     },
+     "destination_radius": {
+      "n": 61,
+      "min": 18.326522827148438,
+      "p10": 27.85072135925293,
+      "median": 77.43058776855469,
+      "p90": 139.48220825195312,
+      "max": 147.6820526123047
+     },
+     "destination_speed": {
+      "n": 61,
+      "min": 8.280449061528259,
+      "p10": 9.55125518548816,
+      "median": 13.732081253467292,
+      "p90": 19.645957532773508,
+      "max": 21.048559663702495
+     },
+     "entry_distance": {
+      "n": 61,
+      "min": 1.0368813276290894,
+      "p10": 34.38734817504883,
+      "median": 34.7784423828125,
+      "p90": 34.94094467163086,
+      "max": 34.998741149902344
+     },
+     "relative_speed": {
+      "n": 61,
+      "min": 17.625818252563477,
+      "p10": 27.10252571105957,
+      "median": 28.82512092590332,
+      "p90": 31.64711570739746,
+      "max": 37.789466857910156
+     },
+     "bodies": {
+      "10": 61
+     },
+     "starts_leaving_bodies_out": 61,
+     "omitted_kinds": {
+      "Planet": 100,
+      "Edge": 22
+     },
+     "omitted_clearance": {
+      "n": 122,
+      "min": 1138.5037841796875,
+      "p10": 1344.69140625,
+      "median": 1936.4852294921875,
+      "p90": 2482.231689453125,
+      "max": 3388.48095703125
+     },
+     "farthest_kept_when_omitting": {
+      "n": 61,
+      "min": 976.2189331054688,
+      "p10": 1191.0745849609375,
+      "median": 1522.5289306640625,
+      "p90": 1933.1964111328125,
+      "max": 2463.00439453125
+     }
+    },
+    "nosun2": {
+     "starts": 61,
+     "low_margin_starts": 0,
+     "sun_margin_bands": {},
+     "planet_margin_bands": {
+      ">=30": 61
+     },
+     "climb_margin_bands": {
+      ">=30": 51,
+      "<30": 9,
+      "<15": 1
+     },
+     "edge_distance": {
+      "n": 61,
+      "min": 235.90435791015625,
+      "p10": 279.63653564453125,
+      "median": 427.7095947265625,
+      "p90": 667.228271484375,
+      "max": 752.7725219726562
+     },
+     "destination_radius": {
+      "n": 61,
+      "min": 16.051694869995117,
+      "p10": 24.216590881347656,
+      "median": 87.20248413085938,
+      "p90": 141.8541717529297,
+      "max": 146.13343811035156
+     },
+     "destination_speed": {
+      "n": 61,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 0.0,
+      "p90": 0.0,
+      "max": 0.003554379430016645
+     },
+     "entry_distance": {
+      "n": 61,
+      "min": 1.549981713294983,
+      "p10": 34.555824279785156,
+      "median": 34.73488235473633,
+      "p90": 34.96976852416992,
+      "max": 34.99464416503906
+     },
+     "relative_speed": {
+      "n": 61,
+      "min": 18.030101776123047,
+      "p10": 28.07361602783203,
+      "median": 28.42780876159668,
+      "p90": 32.058040618896484,
+      "max": 36.74433898925781
+     },
+     "bodies": {
+      "3": 61
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "nosun3": {
+     "starts": 64,
+     "low_margin_starts": 0,
+     "sun_margin_bands": {},
+     "planet_margin_bands": {
+      ">=30": 64
+     },
+     "climb_margin_bands": {
+      ">=30": 58,
+      "<30": 6
+     },
+     "edge_distance": {
+      "n": 64,
+      "min": 348.8975830078125,
+      "p10": 385.8808898925781,
+      "median": 531.6392822265625,
+      "p90": 774.430908203125,
+      "max": 905.047607421875
+     },
+     "destination_radius": {
+      "n": 64,
+      "min": 15.9707612991333,
+      "p10": 31.965959548950195,
+      "median": 72.25143432617188,
+      "p90": 138.88720703125,
+      "max": 148.81436157226562
+     },
+     "destination_speed": {
+      "n": 64,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 0.0,
+      "p90": 9.53441542606015e-07,
+      "max": 0.0013211469105950048
+     },
+     "entry_distance": {
+      "n": 64,
+      "min": 26.73483657836914,
+      "p10": 34.62153244018555,
+      "median": 34.81642532348633,
+      "p90": 34.94646072387695,
+      "max": 34.994205474853516
+     },
+     "relative_speed": {
+      "n": 64,
+      "min": 23.8019962310791,
+      "p10": 28.142297744750977,
+      "median": 28.437740325927734,
+      "p90": 31.10943031311035,
+      "max": 37.98268508911133
+     },
+     "bodies": {
+      "4": 64
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "nosun5": {
+     "starts": 61,
+     "low_margin_starts": 0,
+     "sun_margin_bands": {},
+     "planet_margin_bands": {
+      ">=30": 61
+     },
+     "climb_margin_bands": {
+      ">=30": 52,
+      "<30": 9
+     },
+     "edge_distance": {
+      "n": 61,
+      "min": 323.48870849609375,
+      "p10": 427.91064453125,
+      "median": 863.3092041015625,
+      "p90": 1173.801513671875,
+      "max": 1459.5374755859375
+     },
+     "destination_radius": {
+      "n": 61,
+      "min": 24.103519439697266,
+      "p10": 33.18708038330078,
+      "median": 86.80816650390625,
+      "p90": 131.79922485351562,
+      "max": 147.7432861328125
+     },
+     "destination_speed": {
+      "n": 61,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 0.0,
+      "p90": 0.0,
+      "max": 0.0014831674614734097
+     },
+     "entry_distance": {
+      "n": 61,
+      "min": 16.665180206298828,
+      "p10": 34.54292678833008,
+      "median": 34.77722930908203,
+      "p90": 34.96125793457031,
+      "max": 34.998443603515625
+     },
+     "relative_speed": {
+      "n": 61,
+      "min": 18.10112190246582,
+      "p10": 27.99187469482422,
+      "median": 28.396282196044922,
+      "p90": 30.974464416503906,
+      "max": 37.59529113769531
+     },
+     "bodies": {
+      "6": 61
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "nosun8": {
+     "starts": 61,
+     "low_margin_starts": 0,
+     "sun_margin_bands": {},
+     "planet_margin_bands": {
+      ">=30": 61
+     },
+     "climb_margin_bands": {
+      ">=30": 54,
+      "<30": 7
+     },
+     "edge_distance": {
+      "n": 61,
+      "min": 333.38037109375,
+      "p10": 814.066650390625,
+      "median": 1335.67041015625,
+      "p90": 1777.25390625,
+      "max": 2074.72119140625
+     },
+     "destination_radius": {
+      "n": 61,
+      "min": 15.039010047912598,
+      "p10": 29.7406005859375,
+      "median": 84.1599349975586,
+      "p90": 123.17222595214844,
+      "max": 136.42710876464844
+     },
+     "destination_speed": {
+      "n": 61,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 0.0,
+      "p90": 0.0,
+      "max": 0.000371855410019193
+     },
+     "entry_distance": {
+      "n": 61,
+      "min": 20.72799301147461,
+      "p10": 34.41344451904297,
+      "median": 34.764373779296875,
+      "p90": 34.94187927246094,
+      "max": 34.99417495727539
+     },
+     "relative_speed": {
+      "n": 61,
+      "min": 18.611427307128906,
+      "p10": 27.952104568481445,
+      "median": 28.344898223876953,
+      "p90": 29.269664764404297,
+      "max": 37.05469512939453
+     },
+     "bodies": {
+      "9": 61
+     },
+     "starts_leaving_bodies_out": 61,
+     "omitted_kinds": {
+      "Edge": 11,
+      "Planet": 50
+     },
+     "omitted_clearance": {
+      "n": 61,
+      "min": 1196.0361328125,
+      "p10": 1501.6929931640625,
+      "median": 1888.75927734375,
+      "p90": 2658.53271484375,
+      "max": 3330.271240234375
+     },
+     "farthest_kept_when_omitting": {
+      "n": 61,
+      "min": 1082.527099609375,
+      "p10": 1239.8709716796875,
+      "median": 1740.4552001953125,
+      "p90": 2357.57958984375,
+      "max": 3057.86865234375
+     }
+    },
+    "sun3-edge": {
+     "starts": 63,
+     "low_margin_starts": 4,
+     "sun_margin_bands": {
+      ">=30": 50,
+      "<30": 5,
+      "<0": 4,
+      "<15": 3,
+      "<5": 1
+     },
+     "planet_margin_bands": {
+      ">=30": 61,
+      "<15": 1,
+      "<30": 1
+     },
+     "climb_margin_bands": {
+      ">=30": 52,
+      "<30": 9,
+      "<5": 1,
+      "<15": 1
+     },
+     "edge_distance": {
+      "n": 63,
+      "min": 244.05615234375,
+      "p10": 347.9576721191406,
+      "median": 592.4415893554688,
+      "p90": 872.751953125,
+      "max": 1011.2119140625
+     },
+     "destination_radius": {
+      "n": 63,
+      "min": 17.662322998046875,
+      "p10": 36.80335235595703,
+      "median": 106.67670440673828,
+      "p90": 137.41415405273438,
+      "max": 149.9352569580078
+     },
+     "destination_speed": {
+      "n": 63,
+      "min": 11.025676338300933,
+      "p10": 12.350847602380096,
+      "median": 15.698185381779178,
+      "p90": 19.27092569229459,
+      "max": 20.569808011791284
+     },
+     "entry_distance": {
+      "n": 63,
+      "min": 5.286385536193848,
+      "p10": 21.592451095581055,
+      "median": 34.69671630859375,
+      "p90": 34.92888641357422,
+      "max": 34.99821090698242
+     },
+     "relative_speed": {
+      "n": 63,
+      "min": 19.061420440673828,
+      "p10": 24.415884017944336,
+      "median": 28.418283462524414,
+      "p90": 31.849510192871094,
+      "max": 36.49831008911133
+     },
+     "bodies": {
+      "5": 63
+     },
+     "starts_leaving_bodies_out": 0,
+     "omitted_kinds": {},
+     "omitted_clearance": null,
+     "farthest_kept_when_omitting": null
+    },
+    "all": {
+     "starts": 738,
+     "low_margin_starts": 27,
+     "sun_margin_bands": {
+      ">=30": 404,
+      "<0": 37,
+      "<15": 19,
+      "<30": 23,
+      "<5": 8
+     },
+     "planet_margin_bands": {
+      ">=30": 720,
+      "<5": 2,
+      "<30": 11,
+      "<15": 5
+     },
+     "climb_margin_bands": {
+      ">=30": 624,
+      "<30": 92,
+      "<5": 16,
+      "<15": 6
+     },
+     "edge_distance": {
+      "n": 738,
+      "min": 102.248046875,
+      "p10": 349.8211975097656,
+      "median": 590.58154296875,
+      "p90": 1270.5771484375,
+      "max": 2127.257080078125
+     },
+     "destination_radius": {
+      "n": 738,
+      "min": 15.039010047912598,
+      "p10": 29.39583396911621,
+      "median": 84.4817886352539,
+      "p90": 137.41415405273438,
+      "max": 149.9352569580078
+     },
+     "destination_speed": {
+      "n": 738,
+      "min": 0.0,
+      "p10": 0.0,
+      "median": 13.490885818138493,
+      "p90": 19.257502622328637,
+      "max": 21.656200818016664
+     },
+     "entry_distance": {
+      "n": 738,
+      "min": 0.06760381162166595,
+      "p10": 30.014923095703125,
+      "median": 34.728267669677734,
+      "p90": 34.94247817993164,
+      "max": 34.998741149902344
+     },
+     "relative_speed": {
+      "n": 738,
+      "min": 5.860764026641846,
+      "p10": 25.6765193939209,
+      "median": 28.436765670776367,
+      "p90": 31.807819366455078,
+      "max": 49.076881408691406
+     },
+     "bodies": {
+      "4": 125,
+      "5": 303,
+      "7": 66,
+      "10": 61,
+      "3": 61,
+      "6": 61,
+      "9": 61
+     },
+     "starts_leaving_bodies_out": 122,
+     "omitted_kinds": {
+      "Planet": 150,
+      "Edge": 33
+     },
+     "omitted_clearance": {
+      "n": 183,
+      "min": 1138.5037841796875,
+      "p10": 1378.365966796875,
+      "median": 1925.255859375,
+      "p90": 2533.06689453125,
+      "max": 3388.48095703125
+     },
+     "farthest_kept_when_omitting": {
+      "n": 122,
+      "min": 976.2189331054688,
+      "p10": 1209.9093017578125,
+      "median": 1607.67822265625,
+      "p90": 2091.924560546875,
+      "max": 3057.86865234375
+     }
+    }
+   },
+   "failures": {
+    "native": {
+     "sun2": {
+      "climb": 4,
+      "avoid planet": 2
+     },
+     "all": {
+      "climb": 41,
+      "avoid planet": 5,
+      "frame_changed": 2,
+      "host hunt": 4,
+      "contact": 2,
+      "damaged": 1
+     },
+     "sun3": {
+      "climb": 25,
+      "frame_changed": 1,
+      "host hunt": 2,
+      "avoid planet": 2,
+      "contact": 1
+     },
+     "sun5": {
+      "climb": 3,
+      "damaged": 1
+     },
+     "sun8": {
+      "climb": 4
+     },
+     "nosun3": {
+      "contact": 1
+     },
+     "nosun5": {
+      "host hunt": 1
+     },
+     "sun3-edge": {
+      "climb": 5,
+      "avoid planet": 1,
+      "host hunt": 1,
+      "frame_changed": 1
+     }
+    }
+   }
+  }
+ }
+}

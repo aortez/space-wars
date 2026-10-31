@@ -33,6 +33,9 @@ mod connectivity;
 #[cfg(feature = "query-diagnostics")]
 pub use connectivity::{CapsuleConnectivity, ConnectivityGrid};
 mod forecast_body;
+mod point_projection;
+pub use point_projection::{PointProjectionHit, PointProjectionOptions};
+pub mod polar;
 mod query_snapshot;
 mod surface_drive;
 pub use query_snapshot::{
@@ -478,6 +481,10 @@ pub struct ContactEvent {
     pub impulse: Vec2,
     pub impulse_magnitude: f32,
     pub solver_contacts: usize,
+    /// Minimum signed solver separation across occurrences in this step.
+    /// Positive contacts are speculative; an applied impulse is still a
+    /// physical response even if the solver kept the surfaces separated.
+    pub minimum_separation: Option<f32>,
 }
 
 #[derive(Default)]
@@ -999,6 +1006,31 @@ impl PhysicsWorld {
                     Vec2::new(max.x.max(next_max.x), max.y.max(next_max.y)),
                 )
             })
+    }
+
+    /// Conservative radius about the body's origin, from current enabled solid
+    /// shapes in body-local coordinates. Independent of the body's world angle.
+    /// None means missing body or no solid shapes; sensors do not enlarge it.
+    pub fn body_solid_radius(&self, id: BodyId) -> Option<f32> {
+        self.body_solid_radius_about(id, Vec2::ZERO)
+    }
+
+    /// Conservative current solid bound about an explicit body-local point.
+    pub fn body_solid_radius_about(&self, id: BodyId, local_center: Vec2) -> Option<f32> {
+        if !finite_vec2(local_center) {
+            return None;
+        }
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        body.colliders()
+            .iter()
+            .filter_map(|handle| self.raw.colliders.get(*handle))
+            .filter(|collider| collider.is_enabled() && !collider.is_sensor())
+            .map(|collider| {
+                let pose = collider.position_wrt_parent().copied().unwrap_or_default();
+                let sphere = collider.shape().compute_bounding_sphere(&pose);
+                (sphere.center - to_rapier(local_center)).length() + sphere.radius
+            })
+            .reduce(f32::max)
     }
 
     /// Velocity at a world-space point, accounting for an off-center mass.
@@ -2357,13 +2389,26 @@ impl PhysicsWorld {
                 ))
                 .then_with(|| right.impulse_magnitude.total_cmp(&left.impulse_magnitude))
         });
-        self.contact_events.dedup_by_key(|event| {
-            (
-                event.collider_a,
-                event.subshape_a,
-                event.collider_b,
-                event.subshape_b,
-            )
+        self.contact_events.dedup_by(|removed, retained| {
+            let same = (
+                removed.collider_a,
+                removed.subshape_a,
+                removed.collider_b,
+                removed.subshape_b,
+            ) == (
+                retained.collider_a,
+                retained.subshape_a,
+                retained.collider_b,
+                retained.subshape_b,
+            );
+            if same {
+                retained.minimum_separation = retained
+                    .minimum_separation
+                    .into_iter()
+                    .chain(removed.minimum_separation)
+                    .reduce(f32::min);
+            }
+            same
         });
 
         for (_, collider_a, _, collider_b, intersecting) in self.raw.intersection_pairs() {
@@ -2600,6 +2645,10 @@ fn contact_event_from_manifolds<'a>(
         .clone()
         .map(|manifold| manifold.data.solver_contacts.len())
         .sum();
+    let minimum_separation = manifolds
+        .flat_map(|manifold| &manifold.data.solver_contacts)
+        .map(|contact| contact.dist)
+        .reduce(f32::min);
     Some(ContactEvent {
         collider_a: id_a,
         collider_b: id_b,
@@ -2612,6 +2661,7 @@ fn contact_event_from_manifolds<'a>(
         impulse,
         impulse_magnitude: magnitude,
         solver_contacts,
+        minimum_separation,
     })
 }
 
@@ -3001,6 +3051,11 @@ mod tests {
         assert!(event.collider_a < event.collider_b);
         assert_eq!(event.collider_a.entity, PhysicsId::new(2));
         assert_eq!(event.collider_b.entity, PhysicsId::new(9));
+        assert!(
+            event
+                .minimum_separation
+                .is_some_and(|distance| distance <= 0.0)
+        );
     }
 
     #[test]
@@ -3055,6 +3110,7 @@ mod tests {
         assert_eq!(event.collider_a, moving_collider_id);
         assert_eq!(event.collider_b, fixed_collider_id);
         assert!(event.impulse_magnitude > 0.0);
+        assert!(event.minimum_separation.is_some_and(f32::is_finite));
         assert!(world.motion(moving_body).unwrap().linear_velocity.x < 0.0);
 
         let cloned = world.clone();

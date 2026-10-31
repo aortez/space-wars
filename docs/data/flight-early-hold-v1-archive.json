@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-early-hold-v1-20261024",
+  "kind": "paired first-exit hold training experiment",
+  "completed_at_utc": "2026-10-24T21:50:58.218100+00:00",
+  "source_file_count": 1545,
+  "source_archive_sha256": "f445e0381273d2b52fdd9b18eaee6f107083a3d6fba573198c178918f838728b",
+  "runtime_sha256": "85d6f22d5625710d0b8e20dfa6f37b34df54c1e8ea748df897a6450ac3a496be",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "arms": [
+    "long",
+    "early"
+  ],
+  "updates_per_seed_arm": 32,
+  "checkpoint_count": 206,
+  "policy_export_count": 20,
+  "training_ticks": 196608,
+  "evaluation_ticks": 262229,
+  "preflight_training_ticks": 6144,
+  "parity_fixtures": 192,
+  "preflight_parity_fixtures": 32,
+  "gates": {
+    "long": {
+      "learning_evidence": false,
+      "scoped_hold": false
+    },
+    "early": {
+      "learning_evidence": false,
+      "scoped_hold": false
+    }
+  },
+  "paired": [
+    {
+      "seed": 17,
+      "immediate_hold_difference": 0
+    },
+    {
+      "seed": 29,
+      "immediate_hold_difference": 0
+    },
+    {
+      "seed": 43,
+      "immediate_hold_difference": 0
+    }
+  ],
+  "early_hold_improvement": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "approach_or_navigation_claim": false,
+  "validation": {
+    "source_archive_and_workspace_verified": true,
+    "source_files": 1545,
+    "frozen_specification_configs_runtime_unchanged": true,
+    "copied_parent_inputs_unchanged": 8,
+    "previous_manifests_unchanged": 27,
+    "python_tests": 18,
+    "native_tests_passed": 418,
+    "native_tests_ignored": 2,
+    "native_python_endpoint_comparisons": 192,
+    "preflight_native_parity_comparisons": 32,
+    "exact_preflight_resume_both_arms": true,
+    "exact_preflight_main_updates": [
+      0,
+      2
+    ],
+    "matched_initial_parameters_and_starts": true,
+    "long_arm_parent_model_optimizer_rng_exact": true,
+    "all_physical_outcomes_and_complete_dwell_reconstructed": true,
+    "budgets_passed": true,
+    "compile_whitespace": "passed",
+    "all_12_process_exits_zero": true
+  },
+  "retained_file_count": 27737,
+  "retained_bytes_excluding_manifest": 1129005411,
+  "archive_path": "data/training-experiments/learned-flight-early-hold-v1-20261024",
+  "manifest_sha256": "709f4a61b2294c4fd868c714b9229a470ec5bce526319b8adcb1bf1aad1ba200",
+  "report_sha256": "28c4b271f339cd72937f47ace90b0558eaba0b266250a7ca69a6eb7ea9c26f2b",
+  "results_sha256": "870d7136a563f6a387ac7c2a01eb5b13d32ff82337470c3e5d6b6e8f1db06bfe"
+}

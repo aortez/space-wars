@@ -1,0 +1,121 @@
+{
+  "experiment": "recovery-guidance-near-repair-v1",
+  "created_utc": "2026-10-18T19:10:15.160712+00:00",
+  "prior_directory": "/home/data/workspace/space-wars3/data/training-experiments/recovery-guidance-near-miss-v1-20261018",
+  "prior_manifest_sha256": "5f201afd5ffaf172a82c1e353247bc5d2e48d909576955334afdaf8f3a110315",
+  "inputs": {
+    "base-plan.json": "3919c9eca778e457b7273bbd6db75c56ca5d940acf5d9cf638ab8a303090461d",
+    "inputs.json": "6f9c932fda211ab79ce930f52d67ac2bfd4fd07ae7610cdc387665a36ed3f829",
+    "near-miss.json": "17dfeb307b7948cd8d059e36396b31481dba671e95f44b322767f27834491b1a",
+    "parent.json": "5a049306c2a51f2dac0413000f53c7f192c90c0a11430c4771eba3b9101b0549",
+    "expected.json": "e995697dd987aaa8944aadab36437562a86c08b74863026a3eaf7ed4fb2cf60e",
+    "diagnosis.json": "42307cef6ea0288a287230e23121ae068847e03c7a771b077d61e0ef697e069f"
+  },
+  "seed_genome": "6e582a44d403aec5899a1ffcdde3a89b64d09c68edca7976385c99cf659b52ad",
+  "parent_genome": "43fc7b5880a84526cd64f88e006cdfddbe2a67a11aafd1bc3a3c07ee5a15b72c",
+  "parent_fitness": {
+    "protected_completed": 616,
+    "remaining_completed": 3,
+    "remaining_speed_points": 3386,
+    "remaining_position_points": 4546,
+    "focal_completed": 2,
+    "retained_completed": 617,
+    "precision_completed": 157,
+    "retained_match_completed": 460,
+    "precision_position_points": 155068,
+    "precision_velocity_points": 155582,
+    "approach_speed_points": 370522,
+    "approach_position_points": 376041,
+    "spare_ticks": 204320
+  },
+  "changes": [
+    {
+      "layer": 0,
+      "kind": "weights",
+      "index": 0,
+      "parent": -0.7506655,
+      "child": -0.77425843,
+      "delta": -0.023592930000000067
+    },
+    {
+      "layer": 0,
+      "kind": "weights",
+      "index": 2,
+      "parent": 1.0389998,
+      "child": 1.0671893,
+      "delta": 0.028189499999999867
+    },
+    {
+      "layer": 0,
+      "kind": "weights",
+      "index": 24,
+      "parent": 0.33891773,
+      "child": 0.3525642,
+      "delta": 0.013646470000000022
+    },
+    {
+      "layer": 0,
+      "kind": "weights",
+      "index": 46,
+      "parent": -0.113210365,
+      "child": -0.12645659,
+      "delta": -0.013246225000000014
+    },
+    {
+      "layer": 0,
+      "kind": "weights",
+      "index": 58,
+      "parent": 0.41375348,
+      "child": 0.44179767,
+      "delta": 0.02804418999999997
+    },
+    {
+      "layer": 0,
+      "kind": "weights",
+      "index": 67,
+      "parent": -0.6145604,
+      "child": -0.65034574,
+      "delta": -0.03578534
+    }
+  ],
+  "reversion_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+  ],
+  "target_case": {
+    "max_ticks": 1200,
+    "name": "mixed_train_inward_stationary",
+    "seed": 42,
+    "start": {
+      "altitude": 70.0,
+      "bearing": 0.0,
+      "heading_offset": 0.0,
+      "lateral_speed": 0.0,
+      "radial_speed": 0.0
+    },
+    "target_offset": {
+      "x": 0.0,
+      "y": -12.0
+    },
+    "target_velocity": {
+      "x": 0.0,
+      "y": 0.0
+    }
+  },
+  "candidate_generation": "Each candidate changes exactly one of six first-layer weights back toward the parent by one of the four declared fractions. Float32 child + fraction * (parent-child); use the exact parent value at fraction 1. No combinations, adaptive changes, network changes, or extra candidates.",
+  "budget": {
+    "candidates": 24,
+    "episodes_per_candidate": 621,
+    "candidate_episodes": 14904,
+    "baseline_models": 2,
+    "baseline_episodes": 1242,
+    "extra_target_trace_episodes": 26
+  },
+  "selection": "Keep every full-621 candidate. Select the full-621 candidate with the smallest absolute float32 parameter change from the near-miss, breaking ties by changed weight index then fraction. If none passes, select no replacement. Finish all 24 candidates before selection; diagnostics do not alter the budget.",
+  "acceptance": "All 464 included match states and all 157 precision cases must arrive. In particular, preserve the near-miss 620 successes and recover mixed_train_inward_stationary.",
+  "evaluation": "Independently re-evaluate the near-miss and selected repair, if present, on all 157 precision cases plus 482 match states. Eighteen excluded states stay diagnostic and do not select candidates. Check near-miss parity against the previous runtime, including all match trace bytes. Retain the fixed replay cases plus the sole precision failure.",
+  "scope": "A retrospective one-coordinate repair on known training data, not evidence of fresh generalization. A passing model must undergo separately frozen fresh-world qualification before integration.",
+  "production_controls_changed": false
+}

@@ -24,6 +24,7 @@ use std::{
     path::Path,
 };
 
+mod time_ranking;
 mod training;
 
 const PLAN: &[u8] = include_bytes!(concat!(
@@ -112,6 +113,11 @@ fn fork(source: &MaterialMissionClientScenario) -> MaterialMissionClientScenario
         flag_value_shadow: timed("clone.flag_value_shadow", || {
             source.flag_value_shadow.clone()
         }),
+        // A fresh host: the forked seat resumes its leg with a new attempt.
+        learned: source
+            .learned
+            .as_ref()
+            .map(|_| LearnedTransferHost::new(2).expect("the retained learned flight stack")),
     })
 }
 

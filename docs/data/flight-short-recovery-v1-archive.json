@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-short-recovery-v1-20261024",
+  "completed_at_utc": "2026-10-24T23:11:23.536366+00:00",
+  "kind": "gated short-recovery curriculum entry experiment",
+  "source_file_count": 1554,
+  "source_archive_sha256": "41fbcaeb248e7857aea0438130fbe1ca3415d3cc3a0e3d891d9bf4b15c67587b",
+  "runtime_sha256": "73b06a97af78b64ff3b93dda0df79f703bbbf61bc26360236a2029f284648374",
+  "checkpoint_count": 71,
+  "policy_export_count": 14,
+  "pilot_gate": {
+    "checks": {
+      "signed_exposure": true,
+      "sampled_success_each_seed": false,
+      "position_eligible_30_rows_two_seeds": true,
+      "short_hold_retention_two_seeds": true
+    },
+    "passed": false
+  },
+  "main_executed": false,
+  "training_ticks": 68608,
+  "evaluation_ticks": 53788,
+  "evaluation_episodes": 192,
+  "parity_comparisons": 112,
+  "progression_qualified": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "validation": {
+    "sources_and_archive_verified": 1554,
+    "previous_manifests_unchanged": 31,
+    "copied_inputs_unchanged": 123,
+    "native_runtime_unchanged": true,
+    "native_baseline_passed": 421,
+    "native_baseline_ignored": 2,
+    "python_tests": 19,
+    "control16_state_exact_except_source_identity": true,
+    "all_three_exact_resumes": true,
+    "parent_initial_traces_exact": true,
+    "physical_dwell_reward_reconstructed": true,
+    "all_process_exits_zero": true,
+    "budgets_passed": true,
+    "pilot_gate_honored": true,
+    "new_checkpoint_count": 71,
+    "new_export_count": 14
+  },
+  "retained_file_count": 606,
+  "retained_bytes_excluding_manifest": 364872507,
+  "archive_path": "data/training-experiments/learned-flight-short-recovery-v1-20261024",
+  "manifest_sha256": "59d8760d3ec1fb88d9c2e94da2abfb83570ba177deaaa06eb3e4574638f7e4ff",
+  "report_sha256": "7fe746c42b6543a736ed162f06a36184f357f5b1f1c8e802c3caeef4ba8fb03e",
+  "results_sha256": "fa26ec0874f98610a22845c984b23e3e7b7dacb003d70f41d8a22b08521e2d4d"
+}

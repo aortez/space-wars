@@ -1,0 +1,24 @@
+{
+  "experiment": "recovery-guidance-near-miss-v1",
+  "created_utc": "2026-10-18T19:02:00.136997+00:00",
+  "prior_directory": "/home/data/workspace/space-wars3/data/training-experiments/recovery-guidance-repair-focus-v1-20261018",
+  "prior_manifest_sha256": "7ba3d5872f8c4ea4a2c0ed9e3b20f9abe3656e5d3e98001242330c7065addbeb",
+  "inputs": {
+    "base-plan.json": "3919c9eca778e457b7273bbd6db75c56ca5d940acf5d9cf638ab8a303090461d",
+    "inputs.json": "6f9c932fda211ab79ce930f52d67ac2bfd4fd07ae7610cdc387665a36ed3f829",
+    "history.json": "e03fa06f9e7615f1ccaab444a53442dc0357267914d82cc5005e56305901a752",
+    "focused-final.json": "044662ffbe3961f9278e437e04c2596005083a2b0292d259b0c90f6b84f9675d",
+    "reference.json": "fb8f46a17b85fe722f9bb8fd62242a8d52218e212251da3f79cffd9f00702aa1",
+    "expected.json": "3de9c887c87175770bfcf694544a1d736fe89822e2702a5d2b659dc316ef5c09"
+  },
+  "target": {
+    "generation": 42,
+    "slot_zero_based": 9,
+    "genome": "6e582a44d403aec5899a1ffcdde3a89b64d09c68edca7976385c99cf659b52ad"
+  },
+  "reconstruction": "Replay all 48 populations using recorded fitness, checking every population identity, winner, full history and final candidate metadata; retain only the predeclared generation 42 slot 9 candidate. This is reconstruction, not another physics training run.",
+  "evaluation": "Reevaluate the recovered near-miss, selected focused final, and original learned reference on all 157 precision and 482 match cases; 464 matches count toward the known 621, while 18 remain diagnostic. Controls must exactly match prior endpoints and match trace bytes, with runtime identity normalized only for precision reports.",
+  "traces": "Retain all match traces, the six fixed precision replays, and every failed precision case of the near-miss under all three controllers. Diagnose all failures without case selection.",
+  "acceptance": "All 621 known training cases, followed by separately frozen fresh-world qualification. No qualification or production rollout in this diagnostic.",
+  "production_controls_changed": false
+}

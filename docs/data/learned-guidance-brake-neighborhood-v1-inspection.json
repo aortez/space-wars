@@ -1,0 +1,140 @@
+[
+  {
+    "case": "qualification_target_motion_b0_p0",
+    "first_changed_action": {
+      "decision": 4,
+      "before_raw_brake": -0.006922841,
+      "after_raw_brake": 0.25536093,
+      "before_brake": false,
+      "after_brake": true,
+      "target_distance": 19.855174742261305,
+      "relative_speed": 4.718807592149832
+    },
+    "controllers": {
+      "baseline": {
+        "outcome": "arrived",
+        "ticks": 864,
+        "brake_ticks": 102,
+        "smallest_distance": 0.2054261,
+        "longest_dwell": 30,
+        "final": {
+          "distance": 1.8784423,
+          "relative_speed": 0.31630927,
+          "dwell": 30
+        },
+        "target_velocity": {
+          "x": 3.0,
+          "y": 0.0
+        }
+      },
+      "changed": {
+        "outcome": "timeout",
+        "ticks": 1200,
+        "brake_ticks": 504,
+        "smallest_distance": 19.747486,
+        "longest_dwell": 0,
+        "final": {
+          "distance": 77.17006,
+          "relative_speed": 5.5365334,
+          "dwell": 0
+        },
+        "target_velocity": {
+          "x": 3.0,
+          "y": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "qualification_target_motion_b0_p4",
+    "first_changed_action": {
+      "decision": 4,
+      "before_raw_brake": -0.0003001988,
+      "after_raw_brake": 0.23516193,
+      "before_brake": false,
+      "after_brake": true,
+      "target_distance": 18.16062705475094,
+      "relative_speed": 3.780038843749845
+    },
+    "controllers": {
+      "baseline": {
+        "outcome": "arrived",
+        "ticks": 1058,
+        "brake_ticks": 98,
+        "smallest_distance": 0.45080405,
+        "longest_dwell": 30,
+        "final": {
+          "distance": 1.5566071,
+          "relative_speed": 0.45627463,
+          "dwell": 30
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 1.0
+        }
+      },
+      "changed": {
+        "outcome": "timeout",
+        "ticks": 1200,
+        "brake_ticks": 496,
+        "smallest_distance": 18.06928,
+        "longest_dwell": 0,
+        "final": {
+          "distance": 55.848476,
+          "relative_speed": 3.5925493,
+          "dwell": 0
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 1.0
+        }
+      }
+    }
+  },
+  {
+    "case": "moving_right",
+    "first_changed_action": {
+      "decision": 3,
+      "before_raw_brake": -0.0009837896,
+      "after_raw_brake": 0.23533434,
+      "before_brake": false,
+      "after_brake": true,
+      "target_distance": 20.700008252405024,
+      "relative_speed": 3.277062718829116
+    },
+    "controllers": {
+      "baseline": {
+        "outcome": "arrived",
+        "ticks": 862,
+        "brake_ticks": 100,
+        "smallest_distance": 0.26642177,
+        "longest_dwell": 30,
+        "final": {
+          "distance": 1.419858,
+          "relative_speed": 0.39650694,
+          "dwell": 30
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 0.0
+        }
+      },
+      "changed": {
+        "outcome": "timeout",
+        "ticks": 1200,
+        "brake_ticks": 490,
+        "smallest_distance": 20.654749,
+        "longest_dwell": 0,
+        "final": {
+          "distance": 47.295815,
+          "relative_speed": 4.6978574,
+          "dwell": 0
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 0.0
+        }
+      }
+    }
+  }
+]

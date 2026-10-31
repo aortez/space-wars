@@ -1,0 +1,2242 @@
+{
+ "training": {
+  "time": [
+   {
+    "generation": 1,
+    "completed": 621,
+    "mean_match_ticks": 52.43103448275863,
+    "approach_speed_points": 371078,
+    "precision_position_points": 155040,
+    "precision_velocity_points": 155580,
+    "precision_spare_ticks": 88977
+   },
+   {
+    "generation": 2,
+    "completed": 621,
+    "mean_match_ticks": 52.43103448275863,
+    "approach_speed_points": 371078,
+    "precision_position_points": 155040,
+    "precision_velocity_points": 155580,
+    "precision_spare_ticks": 88977
+   },
+   {
+    "generation": 3,
+    "completed": 621,
+    "mean_match_ticks": 52.40517241379311,
+    "approach_speed_points": 371937,
+    "precision_position_points": 155030,
+    "precision_velocity_points": 155681,
+    "precision_spare_ticks": 89550
+   },
+   {
+    "generation": 4,
+    "completed": 621,
+    "mean_match_ticks": 52.40517241379311,
+    "approach_speed_points": 371937,
+    "precision_position_points": 155030,
+    "precision_velocity_points": 155681,
+    "precision_spare_ticks": 89550
+   },
+   {
+    "generation": 5,
+    "completed": 621,
+    "mean_match_ticks": 52.40517241379311,
+    "approach_speed_points": 371937,
+    "precision_position_points": 155030,
+    "precision_velocity_points": 155681,
+    "precision_spare_ticks": 89550
+   },
+   {
+    "generation": 6,
+    "completed": 621,
+    "mean_match_ticks": 52.40517241379311,
+    "approach_speed_points": 371937,
+    "precision_position_points": 155030,
+    "precision_velocity_points": 155681,
+    "precision_spare_ticks": 89550
+   },
+   {
+    "generation": 7,
+    "completed": 621,
+    "mean_match_ticks": 52.40517241379311,
+    "approach_speed_points": 371937,
+    "precision_position_points": 155030,
+    "precision_velocity_points": 155681,
+    "precision_spare_ticks": 89550
+   },
+   {
+    "generation": 8,
+    "completed": 621,
+    "mean_match_ticks": 52.40517241379311,
+    "approach_speed_points": 371937,
+    "precision_position_points": 155030,
+    "precision_velocity_points": 155681,
+    "precision_spare_ticks": 89550
+   },
+   {
+    "generation": 9,
+    "completed": 621,
+    "mean_match_ticks": 52.29741379310346,
+    "approach_speed_points": 371459,
+    "precision_position_points": 155068,
+    "precision_velocity_points": 155594,
+    "precision_spare_ticks": 90507
+   },
+   {
+    "generation": 10,
+    "completed": 621,
+    "mean_match_ticks": 52.29741379310346,
+    "approach_speed_points": 371459,
+    "precision_position_points": 155068,
+    "precision_velocity_points": 155594,
+    "precision_spare_ticks": 90507
+   },
+   {
+    "generation": 11,
+    "completed": 621,
+    "mean_match_ticks": 52.29741379310346,
+    "approach_speed_points": 371459,
+    "precision_position_points": 155068,
+    "precision_velocity_points": 155594,
+    "precision_spare_ticks": 90507
+   },
+   {
+    "generation": 12,
+    "completed": 621,
+    "mean_match_ticks": 52.29741379310346,
+    "approach_speed_points": 371459,
+    "precision_position_points": 155068,
+    "precision_velocity_points": 155594,
+    "precision_spare_ticks": 90507
+   },
+   {
+    "generation": 13,
+    "completed": 621,
+    "mean_match_ticks": 52.29741379310346,
+    "approach_speed_points": 371459,
+    "precision_position_points": 155068,
+    "precision_velocity_points": 155594,
+    "precision_spare_ticks": 90507
+   },
+   {
+    "generation": 14,
+    "completed": 621,
+    "mean_match_ticks": 52.08836206896552,
+    "approach_speed_points": 371640,
+    "precision_position_points": 154968,
+    "precision_velocity_points": 155609,
+    "precision_spare_ticks": 91762
+   },
+   {
+    "generation": 15,
+    "completed": 621,
+    "mean_match_ticks": 52.08836206896552,
+    "approach_speed_points": 371640,
+    "precision_position_points": 154968,
+    "precision_velocity_points": 155609,
+    "precision_spare_ticks": 91762
+   },
+   {
+    "generation": 16,
+    "completed": 621,
+    "mean_match_ticks": 52.04741379310346,
+    "approach_speed_points": 370382,
+    "precision_position_points": 154980,
+    "precision_velocity_points": 155695,
+    "precision_spare_ticks": 91493
+   },
+   {
+    "generation": 17,
+    "completed": 621,
+    "mean_match_ticks": 52.04741379310346,
+    "approach_speed_points": 370382,
+    "precision_position_points": 154980,
+    "precision_velocity_points": 155695,
+    "precision_spare_ticks": 91493
+   },
+   {
+    "generation": 18,
+    "completed": 621,
+    "mean_match_ticks": 52.04741379310346,
+    "approach_speed_points": 370382,
+    "precision_position_points": 154980,
+    "precision_velocity_points": 155695,
+    "precision_spare_ticks": 91493
+   },
+   {
+    "generation": 19,
+    "completed": 621,
+    "mean_match_ticks": 52.04741379310346,
+    "approach_speed_points": 370382,
+    "precision_position_points": 154980,
+    "precision_velocity_points": 155695,
+    "precision_spare_ticks": 91493
+   },
+   {
+    "generation": 20,
+    "completed": 621,
+    "mean_match_ticks": 52.04741379310346,
+    "approach_speed_points": 370382,
+    "precision_position_points": 154980,
+    "precision_velocity_points": 155695,
+    "precision_spare_ticks": 91493
+   },
+   {
+    "generation": 21,
+    "completed": 621,
+    "mean_match_ticks": 51.92456896551724,
+    "approach_speed_points": 369522,
+    "precision_position_points": 155035,
+    "precision_velocity_points": 155692,
+    "precision_spare_ticks": 96128
+   },
+   {
+    "generation": 22,
+    "completed": 621,
+    "mean_match_ticks": 51.92456896551724,
+    "approach_speed_points": 369522,
+    "precision_position_points": 155035,
+    "precision_velocity_points": 155692,
+    "precision_spare_ticks": 96128
+   },
+   {
+    "generation": 23,
+    "completed": 621,
+    "mean_match_ticks": 51.92456896551724,
+    "approach_speed_points": 369522,
+    "precision_position_points": 155035,
+    "precision_velocity_points": 155692,
+    "precision_spare_ticks": 96128
+   },
+   {
+    "generation": 24,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 25,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 26,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 27,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 28,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 29,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 30,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 31,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 32,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 33,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 34,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 35,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 36,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 37,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 38,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 39,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 40,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 41,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 42,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 43,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 44,
+    "completed": 621,
+    "mean_match_ticks": 51.91163793103448,
+    "approach_speed_points": 369615,
+    "precision_position_points": 155037,
+    "precision_velocity_points": 155682,
+    "precision_spare_ticks": 96937
+   },
+   {
+    "generation": 45,
+    "completed": 621,
+    "mean_match_ticks": 51.90732758620689,
+    "approach_speed_points": 369451,
+    "precision_position_points": 155024,
+    "precision_velocity_points": 155745,
+    "precision_spare_ticks": 96860
+   },
+   {
+    "generation": 46,
+    "completed": 621,
+    "mean_match_ticks": 51.90732758620689,
+    "approach_speed_points": 369451,
+    "precision_position_points": 155024,
+    "precision_velocity_points": 155745,
+    "precision_spare_ticks": 96860
+   },
+   {
+    "generation": 47,
+    "completed": 621,
+    "mean_match_ticks": 51.90732758620689,
+    "approach_speed_points": 369451,
+    "precision_position_points": 155024,
+    "precision_velocity_points": 155745,
+    "precision_spare_ticks": 96860
+   },
+   {
+    "generation": 48,
+    "completed": 621,
+    "mean_match_ticks": 51.90732758620689,
+    "approach_speed_points": 369451,
+    "precision_position_points": 155024,
+    "precision_velocity_points": 155745,
+    "precision_spare_ticks": 96860
+   },
+   {
+    "generation": 49,
+    "completed": 621,
+    "mean_match_ticks": 51.90732758620689,
+    "approach_speed_points": 369451,
+    "precision_position_points": 155024,
+    "precision_velocity_points": 155745,
+    "precision_spare_ticks": 96860
+   },
+   {
+    "generation": 50,
+    "completed": 621,
+    "mean_match_ticks": 51.90732758620689,
+    "approach_speed_points": 369451,
+    "precision_position_points": 155024,
+    "precision_velocity_points": 155745,
+    "precision_spare_ticks": 96860
+   },
+   {
+    "generation": 51,
+    "completed": 621,
+    "mean_match_ticks": 51.90732758620689,
+    "approach_speed_points": 369451,
+    "precision_position_points": 155024,
+    "precision_velocity_points": 155745,
+    "precision_spare_ticks": 96860
+   },
+   {
+    "generation": 52,
+    "completed": 621,
+    "mean_match_ticks": 51.90732758620689,
+    "approach_speed_points": 369451,
+    "precision_position_points": 155024,
+    "precision_velocity_points": 155745,
+    "precision_spare_ticks": 96860
+   },
+   {
+    "generation": 53,
+    "completed": 621,
+    "mean_match_ticks": 51.834051724137936,
+    "approach_speed_points": 370594,
+    "precision_position_points": 155131,
+    "precision_velocity_points": 155671,
+    "precision_spare_ticks": 91145
+   },
+   {
+    "generation": 54,
+    "completed": 621,
+    "mean_match_ticks": 51.834051724137936,
+    "approach_speed_points": 370594,
+    "precision_position_points": 155131,
+    "precision_velocity_points": 155671,
+    "precision_spare_ticks": 91145
+   },
+   {
+    "generation": 55,
+    "completed": 621,
+    "mean_match_ticks": 51.834051724137936,
+    "approach_speed_points": 370594,
+    "precision_position_points": 155131,
+    "precision_velocity_points": 155671,
+    "precision_spare_ticks": 91145
+   },
+   {
+    "generation": 56,
+    "completed": 621,
+    "mean_match_ticks": 51.834051724137936,
+    "approach_speed_points": 370594,
+    "precision_position_points": 155131,
+    "precision_velocity_points": 155671,
+    "precision_spare_ticks": 91145
+   },
+   {
+    "generation": 57,
+    "completed": 621,
+    "mean_match_ticks": 51.709051724137936,
+    "approach_speed_points": 371539,
+    "precision_position_points": 154959,
+    "precision_velocity_points": 155552,
+    "precision_spare_ticks": 91400
+   },
+   {
+    "generation": 58,
+    "completed": 621,
+    "mean_match_ticks": 51.709051724137936,
+    "approach_speed_points": 371539,
+    "precision_position_points": 154959,
+    "precision_velocity_points": 155552,
+    "precision_spare_ticks": 91400
+   },
+   {
+    "generation": 59,
+    "completed": 621,
+    "mean_match_ticks": 51.67456896551724,
+    "approach_speed_points": 371726,
+    "precision_position_points": 154936,
+    "precision_velocity_points": 155564,
+    "precision_spare_ticks": 90625
+   },
+   {
+    "generation": 60,
+    "completed": 621,
+    "mean_match_ticks": 51.398706896551715,
+    "approach_speed_points": 371595,
+    "precision_position_points": 155028,
+    "precision_velocity_points": 155615,
+    "precision_spare_ticks": 92666
+   },
+   {
+    "generation": 61,
+    "completed": 621,
+    "mean_match_ticks": 51.366379310344826,
+    "approach_speed_points": 371426,
+    "precision_position_points": 154929,
+    "precision_velocity_points": 155554,
+    "precision_spare_ticks": 91766
+   },
+   {
+    "generation": 62,
+    "completed": 621,
+    "mean_match_ticks": 51.366379310344826,
+    "approach_speed_points": 371426,
+    "precision_position_points": 154929,
+    "precision_velocity_points": 155554,
+    "precision_spare_ticks": 91766
+   },
+   {
+    "generation": 63,
+    "completed": 621,
+    "mean_match_ticks": 51.366379310344826,
+    "approach_speed_points": 371426,
+    "precision_position_points": 154929,
+    "precision_velocity_points": 155554,
+    "precision_spare_ticks": 91766
+   },
+   {
+    "generation": 64,
+    "completed": 621,
+    "mean_match_ticks": 51.366379310344826,
+    "approach_speed_points": 371426,
+    "precision_position_points": 154929,
+    "precision_velocity_points": 155554,
+    "precision_spare_ticks": 91766
+   },
+   {
+    "generation": 65,
+    "completed": 621,
+    "mean_match_ticks": 51.0905172413793,
+    "approach_speed_points": 371250,
+    "precision_position_points": 155076,
+    "precision_velocity_points": 155520,
+    "precision_spare_ticks": 93009
+   },
+   {
+    "generation": 66,
+    "completed": 621,
+    "mean_match_ticks": 51.0905172413793,
+    "approach_speed_points": 371250,
+    "precision_position_points": 155076,
+    "precision_velocity_points": 155520,
+    "precision_spare_ticks": 93009
+   },
+   {
+    "generation": 67,
+    "completed": 621,
+    "mean_match_ticks": 51.0905172413793,
+    "approach_speed_points": 371250,
+    "precision_position_points": 155076,
+    "precision_velocity_points": 155520,
+    "precision_spare_ticks": 93009
+   },
+   {
+    "generation": 68,
+    "completed": 621,
+    "mean_match_ticks": 51.0905172413793,
+    "approach_speed_points": 371250,
+    "precision_position_points": 155076,
+    "precision_velocity_points": 155520,
+    "precision_spare_ticks": 93009
+   },
+   {
+    "generation": 69,
+    "completed": 621,
+    "mean_match_ticks": 51.0905172413793,
+    "approach_speed_points": 371250,
+    "precision_position_points": 155076,
+    "precision_velocity_points": 155520,
+    "precision_spare_ticks": 93009
+   },
+   {
+    "generation": 70,
+    "completed": 621,
+    "mean_match_ticks": 51.073275862068954,
+    "approach_speed_points": 371220,
+    "precision_position_points": 155100,
+    "precision_velocity_points": 155538,
+    "precision_spare_ticks": 92613
+   },
+   {
+    "generation": 71,
+    "completed": 621,
+    "mean_match_ticks": 51.073275862068954,
+    "approach_speed_points": 371220,
+    "precision_position_points": 155100,
+    "precision_velocity_points": 155538,
+    "precision_spare_ticks": 92613
+   },
+   {
+    "generation": 72,
+    "completed": 621,
+    "mean_match_ticks": 51.073275862068954,
+    "approach_speed_points": 371220,
+    "precision_position_points": 155100,
+    "precision_velocity_points": 155538,
+    "precision_spare_ticks": 92613
+   },
+   {
+    "generation": 73,
+    "completed": 621,
+    "mean_match_ticks": 51.073275862068954,
+    "approach_speed_points": 371220,
+    "precision_position_points": 155100,
+    "precision_velocity_points": 155538,
+    "precision_spare_ticks": 92613
+   },
+   {
+    "generation": 74,
+    "completed": 621,
+    "mean_match_ticks": 51.073275862068954,
+    "approach_speed_points": 371220,
+    "precision_position_points": 155100,
+    "precision_velocity_points": 155538,
+    "precision_spare_ticks": 92613
+   },
+   {
+    "generation": 75,
+    "completed": 621,
+    "mean_match_ticks": 51.04525862068965,
+    "approach_speed_points": 370995,
+    "precision_position_points": 155164,
+    "precision_velocity_points": 155565,
+    "precision_spare_ticks": 93297
+   },
+   {
+    "generation": 76,
+    "completed": 621,
+    "mean_match_ticks": 51.04525862068965,
+    "approach_speed_points": 370995,
+    "precision_position_points": 155164,
+    "precision_velocity_points": 155565,
+    "precision_spare_ticks": 93297
+   },
+   {
+    "generation": 77,
+    "completed": 621,
+    "mean_match_ticks": 51.04525862068965,
+    "approach_speed_points": 370995,
+    "precision_position_points": 155164,
+    "precision_velocity_points": 155565,
+    "precision_spare_ticks": 93297
+   },
+   {
+    "generation": 78,
+    "completed": 621,
+    "mean_match_ticks": 51.04525862068965,
+    "approach_speed_points": 370995,
+    "precision_position_points": 155164,
+    "precision_velocity_points": 155565,
+    "precision_spare_ticks": 93297
+   },
+   {
+    "generation": 79,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 80,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 81,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 82,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 83,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 84,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 85,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 86,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 87,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 88,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 89,
+    "completed": 621,
+    "mean_match_ticks": 51.02586206896552,
+    "approach_speed_points": 370923,
+    "precision_position_points": 155199,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93205
+   },
+   {
+    "generation": 90,
+    "completed": 621,
+    "mean_match_ticks": 50.9375,
+    "approach_speed_points": 370803,
+    "precision_position_points": 155161,
+    "precision_velocity_points": 155656,
+    "precision_spare_ticks": 96099
+   },
+   {
+    "generation": 91,
+    "completed": 621,
+    "mean_match_ticks": 50.9375,
+    "approach_speed_points": 370803,
+    "precision_position_points": 155161,
+    "precision_velocity_points": 155656,
+    "precision_spare_ticks": 96099
+   },
+   {
+    "generation": 92,
+    "completed": 621,
+    "mean_match_ticks": 50.9375,
+    "approach_speed_points": 370803,
+    "precision_position_points": 155161,
+    "precision_velocity_points": 155656,
+    "precision_spare_ticks": 96099
+   },
+   {
+    "generation": 93,
+    "completed": 621,
+    "mean_match_ticks": 50.9375,
+    "approach_speed_points": 370803,
+    "precision_position_points": 155161,
+    "precision_velocity_points": 155656,
+    "precision_spare_ticks": 96099
+   },
+   {
+    "generation": 94,
+    "completed": 621,
+    "mean_match_ticks": 50.9375,
+    "approach_speed_points": 370803,
+    "precision_position_points": 155161,
+    "precision_velocity_points": 155656,
+    "precision_spare_ticks": 96099
+   },
+   {
+    "generation": 95,
+    "completed": 621,
+    "mean_match_ticks": 50.9375,
+    "approach_speed_points": 370803,
+    "precision_position_points": 155161,
+    "precision_velocity_points": 155656,
+    "precision_spare_ticks": 96099
+   },
+   {
+    "generation": 96,
+    "completed": 621,
+    "mean_match_ticks": 50.875,
+    "approach_speed_points": 370883,
+    "precision_position_points": 155076,
+    "precision_velocity_points": 155631,
+    "precision_spare_ticks": 95764
+   }
+  ],
+  "control": [
+   {
+    "generation": 1,
+    "completed": 621,
+    "mean_match_ticks": 52.43103448275863,
+    "approach_speed_points": 371078,
+    "precision_position_points": 155040,
+    "precision_velocity_points": 155580,
+    "precision_spare_ticks": 88977
+   },
+   {
+    "generation": 2,
+    "completed": 621,
+    "mean_match_ticks": 52.43103448275863,
+    "approach_speed_points": 371078,
+    "precision_position_points": 155040,
+    "precision_velocity_points": 155580,
+    "precision_spare_ticks": 88977
+   },
+   {
+    "generation": 3,
+    "completed": 621,
+    "mean_match_ticks": 52.43103448275863,
+    "approach_speed_points": 371078,
+    "precision_position_points": 155040,
+    "precision_velocity_points": 155580,
+    "precision_spare_ticks": 88977
+   },
+   {
+    "generation": 4,
+    "completed": 621,
+    "mean_match_ticks": 52.43103448275863,
+    "approach_speed_points": 371078,
+    "precision_position_points": 155040,
+    "precision_velocity_points": 155580,
+    "precision_spare_ticks": 88977
+   },
+   {
+    "generation": 5,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 6,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 7,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 8,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 9,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 10,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 11,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 12,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 13,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 14,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 15,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 16,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 17,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 18,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 19,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 20,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 21,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 22,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 23,
+    "completed": 621,
+    "mean_match_ticks": 52.20474137931035,
+    "approach_speed_points": 369444,
+    "precision_position_points": 155361,
+    "precision_velocity_points": 155708,
+    "precision_spare_ticks": 96002
+   },
+   {
+    "generation": 24,
+    "completed": 621,
+    "mean_match_ticks": 52.133620689655174,
+    "approach_speed_points": 369624,
+    "precision_position_points": 155369,
+    "precision_velocity_points": 155724,
+    "precision_spare_ticks": 95764
+   },
+   {
+    "generation": 25,
+    "completed": 621,
+    "mean_match_ticks": 52.35560344827587,
+    "approach_speed_points": 369385,
+    "precision_position_points": 155487,
+    "precision_velocity_points": 155678,
+    "precision_spare_ticks": 95361
+   },
+   {
+    "generation": 26,
+    "completed": 621,
+    "mean_match_ticks": 52.35560344827587,
+    "approach_speed_points": 369385,
+    "precision_position_points": 155487,
+    "precision_velocity_points": 155678,
+    "precision_spare_ticks": 95361
+   },
+   {
+    "generation": 27,
+    "completed": 621,
+    "mean_match_ticks": 52.35560344827587,
+    "approach_speed_points": 369385,
+    "precision_position_points": 155487,
+    "precision_velocity_points": 155678,
+    "precision_spare_ticks": 95361
+   },
+   {
+    "generation": 28,
+    "completed": 621,
+    "mean_match_ticks": 52.35560344827587,
+    "approach_speed_points": 369385,
+    "precision_position_points": 155487,
+    "precision_velocity_points": 155678,
+    "precision_spare_ticks": 95361
+   },
+   {
+    "generation": 29,
+    "completed": 621,
+    "mean_match_ticks": 52.35560344827587,
+    "approach_speed_points": 369385,
+    "precision_position_points": 155487,
+    "precision_velocity_points": 155678,
+    "precision_spare_ticks": 95361
+   },
+   {
+    "generation": 30,
+    "completed": 621,
+    "mean_match_ticks": 52.35560344827587,
+    "approach_speed_points": 369385,
+    "precision_position_points": 155487,
+    "precision_velocity_points": 155678,
+    "precision_spare_ticks": 95361
+   },
+   {
+    "generation": 31,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 32,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 33,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 34,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 35,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 36,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 37,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 38,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 39,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 40,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 41,
+    "completed": 621,
+    "mean_match_ticks": 53.133620689655174,
+    "approach_speed_points": 369879,
+    "precision_position_points": 155530,
+    "precision_velocity_points": 155694,
+    "precision_spare_ticks": 95847
+   },
+   {
+    "generation": 42,
+    "completed": 621,
+    "mean_match_ticks": 53.65086206896552,
+    "approach_speed_points": 369586,
+    "precision_position_points": 155588,
+    "precision_velocity_points": 155614,
+    "precision_spare_ticks": 88653
+   },
+   {
+    "generation": 43,
+    "completed": 621,
+    "mean_match_ticks": 53.65086206896552,
+    "approach_speed_points": 369586,
+    "precision_position_points": 155588,
+    "precision_velocity_points": 155614,
+    "precision_spare_ticks": 88653
+   },
+   {
+    "generation": 44,
+    "completed": 621,
+    "mean_match_ticks": 53.65086206896552,
+    "approach_speed_points": 369586,
+    "precision_position_points": 155588,
+    "precision_velocity_points": 155614,
+    "precision_spare_ticks": 88653
+   },
+   {
+    "generation": 45,
+    "completed": 621,
+    "mean_match_ticks": 53.65086206896552,
+    "approach_speed_points": 369586,
+    "precision_position_points": 155588,
+    "precision_velocity_points": 155614,
+    "precision_spare_ticks": 88653
+   },
+   {
+    "generation": 46,
+    "completed": 621,
+    "mean_match_ticks": 53.65086206896552,
+    "approach_speed_points": 369586,
+    "precision_position_points": 155588,
+    "precision_velocity_points": 155614,
+    "precision_spare_ticks": 88653
+   },
+   {
+    "generation": 47,
+    "completed": 621,
+    "mean_match_ticks": 53.65086206896552,
+    "approach_speed_points": 369586,
+    "precision_position_points": 155588,
+    "precision_velocity_points": 155614,
+    "precision_spare_ticks": 88653
+   },
+   {
+    "generation": 48,
+    "completed": 621,
+    "mean_match_ticks": 53.65086206896552,
+    "approach_speed_points": 369586,
+    "precision_position_points": 155588,
+    "precision_velocity_points": 155614,
+    "precision_spare_ticks": 88653
+   },
+   {
+    "generation": 49,
+    "completed": 621,
+    "mean_match_ticks": 53.75431034482759,
+    "approach_speed_points": 369751,
+    "precision_position_points": 155604,
+    "precision_velocity_points": 155681,
+    "precision_spare_ticks": 92491
+   },
+   {
+    "generation": 50,
+    "completed": 621,
+    "mean_match_ticks": 53.75431034482759,
+    "approach_speed_points": 369751,
+    "precision_position_points": 155604,
+    "precision_velocity_points": 155681,
+    "precision_spare_ticks": 92491
+   },
+   {
+    "generation": 51,
+    "completed": 621,
+    "mean_match_ticks": 54.086206896551715,
+    "approach_speed_points": 369739,
+    "precision_position_points": 155612,
+    "precision_velocity_points": 155593,
+    "precision_spare_ticks": 92790
+   },
+   {
+    "generation": 52,
+    "completed": 621,
+    "mean_match_ticks": 54.086206896551715,
+    "approach_speed_points": 369739,
+    "precision_position_points": 155612,
+    "precision_velocity_points": 155593,
+    "precision_spare_ticks": 92790
+   },
+   {
+    "generation": 53,
+    "completed": 621,
+    "mean_match_ticks": 54.086206896551715,
+    "approach_speed_points": 369739,
+    "precision_position_points": 155612,
+    "precision_velocity_points": 155593,
+    "precision_spare_ticks": 92790
+   },
+   {
+    "generation": 54,
+    "completed": 621,
+    "mean_match_ticks": 53.8125,
+    "approach_speed_points": 369703,
+    "precision_position_points": 155630,
+    "precision_velocity_points": 155627,
+    "precision_spare_ticks": 92684
+   },
+   {
+    "generation": 55,
+    "completed": 621,
+    "mean_match_ticks": 53.8125,
+    "approach_speed_points": 369703,
+    "precision_position_points": 155630,
+    "precision_velocity_points": 155627,
+    "precision_spare_ticks": 92684
+   },
+   {
+    "generation": 56,
+    "completed": 621,
+    "mean_match_ticks": 53.8125,
+    "approach_speed_points": 369703,
+    "precision_position_points": 155630,
+    "precision_velocity_points": 155627,
+    "precision_spare_ticks": 92684
+   },
+   {
+    "generation": 57,
+    "completed": 621,
+    "mean_match_ticks": 53.8125,
+    "approach_speed_points": 369703,
+    "precision_position_points": 155630,
+    "precision_velocity_points": 155627,
+    "precision_spare_ticks": 92684
+   },
+   {
+    "generation": 58,
+    "completed": 621,
+    "mean_match_ticks": 53.8125,
+    "approach_speed_points": 369703,
+    "precision_position_points": 155630,
+    "precision_velocity_points": 155627,
+    "precision_spare_ticks": 92684
+   },
+   {
+    "generation": 59,
+    "completed": 621,
+    "mean_match_ticks": 53.80818965517241,
+    "approach_speed_points": 369650,
+    "precision_position_points": 155648,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93338
+   },
+   {
+    "generation": 60,
+    "completed": 621,
+    "mean_match_ticks": 53.80818965517241,
+    "approach_speed_points": 369650,
+    "precision_position_points": 155648,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93338
+   },
+   {
+    "generation": 61,
+    "completed": 621,
+    "mean_match_ticks": 53.80818965517241,
+    "approach_speed_points": 369650,
+    "precision_position_points": 155648,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93338
+   },
+   {
+    "generation": 62,
+    "completed": 621,
+    "mean_match_ticks": 53.80818965517241,
+    "approach_speed_points": 369650,
+    "precision_position_points": 155648,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93338
+   },
+   {
+    "generation": 63,
+    "completed": 621,
+    "mean_match_ticks": 53.80818965517241,
+    "approach_speed_points": 369650,
+    "precision_position_points": 155648,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 93338
+   },
+   {
+    "generation": 64,
+    "completed": 621,
+    "mean_match_ticks": 53.834051724137936,
+    "approach_speed_points": 369328,
+    "precision_position_points": 155694,
+    "precision_velocity_points": 155613,
+    "precision_spare_ticks": 92685
+   },
+   {
+    "generation": 65,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 66,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 67,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 68,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 69,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 70,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 71,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 72,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 73,
+    "completed": 621,
+    "mean_match_ticks": 53.78232758620689,
+    "approach_speed_points": 369315,
+    "precision_position_points": 155760,
+    "precision_velocity_points": 155642,
+    "precision_spare_ticks": 92542
+   },
+   {
+    "generation": 74,
+    "completed": 621,
+    "mean_match_ticks": 53.92025862068965,
+    "approach_speed_points": 368643,
+    "precision_position_points": 155815,
+    "precision_velocity_points": 155670,
+    "precision_spare_ticks": 91929
+   },
+   {
+    "generation": 75,
+    "completed": 621,
+    "mean_match_ticks": 53.92025862068965,
+    "approach_speed_points": 368643,
+    "precision_position_points": 155815,
+    "precision_velocity_points": 155670,
+    "precision_spare_ticks": 91929
+   },
+   {
+    "generation": 76,
+    "completed": 621,
+    "mean_match_ticks": 53.92025862068965,
+    "approach_speed_points": 368643,
+    "precision_position_points": 155815,
+    "precision_velocity_points": 155670,
+    "precision_spare_ticks": 91929
+   },
+   {
+    "generation": 77,
+    "completed": 621,
+    "mean_match_ticks": 53.92025862068965,
+    "approach_speed_points": 368643,
+    "precision_position_points": 155815,
+    "precision_velocity_points": 155670,
+    "precision_spare_ticks": 91929
+   },
+   {
+    "generation": 78,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 79,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 80,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 81,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 82,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 83,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 84,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 85,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 86,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 87,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 88,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 89,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 90,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 91,
+    "completed": 621,
+    "mean_match_ticks": 54.364224137931046,
+    "approach_speed_points": 368157,
+    "precision_position_points": 155846,
+    "precision_velocity_points": 155622,
+    "precision_spare_ticks": 92739
+   },
+   {
+    "generation": 92,
+    "completed": 621,
+    "mean_match_ticks": 54.39439655172413,
+    "approach_speed_points": 367332,
+    "precision_position_points": 155857,
+    "precision_velocity_points": 155720,
+    "precision_spare_ticks": 93954
+   },
+   {
+    "generation": 93,
+    "completed": 621,
+    "mean_match_ticks": 54.39439655172413,
+    "approach_speed_points": 367332,
+    "precision_position_points": 155857,
+    "precision_velocity_points": 155720,
+    "precision_spare_ticks": 93954
+   },
+   {
+    "generation": 94,
+    "completed": 621,
+    "mean_match_ticks": 54.39439655172413,
+    "approach_speed_points": 367332,
+    "precision_position_points": 155857,
+    "precision_velocity_points": 155720,
+    "precision_spare_ticks": 93954
+   },
+   {
+    "generation": 95,
+    "completed": 621,
+    "mean_match_ticks": 54.39439655172413,
+    "approach_speed_points": 367332,
+    "precision_position_points": 155857,
+    "precision_velocity_points": 155720,
+    "precision_spare_ticks": 93954
+   },
+   {
+    "generation": 96,
+    "completed": 621,
+    "mean_match_ticks": 54.39439655172413,
+    "approach_speed_points": 367332,
+    "precision_position_points": 155857,
+    "precision_velocity_points": 155720,
+    "precision_spare_ticks": 93954
+   }
+  ]
+ },
+ "evaluation": {
+  "complete": true,
+  "models": {
+   "candidate": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1",
+   "control-final": "acca47e5a22719958070ea4d7844706cb839fa61b88672cbff1dc9eabb3f7b27",
+   "time-final": "e03d3e2900722539e1a05838c4134a4b01bc33451582e795c37f53b502885b42"
+  },
+  "plan_sha256": "fda52c05775b6d28a04bf7ca817865f17378b14bd7c9b9d8793a6de4fb6e9f56",
+  "precision": {
+   "inspected": [
+    {
+     "arrived": 96,
+     "cases": 96,
+     "controller": "candidate",
+     "median_ticks": 517.0
+    },
+    {
+     "arrived": 96,
+     "cases": 96,
+     "controller": "time-final",
+     "median_ticks": 518.0
+    },
+    {
+     "arrived": 96,
+     "cases": 96,
+     "controller": "control-final",
+     "median_ticks": 522.0
+    }
+   ],
+   "training": [
+    {
+     "arrived": 157,
+     "cases": 157,
+     "controller": "candidate",
+     "median_ticks": 610.0
+    },
+    {
+     "arrived": 157,
+     "cases": 157,
+     "controller": "time-final",
+     "median_ticks": 519.0
+    },
+    {
+     "arrived": 157,
+     "cases": 157,
+     "controller": "control-final",
+     "median_ticks": 562.0
+    }
+   ]
+  },
+  "runtime": "diagnostic_v1/linux/x86_64/589a9354dc2bd1fc5c660ac7d61b1e4f284aaad6b161da9227136796dc5520e8",
+  "seconds": 73.185511325,
+  "sets": {
+   "excluded": [
+    {
+     "completed": 10,
+     "controller": "native",
+     "starts": 18
+    },
+    {
+     "controller": "candidate",
+     "genome": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1",
+     "versus_native": {
+      "completed": 0,
+      "faster": 0,
+      "gained": 0,
+      "median_ticks": null,
+      "native_completed": 10,
+      "native_median_ticks": null,
+      "native_successes_lost": 10,
+      "shared_successes": 0,
+      "slower": 0,
+      "starts": 18,
+      "tied": 0,
+      "time_saved_ticks": -2534
+     }
+    },
+    {
+     "controller": "time-final",
+     "genome": "e03d3e2900722539e1a05838c4134a4b01bc33451582e795c37f53b502885b42",
+     "versus_native": {
+      "completed": 2,
+      "faster": 0,
+      "gained": 0,
+      "median_ticks": 28.0,
+      "native_completed": 10,
+      "native_median_ticks": 26.0,
+      "native_successes_lost": 8,
+      "shared_successes": 2,
+      "slower": 2,
+      "starts": 18,
+      "tied": 0,
+      "time_saved_ticks": -1990
+     }
+    },
+    {
+     "controller": "control-final",
+     "genome": "acca47e5a22719958070ea4d7844706cb839fa61b88672cbff1dc9eabb3f7b27",
+     "versus_native": {
+      "completed": 0,
+      "faster": 0,
+      "gained": 0,
+      "median_ticks": null,
+      "native_completed": 10,
+      "native_median_ticks": null,
+      "native_successes_lost": 10,
+      "shared_successes": 0,
+      "slower": 0,
+      "starts": 18,
+      "tied": 0,
+      "time_saved_ticks": -2534
+     }
+    }
+   ],
+   "fresh": [
+    {
+     "completed": 209,
+     "controller": "native",
+     "starts": 239
+    },
+    {
+     "controller": "candidate",
+     "genome": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1",
+     "versus_native": {
+      "completed": 221,
+      "faster": 80,
+      "gained": 20,
+      "median_ticks": 55.0,
+      "native_completed": 209,
+      "native_median_ticks": 47.0,
+      "native_successes_lost": 8,
+      "shared_successes": 201,
+      "slower": 117,
+      "starts": 239,
+      "tied": 4,
+      "time_saved_ticks": 1656
+     }
+    },
+    {
+     "controller": "time-final",
+     "genome": "e03d3e2900722539e1a05838c4134a4b01bc33451582e795c37f53b502885b42",
+     "versus_native": {
+      "completed": 221,
+      "faster": 80,
+      "gained": 20,
+      "median_ticks": 54.0,
+      "native_completed": 209,
+      "native_median_ticks": 47.0,
+      "native_successes_lost": 8,
+      "shared_successes": 201,
+      "slower": 113,
+      "starts": 239,
+      "tied": 8,
+      "time_saved_ticks": 1864
+     }
+    },
+    {
+     "controller": "control-final",
+     "genome": "acca47e5a22719958070ea4d7844706cb839fa61b88672cbff1dc9eabb3f7b27",
+     "versus_native": {
+      "completed": 217,
+      "faster": 84,
+      "gained": 20,
+      "median_ticks": 53.0,
+      "native_completed": 209,
+      "native_median_ticks": 47.0,
+      "native_successes_lost": 12,
+      "shared_successes": 197,
+      "slower": 111,
+      "starts": 239,
+      "tied": 2,
+      "time_saved_ticks": 781
+     }
+    }
+   ],
+   "inspected": [
+    {
+     "completed": 218,
+     "controller": "native",
+     "starts": 238
+    },
+    {
+     "controller": "candidate",
+     "genome": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1",
+     "versus_native": {
+      "completed": 222,
+      "faster": 98,
+      "gained": 12,
+      "median_ticks": 54.0,
+      "native_completed": 218,
+      "native_median_ticks": 48.0,
+      "native_successes_lost": 8,
+      "shared_successes": 210,
+      "slower": 106,
+      "starts": 238,
+      "tied": 6,
+      "time_saved_ticks": 423
+     }
+    },
+    {
+     "controller": "time-final",
+     "genome": "e03d3e2900722539e1a05838c4134a4b01bc33451582e795c37f53b502885b42",
+     "versus_native": {
+      "completed": 224,
+      "faster": 98,
+      "gained": 12,
+      "median_ticks": 53.0,
+      "native_completed": 218,
+      "native_median_ticks": 48.0,
+      "native_successes_lost": 6,
+      "shared_successes": 212,
+      "slower": 106,
+      "starts": 238,
+      "tied": 8,
+      "time_saved_ticks": 1013
+     }
+    },
+    {
+     "controller": "control-final",
+     "genome": "acca47e5a22719958070ea4d7844706cb839fa61b88672cbff1dc9eabb3f7b27",
+     "versus_native": {
+      "completed": 222,
+      "faster": 94,
+      "gained": 12,
+      "median_ticks": 52.0,
+      "native_completed": 218,
+      "native_median_ticks": 48.0,
+      "native_successes_lost": 8,
+      "shared_successes": 210,
+      "slower": 110,
+      "starts": 238,
+      "tied": 6,
+      "time_saved_ticks": 351
+     }
+    }
+   ],
+   "training": [
+    {
+     "completed": 430,
+     "controller": "native",
+     "starts": 464
+    },
+    {
+     "controller": "candidate",
+     "genome": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1",
+     "versus_native": {
+      "completed": 464,
+      "faster": 175,
+      "gained": 34,
+      "median_ticks": 51.0,
+      "native_completed": 430,
+      "native_median_ticks": 47.0,
+      "native_successes_lost": 0,
+      "shared_successes": 430,
+      "slower": 242,
+      "starts": 464,
+      "tied": 13,
+      "time_saved_ticks": 6047
+     }
+    },
+    {
+     "controller": "time-final",
+     "genome": "e03d3e2900722539e1a05838c4134a4b01bc33451582e795c37f53b502885b42",
+     "versus_native": {
+      "completed": 464,
+      "faster": 185,
+      "gained": 34,
+      "median_ticks": 51.0,
+      "native_completed": 430,
+      "native_median_ticks": 47.0,
+      "native_successes_lost": 0,
+      "shared_successes": 430,
+      "slower": 227,
+      "starts": 464,
+      "tied": 18,
+      "time_saved_ticks": 6769
+     }
+    },
+    {
+     "controller": "control-final",
+     "genome": "acca47e5a22719958070ea4d7844706cb839fa61b88672cbff1dc9eabb3f7b27",
+     "versus_native": {
+      "completed": 464,
+      "faster": 170,
+      "gained": 34,
+      "median_ticks": 52.0,
+      "native_completed": 430,
+      "native_median_ticks": 47.0,
+      "native_successes_lost": 0,
+      "shared_successes": 430,
+      "slower": 244,
+      "starts": 464,
+      "tied": 16,
+      "time_saved_ticks": 5136
+     }
+    }
+   ]
+  }
+ },
+ "details": {
+  "matches": {
+   "training": {
+    "all_complete": 430,
+    "means": {
+     "native": {
+      "ticks": 46.92,
+      "arrival_relative_speed": 16.54
+     },
+     "candidate": {
+      "ticks": 53.45,
+      "arrival_relative_speed": 14.09
+     },
+     "time-final": {
+      "ticks": 51.79,
+      "arrival_relative_speed": 14.07
+     },
+     "control-final": {
+      "ticks": 55.61,
+      "arrival_relative_speed": 14.81
+     }
+    },
+    "versus_seed": {
+     "time-final": {
+      "shared": 464,
+      "faster": 231,
+      "slower": 33,
+      "tied": 200,
+      "mean_change": -1.56,
+      "gained": 0,
+      "lost": 0
+     },
+     "control-final": {
+      "shared": 464,
+      "faster": 164,
+      "slower": 164,
+      "tied": 136,
+      "mean_change": 1.96,
+      "gained": 0,
+      "lost": 0
+     }
+    }
+   },
+   "excluded": {
+    "all_complete": 0,
+    "means": {},
+    "versus_seed": {
+     "time-final": {
+      "shared": 0,
+      "faster": 0,
+      "slower": 0,
+      "tied": 0,
+      "mean_change": null,
+      "gained": 2,
+      "lost": 0
+     },
+     "control-final": {
+      "shared": 0,
+      "faster": 0,
+      "slower": 0,
+      "tied": 0,
+      "mean_change": null,
+      "gained": 0,
+      "lost": 0
+     }
+    }
+   },
+   "inspected": {
+    "all_complete": 210,
+    "means": {
+     "native": {
+      "ticks": 50.29,
+      "arrival_relative_speed": 16.83
+     },
+     "candidate": {
+      "ticks": 53.37,
+      "arrival_relative_speed": 14.03
+     },
+     "time-final": {
+      "ticks": 52.84,
+      "arrival_relative_speed": 14.0
+     },
+     "control-final": {
+      "ticks": 53.73,
+      "arrival_relative_speed": 14.72
+     }
+    },
+    "versus_seed": {
+     "time-final": {
+      "shared": 222,
+      "faster": 103,
+      "slower": 21,
+      "tied": 98,
+      "mean_change": -0.51,
+      "gained": 2,
+      "lost": 0
+     },
+     "control-final": {
+      "shared": 222,
+      "faster": 96,
+      "slower": 76,
+      "tied": 50,
+      "mean_change": 0.32,
+      "gained": 0,
+      "lost": 0
+     }
+    }
+   },
+   "fresh": {
+    "all_complete": 197,
+    "means": {
+     "native": {
+      "ticks": 48.52,
+      "arrival_relative_speed": 16.72
+     },
+     "candidate": {
+      "ticks": 55.47,
+      "arrival_relative_speed": 14.23
+     },
+     "time-final": {
+      "ticks": 54.49,
+      "arrival_relative_speed": 14.15
+     },
+     "control-final": {
+      "ticks": 55.45,
+      "arrival_relative_speed": 15.04
+     }
+    },
+    "versus_seed": {
+     "time-final": {
+      "shared": 221,
+      "faster": 124,
+      "slower": 18,
+      "tied": 79,
+      "mean_change": -0.94,
+      "gained": 0,
+      "lost": 0
+     },
+     "control-final": {
+      "shared": 217,
+      "faster": 91,
+      "slower": 68,
+      "tied": 58,
+      "mean_change": -0.08,
+      "gained": 0,
+      "lost": 4
+     }
+    }
+   }
+  },
+  "precision": {
+   "training": {
+    "mean_ticks": {
+     "candidate": 633.3,
+     "time-final": 590.0,
+     "control-final": 601.6
+    },
+    "versus_seed": {
+     "time-final": {
+      "shared": 157,
+      "faster": 88,
+      "slower": 61,
+      "tied": 8,
+      "mean_change": -43.23,
+      "gained": 0,
+      "lost": 0
+     },
+     "control-final": {
+      "shared": 157,
+      "faster": 102,
+      "slower": 49,
+      "tied": 6,
+      "mean_change": -31.7,
+      "gained": 0,
+      "lost": 0
+     }
+    }
+   },
+   "inspected": {
+    "mean_ticks": {
+     "candidate": 564.2,
+     "time-final": 536.7,
+     "control-final": 542.7
+    },
+    "versus_seed": {
+     "time-final": {
+      "shared": 96,
+      "faster": 36,
+      "slower": 57,
+      "tied": 3,
+      "mean_change": -27.49,
+      "gained": 0,
+      "lost": 0
+     },
+     "control-final": {
+      "shared": 96,
+      "faster": 36,
+      "slower": 59,
+      "tied": 1,
+      "mean_change": -21.49,
+      "gained": 0,
+      "lost": 0
+     }
+    }
+   }
+  }
+ }
+}

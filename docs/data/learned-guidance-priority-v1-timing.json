@@ -1,0 +1,49 @@
+{
+  "scope": "Post-hoc elapsed-time diagnostic on cases where both validation-selected models arrive. It does not change selection or rank models using the final test.",
+  "groups": [
+    {
+      "partition": "protected",
+      "common_arrivals": 128,
+      "brake_first_total_ticks": 6879,
+      "progress_first_total_ticks": 6483,
+      "brake_first_median": 56.0,
+      "progress_first_median": 50.0,
+      "progress_faster": 30,
+      "brake_faster": 54,
+      "tied": 44
+    },
+    {
+      "partition": "additional",
+      "common_arrivals": 32,
+      "brake_first_total_ticks": 1898,
+      "progress_first_total_ticks": 1608,
+      "brake_first_median": 52.5,
+      "progress_first_median": 51.5,
+      "progress_faster": 18,
+      "brake_faster": 10,
+      "tied": 4
+    },
+    {
+      "partition": "validation",
+      "common_arrivals": 28,
+      "brake_first_total_ticks": 1420,
+      "progress_first_total_ticks": 1602,
+      "brake_first_median": 45.5,
+      "progress_first_median": 49.0,
+      "progress_faster": 4,
+      "brake_faster": 12,
+      "tied": 12
+    },
+    {
+      "partition": "qualification",
+      "common_arrivals": 32,
+      "brake_first_total_ticks": 1959,
+      "progress_first_total_ticks": 1852,
+      "brake_first_median": 51.5,
+      "progress_first_median": 54.0,
+      "progress_faster": 4,
+      "brake_faster": 20,
+      "tied": 8
+    }
+  ]
+}

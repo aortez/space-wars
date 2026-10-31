@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-continuous-approach-v1-20261024",
+  "kind": "fresh continuous-policy aligned-approach training with primary mean and secondary sampled evaluation",
+  "completed_at_utc": "2026-10-24T19:18:46.818931+00:00",
+  "source_file_count": 1535,
+  "source_archive_sha256": "fb588896231514c4ff00d16bc996e7e2f9c16a26288276b378693922c3ad5fe7",
+  "analysis_revision_archive_sha256": "345b804f1abbdf239073024148329a34015016c225b2c3bdbd74b83faf1051c1",
+  "runtime_sha256": "e938d3a383c43a404715da851808b828afff036e9885c58f36c3d4842abc244a",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "updates_per_seed": 128,
+  "training_ticks": 393216,
+  "evaluation_ticks": 666152,
+  "preflight_training_ticks": 2048,
+  "checkpoint_count": 390,
+  "policy_export_count": 8,
+  "primary_episodes": 96,
+  "secondary_episodes": 384,
+  "gates": {
+    "all_runs_completed": true,
+    "learning_evidence": false,
+    "scoped_progression": false,
+    "clean_training_process_exits": false,
+    "qualification_blocked_by_execution_anomaly": true
+  },
+  "execution_status": {
+    "training_primary_exit_codes": {
+      "17": 0,
+      "29": 0,
+      "43": 143
+    },
+    "seed_43_completed_updates": 128,
+    "seed_43_training_ticks": 131072,
+    "seed_43_primary_evaluation_episodes": 32,
+    "seed_43_summary_present": true,
+    "seed_43_interruption_file_present": false,
+    "seed_43_all_physical_traces_verified": true,
+    "seed_43_final_export_native_parity_verified": true,
+    "cause": "Unexplained termination status reported by execution session after complete artifacts were written. No error traceback or incomplete scored episode was found.",
+    "training_rerun": false,
+    "qualification_limitation": "Treat the nonzero process exit as an execution anomaly. Completed artifacts support descriptive evaluation; no model is promoted and primary gates already fail in every seed.",
+    "all_final_exports_equal_checkpoints": true,
+    "all_checkpoint_histories_equal_summaries": true,
+    "sampled_evaluation_exit_codes": {
+      "17": 0,
+      "29": 0,
+      "43": 0
+    }
+  },
+  "successes": {
+    "mean": {
+      "initial": 0,
+      "final": 0
+    },
+    "sampled": {
+      "initial": 0,
+      "final": 0
+    }
+  },
+  "confirmation_used": false,
+  "model_promoted": false,
+  "general_flight_claim": false,
+  "validation": {
+    "synthetic_tests": 6,
+    "exact_preflight_main_updates": [
+      0,
+      2
+    ],
+    "native_parity_fixtures": 48,
+    "maximum_raw_parity_error": 1.1920928955078125e-06,
+    "previous_manifests_unchanged": 22,
+    "parent_inputs_unchanged": 3,
+    "compile_whitespace": "passed"
+  },
+  "retained_file_count": 1637,
+  "retained_bytes_excluding_manifest": 2256998485,
+  "archive_path": "data/training-experiments/learned-flight-continuous-approach-v1-20261024",
+  "manifest_sha256": "18d8a50ecb41f8580b370e2156c203cdbf65e38665cad6b0f6474efd261b3883",
+  "report_sha256": "19e422834360c6987f50e9dff578ce97513db98f486a75e8ab5f690591b31cda",
+  "results_sha256": "389b8b329917d1099c3cd5fa943f4b477a0a422d4df10071b91500ecdff121d3"
+}

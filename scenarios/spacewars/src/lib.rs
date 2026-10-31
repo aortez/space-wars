@@ -1413,7 +1413,13 @@ impl SpacewarsScenario {
             } else {
                 ship.update(dt, state.seed, state.tick);
             }
-            recover_ship_outside_universe(ship, universe_radius);
+            if !surface_pilots.iter().any(|pilot| {
+                pilot.vehicle_index() == index
+                    && pilot.flight_control_mode()
+                        == surface_sortie::flight::FlightControlMode::Learned
+            }) {
+                recover_ship_outside_universe(ship, universe_radius);
+            }
         }
         finish_spaceport_ejections(state, dt);
         for ship in &mut state.ships {

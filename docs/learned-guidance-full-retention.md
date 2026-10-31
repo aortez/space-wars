@@ -1,10 +1,14 @@
 # Match training with complete precision retention
 
-This experiment tests whether the arrival network can improve match braking
-while retaining every older precision arrival. Selection now evaluates all
-**157 distinct original starts**, followed by the same 15 match approaches used
-in v2. A lost precision arrival ranks below every possible improvement in match
-completion or progress.
+The completed experiment improved match approaches while retaining all
+**157 original precision arrivals**. The finalist completed 8/15 training and
+26/40 development approaches, compared with the parent's 6/15 and 20/40.
+New validation remained at 12/14 available starts. The candidate fails the
+integration gate and does not qualify live match control.
+
+Selection evaluated all 157 distinct original starts followed by the same
+15 match approaches used in v2. A lost precision arrival ranked below every
+possible improvement in match completion or progress.
 
 The [failure diagnostic](learned-guidance-failure-diagnostic.md) found that the
 v2 network's five precision timeouts reach the distance-and-speed window but do
@@ -24,6 +28,42 @@ All 55 reused starting-state records and all 157 practice starts match the
 earlier evidence. The 14 new starts have initial relative speeds of
 20.04–34.63 units/s. Eight fixture tests passed before freezing the source and
 executable, including serial/parallel episode equality.
+
+## Final comparison
+
+| Controller | Training approaches | Development approaches | New validation approaches | Original precision starts |
+| --- | ---: | ---: | ---: | ---: |
+| Ordinary mission guidance | 14/15 | 38/40 | 14/14 | — |
+| Arrival reference | 12/15 | 40/40 | 12/14 | 157/157 |
+| Retained parent | 6/15 | 20/40 | 12/14 | 157/157 |
+| Trained finalist | 8/15 | 26/40 | 12/14 | 157/157 |
+
+The finalist preserves every parent success in these comparisons. Its gains
+cover seed 17 P2, seed 9001 P1, and seed 509 P2 in the inspected short approaches,
+including their Round variants. Training and development overlap, so their
+counts are not independent evidence. All remaining failed finalist approaches
+use zero braking before the native host preempts them for launch/climb.
+
+Training took about 66 minutes on the original executable. Final evaluation
+took 237.58 seconds. The later [performance optimizations](learned-guidance-training-performance.md)
+replay the retained evidence without changing its original runtime identity.
+
+All 276 match trials and 501 original-suite endpoint reports ended at 100 health.
+The 165 reused baseline match traces are byte-identical to v2, and all 334
+reused baseline precision endpoints match apart from runtime identity.
+The 471 additional traced precision replays match their ordinary endpoints;
+24 full traces verify 19,953 applied precision decisions. Match traces verify
+16,557 component decisions with no missing post-step observations.
+
+The Python report initially compared direct `f32` JSON serialization with the
+same values expanded through a JSON value object. Its corrected check requires
+identical native `f32` bits rather than decimal-string identity; all 1,570
+different decimal representations map to identical values. The Rust replay
+already asserted complete episode equality before serialization. Training,
+evaluation, source and the selected genome were not rerun or changed.
+
+The [machine-readable results](data/learned-guidance-match-training-v3-results.json)
+retain each approach outcome, settling metrics and verification counts.
 
 ## Population history
 
@@ -54,9 +94,8 @@ The ordinary [Training view](managed-training.md) already shows winner and media
 progress for its managed recipes; this experimental match-training recipe runs
 through the separate harness and is not a managed UI job.
 
-The [headless performance profile](learned-guidance-training-performance.md)
-measures this recipe's throughput and identifies per-tick world cloning as the
-dominant match-evaluation cost.
+The headless profile identified per-tick world cloning as the original dominant
+cost; subsequent optimizations are documented separately from these results.
 
 ## Frozen recipe
 
@@ -134,3 +173,24 @@ batches. `evaluate` requires a complete run through
 The complete checkpoint is saved after each candidate batch and checked through
 the on-disk resume path. Learned control in ordinary matches remains subject to
 the [integration plan](design/learned-guidance-match-v1.md).
+
+## Retained evidence
+
+The local archive is
+`data/training-experiments/recovery-guidance-match-learning-v3-20261016.tar.gz`
+(18,795,428 bytes), SHA-256
+`6c150070f0a0c8d4fc7c7c4c7ebf1a7079ae9f0c75cef0a33ade565e785d6bf1`.
+All 339 members were checked against their retained files. The package includes
+the original source patch, freezes, complete checkpoint, selected genome,
+physical starts, traces, analysis, population history and reproduction scripts.
+
+The comparison runtime is
+`diagnostic_v1/linux/x86_64/cb77fce2782528640f054d019df231008564988e5e66f945ea0e1ff1d79dfc8b`.
+The selected genome is
+`1cea67c1a3a7ef8f45b8358821115624217c135b1440194ecbc459aa36df28f7`,
+with file SHA-256
+`45790a33d6ebfcea1620b74e32c00d29ae27439f38c2c9b54ab5416256f7d04f`.
+
+The subsequent [brake readout comparison](learned-guidance-brake-readout.md)
+tests a restricted output search against further full-network evolution from
+this finalist, using the optimized executable and fresh validation worlds.

@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-value-continuation-v1-20261024",
+  "completed_at_utc": "2026-10-25T00:36:28.598377+00:00",
+  "kind": "paired value-gradient continuation to update32",
+  "source_file_count": 1567,
+  "source_archive_sha256": "30ad2923f58ff77f26b71482f1a99ea602a5c516997da7f99bb71eadd426dc32",
+  "runtime_sha256": "73b06a97af78b64ff3b93dda0df79f703bbbf61bc26360236a2029f284648374",
+  "new_checkpoint_count": 102,
+  "new_policy_export_count": 24,
+  "extension_gates": {
+    "shared": {
+      "per_seed": [
+        {
+          "seed": 17,
+          "gain_from_16": 0,
+          "gain_from_0": -2,
+          "retention": false,
+          "physical_safety": true,
+          "joint_improvement_and_retention": false
+        },
+        {
+          "seed": 29,
+          "gain_from_16": -4,
+          "gain_from_0": -5,
+          "retention": false,
+          "physical_safety": true,
+          "joint_improvement_and_retention": false
+        },
+        {
+          "seed": 43,
+          "gain_from_16": -6,
+          "gain_from_0": -9,
+          "retention": false,
+          "physical_safety": true,
+          "joint_improvement_and_retention": false
+        }
+      ],
+      "passed": false,
+      "scope": "eligibility to discuss a separately frozen update-64 extension; never automatic authorization"
+    },
+    "head_only": {
+      "per_seed": [
+        {
+          "seed": 17,
+          "gain_from_16": 0,
+          "gain_from_0": 0,
+          "retention": true,
+          "physical_safety": true,
+          "joint_improvement_and_retention": false
+        },
+        {
+          "seed": 29,
+          "gain_from_16": 0,
+          "gain_from_0": 2,
+          "retention": true,
+          "physical_safety": true,
+          "joint_improvement_and_retention": false
+        },
+        {
+          "seed": 43,
+          "gain_from_16": 0,
+          "gain_from_0": 0,
+          "retention": true,
+          "physical_safety": true,
+          "joint_improvement_and_retention": false
+        }
+      ],
+      "passed": false,
+      "scope": "eligibility to discuss a separately frozen update-64 extension; never automatic authorization"
+    }
+  },
+  "extension_review_eligible": false,
+  "update_64_executed": false,
+  "training_ticks": 104448,
+  "restore_ticks": 19899,
+  "optimizer_steps": 1521,
+  "evaluation_ticks": 121414,
+  "evaluation_episodes": 384,
+  "parity_comparisons": 192,
+  "progression_qualified": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "validation": {
+    "sources_and_archive_verified": 1567,
+    "previous_manifests_unchanged": 38,
+    "copied_inputs_unchanged": 569,
+    "inherited_completed_traces_verified": 334,
+    "production_sources_unchanged": true,
+    "native_runtime_unchanged": true,
+    "native_baseline_passed": 421,
+    "native_baseline_ignored": 2,
+    "python_tests": 14,
+    "all_six_exact_31_to_32_resumes": true,
+    "boundary_policies_and_traces_exact": true,
+    "history_and_completed_episode_prefixes_exact": true,
+    "shared_control32_exact_except_declared_mode_and_sources": true,
+    "native_python_parity_comparisons": 192,
+    "cumulative_physical_dwell_reward_reconstructed": true,
+    "new_block_outcomes_separate": true,
+    "all_process_exits_zero": true,
+    "budgets_passed": true,
+    "no_update_64": true,
+    "new_checkpoint_count": 102,
+    "new_export_count": 24
+  },
+  "retained_file_count": 1937,
+  "retained_bytes_excluding_manifest": 745590439,
+  "archive_path": "data/training-experiments/learned-flight-value-continuation-v1-20261024",
+  "manifest_sha256": "77b000b5d5b0790b28375fc2117da422eec2157e3029c904b7528754dfffeccc",
+  "report_sha256": "36664714ed137b0e1f2dcbeda65fa0534cdca06d2532a1356d47c324c17dabbe",
+  "results_sha256": "bb418a5eb996d58e89425b8f3430e0be6f952b2ab9c5e65a1cce25f1ee132257"
+}

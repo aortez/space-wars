@@ -7,6 +7,16 @@ enough state to continue after leaving the screen or restarting the app.
 This is the first job/UI slice of the
 [evolutionary training plan](design/evolutionary-training.md).
 
+The [new flight-controller plan](design/learned-flight-controller-v1.md) uses
+PPO and starts with a headless capability experiment. It is not implemented by
+this screen or its population/generation settings. The instructions below
+remain for the existing evolutionary arrival recipes.
+
+The separate headless match-guidance experiments currently use checkpoint
+graphs and diagnostic trace exports. Their visual replays and connection to
+these screens are tracked in the
+[training observability delivery plan](design/training-observability.md).
+
 ## Using it
 
 Open **Training** from the launcher footer. Choose a curriculum, population,

@@ -1,5 +1,14 @@
 # Evolutionary training and genome browser
 
+**Flight-controller direction, 2026-10-22:** the
+[learned flight controller plan](learned-flight-controller-v1.md) governs the
+next flight skill: layered planning and control, physical task outcomes, no
+native takeover, and a fresh feedforward policy trained with PPO. The arrival
+and match-hybrid recipes below describe the earlier evolutionary workflow;
+their native comparisons, handoff proposals and small-network choices do not
+constrain the new skill. Existing evolutionary tools and practice artifacts
+remain supported by their original contracts.
+
 Draft design for [AI roadmap #14](https://github.com/aortez/space-wars/issues/14).
 The first usable training release includes setup, visible progress, saved
 genomes, and a way to try those genomes in compatible scenarios. Its initial
@@ -38,6 +47,13 @@ browses retained runs, generation winners, monitoring results and practice
 receipts, with explicit protocol checks for comparisons and exact artifact links.
 This first assembly owns one guidance slot; whole learned brains, broader hybrids
 and general gameplay assignment remain open.
+
+The [training observability delivery plan](training-observability.md) stages the
+remaining match-training work: checkpoint graphs and trace diagnostics now,
+convenient visual match replays next, then match-job integration with Training,
+History and Genomes. The existing arrival UI and the headless match harness
+currently have different replay and storage paths; the plan records both their
+current capabilities and the acceptance criteria for connecting them.
 
 ## Product requirements
 
@@ -799,18 +815,27 @@ write, recovery from a terminated runner, stale/incompatible artifacts, and
 distinct Pause versus Save and stop behavior. Library storage and preview queues
 need explicit bounds so an unattended run cannot accumulate unbounded data.
 
-The [first match-hybrid integration plan](learned-guidance-match-v1.md) scopes
-#291 to a retained arrival component inside Recovery bot v1, beginning with
-measurements of the flight states encountered by the real match host.
+The [first match-hybrid integration plan](learned-guidance-match-v1.md) recorded
+the retained arrival experiments inside Recovery bot v1. It is superseded by
+the [learned flight controller plan](learned-flight-controller-v1.md), which
+replaces native-relative qualification and temporary delegation with physical
+flight tasks owned by the learned skill.
 
-After those slices, a hybrid match brain and its adapter can be assigned to P1
-or P2. They need both-seat, reset, transfer, vehicle-loss, and recovery checks
-plus paired match comparisons. A complete learned pilot and joint evolution of
-selected components are subsequent training scopes. Wider action sets, other
+The earlier integration proposal assigned a hybrid match brain and its adapter
+to P1 or P2 after those slices, with both-seat, reset, transfer, vehicle-loss,
+and recovery checks plus paired match comparisons. The new flight plan replaces
+that integration sequence. A complete learned pilot and joint evolution of
+selected components remain possible later scopes. Wider action sets, other
 organisms, obstacle curricula, combat, and a league then extend declared
 contracts and evaluation suites rather than one undifferentiated fitness score.
 
 ## Decisions before scored implementation
+
+This table records decisions for the original evolutionary arrival workflow.
+For new flight work, use the
+[flight plan's open decisions](learned-flight-controller-v1.md#open-decisions-before-implementation)
+and implementation sequence. In particular, the native-fallback integration
+row and 107-parameter recipe below do not apply to the new skill.
 
 | Decision | Proposed direction | How to settle it |
 | --- | --- | --- |

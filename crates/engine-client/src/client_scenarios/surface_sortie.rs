@@ -7,10 +7,15 @@ use scenario_spacewars::surface_sortie::{
     SurfaceSortieState, SurfaceWingAction,
     combat::SurfaceWeaponAction,
     impact::{ImpactKind, SurfaceImpactAction},
+    pilot::MaterialFlightStart,
 };
 use spacewars_ai::{
-    BrainReset, combat_pilot::RulePilotV4, flight_pilot::RulePilotV2,
-    jetpack_crossing::JetpackCrossingPilot, recovery_pilot::RulePilotV3,
+    BrainReset,
+    combat_pilot::RulePilotV4,
+    flight_pilot::RulePilotV2,
+    flight_stack::{FlightStack, FlightStackDriver, GoalOutcome, NavigationGoal, flight_actions},
+    jetpack_crossing::JetpackCrossingPilot,
+    recovery_pilot::RulePilotV3,
     tactical_capture::TacticalCapturePilot,
 };
 
@@ -225,6 +230,157 @@ fn create_pilot(
             episode_seed: seed,
         }),
     }))
+}
+
+pub(super) const LEARNED_FLIGHT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain-learned-flight",
+    controls_help: "Learned flight stack playtest: P1 is human; P2's ship is flown by the composed learned flight stack, a navigation network choosing heading and speed every six ticks over a motor network on the actuators at 60 Hz, with no native controller behind it. The practice planet is stationary and has no gravity, the stack's qualified envelope. P2 flies between eight goals around the planet at its starting altitude, stopping inside the arrival rule at each: within three units of the goal, slower than one unit per second, spinning below 0.2 radians per second, for half a second. Watch its goal, clock and dwell in the P2 view. After an arrival it takes the next goal; a missed deadline retries the same goal; an unsupported ship state, such as a lost ship, is reported and retried every tick. Human controls match Destructible Expedition. Start/Esc pauses; R restarts.",
+    create: create_learned_flight,
+    ..TERRAIN_REGISTRATION
+};
+
+/// Host-owned learned flight stack. The scenario consumes only the ordinary
+/// encoded actions the headless environment sends.
+struct LearnedFlightClientScenario {
+    sortie: SurfaceSortieClientScenario,
+    stack: FlightStack,
+    driver: FlightStackDriver,
+    goals: Vec<engine_core::Vec2>,
+    goal: usize,
+    goal_id: u64,
+    status: LearnedFlightStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+struct LearnedFlightStatus {
+    arrivals: u32,
+    deadlines: u32,
+    errors: u32,
+    last_error: Option<String>,
+    label: String,
+}
+
+fn create_learned_flight(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    let state = SurfaceSortieScenario::init_learned_flight(
+        seed,
+        2,
+        &[(
+            PlayerId::PLAYER_2,
+            MaterialFlightStart {
+                bearing: 0.0,
+                altitude: 120.0,
+                radial_speed: 0.0,
+                lateral_speed: 0.0,
+                heading_offset: 0.0,
+            },
+        )],
+    );
+    let own = state
+        .free_flight_observation(1)
+        .expect("learned flight ship");
+    let center = own.planet_motion.position;
+    let radius = own.ship.position.distance_to(center);
+    // Eight stops around the planet at the starting altitude; neighbours are
+    // about 140 units apart, inside the stack's 200-unit goal envelope.
+    let goals = (1..=8)
+        .map(|k| {
+            center
+                + engine_core::Vec2::Y.rotate_radians(k as f32 * std::f32::consts::FRAC_PI_4)
+                    * radius
+        })
+        .collect();
+    Ok(Box::new(LearnedFlightClientScenario {
+        sortie: SurfaceSortieClientScenario::new(state),
+        stack: FlightStack::retained().expect("retained learned flight stack"),
+        driver: FlightStackDriver::new(1).expect("learned flight driver"),
+        goals,
+        goal: 0,
+        goal_id: 1,
+        status: LearnedFlightStatus {
+            label: "learned flight stack: arming".into(),
+            ..Default::default()
+        },
+    }))
+}
+
+impl ClientScenario for LearnedFlightClientScenario {
+    fn registration(&self) -> &'static ScenarioRegistration {
+        &LEARNED_FLIGHT_REGISTRATION
+    }
+    fn tick_model(&self) -> TickModel {
+        self.sortie.tick_model()
+    }
+    fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
+        if dt.is_zero() {
+            return self.sortie.step(&[], dt);
+        }
+        let mut actions = human_pilot_actions(actions);
+        let goal = NavigationGoal::stationary(self.goal_id, self.goals[self.goal]);
+        match self.driver.decide(&self.stack, &self.sortie.state, goal) {
+            Ok(decision) => {
+                actions.extend(flight_actions(decision.action, PlayerId::PLAYER_2));
+                let progress = decision.progress;
+                let number = self.goal + 1;
+                self.status.label = match progress.outcome {
+                    Some(GoalOutcome::Arrived) => {
+                        self.status.arrivals += 1;
+                        self.goal = (self.goal + 1) % self.goals.len();
+                        self.goal_id += 1;
+                        format!(
+                            "learned flight stack: arrived at goal {number} in {} ticks; next goal {}",
+                            progress.elapsed_ticks,
+                            self.goal + 1
+                        )
+                    }
+                    Some(GoalOutcome::Deadline) => {
+                        self.status.deadlines += 1;
+                        self.goal_id += 1;
+                        format!("learned flight stack: deadline on goal {number}; retrying")
+                    }
+                    None => format!(
+                        "learned flight stack: goal {number} of {}, {} ticks, {:.1} units, dwell {}/{}",
+                        self.goals.len(),
+                        progress.elapsed_ticks,
+                        progress.errors.position,
+                        progress.dwell_ticks,
+                        goal.arrival.dwell_ticks
+                    ),
+                };
+            }
+            Err(error) => {
+                self.status.errors += 1;
+                self.status.label = format!("learned flight stack waiting: {error}");
+                self.status.last_error = Some(error.to_string());
+                self.goal_id += 1;
+            }
+        }
+        self.sortie.step(&actions, dt)
+    }
+    fn map_input(&self, input: &mut ClientInput, benchmark: bool) -> Vec<Action> {
+        human_pilot_actions(&self.sortie.map_input(input, benchmark))
+    }
+    fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
+        let mut frames = self.sortie.render_frames(renderer, viewport);
+        pilot_hud(&mut frames, &self.status.label);
+        frames
+    }
+    fn frame_layout(&self) -> FrameLayout {
+        self.sortie.frame_layout()
+    }
+    #[cfg(test)]
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    #[cfg(test)]
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 pub(super) const COMBAT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
@@ -840,6 +996,54 @@ mod tests {
     use super::*;
     use crate::input::{GameKey, GamepadInput, GamepadSeatInput};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn learned_flight_preset_flies_goal_to_goal_and_ignores_human_interference() {
+        let mut host = LEARNED_FLIGHT_REGISTRATION
+            .create(
+                42,
+                &Settings::default(),
+                Viewport::new(800.0, 480.0),
+                ScenarioStartMode::Normal,
+            )
+            .unwrap();
+        let host = host
+            .as_any_mut()
+            .downcast_mut::<LearnedFlightClientScenario>()
+            .unwrap();
+        let interference = [SurfaceSortieAction {
+            primary_held: true,
+            horizontal: 1.0,
+            interact_held: true,
+            brake_held: true,
+        }
+        .encode(PlayerId::PLAYER_2)];
+        let mut first_arrival = None;
+        for tick in 0..240 * 60 {
+            host.step(&interference, Duration::from_nanos(16_666_667));
+            if host.status.arrivals >= 1 && first_arrival.is_none() {
+                first_arrival = Some(tick);
+                assert!(host.status.label.contains("arrived at goal 1"));
+            }
+            if host.status.arrivals >= 2 {
+                break;
+            }
+        }
+        assert!(host.status.arrivals >= 2, "{:?}", host.status);
+        assert_eq!(host.status.deadlines, 0, "{:?}", host.status);
+        // Only the arming tick, before the controls accept input, is refused.
+        assert!(host.status.errors <= 1, "{:?}", host.status);
+        assert!(first_arrival.is_some_and(|tick| tick < 1800));
+        assert_eq!(host.goal, 2);
+        let before = host.status.clone();
+        host.step(&[], Duration::ZERO);
+        assert_eq!(host.status, before);
+        let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
+        assert_eq!(
+            hud::has_bot_diagnostic(&frames, 1),
+            hud::bot_diagnostics_enabled()
+        );
+    }
 
     #[test]
     fn capture_mission_owns_the_expected_seat_and_pause_restart_preserve_boundaries() {

@@ -6,7 +6,7 @@ const DIAGNOSTIC_PLAN: &[u8] = include_bytes!(concat!(
     "/../../docs/data/learned-guidance-failure-diagnostic-v1-plan.json"
 ));
 
-fn brake_on(model: &DenseModel) -> DenseModel {
+pub(super) fn brake_on(model: &DenseModel) -> DenseModel {
     let mut genome = model.genome().clone();
     let output = genome.layers.last_mut().unwrap();
     assert_eq!(output.outputs, 3);

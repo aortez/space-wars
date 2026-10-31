@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-signal-audit-v1-20261023",
+  "kind": "read-only learning signal diagnostic",
+  "completed_at_utc": "2026-10-24T02:23:19.010904+00:00",
+  "parent": "data/training-experiments/learned-flight-credit-v1-20261023",
+  "parent_manifest_sha256": "d087b1526995c3b1a5f780ac4d150241feab48d016308eb751b359a838e2d19e",
+  "source_file_count": 25,
+  "source_archive_sha256": "b7f527080c174b6445474fcdbe8b19fbac9e29ed8b81b63c1234df8a525839fa",
+  "runtime_sha256": "e7a4122aa50c7b125f915b7fb08689f7bef9176dcce0e489ba3d55ef0ac872d4",
+  "cases": 36,
+  "reconstructed_action_ticks": 36864,
+  "frozen_continuations": 48,
+  "retained_replay_ticks": 223317,
+  "preflight_ticks": 1024,
+  "optimizer_steps": 0,
+  "new_trained_checkpoints": 0,
+  "capability_claim": false,
+  "confirmation_partition": "unused",
+  "validation": {
+    "diagnostic_tests": 4,
+    "exact_collector_reconstructions": 36,
+    "unchanged_model_optimizer_checks": 36,
+    "timeout_return_formula_checks": 48,
+    "maximum_abs_formula_error": 9.103828801926284e-15,
+    "compile_whitespace": "passed",
+    "prior_manifests_unchanged": 11,
+    "parent_input_hashes_verified": 81
+  },
+  "retained_file_count": 236,
+  "retained_bytes_excluding_manifest": 1263254093,
+  "limitations": [
+    "Descriptive groups are not causal action comparisons.",
+    "Gradient probes inspect first minibatches only, without alternative Adam updates.",
+    "Boundary checks cover 24 states and only deadline outcomes; no general critic calibration.",
+    "Timeout reward plateau is verified but is not proven the sole learning failure cause.",
+    "Depends on retained parent archive; local retention is not an off-machine backup."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-signal-audit-v1-20261023",
+  "manifest_sha256": "e37c14ac77c610bbd73060d381beceab067965c7373bfe5c07fc8af65d01d22d",
+  "compact_results_sha256": "8e89454535ca5f5e4f9afbf4a6fb026bdef077e791baedd40ab331f0ff0be3d9",
+  "report_sha256": "78c337686cd7d07694341e5c7ecb087b20e1df43d540379b83370f12b9312e47"
+}

@@ -1,0 +1,1090 @@
+{
+ "experiment": "LF-089",
+ "date": "2026-10-29",
+ "seeds": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6
+ ],
+ "seconds": 180,
+ "configurations": [
+  "recovery_bot/recovery_bot",
+  "learned_flight_bot/recovery_bot",
+  "recovery_bot/learned_flight_bot"
+ ],
+ "first_legs": [
+  {
+   "seed": 1,
+   "seat": 1,
+   "native_first_leg_ticks": 1244,
+   "learned_first_leg_ticks": 1269
+  },
+  {
+   "seed": 1,
+   "seat": 2,
+   "native_first_leg_ticks": 1493,
+   "learned_first_leg_ticks": 2269
+  },
+  {
+   "seed": 2,
+   "seat": 1,
+   "native_first_leg_ticks": 1060,
+   "learned_first_leg_ticks": 773
+  },
+  {
+   "seed": 2,
+   "seat": 2,
+   "native_first_leg_ticks": 792,
+   "learned_first_leg_ticks": 692
+  },
+  {
+   "seed": 3,
+   "seat": 1,
+   "native_first_leg_ticks": 829,
+   "learned_first_leg_ticks": 844
+  },
+  {
+   "seed": 3,
+   "seat": 2,
+   "native_first_leg_ticks": 1169,
+   "learned_first_leg_ticks": 1248
+  },
+  {
+   "seed": 4,
+   "seat": 1,
+   "native_first_leg_ticks": 929,
+   "learned_first_leg_ticks": 674
+  },
+  {
+   "seed": 4,
+   "seat": 2,
+   "native_first_leg_ticks": 1840,
+   "learned_first_leg_ticks": 1838
+  },
+  {
+   "seed": 5,
+   "seat": 1,
+   "native_first_leg_ticks": 329,
+   "learned_first_leg_ticks": 309
+  },
+  {
+   "seed": 5,
+   "seat": 2,
+   "native_first_leg_ticks": 871,
+   "learned_first_leg_ticks": 893
+  },
+  {
+   "seed": 6,
+   "seat": 1,
+   "native_first_leg_ticks": 1271,
+   "learned_first_leg_ticks": 2229
+  },
+  {
+   "seed": 6,
+   "seat": 2,
+   "native_first_leg_ticks": 1191,
+   "learned_first_leg_ticks": 754
+  }
+ ],
+ "seats": [
+  {
+   "seed": 1,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "learned_flight_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    1269,
+    2984,
+    910
+   ],
+   "sorties": 3,
+   "replans": 0,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 4,
+    "resumptions": 0,
+    "attempts": 5,
+    "flown_ticks": 5335,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 1
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 5,
+    "attempts": 6,
+    "flown_ticks": 5036,
+    "handoffs": 3,
+    "leg_ticks": [
+     1269,
+     2984,
+     910
+    ]
+   }
+  },
+  {
+   "seed": 1,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 4,
+   "leg_ticks": [
+    1493,
+    766,
+    862,
+    1235
+   ],
+   "sorties": 3,
+   "replans": 0,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 1,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    1244
+   ],
+   "sorties": 1,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 1,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 2,
+   "controller": "learned_flight_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    2269,
+    1864
+   ],
+   "sorties": 2,
+   "replans": 2,
+   "budget_replans": 1,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 4,
+    "resumptions": 0,
+    "attempts": 6,
+    "flown_ticks": 5393,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 2
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 4,
+    "attempts": 6,
+    "flown_ticks": 5393,
+    "handoffs": 2,
+    "leg_ticks": [
+     2269,
+     1864
+    ]
+   }
+  },
+  {
+   "seed": 1,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    1244,
+    1443
+   ],
+   "sorties": 1,
+   "replans": 0,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 1,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    1493,
+    766,
+    858
+   ],
+   "sorties": 3,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 2,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "learned_flight_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    773,
+    635,
+    18
+   ],
+   "sorties": 2,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 4,
+    "resumptions": 0,
+    "attempts": 4,
+    "flown_ticks": 2025,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 13,
+    "attempts": 16,
+    "flown_ticks": 2280,
+    "handoffs": 2,
+    "leg_ticks": [
+     2909,
+     866
+    ]
+   }
+  },
+  {
+   "seed": 2,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    792,
+    115
+   ],
+   "sorties": 0,
+   "replans": 4,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 2,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    1060,
+    220,
+    302
+   ],
+   "sorties": 0,
+   "replans": 4,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": "Player 1 wins / opposing pilot lost",
+   "ticks": 5478
+  },
+  {
+   "seed": 2,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 2,
+   "controller": "learned_flight_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    692
+   ],
+   "sorties": 1,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": "Player 1 wins / opposing pilot lost",
+   "ticks": 5478,
+   "learned": {
+    "legs": 2,
+    "resumptions": 0,
+    "attempts": 2,
+    "flown_ticks": 687,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 26,
+    "attempts": 26,
+    "flown_ticks": 1090,
+    "handoffs": 1,
+    "leg_ticks": [
+     692
+    ]
+   }
+  },
+  {
+   "seed": 2,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    1060,
+    219,
+    344
+   ],
+   "sorties": 0,
+   "replans": 5,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 2,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    792,
+    357,
+    801
+   ],
+   "sorties": 2,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 3,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "learned_flight_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    844
+   ],
+   "sorties": 1,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": "Player 1 wins / opposing pilot lost",
+   "ticks": 5385,
+   "learned": {
+    "legs": 4,
+    "resumptions": 0,
+    "attempts": 4,
+    "flown_ticks": 1571,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 4,
+    "attempts": 4,
+    "flown_ticks": 1573,
+    "handoffs": 2,
+    "leg_ticks": [
+     844,
+     155
+    ]
+   }
+  },
+  {
+   "seed": 3,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    1169
+   ],
+   "sorties": 0,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": "Player 1 wins / opposing pilot lost",
+   "ticks": 5385
+  },
+  {
+   "seed": 3,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    829,
+    1672
+   ],
+   "sorties": 2,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 3,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 2,
+   "controller": "learned_flight_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    1248,
+    988
+   ],
+   "sorties": 0,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 1,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 2,
+    "resumptions": 0,
+    "attempts": 2,
+    "flown_ticks": 1745,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 2,
+    "attempts": 2,
+    "flown_ticks": 1745,
+    "handoffs": 2,
+    "leg_ticks": [
+     1248,
+     988
+    ]
+   }
+  },
+  {
+   "seed": 3,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    829
+   ],
+   "sorties": 1,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": "Player 1 wins / opposing pilot lost",
+   "ticks": 3710
+  },
+  {
+   "seed": 3,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    1169
+   ],
+   "sorties": 0,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": "Player 1 wins / opposing pilot lost",
+   "ticks": 3710
+  },
+  {
+   "seed": 4,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "learned_flight_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    674,
+    330
+   ],
+   "sorties": 1,
+   "replans": 3,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 2,
+    "resumptions": 0,
+    "attempts": 2,
+    "flown_ticks": 437,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 2,
+    "attempts": 2,
+    "flown_ticks": 437,
+    "handoffs": 2,
+    "leg_ticks": [
+     674,
+     330
+    ]
+   }
+  },
+  {
+   "seed": 4,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    1840,
+    962,
+    1668
+   ],
+   "sorties": 2,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 4,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    929
+   ],
+   "sorties": 1,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": "Player 2 wins / opposing pilot lost",
+   "ticks": 6821
+  },
+  {
+   "seed": 4,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 2,
+   "controller": "learned_flight_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    1838,
+    844
+   ],
+   "sorties": 1,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": "Player 2 wins / opposing pilot lost",
+   "ticks": 6821,
+   "learned": {
+    "legs": 3,
+    "resumptions": 0,
+    "attempts": 3,
+    "flown_ticks": 3071,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 14,
+    "attempts": 14,
+    "flown_ticks": 3387,
+    "handoffs": 1,
+    "leg_ticks": [
+     1838
+    ]
+   }
+  },
+  {
+   "seed": 4,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    929
+   ],
+   "sorties": 1,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 4,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    1840,
+    1073,
+    1559
+   ],
+   "sorties": 2,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 5,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "learned_flight_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    309,
+    812,
+    359
+   ],
+   "sorties": 3,
+   "replans": 2,
+   "budget_replans": 1,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 5,
+    "resumptions": 2,
+    "attempts": 7,
+    "flown_ticks": 2819,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 13,
+    "attempts": 13,
+    "flown_ticks": 1717,
+    "handoffs": 3,
+    "leg_ticks": [
+     309,
+     339,
+     193
+    ]
+   }
+  },
+  {
+   "seed": 5,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 4,
+   "leg_ticks": [
+    871,
+    1047,
+    1465,
+    559
+   ],
+   "sorties": 3,
+   "replans": 1,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 5,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 8,
+   "leg_ticks": [
+    329,
+    418,
+    746,
+    643,
+    247,
+    160,
+    116,
+    82
+   ],
+   "sorties": 3,
+   "replans": 7,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 5,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 2,
+   "controller": "learned_flight_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    893
+   ],
+   "sorties": 1,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 2,
+    "resumptions": 0,
+    "attempts": 2,
+    "flown_ticks": 1676,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 8,
+    "attempts": 8,
+    "flown_ticks": 3279,
+    "handoffs": 2,
+    "leg_ticks": [
+     1204,
+     1316
+    ]
+   }
+  },
+  {
+   "seed": 5,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 4,
+   "leg_ticks": [
+    329,
+    418,
+    746,
+    268
+   ],
+   "sorties": 2,
+   "replans": 5,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 5,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    871
+   ],
+   "sorties": 1,
+   "replans": 3,
+   "budget_replans": 0,
+   "recoveries": 1,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 6,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "learned_flight_bot",
+   "handoffs": 3,
+   "leg_ticks": [
+    2229,
+    135,
+    1337
+   ],
+   "sorties": 0,
+   "replans": 3,
+   "budget_replans": 0,
+   "recoveries": 1,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 3,
+    "resumptions": 0,
+    "attempts": 4,
+    "flown_ticks": 3056,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 1
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 21,
+    "attempts": 21,
+    "flown_ticks": 1950,
+    "handoffs": 0,
+    "leg_ticks": []
+   }
+  },
+  {
+   "seed": 6,
+   "controllers": [
+    "learned_flight_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    1191,
+    648
+   ],
+   "sorties": 1,
+   "replans": 4,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 6,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 1,
+   "leg_ticks": [
+    1271
+   ],
+   "sorties": 0,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 6,
+   "controllers": [
+    "recovery_bot",
+    "learned_flight_bot"
+   ],
+   "seat": 2,
+   "controller": "learned_flight_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    754,
+    736
+   ],
+   "sorties": 2,
+   "replans": 3,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800,
+   "learned": {
+    "legs": 4,
+    "resumptions": 0,
+    "attempts": 4,
+    "flown_ticks": 2106,
+    "native_ticks": 0,
+    "refusals": 0,
+    "arrivals": 0,
+    "deadlines": 0
+   },
+   "before_launch_band_fix": {
+    "leg_restarts": 14,
+    "attempts": 14,
+    "flown_ticks": 2225,
+    "handoffs": 5,
+    "leg_ticks": [
+     892,
+     238,
+     267,
+     54,
+     1957
+    ]
+   }
+  },
+  {
+   "seed": 6,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 1,
+   "controller": "recovery_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    1271,
+    367
+   ],
+   "sorties": 2,
+   "replans": 2,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  },
+  {
+   "seed": 6,
+   "controllers": [
+    "recovery_bot",
+    "recovery_bot"
+   ],
+   "seat": 2,
+   "controller": "recovery_bot",
+   "handoffs": 2,
+   "leg_ticks": [
+    1191,
+    833
+   ],
+   "sorties": 2,
+   "replans": 4,
+   "budget_replans": 0,
+   "recoveries": 0,
+   "result": null,
+   "ticks": 10800
+  }
+ ],
+ "first_leg_comparison": {
+  "pairs": 12,
+  "native_mean": 1084.8333333333333,
+  "learned_mean": 1149.3333333333333,
+  "native_median": 1114.5,
+  "learned_median": 868.5,
+  "learned_faster_by_over_5_percent": 5,
+  "within_5_percent": 4,
+  "learned_slower_by_over_5_percent": 3
+ },
+ "handoffs": {
+  "learned_seats": 25,
+  "native_seats_in_native_matches": 26
+ },
+ "stack_ticks": {
+  "flown": 29921,
+  "native_inside_legs": 0,
+  "refusals": 0,
+  "deadlines": 4
+ },
+ "before_launch_band_fix": {
+  "leg_restarts": 126,
+  "handoffs_learned_seats": 25
+ },
+ "after_fix_resumptions": 2
+}

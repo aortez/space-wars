@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-observation-v1-20261022",
+  "kind": "policy-observation-correctness-inspection",
+  "checkpoint": "C2-partial",
+  "completed_at_utc": "2026-10-23T03:22:01.651307+00:00",
+  "source_capture": "selected workspace source, including uncommitted and untracked files, before final executable build/run",
+  "source_file_count": 1471,
+  "runtime_sha256": "cf2391df12b5e871210dd3c7467b9bb1161b1d6b01609541f8f242e55e0d52bd",
+  "source_archive_sha256": "a7389d8c26ed704230b5ab3285deb78ae675c5890230e02cf609eecfaa5efa6c",
+  "validation": {
+    "scenario_tests": {
+      "passed": 642,
+      "ignored": 2,
+      "failed": 0
+    },
+    "physics_tests": {
+      "passed": 175,
+      "ignored": 1,
+      "failed": 0
+    },
+    "sensor_example_tests": {
+      "passed": 2,
+      "failed": 0
+    },
+    "new_policy_tests": 6,
+    "new_physics_tests": 3,
+    "probe_cases_and_serialized_trace_replays": 4,
+    "format_and_whitespace": "passed",
+    "clippy": "completed with 18 existing warnings; none in the new adapter/probe",
+    "source_archive_and_current_source_hashes": "passed",
+    "prior_four_manifest_hashes": "unchanged",
+    "runtime_identity": "passed"
+  },
+  "limitations": [
+    "Diagnostic fixtures, not a generated training distribution or learned policy.",
+    "No task-generator admission checks or PPO pipeline.",
+    "Source excludes Cargo registry dependencies and toolchain binaries.",
+    "Local retained evidence, not an off-machine backup."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-observation-v1-20261022",
+  "manifest_sha256": "ae9256f9474fcc24c6597dad5c7eccffa16e93f5dca5e66c5e001301b5845511",
+  "compact_results_sha256": "c71412972b9af996e66e864b658b30cceb559e26a322297a8d03654d3757c5e5",
+  "report_sha256": "57322e3097a0613f12fc3183722904fd79c539b5da023a0ca99518dc2e692f24"
+}

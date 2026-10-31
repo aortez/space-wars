@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-goal-response-v1-20261024",
+  "kind": "frozen continuous-policy counterfactual goal and velocity response audit",
+  "completed_at_utc": "2026-10-24T20:37:02.564220+00:00",
+  "source_file_count": 1537,
+  "source_archive_sha256": "eca709df87a6d248ccf15cdd588ffc6489c9dbe6d9dfce84b95868b3e1769550",
+  "runtime_sha256": "e938d3a383c43a404715da851808b828afff036e9885c58f36c3d4842abc244a",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "anchor_count": 93,
+  "replay_action_ticks": 5555,
+  "neutral_setup_ticks": 93,
+  "native_python_comparisons": 18693,
+  "seconds": 88.14343808899866,
+  "optimizer_steps": 0,
+  "new_flight_trials": 0,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "parameters_and_rng_unchanged": true,
+  "maximum_raw_parity_error": 1.9073486328125e-06,
+  "maximum_action_parity_error": 1.4901161193847656e-07,
+  "validation": {
+    "synthetic_tests": 6,
+    "previous_manifests_unchanged": 23,
+    "parent_inputs_unchanged": 56,
+    "compile_whitespace": "passed",
+    "process_exit_code": 0
+  },
+  "retained_file_count": 456,
+  "retained_bytes_excluding_manifest": 175833286,
+  "archive_path": "data/training-experiments/learned-flight-goal-response-v1-20261024",
+  "manifest_sha256": "949612a81f5362e7908262706a7fac775f0e0ff7724dbbe0762511bc19cac5ab",
+  "report_sha256": "e870d0daa1c4d268c32312e5ce62ba2023dada55ed61ef01d94509c1e963789e",
+  "results_sha256": "64b91aae583535f2682adb3b3da198851717445cd92f6438f168f17a01e58b85"
+}

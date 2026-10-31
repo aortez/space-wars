@@ -1,0 +1,1376 @@
+{
+ "experiment": "LF-091",
+ "date": "2026-10-30",
+ "report": "docs/flight-motor-steering-v1.md",
+ "swing": {
+  "sets": [
+   "transfer-7700101",
+   "transfer-7700102",
+   "generated-7700002",
+   "generated-7700003"
+  ],
+  "spinning_share_learned_stack": [
+   0.36,
+   0.38,
+   0.37,
+   0.34
+  ],
+  "spinning_share_native_transfer_law": [
+   0.11,
+   0.1,
+   0.21,
+   0.21
+  ],
+  "spinning_share_native_arrival_law": "0.03 to 0.04",
+  "law_with_motor_network": {
+   "spinning_share": [
+    0.31,
+    0.3,
+    0.39,
+    0.37
+   ],
+   "passed": [
+    23,
+    23,
+    96,
+    96
+   ]
+  },
+  "law_with_v5_teacher": {
+   "spinning_share": [
+    0.44,
+    0.47,
+    0.49,
+    0.48
+   ],
+   "passed": [
+    18,
+    18,
+    76,
+    70
+   ]
+  },
+  "spinning_share_in_matches_retained_lf090": [
+   0.45,
+   0.43
+  ],
+  "threshold": "ticks with |spin| above 1.5 radians per second"
+ },
+ "law_change": {
+  "motor_teacher_v6": {
+   "brake_share": 1.0,
+   "brake_share_speed": 2.5,
+   "attitude_forward": 0.0
+  },
+  "navigation_planner": "route.straight_free: a waypoint on the exact goal direction at the lead radius when the line is free"
+ },
+ "sweep_selected_rows": {
+  "columns": [
+   "matrix of 320",
+   "transfers in the loop of 24",
+   "transfer spinning share",
+   "practice in the loop of 96",
+   "practice spinning share"
+  ],
+  "v5 teacher": [
+   314,
+   18,
+   0.44,
+   75,
+   0.49
+  ],
+  "brake share fading under 10": [
+   316,
+   18,
+   0.35,
+   80,
+   0.34
+  ],
+  "brake share fading under 2.5 with the forward-error cut (retained)": [
+   316,
+   22,
+   0.25,
+   96,
+   0.17
+  ],
+  "relative gain 0.5": [
+   300,
+   22,
+   0.25,
+   96,
+   0.18
+  ],
+  "attitude 0.03": [
+   312,
+   22,
+   0.27,
+   91,
+   0.25
+  ],
+  "hold kept under gravity (LF-090 candidate)": [
+   319,
+   15,
+   0.27,
+   79,
+   0.32
+  ],
+  "candidates": 46
+ },
+ "motor_fits": {
+  "teacher_v6_matrix": 316,
+  "v5_fit_retained_lf087": {
+   "matrix": {
+    "development": 287,
+    "held_out": 299
+   },
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 20,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1127.85
+    },
+    "transfer-7700102": {
+     "learned_stack": 18,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1135.7222222222222
+    },
+    "generated-7700002": {
+     "learned_stack": 88,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 823.1704545454545
+    },
+    "generated-7700003": {
+     "learned_stack": 91,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 819.1428571428571
+    }
+   }
+  },
+  "v6_seed_1": {
+   "matrix": {
+    "development": 265,
+    "held_out": 245
+   },
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 16,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1098.5
+    },
+    "transfer-7700102": {
+     "learned_stack": 15,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1413.2666666666667
+    },
+    "generated-7700002": {
+     "learned_stack": 88,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 790.8977272727273
+    },
+    "generated-7700003": {
+     "learned_stack": 88,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 806.6022727272727
+    }
+   }
+  },
+  "v6_seed_2": {
+   "matrix": {
+    "development": 263,
+    "held_out": 260
+   },
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 18,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1118.888888888889
+    },
+    "transfer-7700102": {
+     "learned_stack": 21,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1300.6190476190477
+    },
+    "generated-7700002": {
+     "learned_stack": 89,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 709.4719101123595
+    },
+    "generated-7700003": {
+     "learned_stack": 92,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 759.4782608695652
+    }
+   },
+   "retained": true,
+   "sha256": "b7e541402f9732766e515d25215f08d52a9fb94e23fd1cc9da3737d89cf0203b"
+  },
+  "v6_seed_3": {
+   "matrix": {
+    "development": 276,
+    "held_out": 268
+   },
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 17,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1111.4705882352941
+    },
+    "transfer-7700102": {
+     "learned_stack": 17,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1305.235294117647
+    },
+    "generated-7700002": {
+     "learned_stack": 84,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 648.4047619047619
+    },
+    "generated-7700003": {
+     "learned_stack": 88,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 690.9090909090909
+    }
+   }
+  },
+  "v6_seed_4": {
+   "matrix": {
+    "development": 233,
+    "held_out": 242
+   },
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 18,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1031.3333333333333
+    },
+    "transfer-7700102": {
+     "learned_stack": 19,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1247.2631578947369
+    },
+    "generated-7700002": {
+     "learned_stack": 88,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 695.1477272727273
+    },
+    "generated-7700003": {
+     "learned_stack": 91,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 767.0439560439561
+    }
+   }
+  },
+  "relative_gain_seed_1": {
+   "matrix": {
+    "development": 273,
+    "held_out": 275
+   },
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 20,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1062.25
+    },
+    "transfer-7700102": {
+     "learned_stack": 21,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1281.952380952381
+    },
+    "generated-7700002": {
+     "learned_stack": 85,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 707.2117647058824
+    },
+    "generated-7700003": {
+     "learned_stack": 89,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 802.438202247191
+    }
+   }
+  },
+  "relative_gain_seed_2": {
+   "matrix": {
+    "development": 228,
+    "held_out": 241
+   },
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 20,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1056.65
+    },
+    "transfer-7700102": {
+     "learned_stack": 22,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1249.3636363636363
+    },
+    "generated-7700002": {
+     "learned_stack": 85,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 695.4235294117647
+    },
+    "generated-7700003": {
+     "learned_stack": 86,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 731.9767441860465
+    }
+   }
+  }
+ },
+ "motor_matches_under_lf090_navigation": {
+  "v6_seed_1": {
+   "1..12": {
+    "pairs": 24,
+    "faster": 3,
+    "within_5_percent": 14,
+    "slower": 7,
+    "first_leg_median": {
+     "native": 1217.5,
+     "learned": 1235.5
+    },
+    "first_leg_mean": {
+     "native": 1201.8333333333333,
+     "learned": 1277.4583333333333
+    },
+    "handoffs": {
+     "learned_seats": 67,
+     "native_seats": 53
+    },
+    "sorties": {
+     "learned_seats": 39,
+     "native_seats": 35
+    },
+    "all_legs": {
+     "learned": {
+      "n": 67,
+      "median": 845,
+      "mean": 876.8059701492538,
+      "max": 2384
+     },
+     "native": {
+      "n": 53,
+      "median": 833,
+      "mean": 883.9433962264151,
+      "max": 1984
+     }
+    },
+    "deadlines": 0,
+    "refusals": 0,
+    "resumptions": 6,
+    "budget_replans": {
+     "learned_seats": 0,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 1,
+     "native": 2
+    },
+    "spinning": {
+     "flown_ticks": 31368,
+     "ticks_with_spin_over_1_5": 9089,
+     "share": 0.2897538893139505
+    }
+   },
+   "13..24": {
+    "pairs": 24,
+    "faster": 5,
+    "within_5_percent": 11,
+    "slower": 8,
+    "first_leg_median": {
+     "native": 998.5,
+     "learned": 1006.5
+    },
+    "first_leg_mean": {
+     "native": 1064.0416666666667,
+     "learned": 1074.1666666666667
+    },
+    "handoffs": {
+     "learned_seats": 64,
+     "native_seats": 55
+    },
+    "sorties": {
+     "learned_seats": 45,
+     "native_seats": 41
+    },
+    "all_legs": {
+     "learned": {
+      "n": 64,
+      "median": 605.5,
+      "mean": 763.546875,
+      "max": 2115
+     },
+     "native": {
+      "n": 55,
+      "median": 911,
+      "mean": 935.3636363636364,
+      "max": 2057
+     }
+    },
+    "deadlines": 1,
+    "refusals": 0,
+    "resumptions": 2,
+    "budget_replans": {
+     "learned_seats": 1,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 2,
+     "native": 3
+    },
+    "spinning": {
+     "flown_ticks": 38414,
+     "ticks_with_spin_over_1_5": 10565,
+     "share": 0.27502993700213463
+    }
+   }
+  },
+  "v6_seed_2": {
+   "1..12": {
+    "pairs": 24,
+    "faster": 5,
+    "within_5_percent": 12,
+    "slower": 7,
+    "first_leg_median": {
+     "native": 1217.5,
+     "learned": 1215.5
+    },
+    "first_leg_mean": {
+     "native": 1201.8333333333333,
+     "learned": 1186.25
+    },
+    "handoffs": {
+     "learned_seats": 62,
+     "native_seats": 53
+    },
+    "sorties": {
+     "learned_seats": 34,
+     "native_seats": 35
+    },
+    "all_legs": {
+     "learned": {
+      "n": 62,
+      "median": 835.0,
+      "mean": 902.3387096774194,
+      "max": 2365
+     },
+     "native": {
+      "n": 53,
+      "median": 833,
+      "mean": 883.9433962264151,
+      "max": 1984
+     }
+    },
+    "deadlines": 1,
+    "refusals": 0,
+    "resumptions": 5,
+    "budget_replans": {
+     "learned_seats": 1,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 4,
+     "native": 2
+    },
+    "spinning": {
+     "flown_ticks": 33460,
+     "ticks_with_spin_over_1_5": 9772,
+     "share": 0.2920502092050209
+    }
+   },
+   "13..24": {
+    "pairs": 23,
+    "faster": 4,
+    "within_5_percent": 11,
+    "slower": 8,
+    "first_leg_median": {
+     "native": 989,
+     "learned": 1023
+    },
+    "first_leg_mean": {
+     "native": 1059.2608695652175,
+     "learned": 1098.0869565217392
+    },
+    "handoffs": {
+     "learned_seats": 58,
+     "native_seats": 55
+    },
+    "sorties": {
+     "learned_seats": 39,
+     "native_seats": 41
+    },
+    "all_legs": {
+     "learned": {
+      "n": 58,
+      "median": 678.0,
+      "mean": 826.3275862068965,
+      "max": 2393
+     },
+     "native": {
+      "n": 55,
+      "median": 911,
+      "mean": 935.3636363636364,
+      "max": 2057
+     }
+    },
+    "deadlines": 3,
+    "refusals": 0,
+    "resumptions": 7,
+    "budget_replans": {
+     "learned_seats": 0,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 1,
+     "native": 4
+    },
+    "spinning": {
+     "flown_ticks": 38036,
+     "ticks_with_spin_over_1_5": 10949,
+     "share": 0.28785887054369547
+    }
+   }
+  },
+  "relative_gain_seed_1": {
+   "1..12": {
+    "pairs": 24,
+    "faster": 5,
+    "within_5_percent": 12,
+    "slower": 7,
+    "first_leg_median": {
+     "native": 1217.5,
+     "learned": 1229.5
+    },
+    "first_leg_mean": {
+     "native": 1201.8333333333333,
+     "learned": 1218.4166666666667
+    },
+    "handoffs": {
+     "learned_seats": 59,
+     "native_seats": 53
+    },
+    "sorties": {
+     "learned_seats": 39,
+     "native_seats": 35
+    },
+    "all_legs": {
+     "learned": {
+      "n": 59,
+      "median": 862,
+      "mean": 890.6610169491526,
+      "max": 2308
+     },
+     "native": {
+      "n": 53,
+      "median": 833,
+      "mean": 883.9433962264151,
+      "max": 1984
+     }
+    },
+    "deadlines": 0,
+    "refusals": 12,
+    "resumptions": 16,
+    "budget_replans": {
+     "learned_seats": 0,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 3,
+     "native": 2
+    },
+    "spinning": {
+     "flown_ticks": 32783,
+     "ticks_with_spin_over_1_5": 9239,
+     "share": 0.28182289601317756
+    }
+   },
+   "13..24": {
+    "pairs": 24,
+    "faster": 7,
+    "within_5_percent": 11,
+    "slower": 6,
+    "first_leg_median": {
+     "native": 998.5,
+     "learned": 970.5
+    },
+    "first_leg_mean": {
+     "native": 1064.0416666666667,
+     "learned": 1026.0416666666667
+    },
+    "handoffs": {
+     "learned_seats": 59,
+     "native_seats": 55
+    },
+    "sorties": {
+     "learned_seats": 38,
+     "native_seats": 41
+    },
+    "all_legs": {
+     "learned": {
+      "n": 59,
+      "median": 723,
+      "mean": 821.7118644067797,
+      "max": 2111
+     },
+     "native": {
+      "n": 55,
+      "median": 911,
+      "mean": 935.3636363636364,
+      "max": 2057
+     }
+    },
+    "deadlines": 0,
+    "refusals": 0,
+    "resumptions": 8,
+    "budget_replans": {
+     "learned_seats": 2,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 2,
+     "native": 3
+    },
+    "spinning": {
+     "flown_ticks": 38772,
+     "ticks_with_spin_over_1_5": 10940,
+     "share": 0.2821623852264521
+    }
+   }
+  },
+  "relative_gain_seed_2": {
+   "1..12": {
+    "pairs": 24,
+    "faster": 4,
+    "within_5_percent": 13,
+    "slower": 7,
+    "first_leg_median": {
+     "native": 1217.5,
+     "learned": 1248.0
+    },
+    "first_leg_mean": {
+     "native": 1201.8333333333333,
+     "learned": 1211.0833333333333
+    },
+    "handoffs": {
+     "learned_seats": 58,
+     "native_seats": 53
+    },
+    "sorties": {
+     "learned_seats": 36,
+     "native_seats": 35
+    },
+    "all_legs": {
+     "learned": {
+      "n": 58,
+      "median": 805.5,
+      "mean": 864.2413793103449,
+      "max": 1981
+     },
+     "native": {
+      "n": 53,
+      "median": 833,
+      "mean": 883.9433962264151,
+      "max": 1984
+     }
+    },
+    "deadlines": 0,
+    "refusals": 0,
+    "resumptions": 3,
+    "budget_replans": {
+     "learned_seats": 0,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 2,
+     "native": 4
+    },
+    "spinning": {
+     "flown_ticks": 30833,
+     "ticks_with_spin_over_1_5": 8100,
+     "share": 0.2627055427626245
+    }
+   },
+   "13..24": {
+    "pairs": 23,
+    "faster": 5,
+    "within_5_percent": 13,
+    "slower": 5,
+    "first_leg_median": {
+     "native": 1008,
+     "learned": 999
+    },
+    "first_leg_mean": {
+     "native": 1069.391304347826,
+     "learned": 1092.3478260869565
+    },
+    "handoffs": {
+     "learned_seats": 64,
+     "native_seats": 55
+    },
+    "sorties": {
+     "learned_seats": 41,
+     "native_seats": 41
+    },
+    "all_legs": {
+     "learned": {
+      "n": 64,
+      "median": 873.5,
+      "mean": 874.5,
+      "max": 2321
+     },
+     "native": {
+      "n": 55,
+      "median": 911,
+      "mean": 935.3636363636364,
+      "max": 2057
+     }
+    },
+    "deadlines": 1,
+    "refusals": 0,
+    "resumptions": 4,
+    "budget_replans": {
+     "learned_seats": 0,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 2,
+     "native": 1
+    },
+    "spinning": {
+     "flown_ticks": 41260,
+     "ticks_with_spin_over_1_5": 11382,
+     "share": 0.27586039747939894
+    }
+   }
+  }
+ },
+ "navigation_refits": {
+  "recipe": "fit_v2 --round-transfers 72 with the v6 seed 2 motor in the loop; law parameters unchanged",
+  "seed_1": {
+   "development": 65,
+   "held_out": 68,
+   "law_held_out": 69,
+   "max_parity": 3.337860107421875e-06,
+   "sha256": "277ea2f05d6211ce84d55a5f21ed8c14f404796dfa6c377d1e8fa21feb0f7748",
+   "resumed_evaluation": false,
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 21,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1129.3333333333333
+    },
+    "transfer-7700102": {
+     "learned_stack": 23,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1251.7826086956522
+    },
+    "generated-7700002": {
+     "learned_stack": 87,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 677.1494252873563
+    },
+    "generated-7700003": {
+     "learned_stack": 92,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 722.0869565217391
+    }
+   },
+   "retained": true
+  },
+  "seed_2": {
+   "development": 63,
+   "held_out": 67,
+   "law_held_out": 69,
+   "max_parity": 2.4437904357910156e-06,
+   "sha256": "74be7ba1dc5d3e6fafb51d316d2a01c3b59d4f4a0f9cfb140e145b4121cf3d5e",
+   "resumed_evaluation": true,
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 19,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1184.3157894736842
+    },
+    "transfer-7700102": {
+     "learned_stack": 23,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1297.0434782608695
+    },
+    "generated-7700002": {
+     "learned_stack": 91,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 698.2417582417582
+    },
+    "generated-7700003": {
+     "learned_stack": 91,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 735.2747252747253
+    }
+   }
+  },
+  "lf090_network_over_the_v6_motor": {
+   "families": {
+    "transfer-7700101": {
+     "learned_stack": 18,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 1118.888888888889
+    },
+    "transfer-7700102": {
+     "learned_stack": 21,
+     "mission_transfer_law": 11,
+     "learned_mean_ticks_passed": 1300.6190476190477
+    },
+    "generated-7700002": {
+     "learned_stack": 89,
+     "mission_transfer_law": 18,
+     "learned_mean_ticks_passed": 709.4719101123595
+    },
+    "generated-7700003": {
+     "learned_stack": 92,
+     "mission_transfer_law": 13,
+     "learned_mean_ticks_passed": 759.4782608695652
+    }
+   }
+  }
+ },
+ "navigation_matches": {
+  "lf090_network": {
+   "1..12": {
+    "pairs": 24,
+    "faster": 5,
+    "within_5_percent": 12,
+    "slower": 7,
+    "first_leg_median": {
+     "native": 1217.5,
+     "learned": 1215.5
+    },
+    "first_leg_mean": {
+     "native": 1201.8333333333333,
+     "learned": 1186.25
+    },
+    "handoffs": {
+     "learned_seats": 62,
+     "native_seats": 53
+    },
+    "sorties": {
+     "learned_seats": 34,
+     "native_seats": 35
+    },
+    "all_legs": {
+     "learned": {
+      "n": 62,
+      "median": 835.0,
+      "mean": 902.3387096774194,
+      "max": 2365
+     },
+     "native": {
+      "n": 53,
+      "median": 833,
+      "mean": 883.9433962264151,
+      "max": 1984
+     }
+    },
+    "deadlines": 1,
+    "refusals": 0,
+    "resumptions": 5,
+    "budget_replans": {
+     "learned_seats": 1,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 4,
+     "native": 2
+    },
+    "spinning": {
+     "flown_ticks": 33460,
+     "ticks_with_spin_over_1_5": 9772,
+     "share": 0.2920502092050209
+    }
+   },
+   "13..24": {
+    "pairs": 23,
+    "faster": 4,
+    "within_5_percent": 11,
+    "slower": 8,
+    "first_leg_median": {
+     "native": 989,
+     "learned": 1023
+    },
+    "first_leg_mean": {
+     "native": 1059.2608695652175,
+     "learned": 1098.0869565217392
+    },
+    "handoffs": {
+     "learned_seats": 58,
+     "native_seats": 55
+    },
+    "sorties": {
+     "learned_seats": 39,
+     "native_seats": 41
+    },
+    "all_legs": {
+     "learned": {
+      "n": 58,
+      "median": 678.0,
+      "mean": 826.3275862068965,
+      "max": 2393
+     },
+     "native": {
+      "n": 55,
+      "median": 911,
+      "mean": 935.3636363636364,
+      "max": 2057
+     }
+    },
+    "deadlines": 3,
+    "refusals": 0,
+    "resumptions": 7,
+    "budget_replans": {
+     "learned_seats": 0,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 1,
+     "native": 4
+    },
+    "spinning": {
+     "flown_ticks": 38036,
+     "ticks_with_spin_over_1_5": 10949,
+     "share": 0.28785887054369547
+    }
+   }
+  },
+  "seed_1": {
+   "1..12": {
+    "pairs": 24,
+    "faster": 4,
+    "within_5_percent": 12,
+    "slower": 8,
+    "first_leg_median": {
+     "native": 1217.5,
+     "learned": 1224.5
+    },
+    "first_leg_mean": {
+     "native": 1201.8333333333333,
+     "learned": 1212.375
+    },
+    "handoffs": {
+     "learned_seats": 61,
+     "native_seats": 53
+    },
+    "sorties": {
+     "learned_seats": 36,
+     "native_seats": 35
+    },
+    "all_legs": {
+     "learned": {
+      "n": 61,
+      "median": 847,
+      "mean": 897.0655737704918,
+      "max": 1930
+     },
+     "native": {
+      "n": 53,
+      "median": 833,
+      "mean": 883.9433962264151,
+      "max": 1984
+     }
+    },
+    "deadlines": 0,
+    "refusals": 0,
+    "resumptions": 2,
+    "budget_replans": {
+     "learned_seats": 0,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 2,
+     "native": 3
+    },
+    "spinning": {
+     "flown_ticks": 32581,
+     "ticks_with_spin_over_1_5": 9652,
+     "share": 0.29624627850587765
+    }
+   },
+   "13..24": {
+    "pairs": 24,
+    "faster": 5,
+    "within_5_percent": 15,
+    "slower": 4,
+    "first_leg_median": {
+     "native": 998.5,
+     "learned": 1013.0
+    },
+    "first_leg_mean": {
+     "native": 1064.0416666666667,
+     "learned": 1098.875
+    },
+    "handoffs": {
+     "learned_seats": 67,
+     "native_seats": 55
+    },
+    "sorties": {
+     "learned_seats": 44,
+     "native_seats": 41
+    },
+    "all_legs": {
+     "learned": {
+      "n": 67,
+      "median": 752,
+      "mean": 794.5671641791045,
+      "max": 3095
+     },
+     "native": {
+      "n": 55,
+      "median": 911,
+      "mean": 935.3636363636364,
+      "max": 2057
+     }
+    },
+    "deadlines": 2,
+    "refusals": 9,
+    "resumptions": 13,
+    "budget_replans": {
+     "learned_seats": 1,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 1,
+     "native": 0
+    },
+    "spinning": {
+     "flown_ticks": 44438,
+     "ticks_with_spin_over_1_5": 13950,
+     "share": 0.3139205184751789
+    }
+   }
+  },
+  "seed_2": {
+   "1..12": {
+    "pairs": 24,
+    "faster": 4,
+    "within_5_percent": 12,
+    "slower": 8,
+    "first_leg_median": {
+     "native": 1217.5,
+     "learned": 1236.5
+    },
+    "first_leg_mean": {
+     "native": 1201.8333333333333,
+     "learned": 1258.0833333333333
+    },
+    "handoffs": {
+     "learned_seats": 53,
+     "native_seats": 53
+    },
+    "sorties": {
+     "learned_seats": 31,
+     "native_seats": 35
+    },
+    "all_legs": {
+     "learned": {
+      "n": 53,
+      "median": 900,
+      "mean": 989.2264150943396,
+      "max": 2225
+     },
+     "native": {
+      "n": 53,
+      "median": 833,
+      "mean": 883.9433962264151,
+      "max": 1984
+     }
+    },
+    "deadlines": 2,
+    "refusals": 0,
+    "resumptions": 3,
+    "budget_replans": {
+     "learned_seats": 0,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 3,
+     "native": 1
+    },
+    "spinning": {
+     "flown_ticks": 34000,
+     "ticks_with_spin_over_1_5": 10278,
+     "share": 0.3022941176470588
+    }
+   },
+   "13..24": {
+    "pairs": 24,
+    "faster": 7,
+    "within_5_percent": 14,
+    "slower": 3,
+    "first_leg_median": {
+     "native": 998.5,
+     "learned": 972.5
+    },
+    "first_leg_mean": {
+     "native": 1064.0416666666667,
+     "learned": 1010.0833333333334
+    },
+    "handoffs": {
+     "learned_seats": 71,
+     "native_seats": 55
+    },
+    "sorties": {
+     "learned_seats": 46,
+     "native_seats": 41
+    },
+    "all_legs": {
+     "learned": {
+      "n": 71,
+      "median": 767,
+      "mean": 808.112676056338,
+      "max": 2573
+     },
+     "native": {
+      "n": 55,
+      "median": 911,
+      "mean": 935.3636363636364,
+      "max": 2057
+     }
+    },
+    "deadlines": 0,
+    "refusals": 0,
+    "resumptions": 2,
+    "budget_replans": {
+     "learned_seats": 2,
+     "native_seats": 0
+    },
+    "decided_mixed_matches": {
+     "learned": 1,
+     "native": 2
+    },
+    "spinning": {
+     "flown_ticks": 43135,
+     "ticks_with_spin_over_1_5": 13052,
+     "share": 0.3025849078474557
+    }
+   }
+  }
+ },
+ "pooled_seeds_1_to_24": {
+  "lf090_stack": {
+   "pairs": 47,
+   "typical_first_leg_ratio": 0.9962718058360364,
+   "median_first_leg_ratio": 1.0,
+   "first_legs_over_1_25": 4,
+   "first_legs_under_0_8": 5,
+   "legs_over_2000_ticks": 2,
+   "longest_leg": 2732,
+   "handoffs": {
+    "learned_seats": 116,
+    "native_seats": 108
+   },
+   "seats_with_more_same_fewer_handoffs_than_native": [
+    16,
+    21,
+    11
+   ]
+  },
+  "lf090_network_over_the_v6_motor": {
+   "pairs": 47,
+   "typical_first_leg_ratio": 0.991961638694685,
+   "median_first_leg_ratio": 1.0,
+   "first_legs_over_1_25": 2,
+   "first_legs_under_0_8": 4,
+   "legs_over_2000_ticks": 5,
+   "longest_leg": 2393,
+   "handoffs": {
+    "learned_seats": 120,
+    "native_seats": 108
+   },
+   "seats_with_more_same_fewer_handoffs_than_native": [
+    17,
+    20,
+    11
+   ]
+  },
+  "seed_1": {
+   "pairs": 48,
+   "typical_first_leg_ratio": 1.000133890899238,
+   "median_first_leg_ratio": 1.0,
+   "first_legs_over_1_25": 2,
+   "first_legs_under_0_8": 3,
+   "legs_over_2000_ticks": 1,
+   "longest_leg": 3095,
+   "handoffs": {
+    "learned_seats": 128,
+    "native_seats": 108
+   },
+   "seats_with_more_same_fewer_handoffs_than_native": [
+    18,
+    26,
+    4
+   ]
+  },
+  "seed_2": {
+   "pairs": 48,
+   "typical_first_leg_ratio": 0.986899924340763,
+   "median_first_leg_ratio": 1.0,
+   "first_legs_over_1_25": 4,
+   "first_legs_under_0_8": 6,
+   "legs_over_2000_ticks": 6,
+   "longest_leg": 2573,
+   "handoffs": {
+    "learned_seats": 124,
+    "native_seats": 108
+   },
+   "seats_with_more_same_fewer_handoffs_than_native": [
+    19,
+    19,
+    10
+   ]
+  }
+ },
+ "validation_seeds_25_to_36": {
+  "lf090_stack": {
+   "pairs": 23,
+   "faster": 3,
+   "within_5_percent": 13,
+   "slower": 7,
+   "first_leg_median": {
+    "native": 1181,
+    "learned": 1261
+   },
+   "first_leg_mean": {
+    "native": 1211.0434782608695,
+    "learned": 1258.9565217391305
+   },
+   "handoffs": {
+    "learned_seats": 63,
+    "native_seats": 65
+   },
+   "sorties": {
+    "learned_seats": 33,
+    "native_seats": 38
+   },
+   "all_legs": {
+    "learned": {
+     "n": 63,
+     "median": 772,
+     "mean": 860.5079365079365,
+     "max": 3285
+    },
+    "native": {
+     "n": 65,
+     "median": 864,
+     "mean": 877.1692307692308,
+     "max": 2193
+    }
+   },
+   "deadlines": 0,
+   "refusals": 37,
+   "resumptions": 39,
+   "budget_replans": {
+    "learned_seats": 0,
+    "native_seats": 0
+   },
+   "decided_mixed_matches": {
+    "learned": 3,
+    "native": 1
+   },
+   "spinning": {
+    "flown_ticks": 35022,
+    "ticks_with_spin_over_1_5": 16898,
+    "share": 0.482496716349723
+   },
+   "pooled": {
+    "pairs": 23,
+    "typical_first_leg_ratio": 1.0222462695884356,
+    "median_first_leg_ratio": 1.0,
+    "first_legs_over_1_25": 0,
+    "first_legs_under_0_8": 1,
+    "legs_over_2000_ticks": 3,
+    "longest_leg": 3285,
+    "handoffs": {
+     "learned_seats": 63,
+     "native_seats": 65
+    },
+    "seats_with_more_same_fewer_handoffs_than_native": [
+     6,
+     10,
+     8
+    ]
+   }
+  },
+  "retained": {
+   "pairs": 23,
+   "faster": 9,
+   "within_5_percent": 9,
+   "slower": 5,
+   "first_leg_median": {
+    "native": 1181,
+    "learned": 1212
+   },
+   "first_leg_mean": {
+    "native": 1211.0434782608695,
+    "learned": 1174.7826086956522
+   },
+   "handoffs": {
+    "learned_seats": 67,
+    "native_seats": 65
+   },
+   "sorties": {
+    "learned_seats": 36,
+    "native_seats": 38
+   },
+   "all_legs": {
+    "learned": {
+     "n": 67,
+     "median": 805,
+     "mean": 797.0597014925373,
+     "max": 2071
+    },
+    "native": {
+     "n": 65,
+     "median": 864,
+     "mean": 877.1692307692308,
+     "max": 2193
+    }
+   },
+   "deadlines": 1,
+   "refusals": 4,
+   "resumptions": 4,
+   "budget_replans": {
+    "learned_seats": 2,
+    "native_seats": 0
+   },
+   "decided_mixed_matches": {
+    "learned": 5,
+    "native": 1
+   },
+   "spinning": {
+    "flown_ticks": 38699,
+    "ticks_with_spin_over_1_5": 11536,
+    "share": 0.2980955580247552
+   },
+   "pooled": {
+    "pairs": 23,
+    "typical_first_leg_ratio": 0.9688776304837421,
+    "median_first_leg_ratio": 0.9922341696535245,
+    "first_legs_over_1_25": 1,
+    "first_legs_under_0_8": 2,
+    "legs_over_2000_ticks": 2,
+    "longest_leg": 2071,
+    "handoffs": {
+     "learned_seats": 67,
+     "native_seats": 65
+    },
+    "seats_with_more_same_fewer_handoffs_than_native": [
+     6,
+     11,
+     7
+    ]
+   }
+  }
+ },
+ "retained": {
+  "navigation_sha256": "277ea2f05d6211ce84d55a5f21ed8c14f404796dfa6c377d1e8fa21feb0f7748",
+  "motor_sha256": "b7e541402f9732766e515d25215f08d52a9fb94e23fd1cc9da3737d89cf0203b",
+  "parity_case": "nav-fit-seed1/evaluation-development/case-045.json (gravity on, planet spin -0.015, 323 ticks)",
+  "parity_case_sha256": "7a1a6a7f2006adf24b05f6dc378accc94f962449affcd4801bb6ad3aef40fb6f"
+ }
+}

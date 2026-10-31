@@ -1,0 +1,105 @@
+{
+  "cases": [
+    {
+      "name": "stationary",
+      "native_queries": 11909,
+      "objects": 2,
+      "raw_polar_version": 2,
+      "ray_hits": 32,
+      "replay_policy_equal": true,
+      "timing_us": {
+        "max": 1195.194,
+        "median": 959.7320000000001,
+        "p95": 990.3399999999999,
+        "samples": 100
+      },
+      "transitions": 30,
+      "values": 4009
+    },
+    {
+      "name": "rotating-surfaces",
+      "native_queries": 11909,
+      "objects": 2,
+      "raw_polar_version": 2,
+      "ray_hits": 32,
+      "replay_policy_equal": true,
+      "timing_us": {
+        "max": 1015.216,
+        "median": 757.602,
+        "p95": 811.1229999999999,
+        "samples": 100
+      },
+      "transitions": 30,
+      "values": 4009
+    },
+    {
+      "name": "independent-wall",
+      "native_queries": 11908,
+      "objects": 3,
+      "raw_polar_version": 2,
+      "ray_hits": 60,
+      "replay_policy_equal": true,
+      "timing_us": {
+        "max": 1049.831,
+        "median": 794.302,
+        "p95": 812.876,
+        "samples": 100
+      },
+      "transitions": 30,
+      "values": 4009
+    },
+    {
+      "name": "gravity-moving-goal",
+      "native_queries": 11909,
+      "objects": 2,
+      "raw_polar_version": 2,
+      "ray_hits": 32,
+      "replay_policy_equal": true,
+      "timing_us": {
+        "max": 1126.295,
+        "median": 757.092,
+        "p95": 795.474,
+        "samples": 100
+      },
+      "transitions": 30,
+      "values": 4009
+    }
+  ],
+  "debug_assertions": true,
+  "decision_hz": 60,
+  "kind": "policy-observation-correctness-inspection",
+  "physics_hz": 60,
+  "schema_version": 1,
+  "timing_scope": "single-process full adapter, warmed unchanged scene; excludes physics, reset, serialization, replay and neural inference; local diagnostic only",
+  "training": false,
+  "validation": {
+    "scenario_tests": {
+      "passed": 642,
+      "ignored": 2,
+      "failed": 0
+    },
+    "physics_tests": {
+      "passed": 175,
+      "ignored": 1,
+      "failed": 0
+    },
+    "sensor_example_tests": {
+      "passed": 2,
+      "failed": 0
+    },
+    "new_policy_tests": 6,
+    "new_physics_tests": 3,
+    "probe_cases_and_serialized_trace_replays": 4,
+    "format_and_whitespace": "passed",
+    "clippy": "completed with 18 existing warnings; none in the new adapter/probe",
+    "source_archive_and_current_source_hashes": "passed",
+    "prior_four_manifest_hashes": "unchanged"
+  },
+  "experiment_id": "learned-flight-observation-v1-20261022",
+  "limitations": [
+    "Diagnostic fixtures, not a generated training distribution or learned policy.",
+    "No task-generator admission checks or PPO pipeline.",
+    "Source excludes Cargo registry dependencies and toolchain binaries.",
+    "Local retained evidence, not an off-machine backup."
+  ]
+}

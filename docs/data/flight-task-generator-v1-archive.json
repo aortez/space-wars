@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-tasks-v1-20261022",
+  "kind": "task-generator-correctness-inspection",
+  "checkpoint": "C2-scoped-validation",
+  "completed_at_utc": "2026-10-23T04:12:49.328550+00:00",
+  "source_capture": "selected workspace source, including uncommitted and untracked files, before final executable build/run",
+  "source_file_count": 1478,
+  "runtime_sha256": "ac4449e9c7d0b2e20a2f0c85389f74f18ba46addb7138dba09606837d29f6b39",
+  "source_archive_sha256": "ae61706ac08035e74ee16ed5996081221a3e819e8a97874fb5c8193451914e19",
+  "validation": {
+    "scenario_tests": {
+      "passed": 650,
+      "ignored": 2,
+      "failed": 0
+    },
+    "physics_tests": {
+      "passed": 175,
+      "ignored": 1,
+      "failed": 0
+    },
+    "new_generator_tests": 8,
+    "accepted_task_json_reset_parity": 192,
+    "accepted_alterations_change_direct_clearance": 48,
+    "retreat_first_u_witnesses": 15,
+    "budget_exhaustion_cli": "passed; four attempts retained, nonzero exit",
+    "browser_desktop_mobile": "passed; no JavaScript errors or horizontal overflow",
+    "clippy": "18 existing warnings; none in new generator/probe",
+    "format_and_whitespace": "passed",
+    "source_archive_and_current_source_hashes": "passed",
+    "runtime_identity": "passed",
+    "previous_five_manifest_hashes": "unchanged"
+  },
+  "limitations": [
+    "Conservative geometric witnesses and a reference time screen, not dynamically flown maneuvers or feasibility proofs.",
+    "One practice planet, fixed-center rotation and fixed added solids; no generated-match gravity or sun.",
+    "No PPO, model weights, training distribution freeze or learned capability.",
+    "Source excludes Cargo registry dependencies and toolchain binaries.",
+    "Local retained evidence, not an off-machine backup."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-tasks-v1-20261022",
+  "manifest_sha256": "d419cbff580ccde789de5e5c25f83e2bdc99c0acfe50d12187f275bfe60ca6a8",
+  "compact_results_sha256": "c09c51b9929989a844b1799a132e11c5e49895de1c9f3a979e0f644cb116fdcb",
+  "report_sha256": "fbc4ccaa8ecb77ecfc633efdc61eda949a1e71262e0ddd24204174b7c5887472"
+}

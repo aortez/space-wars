@@ -2,6 +2,7 @@ use super::*;
 use engine_core::planning::Work;
 use scenario_spacewars::surface_sortie::live_planning::{FlagSurveyPlanner, LiveObjectivePlanner};
 use spacewars_ai::mission_evaluation::{DEFAULT_WORK, FlagValueShadow, MissionEvaluator};
+use spacewars_ai::mission_learned_transfer::LearnedTransferHost;
 use spacewars_ai::mission_policy::{MissionBot, MissionPolicy, MissionRecoveryProfile};
 use std::time::Instant;
 
@@ -14,6 +15,18 @@ const OBSERVATION_WORK: Work = Work {
 mod guidance_approach;
 #[cfg(test)]
 mod guidance_census;
+#[cfg(test)]
+mod guidance_match;
+#[cfg(test)]
+mod guidance_perception;
+#[cfg(test)]
+mod guidance_training_cost;
+#[cfg(test)]
+mod guidance_worlds;
+#[cfg(test)]
+mod guidance_worlds_parity;
+#[cfg(test)]
+mod learned_transfer_matches;
 mod profiling;
 #[cfg(test)]
 mod recovery_tests;
@@ -79,11 +92,15 @@ struct MaterialMissionClientScenario {
     surveys: LiveObjectivePlanner,
     flag_surveys: Option<FlagSurveyPlanner>,
     flag_value_shadow: FlagValueShadow,
+    /// Present when a seat's transfer legs are flown by the learned stack.
+    learned: Option<LearnedTransferHost>,
 }
 impl MaterialMissionClientScenario {
     fn controller_name(&self, seat: usize) -> &'static str {
         if !self.bots[seat] {
             "Human"
+        } else if self.pilots[seat].learned_transfer() {
+            "Learned flight bot v1"
         } else if self.recovery_profiles[seat]
             == MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1
         {
@@ -98,7 +115,11 @@ impl MaterialMissionClientScenario {
             let identity = self.controller_name(seat);
             super::hud::append_controller_identity(frames, viewport, seat, identity);
             if self.bots[seat] {
-                pilot_hud_for(frames, seat, &self.pilots[seat].label());
+                let mut label = self.pilots[seat].label();
+                if let Some(line) = self.learned.as_ref().and_then(|host| host.label(seat)) {
+                    label = format!("{label} | {line}");
+                }
+                pilot_hud_for(frames, seat, &label);
             }
         }
     }
@@ -120,11 +141,44 @@ fn create_with_seats(
     arena: bool,
     registration: &'static ScenarioRegistration,
 ) -> Box<dyn ClientScenario> {
-    let mut state = if arena {
+    let state = if arena {
         SurfaceSortieScenario::init_material_match(seed)
     } else {
         SurfaceSortieScenario::init_material_travel(seed, false)
     };
+    Box::new(with_seats(state, seed, settings, bots, arena, registration))
+}
+
+/// A lab layout with the match's rules and controllers, for training and
+/// evaluation worlds. The launcher offers only the standard layout.
+#[cfg(test)]
+fn create_layout_match(
+    seed: u64,
+    settings: &Settings,
+    layout: scenario_spacewars::surface_sortie::mission::ArenaLayout,
+) -> MaterialMissionClientScenario {
+    with_seats(
+        SurfaceSortieScenario::init_material_match_layout(seed, layout),
+        seed,
+        settings,
+        [
+            settings.spacewars.player_1_controller,
+            settings.spacewars.player_2_controller,
+        ]
+        .map(|controller| controller != engine_common::SpacewarsController::Human),
+        true,
+        &MATCH_REGISTRATION,
+    )
+}
+
+fn with_seats(
+    mut state: SurfaceSortieState,
+    seed: u64,
+    settings: &Settings,
+    bots: [bool; 2],
+    arena: bool,
+    registration: &'static ScenarioRegistration,
+) -> MaterialMissionClientScenario {
     if arena {
         let seconds = settings.spacewars_match.normalized().time_limit_seconds;
         state.set_match_time_limit((seconds != 0).then(|| Duration::from_secs(seconds.into())));
@@ -139,14 +193,24 @@ fn create_with_seats(
     ];
     let recovery_profiles = controllers.map(|controller| {
         if registration.id == MATCH_REGISTRATION.id
-            && controller == engine_common::SpacewarsController::RecoveryBot
+            && matches!(
+                controller,
+                engine_common::SpacewarsController::RecoveryBot
+                    | engine_common::SpacewarsController::LearnedFlightBot
+            )
         {
             MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1
         } else {
             MissionRecoveryProfile::Standard
         }
     });
-    Box::new(MaterialMissionClientScenario {
+    // The learned flight bot is the recovery bot with its transfer legs
+    // flown by the retained v2 stack; the stack loads only when a seat uses it.
+    let learned_seats = controllers.map(|controller| {
+        registration.id == MATCH_REGISTRATION.id
+            && controller == engine_common::SpacewarsController::LearnedFlightBot
+    });
+    MaterialMissionClientScenario {
         sortie: SurfaceSortieClientScenario::new(state),
         bots,
         recovery_profiles,
@@ -175,7 +239,8 @@ fn create_with_seats(
                             MissionPolicy::DestinationPlanner
                         }
                         engine_common::SpacewarsController::ValueBot
-                        | engine_common::SpacewarsController::RecoveryBot => {
+                        | engine_common::SpacewarsController::RecoveryBot
+                        | engine_common::SpacewarsController::LearnedFlightBot => {
                             MissionPolicy::ValuePlanner
                         }
                         _ => MissionPolicy::Legacy,
@@ -193,8 +258,12 @@ fn create_with_seats(
             .with_hunt_clearance_handoff(
                 recovery_profiles[seat] == MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1,
             )
+            .with_learned_transfer(learned_seats[seat])
         }),
-    })
+        learned: learned_seats
+            .contains(&true)
+            .then(|| LearnedTransferHost::new(2).expect("the retained learned flight stack")),
+    }
 }
 
 fn create_match(
@@ -292,7 +361,16 @@ impl ClientScenario for MaterialMissionClientScenario {
                     sample.policies[seat] = clock.elapsed();
                     (o, intent)
                 };
-            actions.extend(intent.encode(PlayerId::from_index(seat).unwrap()));
+            if let Some(learned) = &mut self.learned
+                && self.pilots[seat].learned_transfer()
+            {
+                let clock = Instant::now();
+                let leg = self.pilots[seat].transfer_leg();
+                actions.extend(learned.actions(seat, &mut self.sortie.state, leg, intent));
+                sample.policies[seat] += clock.elapsed();
+            } else {
+                actions.extend(intent.encode(PlayerId::from_index(seat).unwrap()));
+            }
             sample.seats[seat] = Some(profiling::Seat::read(&o, site));
             let clock = Instant::now();
             let request = self
@@ -427,7 +505,7 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
             format_args!(
-                "{}\nmission_recovery_profile_p1={}\nmission_recovery_profile_p2={}\nmission_hunt_clearance_handoff_p1={}\nmission_hunt_clearance_handoff_p2={}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}\nmission_flag_value_shadow={}",
+                "{}\nmission_recovery_profile_p1={}\nmission_recovery_profile_p2={}\nmission_hunt_clearance_handoff_p1={}\nmission_hunt_clearance_handoff_p2={}\nmission_learned_transfer_p1={}\nmission_learned_transfer_p2={}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}\nmission_flag_value_shadow={}",
                 self.profile.diagnostics(&self.pilots),
                 self.recovery_profiles[0].id(),
                 self.recovery_profiles[1].id(),
@@ -439,6 +517,8 @@ impl ClientScenario for MaterialMissionClientScenario {
                     .telemetry()
                     .hunt_clearance_handoff
                     .unwrap_or("off"),
+                self.learned_diagnostic(0),
+                self.learned_diagnostic(1),
                 serde_json::to_string(&self.pilots.each_ref().map(|p| {
                     spacewars_ai::mission_evaluation::model_for_policy(p.telemetry().policy)
                 }))
@@ -474,13 +554,23 @@ impl ClientScenario for MaterialMissionClientScenario {
         self
     }
 }
+impl MaterialMissionClientScenario {
+    fn learned_diagnostic(&self, seat: usize) -> String {
+        match &self.learned {
+            Some(host) if self.pilots[seat].learned_transfer() => {
+                serde_json::to_string(host.telemetry(seat)).unwrap()
+            }
+            _ => "off".into(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::input::{GamepadInput, GamepadSeatInput};
     use engine_common::SpacewarsController::{
-        DestinationBot, Human, PlannerBot, RecoveryBot, RuleBot, ValueBot,
+        DestinationBot, Human, LearnedFlightBot, PlannerBot, RecoveryBot, RuleBot, ValueBot,
     };
     use scenario_spacewars::surface_sortie::match_rules::{MatchEndReason, MatchOutcome};
     use std::{cell::RefCell, rc::Rc};
@@ -618,6 +708,81 @@ mod tests {
     }
 
     #[test]
+    fn learned_flight_bot_flies_its_transfer_legs_with_the_stack_and_hands_off() {
+        use scenario_spacewars::surface_sortie::flight::FlightControlMode;
+        use spacewars_ai::mission_pilot::MissionGoal;
+        let mut settings = Settings::default();
+        settings.spacewars.player_1_controller = RecoveryBot;
+        settings.spacewars.player_2_controller = LearnedFlightBot;
+        let mut client = create_match(
+            42,
+            &settings,
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::None,
+        )
+        .unwrap();
+        let host = client
+            .as_any_mut()
+            .downcast_mut::<MaterialMissionClientScenario>()
+            .unwrap();
+        assert_eq!(host.controller_name(0), "Recovery bot v1");
+        assert_eq!(host.controller_name(1), "Learned flight bot v1");
+        assert!(host.learned.is_some());
+        assert!(!host.pilots[0].learned_transfer() && host.pilots[1].learned_transfer());
+        assert!(
+            host.runtime_diagnostics().contains(
+                "mission_learned_transfer_p1=off\nmission_learned_transfer_p2={\"legs\":0,"
+            )
+        );
+        let mut flown = 0;
+        let mut labelled = 0;
+        let mut handoff = false;
+        for _ in 0..90 * 60 {
+            host.step(&[], Duration::from_nanos(16_666_667));
+            let learned = host.learned.as_ref().unwrap();
+            assert_eq!(
+                host.sortie.state.flight_control_mode(0),
+                Some(FlightControlMode::Standard)
+            );
+            if learned.flying(1) {
+                flown += 1;
+                assert_eq!(
+                    host.sortie.state.flight_control_mode(1),
+                    Some(FlightControlMode::Learned)
+                );
+                assert_eq!(host.pilots[1].telemetry().goal, MissionGoal::Transfer);
+                labelled += usize::from(learned.label(1).is_some_and(|l| l.starts_with("stack ")));
+            } else {
+                assert_eq!(
+                    host.sortie.state.flight_control_mode(1),
+                    Some(FlightControlMode::Standard)
+                );
+                assert_eq!(learned.label(1), None);
+            }
+            if flown > 0 && host.pilots[1].telemetry().goal == MissionGoal::Capture {
+                handoff = true;
+                break;
+            }
+        }
+        assert!(flown > 120 && labelled == flown, "{flown} {labelled}");
+        assert!(handoff);
+        let telemetry = host.learned.as_ref().unwrap().telemetry(1);
+        assert_eq!(telemetry.legs, 1);
+        assert_eq!(telemetry.flown_ticks, flown as u64);
+        assert!(
+            telemetry.native_ticks * 10 < telemetry.flown_ticks,
+            "{telemetry:?}"
+        );
+        assert_eq!(host.learned_diagnostic(0), "off");
+        assert_eq!(
+            host.learned_diagnostic(1),
+            serde_json::to_string(telemetry).unwrap()
+        );
+        assert!(host.round_result().is_none());
+    }
+
+    #[test]
     fn normal_match_gives_each_seat_exclusively_to_its_selected_controller() {
         for controllers in [
             [Human, Human],
@@ -644,6 +809,10 @@ mod tests {
             [DestinationBot, DestinationBot],
             [DestinationBot, PlannerBot],
             [PlannerBot, DestinationBot],
+            [LearnedFlightBot, Human],
+            [Human, LearnedFlightBot],
+            [LearnedFlightBot, RecoveryBot],
+            [LearnedFlightBot, LearnedFlightBot],
         ] {
             let mut settings = Settings::default();
             settings.spacewars.player_1_controller = controllers[0];
@@ -677,16 +846,20 @@ mod tests {
                 let policy = match controller {
                     PlannerBot => MissionPolicy::Planner,
                     DestinationBot => MissionPolicy::DestinationPlanner,
-                    ValueBot | RecoveryBot => MissionPolicy::ValuePlanner,
+                    ValueBot | RecoveryBot | LearnedFlightBot => MissionPolicy::ValuePlanner,
                     _ => MissionPolicy::Legacy,
                 };
                 assert_eq!(client.pilots[seat].telemetry().policy, policy.id());
-                let recovery = if *controller == RecoveryBot {
+                let recovery = if matches!(controller, RecoveryBot | LearnedFlightBot) {
                     MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1
                 } else {
                     MissionRecoveryProfile::Standard
                 };
                 assert_eq!(client.recovery_profiles[seat], recovery);
+                assert_eq!(
+                    client.pilots[seat].learned_transfer(),
+                    *controller == LearnedFlightBot
+                );
                 let expected = MissionBot::new(
                     policy,
                     BrainReset {
@@ -696,7 +869,8 @@ mod tests {
                     settings.combat_breaks,
                 )
                 .with_recovery_profile(recovery)
-                .with_hunt_clearance_handoff(*controller == RecoveryBot);
+                .with_hunt_clearance_handoff(matches!(controller, RecoveryBot | LearnedFlightBot))
+                .with_learned_transfer(*controller == LearnedFlightBot);
                 assert_eq!(
                     format!("{:?}", client.pilots[seat]),
                     format!("{expected:?}")
@@ -765,13 +939,21 @@ mod tests {
                     seat + 1,
                     if controllers[seat] != Human { 31 } else { 0 }
                 )));
-                let handoff = if controllers[seat] == RecoveryBot {
+                let handoff = if matches!(controllers[seat], RecoveryBot | LearnedFlightBot) {
                     "material_hunt_clearance_handoff_v1"
                 } else {
                     "off"
                 };
                 assert!(diagnostics.lines().any(|line| {
                     line == format!("mission_hunt_clearance_handoff_p{}={handoff}", seat + 1)
+                }));
+                let learned = if controllers[seat] == LearnedFlightBot {
+                    serde_json::to_string(client.learned.as_ref().unwrap().telemetry(seat)).unwrap()
+                } else {
+                    "off".into()
+                };
+                assert!(diagnostics.lines().any(|line| {
+                    line == format!("mission_learned_transfer_p{}={learned}", seat + 1)
                 }));
             }
             let frames = client.render_frames(RenderBackend::Vector, Viewport::new(800.0, 480.0));

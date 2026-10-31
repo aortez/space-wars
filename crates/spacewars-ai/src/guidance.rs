@@ -1,8 +1,9 @@
 //! Experimental arrival-only component. Physical units remain available to the
-//! reference rule; models receive the fixed nine-feature projection of them.
+//! reference rule; models receive the fixed nine-feature projection of them,
+//! and perception models also the blocks in `perception`.
 
 use crate::{
-    model::{DenseModel, ModelContract},
+    model::{DenseModel, ModelContract, shared::SharedModel},
     shortest_heading_error,
 };
 use engine_common::Action;
@@ -17,6 +18,8 @@ use scenario_spacewars::{
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
+
+pub mod perception;
 
 pub const DISTANCE_SCALE: f32 = 100.0;
 pub const SPEED_SCALE: f32 = 70.0;
@@ -157,6 +160,9 @@ pub struct Decision {
     pub encoded: EncodedFeatures,
     pub raw_outputs: Option<Vec<f32>>,
     pub movement: Movement,
+    /// Present only for a policy that reads it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub perception: Option<perception::EncodedPerception>,
 }
 
 #[derive(Debug, Clone)]
@@ -164,6 +170,8 @@ pub enum Policy {
     Reference,
     Idle,
     Model(DenseModel),
+    /// Reads the perception blocks after the nine features.
+    Perception(SharedModel),
 }
 impl Policy {
     pub fn id(&self) -> &str {
@@ -171,7 +179,13 @@ impl Policy {
             Self::Reference => "arrival_reference_v1",
             Self::Idle => "arrival_idle_v1",
             Self::Model(m) => m.id(),
+            Self::Perception(m) => m.id(),
         }
+    }
+
+    /// Whether decisions need `Controller::decide_perceiving`.
+    pub fn perceives(&self) -> bool {
+        matches!(self, Self::Perception(_))
     }
 }
 
@@ -184,11 +198,12 @@ pub struct Controller {
 }
 impl Controller {
     pub fn new(policy: Policy, binding: Binding) -> Result<Self, GuidanceError> {
-        if let Policy::Model(model) = &policy {
-            model
-                .require_contract(&contract())
-                .map_err(|e| GuidanceError(e.to_string()))?;
+        match &policy {
+            Policy::Model(model) => model.require_contract(&contract()),
+            Policy::Perception(model) => model.require_contract(&perception::contract()),
+            Policy::Reference | Policy::Idle => Ok(()),
         }
+        .map_err(|e| GuidanceError(e.to_string()))?;
         Ok(Self {
             policy,
             binding,
@@ -197,12 +212,36 @@ impl Controller {
         })
     }
     pub fn decide(&mut self, request: Request) -> Result<Decision, GuidanceError> {
+        self.decide_with(request, None)
+    }
+    /// As `decide`, also offering the perception blocks. Policies that do not
+    /// read them decide exactly as `decide` does.
+    pub fn decide_perceiving(
+        &mut self,
+        request: Request,
+        perception: &perception::Perception,
+    ) -> Result<Decision, GuidanceError> {
+        self.decide_with(request, Some(perception))
+    }
+    fn decide_with(
+        &mut self,
+        request: Request,
+        perception: Option<&perception::Perception>,
+    ) -> Result<Decision, GuidanceError> {
         if request.binding != self.binding {
             return Err(GuidanceError("guidance owner or epoch mismatch".into()));
         }
         let encoded = request.features.encode()?;
+        let sensed = match (&self.policy, perception) {
+            (Policy::Perception(_), Some(perception)) => Some(perception.encode()?),
+            (Policy::Perception(_), None) => {
+                return Err(GuidanceError("perception inputs are required".into()));
+            }
+            _ => None,
+        };
         if let Some(previous) = &self.previous {
-            if previous.request == request {
+            // A repeated tick with different perception is a conflict.
+            if previous.request == request && previous.perception == sensed {
                 return Ok(previous.clone());
             }
             if previous.request.tick.checked_add(1) != Some(request.tick) {
@@ -223,6 +262,15 @@ impl Controller {
                 let movement = Movement::decode(&raw)?;
                 (Some(raw), movement)
             }
+            Policy::Perception(model) => {
+                let sensed = sensed.as_ref().expect("perception was encoded");
+                let inputs = [encoded.inputs.as_slice(), &sensed.inputs].concat();
+                let raw = model
+                    .infer(&inputs)
+                    .map_err(|e| GuidanceError(e.to_string()))?;
+                let movement = Movement::decode(&raw)?;
+                (Some(raw), movement)
+            }
             Policy::Reference => (
                 None,
                 reference(request.features, &mut self.thrust_remainder),
@@ -236,6 +284,7 @@ impl Controller {
             encoded,
             raw_outputs,
             movement,
+            perception: sensed,
         };
         self.previous = Some(decision.clone());
         Ok(decision)

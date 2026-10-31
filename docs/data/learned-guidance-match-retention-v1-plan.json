@@ -1,0 +1,1678 @@
+{
+  "evolution": {
+    "seed": 1,
+    "population": 16,
+    "generations": 24,
+    "elites": 2,
+    "tournament_size": 3,
+    "mutation_probability": 0.05,
+    "mutation_scale": 0.15,
+    "initial_scale": 0.5,
+    "parameter_limit": 8.0
+  },
+  "retention_partitions": [
+    "training",
+    "original",
+    "development",
+    "fresh_stationary",
+    "fresh_moving",
+    "fresh_inward"
+  ],
+  "retention_deduplicate": true,
+  "validation_shapes": [
+    "weak-angular",
+    "weak-round"
+  ],
+  "validation_seats": [
+    0,
+    1
+  ],
+  "validation_entry_distance": 35.0,
+  "validation_prefix_ticks": 10800,
+  "validation_selection": "first source per seed/shape/seat with free direct transfer, entry distance <=35, finite unsaturated features, and the common neutral handoff retaining these conditions; discover initial states only before training; no candidate/reference continuation consulted",
+  "precision_traces": [
+    "qualification_target_motion_b0_p0",
+    "qualification_target_motion_b1_p0",
+    "qualification_target_motion_b2_p0",
+    "qualification_target_motion_b3_p0",
+    "qualification_combined_a0_b0_p0",
+    "qualification_combined_a0_b1_p0",
+    "qualification_combined_a1_b0_p0",
+    "qualification_combined_a1_b1_p0"
+  ],
+  "version": 1,
+  "experiment": "recovery_guidance_match_retention_v1",
+  "prior_plan_sha256": "bb3750d9f191c6e0444630c6fd94584ac4c3962672743d108f7e5ab41ba5db58",
+  "prior_preflight_sha256": "1e2f9dcfe3668991c4c98c797c681a523439f9c7c2e66e74833e3ef79a9162da",
+  "prior_results_sha256": "ca37d625b6942525ced43cb0ca315ac938783043e8e5d89558fe9f8f5231b1ce",
+  "seeds": [
+    {
+      "label": "candidate",
+      "genome": "87ef80d47da3fa4d3c15cccfdf83ce7d7377644808ee557867749c18e67d5600",
+      "file_sha256": "61654e392602f1e3f0fd9cf59cc0b0160e3e663a6ce178582d5fd4defe65be27"
+    },
+    {
+      "label": "baseline",
+      "genome": "1cea67c1a3a7ef8f45b8358821115624217c135b1440194ecbc459aa36df28f7",
+      "file_sha256": "45790a33d6ebfcea1620b74e32c00d29ae27439f38c2c9b54ab5416256f7d04f"
+    }
+  ],
+  "initialization": "Two declared full-network seed genomes in order; remaining 14 independently initialized as in the previous recipe. No recombination; ordinary full-network mutations.",
+  "training_cases": [
+    {
+      "name": "train-42-p1-d65",
+      "planet": 1,
+      "seat": 0,
+      "seed": 42,
+      "shape": "weak-angular",
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711,
+      "source_tick": 883
+    },
+    {
+      "name": "train-42-p2-d65",
+      "planet": 1,
+      "seat": 1,
+      "seed": 42,
+      "shape": "weak-angular",
+      "source_entry_distance": 55.553462982177734,
+      "source_relative_speed": 44.16749572753906,
+      "source_tick": 784
+    },
+    {
+      "name": "train-42-p2-d35",
+      "planet": 1,
+      "seat": 1,
+      "seed": 42,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273,
+      "source_tick": 821
+    },
+    {
+      "name": "train-10101-p1-d65",
+      "planet": 1,
+      "seat": 0,
+      "seed": 10101,
+      "shape": "weak-angular",
+      "source_entry_distance": 53.1820182800293,
+      "source_relative_speed": 41.5108642578125,
+      "source_tick": 1008
+    },
+    {
+      "name": "train-10101-p1-d35",
+      "planet": 1,
+      "seat": 0,
+      "seed": 10101,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961,
+      "source_tick": 1040
+    },
+    {
+      "name": "train-10101-p2-d65",
+      "planet": 1,
+      "seat": 1,
+      "seed": 10101,
+      "shape": "weak-angular",
+      "source_entry_distance": 64.95734405517578,
+      "source_relative_speed": 50.2044792175293,
+      "source_tick": 1242
+    },
+    {
+      "name": "train-10101-p2-d35",
+      "planet": 1,
+      "seat": 1,
+      "seed": 10101,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367,
+      "source_tick": 1290
+    },
+    {
+      "name": "train-inspected-17-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 17,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.8948860168457,
+      "source_relative_speed": 37.15235900878906,
+      "source_tick": 455
+    },
+    {
+      "name": "train-inspected-17-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 17,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.760799407958984,
+      "source_relative_speed": 29.299516677856445,
+      "source_tick": 1126
+    },
+    {
+      "name": "train-inspected-113-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 113,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.88804626464844,
+      "source_relative_speed": 30.90194320678711,
+      "source_tick": 605
+    },
+    {
+      "name": "train-inspected-113-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 113,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.57772445678711,
+      "source_relative_speed": 28.19192123413086,
+      "source_tick": 1102
+    },
+    {
+      "name": "train-inspected-2027-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2027,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.63172912597656,
+      "source_relative_speed": 27.205408096313477,
+      "source_tick": 599
+    },
+    {
+      "name": "train-inspected-2027-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 2027,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.72901916503906,
+      "source_relative_speed": 28.07271957397461,
+      "source_tick": 1419
+    },
+    {
+      "name": "train-inspected-9001-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 9001,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.85470199584961,
+      "source_relative_speed": 26.82145881652832,
+      "source_tick": 1554
+    },
+    {
+      "name": "train-inspected-9001-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 9001,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.912410736083984,
+      "source_relative_speed": 22.630029678344727,
+      "source_tick": 1603
+    },
+    {
+      "name": "seed-42-weak-round-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 42,
+      "shape": "weak-round",
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711,
+      "source_tick": 883
+    },
+    {
+      "name": "seed-42-weak-round-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 42,
+      "shape": "weak-round",
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273,
+      "source_tick": 821
+    },
+    {
+      "name": "seed-10101-weak-round-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 10101,
+      "shape": "weak-round",
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961,
+      "source_tick": 1040
+    },
+    {
+      "name": "seed-10101-weak-round-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 10101,
+      "shape": "weak-round",
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367,
+      "source_tick": 1290
+    },
+    {
+      "name": "development-inspected-17-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 17,
+      "shape": "weak-round",
+      "source_entry_distance": 34.8948860168457,
+      "source_relative_speed": 37.15235900878906,
+      "source_tick": 455
+    },
+    {
+      "name": "development-inspected-17-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 17,
+      "shape": "weak-round",
+      "source_entry_distance": 34.760799407958984,
+      "source_relative_speed": 29.299516677856445,
+      "source_tick": 1126
+    },
+    {
+      "name": "development-inspected-113-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 113,
+      "shape": "weak-round",
+      "source_entry_distance": 34.88804626464844,
+      "source_relative_speed": 30.90194320678711,
+      "source_tick": 605
+    },
+    {
+      "name": "development-inspected-113-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 113,
+      "shape": "weak-round",
+      "source_entry_distance": 34.57772445678711,
+      "source_relative_speed": 28.19192123413086,
+      "source_tick": 1102
+    },
+    {
+      "name": "development-inspected-2027-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2027,
+      "shape": "weak-round",
+      "source_entry_distance": 34.63172912597656,
+      "source_relative_speed": 27.205408096313477,
+      "source_tick": 599
+    },
+    {
+      "name": "development-inspected-2027-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 2027,
+      "shape": "weak-round",
+      "source_entry_distance": 34.72901916503906,
+      "source_relative_speed": 28.07271957397461,
+      "source_tick": 1419
+    },
+    {
+      "name": "development-inspected-9001-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 9001,
+      "shape": "weak-round",
+      "source_entry_distance": 34.85470199584961,
+      "source_relative_speed": 26.82145881652832,
+      "source_tick": 1554
+    },
+    {
+      "name": "development-inspected-9001-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 9001,
+      "shape": "weak-round",
+      "source_entry_distance": 34.912410736083984,
+      "source_relative_speed": 22.630029678344727,
+      "source_tick": 1603
+    },
+    {
+      "name": "validation-73-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 73,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.70812225341797,
+      "source_relative_speed": 29.259910583496094,
+      "source_tick": 780
+    },
+    {
+      "name": "validation-73-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 73,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.65625762939453,
+      "source_relative_speed": 28.35440444946289,
+      "source_tick": 889
+    },
+    {
+      "name": "validation-73-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 73,
+      "shape": "weak-round",
+      "source_entry_distance": 34.70812225341797,
+      "source_relative_speed": 29.259910583496094,
+      "source_tick": 780
+    },
+    {
+      "name": "validation-73-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 73,
+      "shape": "weak-round",
+      "source_entry_distance": 34.65625762939453,
+      "source_relative_speed": 28.35440444946289,
+      "source_tick": 889
+    },
+    {
+      "name": "validation-509-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 509,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.76520919799805,
+      "source_relative_speed": 35.475364685058594,
+      "source_tick": 431
+    },
+    {
+      "name": "validation-509-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 509,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.755958557128906,
+      "source_relative_speed": 28.789894104003906,
+      "source_tick": 953
+    },
+    {
+      "name": "validation-509-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 509,
+      "shape": "weak-round",
+      "source_entry_distance": 34.76520919799805,
+      "source_relative_speed": 35.475364685058594,
+      "source_tick": 431
+    },
+    {
+      "name": "validation-509-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 509,
+      "shape": "weak-round",
+      "source_entry_distance": 34.755958557128906,
+      "source_relative_speed": 28.789894104003906,
+      "source_tick": 953
+    },
+    {
+      "name": "validation-4093-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 4093,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.98323059082031,
+      "source_relative_speed": 28.6729736328125,
+      "source_tick": 981
+    },
+    {
+      "name": "validation-4093-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 4093,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.76390838623047,
+      "source_relative_speed": 26.471450805664062,
+      "source_tick": 1197
+    },
+    {
+      "name": "validation-4093-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 4093,
+      "shape": "weak-round",
+      "source_entry_distance": 34.98323059082031,
+      "source_relative_speed": 28.6729736328125,
+      "source_tick": 981
+    },
+    {
+      "name": "validation-4093-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 4093,
+      "shape": "weak-round",
+      "source_entry_distance": 34.76390838623047,
+      "source_relative_speed": 26.471450805664062,
+      "source_tick": 1197
+    },
+    {
+      "name": "validation-65537-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 65537,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.71917724609375,
+      "source_relative_speed": 29.432384490966797,
+      "source_tick": 1387
+    },
+    {
+      "name": "validation-65537-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 65537,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.623558044433594,
+      "source_relative_speed": 29.772905349731445,
+      "source_tick": 1571
+    },
+    {
+      "name": "validation-65537-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 65537,
+      "shape": "weak-round",
+      "source_entry_distance": 34.71917724609375,
+      "source_relative_speed": 29.432384490966797,
+      "source_tick": 1387
+    },
+    {
+      "name": "validation-65537-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 65537,
+      "shape": "weak-round",
+      "source_entry_distance": 34.623558044433594,
+      "source_relative_speed": 29.772905349731445,
+      "source_tick": 1571
+    },
+    {
+      "name": "validation-211-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 211,
+      "shape": "weak-angular",
+      "source_entry_distance": 22.559139251708984,
+      "source_relative_speed": 20.037641525268555,
+      "source_tick": 705
+    },
+    {
+      "name": "validation-211-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 211,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.59903335571289,
+      "source_relative_speed": 28.94040298461914,
+      "source_tick": 4641
+    },
+    {
+      "name": "validation-211-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 211,
+      "shape": "weak-round",
+      "source_entry_distance": 22.559139251708984,
+      "source_relative_speed": 20.037641525268555,
+      "source_tick": 705
+    },
+    {
+      "name": "validation-211-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 211,
+      "shape": "weak-round",
+      "source_entry_distance": 34.59903335571289,
+      "source_relative_speed": 28.94040298461914,
+      "source_tick": 4641
+    },
+    {
+      "name": "validation-1021-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1021,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.74074172973633,
+      "source_relative_speed": 34.62619400024414,
+      "source_tick": 775
+    },
+    {
+      "name": "validation-1021-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1021,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.87705993652344,
+      "source_relative_speed": 31.925981521606445,
+      "source_tick": 1042
+    },
+    {
+      "name": "validation-1021-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1021,
+      "shape": "weak-round",
+      "source_entry_distance": 34.74074172973633,
+      "source_relative_speed": 34.62619400024414,
+      "source_tick": 775
+    },
+    {
+      "name": "validation-1021-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1021,
+      "shape": "weak-round",
+      "source_entry_distance": 34.87705993652344,
+      "source_relative_speed": 31.925981521606445,
+      "source_tick": 1042
+    },
+    {
+      "name": "validation-8191-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 8191,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.698265075683594,
+      "source_relative_speed": 33.15288162231445,
+      "source_tick": 1894
+    },
+    {
+      "name": "validation-8191-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 8191,
+      "shape": "weak-round",
+      "source_entry_distance": 34.698265075683594,
+      "source_relative_speed": 33.15288162231445,
+      "source_tick": 1894
+    },
+    {
+      "name": "validation-131071-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 131071,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.8666877746582,
+      "source_relative_speed": 28.943628311157227,
+      "source_tick": 788
+    },
+    {
+      "name": "validation-131071-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 131071,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.780574798583984,
+      "source_relative_speed": 25.917301177978516,
+      "source_tick": 995
+    },
+    {
+      "name": "validation-131071-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 131071,
+      "shape": "weak-round",
+      "source_entry_distance": 34.8666877746582,
+      "source_relative_speed": 28.943628311157227,
+      "source_tick": 788
+    },
+    {
+      "name": "validation-131071-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 131071,
+      "shape": "weak-round",
+      "source_entry_distance": 34.780574798583984,
+      "source_relative_speed": 25.917301177978516,
+      "source_tick": 995
+    },
+    {
+      "name": "validation-307-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 307,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.753665924072266,
+      "source_relative_speed": 26.794004440307617,
+      "source_tick": 1592
+    },
+    {
+      "name": "validation-307-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 307,
+      "shape": "weak-angular",
+      "source_entry_distance": 10.749626159667969,
+      "source_relative_speed": 19.38563346862793,
+      "source_tick": 2489
+    },
+    {
+      "name": "validation-307-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 307,
+      "shape": "weak-round",
+      "source_entry_distance": 34.753665924072266,
+      "source_relative_speed": 26.794004440307617,
+      "source_tick": 1592
+    },
+    {
+      "name": "validation-307-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 307,
+      "shape": "weak-round",
+      "source_entry_distance": 10.749626159667969,
+      "source_relative_speed": 19.38563346862793,
+      "source_tick": 2489
+    },
+    {
+      "name": "validation-1543-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1543,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.594146728515625,
+      "source_relative_speed": 28.75322723388672,
+      "source_tick": 724
+    },
+    {
+      "name": "validation-1543-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1543,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.58313751220703,
+      "source_relative_speed": 28.19756507873535,
+      "source_tick": 1128
+    },
+    {
+      "name": "validation-1543-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1543,
+      "shape": "weak-round",
+      "source_entry_distance": 34.594146728515625,
+      "source_relative_speed": 28.75322723388672,
+      "source_tick": 724
+    },
+    {
+      "name": "validation-1543-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1543,
+      "shape": "weak-round",
+      "source_entry_distance": 34.58313751220703,
+      "source_relative_speed": 28.19756507873535,
+      "source_tick": 1128
+    },
+    {
+      "name": "validation-12289-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 12289,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.656105041503906,
+      "source_relative_speed": 31.239988327026367,
+      "source_tick": 1380
+    },
+    {
+      "name": "validation-12289-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 12289,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.75042724609375,
+      "source_relative_speed": 27.864171981811523,
+      "source_tick": 1534
+    },
+    {
+      "name": "validation-12289-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 12289,
+      "shape": "weak-round",
+      "source_entry_distance": 34.656105041503906,
+      "source_relative_speed": 31.239988327026367,
+      "source_tick": 1380
+    },
+    {
+      "name": "validation-12289-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 12289,
+      "shape": "weak-round",
+      "source_entry_distance": 34.75042724609375,
+      "source_relative_speed": 27.864171981811523,
+      "source_tick": 1534
+    },
+    {
+      "name": "validation-262147-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 262147,
+      "shape": "weak-angular",
+      "source_entry_distance": 22.400888442993164,
+      "source_relative_speed": 22.778034210205078,
+      "source_tick": 2135
+    },
+    {
+      "name": "validation-262147-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 262147,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.878196716308594,
+      "source_relative_speed": 27.17969512939453,
+      "source_tick": 5198
+    },
+    {
+      "name": "validation-262147-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 262147,
+      "shape": "weak-round",
+      "source_entry_distance": 22.400888442993164,
+      "source_relative_speed": 22.778034210205078,
+      "source_tick": 2135
+    },
+    {
+      "name": "validation-262147-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 262147,
+      "shape": "weak-round",
+      "source_entry_distance": 34.913055419921875,
+      "source_relative_speed": 27.15361976623535,
+      "source_tick": 5203
+    }
+  ],
+  "protected_cases": [
+    "train-42-p2-d35",
+    "train-10101-p1-d65",
+    "train-10101-p1-d35",
+    "train-10101-p2-d35",
+    "train-inspected-17-WeakAngular-p2",
+    "train-inspected-113-WeakAngular-p1",
+    "train-inspected-113-WeakAngular-p2",
+    "train-inspected-2027-WeakAngular-p2",
+    "train-inspected-9001-WeakAngular-p2",
+    "train-inspected-9001-WeakAngular-p1",
+    "seed-42-weak-round-p2",
+    "seed-10101-weak-round-p1",
+    "seed-10101-weak-round-p2",
+    "development-inspected-17-WeakRound-p2",
+    "development-inspected-113-WeakRound-p1",
+    "development-inspected-113-WeakRound-p2",
+    "development-inspected-2027-WeakRound-p2",
+    "development-inspected-9001-WeakRound-p2",
+    "development-inspected-9001-WeakRound-p1",
+    "validation-73-WeakAngular-p1",
+    "validation-73-WeakAngular-p2",
+    "validation-73-WeakRound-p1",
+    "validation-73-WeakRound-p2",
+    "validation-509-WeakAngular-p1",
+    "validation-509-WeakAngular-p2",
+    "validation-509-WeakRound-p1",
+    "validation-509-WeakRound-p2",
+    "validation-4093-WeakAngular-p2",
+    "validation-4093-WeakAngular-p1",
+    "validation-4093-WeakRound-p2",
+    "validation-4093-WeakRound-p1",
+    "validation-65537-WeakAngular-p1",
+    "validation-65537-WeakRound-p1",
+    "validation-211-WeakAngular-p2",
+    "validation-211-WeakAngular-p1",
+    "validation-211-WeakRound-p2",
+    "validation-211-WeakRound-p1",
+    "validation-1021-WeakAngular-p1",
+    "validation-1021-WeakRound-p1",
+    "validation-8191-WeakAngular-p2",
+    "validation-8191-WeakRound-p2",
+    "validation-131071-WeakAngular-p1",
+    "validation-131071-WeakAngular-p2",
+    "validation-131071-WeakRound-p1",
+    "validation-131071-WeakRound-p2",
+    "validation-307-WeakAngular-p2",
+    "validation-307-WeakAngular-p1",
+    "validation-307-WeakRound-p2",
+    "validation-307-WeakRound-p1",
+    "validation-1543-WeakAngular-p1",
+    "validation-1543-WeakAngular-p2",
+    "validation-1543-WeakRound-p1",
+    "validation-1543-WeakRound-p2",
+    "validation-12289-WeakAngular-p2",
+    "validation-12289-WeakAngular-p1",
+    "validation-12289-WeakRound-p2",
+    "validation-12289-WeakRound-p1",
+    "validation-262147-WeakAngular-p2",
+    "validation-262147-WeakAngular-p1",
+    "validation-262147-WeakRound-p2",
+    "validation-262147-WeakRound-p1"
+  ],
+  "case_aliases": {
+    "train-42-p1-d65": [
+      {
+        "partition": "training",
+        "name": "train-42-p1-d65"
+      },
+      {
+        "partition": "development",
+        "name": "seed-42-weak-angular-p1"
+      }
+    ],
+    "train-42-p2-d65": [
+      {
+        "partition": "training",
+        "name": "train-42-p2-d65"
+      }
+    ],
+    "train-42-p2-d35": [
+      {
+        "partition": "training",
+        "name": "train-42-p2-d35"
+      },
+      {
+        "partition": "development",
+        "name": "seed-42-weak-angular-p2"
+      }
+    ],
+    "train-10101-p1-d65": [
+      {
+        "partition": "training",
+        "name": "train-10101-p1-d65"
+      }
+    ],
+    "train-10101-p1-d35": [
+      {
+        "partition": "training",
+        "name": "train-10101-p1-d35"
+      },
+      {
+        "partition": "development",
+        "name": "seed-10101-weak-angular-p1"
+      }
+    ],
+    "train-10101-p2-d65": [
+      {
+        "partition": "training",
+        "name": "train-10101-p2-d65"
+      }
+    ],
+    "train-10101-p2-d35": [
+      {
+        "partition": "training",
+        "name": "train-10101-p2-d35"
+      },
+      {
+        "partition": "development",
+        "name": "seed-10101-weak-angular-p2"
+      }
+    ],
+    "train-inspected-17-WeakAngular-p1": [
+      {
+        "partition": "training",
+        "name": "train-inspected-17-WeakAngular-p1"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-17-WeakAngular-p1"
+      }
+    ],
+    "train-inspected-17-WeakAngular-p2": [
+      {
+        "partition": "training",
+        "name": "train-inspected-17-WeakAngular-p2"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-17-WeakAngular-p2"
+      }
+    ],
+    "train-inspected-113-WeakAngular-p1": [
+      {
+        "partition": "training",
+        "name": "train-inspected-113-WeakAngular-p1"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-113-WeakAngular-p1"
+      }
+    ],
+    "train-inspected-113-WeakAngular-p2": [
+      {
+        "partition": "training",
+        "name": "train-inspected-113-WeakAngular-p2"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-113-WeakAngular-p2"
+      }
+    ],
+    "train-inspected-2027-WeakAngular-p1": [
+      {
+        "partition": "training",
+        "name": "train-inspected-2027-WeakAngular-p1"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-2027-WeakAngular-p1"
+      }
+    ],
+    "train-inspected-2027-WeakAngular-p2": [
+      {
+        "partition": "training",
+        "name": "train-inspected-2027-WeakAngular-p2"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-2027-WeakAngular-p2"
+      }
+    ],
+    "train-inspected-9001-WeakAngular-p2": [
+      {
+        "partition": "training",
+        "name": "train-inspected-9001-WeakAngular-p2"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-9001-WeakAngular-p2"
+      }
+    ],
+    "train-inspected-9001-WeakAngular-p1": [
+      {
+        "partition": "training",
+        "name": "train-inspected-9001-WeakAngular-p1"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-9001-WeakAngular-p1"
+      }
+    ],
+    "seed-42-weak-round-p1": [
+      {
+        "partition": "development",
+        "name": "seed-42-weak-round-p1"
+      }
+    ],
+    "seed-42-weak-round-p2": [
+      {
+        "partition": "development",
+        "name": "seed-42-weak-round-p2"
+      }
+    ],
+    "seed-10101-weak-round-p1": [
+      {
+        "partition": "development",
+        "name": "seed-10101-weak-round-p1"
+      }
+    ],
+    "seed-10101-weak-round-p2": [
+      {
+        "partition": "development",
+        "name": "seed-10101-weak-round-p2"
+      }
+    ],
+    "development-inspected-17-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "development-inspected-17-WeakRound-p1"
+      }
+    ],
+    "development-inspected-17-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "development-inspected-17-WeakRound-p2"
+      }
+    ],
+    "development-inspected-113-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "development-inspected-113-WeakRound-p1"
+      }
+    ],
+    "development-inspected-113-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "development-inspected-113-WeakRound-p2"
+      }
+    ],
+    "development-inspected-2027-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "development-inspected-2027-WeakRound-p1"
+      }
+    ],
+    "development-inspected-2027-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "development-inspected-2027-WeakRound-p2"
+      }
+    ],
+    "development-inspected-9001-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "development-inspected-9001-WeakRound-p2"
+      }
+    ],
+    "development-inspected-9001-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "development-inspected-9001-WeakRound-p1"
+      }
+    ],
+    "validation-73-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-73-WeakAngular-p1"
+      }
+    ],
+    "validation-73-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-73-WeakAngular-p2"
+      }
+    ],
+    "validation-73-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-73-WeakRound-p1"
+      }
+    ],
+    "validation-73-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-73-WeakRound-p2"
+      }
+    ],
+    "validation-509-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-509-WeakAngular-p1"
+      }
+    ],
+    "validation-509-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-509-WeakAngular-p2"
+      }
+    ],
+    "validation-509-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-509-WeakRound-p1"
+      }
+    ],
+    "validation-509-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-509-WeakRound-p2"
+      }
+    ],
+    "validation-4093-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-4093-WeakAngular-p2"
+      }
+    ],
+    "validation-4093-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-4093-WeakAngular-p1"
+      }
+    ],
+    "validation-4093-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-4093-WeakRound-p2"
+      }
+    ],
+    "validation-4093-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-4093-WeakRound-p1"
+      }
+    ],
+    "validation-65537-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-65537-WeakAngular-p2"
+      }
+    ],
+    "validation-65537-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-65537-WeakAngular-p1"
+      }
+    ],
+    "validation-65537-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-65537-WeakRound-p2"
+      }
+    ],
+    "validation-65537-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-65537-WeakRound-p1"
+      }
+    ],
+    "validation-211-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-211-WeakAngular-p2"
+      }
+    ],
+    "validation-211-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-211-WeakAngular-p1"
+      }
+    ],
+    "validation-211-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-211-WeakRound-p2"
+      }
+    ],
+    "validation-211-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-211-WeakRound-p1"
+      }
+    ],
+    "validation-1021-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-1021-WeakAngular-p1"
+      }
+    ],
+    "validation-1021-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-1021-WeakAngular-p2"
+      }
+    ],
+    "validation-1021-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-1021-WeakRound-p1"
+      }
+    ],
+    "validation-1021-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-1021-WeakRound-p2"
+      }
+    ],
+    "validation-8191-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-8191-WeakAngular-p2"
+      }
+    ],
+    "validation-8191-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-8191-WeakRound-p2"
+      }
+    ],
+    "validation-131071-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-131071-WeakAngular-p1"
+      }
+    ],
+    "validation-131071-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-131071-WeakAngular-p2"
+      }
+    ],
+    "validation-131071-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-131071-WeakRound-p1"
+      }
+    ],
+    "validation-131071-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-131071-WeakRound-p2"
+      }
+    ],
+    "validation-307-WeakAngular-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-307-WeakAngular-p2"
+      }
+    ],
+    "validation-307-WeakAngular-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-307-WeakAngular-p1"
+      }
+    ],
+    "validation-307-WeakRound-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-307-WeakRound-p2"
+      }
+    ],
+    "validation-307-WeakRound-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-307-WeakRound-p1"
+      }
+    ],
+    "validation-1543-WeakAngular-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-1543-WeakAngular-p1"
+      }
+    ],
+    "validation-1543-WeakAngular-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-1543-WeakAngular-p2"
+      }
+    ],
+    "validation-1543-WeakRound-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-1543-WeakRound-p1"
+      }
+    ],
+    "validation-1543-WeakRound-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-1543-WeakRound-p2"
+      }
+    ],
+    "validation-12289-WeakAngular-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-12289-WeakAngular-p2"
+      }
+    ],
+    "validation-12289-WeakAngular-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-12289-WeakAngular-p1"
+      }
+    ],
+    "validation-12289-WeakRound-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-12289-WeakRound-p2"
+      }
+    ],
+    "validation-12289-WeakRound-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-12289-WeakRound-p1"
+      }
+    ],
+    "validation-262147-WeakAngular-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-262147-WeakAngular-p2"
+      }
+    ],
+    "validation-262147-WeakAngular-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-262147-WeakAngular-p1"
+      }
+    ],
+    "validation-262147-WeakRound-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-262147-WeakRound-p2"
+      }
+    ],
+    "validation-262147-WeakRound-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-262147-WeakRound-p1"
+      }
+    ]
+  },
+  "protected_evidence": {
+    "train-42-p2-d35": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "train-10101-p1-d65": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "train-10101-p1-d35": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "train-10101-p2-d35": [
+      "all"
+    ],
+    "train-inspected-17-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "train-inspected-113-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "train-inspected-113-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "train-inspected-2027-WeakAngular-p2": [
+      "all"
+    ],
+    "train-inspected-9001-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "train-inspected-9001-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "seed-42-weak-round-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "seed-10101-weak-round-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "seed-10101-weak-round-p2": [
+      "all"
+    ],
+    "development-inspected-17-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "development-inspected-113-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "development-inspected-113-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "development-inspected-2027-WeakRound-p2": [
+      "all"
+    ],
+    "development-inspected-9001-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "development-inspected-9001-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-73-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-73-WeakAngular-p2": [
+      "all"
+    ],
+    "validation-73-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-73-WeakRound-p2": [
+      "all"
+    ],
+    "validation-509-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-509-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-509-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-509-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-4093-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-4093-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-4093-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-4093-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-65537-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-65537-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-211-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-211-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-211-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-211-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-1021-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-1021-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-8191-WeakAngular-p2": [
+      "baseline",
+      "brake"
+    ],
+    "validation-8191-WeakRound-p2": [
+      "baseline",
+      "brake"
+    ],
+    "validation-131071-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-131071-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-131071-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-131071-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-307-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-307-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-307-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-307-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-1543-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-1543-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-1543-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-1543-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-12289-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-12289-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-12289-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-12289-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-262147-WeakAngular-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-262147-WeakAngular-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-262147-WeakRound-p2": [
+      "baseline",
+      "all",
+      "brake"
+    ],
+    "validation-262147-WeakRound-p1": [
+      "baseline",
+      "all",
+      "brake"
+    ]
+  },
+  "training_selection": "All 73 distinct inspected physical starts, ordered by previous training, development, then validation receipt; duplicate identities collapse only after verifying all case fields except name. All are now training data.",
+  "protection": "61 starts completed by at least one of the prior baseline, full-network, or brake-only candidates. Maximize protected successes before progress on the 12 remaining starts; this is a selection priority, not a per-case guarantee until 61/61.",
+  "fitness_order": [
+    "precision_completed",
+    "protected_completed",
+    "additional_completed",
+    "approach_speed_points",
+    "approach_position_points",
+    "precision_position_points",
+    "precision_velocity_points",
+    "spare_ticks"
+  ],
+  "quality": "Same per-episode quality as the brake-readout recipe; all 157 precision successes rank first, then protected match successes, then additional match successes, then aggregate match speed/position and precision quality. Every candidate evaluates every case exactly once.",
+  "validation_seeds": [
+    431,
+    2017,
+    32771,
+    524309
+  ],
+  "budget": {
+    "candidate_evaluations": 384,
+    "episodes_per_candidate": 230,
+    "training_episodes": 88320
+  },
+  "finalist": "Select final-generation winner using training fitness only. Freeze winner and checkpoint hashes before reserved controller continuations.",
+  "comparison": [
+    "mission",
+    "reference",
+    "baseline",
+    "candidate",
+    "finalist"
+  ],
+  "acceptance": {
+    "precision": 157,
+    "protected": 61,
+    "additional": 12,
+    "reserved": 16,
+    "missing_validation": "Do not replace missing starts; any missing start prevents passing.",
+    "required": "All declared starts must arrive with existing safety and native-host handoff checks; all precision cases must pass original tolerances and dwell."
+  },
+  "scope": "Test-only full-network continuation; unchanged observations, action decoder, physics, host priority, arrival thresholds, mutation configuration, and production bot. Extra inspected training starts, protected-success priority and two-seed initialization change together; not an isolated causal comparison."
+}

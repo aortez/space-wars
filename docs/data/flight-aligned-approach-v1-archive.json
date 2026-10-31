@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-aligned-approach-v1-20261023",
+  "kind": "aligned stationary short-approach diagnostic",
+  "checkpoint": "C4-aligned-approach",
+  "completed_at_utc": "2026-10-24T03:18:22.594152+00:00",
+  "source_capture": "selected dirty/untracked workspace source before retained executable build/run",
+  "source_file_count": 1509,
+  "source_archive_sha256": "619550365e12222fbf1ef9d3732050306d2b678eac3ddc2e2818b72468db86b7",
+  "runtime_sha256": "e39a1c0b7e06c044ba764729e890f871872b70d248a07eae5fe025e80b724e2a",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "training_ticks": 393216,
+  "development_ticks": 156128,
+  "confirmation_ticks": 0,
+  "final_successes": 0,
+  "final_attempts": 48,
+  "gates": {
+    "learning_evidence": false,
+    "basic_flight_gate": false
+  },
+  "confirmation": "unused: progression gate failed",
+  "general_flight_claim": false,
+  "obstacle_navigation_claim": false,
+  "validation": {
+    "python_tests": 45,
+    "native_generation_tests": 10,
+    "fresh_process_resume": "bitwise equal on aligned recipe",
+    "trained_parity_fixtures": 48,
+    "maximum_abs_output_error": 1.1920928955078125e-06,
+    "compile_format_whitespace": "passed",
+    "source_runtime_frozen_plan_identity": "passed",
+    "legacy_admissions": "identical",
+    "initial_model_optimizer_rng": "identical to corresponding parent graded seed",
+    "previous_thirteen_manifests": "unchanged"
+  },
+  "checkpoint_count": 387,
+  "retained_file_count": 784,
+  "retained_bytes_excluding_manifest": 1631876515,
+  "limitations": [
+    "Aligned stationary starts 4\u201312 units from stationary goals in zero-gravity practice worlds only.",
+    "No matched control isolating individual changes of task attributes.",
+    "Graded deadline reward remains delayed and distance-only.",
+    "A bounded three-seed result does not establish long-run impossibility or a unique failure cause.",
+    "External dependency/toolchain binaries excluded; local retention is not off-machine backup."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-aligned-approach-v1-20261023",
+  "manifest_sha256": "895da95e1550ba32a24402248e4680e3f4ff504472fde92ae8bcd505898c1a92",
+  "compact_results_sha256": "aae068135e37dd20017e7d4594d245b09d568167ee4850f7876952d21ef7413c",
+  "report_sha256": "4340b432742ad20dc3e68d33f059413403f913d4b9c514c83d35969336cdd2bb"
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-hold-update-audit-v1-20261024",
+  "kind": "exact continuous hold-update replay and immediate-loss coefficient audit",
+  "completed_at_utc": "2026-10-24T21:28:16.609958+00:00",
+  "source_file_count": 1543,
+  "source_archive_sha256": "e907bee25f9e3b66ad65a0bd79639d2a96d8a1f64ef1dfa97631c05d69694e03",
+  "runtime_sha256": "1a488c895feec57f6b5f91093e0aff40689b1ab5b470a91729fc9bc72e46bb82",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "before_updates": [
+    0,
+    32,
+    64,
+    127
+  ],
+  "exact_update_count": 12,
+  "diagnostic_branch_count": 48,
+  "action_ticks": 44724,
+  "neutral_setup_ticks": 55,
+  "diagnostic_optimizer_steps": 768,
+  "seconds": 61.32309793700006,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "new_training_experiment": false,
+  "new_flight_evaluation": false,
+  "validation": {
+    "synthetic_tests": 6,
+    "previous_manifests_unchanged": 26,
+    "parent_inputs_unchanged": 34,
+    "compile_whitespace": "passed",
+    "process_exit_zero": true
+  },
+  "retained_file_count": 257,
+  "retained_bytes_excluding_manifest": 589593466,
+  "archive_path": "data/training-experiments/learned-flight-hold-update-audit-v1-20261024",
+  "manifest_sha256": "79dabe571aacefdfe8b14001bc0b4ac965aab4a632e7e289a689ee45ef14daa0",
+  "report_sha256": "3914934f807d847dbe7f496a362ffa8305bfcbd7d36f19e0a992d1f9ba1259f3",
+  "results_sha256": "6ca5569a9cc553105e2a2ccec73bd378625764732091ae62acc5e3f5832c4af2"
+}

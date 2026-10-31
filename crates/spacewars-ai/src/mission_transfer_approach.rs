@@ -32,7 +32,9 @@ pub struct TransferApproachSample {
     pub reason: &'static str,
 }
 
-fn clear_entry(o: &MissionObservationV1, target: usize, entry: Vec2) -> bool {
+/// Whether an entry point is clear of the other planets' margins, the sun's
+/// and the boundary: the mission's screen for an entry worth flying to.
+pub(super) fn clear_entry(o: &MissionObservationV1, target: usize, entry: Vec2) -> bool {
     o.planets
         .iter()
         .filter(|v| v.index != target)

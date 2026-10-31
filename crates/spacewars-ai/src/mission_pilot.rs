@@ -209,6 +209,9 @@ pub struct MissionTelemetry {
     pub transfer_approach: Option<TransferApproach>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transfer_speed: Option<TransferSpeed>,
+    /// The flight stack a host flies the transfer legs with.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learned_transfer: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -229,6 +232,24 @@ pub enum MissionObstacleId {
 pub struct MissionAvoidance {
     pub obstacle: MissionObstacleId,
     pub waypoint: Vec2,
+}
+
+/// The transfer leg the pilot would fly with its own controls this tick,
+/// published for a learned flight host: the mission's entry point above the
+/// destination and that point's velocity in the world, both re-issued every
+/// tick as the entry rides the planet's orbit and spin. Published only while
+/// the pilot's priorities leave the ship to the transfer; the handoff, a
+/// recovery, a pursuit or a solar escape withdraws it.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct TransferLeg {
+    pub tick: u64,
+    /// The tick the destination was selected; a new selection is a new leg.
+    pub selected_tick: u64,
+    pub target: usize,
+    pub entry: Vec2,
+    pub entry_velocity: Vec2,
+    /// From the ship to the entry point.
+    pub distance: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -269,6 +290,11 @@ pub struct MaterialMissionPilot {
     pub(crate) actual_route_recovery: bool,
     destination_switched: bool,
     landing_reference: Option<crate::mission_evaluation::CostedLandingReference>,
+    learned_transfer: bool,
+    transfer_leg: Option<TransferLeg>,
+    /// The selection whose leg a learned host has been given: from then on
+    /// the stack owns the ship's altitude until the handoff.
+    learned_leg: Option<u64>,
 }
 
 impl MaterialMissionPilot {
@@ -322,6 +348,7 @@ impl MaterialMissionPilot {
                 escape_travel: None,
                 transfer_approach: None,
                 transfer_speed: None,
+                learned_transfer: None,
             },
             capture: None,
             recovery: None,
@@ -354,6 +381,9 @@ impl MaterialMissionPilot {
             actual_route_recovery: false,
             destination_switched: false,
             landing_reference: None,
+            learned_transfer: false,
+            transfer_leg: None,
+            learned_leg: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -379,6 +409,7 @@ impl MaterialMissionPilot {
         let escape_travel = self.telemetry.escape_travel.is_some();
         let transfer_approach = self.telemetry.transfer_approach.is_some();
         let transfer_speed = self.telemetry.transfer_speed.is_some();
+        let learned_transfer = self.learned_transfer;
         let powered_capture = self.telemetry.powered_capture;
         let live_claim_stopping = !self.telemetry.live_claim_stopping_disabled;
         let destination_retry = self.telemetry.destination_retry.is_some();
@@ -410,6 +441,7 @@ impl MaterialMissionPilot {
         self.configure_escape_travel(escape_travel);
         self.configure_transfer_approach(transfer_approach);
         self.configure_transfer_speed(transfer_speed);
+        self.configure_learned_transfer(learned_transfer);
         self.configure_powered_capture(powered_capture);
         self.configure_live_claim_stopping(live_claim_stopping);
         self.configure_active_flight_checks(active_flight_checks);
@@ -509,6 +541,24 @@ impl MaterialMissionPilot {
             site: self.site_request(),
             last_survey: self.last_survey,
         }
+    }
+    /// Publish transfer legs for a learned flight host instead of relying on
+    /// the pilot's own transfer controls. The pilot still computes those
+    /// controls every tick, so a host can fall back to them tick by tick.
+    pub(crate) fn configure_learned_transfer(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        self.learned_transfer = enabled;
+        self.telemetry.learned_transfer = enabled.then_some(crate::flight_stack::STACK_ID_V2);
+    }
+    pub fn learned_transfer(&self) -> bool {
+        self.learned_transfer
+    }
+    /// The leg published by the last intent, if that intent flew a transfer.
+    pub fn transfer_leg(&self) -> Option<TransferLeg> {
+        self.transfer_leg
     }
     pub(crate) fn configure_initial_cover(&mut self, enabled: bool) {
         assert!(
@@ -791,6 +841,7 @@ impl MaterialMissionPilot {
         self.telemetry.opponent = None;
         self.telemetry.combat = None;
         self.telemetry.reason = None;
+        self.transfer_leg = None;
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         self.update_capture_escape(o);
@@ -1128,13 +1179,42 @@ impl MaterialMissionPilot {
         let relative = p.ship.velocity - p.planet.motion.velocity;
         let falling = (-relative.dot(up)).max(0.0);
         let mut speed_brake = false;
-        let desired = if altitude < 70.0 + falling * falling / 50.0 {
+        // The launch climb clears the surface before a transfer; once a
+        // learned host flies the leg, the stack keeps its own clearances and
+        // the band must not take the ship back every time its route runs low.
+        let launching = altitude < 70.0 + falling * falling / 50.0
+            && self.learned_leg != Some(self.selected_tick);
+        let desired = if launching {
             self.goal(MissionGoal::Launch, p.tick);
             self.progress_tick = p.tick;
             p.planet.motion.velocity + up * 18.0
         } else {
             self.goal(MissionGoal::Transfer, p.tick);
             self.record_transfer_approach_guidance(p.tick);
+            // The leg is published while the entry is one the mission would
+            // fly to itself: an entry that another planet's orbit has carried
+            // into its margin is left to the pilot's own detours until the
+            // orbits part, since the handoff cannot fire at another planet's
+            // surface and the stack would park there.
+            if self.learned_transfer
+                && p.controls_armed
+                && p.ship_available
+                && p.ship_form == ShipForm::Ship
+                && c.recovery.flight.flight.enabled
+                && matches!(p.location, PilotLocation::Aboard(_))
+                && p.landing.supported_feet == 0
+                && transfer_approach::clear_entry(o, target.index, entry)
+            {
+                self.transfer_leg = Some(TransferLeg {
+                    tick: p.tick,
+                    selected_tick: self.selected_tick,
+                    target: target.index,
+                    entry,
+                    entry_velocity: target.velocity_at(entry),
+                    distance: p.ship.position.distance_to(entry),
+                });
+                self.learned_leg = Some(self.selected_tick);
+            }
             let waypoint = self.route_waypoint(o, entry, Some(target.index));
             let delta = waypoint - p.ship.position;
             let ordinary = self.detour_velocity(o, target.motion.velocity)

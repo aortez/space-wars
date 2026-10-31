@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-noise-probe-v1-20261024",
+  "completed_at_utc": "2026-10-24T23:30:19.920273+00:00",
+  "kind": "frozen-policy paired noise-amplitude audit",
+  "source_file_count": 1556,
+  "source_archive_sha256": "fa04ef33be2d74cbdd0882e86bba727543daa1632ba9baa54fe3e1e4a1472ee9",
+  "runtime_sha256": "73b06a97af78b64ff3b93dda0df79f703bbbf61bc26360236a2029f284648374",
+  "checkpoint_count": 0,
+  "policy_export_count": 0,
+  "training_ticks": 0,
+  "optimizer_steps": 0,
+  "evaluation_ticks": 972617,
+  "evaluation_episodes": 1344,
+  "parity_comparisons": 96,
+  "gates": {
+    "half": {
+      "holding_noise_effect": false,
+      "position_noise_effect": false,
+      "broad_recovery": false
+    },
+    "quarter": {
+      "holding_noise_effect": true,
+      "position_noise_effect": false,
+      "broad_recovery": false
+    }
+  },
+  "confirmation_used": false,
+  "model_promoted": false,
+  "validation": {
+    "sources_and_archive_verified": 1556,
+    "previous_manifests_unchanged": 32,
+    "copied_inputs_unchanged": 105,
+    "production_sources_and_native_runtime_unchanged": true,
+    "native_baseline_passed": 421,
+    "native_baseline_ignored": 2,
+    "python_tests": 19,
+    "native_python_parity_comparisons": 96,
+    "original_native_traces_exact": 96,
+    "normal_streams_exact": 384,
+    "sampled_and_python_mean_traces_reconstructed": 1248,
+    "all_latents_exact_and_actions_verified": true,
+    "weights_hashes_and_rng_preserved": true,
+    "all_seven_process_exits_zero": true,
+    "budgets_passed": true
+  },
+  "retained_file_count": 3160,
+  "retained_bytes_excluding_manifest": 348294736,
+  "archive_path": "data/training-experiments/learned-flight-noise-probe-v1-20261024",
+  "manifest_sha256": "ff8f9ff9f4b3dbf1e5ff509e3daf099ba3ae0493d26eebea8a977c48623a94fc",
+  "report_sha256": "532bc805667469d3b66ceff62cb91b663e4b322f0b8a1b0ee284f239eda1b3e6",
+  "results_sha256": "c5c85d5f072e370764576c4f23274c4c7ebc966b56c9f2f009cd94143f648409"
+}

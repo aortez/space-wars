@@ -9,8 +9,13 @@ use engine_agent::{
     training_workers::{EpisodePool, WorkerConfig},
 };
 
+mod brake_bias;
+mod brake_joint_fit;
+mod brake_neighborhood;
+mod brake_readout;
 mod diagnostic;
 mod full_retention;
+mod match_retention;
 pub(super) mod performance;
 
 const LEARNING_PLAN: &[u8] = include_bytes!(concat!(

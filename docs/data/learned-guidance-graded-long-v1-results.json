@@ -1,0 +1,4341 @@
+{
+  "experiment": "recovery_guidance_graded_long_v1",
+  "runtime": "diagnostic_v1/linux/x86_64/89ab627d001347c263a7df8643dab364cdf85ae07d2274bfd518e0d11835ad20",
+  "plan_sha256": "71bf5d795e5106c18f886e362cd7c87d38ff94c2e4c23b3876b8ac18d6052ed5",
+  "prefix_identical_generations": 24,
+  "generations": 240,
+  "population": 16,
+  "candidate_evaluations": 3840,
+  "training_episodes": 979200,
+  "unique_genomes": 3346,
+  "training_seconds": 3050.95584496,
+  "phase_wall_seconds": {
+    "evaluate": 50.28931066799851,
+    "preflight": 50.64130911100074,
+    "train": 324.0197068549969,
+    "resume": 2786.8476162499974
+  },
+  "improvements": [
+    {
+      "generation": 1,
+      "genome": "9ba26f93021d1c2ec7ca97288d81f47d33645965822680ea8d5ec26cfdadf705",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 0,
+        "brake_progress_points": 5267,
+        "approach_speed_points": 3669,
+        "approach_position_points": 6783,
+        "precision_position_points": 155484,
+        "precision_velocity_points": 156015,
+        "spare_ticks": 138844
+      }
+    },
+    {
+      "generation": 5,
+      "genome": "2770b1e488177e0bb1eeac6149fe24aab62a629f4410629da6d2120c8c3ea0e4",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 0,
+        "brake_progress_points": 5326,
+        "approach_speed_points": 3648,
+        "approach_position_points": 6789,
+        "precision_position_points": 155480,
+        "precision_velocity_points": 156008,
+        "spare_ticks": 138724
+      }
+    },
+    {
+      "generation": 10,
+      "genome": "0e4ae49c736163e3a748f986c73d73c1fe74330b41901ed538cffb0dbd1d8767",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 0,
+        "brake_progress_points": 5329,
+        "approach_speed_points": 3594,
+        "approach_position_points": 6700,
+        "precision_position_points": 155435,
+        "precision_velocity_points": 156056,
+        "spare_ticks": 136434
+      }
+    },
+    {
+      "generation": 11,
+      "genome": "87550d1ad6ade1992dc20ad72c9053533aff41253da38a3c9982eaee02d70913",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 0,
+        "brake_progress_points": 5448,
+        "approach_speed_points": 3680,
+        "approach_position_points": 6798,
+        "precision_position_points": 155492,
+        "precision_velocity_points": 155837,
+        "spare_ticks": 131020
+      }
+    },
+    {
+      "generation": 17,
+      "genome": "3032646cc8758ea5ee7df10acd008d5dbbd3055fa00f19415ed6a7dae37fcb5f",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 0,
+        "brake_progress_points": 5479,
+        "approach_speed_points": 3632,
+        "approach_position_points": 6777,
+        "precision_position_points": 155320,
+        "precision_velocity_points": 155948,
+        "spare_ticks": 136390
+      }
+    },
+    {
+      "generation": 18,
+      "genome": "495e2b8563212f96c245ea7b370b0c67784b3bd57af864ee6d8368975cedd4d1",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 0,
+        "brake_progress_points": 5488,
+        "approach_speed_points": 3635,
+        "approach_position_points": 6785,
+        "precision_position_points": 155304,
+        "precision_velocity_points": 155987,
+        "spare_ticks": 136003
+      }
+    },
+    {
+      "generation": 19,
+      "genome": "6ff82f329388dae5957dd77187520dc4f3322c4f2965fd8c88580b3569a4ad1e",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 2,
+        "brake_progress_points": 5277,
+        "approach_speed_points": 4038,
+        "approach_position_points": 6701,
+        "precision_position_points": 155488,
+        "precision_velocity_points": 155989,
+        "spare_ticks": 118310
+      }
+    },
+    {
+      "generation": 25,
+      "genome": "3bc54f04c0149722d2b524fe4d115afde1137586506694a188d68ded7e5f4c6a",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 2,
+        "brake_progress_points": 5325,
+        "approach_speed_points": 4040,
+        "approach_position_points": 6709,
+        "precision_position_points": 155610,
+        "precision_velocity_points": 155943,
+        "spare_ticks": 122434
+      }
+    },
+    {
+      "generation": 26,
+      "genome": "1df62e0063a30e718eaa7b0c9111641d21b3a46fcb78f6124f0dfdbe4608a479",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 2,
+        "brake_progress_points": 5346,
+        "approach_speed_points": 4033,
+        "approach_position_points": 6690,
+        "precision_position_points": 155454,
+        "precision_velocity_points": 155745,
+        "spare_ticks": 120600
+      }
+    },
+    {
+      "generation": 28,
+      "genome": "40113209850f627fd349898141c8925e4b6150538bc723b846ea7bd52332cb8e",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 2,
+        "brake_progress_points": 5457,
+        "approach_speed_points": 4020,
+        "approach_position_points": 6677,
+        "precision_position_points": 155664,
+        "precision_velocity_points": 155796,
+        "spare_ticks": 124987
+      }
+    },
+    {
+      "generation": 29,
+      "genome": "4d51913f9230498bff08433c78769dfeb2480f598eb18a592ab4092fb20509e2",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 2,
+        "brake_progress_points": 5644,
+        "approach_speed_points": 4056,
+        "approach_position_points": 6730,
+        "precision_position_points": 155556,
+        "precision_velocity_points": 155913,
+        "spare_ticks": 118062
+      }
+    },
+    {
+      "generation": 31,
+      "genome": "5d3e2726c24b1a9a0d637495b88dc4f57974ad0db5680e79903c2f1ca2cc033c",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 2,
+        "brake_progress_points": 5660,
+        "approach_speed_points": 4055,
+        "approach_position_points": 6731,
+        "precision_position_points": 155489,
+        "precision_velocity_points": 155882,
+        "spare_ticks": 123837
+      }
+    },
+    {
+      "generation": 34,
+      "genome": "fbcb39fffe44bdcc64168cab9485c8a8a82b06a88c27a4d802d75ba46fcc97fc",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 2,
+        "brake_progress_points": 5938,
+        "approach_speed_points": 4049,
+        "approach_position_points": 6722,
+        "precision_position_points": 155484,
+        "precision_velocity_points": 155788,
+        "spare_ticks": 122382
+      }
+    },
+    {
+      "generation": 39,
+      "genome": "50c10170547500440a62ecb260e238c78fa4f4c56ea4aabe7f0ce4035fdfedf9",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 3,
+        "brake_progress_points": 5618,
+        "approach_speed_points": 4485,
+        "approach_position_points": 6885,
+        "precision_position_points": 155513,
+        "precision_velocity_points": 155881,
+        "spare_ticks": 119284
+      }
+    },
+    {
+      "generation": 41,
+      "genome": "71cf1aefaa1867e9b1a6b7bd2293dfe6e83f6b1f43148109972b3330fd0323f4",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 5849,
+        "approach_speed_points": 5087,
+        "approach_position_points": 7136,
+        "precision_position_points": 155323,
+        "precision_velocity_points": 155829,
+        "spare_ticks": 123530
+      }
+    },
+    {
+      "generation": 42,
+      "genome": "a092bacd72db0c6ca5d87e127fd778b179f3deb1014afa84b14c2bd9d4766916",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 5981,
+        "approach_speed_points": 5100,
+        "approach_position_points": 7054,
+        "precision_position_points": 155371,
+        "precision_velocity_points": 155833,
+        "spare_ticks": 121070
+      }
+    },
+    {
+      "generation": 45,
+      "genome": "f8804992662c3720e72f5bbede58e29035a5e16375af52aff91e211fde0f6225",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6036,
+        "approach_speed_points": 5176,
+        "approach_position_points": 7166,
+        "precision_position_points": 155218,
+        "precision_velocity_points": 155779,
+        "spare_ticks": 120847
+      }
+    },
+    {
+      "generation": 46,
+      "genome": "5e5b9f7fc182b0ba1d46a6be902f21e7d8358ac4632494680b335954b22d6eb8",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6083,
+        "approach_speed_points": 5103,
+        "approach_position_points": 7025,
+        "precision_position_points": 155292,
+        "precision_velocity_points": 155850,
+        "spare_ticks": 115234
+      }
+    },
+    {
+      "generation": 51,
+      "genome": "ba2f55c2b5505844b83de5d4c02c959b70f67b0358eada78ec75d651a0935b31",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6088,
+        "approach_speed_points": 5198,
+        "approach_position_points": 7175,
+        "precision_position_points": 155170,
+        "precision_velocity_points": 155751,
+        "spare_ticks": 114769
+      }
+    },
+    {
+      "generation": 52,
+      "genome": "e7edec77bc8ddc0d8e765b4de12a69c176ad0a3a2d8433d4b5e7d460056fbd28",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6104,
+        "approach_speed_points": 5195,
+        "approach_position_points": 7140,
+        "precision_position_points": 155224,
+        "precision_velocity_points": 155869,
+        "spare_ticks": 125648
+      }
+    },
+    {
+      "generation": 54,
+      "genome": "a9e247637be2fc9e33e7dbcf3554121e20017f15142bee7d5412c2d4bbf3faee",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6129,
+        "approach_speed_points": 5181,
+        "approach_position_points": 7131,
+        "precision_position_points": 155356,
+        "precision_velocity_points": 155731,
+        "spare_ticks": 113311
+      }
+    },
+    {
+      "generation": 55,
+      "genome": "eb4631a1a061841d3fbaf145f2cab12ef0ac7defe2606550b1ab180ac0f160fb",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6139,
+        "approach_speed_points": 5181,
+        "approach_position_points": 7110,
+        "precision_position_points": 155250,
+        "precision_velocity_points": 155769,
+        "spare_ticks": 119578
+      }
+    },
+    {
+      "generation": 60,
+      "genome": "75686dee0d333567d0930a4b2d18e390b5b72a72460a1d5ab3be0c274f04e922",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6142,
+        "approach_speed_points": 5184,
+        "approach_position_points": 7129,
+        "precision_position_points": 155252,
+        "precision_velocity_points": 155720,
+        "spare_ticks": 121223
+      }
+    },
+    {
+      "generation": 65,
+      "genome": "05c17fd40cb0d02b244cf8966f9d9f8e90d42624ba039567d34ab528f756f924",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6145,
+        "approach_speed_points": 5177,
+        "approach_position_points": 7093,
+        "precision_position_points": 155380,
+        "precision_velocity_points": 155751,
+        "spare_ticks": 120410
+      }
+    },
+    {
+      "generation": 66,
+      "genome": "4dd319a6f7364ee42b5ff4906f7823befe2b5debbba8382a4a7f1f672bd25a4a",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6240,
+        "approach_speed_points": 5186,
+        "approach_position_points": 6968,
+        "precision_position_points": 155211,
+        "precision_velocity_points": 155746,
+        "spare_ticks": 112960
+      }
+    },
+    {
+      "generation": 69,
+      "genome": "b5017689a0b4626b719e65a5dd9ee7f949662ca999d60b181fb0247d11fc2780",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6322,
+        "approach_speed_points": 5193,
+        "approach_position_points": 7089,
+        "precision_position_points": 155433,
+        "precision_velocity_points": 155861,
+        "spare_ticks": 112692
+      }
+    },
+    {
+      "generation": 70,
+      "genome": "e496cf9a6ff4938c23039ea60ef42e00b183407fc6c7457f8baaf37de9f88ff8",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6347,
+        "approach_speed_points": 5095,
+        "approach_position_points": 6920,
+        "precision_position_points": 155512,
+        "precision_velocity_points": 155866,
+        "spare_ticks": 113266
+      }
+    },
+    {
+      "generation": 75,
+      "genome": "fce6edf2a6605a76165ef595907f0dd2cc513e403f9d94b8f7999a84a27b727e",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6352,
+        "approach_speed_points": 5105,
+        "approach_position_points": 6881,
+        "precision_position_points": 155389,
+        "precision_velocity_points": 155746,
+        "spare_ticks": 119648
+      }
+    },
+    {
+      "generation": 82,
+      "genome": "efa2dda31729d2adc2b4251d6857bd92efd2440416343b62546894f4ad4513e2",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6356,
+        "approach_speed_points": 5182,
+        "approach_position_points": 7050,
+        "precision_position_points": 155451,
+        "precision_velocity_points": 155892,
+        "spare_ticks": 113051
+      }
+    },
+    {
+      "generation": 83,
+      "genome": "790822573e4c9818d0147ff17fc6c42e6868ffe495556c532e71e31a975e863f",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6402,
+        "approach_speed_points": 5197,
+        "approach_position_points": 7042,
+        "precision_position_points": 155398,
+        "precision_velocity_points": 155727,
+        "spare_ticks": 113978
+      }
+    },
+    {
+      "generation": 85,
+      "genome": "d5ecc199285a6b9ea290a5b9137f0f00ad60d5f94665ea4d7cd78667a617b042",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6420,
+        "approach_speed_points": 5199,
+        "approach_position_points": 7042,
+        "precision_position_points": 155419,
+        "precision_velocity_points": 155759,
+        "spare_ticks": 113691
+      }
+    },
+    {
+      "generation": 90,
+      "genome": "42dc8e087b921300aed9f329205768bc280d57b58c1aedbd2f1b7630af9054fe",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6433,
+        "approach_speed_points": 5198,
+        "approach_position_points": 6986,
+        "precision_position_points": 155098,
+        "precision_velocity_points": 155864,
+        "spare_ticks": 122766
+      }
+    },
+    {
+      "generation": 91,
+      "genome": "24e3070aa8a8de0c0bfb36dc31d9e36ef9fed00e584c697a98843ef1d55a2cba",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6494,
+        "approach_speed_points": 5191,
+        "approach_position_points": 7066,
+        "precision_position_points": 155367,
+        "precision_velocity_points": 155818,
+        "spare_ticks": 124802
+      }
+    },
+    {
+      "generation": 95,
+      "genome": "2ac87e772cabbc79930435a6a8fd5d744e981089a2eed89708f9256abed22e42",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6515,
+        "approach_speed_points": 5089,
+        "approach_position_points": 6825,
+        "precision_position_points": 155325,
+        "precision_velocity_points": 155895,
+        "spare_ticks": 118713
+      }
+    },
+    {
+      "generation": 102,
+      "genome": "6de42f9e4f447807f6e0a8a492feeacbc27a4005e4c5c8bee1240d24f7baa86f",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6553,
+        "approach_speed_points": 5082,
+        "approach_position_points": 6754,
+        "precision_position_points": 155179,
+        "precision_velocity_points": 155945,
+        "spare_ticks": 113743
+      }
+    },
+    {
+      "generation": 107,
+      "genome": "944eac507f137226fe21ebc8fd837a57b5a7df5c4d746bf00ac2dc3ac278ca56",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6623,
+        "approach_speed_points": 5113,
+        "approach_position_points": 6688,
+        "precision_position_points": 154890,
+        "precision_velocity_points": 155822,
+        "spare_ticks": 113960
+      }
+    },
+    {
+      "generation": 109,
+      "genome": "61ef33e2dcd7d47bc7c68b606c1cef8b356032313006b5b3c4612ab838825cfc",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6705,
+        "approach_speed_points": 5396,
+        "approach_position_points": 6824,
+        "precision_position_points": 154850,
+        "precision_velocity_points": 155711,
+        "spare_ticks": 119385
+      }
+    },
+    {
+      "generation": 118,
+      "genome": "93014ccf767bdc5f3ad7eb3c2733599b969eb36403fd3de9975fe2e4efc01173",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6747,
+        "approach_speed_points": 5303,
+        "approach_position_points": 6612,
+        "precision_position_points": 155268,
+        "precision_velocity_points": 155856,
+        "spare_ticks": 121385
+      }
+    },
+    {
+      "generation": 121,
+      "genome": "5e8799f7901724ca7e7051061df959526d208942db63da334562c78db5df8780",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6762,
+        "approach_speed_points": 5414,
+        "approach_position_points": 6780,
+        "precision_position_points": 154960,
+        "precision_velocity_points": 155783,
+        "spare_ticks": 122361
+      }
+    },
+    {
+      "generation": 126,
+      "genome": "6738d00d27ea03cd40a7be7d68edbcfd3822ea40ab5075bdbf2420c6bf51a457",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6850,
+        "approach_speed_points": 5415,
+        "approach_position_points": 6699,
+        "precision_position_points": 155280,
+        "precision_velocity_points": 155736,
+        "spare_ticks": 119537
+      }
+    },
+    {
+      "generation": 133,
+      "genome": "aa49e78d4b632847aba7df4aac954e6c64b01e4a8c36b36a3c9d3e94ca3dc41e",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 5,
+        "brake_progress_points": 6856,
+        "approach_speed_points": 5409,
+        "approach_position_points": 6677,
+        "precision_position_points": 155380,
+        "precision_velocity_points": 155739,
+        "spare_ticks": 116231
+      }
+    },
+    {
+      "generation": 135,
+      "genome": "4a767b86ca60fef63528e57e2618d9af1d66cf2f746b0407cde7fc786c7ed26a",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 6733,
+        "approach_speed_points": 6282,
+        "approach_position_points": 6460,
+        "precision_position_points": 155185,
+        "precision_velocity_points": 155671,
+        "spare_ticks": 112886
+      }
+    },
+    {
+      "generation": 138,
+      "genome": "362524e16e0904df27cd8d8defa52c4e1488f517b07dcdd644c6e412006d59da",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 6896,
+        "approach_speed_points": 6313,
+        "approach_position_points": 6468,
+        "precision_position_points": 155408,
+        "precision_velocity_points": 155629,
+        "spare_ticks": 113883
+      }
+    },
+    {
+      "generation": 141,
+      "genome": "0b39423218cbc67b570e9c5d8f30b604550399c8db6ee2fe2ba0e4849e7dfb50",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7012,
+        "approach_speed_points": 6341,
+        "approach_position_points": 6531,
+        "precision_position_points": 155435,
+        "precision_velocity_points": 155710,
+        "spare_ticks": 112465
+      }
+    },
+    {
+      "generation": 146,
+      "genome": "7212408beb6c012bf859fa28cf3b92c30d24732b352d4674639f961558a44936",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7025,
+        "approach_speed_points": 6282,
+        "approach_position_points": 6467,
+        "precision_position_points": 155054,
+        "precision_velocity_points": 155893,
+        "spare_ticks": 113852
+      }
+    },
+    {
+      "generation": 148,
+      "genome": "131a87fbdb8bfcd92203649c8e399af08fde8e79d829f2611f8a76dabbfd7018",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7052,
+        "approach_speed_points": 6297,
+        "approach_position_points": 6489,
+        "precision_position_points": 155080,
+        "precision_velocity_points": 155838,
+        "spare_ticks": 112438
+      }
+    },
+    {
+      "generation": 149,
+      "genome": "cdef7f8bde0d4a1f6ab6e0535949f526cdec6340489de29e83e0f8833f598837",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7054,
+        "approach_speed_points": 6263,
+        "approach_position_points": 6482,
+        "precision_position_points": 154901,
+        "precision_velocity_points": 155804,
+        "spare_ticks": 109120
+      }
+    },
+    {
+      "generation": 151,
+      "genome": "59146bca5f44015a371b1f426acd274999e72a061879f39ed7521907e56deffe",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7123,
+        "approach_speed_points": 6273,
+        "approach_position_points": 6466,
+        "precision_position_points": 155030,
+        "precision_velocity_points": 155706,
+        "spare_ticks": 115656
+      }
+    },
+    {
+      "generation": 159,
+      "genome": "8c2906bada38c1bea6cce9fc7efe527a0e3fad0b951b1e8c803c98cae0ef1e1a",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7148,
+        "approach_speed_points": 6267,
+        "approach_position_points": 6477,
+        "precision_position_points": 155100,
+        "precision_velocity_points": 155827,
+        "spare_ticks": 115946
+      }
+    },
+    {
+      "generation": 165,
+      "genome": "d320ecd519ef3bf3e1efd09c3f70a453ea825d68143d3b866d7e9a060af24898",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7365,
+        "approach_speed_points": 6292,
+        "approach_position_points": 6557,
+        "precision_position_points": 155101,
+        "precision_velocity_points": 155804,
+        "spare_ticks": 122545
+      }
+    },
+    {
+      "generation": 166,
+      "genome": "8b772da5e8aa39f11a1a02e1129f2ee510a8ff2bd0b78cf8146c2c0713679002",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7367,
+        "approach_speed_points": 6292,
+        "approach_position_points": 6559,
+        "precision_position_points": 154974,
+        "precision_velocity_points": 155816,
+        "spare_ticks": 122248
+      }
+    },
+    {
+      "generation": 167,
+      "genome": "1d1e65ffab0af6ec4939de3117a1de49e159b8f24ef7bf9241605e5b5de4caf5",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7433,
+        "approach_speed_points": 6319,
+        "approach_position_points": 6618,
+        "precision_position_points": 155156,
+        "precision_velocity_points": 155882,
+        "spare_ticks": 122523
+      }
+    },
+    {
+      "generation": 170,
+      "genome": "69c27e731a289007b440cc9cc148543a456818e98873ce32787567514889602b",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7472,
+        "approach_speed_points": 6295,
+        "approach_position_points": 6620,
+        "precision_position_points": 155121,
+        "precision_velocity_points": 155854,
+        "spare_ticks": 122515
+      }
+    },
+    {
+      "generation": 172,
+      "genome": "86a345ee409c3827417bf37c2b07123c904b56314e861fc7541670978746a9ad",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7552,
+        "approach_speed_points": 6310,
+        "approach_position_points": 6752,
+        "precision_position_points": 155198,
+        "precision_velocity_points": 155844,
+        "spare_ticks": 122315
+      }
+    },
+    {
+      "generation": 173,
+      "genome": "b0cca6a3e2cc9a94fdbf2e6c2f014a46c49ada96b69a9faa565640ac1b8e8f15",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7557,
+        "approach_speed_points": 6313,
+        "approach_position_points": 6762,
+        "precision_position_points": 155277,
+        "precision_velocity_points": 155841,
+        "spare_ticks": 122161
+      }
+    },
+    {
+      "generation": 177,
+      "genome": "42391c77cc4d2057c65bc914e5e51c88337eb13820d91c83bce59ce21aac178e",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7589,
+        "approach_speed_points": 6290,
+        "approach_position_points": 6777,
+        "precision_position_points": 155208,
+        "precision_velocity_points": 155807,
+        "spare_ticks": 122736
+      }
+    },
+    {
+      "generation": 180,
+      "genome": "84c79fe163d3ed5a119afe530e53466c6147239f22767eb4011bfd19c1a846c5",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7670,
+        "approach_speed_points": 6349,
+        "approach_position_points": 6760,
+        "precision_position_points": 155241,
+        "precision_velocity_points": 155851,
+        "spare_ticks": 121731
+      }
+    },
+    {
+      "generation": 184,
+      "genome": "599f9f4a4596f1cecb37c2d9e1a487479cd8a6ef42a16384ea33878fb351162d",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7742,
+        "approach_speed_points": 6388,
+        "approach_position_points": 6666,
+        "precision_position_points": 155085,
+        "precision_velocity_points": 155825,
+        "spare_ticks": 124074
+      }
+    },
+    {
+      "generation": 189,
+      "genome": "063de49ea47288517fa0a19a50fd59b6e07e0e421f188ad07a8244ccb5f8a0b9",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7754,
+        "approach_speed_points": 6393,
+        "approach_position_points": 6649,
+        "precision_position_points": 155236,
+        "precision_velocity_points": 155854,
+        "spare_ticks": 128386
+      }
+    },
+    {
+      "generation": 190,
+      "genome": "2aec91dc9a4ef74ea394d4c184d78fdbc1b9339780060a4b7dc44055b0724bfe",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7765,
+        "approach_speed_points": 6360,
+        "approach_position_points": 6629,
+        "precision_position_points": 154984,
+        "precision_velocity_points": 155854,
+        "spare_ticks": 122249
+      }
+    },
+    {
+      "generation": 201,
+      "genome": "6426a5720ed1775219d344bd39c04f2fd38430206c2258a057333bde8dbc2d79",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7767,
+        "approach_speed_points": 6336,
+        "approach_position_points": 6626,
+        "precision_position_points": 155183,
+        "precision_velocity_points": 155830,
+        "spare_ticks": 122789
+      }
+    },
+    {
+      "generation": 202,
+      "genome": "cf92ea86fda4e63d223019b44b5b3a86a6fb9051c303e18fbec727d7bfa4caf4",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7776,
+        "approach_speed_points": 6376,
+        "approach_position_points": 6618,
+        "precision_position_points": 155011,
+        "precision_velocity_points": 155883,
+        "spare_ticks": 121801
+      }
+    },
+    {
+      "generation": 206,
+      "genome": "7871380e39f2e381791933a7ffce6c5aa7bc58451849a1bc711a20157ab57fec",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7825,
+        "approach_speed_points": 6409,
+        "approach_position_points": 6622,
+        "precision_position_points": 154977,
+        "precision_velocity_points": 155903,
+        "spare_ticks": 123079
+      }
+    },
+    {
+      "generation": 208,
+      "genome": "4babfd46bd89bd3704932af91497218d85cc4ad8a9c9dd13f9bef5289896e0d4",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7829,
+        "approach_speed_points": 6429,
+        "approach_position_points": 6622,
+        "precision_position_points": 155106,
+        "precision_velocity_points": 155934,
+        "spare_ticks": 121293
+      }
+    },
+    {
+      "generation": 210,
+      "genome": "78be2b0a1bcdf86eb22a5fce0e85fd4302f6bf36f8ebfe9cc591ff17d0f2415b",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7830,
+        "approach_speed_points": 6416,
+        "approach_position_points": 6620,
+        "precision_position_points": 155085,
+        "precision_velocity_points": 155886,
+        "spare_ticks": 121723
+      }
+    },
+    {
+      "generation": 214,
+      "genome": "de036c971f57c8540c80296ee426fa574c0e759b179dd0dff66c3c0a808364e6",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7831,
+        "approach_speed_points": 6406,
+        "approach_position_points": 6622,
+        "precision_position_points": 155077,
+        "precision_velocity_points": 155879,
+        "spare_ticks": 122419
+      }
+    },
+    {
+      "generation": 215,
+      "genome": "d7be6b4b8e681b406cff8077681dd1ac6410b4a18b65be3664833afc15078059",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7832,
+        "approach_speed_points": 6425,
+        "approach_position_points": 6618,
+        "precision_position_points": 155094,
+        "precision_velocity_points": 155951,
+        "spare_ticks": 120308
+      }
+    },
+    {
+      "generation": 218,
+      "genome": "83f210b1c4fca9477a46d8c3ac3ac5b0a2bb3c3fc738cda71dc70b1de0562852",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7840,
+        "approach_speed_points": 6414,
+        "approach_position_points": 6621,
+        "precision_position_points": 155069,
+        "precision_velocity_points": 155817,
+        "spare_ticks": 126225
+      }
+    },
+    {
+      "generation": 223,
+      "genome": "fc122c10171adf5b767cacaa2219924db6741405876254ef0dcad75bc9d18acf",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7844,
+        "approach_speed_points": 6435,
+        "approach_position_points": 6623,
+        "precision_position_points": 155191,
+        "precision_velocity_points": 155845,
+        "spare_ticks": 124433
+      }
+    },
+    {
+      "generation": 230,
+      "genome": "e6ae2645c4adb9224b6f0e5dcc72961384cd51e3e598b444fd9731f741a6d006",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7865,
+        "approach_speed_points": 6469,
+        "approach_position_points": 6623,
+        "precision_position_points": 154967,
+        "precision_velocity_points": 155796,
+        "spare_ticks": 118507
+      }
+    },
+    {
+      "generation": 240,
+      "genome": "dba8538c878c39d07aa2a48e85552c0ad131adfdab080bc80f53b04cefebb872",
+      "fitness": {
+        "precision_completed": 157,
+        "protected_completed": 90,
+        "additional_completed": 8,
+        "brake_progress_points": 7869,
+        "approach_speed_points": 6484,
+        "approach_position_points": 6623,
+        "precision_position_points": 155080,
+        "precision_velocity_points": 155813,
+        "spare_ticks": 117817
+      }
+    }
+  ],
+  "completion_improvements": [
+    {
+      "generation": 1,
+      "additional": 0,
+      "genome": "9ba26f93021d1c2ec7ca97288d81f47d33645965822680ea8d5ec26cfdadf705"
+    },
+    {
+      "generation": 19,
+      "additional": 2,
+      "genome": "6ff82f329388dae5957dd77187520dc4f3322c4f2965fd8c88580b3569a4ad1e"
+    },
+    {
+      "generation": 39,
+      "additional": 3,
+      "genome": "50c10170547500440a62ecb260e238c78fa4f4c56ea4aabe7f0ce4035fdfedf9"
+    },
+    {
+      "generation": 41,
+      "additional": 5,
+      "genome": "71cf1aefaa1867e9b1a6b7bd2293dfe6e83f6b1f43148109972b3330fd0323f4"
+    },
+    {
+      "generation": 135,
+      "additional": 8,
+      "genome": "4a767b86ca60fef63528e57e2618d9af1d66cf2f746b0407cde7fc786c7ed26a"
+    }
+  ],
+  "generations_since_improvement": 0,
+  "fully_retained_candidate_evaluations": 877,
+  "max_additional_with_full_retention": 8,
+  "max_additional_without_retention": 8,
+  "controllers": [
+    {
+      "controller": "short",
+      "genome": "6ff82f329388dae5957dd77187520dc4f3322c4f2965fd8c88580b3569a4ad1e",
+      "fitness": {
+        "additional_completed": 2,
+        "approach_position_points": 6701,
+        "approach_speed_points": 4038,
+        "brake_progress_points": 5277,
+        "precision_completed": 157,
+        "precision_position_points": 155488,
+        "precision_velocity_points": 155989,
+        "protected_completed": 90,
+        "spare_ticks": 118310
+      },
+      "passed": false,
+      "approaches": [
+        {
+          "partition": "protected",
+          "cases": 90,
+          "arrived": 90,
+          "outcomes": {
+            "arrived": 90
+          },
+          "episodes": [
+            {
+              "case": "train-42-p2-d35",
+              "outcome": "arrived",
+              "ticks": 44,
+              "brake_ticks": 29,
+              "first_brake_decision": 15,
+              "initial_raw_brake": -0.25304675102233887,
+              "maximum_raw_brake": 0.23530305922031403,
+              "host_reason": null
+            },
+            {
+              "case": "train-10101-p1-d65",
+              "outcome": "arrived",
+              "ticks": 127,
+              "brake_ticks": 42,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.9395357370376587,
+              "maximum_raw_brake": 0.9395357370376587,
+              "host_reason": null
+            },
+            {
+              "case": "train-10101-p1-d35",
+              "outcome": "arrived",
+              "ticks": 57,
+              "brake_ticks": 56,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6988359093666077,
+              "maximum_raw_brake": 0.6988359093666077,
+              "host_reason": null
+            },
+            {
+              "case": "train-10101-p2-d35",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 24,
+              "first_brake_decision": 37,
+              "initial_raw_brake": -0.6875067949295044,
+              "maximum_raw_brake": 0.15461671352386475,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-17-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 45,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.26970532536506653,
+              "maximum_raw_brake": 0.26970532536506653,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-17-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 48,
+              "brake_ticks": 47,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.40669524669647217,
+              "maximum_raw_brake": 0.40669524669647217,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-113-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 56,
+              "brake_ticks": 45,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8655266165733337,
+              "maximum_raw_brake": 0.8655266165733337,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-113-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 49,
+              "brake_ticks": 48,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8783783316612244,
+              "maximum_raw_brake": 0.8783783316612244,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-2027-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 66,
+              "brake_ticks": 29,
+              "first_brake_decision": 37,
+              "initial_raw_brake": -0.2402583211660385,
+              "maximum_raw_brake": 0.15246029198169708,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-2027-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 58,
+              "brake_ticks": 24,
+              "first_brake_decision": 34,
+              "initial_raw_brake": -0.5873204469680786,
+              "maximum_raw_brake": 0.11758823692798615,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-9001-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 64,
+              "brake_ticks": 35,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.759162425994873,
+              "maximum_raw_brake": 0.759162425994873,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-9001-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.2590705156326294,
+              "maximum_raw_brake": 0.2590705156326294,
+              "host_reason": null
+            },
+            {
+              "case": "seed-42-weak-round-p2",
+              "outcome": "arrived",
+              "ticks": 44,
+              "brake_ticks": 29,
+              "first_brake_decision": 15,
+              "initial_raw_brake": -0.25304675102233887,
+              "maximum_raw_brake": 0.23530305922031403,
+              "host_reason": null
+            },
+            {
+              "case": "seed-10101-weak-round-p1",
+              "outcome": "arrived",
+              "ticks": 57,
+              "brake_ticks": 56,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6988359093666077,
+              "maximum_raw_brake": 0.6988359093666077,
+              "host_reason": null
+            },
+            {
+              "case": "seed-10101-weak-round-p2",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 24,
+              "first_brake_decision": 37,
+              "initial_raw_brake": -0.6875067949295044,
+              "maximum_raw_brake": 0.15461671352386475,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-17-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 45,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.26970532536506653,
+              "maximum_raw_brake": 0.26970532536506653,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-17-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 48,
+              "brake_ticks": 47,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.40669524669647217,
+              "maximum_raw_brake": 0.40669524669647217,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-113-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 56,
+              "brake_ticks": 45,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8655266165733337,
+              "maximum_raw_brake": 0.8655266165733337,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-113-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 49,
+              "brake_ticks": 48,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8783783316612244,
+              "maximum_raw_brake": 0.8783783316612244,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-2027-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 66,
+              "brake_ticks": 29,
+              "first_brake_decision": 37,
+              "initial_raw_brake": -0.2402583211660385,
+              "maximum_raw_brake": 0.15246029198169708,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-2027-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 58,
+              "brake_ticks": 24,
+              "first_brake_decision": 34,
+              "initial_raw_brake": -0.5873204469680786,
+              "maximum_raw_brake": 0.11758823692798615,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-9001-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 64,
+              "brake_ticks": 35,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.759162425994873,
+              "maximum_raw_brake": 0.759162425994873,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-9001-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.2590705156326294,
+              "maximum_raw_brake": 0.2590705156326294,
+              "host_reason": null
+            },
+            {
+              "case": "validation-73-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 43,
+              "brake_ticks": 42,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.43368664383888245,
+              "maximum_raw_brake": 0.43368664383888245,
+              "host_reason": null
+            },
+            {
+              "case": "validation-73-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 64,
+              "brake_ticks": 24,
+              "first_brake_decision": 40,
+              "initial_raw_brake": -0.6942113637924194,
+              "maximum_raw_brake": 0.16582758724689484,
+              "host_reason": null
+            },
+            {
+              "case": "validation-73-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 43,
+              "brake_ticks": 42,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.43368664383888245,
+              "maximum_raw_brake": 0.43368664383888245,
+              "host_reason": null
+            },
+            {
+              "case": "validation-73-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 64,
+              "brake_ticks": 24,
+              "first_brake_decision": 40,
+              "initial_raw_brake": -0.6942113637924194,
+              "maximum_raw_brake": 0.16582758724689484,
+              "host_reason": null
+            },
+            {
+              "case": "validation-509-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 37,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3303524851799011,
+              "maximum_raw_brake": 0.3303524851799011,
+              "host_reason": null
+            },
+            {
+              "case": "validation-509-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 52,
+              "brake_ticks": 21,
+              "first_brake_decision": 31,
+              "initial_raw_brake": -0.5039940476417542,
+              "maximum_raw_brake": 0.12990547716617584,
+              "host_reason": null
+            },
+            {
+              "case": "validation-509-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 37,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3303524851799011,
+              "maximum_raw_brake": 0.3303524851799011,
+              "host_reason": null
+            },
+            {
+              "case": "validation-509-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 52,
+              "brake_ticks": 21,
+              "first_brake_decision": 31,
+              "initial_raw_brake": -0.5039940476417542,
+              "maximum_raw_brake": 0.12990547716617584,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4093-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 77,
+              "brake_ticks": 32,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6611363291740417,
+              "maximum_raw_brake": 0.6611363291740417,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4093-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 76,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7062947750091553,
+              "maximum_raw_brake": 0.7062947750091553,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4093-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 77,
+              "brake_ticks": 32,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6611363291740417,
+              "maximum_raw_brake": 0.6611363291740417,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4093-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 76,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7062947750091553,
+              "maximum_raw_brake": 0.7062947750091553,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65537-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 66,
+              "brake_ticks": 26,
+              "first_brake_decision": 40,
+              "initial_raw_brake": -0.7279743552207947,
+              "maximum_raw_brake": 0.1609516143798828,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65537-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 69,
+              "brake_ticks": 32,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6856197118759155,
+              "maximum_raw_brake": 0.6856197118759155,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65537-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 66,
+              "brake_ticks": 26,
+              "first_brake_decision": 40,
+              "initial_raw_brake": -0.7279743552207947,
+              "maximum_raw_brake": 0.1609516143798828,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65537-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 69,
+              "brake_ticks": 32,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6856197118759155,
+              "maximum_raw_brake": 0.6856197118759155,
+              "host_reason": null
+            },
+            {
+              "case": "validation-211-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 9,
+              "brake_ticks": 8,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6111763715744019,
+              "maximum_raw_brake": 0.6111763715744019,
+              "host_reason": null
+            },
+            {
+              "case": "validation-211-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 50,
+              "brake_ticks": 49,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8306424617767334,
+              "maximum_raw_brake": 0.8306424617767334,
+              "host_reason": null
+            },
+            {
+              "case": "validation-211-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 9,
+              "brake_ticks": 8,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6111763715744019,
+              "maximum_raw_brake": 0.6111763715744019,
+              "host_reason": null
+            },
+            {
+              "case": "validation-211-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 50,
+              "brake_ticks": 49,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8306424617767334,
+              "maximum_raw_brake": 0.8306424617767334,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1021-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 36,
+              "brake_ticks": 35,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3701990246772766,
+              "maximum_raw_brake": 0.3701990246772766,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1021-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 36,
+              "brake_ticks": 35,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3701990246772766,
+              "maximum_raw_brake": 0.3701990246772766,
+              "host_reason": null
+            },
+            {
+              "case": "validation-8191-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 65,
+              "brake_ticks": 20,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4258332848548889,
+              "maximum_raw_brake": 0.4258332848548889,
+              "host_reason": null
+            },
+            {
+              "case": "validation-8191-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 65,
+              "brake_ticks": 20,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4258332848548889,
+              "maximum_raw_brake": 0.4258332848548889,
+              "host_reason": null
+            },
+            {
+              "case": "validation-131071-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 35,
+              "brake_ticks": 24,
+              "first_brake_decision": 11,
+              "initial_raw_brake": -0.1464671790599823,
+              "maximum_raw_brake": 0.15397876501083374,
+              "host_reason": null
+            },
+            {
+              "case": "validation-131071-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 17,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.47029563784599304,
+              "maximum_raw_brake": 0.47029563784599304,
+              "host_reason": null
+            },
+            {
+              "case": "validation-131071-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 35,
+              "brake_ticks": 24,
+              "first_brake_decision": 11,
+              "initial_raw_brake": -0.1464671790599823,
+              "maximum_raw_brake": 0.15397876501083374,
+              "host_reason": null
+            },
+            {
+              "case": "validation-131071-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 17,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.47029563784599304,
+              "maximum_raw_brake": 0.47029563784599304,
+              "host_reason": null
+            },
+            {
+              "case": "validation-307-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 76,
+              "brake_ticks": 29,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5755950212478638,
+              "maximum_raw_brake": 0.5755950212478638,
+              "host_reason": null
+            },
+            {
+              "case": "validation-307-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 3,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.12460091710090637,
+              "maximum_raw_brake": -0.12460091710090637,
+              "host_reason": null
+            },
+            {
+              "case": "validation-307-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 76,
+              "brake_ticks": 29,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5755950212478638,
+              "maximum_raw_brake": 0.5755950212478638,
+              "host_reason": null
+            },
+            {
+              "case": "validation-307-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 3,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.12460091710090637,
+              "maximum_raw_brake": -0.12460091710090637,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1543-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 63,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7275612354278564,
+              "maximum_raw_brake": 0.7275612354278564,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1543-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 40,
+              "brake_ticks": 22,
+              "first_brake_decision": 18,
+              "initial_raw_brake": -0.1504913717508316,
+              "maximum_raw_brake": 0.1440524309873581,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1543-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 63,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7275612354278564,
+              "maximum_raw_brake": 0.7275612354278564,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1543-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 40,
+              "brake_ticks": 22,
+              "first_brake_decision": 18,
+              "initial_raw_brake": -0.1504913717508316,
+              "maximum_raw_brake": 0.1440524309873581,
+              "host_reason": null
+            },
+            {
+              "case": "validation-12289-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 56,
+              "brake_ticks": 29,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6206664443016052,
+              "maximum_raw_brake": 0.6206664443016052,
+              "host_reason": null
+            },
+            {
+              "case": "validation-12289-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 54,
+              "brake_ticks": 43,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7154222130775452,
+              "maximum_raw_brake": 0.7154222130775452,
+              "host_reason": null
+            },
+            {
+              "case": "validation-12289-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 56,
+              "brake_ticks": 29,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6206664443016052,
+              "maximum_raw_brake": 0.6206664443016052,
+              "host_reason": null
+            },
+            {
+              "case": "validation-12289-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 54,
+              "brake_ticks": 43,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7154222130775452,
+              "maximum_raw_brake": 0.7154222130775452,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262147-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 8,
+              "brake_ticks": 7,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.34786611795425415,
+              "maximum_raw_brake": 0.34786611795425415,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262147-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 129,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6914674043655396,
+              "maximum_raw_brake": 0.6914674043655396,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262147-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 8,
+              "brake_ticks": 7,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.34786611795425415,
+              "maximum_raw_brake": 0.34786611795425415,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262147-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 129,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6903855800628662,
+              "maximum_raw_brake": 0.6903855800628662,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2017-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 59,
+              "brake_ticks": 22,
+              "first_brake_decision": 37,
+              "initial_raw_brake": -0.6274865865707397,
+              "maximum_raw_brake": 0.1394268274307251,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2017-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 41,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8506622314453125,
+              "maximum_raw_brake": 0.8506622314453125,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2017-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 59,
+              "brake_ticks": 22,
+              "first_brake_decision": 37,
+              "initial_raw_brake": -0.6274865865707397,
+              "maximum_raw_brake": 0.1394268274307251,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32771-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 35,
+              "brake_ticks": 26,
+              "first_brake_decision": 9,
+              "initial_raw_brake": -0.06377173960208893,
+              "maximum_raw_brake": 0.18941211700439453,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32771-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 52,
+              "brake_ticks": 51,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8220126628875732,
+              "maximum_raw_brake": 0.8220126628875732,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32771-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 35,
+              "brake_ticks": 26,
+              "first_brake_decision": 9,
+              "initial_raw_brake": -0.06377173960208893,
+              "maximum_raw_brake": 0.18941211700439453,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32771-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 52,
+              "brake_ticks": 51,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8220126628875732,
+              "maximum_raw_brake": 0.8220126628875732,
+              "host_reason": null
+            },
+            {
+              "case": "validation-524309-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 7,
+              "brake_ticks": 6,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.19314993917942047,
+              "maximum_raw_brake": 0.19314993917942047,
+              "host_reason": null
+            },
+            {
+              "case": "validation-524309-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 7,
+              "brake_ticks": 6,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.19314993917942047,
+              "maximum_raw_brake": 0.19314993917942047,
+              "host_reason": null
+            },
+            {
+              "case": "validation-619-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 53,
+              "brake_ticks": 24,
+              "first_brake_decision": 29,
+              "initial_raw_brake": -0.4667770266532898,
+              "maximum_raw_brake": 0.11929237842559814,
+              "host_reason": null
+            },
+            {
+              "case": "validation-619-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 42,
+              "brake_ticks": 41,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3180640637874603,
+              "maximum_raw_brake": 0.3180640637874603,
+              "host_reason": null
+            },
+            {
+              "case": "validation-619-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 53,
+              "brake_ticks": 24,
+              "first_brake_decision": 29,
+              "initial_raw_brake": -0.4667770266532898,
+              "maximum_raw_brake": 0.11929237842559814,
+              "host_reason": null
+            },
+            {
+              "case": "validation-619-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 42,
+              "brake_ticks": 41,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3180640637874603,
+              "maximum_raw_brake": 0.3180640637874603,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2381-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 9,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.16204626858234406,
+              "maximum_raw_brake": -0.16204626858234406,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2381-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 37,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5032345056533813,
+              "maximum_raw_brake": 0.5032345056533813,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2381-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 9,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.16204626858234406,
+              "maximum_raw_brake": -0.16204626858234406,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2381-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 37,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5032345056533813,
+              "maximum_raw_brake": 0.5032345056533813,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4919-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 44,
+              "brake_ticks": 43,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.24399589002132416,
+              "maximum_raw_brake": 0.24399589002132416,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4919-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 41,
+              "brake_ticks": 40,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5900676250457764,
+              "maximum_raw_brake": 0.5900676250457764,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4919-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 44,
+              "brake_ticks": 43,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.24399589002132416,
+              "maximum_raw_brake": 0.24399589002132416,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4919-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 41,
+              "brake_ticks": 40,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5900676250457764,
+              "maximum_raw_brake": 0.5900676250457764,
+              "host_reason": null
+            },
+            {
+              "case": "validation-10037-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 71,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7107993364334106,
+              "maximum_raw_brake": 0.7107993364334106,
+              "host_reason": null
+            },
+            {
+              "case": "validation-10037-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 71,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7107993364334106,
+              "maximum_raw_brake": 0.7107993364334106,
+              "host_reason": null
+            }
+          ]
+        },
+        {
+          "partition": "additional",
+          "cases": 8,
+          "arrived": 2,
+          "outcomes": {
+            "host_preempted": 6,
+            "arrived": 2
+          },
+          "episodes": [
+            {
+              "case": "train-42-p1-d65",
+              "outcome": "host_preempted",
+              "ticks": 53,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.40297460556030273,
+              "maximum_raw_brake": -0.40297460556030273,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 1,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 937,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 1
+              }
+            },
+            {
+              "case": "train-42-p2-d65",
+              "outcome": "host_preempted",
+              "ticks": 33,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -1.0503506660461426,
+              "maximum_raw_brake": -0.35341328382492065,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 1,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 818,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 1
+              }
+            },
+            {
+              "case": "train-10101-p2-d65",
+              "outcome": "host_preempted",
+              "ticks": 28,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.9634696245193481,
+              "maximum_raw_brake": -0.8985536098480225,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 1,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 1271,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 1
+              }
+            },
+            {
+              "case": "seed-42-weak-round-p1",
+              "outcome": "host_preempted",
+              "ticks": 53,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.40297460556030273,
+              "maximum_raw_brake": -0.40297460556030273,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 1,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 937,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 1
+              }
+            },
+            {
+              "case": "validation-1021-WeakAngular-p2",
+              "outcome": "host_preempted",
+              "ticks": 40,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.22412264347076416,
+              "maximum_raw_brake": -0.22412264347076416,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 0,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 1083,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 0
+              }
+            },
+            {
+              "case": "validation-1021-WeakRound-p2",
+              "outcome": "host_preempted",
+              "ticks": 40,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.22412264347076416,
+              "maximum_raw_brake": -0.22412264347076416,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 0,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 1083,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 0
+              }
+            },
+            {
+              "case": "validation-10037-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 72,
+              "brake_ticks": 32,
+              "first_brake_decision": 40,
+              "initial_raw_brake": -0.7531905770301819,
+              "maximum_raw_brake": 0.187763512134552,
+              "host_reason": null
+            },
+            {
+              "case": "validation-10037-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 72,
+              "brake_ticks": 32,
+              "first_brake_decision": 40,
+              "initial_raw_brake": -0.7531905770301819,
+              "maximum_raw_brake": 0.187763512134552,
+              "host_reason": null
+            }
+          ]
+        },
+        {
+          "partition": "validation",
+          "cases": 16,
+          "arrived": 12,
+          "outcomes": {
+            "arrived": 12,
+            "host_preempted": 4
+          },
+          "episodes": [
+            {
+              "case": "validation-710001-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 71,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7050280570983887,
+              "maximum_raw_brake": 0.7050280570983887,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710001-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 60,
+              "brake_ticks": 20,
+              "first_brake_decision": 40,
+              "initial_raw_brake": -0.667388916015625,
+              "maximum_raw_brake": 0.13023322820663452,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710001-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 71,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7050280570983887,
+              "maximum_raw_brake": 0.7050280570983887,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710001-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 60,
+              "brake_ticks": 20,
+              "first_brake_decision": 40,
+              "initial_raw_brake": -0.667388916015625,
+              "maximum_raw_brake": 0.13023322820663452,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710002-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 42,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6439419388771057,
+              "maximum_raw_brake": 0.6439419388771057,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710002-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 58,
+              "brake_ticks": 50,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7456940412521362,
+              "maximum_raw_brake": 0.7456940412521362,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710002-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 42,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6439419388771057,
+              "maximum_raw_brake": 0.6439419388771057,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710002-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 58,
+              "brake_ticks": 50,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7456940412521362,
+              "maximum_raw_brake": 0.7456940412521362,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710003-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 69,
+              "brake_ticks": 32,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6798861026763916,
+              "maximum_raw_brake": 0.6798861026763916,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710003-WeakAngular-p2",
+              "outcome": "host_preempted",
+              "ticks": 13,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.4669622480869293,
+              "maximum_raw_brake": -0.4669622480869293,
+              "host_reason": {
+                "avoidance": {
+                  "obstacle": "sun",
+                  "waypoint": {
+                    "x": 1213.4102783203125,
+                    "y": 881.0030517578125
+                  }
+                },
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 0,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "transfer",
+                "goal_since": 249,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 0
+              }
+            },
+            {
+              "case": "validation-710003-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 69,
+              "brake_ticks": 32,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6798861026763916,
+              "maximum_raw_brake": 0.6798861026763916,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710003-WeakRound-p2",
+              "outcome": "host_preempted",
+              "ticks": 13,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.4669622480869293,
+              "maximum_raw_brake": -0.4669622480869293,
+              "host_reason": {
+                "avoidance": {
+                  "obstacle": "sun",
+                  "waypoint": {
+                    "x": 1213.4102783203125,
+                    "y": 881.0030517578125
+                  }
+                },
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 0,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "transfer",
+                "goal_since": 249,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 0
+              }
+            },
+            {
+              "case": "validation-710006-WeakAngular-p1",
+              "outcome": "host_preempted",
+              "ticks": 24,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.38758644461631775,
+              "maximum_raw_brake": -0.03118392825126648,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 1,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 1125,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 1
+              }
+            },
+            {
+              "case": "validation-710006-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 43,
+              "brake_ticks": 42,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6346736550331116,
+              "maximum_raw_brake": 0.6346736550331116,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710006-WeakRound-p1",
+              "outcome": "host_preempted",
+              "ticks": 24,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.38758644461631775,
+              "maximum_raw_brake": -0.03118392825126648,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 1,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 1125,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 1
+              }
+            },
+            {
+              "case": "validation-710006-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 43,
+              "brake_ticks": 42,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6346736550331116,
+              "maximum_raw_brake": 0.6346736550331116,
+              "host_reason": null
+            }
+          ]
+        },
+        {
+          "partition": "inspected",
+          "cases": 16,
+          "arrived": 16,
+          "outcomes": {
+            "arrived": 16
+          },
+          "episodes": [
+            {
+              "case": "validation-16411-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 76,
+              "brake_ticks": 29,
+              "first_brake_decision": 47,
+              "initial_raw_brake": -0.2017453908920288,
+              "maximum_raw_brake": 0.1273198127746582,
+              "host_reason": null
+            },
+            {
+              "case": "validation-16411-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 20,
+              "first_brake_decision": 26,
+              "initial_raw_brake": -0.06545010209083557,
+              "maximum_raw_brake": 0.11408714950084686,
+              "host_reason": null
+            },
+            {
+              "case": "validation-16411-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 76,
+              "brake_ticks": 29,
+              "first_brake_decision": 47,
+              "initial_raw_brake": -0.2017453908920288,
+              "maximum_raw_brake": 0.1273198127746582,
+              "host_reason": null
+            },
+            {
+              "case": "validation-16411-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 20,
+              "first_brake_decision": 26,
+              "initial_raw_brake": -0.06545010209083557,
+              "maximum_raw_brake": 0.11408714950084686,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32803-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 21,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3970271646976471,
+              "maximum_raw_brake": 0.3970271646976471,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32803-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 62,
+              "brake_ticks": 45,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8954960107803345,
+              "maximum_raw_brake": 0.8954960107803345,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32803-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 21,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3970271646976471,
+              "maximum_raw_brake": 0.3970271646976471,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32803-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 62,
+              "brake_ticks": 45,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8954960107803345,
+              "maximum_raw_brake": 0.8954960107803345,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65539-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 53,
+              "brake_ticks": 23,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.589214026927948,
+              "maximum_raw_brake": 0.589214026927948,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65539-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 36,
+              "brake_ticks": 21,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5156630277633667,
+              "maximum_raw_brake": 0.5156630277633667,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65539-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 53,
+              "brake_ticks": 23,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.589214026927948,
+              "maximum_raw_brake": 0.589214026927948,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65539-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 36,
+              "brake_ticks": 21,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5156630277633667,
+              "maximum_raw_brake": 0.5156630277633667,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262151-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 5,
+              "brake_ticks": 4,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.34123194217681885,
+              "maximum_raw_brake": 0.34123194217681885,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262151-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 38,
+              "brake_ticks": 37,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3802396357059479,
+              "maximum_raw_brake": 0.3802396357059479,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262151-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 5,
+              "brake_ticks": 4,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.34123194217681885,
+              "maximum_raw_brake": 0.34123194217681885,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262151-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 38,
+              "brake_ticks": 37,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3802396357059479,
+              "maximum_raw_brake": 0.3802396357059479,
+              "host_reason": null
+            }
+          ]
+        }
+      ],
+      "precision": {
+        "cases": 157,
+        "arrived": 157
+      }
+    },
+    {
+      "controller": "long",
+      "genome": "dba8538c878c39d07aa2a48e85552c0ad131adfdab080bc80f53b04cefebb872",
+      "fitness": {
+        "additional_completed": 8,
+        "approach_position_points": 6623,
+        "approach_speed_points": 6484,
+        "brake_progress_points": 7869,
+        "precision_completed": 157,
+        "precision_position_points": 155080,
+        "precision_velocity_points": 155813,
+        "protected_completed": 90,
+        "spare_ticks": 117817
+      },
+      "passed": false,
+      "approaches": [
+        {
+          "partition": "protected",
+          "cases": 90,
+          "arrived": 90,
+          "outcomes": {
+            "arrived": 90
+          },
+          "episodes": [
+            {
+              "case": "train-42-p2-d35",
+              "outcome": "arrived",
+              "ticks": 48,
+              "brake_ticks": 47,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3318539261817932,
+              "maximum_raw_brake": 0.3318539261817932,
+              "host_reason": null
+            },
+            {
+              "case": "train-10101-p1-d65",
+              "outcome": "arrived",
+              "ticks": 102,
+              "brake_ticks": 18,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.2019384205341339,
+              "maximum_raw_brake": 0.2019384205341339,
+              "host_reason": null
+            },
+            {
+              "case": "train-10101-p1-d35",
+              "outcome": "arrived",
+              "ticks": 139,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6420270204544067,
+              "maximum_raw_brake": 0.6420270204544067,
+              "host_reason": null
+            },
+            {
+              "case": "train-10101-p2-d35",
+              "outcome": "arrived",
+              "ticks": 50,
+              "brake_ticks": 49,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.1719518005847931,
+              "maximum_raw_brake": 0.20843204855918884,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-17-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 37,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7204046249389648,
+              "maximum_raw_brake": 0.7204046249389648,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-17-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 43,
+              "brake_ticks": 39,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6736912131309509,
+              "maximum_raw_brake": 0.6736912131309509,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-113-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 30,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4768677353858948,
+              "maximum_raw_brake": 0.4768677353858948,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-113-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 63,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6157327890396118,
+              "maximum_raw_brake": 0.6157327890396118,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-2027-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 40,
+              "brake_ticks": 39,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5907148122787476,
+              "maximum_raw_brake": 0.5907148122787476,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-2027-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 45,
+              "brake_ticks": 44,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.25232818722724915,
+              "maximum_raw_brake": 0.25232818722724915,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-9001-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 75,
+              "brake_ticks": 31,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4437422752380371,
+              "maximum_raw_brake": 0.4437422752380371,
+              "host_reason": null
+            },
+            {
+              "case": "train-inspected-9001-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 102,
+              "brake_ticks": 98,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 1.0121310949325562,
+              "maximum_raw_brake": 1.0121310949325562,
+              "host_reason": null
+            },
+            {
+              "case": "seed-42-weak-round-p2",
+              "outcome": "arrived",
+              "ticks": 48,
+              "brake_ticks": 47,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3318539261817932,
+              "maximum_raw_brake": 0.3318539261817932,
+              "host_reason": null
+            },
+            {
+              "case": "seed-10101-weak-round-p1",
+              "outcome": "arrived",
+              "ticks": 139,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6420270204544067,
+              "maximum_raw_brake": 0.6420270204544067,
+              "host_reason": null
+            },
+            {
+              "case": "seed-10101-weak-round-p2",
+              "outcome": "arrived",
+              "ticks": 50,
+              "brake_ticks": 49,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.1719518005847931,
+              "maximum_raw_brake": 0.20843204855918884,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-17-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 37,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7204046249389648,
+              "maximum_raw_brake": 0.7204046249389648,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-17-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 43,
+              "brake_ticks": 39,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6736912131309509,
+              "maximum_raw_brake": 0.6736912131309509,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-113-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 30,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4768677353858948,
+              "maximum_raw_brake": 0.4768677353858948,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-113-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 63,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6157327890396118,
+              "maximum_raw_brake": 0.6157327890396118,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-2027-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 40,
+              "brake_ticks": 39,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5907148122787476,
+              "maximum_raw_brake": 0.5907148122787476,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-2027-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 45,
+              "brake_ticks": 44,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.25232818722724915,
+              "maximum_raw_brake": 0.25232818722724915,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-9001-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 75,
+              "brake_ticks": 31,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4437422752380371,
+              "maximum_raw_brake": 0.4437422752380371,
+              "host_reason": null
+            },
+            {
+              "case": "development-inspected-9001-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 102,
+              "brake_ticks": 98,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 1.0121310949325562,
+              "maximum_raw_brake": 1.0121310949325562,
+              "host_reason": null
+            },
+            {
+              "case": "validation-73-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5527082681655884,
+              "maximum_raw_brake": 0.5527082681655884,
+              "host_reason": null
+            },
+            {
+              "case": "validation-73-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 65,
+              "brake_ticks": 64,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.18497541546821594,
+              "maximum_raw_brake": 0.2061748206615448,
+              "host_reason": null
+            },
+            {
+              "case": "validation-73-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5527082681655884,
+              "maximum_raw_brake": 0.5527082681655884,
+              "host_reason": null
+            },
+            {
+              "case": "validation-73-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 65,
+              "brake_ticks": 64,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.18497541546821594,
+              "maximum_raw_brake": 0.2061748206615448,
+              "host_reason": null
+            },
+            {
+              "case": "validation-509-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 111,
+              "brake_ticks": 19,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4440312385559082,
+              "maximum_raw_brake": 0.4440312385559082,
+              "host_reason": null
+            },
+            {
+              "case": "validation-509-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 57,
+              "brake_ticks": 56,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3176438510417938,
+              "maximum_raw_brake": 0.3176438510417938,
+              "host_reason": null
+            },
+            {
+              "case": "validation-509-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 111,
+              "brake_ticks": 19,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4440312385559082,
+              "maximum_raw_brake": 0.4440312385559082,
+              "host_reason": null
+            },
+            {
+              "case": "validation-509-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 57,
+              "brake_ticks": 56,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3176438510417938,
+              "maximum_raw_brake": 0.3176438510417938,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4093-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 71,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3372867703437805,
+              "maximum_raw_brake": 0.3372867703437805,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4093-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 85,
+              "brake_ticks": 30,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4053937792778015,
+              "maximum_raw_brake": 0.4053937792778015,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4093-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 71,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3372867703437805,
+              "maximum_raw_brake": 0.3372867703437805,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4093-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 85,
+              "brake_ticks": 30,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4053937792778015,
+              "maximum_raw_brake": 0.4053937792778015,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65537-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 57,
+              "brake_ticks": 56,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.16716036200523376,
+              "maximum_raw_brake": 0.22261956334114075,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65537-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 57,
+              "brake_ticks": 26,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.33486059308052063,
+              "maximum_raw_brake": 0.33486059308052063,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65537-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 57,
+              "brake_ticks": 56,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.16716036200523376,
+              "maximum_raw_brake": 0.22261956334114075,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65537-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 57,
+              "brake_ticks": 26,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.33486059308052063,
+              "maximum_raw_brake": 0.33486059308052063,
+              "host_reason": null
+            },
+            {
+              "case": "validation-211-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 9,
+              "brake_ticks": 8,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6019750833511353,
+              "maximum_raw_brake": 0.6019750833511353,
+              "host_reason": null
+            },
+            {
+              "case": "validation-211-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 59,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.549755871295929,
+              "maximum_raw_brake": 0.549755871295929,
+              "host_reason": null
+            },
+            {
+              "case": "validation-211-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 9,
+              "brake_ticks": 8,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6019750833511353,
+              "maximum_raw_brake": 0.6019750833511353,
+              "host_reason": null
+            },
+            {
+              "case": "validation-211-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 59,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.549755871295929,
+              "maximum_raw_brake": 0.549755871295929,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1021-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 106,
+              "brake_ticks": 17,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4123586118221283,
+              "maximum_raw_brake": 0.4123586118221283,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1021-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 106,
+              "brake_ticks": 17,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4123586118221283,
+              "maximum_raw_brake": 0.4123586118221283,
+              "host_reason": null
+            },
+            {
+              "case": "validation-8191-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 48,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.057180434465408325,
+              "maximum_raw_brake": -0.057180434465408325,
+              "host_reason": null
+            },
+            {
+              "case": "validation-8191-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 48,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.057180434465408325,
+              "maximum_raw_brake": -0.057180434465408325,
+              "host_reason": null
+            },
+            {
+              "case": "validation-131071-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 63,
+              "brake_ticks": 41,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3100288212299347,
+              "maximum_raw_brake": 0.3100288212299347,
+              "host_reason": null
+            },
+            {
+              "case": "validation-131071-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 65,
+              "brake_ticks": 3,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.042663801461458206,
+              "maximum_raw_brake": 0.042663801461458206,
+              "host_reason": null
+            },
+            {
+              "case": "validation-131071-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 63,
+              "brake_ticks": 41,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3100288212299347,
+              "maximum_raw_brake": 0.3100288212299347,
+              "host_reason": null
+            },
+            {
+              "case": "validation-131071-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 65,
+              "brake_ticks": 3,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.042663801461458206,
+              "maximum_raw_brake": 0.042663801461458206,
+              "host_reason": null
+            },
+            {
+              "case": "validation-307-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 74,
+              "brake_ticks": 26,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.31904077529907227,
+              "maximum_raw_brake": 0.31904077529907227,
+              "host_reason": null
+            },
+            {
+              "case": "validation-307-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 3,
+              "brake_ticks": 2,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.1879151463508606,
+              "maximum_raw_brake": 0.1879151463508606,
+              "host_reason": null
+            },
+            {
+              "case": "validation-307-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 74,
+              "brake_ticks": 26,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.31904077529907227,
+              "maximum_raw_brake": 0.31904077529907227,
+              "host_reason": null
+            },
+            {
+              "case": "validation-307-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 3,
+              "brake_ticks": 2,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.1879151463508606,
+              "maximum_raw_brake": 0.1879151463508606,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1543-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 62,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.36292406916618347,
+              "maximum_raw_brake": 0.36292406916618347,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1543-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 49,
+              "brake_ticks": 47,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.41358622908592224,
+              "maximum_raw_brake": 0.41358622908592224,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1543-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 62,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.36292406916618347,
+              "maximum_raw_brake": 0.36292406916618347,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1543-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 49,
+              "brake_ticks": 47,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.41358622908592224,
+              "maximum_raw_brake": 0.41358622908592224,
+              "host_reason": null
+            },
+            {
+              "case": "validation-12289-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 45,
+              "brake_ticks": 21,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.24764063954353333,
+              "maximum_raw_brake": 0.24764063954353333,
+              "host_reason": null
+            },
+            {
+              "case": "validation-12289-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 51,
+              "brake_ticks": 17,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3795033097267151,
+              "maximum_raw_brake": 0.3795033097267151,
+              "host_reason": null
+            },
+            {
+              "case": "validation-12289-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 45,
+              "brake_ticks": 21,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.24764063954353333,
+              "maximum_raw_brake": 0.24764063954353333,
+              "host_reason": null
+            },
+            {
+              "case": "validation-12289-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 51,
+              "brake_ticks": 17,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3795033097267151,
+              "maximum_raw_brake": 0.3795033097267151,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262147-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 8,
+              "brake_ticks": 7,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.16366150975227356,
+              "maximum_raw_brake": 0.16366150975227356,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262147-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 73,
+              "brake_ticks": 28,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.38487815856933594,
+              "maximum_raw_brake": 0.38487815856933594,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262147-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 8,
+              "brake_ticks": 7,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.16366150975227356,
+              "maximum_raw_brake": 0.16366150975227356,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262147-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 73,
+              "brake_ticks": 28,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.38434553146362305,
+              "maximum_raw_brake": 0.38434553146362305,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2017-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 70,
+              "brake_ticks": 69,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.22669559717178345,
+              "maximum_raw_brake": 0.24012872576713562,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2017-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 66,
+              "brake_ticks": 32,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.46203750371932983,
+              "maximum_raw_brake": 0.46203750371932983,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2017-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 70,
+              "brake_ticks": 69,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.22669559717178345,
+              "maximum_raw_brake": 0.24012872576713562,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32771-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 53,
+              "brake_ticks": 44,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3653082549571991,
+              "maximum_raw_brake": 0.3653082549571991,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32771-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 137,
+              "brake_ticks": 35,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6145265698432922,
+              "maximum_raw_brake": 0.6145265698432922,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32771-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 53,
+              "brake_ticks": 44,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.3653082549571991,
+              "maximum_raw_brake": 0.3653082549571991,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32771-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 137,
+              "brake_ticks": 35,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6145265698432922,
+              "maximum_raw_brake": 0.6145265698432922,
+              "host_reason": null
+            },
+            {
+              "case": "validation-524309-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 7,
+              "brake_ticks": 6,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8664367198944092,
+              "maximum_raw_brake": 0.8664367198944092,
+              "host_reason": null
+            },
+            {
+              "case": "validation-524309-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 7,
+              "brake_ticks": 6,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.8664367198944092,
+              "maximum_raw_brake": 0.8664367198944092,
+              "host_reason": null
+            },
+            {
+              "case": "validation-619-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 39,
+              "brake_ticks": 38,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.31305211782455444,
+              "maximum_raw_brake": 0.31305211782455444,
+              "host_reason": null
+            },
+            {
+              "case": "validation-619-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 42,
+              "brake_ticks": 30,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5588690638542175,
+              "maximum_raw_brake": 0.5588690638542175,
+              "host_reason": null
+            },
+            {
+              "case": "validation-619-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 39,
+              "brake_ticks": 38,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.31305211782455444,
+              "maximum_raw_brake": 0.31305211782455444,
+              "host_reason": null
+            },
+            {
+              "case": "validation-619-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 42,
+              "brake_ticks": 30,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5588690638542175,
+              "maximum_raw_brake": 0.5588690638542175,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2381-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 5,
+              "brake_ticks": 4,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.046193987131118774,
+              "maximum_raw_brake": 0.046193987131118774,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2381-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 101,
+              "brake_ticks": 19,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.47637489438056946,
+              "maximum_raw_brake": 0.47637489438056946,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2381-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 5,
+              "brake_ticks": 4,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.046193987131118774,
+              "maximum_raw_brake": 0.046193987131118774,
+              "host_reason": null
+            },
+            {
+              "case": "validation-2381-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 101,
+              "brake_ticks": 19,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.47637489438056946,
+              "maximum_raw_brake": 0.47637489438056946,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4919-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 34,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7099179029464722,
+              "maximum_raw_brake": 0.7099179029464722,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4919-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 53,
+              "brake_ticks": 23,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4810220003128052,
+              "maximum_raw_brake": 0.4810220003128052,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4919-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 34,
+              "brake_ticks": 33,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7099179029464722,
+              "maximum_raw_brake": 0.7099179029464722,
+              "host_reason": null
+            },
+            {
+              "case": "validation-4919-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 53,
+              "brake_ticks": 23,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4810220003128052,
+              "maximum_raw_brake": 0.4810220003128052,
+              "host_reason": null
+            },
+            {
+              "case": "validation-10037-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 67,
+              "brake_ticks": 28,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.37207913398742676,
+              "maximum_raw_brake": 0.37207913398742676,
+              "host_reason": null
+            },
+            {
+              "case": "validation-10037-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 67,
+              "brake_ticks": 28,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.37207913398742676,
+              "maximum_raw_brake": 0.37207913398742676,
+              "host_reason": null
+            }
+          ]
+        },
+        {
+          "partition": "additional",
+          "cases": 8,
+          "arrived": 8,
+          "outcomes": {
+            "arrived": 8
+          },
+          "episodes": [
+            {
+              "case": "train-42-p1-d65",
+              "outcome": "arrived",
+              "ticks": 19,
+              "brake_ticks": 18,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.35576823353767395,
+              "maximum_raw_brake": 0.35576823353767395,
+              "host_reason": null
+            },
+            {
+              "case": "train-42-p2-d65",
+              "outcome": "arrived",
+              "ticks": 112,
+              "brake_ticks": 105,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.21041513979434967,
+              "maximum_raw_brake": 0.2852928042411804,
+              "host_reason": null
+            },
+            {
+              "case": "train-10101-p2-d65",
+              "outcome": "arrived",
+              "ticks": 82,
+              "brake_ticks": 56,
+              "first_brake_decision": 26,
+              "initial_raw_brake": -0.15158525109291077,
+              "maximum_raw_brake": 0.1783747673034668,
+              "host_reason": null
+            },
+            {
+              "case": "seed-42-weak-round-p1",
+              "outcome": "arrived",
+              "ticks": 19,
+              "brake_ticks": 18,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.35576823353767395,
+              "maximum_raw_brake": 0.35576823353767395,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1021-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 60,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7216149568557739,
+              "maximum_raw_brake": 0.7216149568557739,
+              "host_reason": null
+            },
+            {
+              "case": "validation-1021-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 60,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.7216149568557739,
+              "maximum_raw_brake": 0.7216149568557739,
+              "host_reason": null
+            },
+            {
+              "case": "validation-10037-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 39,
+              "brake_ticks": 38,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.20184703171253204,
+              "maximum_raw_brake": 0.23276831209659576,
+              "host_reason": null
+            },
+            {
+              "case": "validation-10037-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 39,
+              "brake_ticks": 38,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.20184703171253204,
+              "maximum_raw_brake": 0.23276831209659576,
+              "host_reason": null
+            }
+          ]
+        },
+        {
+          "partition": "validation",
+          "cases": 16,
+          "arrived": 12,
+          "outcomes": {
+            "arrived": 12,
+            "host_preempted": 4
+          },
+          "episodes": [
+            {
+              "case": "validation-710001-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 71,
+              "brake_ticks": 28,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.37224674224853516,
+              "maximum_raw_brake": 0.37224674224853516,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710001-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 79,
+              "brake_ticks": 78,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.19374580681324005,
+              "maximum_raw_brake": 0.20773299038410187,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710001-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 71,
+              "brake_ticks": 28,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.37224674224853516,
+              "maximum_raw_brake": 0.37224674224853516,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710001-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 79,
+              "brake_ticks": 78,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.19374580681324005,
+              "maximum_raw_brake": 0.20773299038410187,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710002-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 18,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.37422075867652893,
+              "maximum_raw_brake": 0.37422075867652893,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710002-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 69,
+              "brake_ticks": 29,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5265378952026367,
+              "maximum_raw_brake": 0.5265378952026367,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710002-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 46,
+              "brake_ticks": 18,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.37422075867652893,
+              "maximum_raw_brake": 0.37422075867652893,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710002-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 69,
+              "brake_ticks": 29,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5265378952026367,
+              "maximum_raw_brake": 0.5265378952026367,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710003-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.33894816040992737,
+              "maximum_raw_brake": 0.33894816040992737,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710003-WeakAngular-p2",
+              "outcome": "host_preempted",
+              "ticks": 12,
+              "brake_ticks": 12,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4678530693054199,
+              "maximum_raw_brake": 0.4678530693054199,
+              "host_reason": {
+                "avoidance": {
+                  "obstacle": "sun",
+                  "waypoint": {
+                    "x": 1213.4464111328125,
+                    "y": 881.35546875
+                  }
+                },
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 0,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "transfer",
+                "goal_since": 249,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 0
+              }
+            },
+            {
+              "case": "validation-710003-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 61,
+              "brake_ticks": 27,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.33894816040992737,
+              "maximum_raw_brake": 0.33894816040992737,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710003-WeakRound-p2",
+              "outcome": "host_preempted",
+              "ticks": 12,
+              "brake_ticks": 12,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4678530693054199,
+              "maximum_raw_brake": 0.4678530693054199,
+              "host_reason": {
+                "avoidance": {
+                  "obstacle": "sun",
+                  "waypoint": {
+                    "x": 1213.4464111328125,
+                    "y": 881.35546875
+                  }
+                },
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 0,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "transfer",
+                "goal_since": 249,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 0
+              }
+            },
+            {
+              "case": "validation-710006-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 45,
+              "brake_ticks": 44,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4312573969364166,
+              "maximum_raw_brake": 0.4312573969364166,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710006-WeakAngular-p2",
+              "outcome": "host_preempted",
+              "ticks": 70,
+              "brake_ticks": 11,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.2989451289176941,
+              "maximum_raw_brake": 0.2989451289176941,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 0,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 2671,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 0
+              }
+            },
+            {
+              "case": "validation-710006-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 45,
+              "brake_ticks": 44,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4312573969364166,
+              "maximum_raw_brake": 0.4312573969364166,
+              "host_reason": null
+            },
+            {
+              "case": "validation-710006-WeakRound-p2",
+              "outcome": "host_preempted",
+              "ticks": 70,
+              "brake_ticks": 11,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.2989451289176941,
+              "maximum_raw_brake": 0.2989451289176941,
+              "host_reason": {
+                "avoidance": null,
+                "capture": null,
+                "combat": null,
+                "completed_recoveries": 0,
+                "completed_sorties": 0,
+                "destination_planning": {
+                  "last_switch": null,
+                  "switches": 0
+                },
+                "events": [
+                  {
+                    "kind": "selected",
+                    "planet": 0,
+                    "reason": null,
+                    "tick": 1
+                  }
+                ],
+                "frame_changes": 1,
+                "goal": "launch",
+                "goal_since": 2671,
+                "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+                "opponent": null,
+                "policy": "material_mission_v13",
+                "pursuit": null,
+                "reason": null,
+                "recovery": null,
+                "replans": 0,
+                "target": 0
+              }
+            }
+          ]
+        },
+        {
+          "partition": "inspected",
+          "cases": 16,
+          "arrived": 16,
+          "outcomes": {
+            "arrived": 16
+          },
+          "episodes": [
+            {
+              "case": "validation-16411-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 37,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6993393898010254,
+              "maximum_raw_brake": 0.6993393898010254,
+              "host_reason": null
+            },
+            {
+              "case": "validation-16411-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 20,
+              "brake_ticks": 19,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5151509046554565,
+              "maximum_raw_brake": 0.5151509046554565,
+              "host_reason": null
+            },
+            {
+              "case": "validation-16411-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 37,
+              "brake_ticks": 36,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.6993393898010254,
+              "maximum_raw_brake": 0.6993393898010254,
+              "host_reason": null
+            },
+            {
+              "case": "validation-16411-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 20,
+              "brake_ticks": 19,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.5151509046554565,
+              "maximum_raw_brake": 0.5151509046554565,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32803-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 39,
+              "brake_ticks": 1,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.004864729940891266,
+              "maximum_raw_brake": 0.004864729940891266,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32803-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 65,
+              "brake_ticks": 31,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.480632483959198,
+              "maximum_raw_brake": 0.480632483959198,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32803-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 39,
+              "brake_ticks": 1,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.004864729940891266,
+              "maximum_raw_brake": 0.004864729940891266,
+              "host_reason": null
+            },
+            {
+              "case": "validation-32803-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 65,
+              "brake_ticks": 31,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.480632483959198,
+              "maximum_raw_brake": 0.480632483959198,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65539-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 75,
+              "brake_ticks": 5,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.07372544705867767,
+              "maximum_raw_brake": 0.07372544705867767,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65539-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 66,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.06451688706874847,
+              "maximum_raw_brake": -0.06451688706874847,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65539-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 75,
+              "brake_ticks": 5,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.07372544705867767,
+              "maximum_raw_brake": 0.07372544705867767,
+              "host_reason": null
+            },
+            {
+              "case": "validation-65539-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 66,
+              "brake_ticks": 0,
+              "first_brake_decision": null,
+              "initial_raw_brake": -0.06451688706874847,
+              "maximum_raw_brake": -0.06451688706874847,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262151-WeakAngular-p2",
+              "outcome": "arrived",
+              "ticks": 5,
+              "brake_ticks": 4,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.43368035554885864,
+              "maximum_raw_brake": 0.43368035554885864,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262151-WeakAngular-p1",
+              "outcome": "arrived",
+              "ticks": 39,
+              "brake_ticks": 21,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4871339201927185,
+              "maximum_raw_brake": 0.4871339201927185,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262151-WeakRound-p2",
+              "outcome": "arrived",
+              "ticks": 5,
+              "brake_ticks": 4,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.43368035554885864,
+              "maximum_raw_brake": 0.43368035554885864,
+              "host_reason": null
+            },
+            {
+              "case": "validation-262151-WeakRound-p1",
+              "outcome": "arrived",
+              "ticks": 39,
+              "brake_ticks": 21,
+              "first_brake_decision": 1,
+              "initial_raw_brake": 0.4871339201927185,
+              "maximum_raw_brake": 0.4871339201927185,
+              "host_reason": null
+            }
+          ]
+        }
+      ],
+      "precision": {
+        "cases": 157,
+        "arrived": 157
+      }
+    }
+  ],
+  "comparison": [
+    {
+      "partition": "protected",
+      "cases": 90,
+      "short_arrived": 90,
+      "long_arrived": 90,
+      "gained": [],
+      "lost": [],
+      "remaining_failures": []
+    },
+    {
+      "partition": "additional",
+      "cases": 8,
+      "short_arrived": 2,
+      "long_arrived": 8,
+      "gained": [
+        "train-42-p1-d65",
+        "train-42-p2-d65",
+        "train-10101-p2-d65",
+        "seed-42-weak-round-p1",
+        "validation-1021-WeakAngular-p2",
+        "validation-1021-WeakRound-p2"
+      ],
+      "lost": [],
+      "remaining_failures": []
+    },
+    {
+      "partition": "validation",
+      "cases": 16,
+      "short_arrived": 12,
+      "long_arrived": 12,
+      "gained": [
+        "validation-710006-WeakAngular-p1",
+        "validation-710006-WeakRound-p1"
+      ],
+      "lost": [
+        "validation-710006-WeakAngular-p2",
+        "validation-710006-WeakRound-p2"
+      ],
+      "remaining_failures": [
+        "validation-710003-WeakAngular-p2",
+        "validation-710003-WeakRound-p2",
+        "validation-710006-WeakAngular-p2",
+        "validation-710006-WeakRound-p2"
+      ]
+    },
+    {
+      "partition": "inspected",
+      "cases": 16,
+      "short_arrived": 16,
+      "long_arrived": 16,
+      "gained": [],
+      "lost": [],
+      "remaining_failures": []
+    }
+  ],
+  "verification": {
+    "unchanged_short_match_traces": 114,
+    "match_traces": 260,
+    "match_decisions": 13661,
+    "unchanged_short_precision_endpoints": 167,
+    "precision_trace_endpoint_parity": 314,
+    "precision_decisions": 13515,
+    "retained_precision_traces": 16
+  },
+  "scope": "One evolution seed, same training cases and reward. Fresh evaluation is conditional on native eligibility. Live integration remains separately gated."
+}

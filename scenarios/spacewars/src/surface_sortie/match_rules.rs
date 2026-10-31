@@ -145,6 +145,16 @@ impl SurfaceSortieScenario {
         state.enable_match_rules();
         state
     }
+
+    /// A lab layout under the match's rules, for training and evaluation.
+    pub fn init_material_match_layout(
+        seed: u64,
+        layout: mission::ArenaLayout,
+    ) -> SurfaceSortieState {
+        let mut state = Self::init_material_arena_layout(seed, layout);
+        state.enable_match_rules();
+        state
+    }
 }
 
 impl SurfaceSortieState {

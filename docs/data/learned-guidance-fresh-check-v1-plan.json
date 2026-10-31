@@ -1,0 +1,2360 @@
+{
+  "experiment": "recovery-guidance-fresh-check-v1",
+  "created_utc": "2026-10-18T19:25:03.295096+00:00",
+  "prior_directory": "/home/data/workspace/space-wars3/data/training-experiments/recovery-guidance-near-repair-v1-20261018",
+  "prior_manifest_sha256": "52742f7d62a8111e080720708a34fabd0344ba389cf0f3707140259776c806a7",
+  "reference_directory": "/home/data/workspace/space-wars3/data/training-experiments/recovery-guidance-near-miss-v1-20261018",
+  "reference_manifest_sha256": "5f201afd5ffaf172a82c1e353247bc5d2e48d909576955334afdaf8f3a110315",
+  "inputs": {
+    "candidate.json": "5088139d6c09f0787bd0785865eb1f76dd3fdd3eebe869adf4a0f87ce5ab8097",
+    "base-plan.json": "3919c9eca778e457b7273bbd6db75c56ca5d940acf5d9cf638ab8a303090461d",
+    "inputs.json": "6f9c932fda211ab79ce930f52d67ac2bfd4fd07ae7610cdc387665a36ed3f829",
+    "expected-candidate.json": "56d639cfe5a3c0c7e31987f5b4f6d61ee206d23a924110bdfe56d24ae10fee36",
+    "learned-reference.json": "fb8f46a17b85fe722f9bb8fd62242a8d52218e212251da3f79cffd9f00702aa1",
+    "expected-reference.json": "e995697dd987aaa8944aadab36437562a86c08b74863026a3eaf7ed4fb2cf60e"
+  },
+  "novelty_sha256": "1dcde9d9c36a7304a820c19488c011125e61ce73714009d5ad22f697ba6e4507",
+  "models": {
+    "candidate": {
+      "file": "candidate.json",
+      "genome": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1"
+    },
+    "learned_reference": {
+      "file": "learned-reference.json",
+      "genome": "735639dea9e8d49feb3acdd436954746ccc23c8596777e771ae489a571cbb586"
+    }
+  },
+  "validation_seeds": [
+    94000001,
+    94000002,
+    94000003,
+    94000004,
+    94000005,
+    94000006,
+    94000007,
+    94000008,
+    94000009,
+    94000010,
+    94000011,
+    94000012,
+    94000013,
+    94000014,
+    94000015,
+    94000016,
+    94000017,
+    94000018,
+    94000019,
+    94000020,
+    94000021,
+    94000022,
+    94000023,
+    94000024,
+    94000025,
+    94000026,
+    94000027,
+    94000028,
+    94000029,
+    94000030,
+    94000031,
+    94000032,
+    94000033,
+    94000034,
+    94000035,
+    94000036,
+    94000037,
+    94000038,
+    94000039,
+    94000040,
+    94000041,
+    94000042,
+    94000043,
+    94000044,
+    94000045,
+    94000046,
+    94000047,
+    94000048,
+    94000049,
+    94000050,
+    94000051,
+    94000052,
+    94000053,
+    94000054,
+    94000055,
+    94000056,
+    94000057,
+    94000058,
+    94000059,
+    94000060,
+    94000061,
+    94000062,
+    94000063,
+    94000064
+  ],
+  "validation_prefix_ticks": 10800,
+  "validation_entry_distance": 35.0,
+  "shapes": [
+    "weak-angular",
+    "weak-round"
+  ],
+  "seats": [
+    0,
+    1
+  ],
+  "precision_cases": [
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b0_p0",
+        "seed": 94100001,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 88,
+          "radial_speed": 2.5,
+          "lateral_speed": 0,
+          "heading_offset": 0.15
+        },
+        "target_offset": {
+          "x": 0,
+          "y": 17
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b0_p1",
+        "seed": 94100002,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 96,
+          "radial_speed": 0,
+          "lateral_speed": -3.5,
+          "heading_offset": -0.35
+        },
+        "target_offset": {
+          "x": 26,
+          "y": 7
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b0_p2",
+        "seed": 94100003,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 96,
+          "radial_speed": 0,
+          "lateral_speed": 3.5,
+          "heading_offset": 0.35
+        },
+        "target_offset": {
+          "x": -26,
+          "y": 7
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b0_p3",
+        "seed": 94100004,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 104,
+          "radial_speed": -2.5,
+          "lateral_speed": 0,
+          "heading_offset": 2.6
+        },
+        "target_offset": {
+          "x": 9,
+          "y": 19
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b0_p4",
+        "seed": 94100005,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 80,
+          "radial_speed": 0,
+          "lateral_speed": 0.5,
+          "heading_offset": 0.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -9
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b0_p5",
+        "seed": 94100006,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 112,
+          "radial_speed": 1,
+          "lateral_speed": -2,
+          "heading_offset": -0.7
+        },
+        "target_offset": {
+          "x": 31,
+          "y": 4
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b1_p0",
+        "seed": 94100007,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 88,
+          "radial_speed": 2.5,
+          "lateral_speed": 0,
+          "heading_offset": 0.15
+        },
+        "target_offset": {
+          "x": 0,
+          "y": 17
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b1_p1",
+        "seed": 94100008,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 96,
+          "radial_speed": 0,
+          "lateral_speed": -3.5,
+          "heading_offset": -0.35
+        },
+        "target_offset": {
+          "x": 26,
+          "y": 7
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b1_p2",
+        "seed": 94100009,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 96,
+          "radial_speed": 0,
+          "lateral_speed": 3.5,
+          "heading_offset": 0.35
+        },
+        "target_offset": {
+          "x": -26,
+          "y": 7
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b1_p3",
+        "seed": 94100010,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 104,
+          "radial_speed": -2.5,
+          "lateral_speed": 0,
+          "heading_offset": 2.6
+        },
+        "target_offset": {
+          "x": 9,
+          "y": 19
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b1_p4",
+        "seed": 94100011,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 80,
+          "radial_speed": 0,
+          "lateral_speed": 0.5,
+          "heading_offset": 0.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -9
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b1_p5",
+        "seed": 94100012,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 112,
+          "radial_speed": 1,
+          "lateral_speed": -2,
+          "heading_offset": -0.7
+        },
+        "target_offset": {
+          "x": 31,
+          "y": 4
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b2_p0",
+        "seed": 94100013,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 88,
+          "radial_speed": 2.5,
+          "lateral_speed": 0,
+          "heading_offset": 0.15
+        },
+        "target_offset": {
+          "x": 0,
+          "y": 17
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b2_p1",
+        "seed": 94100014,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 96,
+          "radial_speed": 0,
+          "lateral_speed": -3.5,
+          "heading_offset": -0.35
+        },
+        "target_offset": {
+          "x": 26,
+          "y": 7
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b2_p2",
+        "seed": 94100015,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 96,
+          "radial_speed": 0,
+          "lateral_speed": 3.5,
+          "heading_offset": 0.35
+        },
+        "target_offset": {
+          "x": -26,
+          "y": 7
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b2_p3",
+        "seed": 94100016,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 104,
+          "radial_speed": -2.5,
+          "lateral_speed": 0,
+          "heading_offset": 2.6
+        },
+        "target_offset": {
+          "x": 9,
+          "y": 19
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b2_p4",
+        "seed": 94100017,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 80,
+          "radial_speed": 0,
+          "lateral_speed": 0.5,
+          "heading_offset": 0.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -9
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b2_p5",
+        "seed": 94100018,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 112,
+          "radial_speed": 1,
+          "lateral_speed": -2,
+          "heading_offset": -0.7
+        },
+        "target_offset": {
+          "x": 31,
+          "y": 4
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b3_p0",
+        "seed": 94100019,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 88,
+          "radial_speed": 2.5,
+          "lateral_speed": 0,
+          "heading_offset": 0.15
+        },
+        "target_offset": {
+          "x": 0,
+          "y": 17
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b3_p1",
+        "seed": 94100020,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 96,
+          "radial_speed": 0,
+          "lateral_speed": -3.5,
+          "heading_offset": -0.35
+        },
+        "target_offset": {
+          "x": 26,
+          "y": 7
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b3_p2",
+        "seed": 94100021,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 96,
+          "radial_speed": 0,
+          "lateral_speed": 3.5,
+          "heading_offset": 0.35
+        },
+        "target_offset": {
+          "x": -26,
+          "y": 7
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b3_p3",
+        "seed": 94100022,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 104,
+          "radial_speed": -2.5,
+          "lateral_speed": 0,
+          "heading_offset": 2.6
+        },
+        "target_offset": {
+          "x": 9,
+          "y": 19
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b3_p4",
+        "seed": 94100023,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 80,
+          "radial_speed": 0,
+          "lateral_speed": 0.5,
+          "heading_offset": 0.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -9
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "stationary",
+      "case": {
+        "name": "fresh_stationary_b3_p5",
+        "seed": 94100024,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 112,
+          "radial_speed": 1,
+          "lateral_speed": -2,
+          "heading_offset": -0.7
+        },
+        "target_offset": {
+          "x": 31,
+          "y": 4
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b0_p0",
+        "seed": 94100025,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 98,
+          "radial_speed": -1.5,
+          "lateral_speed": 0,
+          "heading_offset": 0.35
+        },
+        "target_offset": {
+          "x": 23,
+          "y": 8
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b0_p1",
+        "seed": 94100026,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 98,
+          "radial_speed": 1.5,
+          "lateral_speed": 0,
+          "heading_offset": -0.35
+        },
+        "target_offset": {
+          "x": -23,
+          "y": 8
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b0_p2",
+        "seed": 94100027,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 102,
+          "radial_speed": 0,
+          "lateral_speed": -1.5,
+          "heading_offset": 0.55
+        },
+        "target_offset": {
+          "x": 13,
+          "y": 11
+        },
+        "target_velocity": {
+          "x": 1.6,
+          "y": 0.65
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b0_p3",
+        "seed": 94100028,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 102,
+          "radial_speed": 0,
+          "lateral_speed": 1.5,
+          "heading_offset": -0.55
+        },
+        "target_offset": {
+          "x": -13,
+          "y": 11
+        },
+        "target_velocity": {
+          "x": -1.6,
+          "y": -0.65
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b0_p4",
+        "seed": 94100029,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 90,
+          "radial_speed": 1,
+          "lateral_speed": 0,
+          "heading_offset": 0.1
+        },
+        "target_offset": {
+          "x": 0,
+          "y": 15
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0.6
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b0_p5",
+        "seed": 94100030,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 108,
+          "radial_speed": -1,
+          "lateral_speed": 1,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": 8,
+          "y": 5
+        },
+        "target_velocity": {
+          "x": 1.2,
+          "y": -0.5
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b1_p0",
+        "seed": 94100031,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 98,
+          "radial_speed": -1.5,
+          "lateral_speed": 0,
+          "heading_offset": 0.35
+        },
+        "target_offset": {
+          "x": 23,
+          "y": 8
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b1_p1",
+        "seed": 94100032,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 98,
+          "radial_speed": 1.5,
+          "lateral_speed": 0,
+          "heading_offset": -0.35
+        },
+        "target_offset": {
+          "x": -23,
+          "y": 8
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b1_p2",
+        "seed": 94100033,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 102,
+          "radial_speed": 0,
+          "lateral_speed": -1.5,
+          "heading_offset": 0.55
+        },
+        "target_offset": {
+          "x": 13,
+          "y": 11
+        },
+        "target_velocity": {
+          "x": 1.6,
+          "y": 0.65
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b1_p3",
+        "seed": 94100034,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 102,
+          "radial_speed": 0,
+          "lateral_speed": 1.5,
+          "heading_offset": -0.55
+        },
+        "target_offset": {
+          "x": -13,
+          "y": 11
+        },
+        "target_velocity": {
+          "x": -1.6,
+          "y": -0.65
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b1_p4",
+        "seed": 94100035,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 90,
+          "radial_speed": 1,
+          "lateral_speed": 0,
+          "heading_offset": 0.1
+        },
+        "target_offset": {
+          "x": 0,
+          "y": 15
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0.6
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b1_p5",
+        "seed": 94100036,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 108,
+          "radial_speed": -1,
+          "lateral_speed": 1,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": 8,
+          "y": 5
+        },
+        "target_velocity": {
+          "x": 1.2,
+          "y": -0.5
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b2_p0",
+        "seed": 94100037,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 98,
+          "radial_speed": -1.5,
+          "lateral_speed": 0,
+          "heading_offset": 0.35
+        },
+        "target_offset": {
+          "x": 23,
+          "y": 8
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b2_p1",
+        "seed": 94100038,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 98,
+          "radial_speed": 1.5,
+          "lateral_speed": 0,
+          "heading_offset": -0.35
+        },
+        "target_offset": {
+          "x": -23,
+          "y": 8
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b2_p2",
+        "seed": 94100039,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 102,
+          "radial_speed": 0,
+          "lateral_speed": -1.5,
+          "heading_offset": 0.55
+        },
+        "target_offset": {
+          "x": 13,
+          "y": 11
+        },
+        "target_velocity": {
+          "x": 1.6,
+          "y": 0.65
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b2_p3",
+        "seed": 94100040,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 102,
+          "radial_speed": 0,
+          "lateral_speed": 1.5,
+          "heading_offset": -0.55
+        },
+        "target_offset": {
+          "x": -13,
+          "y": 11
+        },
+        "target_velocity": {
+          "x": -1.6,
+          "y": -0.65
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b2_p4",
+        "seed": 94100041,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 90,
+          "radial_speed": 1,
+          "lateral_speed": 0,
+          "heading_offset": 0.1
+        },
+        "target_offset": {
+          "x": 0,
+          "y": 15
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0.6
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b2_p5",
+        "seed": 94100042,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 108,
+          "radial_speed": -1,
+          "lateral_speed": 1,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": 8,
+          "y": 5
+        },
+        "target_velocity": {
+          "x": 1.2,
+          "y": -0.5
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b3_p0",
+        "seed": 94100043,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 98,
+          "radial_speed": -1.5,
+          "lateral_speed": 0,
+          "heading_offset": 0.35
+        },
+        "target_offset": {
+          "x": 23,
+          "y": 8
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b3_p1",
+        "seed": 94100044,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 98,
+          "radial_speed": 1.5,
+          "lateral_speed": 0,
+          "heading_offset": -0.35
+        },
+        "target_offset": {
+          "x": -23,
+          "y": 8
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b3_p2",
+        "seed": 94100045,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 102,
+          "radial_speed": 0,
+          "lateral_speed": -1.5,
+          "heading_offset": 0.55
+        },
+        "target_offset": {
+          "x": 13,
+          "y": 11
+        },
+        "target_velocity": {
+          "x": 1.6,
+          "y": 0.65
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b3_p3",
+        "seed": 94100046,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 102,
+          "radial_speed": 0,
+          "lateral_speed": 1.5,
+          "heading_offset": -0.55
+        },
+        "target_offset": {
+          "x": -13,
+          "y": 11
+        },
+        "target_velocity": {
+          "x": -1.6,
+          "y": -0.65
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b3_p4",
+        "seed": 94100047,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 90,
+          "radial_speed": 1,
+          "lateral_speed": 0,
+          "heading_offset": 0.1
+        },
+        "target_offset": {
+          "x": 0,
+          "y": 15
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0.6
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "moving",
+      "case": {
+        "name": "fresh_moving_b3_p5",
+        "seed": 94100048,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 108,
+          "radial_speed": -1,
+          "lateral_speed": 1,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": 8,
+          "y": 5
+        },
+        "target_velocity": {
+          "x": 1.2,
+          "y": -0.5
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b0_p0",
+        "seed": 94100049,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 69,
+          "radial_speed": 0,
+          "lateral_speed": 2.2,
+          "heading_offset": 1.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -7.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": -0.6
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b0_p1",
+        "seed": 94100050,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 76,
+          "radial_speed": 0,
+          "lateral_speed": -2.2,
+          "heading_offset": -1.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -10.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": -0.7
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b0_p2",
+        "seed": 94100051,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 84,
+          "radial_speed": -1.7,
+          "lateral_speed": 0,
+          "heading_offset": 0.45
+        },
+        "target_offset": {
+          "x": 7,
+          "y": -11
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b0_p3",
+        "seed": 94100052,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 72,
+          "radial_speed": -0.8,
+          "lateral_speed": 1.7,
+          "heading_offset": -0.45
+        },
+        "target_offset": {
+          "x": -7,
+          "y": -6.5
+        },
+        "target_velocity": {
+          "x": -0.4,
+          "y": -0.5
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b0_p4",
+        "seed": 94100053,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 92,
+          "radial_speed": -2,
+          "lateral_speed": -0.5,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": 3,
+          "y": -15
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b0_p5",
+        "seed": 94100054,
+        "start": {
+          "bearing": 0.37,
+          "altitude": 78,
+          "radial_speed": -1,
+          "lateral_speed": 0.5,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": -3,
+          "y": -9
+        },
+        "target_velocity": {
+          "x": 0.3,
+          "y": -0.35
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b1_p0",
+        "seed": 94100055,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 69,
+          "radial_speed": 0,
+          "lateral_speed": 2.2,
+          "heading_offset": 1.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -7.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": -0.6
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b1_p1",
+        "seed": 94100056,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 76,
+          "radial_speed": 0,
+          "lateral_speed": -2.2,
+          "heading_offset": -1.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -10.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": -0.7
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b1_p2",
+        "seed": 94100057,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 84,
+          "radial_speed": -1.7,
+          "lateral_speed": 0,
+          "heading_offset": 0.45
+        },
+        "target_offset": {
+          "x": 7,
+          "y": -11
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b1_p3",
+        "seed": 94100058,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 72,
+          "radial_speed": -0.8,
+          "lateral_speed": 1.7,
+          "heading_offset": -0.45
+        },
+        "target_offset": {
+          "x": -7,
+          "y": -6.5
+        },
+        "target_velocity": {
+          "x": -0.4,
+          "y": -0.5
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b1_p4",
+        "seed": 94100059,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 92,
+          "radial_speed": -2,
+          "lateral_speed": -0.5,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": 3,
+          "y": -15
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b1_p5",
+        "seed": 94100060,
+        "start": {
+          "bearing": 1.41,
+          "altitude": 78,
+          "radial_speed": -1,
+          "lateral_speed": 0.5,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": -3,
+          "y": -9
+        },
+        "target_velocity": {
+          "x": 0.3,
+          "y": -0.35
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b2_p0",
+        "seed": 94100061,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 69,
+          "radial_speed": 0,
+          "lateral_speed": 2.2,
+          "heading_offset": 1.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -7.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": -0.6
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b2_p1",
+        "seed": 94100062,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 76,
+          "radial_speed": 0,
+          "lateral_speed": -2.2,
+          "heading_offset": -1.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -10.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": -0.7
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b2_p2",
+        "seed": 94100063,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 84,
+          "radial_speed": -1.7,
+          "lateral_speed": 0,
+          "heading_offset": 0.45
+        },
+        "target_offset": {
+          "x": 7,
+          "y": -11
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b2_p3",
+        "seed": 94100064,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 72,
+          "radial_speed": -0.8,
+          "lateral_speed": 1.7,
+          "heading_offset": -0.45
+        },
+        "target_offset": {
+          "x": -7,
+          "y": -6.5
+        },
+        "target_velocity": {
+          "x": -0.4,
+          "y": -0.5
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b2_p4",
+        "seed": 94100065,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 92,
+          "radial_speed": -2,
+          "lateral_speed": -0.5,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": 3,
+          "y": -15
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b2_p5",
+        "seed": 94100066,
+        "start": {
+          "bearing": 2.67,
+          "altitude": 78,
+          "radial_speed": -1,
+          "lateral_speed": 0.5,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": -3,
+          "y": -9
+        },
+        "target_velocity": {
+          "x": 0.3,
+          "y": -0.35
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b3_p0",
+        "seed": 94100067,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 69,
+          "radial_speed": 0,
+          "lateral_speed": 2.2,
+          "heading_offset": 1.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -7.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": -0.6
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b3_p1",
+        "seed": 94100068,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 76,
+          "radial_speed": 0,
+          "lateral_speed": -2.2,
+          "heading_offset": -1.2
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -10.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": -0.7
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b3_p2",
+        "seed": 94100069,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 84,
+          "radial_speed": -1.7,
+          "lateral_speed": 0,
+          "heading_offset": 0.45
+        },
+        "target_offset": {
+          "x": 7,
+          "y": -11
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b3_p3",
+        "seed": 94100070,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 72,
+          "radial_speed": -0.8,
+          "lateral_speed": 1.7,
+          "heading_offset": -0.45
+        },
+        "target_offset": {
+          "x": -7,
+          "y": -6.5
+        },
+        "target_velocity": {
+          "x": -0.4,
+          "y": -0.5
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b3_p4",
+        "seed": 94100071,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 92,
+          "radial_speed": -2,
+          "lateral_speed": -0.5,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": 3,
+          "y": -15
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "inward",
+      "case": {
+        "name": "fresh_inward_b3_p5",
+        "seed": 94100072,
+        "start": {
+          "bearing": -2.21,
+          "altitude": 78,
+          "radial_speed": -1,
+          "lateral_speed": 0.5,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": -3,
+          "y": -9
+        },
+        "target_velocity": {
+          "x": 0.3,
+          "y": -0.35
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a0_o0_v0",
+        "seed": 94100073,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 69,
+          "radial_speed": -0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a0_o0_v1",
+        "seed": 94100074,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 69,
+          "radial_speed": 0,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a0_o0_v2",
+        "seed": 94100075,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 69,
+          "radial_speed": 0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a0_o1_v0",
+        "seed": 94100076,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 69,
+          "radial_speed": -0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a0_o1_v1",
+        "seed": 94100077,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 69,
+          "radial_speed": 0,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a0_o1_v2",
+        "seed": 94100078,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 69,
+          "radial_speed": 0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a1_o0_v0",
+        "seed": 94100079,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 71,
+          "radial_speed": -0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a1_o0_v1",
+        "seed": 94100080,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 71,
+          "radial_speed": 0,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a1_o0_v2",
+        "seed": 94100081,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 71,
+          "radial_speed": 0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a1_o1_v0",
+        "seed": 94100082,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 71,
+          "radial_speed": -0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a1_o1_v1",
+        "seed": 94100083,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 71,
+          "radial_speed": 0,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b0_a1_o1_v2",
+        "seed": 94100084,
+        "start": {
+          "bearing": 0.11,
+          "altitude": 71,
+          "radial_speed": 0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a0_o0_v0",
+        "seed": 94100085,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 69,
+          "radial_speed": -0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a0_o0_v1",
+        "seed": 94100086,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 69,
+          "radial_speed": 0,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a0_o0_v2",
+        "seed": 94100087,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 69,
+          "radial_speed": 0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a0_o1_v0",
+        "seed": 94100088,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 69,
+          "radial_speed": -0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a0_o1_v1",
+        "seed": 94100089,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 69,
+          "radial_speed": 0,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a0_o1_v2",
+        "seed": 94100090,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 69,
+          "radial_speed": 0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a1_o0_v0",
+        "seed": 94100091,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 71,
+          "radial_speed": -0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a1_o0_v1",
+        "seed": 94100092,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 71,
+          "radial_speed": 0,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a1_o0_v2",
+        "seed": 94100093,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 71,
+          "radial_speed": 0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -11.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a1_o1_v0",
+        "seed": 94100094,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 71,
+          "radial_speed": -0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a1_o1_v1",
+        "seed": 94100095,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 71,
+          "radial_speed": 0,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    },
+    {
+      "group": "settling-neighborhood",
+      "case": {
+        "name": "fresh_settling_b1_a1_o1_v2",
+        "seed": 94100096,
+        "start": {
+          "bearing": 1.13,
+          "altitude": 71,
+          "radial_speed": 0.25,
+          "lateral_speed": 0,
+          "heading_offset": 0
+        },
+        "target_offset": {
+          "x": 0,
+          "y": -12.5
+        },
+        "target_velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "max_ticks": 1200
+      }
+    }
+  ],
+  "discovery": "Use the existing native RecoveryBot match prefix, asteroids off, both dirt shapes, both seats. Keep the first physically eligible direct-transfer state per seat and shape within 10800 ticks and distance 35, after the existing neutral tick. Evaluate every available state from all 64 fixed seeds; never filter on completion of any controller and never replace missing cases. Freeze the discovery receipt before evaluating continuations.",
+  "match_controllers": [
+    {
+      "label": "candidate",
+      "driver": "model",
+      "model": "candidate"
+    },
+    {
+      "label": "learned-reference",
+      "driver": "model",
+      "model": "learned_reference"
+    },
+    {
+      "label": "native-mission",
+      "driver": "mission"
+    },
+    {
+      "label": "handwritten-guidance",
+      "driver": "reference"
+    }
+  ],
+  "precision_controllers": [
+    "candidate",
+    "learned-reference",
+    "handwritten-guidance"
+  ],
+  "acceptance": {
+    "minimum_complete_worlds": 32,
+    "minimum_available_per_shape_seat": 48,
+    "all_available_matches_arrive": true,
+    "all_96_precision_cases_arrive": true,
+    "known_621_retained": true
+  },
+  "gate": "Qualification requires known 621-case retention on the new runtime; at least 32 complete worlds and at least 48 available starts in each of four shape/seat strata; every available fresh match continuation and all 96 fresh precision cases must arrive. Missing starts count against coverage and remain in the report. Reference failures never remove cases or lower the gate. A passing component still needs host integration checks before live delegation.",
+  "preflight": "Replay the fixed candidate and original learned reference on all 157 known precision cases and 482 known match states. Match all prior controller endpoints and match trace bytes, normalizing only runtime identity in precision data. Confirm the candidate retains all 621 known successes.",
+  "traces": "Save every fresh match and precision trace. Replay failures from identical states and assert full trace parity; choose the first candidate failure in each shape/seat stratum and precision group for a compact player, otherwise the first case. Include the first candidate-only failure against each applicable baseline. This affects visualization only, never the gate or model selection.",
+  "budget": {
+    "match_worlds": 64,
+    "match_shapes": 2,
+    "seats": 2,
+    "maximum_match_starts": 256,
+    "match_controllers": 4,
+    "precision_cases": 96,
+    "precision_controllers": 3
+  },
+  "interpretation": "One fixed model, no training, no candidate or case selection using qualification outcomes. The precision matrix samples nearby geometry and motion rather than measuring unrestricted flight. Passing is evidence for this frozen sample, not a general guarantee.",
+  "production_controls_changed": false
+}

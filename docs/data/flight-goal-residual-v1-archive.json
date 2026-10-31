@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-goal-residual-v1-20261024",
+  "completed_at_utc": "2026-10-25T02:16:39.588816+00:00",
+  "kind": "paired learned goal-residual branch pilot",
+  "source_file_count": 1575,
+  "source_archive_sha256": "18d8b10fee84de83ef5c659465464525af5ed662b17ec7daa251e7b44916e267",
+  "runtime_sha256": "e238892a83630fba630065277038c1d6360c160bd5b840e85a3f57d286f2011b",
+  "new_checkpoint_count": 108,
+  "new_training_export_count": 24,
+  "preflight_export_count": 6,
+  "paired_benefit": {
+    "per_seed": [
+      {
+        "seed": 17,
+        "position_gain_over_original_and_control": 0,
+        "recovery_gain_over_original_and_control": 0,
+        "nonforward_successes": 0,
+        "holding_retained": true,
+        "physical_safety": true,
+        "joint_benefit": false
+      },
+      {
+        "seed": 29,
+        "position_gain_over_original_and_control": 0,
+        "recovery_gain_over_original_and_control": -1,
+        "nonforward_successes": 0,
+        "holding_retained": true,
+        "physical_safety": true,
+        "joint_benefit": false
+      },
+      {
+        "seed": 43,
+        "position_gain_over_original_and_control": 0,
+        "recovery_gain_over_original_and_control": 0,
+        "nonforward_successes": 0,
+        "holding_retained": true,
+        "physical_safety": true,
+        "joint_benefit": false
+      }
+    ],
+    "passed": false
+  },
+  "training_ticks": 104448,
+  "restore_ticks": 7322,
+  "optimizer_steps": 1632,
+  "evaluation_ticks": 66818,
+  "evaluation_episodes": 384,
+  "parity_comparisons": 192,
+  "response_comparisons": 2496,
+  "progression_qualified": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "validation": {
+    "sources_and_archive_verified": 1575,
+    "previous_manifests_unchanged": 42,
+    "copied_inputs_unchanged": 172,
+    "declared_production_changes": [
+      "crates/spacewars-ai/examples/flight_ppo_bridge.rs",
+      "crates/spacewars-ai/src/learned_flight.rs",
+      "tools/flight_ppo/checkpoint.py",
+      "tools/flight_ppo/execution.py",
+      "tools/flight_ppo/initialization.py",
+      "tools/flight_ppo/model.py",
+      "tools/flight_ppo/run.py"
+    ],
+    "native_runtime_rebuilt": true,
+    "native_tests_passed": 421,
+    "native_tests_ignored": 2,
+    "python_tests": 51,
+    "all_six_exact_15_to_16_resumes": true,
+    "initial_base_weights_and_physical_traces_exact": true,
+    "initial_training_function_exact": true,
+    "first_collected_rollouts_exact": true,
+    "schema_control_exact_except_five_declared_python_sources_and_runtime": true,
+    "native_python_comparisons": 2688,
+    "physical_dwell_reward_reconstructed": true,
+    "all_process_exits_zero": true,
+    "budgets_passed": true,
+    "no_extension": true,
+    "new_checkpoint_count": 108,
+    "new_training_export_count": 24,
+    "preflight_export_count": 6
+  },
+  "retained_file_count": 1565,
+  "retained_bytes_excluding_manifest": 468002371,
+  "archive_path": "data/training-experiments/learned-flight-goal-residual-v1-20261024",
+  "manifest_sha256": "cb47ee8a9dd7a4f0ce5bd5166802e00c331c83252c4f715c43eb6537832d3622",
+  "report_sha256": "9561cea4fa70fc5fa5ae5d858fb887a99f047ad5544f2e3cbfd9fb3376b91be0",
+  "results_sha256": "cd2a85dd45f1e738af94457ff74735d837aaa9a7056ac6f8063c1a63dd138e35"
+}

@@ -457,6 +457,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     surface_sortie::SURFACE_ROUND_REGISTRATION,
     surface_sortie::PILOT_REGISTRATION,
     surface_sortie::RECOVERY_REGISTRATION,
+    surface_sortie::LEARNED_FLIGHT_REGISTRATION,
     surface_sortie::JETPACK_REGISTRATION,
     surface_sortie::COMBAT_REGISTRATION,
     surface_sortie::DUEL_REGISTRATION,

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-persistence-v1-20261022",
+  "kind": "matched exploration persistence comparison",
+  "checkpoint": "C4-exploration-persistence-comparison",
+  "completed_at_utc": "2026-10-23T06:09:08.618244+00:00",
+  "source_capture": "selected dirty/untracked workspace source before final executable build/run",
+  "source_file_count": 1501,
+  "source_archive_sha256": "04a79d48e9e14c4f540d3588e4e18afe545dc5c168574debe9108382dca764ca",
+  "runtime_sha256": "e7a4122aa50c7b125f915b7fb08689f7bef9176dcce0e489ba3d55ef0ac872d4",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "training_ticks": 786432,
+  "development_ticks": 315912,
+  "final_successes": 0,
+  "final_attempts": 96,
+  "comparison": {
+    "all_runs_completed": true,
+    "paired_success_gains": [
+      0,
+      0,
+      0
+    ],
+    "median_thrust_run_ratio": 4.58771798725586,
+    "persistence_manipulation_gate": true,
+    "arrival_benefit_gate": false
+  },
+  "arm_gates": {
+    "independent": {
+      "learning_evidence": false,
+      "basic_flight_gate": false
+    },
+    "persistent": {
+      "learning_evidence": false,
+      "basic_flight_gate": false
+    }
+  },
+  "confirmation": "unused: neither arm passed the frozen progression gate",
+  "capability_claim": false,
+  "validation": {
+    "python_tests": 16,
+    "fresh_process_resume": "bitwise equal for both arms",
+    "trained_parity_fixtures": 96,
+    "maximum_abs_output_error": 1.430511474609375e-06,
+    "compile_whitespace": "passed",
+    "source_runtime_frozen_plan_identity": "passed",
+    "previous_eight_manifests": "unchanged"
+  },
+  "checkpoint_count": 774,
+  "retained_file_count": 1518,
+  "retained_bytes_excluding_manifest": 3238075805,
+  "limitations": [
+    "Stationary targets, zero gravity, practice worlds only; no obstacle navigation.",
+    "Current-observation critic does not receive latent action history.",
+    "Three seeds and a bounded budget do not establish long-run impossibility or a unique failure cause.",
+    "External dependency/toolchain binaries excluded; local retention is not an off-machine backup."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-persistence-v1-20261022",
+  "manifest_sha256": "15c3cf0e7c6a543176ba8d8c7058cd34d01cfab643f5f719135e4b9b48dee38b",
+  "compact_results_sha256": "f41f214d996c0fce9cdc92c0f0d76da0557c4c1604fae32ed59dca836565c90c",
+  "report_sha256": "19afd4aad8150fcb977285741d02dd7f8483bbb5ca46c2534544c281e9184d70"
+}
