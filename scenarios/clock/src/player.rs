@@ -132,10 +132,26 @@ impl ClockState {
             if duck.player_session().is_some() {
                 return;
             }
-            // An automatic actor already fading out is gone. Retain an event's
-            // leased arena, then let the usual join path create a fresh visit.
-            self.finish_duck_visit();
         }
+        // A joining player's visit claims the arena, and brings a standalone
+        // event it joins into it. The arena refuses before anything changes.
+        let mut owners = self.arena_owners();
+        owners.push(Owner::Visit);
+        if let Some(event) = &self.active_event
+            && event.joins_into_arena()
+        {
+            owners.push(Owner::Event(event.kind()));
+        }
+        if let Err(unavailable) = self.arena.admit(&owners) {
+            self.event_notice = Some((
+                unavailable.notice(),
+                self.schedule.tick + 2 * u64::from(FIXED_HZ),
+            ));
+            return;
+        }
+        // An automatic actor already fading out is gone. Retain an event's
+        // leased arena, then let the usual join path create a fresh visit.
+        self.finish_duck_visit();
         let layout = Layout::new(self.aspect_ratio());
         let seed = self.player_seed.wrapping_add(session);
         if let Some(event) = &mut self.active_event

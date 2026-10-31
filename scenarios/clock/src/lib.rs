@@ -50,7 +50,9 @@ pub mod water_fixture;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
-pub use arena::ArenaAccounting;
+pub use arena::{
+    ARENA_CAPACITY, ArenaAccounting, MAX_ARENA_CLAIMS, MAX_RESIDENT_CLAIMS, Population, Unavailable,
+};
 pub use digits::{
     DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
     SegmentRepresentation, SegmentState,
@@ -481,9 +483,9 @@ pub struct ClockState {
     // step or when an event claims it, and it stays while that visit or an
     // event leasing it needs it. Standalone events keep their own worlds.
     arena: arena::ClockArena,
-    // A resident of the arena for checking its standard, admitted only on
+    // Residents of the arena for checking its standard, admitted only on
     // request.
-    arena_fixture: Option<arena_fixture::ArenaFixture>,
+    arena_fixtures: Vec<arena_fixture::ArenaFixture>,
     crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -1019,27 +1021,102 @@ impl ClockState {
         arena_fixture::ArenaFixture::default_balls(Layout::new(self.aspect_ratio()))
     }
 
-    /// Admits the arena fixture's `balls`, which keep the arena as a resident
-    /// until the last of them falls out of the view. Returns false, changing
-    /// nothing, while the fixture is already in the arena.
-    pub fn admit_arena_fixture(&mut self, balls: &[arena_fixture::FixtureBall]) -> bool {
-        if self.arena_fixture.is_some() {
-            return false;
-        }
+    /// Admits an arena fixture with `balls`, a resident that keeps the arena
+    /// until it is removed or the last of them falls out of the view. Returns
+    /// its index, or why the arena cannot take it, changing nothing.
+    pub fn admit_arena_fixture(
+        &mut self,
+        balls: &[arena_fixture::FixtureBall],
+    ) -> Result<usize, Unavailable> {
+        let index = (0..arena_fixture::MAX_FIXTURES as u8)
+            .find(|index| !self.arena.holds(arena::Owner::Fixture(*index)))
+            .expect("the arena holds fewer residents than there are fixtures");
+        let mut owners = self.arena_owners();
+        owners.push(arena::Owner::Fixture(index));
+        self.arena.admit(&owners)?;
         let layout = Layout::new(self.aspect_ratio());
-        self.arena_fixture = Some(arena_fixture::ArenaFixture::admit(
-            &mut self.arena,
-            layout,
-            balls,
-        ));
+        let fixture = arena_fixture::ArenaFixture::admit(&mut self.arena, layout, index, balls);
+        self.arena_fixtures.push(fixture);
+        self.sync_event_schedule();
+        Ok(usize::from(index))
+    }
+
+    /// Takes arena fixture `index` out of the arena with its balls, leaving
+    /// every other owner as it is. Returns false when there is no such
+    /// fixture.
+    pub fn remove_arena_fixture(&mut self, index: usize) -> bool {
+        let Some(position) = self
+            .arena_fixtures
+            .iter()
+            .position(|fixture| fixture.index() == index)
+        else {
+            return false;
+        };
+        self.arena_fixtures.remove(position).remove(&mut self.arena);
+        self.sync_event_schedule();
         true
     }
 
-    /// The arena fixture's balls, while it has any.
-    pub fn arena_fixture(&self) -> Option<arena_fixture::ArenaFixtureState> {
-        self.arena_fixture
-            .as_ref()
+    /// Arena fixture `index`'s balls, while it has any.
+    pub fn arena_fixture(&self, index: usize) -> Option<arena_fixture::ArenaFixtureState> {
+        self.arena_fixtures
+            .iter()
+            .find(|fixture| fixture.index() == index)
             .map(|fixture| fixture.state(&self.arena))
+    }
+
+    /// Every arena fixture's balls, in the order they were admitted.
+    pub fn arena_fixtures(&self) -> Vec<arena_fixture::ArenaFixtureState> {
+        self.arena_fixtures
+            .iter()
+            .map(|fixture| fixture.state(&self.arena))
+            .collect()
+    }
+
+    /// The owners holding the arena, and a visit, which claims it at its
+    /// first step and so counts from the moment it starts.
+    fn arena_owners(&self) -> Vec<arena::Owner> {
+        let mut owners = self.arena.owners().to_vec();
+        if self.duck_visit.is_some() && !owners.contains(&arena::Owner::Visit) {
+            owners.push(arena::Owner::Visit);
+        }
+        owners
+    }
+
+    /// The owners that would hold the arena once `kind` started, if it needs
+    /// the arena at all. A visit claims it, and so does an event that shares
+    /// a visit's arena. Starting an event finishes the one it replaces first,
+    /// which takes a vacant arena's terrain with it.
+    fn arena_owners_for_event(&self, kind: ClockEventKind) -> Option<Vec<arena::Owner>> {
+        let adding = match kind {
+            ClockEventKind::Duck => vec![arena::Owner::Visit],
+            ClockEventKind::Aquarium
+            | ClockEventKind::Explosion
+            | ClockEventKind::Falling
+            | ClockEventKind::Meltdown
+                if self.duck_visit.is_some() =>
+            {
+                vec![arena::Owner::Visit, arena::Owner::Event(kind)]
+            }
+            _ => return None,
+        };
+        let mut owners: Vec<_> = self
+            .arena_owners()
+            .into_iter()
+            .filter(|owner| match owner {
+                arena::Owner::Event(_) => false,
+                arena::Owner::Visit => self.duck_visit.is_some(),
+                _ => true,
+            })
+            .collect();
+        owners.extend(adding);
+        Some(owners)
+    }
+
+    /// Whether the arena has no room for what starting `kind` would add.
+    pub fn event_blocked_by_arena(&self, kind: ClockEventKind) -> bool {
+        self.arena_owners_for_event(kind)
+            .is_some_and(|owners| arena::admits(&owners).is_err())
     }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
@@ -1076,6 +1153,7 @@ impl ClockState {
     fn event_blocked(&self, kind: ClockEventKind) -> bool {
         self.event_blocked_by_duck(kind)
             || self.event_blocked_by_crow(kind)
+            || self.event_blocked_by_arena(kind)
             || kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed
     }
 
@@ -1142,6 +1220,17 @@ impl ClockState {
                     } else {
                         "Wait for the duck, or take control and dismiss it"
                     },
+                    self.schedule.tick + 2 * u64::from(FIXED_HZ),
+                ));
+                return;
+            }
+            // The arena refuses before anything changes, the event this one
+            // would replace included.
+            if let Some(owners) = self.arena_owners_for_event(kind)
+                && let Err(unavailable) = self.arena.admit(&owners)
+            {
+                self.event_notice = Some((
+                    unavailable.notice(),
                     self.schedule.tick + 2 * u64::from(FIXED_HZ),
                 ));
                 return;
@@ -1402,12 +1491,12 @@ impl ClockState {
             .bind_floor(self.active_event.as_ref(), self.floor.geometry(layout));
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
-        // Fixture balls that fell out of the view leave the arena.
-        if let Some(fixture) = &mut self.arena_fixture
-            && fixture.observe(&mut self.arena, layout)
-        {
-            self.arena_fixture = None;
-        }
+        // Fixture balls that fell out of the view leave the arena, and a
+        // fixture with none left lets it go.
+        let fixtures = self.arena_fixtures.len();
+        self.arena_fixtures
+            .retain_mut(|fixture| !fixture.observe(&mut self.arena, layout));
+        let fixture_left = self.arena_fixtures.len() < fixtures;
         let visit_finished = match (&mut self.duck_visit, visit) {
             (Some(duck), Some(step)) => duck.post_step(&mut self.arena, water, step),
             _ => false,
@@ -1419,6 +1508,9 @@ impl ClockState {
         }
         if visit_finished {
             self.finish_duck_visit();
+        }
+        if fixture_left {
+            self.sync_event_schedule();
         }
         self.update_crow(true);
     }
@@ -1617,7 +1709,7 @@ impl Scenario for ClockScenario {
             event_notice: None,
             duck_visit: None,
             arena: arena::ClockArena::default(),
-            arena_fixture: None,
+            arena_fixtures: Vec::new(),
             crow_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,

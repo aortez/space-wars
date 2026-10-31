@@ -6,6 +6,14 @@
 //! let go takes it away. An owner that lets go while others stay takes its own
 //! bodies with it, by the identities [`ids::canonical`] gives it.
 //!
+//! Each owner has at most its [`Owner::budget`] of bodies, colliders and
+//! joints in the arena. A claim is granted only while the budgets of everyone
+//! holding the arena stay within [`ARENA_CAPACITY`] and the residents within
+//! [`MAX_RESIDENT_CLAIMS`]. Whatever would add an owner asks [`admits`] before
+//! it changes anything, and a claim the arena cannot take is [`Unavailable`].
+//! In debug builds each step audits that the world holds what its owners
+//! claim and nothing else.
+//!
 //! Every body, collider and joint in a Clock world is addressed by a
 //! scenario-chosen `PhysicsId`. Those numbers used to be reserved in comments
 //! beside the code that allocated them, which left five sites reading a range
@@ -31,9 +39,14 @@ use engine_rapier::world::{
 };
 
 use crate::{
-    events::{ActiveEvent, duck::ArenaTerrain},
+    arena_fixture::MAX_FIXTURE_BALLS,
+    digits::{DIGIT_SLOT_COUNT, SegmentKind},
+    events::{
+        ActiveEvent, aquarium::MAX_DIGIT_SOLIDS, duck::ArenaTerrain, duck::planner::MAX_SURFACES,
+        explosion::MAX_EXPLOSION_CELLS, meltdown::MAX_MELTDOWN_CELLS,
+    },
     floor::{FloorGeometry, responsive::ResponsiveFloor},
-    grass::SoilHabitat,
+    grass::{MAX_SOIL_BODIES, MAX_SOIL_CHUNK_COLLIDERS, SoilHabitat},
     layout::Layout,
 };
 
@@ -49,22 +62,60 @@ pub(crate) enum Owner {
     /// Retained soil. It is a resident: once it has material it keeps the
     /// arena for the rest of the run, with or without a visit.
     Soil,
-    /// The arena fixture's balls, a resident that rests on whatever actually
-    /// supports it.
-    Fixture,
+    /// One of the arena fixture's owners, each with balls of its own: a
+    /// resident that rests on whatever actually supports it.
+    Fixture(u8),
 }
 
 impl Owner {
     /// A resident keeps the arena for the rest of the run, whoever else comes
     /// and goes.
     fn resident(self) -> bool {
-        matches!(self, Self::Soil | Self::Fixture)
+        matches!(self, Self::Soil | Self::Fixture(_))
     }
 
     /// A resident that rests on the floor, so the arena keeps a floor under it
     /// while no visit's terrain is one. Soil is fixed in place and needs none.
     fn rests(self) -> bool {
-        matches!(self, Self::Fixture)
+        matches!(self, Self::Fixture(_))
+    }
+
+    /// The most bodies, colliders and joints this owner has in the arena at
+    /// once. No owner has joints.
+    pub(crate) const fn budget(self) -> Population {
+        match self {
+            // A character, a course of at most `MAX_SURFACES` surfaces with
+            // the entrance wall behind it, and two door flaps. A drain-joined
+            // visit's two banks and two walls, or a responsive floor's two
+            // panels, number fewer.
+            Self::Visit => {
+                let bodies = count(&ids::canonical::DUCK)
+                    + MAX_SURFACES
+                    + count(&ids::canonical::ENTRANCE_WALL)
+                    + count(&ids::canonical::FLAPS);
+                Population::new(bodies, bodies)
+            }
+            // A fixed compound of its solid digit cells and two liner panels.
+            Self::Event(ClockEventKind::Aquarium) => Population::new(
+                count(&ids::canonical::AQUARIUM_DIGITS) + count(&ids::canonical::AQUARIUM_LINER),
+                MAX_DIGIT_SOLIDS + count(&ids::canonical::AQUARIUM_LINER),
+            ),
+            Self::Event(ClockEventKind::Explosion) => {
+                Population::new(MAX_EXPLOSION_CELLS, MAX_EXPLOSION_CELLS)
+            }
+            // A bar for each lit segment and one for each of the two meridiem
+            // letters, with a collider for each of their cells.
+            Self::Event(ClockEventKind::Falling) => Population::new(
+                DIGIT_SLOT_COUNT * SegmentKind::ALL.len() + 2,
+                crate::fonts::MAX_DIGIT_CELLS + crate::meridiem::MAX_CELLS,
+            ),
+            Self::Event(ClockEventKind::Meltdown) => {
+                Population::new(MAX_MELTDOWN_CELLS, MAX_MELTDOWN_CELLS)
+            }
+            Self::Event(_) => Population::NONE,
+            Self::Soil => Population::new(MAX_SOIL_BODIES, MAX_SOIL_CHUNK_COLLIDERS),
+            Self::Fixture(_) => Population::new(MAX_FIXTURE_BALLS, MAX_FIXTURE_BALLS),
+        }
     }
 
     /// The identities this owner's bodies take. While other owners keep the
@@ -87,8 +138,156 @@ impl Owner {
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
             Self::Event(_) => &[],
             Self::Soil => &[SOIL],
-            Self::Fixture => &[FIXTURE_BALLS],
+            Self::Fixture(index) => &FIXTURE_OWNER_BALLS[index as usize],
         }
+    }
+}
+
+const fn count(range: &Range<u64>) -> usize {
+    (range.end - range.start) as usize
+}
+
+/// How many bodies, colliders and joints there are, or may be.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Population {
+    pub bodies: usize,
+    pub colliders: usize,
+    pub joints: usize,
+}
+
+impl Population {
+    pub const NONE: Self = Self::new(0, 0);
+
+    /// Bodies and colliders without joints.
+    pub const fn new(bodies: usize, colliders: usize) -> Self {
+        Self {
+            bodies,
+            colliders,
+            joints: 0,
+        }
+    }
+
+    pub const fn plus(self, other: Self) -> Self {
+        Self {
+            bodies: self.bodies + other.bodies,
+            colliders: self.colliders + other.colliders,
+            joints: self.joints + other.joints,
+        }
+    }
+
+    /// The larger of each count.
+    const fn max(self, other: Self) -> Self {
+        const fn larger(a: usize, b: usize) -> usize {
+            if a > b { a } else { b }
+        }
+        Self {
+            bodies: larger(self.bodies, other.bodies),
+            colliders: larger(self.colliders, other.colliders),
+            joints: larger(self.joints, other.joints),
+        }
+    }
+
+    pub const fn within(self, limit: Self) -> bool {
+        self.bodies <= limit.bodies
+            && self.colliders <= limit.colliders
+            && self.joints <= limit.joints
+    }
+}
+
+/// The most the floor kept under resting residents has: a slab for each of a
+/// course's surfaces at most.
+const FLOOR_BUDGET: Population = Population::new(
+    count(&ids::canonical::ARENA_FLOOR),
+    count(&ids::canonical::ARENA_FLOOR),
+);
+
+/// The largest budget of any event that shares the arena.
+const LARGEST_EVENT: Population = {
+    let mut largest = Population::NONE;
+    let mut index = 0;
+    while index < ClockEventKind::ALL.len() {
+        largest = largest.max(Owner::Event(ClockEventKind::ALL[index]).budget());
+        index += 1;
+    }
+    largest
+};
+
+/// The most bodies, colliders and joints the arena holds at once: a visit
+/// and the largest event sharing its arena, with soil and one arena fixture.
+/// Everything Clock ships fits, so only residents beyond those make the arena
+/// refuse a claim.
+pub const ARENA_CAPACITY: Population = Owner::Visit
+    .budget()
+    .plus(LARGEST_EVENT)
+    .plus(Owner::Soil.budget())
+    .plus(Owner::Fixture(0).budget());
+
+/// The most residents that hold the arena at once, soil included.
+pub const MAX_RESIDENT_CLAIMS: usize = 4;
+
+/// The most owners that hold the arena at once: a visit, one event sharing
+/// its arena, and the residents.
+pub const MAX_ARENA_CLAIMS: usize = 2 + MAX_RESIDENT_CLAIMS;
+
+const _: () = assert!(
+    FLOOR_BUDGET
+        .plus(Owner::Soil.budget())
+        .within(ARENA_CAPACITY)
+);
+
+/// Why the arena could not take a claim. Nothing changed: the arena, its
+/// owners and their bodies are as they were.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unavailable {
+    /// The arena already holds as many residents as it may.
+    Residents,
+    /// The owners' budgets together would be more than the arena holds.
+    Capacity,
+}
+
+impl Unavailable {
+    /// What a person asking for the claim is told.
+    pub fn notice(self) -> &'static str {
+        match self {
+            Self::Residents => "The arena holds all the residents it can",
+            Self::Capacity => "The arena has no room for this",
+        }
+    }
+}
+
+/// Whether `owners` can hold the arena together: no more residents than it
+/// may hold, and budgets that together fit its capacity, with the floor kept
+/// under resting residents while no visit's terrain is one. Soil's claim is
+/// reserved for the whole run, so it counts whether or not the soil holds the
+/// arena yet, and soil is never refused. Changes nothing.
+pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
+    let mut held: Vec<Owner> = Vec::with_capacity(owners.len() + 1);
+    for owner in owners.iter().copied().chain([Owner::Soil]) {
+        if !held.contains(&owner) {
+            held.push(owner);
+        }
+    }
+    let events = held
+        .iter()
+        .filter(|owner| matches!(owner, Owner::Event(_)))
+        .count();
+    debug_assert!(events <= 1, "one event at a time: {held:?}");
+    if held.iter().filter(|owner| owner.resident()).count() > MAX_RESIDENT_CLAIMS {
+        return Err(Unavailable::Residents);
+    }
+    let floor = held.iter().any(|owner| owner.rests()) && !held.contains(&Owner::Visit);
+    let floor = if floor {
+        FLOOR_BUDGET
+    } else {
+        Population::NONE
+    };
+    let need = held
+        .iter()
+        .fold(floor, |need, owner| need.plus(owner.budget()));
+    if need.within(ARENA_CAPACITY) {
+        Ok(())
+    } else {
+        Err(Unavailable::Capacity)
     }
 }
 
@@ -151,6 +350,8 @@ pub struct ArenaAccounting {
     pub granted: u64,
     /// Claims let go over the run.
     pub released: u64,
+    /// Claims the arena could not take over the run.
+    pub refused: u64,
     /// Rigid steps over the run. Exactly one per positive tick while a world
     /// exists.
     pub steps: u64,
@@ -238,6 +439,7 @@ pub(crate) struct ClockArena {
     metrics: PhysicsStepMetrics,
     granted: u64,
     released: u64,
+    refused: u64,
     steps: u64,
     worlds: u64,
 }
@@ -274,9 +476,34 @@ impl ClockArena {
         self.owners.contains(&owner)
     }
 
+    /// The owners holding the arena, in the order they claimed it.
+    pub fn owners(&self) -> &[Owner] {
+        &self.owners
+    }
+
+    /// Whether the arena can take `owners` together, as [`admits`] says,
+    /// counting a refusal. Changes nothing else.
+    pub fn admit(&mut self, owners: &[Owner]) -> Result<(), Unavailable> {
+        admits(owners).inspect_err(|_| self.refused += 1)
+    }
+
+    /// Every claim is admitted before whatever asks for it changes anything.
+    fn debug_assert_admitted(&self, owner: Owner) {
+        if cfg!(debug_assertions) {
+            let mut owners = self.owners.clone();
+            owners.push(owner);
+            assert!(
+                admits(&owners).is_ok(),
+                "{owner:?} claims the arena beside {:?} unadmitted",
+                self.owners
+            );
+        }
+    }
+
     /// `owner` is the first to need a world and brings `world` with it.
     pub fn build(&mut self, owner: Owner, world: PhysicsWorld) -> &mut PhysicsWorld {
         assert!(self.idle(), "the arena has one world");
+        self.debug_assert_admitted(owner);
         self.floor = KeptFloor::None;
         self.resident_gravity = None;
         self.owners.push(owner);
@@ -288,6 +515,7 @@ impl ClockArena {
     /// `owner` joins the world another owner built.
     pub fn claim(&mut self, owner: Owner) -> &mut PhysicsWorld {
         assert!(!self.holds(owner), "{owner:?} already holds the arena");
+        self.debug_assert_admitted(owner);
         let world = self
             .world
             .as_mut()
@@ -327,6 +555,7 @@ impl ClockArena {
     /// their bodies into it, which leaves only their contact history behind.
     pub fn adopt(&mut self, owner: Owner, mut world: PhysicsWorld) -> &mut PhysicsWorld {
         assert!(!self.holds(owner), "{owner:?} already holds the arena");
+        self.debug_assert_admitted(owner);
         if let Some(mut kept) = self.world.take() {
             let entities: Vec<_> = kept.entity_ids().collect();
             for entity in entities {
@@ -471,8 +700,85 @@ impl ClockArena {
             }
             self.resident_gravity = Some(gravity);
         }
+        #[cfg(debug_assertions)]
+        self.audit();
+        let world = self.world.as_mut().expect("a held arena");
         self.metrics = world.step(dt);
         self.steps += 1;
+    }
+
+    /// The arena's integrity, checked before each step in debug builds. Its
+    /// owners are distinct, within the claim limits and admitted together.
+    /// The world's identities and Rapier's objects name each other one to
+    /// one. Every entity belongs to exactly one owner holding the arena, by
+    /// the identities it declares, or to the floor kept under resting
+    /// residents while no visit's terrain is one. Each owner has no more than
+    /// its budget.
+    #[cfg(debug_assertions)]
+    fn audit(&self) {
+        let world = self.world.as_ref().expect("a held arena");
+        for (index, owner) in self.owners.iter().enumerate() {
+            assert!(
+                !self.owners[index + 1..].contains(owner),
+                "{owner:?} holds the arena twice"
+            );
+        }
+        assert!(self.owners.len() <= MAX_ARENA_CLAIMS, "{:?}", self.owners);
+        assert!(
+            admits(&self.owners).is_ok(),
+            "{:?} hold the arena unadmitted",
+            self.owners
+        );
+        if let Some(fault) = world.identity_fault() {
+            panic!("the arena's identities: {fault}");
+        }
+        let floor = self.keeps_floor() && !self.holds(Owner::Visit);
+        // The holder of each entity, as an index into `owners`, or the floor.
+        let holder = |entity: PhysicsId| {
+            let id = entity.value();
+            #[cfg(test)]
+            if ids::canonical::TEST_OBSTACLES.contains(&id) {
+                return None;
+            }
+            if ids::canonical::ARENA_FLOOR.contains(&id) {
+                assert!(floor, "floor {id} with no resting resident on it");
+                return Some(self.owners.len());
+            }
+            let mut holders = self
+                .owners
+                .iter()
+                .enumerate()
+                .filter(|(_, owner)| owner.ranges().iter().any(|range| range.contains(&id)));
+            let (index, _) = holders
+                .next()
+                .unwrap_or_else(|| panic!("entity {id} belongs to no owner of {:?}", self.owners));
+            assert!(holders.next().is_none(), "entity {id} has two owners");
+            Some(index)
+        };
+        let mut populations = vec![Population::NONE; self.owners.len() + 1];
+        for body in world.body_ids() {
+            if let Some(index) = holder(body.entity) {
+                populations[index].bodies += 1;
+            }
+        }
+        for collider in world.collider_ids() {
+            if let Some(index) = holder(collider.entity) {
+                populations[index].colliders += 1;
+            }
+        }
+        for (owner, population) in self.owners.iter().zip(&populations) {
+            let budget = owner.budget();
+            assert!(
+                population.within(budget),
+                "{owner:?} has {population:?}, more than {budget:?}"
+            );
+        }
+        let floor = populations[self.owners.len()];
+        assert!(
+            floor.within(FLOOR_BUDGET),
+            "the floor has {floor:?}, more than {FLOOR_BUDGET:?}"
+        );
+        assert_eq!(world.joint_count(), 0, "no owner has joints");
     }
 
     /// The last step's timings and populations.
@@ -490,6 +796,7 @@ impl ClockArena {
             joints: world.map_or(0, PhysicsWorld::joint_count),
             granted: self.granted,
             released: self.released,
+            refused: self.refused,
             steps: self.steps,
             worlds: self.worlds,
         }
@@ -516,6 +823,72 @@ pub(crate) fn canonical_world<'a>(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_arena_takes_everything_clock_ships_beside_soil_and_one_fixture() {
+        for kind in ClockEventKind::ALL {
+            let owners = [
+                Owner::Visit,
+                Owner::Event(kind),
+                Owner::Soil,
+                Owner::Fixture(0),
+            ];
+            assert_eq!(admits(&owners), Ok(()), "{kind:?}");
+            // A second fixture leaves no room for the largest events.
+            let owners = [
+                Owner::Visit,
+                Owner::Event(kind),
+                Owner::Fixture(0),
+                Owner::Fixture(1),
+            ];
+            let largest = matches!(
+                kind,
+                ClockEventKind::Aquarium | ClockEventKind::Explosion | ClockEventKind::Meltdown
+            );
+            let refused = largest.then_some(Unavailable::Capacity);
+            assert_eq!(admits(&owners).err(), refused, "{kind:?}");
+        }
+        // Soil's place is reserved among the residents.
+        let fixtures: Vec<_> = (0..MAX_RESIDENT_CLAIMS as u8).map(Owner::Fixture).collect();
+        assert_eq!(admits(&fixtures[..MAX_RESIDENT_CLAIMS - 1]), Ok(()));
+        assert_eq!(admits(&fixtures), Err(Unavailable::Residents));
+    }
+
+    #[test]
+    fn a_refusal_is_counted_and_changes_nothing_else() {
+        let mut arena = ClockArena::default();
+        let fixtures: Vec<_> = (0..MAX_RESIDENT_CLAIMS as u8).map(Owner::Fixture).collect();
+        assert_eq!(
+            arena.admit(&fixtures),
+            Err(Unavailable::Residents),
+            "soil's place is reserved"
+        );
+        assert_eq!(
+            arena.accounting(),
+            ArenaAccounting {
+                refused: 1,
+                ..ArenaAccounting::default()
+            }
+        );
+        assert!(arena.idle());
+    }
+
+    /// Debug builds catch a claim nobody admitted.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "unadmitted")]
+    fn a_claim_beyond_the_arenas_capacity_fails_in_debug_builds() {
+        let mut arena = ClockArena::default();
+        arena.claim_resident(Owner::Fixture(0), Layout::new(1.0));
+        arena.claim(Owner::Visit);
+        arena.claim(Owner::Event(ClockEventKind::Meltdown));
+        arena.claim_resident(Owner::Fixture(1), Layout::new(1.0));
+    }
+}
+
 pub(crate) mod ids {
     /// The one shared arena, which the visit and its leasing events all insert
     /// into. Disjoint except for the aliases noted below, which the
@@ -526,6 +899,7 @@ pub(crate) mod ids {
         use engine_rapier::world::PhysicsId;
 
         use crate::{
+            arena_fixture::{MAX_FIXTURE_BALLS, MAX_FIXTURES},
             digits::{DIGIT_SLOT_COUNT, SegmentKind},
             events::{
                 duck::planner::MAX_SURFACES, explosion::MAX_EXPLOSION_CELLS,
@@ -572,11 +946,28 @@ pub(crate) mod ids {
         pub(crate) const AQUARIUM_LINER: Range<u64> = 6001..6003;
         /// Aquarium's solid digit compound.
         pub(crate) const AQUARIUM_DIGITS: Range<u64> = 6100..6101;
-        /// The arena fixture's balls.
-        pub(crate) const FIXTURE_BALLS: Range<u64> = 7001..7005;
+        /// The arena fixture's balls, `MAX_FIXTURE_BALLS` for each of its
+        /// owners.
+        pub(crate) const FIXTURE_BALLS: Range<u64> =
+            7001..7001 + (MAX_FIXTURES * MAX_FIXTURE_BALLS) as u64;
+        /// Each fixture owner's share of `FIXTURE_BALLS`.
+        pub(crate) static FIXTURE_OWNER_BALLS: [[Range<u64>; 1]; MAX_FIXTURES] = {
+            let mut owners = [const { [0..0] }; MAX_FIXTURES];
+            let mut index = 0;
+            while index < MAX_FIXTURES {
+                let start = FIXTURE_BALLS.start + (index * MAX_FIXTURE_BALLS) as u64;
+                owners[index] = [start..start + MAX_FIXTURE_BALLS as u64];
+                index += 1;
+            }
+            owners
+        };
         /// Retained soil, the one resident today that outlives its admitting
         /// event.
         pub(crate) const SOIL: Range<u64> = 900_001..900_002;
+        /// Obstacles unit tests drop into a visit's arena, which belong to no
+        /// owner.
+        #[cfg(test)]
+        pub(crate) const TEST_OBSTACLES: Range<u64> = 9000..9100;
 
         /// The body of course surface `index`.
         pub(crate) fn course_surface(index: usize) -> PhysicsId {
@@ -609,6 +1000,7 @@ pub(crate) mod ids {
 
         use super::canonical::*;
         use crate::{
+            arena_fixture::MAX_FIXTURE_BALLS,
             digits::{DIGIT_SLOT_COUNT, SegmentId, SegmentKind},
             events::duck::planner::MAX_SURFACES,
         };
@@ -637,6 +1029,7 @@ pub(crate) mod ids {
             ("AQUARIUM_DIGITS", AQUARIUM_DIGITS),
             ("FIXTURE_BALLS", FIXTURE_BALLS),
             ("SOIL", SOIL),
+            ("TEST_OBSTACLES", TEST_OBSTACLES),
         ];
 
         fn overlaps(a: &Range<u64>, b: &Range<u64>) -> bool {
@@ -670,6 +1063,17 @@ pub(crate) mod ids {
                     "declared alias {a:?}/{b:?} no longer overlaps"
                 );
             }
+        }
+
+        #[test]
+        fn each_fixture_owner_has_its_own_share_of_the_fixtures_identities() {
+            let mut next = FIXTURE_BALLS.start;
+            for [share] in &FIXTURE_OWNER_BALLS {
+                assert_eq!(share.start, next);
+                assert_eq!(share.end - share.start, MAX_FIXTURE_BALLS as u64);
+                next = share.end;
+            }
+            assert_eq!(next, FIXTURE_BALLS.end);
         }
 
         #[test]

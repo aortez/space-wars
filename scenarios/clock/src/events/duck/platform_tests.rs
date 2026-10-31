@@ -495,7 +495,7 @@ fn forced_bad_landings_are_classified_using_real_supports_not_proximity() {
         if kind == 2 {
             // A foreign collider at the intended X coordinate: landing nearby
             // must not count as landing on the intended platform.
-            let entity = PhysicsId::new(999);
+            let entity = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
             let top = floor + plan.landing.y + radius * 3.0;
             world.insert_body(
                 BodyId::new(entity, BodyRole::PRIMARY),

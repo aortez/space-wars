@@ -42,7 +42,7 @@ fn perched(
     let radius = duck.radius;
     let x = width * 0.2;
     let block_center = duck.physics_position(Vec2::new(x, duck.layout.floor_y + radius));
-    let entity = PhysicsId::new(3001);
+    let entity = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
     let body = BodyId::new(entity, BodyRole::PRIMARY);
     let mut collider = ColliderSpec::cuboid(
         ColliderId::new(entity, ColliderRole::PRIMARY, 0),

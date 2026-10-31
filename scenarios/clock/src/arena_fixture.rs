@@ -3,7 +3,8 @@
 //! contract uses it to check that a resident keeps its bodies, their motion
 //! and their identities while visits and events come and go. Each ball rests
 //! on whatever actually supports it and leaves only by falling out of the
-//! view.
+//! view. Several fixtures can hold the arena at once, each its own owner with
+//! its own balls, so one can be taken out while the others stay.
 
 use engine_core::Vec2;
 use engine_rapier::world::{
@@ -11,13 +12,16 @@ use engine_rapier::world::{
 };
 
 use crate::{
-    arena::{ClockArena, Owner, ids::canonical::FIXTURE_BALLS},
+    arena::{ClockArena, MAX_RESIDENT_CLAIMS, Owner, ids::canonical::FIXTURE_OWNER_BALLS},
     layout::Layout,
 };
 
-/// The most balls the fixture holds, one identity each.
+/// The most balls one fixture holds, one identity each.
 pub const MAX_FIXTURE_BALLS: usize = 4;
-const _: () = assert!(FIXTURE_BALLS.end - FIXTURE_BALLS.start == MAX_FIXTURE_BALLS as u64);
+/// The most fixtures, each with identities of its own. There are as many as
+/// the arena holds residents, so the arena's own limit is the one that
+/// refuses another.
+pub const MAX_FIXTURES: usize = MAX_RESIDENT_CLAIMS;
 
 /// A ball to admit: where it starts and how it moves.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -36,28 +40,31 @@ pub struct FixtureBallState {
     pub velocity: Vec2,
 }
 
-/// The fixture's balls now, and how many have fallen out of the view.
+/// A fixture's balls now, and how many have fallen out of the view.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArenaFixtureState {
+    /// Which fixture this is. It keeps the index while it holds the arena.
+    pub index: usize,
     pub radius: f32,
     pub balls: Vec<FixtureBallState>,
     pub fallen: usize,
 }
 
 pub(crate) struct ArenaFixture {
+    index: u8,
     radius: f32,
     /// The slots of the balls still in the arena.
     slots: Vec<usize>,
     fallen: usize,
 }
 
-fn entity(slot: usize) -> PhysicsId {
+fn entity(index: u8, slot: usize) -> PhysicsId {
     debug_assert!(slot < MAX_FIXTURE_BALLS);
-    PhysicsId::new(FIXTURE_BALLS.start + slot as u64)
+    PhysicsId::new(FIXTURE_OWNER_BALLS[usize::from(index)][0].start + slot as u64)
 }
 
-fn body(slot: usize) -> BodyId {
-    BodyId::new(entity(slot), BodyRole::PRIMARY)
+fn body(index: u8, slot: usize) -> BodyId {
+    BodyId::new(entity(index, slot), BodyRole::PRIMARY)
 }
 
 impl ArenaFixture {
@@ -79,19 +86,21 @@ impl ArenaFixture {
             .to_vec()
     }
 
-    /// Claims the arena for `balls` and puts them in it. They fall at Clock's
-    /// own gravity, whoever set the world's.
-    pub fn admit(arena: &mut ClockArena, layout: Layout, balls: &[FixtureBall]) -> Self {
+    /// Claims the arena as fixture `index` and puts `balls` in it. They fall
+    /// at Clock's own gravity, whoever set the world's. The arena admitted
+    /// the claim first.
+    pub fn admit(arena: &mut ClockArena, layout: Layout, index: u8, balls: &[FixtureBall]) -> Self {
         assert!(!balls.is_empty() && balls.len() <= MAX_FIXTURE_BALLS);
         let radius = Self::radius(layout);
-        arena.claim_resident(Owner::Fixture, layout);
+        let owner = Owner::Fixture(index);
+        arena.claim_resident(owner, layout);
         let gravity_scale = arena.resident_gravity_scale();
         let world = arena
-            .held_mut(Owner::Fixture)
+            .held_mut(owner)
             .expect("the fixture's claim keeps a world");
         for (slot, ball) in balls.iter().enumerate() {
             assert!(world.insert_body(
-                body(slot),
+                body(index, slot),
                 BodySpec {
                     position: ball.position,
                     linear_velocity: ball.velocity,
@@ -101,56 +110,73 @@ impl ArenaFixture {
                 &[ColliderSpec {
                     restitution: 0.3,
                     ..ColliderSpec::ball(
-                        ColliderId::new(entity(slot), ColliderRole::PRIMARY, 0),
+                        ColliderId::new(entity(index, slot), ColliderRole::PRIMARY, 0),
                         radius,
                     )
                 }],
             ));
         }
         Self {
+            index,
             radius,
             slots: (0..balls.len()).collect(),
             fallen: 0,
         }
     }
 
+    pub fn index(&self) -> usize {
+        usize::from(self.index)
+    }
+
+    /// Takes the fixture out of the arena, balls and all. The others stay
+    /// as they are.
+    pub fn remove(self, arena: &mut ClockArena) {
+        arena.release(Owner::Fixture(self.index));
+    }
+
     /// The fixture's part of the tick, just after the arena's step: a ball
     /// that has fallen below the view leaves the arena. Returns true once the
     /// last has gone and the fixture has let the arena go.
     pub fn observe(&mut self, arena: &mut ClockArena, layout: Layout) -> bool {
+        let owner = Owner::Fixture(self.index);
         let world = arena
-            .held_mut(Owner::Fixture)
+            .held_mut(owner)
             .expect("the fixture's claim keeps a world");
         let below = layout.bounds_min.y - self.radius;
         let mut kept = Vec::with_capacity(self.slots.len());
         for &slot in &self.slots {
-            let motion = world.motion(body(slot)).expect("a ball in the arena");
+            let motion = world
+                .motion(body(self.index, slot))
+                .expect("a ball in the arena");
             // A position that is not finite is lost as surely as a fall.
             if motion.position.y >= below {
                 kept.push(slot);
             } else {
-                assert!(world.remove_entity(entity(slot)));
+                assert!(world.remove_entity(entity(self.index, slot)));
                 self.fallen += 1;
             }
         }
         self.slots = kept;
         if self.slots.is_empty() {
-            arena.release(Owner::Fixture);
+            arena.release(owner);
         }
         self.slots.is_empty()
     }
 
     pub fn state(&self, arena: &ClockArena) -> ArenaFixtureState {
         let world = arena
-            .held(Owner::Fixture)
+            .held(Owner::Fixture(self.index))
             .expect("the fixture's claim keeps a world");
         ArenaFixtureState {
+            index: self.index(),
             radius: self.radius,
             balls: self
                 .slots
                 .iter()
                 .map(|&slot| {
-                    let motion = world.motion(body(slot)).expect("a ball in the arena");
+                    let motion = world
+                        .motion(body(self.index, slot))
+                        .expect("a ball in the arena");
                     FixtureBallState {
                         slot,
                         position: motion.position,

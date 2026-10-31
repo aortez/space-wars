@@ -36,6 +36,12 @@ pub const AQUARIUM_TICKS: u64 = FILL_TICKS + SWIM_TICKS + EXIT_TICKS + DRAIN_TIC
 const DRAIN_AT: u64 = FILL_TICKS + SWIM_TICKS + EXIT_TICKS;
 const DT: f32 = 1.0 / 60.0;
 const LINER_ID: u64 = crate::arena::ids::canonical::AQUARIUM_LINER.start;
+/// The colon's two cells, in face rows.
+const COLON_ROWS: [f32; 2] = [2.75, 6.25];
+/// The most cells Aquarium's solid digits hold: every digit cell, the
+/// colon's and the meridiem's.
+pub(crate) const MAX_DIGIT_SOLIDS: usize =
+    crate::fonts::MAX_DIGIT_CELLS + COLON_ROWS.len() + crate::meridiem::MAX_CELLS;
 
 struct SharedAquarium {
     digits: solids::DigitSolids,
@@ -171,7 +177,7 @@ impl AquariumEvent {
             }
         }
         // The blinking colon still has visible dim cells between flashes.
-        for y in [2.75, 6.25] {
+        for y in COLON_ROWS {
             let center = Vec2::new(
                 self.layout.face_origin.x + 15.0 * self.layout.pitch,
                 self.layout.face_origin.y + y * self.layout.pitch,

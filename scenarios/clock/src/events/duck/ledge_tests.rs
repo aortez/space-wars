@@ -125,7 +125,7 @@ fn deliberate_drop_keeps_momentum_and_requires_rearming() {
 }
 
 fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) -> PhysicsId {
-    let id = PhysicsId::new(9000);
+    let id = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
     assert!(duck.arena.world_mut().unwrap().insert_body(
         BodyId::new(id, BodyRole::PRIMARY),
         BodySpec {

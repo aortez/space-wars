@@ -850,6 +850,130 @@ impl PhysicsWorld {
         self.entities.keys().copied()
     }
 
+    /// Every body's stable identity.
+    pub fn body_ids(&self) -> impl ExactSizeIterator<Item = BodyId> + '_ {
+        self.bodies.iter().map(|entry| entry.id)
+    }
+
+    /// The first place the stable identities and Rapier's own sets disagree,
+    /// if any. In a consistent world every body, collider and joint identity
+    /// names exactly one live Rapier object, which names it back, a collider's
+    /// parent and a joint's ends are the bodies their identities say, and each
+    /// identity belongs to the entity records it should, once. A stale handle,
+    /// an unnamed Rapier object or an identity listed twice is a fault.
+    pub fn identity_fault(&self) -> Option<String> {
+        let counts = |named: usize, indexed: usize, raw: usize| named == indexed && named == raw;
+        if !counts(
+            self.bodies.len(),
+            self.body_indices.len(),
+            self.raw.bodies.len(),
+        ) || !counts(
+            self.colliders.len(),
+            self.collider_indices.len(),
+            self.raw.colliders.len(),
+        ) || !counts(
+            self.joints.len(),
+            self.joint_indices.len(),
+            self.raw.impulse_joints.len(),
+        ) {
+            return Some(format!(
+                "bodies {}/{}/{}, colliders {}/{}/{}, joints {}/{}/{} (named/indexed/Rapier)",
+                self.bodies.len(),
+                self.body_indices.len(),
+                self.raw.bodies.len(),
+                self.colliders.len(),
+                self.collider_indices.len(),
+                self.raw.colliders.len(),
+                self.joints.len(),
+                self.joint_indices.len(),
+                self.raw.impulse_joints.len()
+            ));
+        }
+        // With the counts equal, an object naming its own identity back makes
+        // the mapping one to one.
+        for (index, entry) in self.bodies.iter().enumerate() {
+            if self.body_indices.get(&entry.id) != Some(&index)
+                || self.raw.bodies.get(entry.handle).map(|body| body.user_data)
+                    != Some(encode_body(entry.id))
+            {
+                return Some(format!("{:?} has a stale handle", entry.id));
+            }
+        }
+        for (index, entry) in self.colliders.iter().enumerate() {
+            let collider = self.raw.colliders.get(entry.handle);
+            if self.collider_indices.get(&entry.id) != Some(&index)
+                || collider.map(|collider| collider.user_data) != Some(encode_collider(entry.id))
+            {
+                return Some(format!("{:?} has a stale handle", entry.id));
+            }
+            if collider.and_then(|collider| collider.parent()) != self.body_handle(entry.parent) {
+                return Some(format!(
+                    "{:?} is not attached to {:?}",
+                    entry.id, entry.parent
+                ));
+            }
+        }
+        for (index, entry) in self.joints.iter().enumerate() {
+            let joint = self.raw.impulse_joints.get(entry.handle);
+            if self.joint_indices.get(&entry.id) != Some(&index)
+                || joint.map(|joint| (joint.body1(), joint.body2()))
+                    != self
+                        .body_handle(entry.body_a)
+                        .zip(self.body_handle(entry.body_b))
+            {
+                return Some(format!("{:?} has a stale handle", entry.id));
+            }
+        }
+        let mut bodies = vec![false; self.bodies.len()];
+        let mut colliders = vec![false; self.colliders.len()];
+        for (entity, record) in &self.entities {
+            if record.bodies.is_empty() && record.colliders.is_empty() && record.joints.is_empty() {
+                return Some(format!("{entity:?} has an empty record"));
+            }
+            for id in &record.bodies {
+                match self.body_indices.get(id) {
+                    Some(&index) if id.entity == *entity && !bodies[index] => bodies[index] = true,
+                    _ => return Some(format!("{entity:?} lists {id:?} wrongly")),
+                }
+            }
+            for id in &record.colliders {
+                match self.collider_indices.get(id) {
+                    Some(&index) if id.entity == *entity && !colliders[index] => {
+                        colliders[index] = true;
+                    }
+                    _ => return Some(format!("{entity:?} lists {id:?} wrongly")),
+                }
+            }
+            for id in &record.joints {
+                let touches = self.joint_indices.get(id).is_some_and(|&index| {
+                    let joint = &self.joints[index];
+                    joint.body_a.entity == *entity || joint.body_b.entity == *entity
+                });
+                if !touches {
+                    return Some(format!("{entity:?} lists {id:?} wrongly"));
+                }
+            }
+        }
+        if let Some(index) = bodies.iter().position(|listed| !listed) {
+            return Some(format!("{:?} has no entity", self.bodies[index].id));
+        }
+        if let Some(index) = colliders.iter().position(|listed| !listed) {
+            return Some(format!("{:?} has no entity", self.colliders[index].id));
+        }
+        for joint in &self.joints {
+            for entity in [joint.body_a.entity, joint.body_b.entity] {
+                if !self
+                    .entities
+                    .get(&entity)
+                    .is_some_and(|record| record.joints.contains(&joint.id))
+                {
+                    return Some(format!("{entity:?} does not list {:?}", joint.id));
+                }
+            }
+        }
+        None
+    }
+
     pub fn contains_body(&self, id: BodyId) -> bool {
         self.body_indices.contains_key(&id)
     }
@@ -3427,6 +3551,51 @@ mod tests {
             world.motions().map(|motion| motion.id).collect::<Vec<_>>(),
             vec![first, third]
         );
+    }
+
+    #[test]
+    fn identities_stay_one_to_one_with_rapiers_objects_and_faults_are_named() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        assert_eq!(world.identity_fault(), None, "an empty world");
+        let first = insert_ball(&mut world, 1, Vec2::new(-1.0, 0.0));
+        let second = insert_ball(&mut world, 2, Vec2::ZERO);
+        let third = insert_ball(&mut world, 3, Vec2::new(1.0, 0.0));
+        let joint = JointId::new(first.entity, JointRole::PRIMARY);
+        assert!(world.insert_raw_joint(joint, first, third, GenericJoint::default()));
+        let block = ColliderSpec::cuboid(ColliderId::new(third.entity, BALL_COLLIDER, 1), 0.5, 0.5);
+        assert!(world.insert_collider(third, &block));
+        assert_eq!(world.identity_fault(), None, "after insertion");
+        assert_eq!(
+            world.body_ids().collect::<Vec<_>>(),
+            vec![first, second, third]
+        );
+        // Dense removal moves the last entries into the gaps.
+        assert!(world.remove_entity(first.entity));
+        assert_eq!(world.identity_fault(), None, "after removal");
+        let mut target = PhysicsWorld::new(PhysicsWorldConfig::default());
+        assert!(world.transfer_entity(third.entity, &mut target));
+        assert_eq!(world.identity_fault(), None, "after a transfer out");
+        assert_eq!(target.identity_fault(), None, "after a transfer in");
+
+        let mut listed_twice = target.clone();
+        let collider = ColliderId::new(third.entity, BALL_COLLIDER, 1);
+        listed_twice
+            .entities
+            .get_mut(&third.entity)
+            .expect("the moved entity")
+            .colliders
+            .push(collider);
+        assert!(listed_twice.identity_fault().is_some(), "a duplicate");
+        let mut unnamed = target.clone();
+        unnamed
+            .raw
+            .colliders
+            .insert(ColliderBuilder::ball(1.0).build());
+        assert!(unnamed.identity_fault().is_some(), "an unnamed collider");
+        let mut stale = target.clone();
+        let handle = stale.body_handle(third).expect("the moved body");
+        stale.raw.remove_body(handle);
+        assert!(stale.identity_fault().is_some(), "a stale handle");
     }
 
     #[test]

@@ -329,6 +329,20 @@ impl ActiveEvent {
         }
     }
 
+    /// Whether a player who joins this event brings it into the arena, so
+    /// the arena takes the event's claim with the visit's. Joining a
+    /// standalone Falling, Explosion, Meltdown or Aquarium does, except
+    /// Meltdown's water lab, which a player never joins.
+    pub fn joins_into_arena(&self) -> bool {
+        match self {
+            Self::Meltdown(event) if event.lab => false,
+            Self::Aquarium(_) | Self::Falling(_) | Self::Explosion(_) | Self::Meltdown(_) => {
+                !self.shares_visit_arena()
+            }
+            _ => false,
+        }
+    }
+
     /// How opaque this event shows the arena once its character has left. A
     /// player who rejoins sees the arena fade in from here.
     pub fn arena_opacity(&self) -> f32 {

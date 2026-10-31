@@ -15,12 +15,21 @@
 //! fixture's balls are the resident these checks use. A standalone Falling or
 //! Explosion still steps a world of its own, so its bodies meet a resident
 //! only once a player joins and the arena adopts that world.
+//!
+//! Owners are bounded. A second owner that leaves takes only its own bodies,
+//! and the fixture moves on exactly as it would have alone. A visit, an event
+//! or a resident the arena has no room for is refused before anything
+//! changes, so the residents and everyone else holding the arena stay as they
+//! were. Debug builds audit every step: each body belongs to exactly one
+//! owner holding the arena, within its budget, and the world's identities
+//! name live objects one to one.
 
 use crate::{
     ArenaAccounting, ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState,
+    MAX_RESIDENT_CLAIMS, Unavailable,
     arena::{Owner, ids::canonical::ARENA_FLOOR},
     arena_fixture::{ArenaFixture, FixtureBall, FixtureBallState},
-    events::{EventPhase, duck::arena::CourseGeometry},
+    events::{COOLDOWN_TICKS, EventLifecycle, EventPhase, duck::arena::CourseGeometry},
     layout::Layout,
 };
 use engine_common::{Action, ClockEventKind, ClockEventProfile, Scenario};
@@ -197,10 +206,25 @@ fn at_rest(position: Vec2) -> FixtureBall {
     }
 }
 
+/// The first fixture's balls.
 fn balls(state: &ClockState) -> Vec<FixtureBallState> {
     state
-        .arena_fixture()
+        .arena_fixture(0)
         .map_or_else(Vec::new, |fixture| fixture.balls)
+}
+
+/// Every fixture's balls, each by its fixture and slot.
+fn every_ball(state: &ClockState) -> Vec<((usize, usize), FixtureBallState)> {
+    state
+        .arena_fixtures()
+        .into_iter()
+        .flat_map(|fixture| {
+            fixture
+                .balls
+                .into_iter()
+                .map(move |ball| ((fixture.index, ball.slot), ball))
+        })
+        .collect()
 }
 
 fn slots(state: &ClockState) -> Vec<usize> {
@@ -219,14 +243,15 @@ fn own_floor(state: &ClockState) -> usize {
     })
 }
 
-/// One frame with `actions`, in which every ball keeps its identity and moves
-/// on from where it was, never further than its speed takes it, give or take
-/// half its radius of contact correction. A ball leaves only by falling out of
-/// the view. Returns the slots of those that did.
-fn keep_with(state: &mut ClockState, actions: &[Action], what: &str) -> Vec<usize> {
+/// One frame with `actions`, in which every fixture's every ball keeps its
+/// identity and moves on from where it was, never further than its speed
+/// takes it, give or take half its radius of contact correction. A ball
+/// leaves only by falling out of the view. Returns the fixtures and slots of
+/// those that did.
+fn keep_with(state: &mut ClockState, actions: &[Action], what: &str) -> Vec<(usize, usize)> {
     let layout = Layout::new(state.aspect_ratio());
     let (bottom, slack) = (layout.bounds_min.y, ArenaFixture::radius(layout) * 0.5);
-    let before = balls(state);
+    let before = every_ball(state);
     let steps = state.arena_accounting().steps;
     ClockScenario::step(state, actions, FRAME);
     if !before.is_empty() {
@@ -236,16 +261,15 @@ fn keep_with(state: &mut ClockState, actions: &[Action], what: &str) -> Vec<usiz
             "{what}: one arena step"
         );
     }
-    let after = balls(state);
+    let after = every_ball(state);
     let mut fell = Vec::new();
-    for ball in &before {
-        match after.iter().find(|now| now.slot == ball.slot) {
-            Some(now) => {
+    for (id, ball) in &before {
+        match after.iter().find(|(now, _)| now == id) {
+            Some((_, now)) => {
                 let reach = ball.velocity.length().max(now.velocity.length()) * DT + slack;
                 assert!(
                     now.position.distance_to(ball.position) <= reach,
-                    "{what}: ball {} went from {:?} to {:?} ({:?} then {:?})",
-                    ball.slot,
+                    "{what}: ball {id:?} went from {:?} to {:?} ({:?} then {:?})",
                     ball.position,
                     now.position,
                     ball.velocity,
@@ -255,25 +279,24 @@ fn keep_with(state: &mut ClockState, actions: &[Action], what: &str) -> Vec<usiz
             None => {
                 assert!(
                     ball.position.y < bottom,
-                    "{what}: ball {} left the arena from {:?}",
-                    ball.slot,
+                    "{what}: ball {id:?} left the arena from {:?}",
                     ball.position
                 );
-                fell.push(ball.slot);
+                fell.push(*id);
             }
         }
     }
     assert!(
         after
             .iter()
-            .all(|now| before.iter().any(|ball| ball.slot == now.slot)),
+            .all(|(now, _)| before.iter().any(|(id, _)| id == now)),
         "{what}: no ball appears"
     );
     fell
 }
 
 /// `ticks` frames of `keep_with` without actions.
-fn keep(state: &mut ClockState, ticks: usize, what: &str) -> Vec<usize> {
+fn keep(state: &mut ClockState, ticks: usize, what: &str) -> Vec<(usize, usize)> {
     (0..ticks)
         .flat_map(|tick| keep_with(state, &[], &format!("{what}, tick {tick}")))
         .collect()
@@ -282,13 +305,16 @@ fn keep(state: &mut ClockState, ticks: usize, what: &str) -> Vec<usize> {
 #[test]
 fn arena_contract_fixture_falls_rests_and_keeps_rolling_while_the_face_changes() {
     let mut state = plain();
-    assert!(state.admit_arena_fixture(&[
-        at_rest(resting(250.0) + Vec2::new(0.0, 60.0)),
-        FixtureBall {
-            position: resting(-300.0),
-            velocity: Vec2::new(15.0, 0.0),
-        },
-    ]));
+    assert_eq!(
+        state.admit_arena_fixture(&[
+            at_rest(resting(250.0) + Vec2::new(0.0, 60.0)),
+            FixtureBall {
+                position: resting(-300.0),
+                velocity: Vec2::new(15.0, 0.0),
+            },
+        ]),
+        Ok(0)
+    );
     let arena = state.arena_accounting();
     assert_eq!(
         (arena.claims, arena.residents, arena.bodies),
@@ -356,14 +382,14 @@ fn arena_contract_fixture_falls_rests_and_keeps_rolling_while_the_face_changes()
 fn arena_contract_fixture_keeps_to_the_banks_through_falling_and_a_player_who_leaves_and_rejoins() {
     let mut state = plain();
     let fixture = state.default_arena_fixture();
-    assert!(state.admit_arena_fixture(&fixture));
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
     keep(&mut state, 120, "landing");
     let landed = balls(&state);
 
     // The drain opens under the middle ball, which falls out of the view, and
     // the banks keep the others. Then it closes under them.
     state.preview_event(ClockEventKind::Falling);
-    assert_eq!(keep(&mut state, 120, "a standalone Falling"), [1]);
+    assert_eq!(keep(&mut state, 120, "a standalone Falling"), [(0, 1)]);
     assert_eq!(own_floor(&state), 2, "the banks");
     for ball in balls(&state) {
         assert!(ball.position.distance_to(landed[ball.slot].position) < 0.05);
@@ -427,7 +453,7 @@ fn arena_contract_fixture_stands_on_a_visits_course_and_stays_when_it_departs() 
     // gives it back when the player leaves.
     let mut state = plain();
     let fixture = state.default_arena_fixture();
-    assert!(state.admit_arena_fixture(&fixture));
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
     keep(&mut state, 120, "landing");
     let landed = balls(&state);
     toggle(&mut state, 1);
@@ -454,7 +480,7 @@ fn arena_contract_fixture_stands_on_a_visits_course_and_stays_when_it_departs() 
     let over_ground = |x: f32| course.iter().any(|(min, max)| (min.x..max.x).contains(&x));
     assert!(over_ground(landed[0].position.x) && over_ground(landed[2].position.x));
     assert!(!over_ground(landed[1].position.x));
-    assert_eq!(keep(&mut state, 35, "the doors opening"), [1]);
+    assert_eq!(keep(&mut state, 35, "the doors opening"), [(0, 1)]);
     for ball in balls(&state) {
         assert!(ball.position.distance_to(landed[ball.slot].position) < 0.1);
     }
@@ -488,7 +514,10 @@ fn arena_contract_fixture_stays_when_an_automatic_visit_departs() {
         Vec2::new((min.x + max.x) * 0.5, max.y + radius)
     };
     let (level, raised) = (on(false), on(true));
-    assert!(state.admit_arena_fixture(&[at_rest(level), at_rest(raised)]));
+    assert_eq!(
+        state.admit_arena_fixture(&[at_rest(level), at_rest(raised)]),
+        Ok(0)
+    );
     keep(&mut state, 10, "the visit's last fade");
     assert!(balls(&state)[0].position.distance_to(level) < 0.1);
     assert_eq!(own_floor(&state), 0, "the course is the floor");
@@ -512,7 +541,10 @@ fn arena_contract_fixture_stays_when_an_automatic_visit_departs() {
 #[test]
 fn arena_contract_fixture_rides_moving_panels_and_falls_through_their_opening() {
     let mut state = plain();
-    assert!(state.admit_arena_fixture(&[at_rest(resting(-100.0))]));
+    assert_eq!(
+        state.admit_arena_fixture(&[at_rest(resting(-100.0))]),
+        Ok(0)
+    );
     keep(&mut state, 30, "at rest");
     state.preview_event(ClockEventKind::Rain);
     let layout = Layout::new(ASPECT);
@@ -531,7 +563,7 @@ fn arena_contract_fixture_rides_moving_panels_and_falls_through_their_opening() 
         }
     }
     assert!(ticks > 60, "it rolls to the opening as the panels tip");
-    assert!(state.arena_fixture().is_none(), "its last ball gone");
+    assert!(state.arena_fixture(0).is_none(), "its last ball gone");
     assert_eq!(state.arena_accounting().claims, 0);
     assert!(
         state.arena.world().is_none(),
@@ -543,11 +575,7 @@ fn arena_contract_fixture_rides_moving_panels_and_falls_through_their_opening() 
 fn arena_contract_fixture_admitted_while_paused_waits_for_time_to_move() {
     let mut state = plain();
     let fixture = state.default_arena_fixture();
-    assert!(state.admit_arena_fixture(&fixture));
-    assert!(
-        !state.admit_arena_fixture(&fixture),
-        "one fixture at a time"
-    );
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
     let admitted = balls(&state);
     for _ in 0..30 {
         ClockScenario::step(&mut state, &[], Duration::ZERO);
@@ -579,7 +607,10 @@ fn arena_contract_fixture_falls_at_clocks_gravity_in_a_visits_world() {
     // At this width a duck's world falls slower than Clock's mechanics do.
     let mut state = plain_at(1.0);
     let layout = Layout::new(1.0);
-    assert!(state.admit_arena_fixture(&[at_rest(Vec2::new(0.0, layout.floor_y + 300.0))]));
+    assert_eq!(
+        state.admit_arena_fixture(&[at_rest(Vec2::new(0.0, layout.floor_y + 300.0))]),
+        Ok(0)
+    );
     toggle(&mut state, 1);
     keep(&mut state, 10, "a player's world");
     let gravity = state.arena.world().expect("the arena").gravity().y;
@@ -597,14 +628,263 @@ fn arena_contract_fixture_falls_at_clocks_gravity_in_a_visits_world() {
 fn arena_contract_fixture_takes_its_floor_with_its_last_ball() {
     let mut state = plain();
     state.admit_soil();
-    assert!(state.admit_arena_fixture(&[at_rest(resting(0.0))]));
+    assert_eq!(state.admit_arena_fixture(&[at_rest(resting(0.0))]), Ok(0));
     keep(&mut state, 30, "a ball beside soil");
     assert_eq!(own_floor(&state), 1);
     state.preview_event(ClockEventKind::Falling);
-    assert_eq!(keep(&mut state, 60, "the drain opening"), [0]);
-    assert!(state.arena_fixture().is_none(), "its last ball gone");
+    assert_eq!(keep(&mut state, 60, "the drain opening"), [(0, 0)]);
+    assert!(state.arena_fixture(0).is_none(), "its last ball gone");
     assert!(state.arena.holds(Owner::Soil), "the soil keeps the arena");
     assert_eq!(own_floor(&state), 0, "with no floor of its own");
     let arena = state.arena_accounting();
     assert_eq!((arena.claims, arena.residents), (1, 1));
+}
+
+/// A fixture of two balls beside the default one, far enough apart that
+/// none of them touch.
+fn second_fixture() -> [FixtureBall; 2] {
+    [
+        at_rest(resting(-330.0) + Vec2::new(0.0, 40.0)),
+        at_rest(resting(330.0) + Vec2::new(0.0, 40.0)),
+    ]
+}
+
+#[test]
+fn arena_contract_a_second_owner_leaves_without_disturbing_the_fixture() {
+    // The same fixture alone, to hold the one beside a second owner against.
+    let mut alone = plain();
+    let mut state = plain();
+    let fixture = state.default_arena_fixture();
+    assert_eq!(alone.admit_arena_fixture(&fixture), Ok(0));
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
+    assert_eq!(state.admit_arena_fixture(&second_fixture()), Ok(1));
+    let arena = state.arena_accounting();
+    assert_eq!((arena.claims, arena.residents, arena.bodies), (2, 2, 5));
+    for tick in 0..120 {
+        keep(&mut alone, 1, "alone");
+        keep(
+            &mut state,
+            1,
+            &format!("beside a second owner, tick {tick}"),
+        );
+        assert_eq!(balls(&state), balls(&alone), "tick {tick}");
+    }
+    assert_eq!(state.arena_fixture(1).map(|f| f.balls.len()), Some(2));
+
+    let before = state.arena_accounting();
+    let resting = balls(&state);
+    assert!(state.remove_arena_fixture(1));
+    assert!(!state.remove_arena_fixture(1), "it went once");
+    assert_eq!(balls(&state), resting, "the removal moves nothing");
+    assert!(state.arena_fixture(1).is_none());
+    let after = state.arena_accounting();
+    assert_eq!(
+        (after.claims, after.residents, after.bodies),
+        (1, 1, 4),
+        "its two balls gone, the first's and the floor kept"
+    );
+    assert_eq!(after.released, before.released + 1);
+    assert_eq!(own_floor(&state), 1);
+    for tick in 0..120 {
+        keep(&mut alone, 1, "alone");
+        keep(
+            &mut state,
+            1,
+            &format!("after the second owner, tick {tick}"),
+        );
+        assert_eq!(balls(&state), balls(&alone), "tick {tick}");
+    }
+}
+
+/// The run's state an action the arena refuses must leave as it was.
+fn untouched(state: &ClockState) -> impl PartialEq + std::fmt::Debug + use<> {
+    (
+        every_ball(state),
+        state.arena.owners().to_vec(),
+        state.event_kind(),
+        state.player_duck_session(),
+        state.has_duck_visit(),
+    )
+}
+
+#[test]
+fn arena_contract_refuses_an_event_it_has_no_room_for_before_anything_changes() {
+    let mut state = plain();
+    state.admit_soil();
+    let fixture = state.default_arena_fixture();
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
+    assert_eq!(state.admit_arena_fixture(&second_fixture()), Ok(1));
+    keep(&mut state, 60, "two fixtures and soil");
+    // A visit fits beside them, and so does Falling's batch, but Meltdown's
+    // and Explosion's cells and Aquarium's digits do not.
+    state.preview_event(ClockEventKind::Duck);
+    keep(&mut state, 1, "the visit claiming the arena");
+    assert!(state.arena.holds(Owner::Visit));
+    for kind in [
+        ClockEventKind::Aquarium,
+        ClockEventKind::Explosion,
+        ClockEventKind::Meltdown,
+    ] {
+        assert!(state.event_blocked_by_arena(kind), "{kind:?}");
+    }
+    for kind in [
+        ClockEventKind::Falling,
+        ClockEventKind::Rain,
+        ClockEventKind::ColorCycle,
+    ] {
+        assert!(!state.event_blocked_by_arena(kind), "{kind:?}");
+    }
+
+    let before = untouched(&state);
+    let arena = state.arena_accounting();
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Meltdown)],
+        Duration::ZERO,
+    );
+    assert_eq!(untouched(&state), before, "nothing changed");
+    assert_eq!(
+        state.arena_accounting(),
+        ArenaAccounting {
+            refused: arena.refused + 1,
+            ..arena
+        }
+    );
+    assert_eq!(
+        state.event_notice.map(|(notice, _)| notice),
+        Some(Unavailable::Capacity.notice())
+    );
+    // Once the visit's cooldown has passed, a trigger starts an event, but
+    // not one the arena has no room for.
+    keep(&mut state, COOLDOWN_TICKS as usize, "the visit going on");
+    assert_eq!(state.lifecycle(), EventLifecycle::Idle);
+    let before = untouched(&state);
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::trigger_event(ClockEventKind::Explosion)],
+        Duration::ZERO,
+    );
+    assert_eq!(untouched(&state), before, "nothing triggered");
+
+    // With the second fixture gone there is room, and Meltdown shares the
+    // visit's arena with the first.
+    assert!(state.remove_arena_fixture(1));
+    assert!(!state.event_blocked_by_arena(ClockEventKind::Meltdown));
+    state.preview_event(ClockEventKind::Meltdown);
+    assert!(state.arena.holds(Owner::Event(ClockEventKind::Meltdown)));
+    keep(&mut state, 30, "Meltdown beside the fixture");
+    // The event a preview replaces leaves its room to the next.
+    assert!(!state.event_blocked_by_arena(ClockEventKind::Explosion));
+    state.preview_event(ClockEventKind::Explosion);
+    assert!(state.arena.holds(Owner::Event(ClockEventKind::Explosion)));
+    keep(&mut state, 30, "Explosion beside the fixture");
+}
+
+#[test]
+fn arena_contract_refuses_a_player_who_would_bring_an_event_into_a_full_arena() {
+    let mut state = plain();
+    let fixture = state.default_arena_fixture();
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
+    assert_eq!(state.admit_arena_fixture(&second_fixture()), Ok(1));
+    keep(&mut state, 60, "two fixtures");
+    // A standalone Meltdown needs nothing of the arena until a player joins.
+    state.preview_event(ClockEventKind::Meltdown);
+    assert_eq!(state.event_kind(), Some(ClockEventKind::Meltdown));
+    keep(&mut state, 30, "a standalone Meltdown");
+
+    let before = untouched(&state);
+    let refused = state.arena_accounting().refused;
+    toggle(&mut state, 1);
+    assert_eq!(untouched(&state), before, "no player, nothing changed");
+    assert_eq!(state.arena_accounting().refused, refused + 1);
+    assert_eq!(
+        state.event_notice.map(|(notice, _)| notice),
+        Some(Unavailable::Capacity.notice())
+    );
+    keep(&mut state, 30, "Meltdown going on alone");
+
+    assert!(state.remove_arena_fixture(1));
+    toggle(&mut state, 1);
+    assert!(state.player_duck_session().is_some(), "the player joins");
+    assert!(state.arena.holds(Owner::Event(ClockEventKind::Meltdown)));
+    keep(&mut state, 30, "a player in Meltdown beside the fixture");
+}
+
+#[test]
+fn arena_contract_holds_no_more_residents_than_its_limit() {
+    let mut state = plain();
+    // Soil's place is reserved, so one fewer fixture fits.
+    for index in 0..MAX_RESIDENT_CLAIMS - 1 {
+        let x = -300.0 + 150.0 * index as f32;
+        assert_eq!(state.admit_arena_fixture(&[at_rest(resting(x))]), Ok(index));
+    }
+    keep(&mut state, 10, "three fixtures");
+    let before = untouched(&state);
+    let arena = state.arena_accounting();
+    assert_eq!(
+        state.admit_arena_fixture(&[at_rest(resting(300.0))]),
+        Err(Unavailable::Residents)
+    );
+    assert_eq!(untouched(&state), before);
+    assert_eq!(
+        state.arena_accounting(),
+        ArenaAccounting {
+            refused: arena.refused + 1,
+            ..arena
+        }
+    );
+    // Soil takes its place whenever it comes.
+    state.admit_soil();
+    keep(&mut state, 10, "soil arriving");
+    assert!(state.arena.holds(Owner::Soil));
+    assert_eq!(state.arena_accounting().residents, MAX_RESIDENT_CLAIMS);
+}
+
+/// Debug builds audit the arena before each step.
+#[cfg(debug_assertions)]
+mod audit {
+    use super::*;
+    use engine_rapier::world::{
+        BodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
+    };
+
+    #[test]
+    #[should_panic(expected = "belongs to no owner")]
+    fn arena_contract_audit_finds_a_body_no_owner_claims() {
+        let mut state = plain();
+        assert_eq!(state.admit_arena_fixture(&[at_rest(resting(0.0))]), Ok(0));
+        keep(&mut state, 1, "the fixture alone");
+        let stray = PhysicsId::new(7500);
+        let world = state.arena.world_mut().expect("the fixture's arena");
+        assert!(world.insert_body(
+            BodyId::new(stray, BodyRole::PRIMARY),
+            BodySpec::default(),
+            &[ColliderSpec::ball(
+                ColliderId::new(stray, ColliderRole::PRIMARY, 0),
+                1.0
+            )],
+        ));
+        keep(&mut state, 1, "a stray body");
+    }
+
+    #[test]
+    #[should_panic(expected = "more than")]
+    fn arena_contract_audit_finds_an_owner_over_its_budget() {
+        let mut state = plain();
+        let fixture = [-150.0, -50.0, 50.0, 150.0].map(|x| at_rest(resting(x)));
+        assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
+        keep(&mut state, 1, "a full fixture");
+        let ball = state.arena.world().and_then(|world| {
+            world.body_ids().find(|body| {
+                crate::arena::ids::canonical::FIXTURE_BALLS.contains(&body.entity.value())
+            })
+        });
+        let ball = ball.expect("a ball");
+        let world = state.arena.world_mut().expect("the fixture's arena");
+        assert!(world.insert_collider(
+            ball,
+            &ColliderSpec::ball(ColliderId::new(ball.entity, ColliderRole::PRIMARY, 1), 1.0),
+        ));
+        keep(&mut state, 1, "a fifth collider");
+    }
 }

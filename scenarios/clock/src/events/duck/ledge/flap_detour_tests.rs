@@ -28,7 +28,7 @@ pub(super) fn until(duck: &mut TestDuck, predicate: impl Fn(&TestDuck) -> bool) 
 }
 
 pub(super) fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) {
-    let entity = PhysicsId::new(9000);
+    let entity = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
     assert!(duck.arena.world_mut().unwrap().insert_body(
         BodyId::new(entity, BodyRole::PRIMARY),
         BodySpec {

@@ -381,7 +381,7 @@ fn a_fall_and_a_blocked_runner_recover_within_the_catalog_bound() {
             world.set_pose(DUCK_BODY, fallen, 0.0, true);
         } else {
             // A real unjumpable obstruction, not a mock of the completion path.
-            let id = PhysicsId::new(999);
+            let id = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
             world.insert_body(
                 BodyId::new(id, BodyRole::PRIMARY),
                 BodySpec {

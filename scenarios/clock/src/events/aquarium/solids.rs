@@ -35,7 +35,7 @@ impl DigitSolids {
         }
         // Only reading/format changes rebuild this bounded cell list. A
         // blinking colon retains its visible dim cells and stays physical.
-        assert!(cells.len() <= 300);
+        assert!(cells.len() <= super::MAX_DIGIT_SOLIDS);
         let colliders: Vec<_> = cells
             .iter()
             .enumerate()
