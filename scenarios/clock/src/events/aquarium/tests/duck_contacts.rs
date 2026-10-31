@@ -17,11 +17,10 @@ fn swimming_duck_triggers_local_scattering_and_departure_allows_regrouping() {
     let mut state = occupied(800.0 / 480.0, ClockFont::Classic);
     let position = event(&state).school.fish[0].position;
     let before = event(&state).diagnostics();
-    let duck = state.duck_visit.as_mut().unwrap();
-    let body = duck.actor_body().unwrap();
-    duck.arena_world_mut().set_pose(body, position, 0.0, true);
-    duck.arena_world_mut()
-        .set_velocity(body, Vec2::ZERO, 0.0, true);
+    let body = state.duck_visit.as_ref().unwrap().actor_body().unwrap();
+    let world = state.arena.as_mut().unwrap();
+    world.set_pose(body, position, 0.0, true);
+    world.set_velocity(body, Vec2::ZERO, 0.0, true);
     state.advance_tick();
     assert!(event(&state).diagnostics().scatter_events > before.scatter_events);
     assert_eq!(
@@ -52,6 +51,7 @@ fn native_duck_hits_digit_sides_tops_and_undersides_on_every_font_and_layout() {
                     })
                     .unwrap();
                 let duck = state.duck_visit.as_mut().unwrap();
+                let world = state.arena.as_mut().unwrap();
                 let body = duck.actor_body().unwrap();
                 let r = duck.radius;
                 let center = (cell.min + cell.max) * 0.5;
@@ -69,14 +69,12 @@ fn native_duck_hits_digit_sides_tops_and_undersides_on_every_font_and_layout() {
                         Vec2::new(0.0, r * 160.0),
                     ),
                 };
-                duck.arena_world_mut().set_pose(body, position, 0.0, true);
-                duck.arena_world_mut()
-                    .set_velocity(body, velocity, 0.0, true);
+                world.set_pose(body, position, 0.0, true);
+                world.set_velocity(body, velocity, 0.0, true);
                 duck.set_player_input(if side == 0 { -1000 } else { 0 }, false, false, side == 1);
                 state.advance_tick();
                 state.advance_tick();
-                let duck = state.duck_visit.as_ref().unwrap();
-                let p = duck.arena_world().motion(body).unwrap().position;
+                let p = state.arena.as_ref().unwrap().motion(body).unwrap().position;
                 let gap = match side {
                     0 => p.x - cell.max.x,
                     1 => p.y - cell.max.y,
@@ -106,17 +104,16 @@ fn lighting_a_cell_through_the_duck_clears_it_once_and_release_removes_only_digi
         .iter()
         .find(|c| !previous.contains(c))
         .unwrap();
-    let duck = state.duck_visit.as_mut().unwrap();
+    let duck = state.duck_visit.as_ref().unwrap();
     let body = duck.actor_body().unwrap();
     let session = duck.player_session();
-    duck.arena_world_mut()
-        .set_pose(body, (added.min + added.max) * 0.5, 0.0, true);
-    duck.arena_world_mut()
-        .set_velocity(body, Vec2::ZERO, 0.0, true);
+    let world = state.arena.as_mut().unwrap();
+    world.set_pose(body, (added.min + added.max) * 0.5, 0.0, true);
+    world.set_velocity(body, Vec2::ZERO, 0.0, true);
     state.advance_tick();
     assert_eq!(event(&state).diagnostics().duck_clearance_corrections, 1);
     let duck = state.duck_visit.as_ref().unwrap();
-    let p = duck.arena_world().motion(body).unwrap().position;
+    let p = state.arena.as_ref().unwrap().motion(body).unwrap().position;
     for c in &event(&state).glyphs {
         let near = Vec2::new(p.x.clamp(c.min.x, c.max.x), p.y.clamp(c.min.y, c.max.y));
         assert!((p - near).length() > duck.radius * 0.9);

@@ -257,7 +257,11 @@ impl ClockState {
             .collect();
         let temporary = grass::SoilHabitat::new(layout);
         let soil = self.soil.as_ref().unwrap_or(&temporary);
-        let world = crate::arena::canonical_world(&self.active_event, self.duck_visit.as_deref());
+        let world = crate::arena::canonical_world(
+            &self.active_event,
+            self.duck_visit.is_some(),
+            &self.arena,
+        );
         self.ceiling.material = soil
             .plan_admission(&supports, |site| {
                 let Some(surface) = surfaces.iter().find(|s| s.covers(site.min.x, site.max.x))

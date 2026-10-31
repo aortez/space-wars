@@ -131,12 +131,17 @@ impl DuckEvent {
         })
     }
 
-    pub fn attach_to_flap(&mut self, handle: FlapHandle, local_point: Vec2) -> bool {
+    pub fn attach_to_flap(
+        &mut self,
+        world: &PhysicsWorld,
+        handle: FlapHandle,
+        local_point: Vec2,
+    ) -> bool {
         let attachment = Attachment {
             handle,
             local_point,
         };
-        if !self.valid_attachment(attachment) {
+        if !self.valid_attachment(world, attachment) {
             return false;
         }
         self.flaps.attachment = Some(attachment);
@@ -147,7 +152,7 @@ impl DuckEvent {
         self.flaps.attachment = None;
     }
 
-    fn valid_attachment(&self, attachment: Attachment) -> bool {
+    fn valid_attachment(&self, world: &PhysicsWorld, attachment: Attachment) -> bool {
         if attachment.handle.generation != self.flaps.generation
             || self.phase == EventPhase::Resetting
         {
@@ -161,7 +166,7 @@ impl DuckEvent {
         else {
             return false;
         };
-        let Some(motion) = self.world.as_ref().and_then(|w| w.motion(DUCK_BODY)) else {
+        let Some(motion) = world.motion(DUCK_BODY) else {
             return false;
         };
         let point = attachment.local_point;
@@ -177,23 +182,21 @@ impl DuckEvent {
         on_edge && (world_point - motion.position).length() <= self.radius * 2.5
     }
 
-    pub(super) fn remove_flaps(&mut self) {
-        if let Some(world) = &mut self.world {
-            for side in 0..2 {
-                world.remove_entity(body(side).entity);
-            }
+    pub(super) fn remove_flaps(&mut self, world: &mut PhysicsWorld) {
+        for side in 0..2 {
+            world.remove_entity(body(side).entity);
         }
         self.flaps.panels = [Flap::default(); 2];
         self.flaps.attachment = None;
         self.flaps.generation += 1;
     }
 
-    pub(super) fn advance_flaps(&mut self) {
+    pub(super) fn advance_flaps(&mut self, world: &mut PhysicsWorld) {
         let (entrance, exit) = self.requested_door_openness();
         if self
             .flaps
             .attachment
-            .is_some_and(|a| !self.valid_attachment(a))
+            .is_some_and(|a| !self.valid_attachment(world, a))
         {
             self.release_flap_attachment();
         }
@@ -215,24 +218,22 @@ impl DuckEvent {
             }
             let previous = old.panel.unwrap_or_else(|| self.panel_at(side, old.open));
             let next = self.panel_at(side, open);
-            if let Some(world) = &self.world {
-                let standing = world.surface_contacts(DUCK_COLLIDER).any(|c| {
-                    c.collider == collider(side)
-                        && c.normal.y > 0.7
-                        && c.separation <= self.radius * 0.05
-                });
-                if closing && standing {
-                    hold = Some(ClockDuckFlapHold::Standing);
-                } else if closing && self.flaps.attachment.is_some_and(|a| a.handle.side == side) {
-                    hold = Some(ClockDuckFlapHold::Attachment);
-                } else if closing
-                    && open != old.open
-                    && world.motion(DUCK_BODY).is_some_and(|m| {
-                        previous.sweep_touches(next, m.position, self.radius * 1.02)
-                    })
-                {
-                    hold = Some(ClockDuckFlapHold::Obstructed);
-                }
+            let standing = world.surface_contacts(DUCK_COLLIDER).any(|c| {
+                c.collider == collider(side)
+                    && c.normal.y > 0.7
+                    && c.separation <= self.radius * 0.05
+            });
+            if closing && standing {
+                hold = Some(ClockDuckFlapHold::Standing);
+            } else if closing && self.flaps.attachment.is_some_and(|a| a.handle.side == side) {
+                hold = Some(ClockDuckFlapHold::Attachment);
+            } else if closing
+                && open != old.open
+                && world
+                    .motion(DUCK_BODY)
+                    .is_some_and(|m| previous.sweep_touches(next, m.position, self.radius * 1.02))
+            {
+                hold = Some(ClockDuckFlapHold::Obstructed);
             }
             let panel = if hold.is_some() {
                 open = old.open;
@@ -240,7 +241,6 @@ impl DuckEvent {
             } else {
                 next
             };
-            let world = self.world.as_mut().expect("flaps share the visit world");
             if open > 0.0 {
                 if !world.contains_body(body(side)) {
                     let half = previous.half_extents();
@@ -271,11 +271,11 @@ impl DuckEvent {
         }
     }
 
-    pub(super) fn flap_diagnostics(&self) -> [ClockDuckFlapState; 2] {
+    pub(super) fn flap_diagnostics(&self, world: Option<&PhysicsWorld>) -> [ClockDuckFlapState; 2] {
         std::array::from_fn(|side| {
             let flap = self.flaps.panels[side];
             let panel = flap.panel.unwrap_or_else(|| self.panel_at(side, 0.0));
-            let motion = self.world.as_ref().and_then(|w| w.motion(body(side)));
+            let motion = world.and_then(|w| w.motion(body(side)));
             let milli = |v: Vec2| [(v.x * 1000.0).round() as i32, (v.y * 1000.0).round() as i32];
             ClockDuckFlapState {
                 generation: self.flaps.generation,

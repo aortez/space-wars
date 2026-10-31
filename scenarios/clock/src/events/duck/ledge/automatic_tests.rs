@@ -9,7 +9,7 @@ const PROFILES: [ClockDuckJumpProfile; 2] =
 /// Let the real controller calibrate and launch, then stage a repeatable
 /// disrupted flight beside its selected target. This is a near-miss fixture,
 /// not evidence that an unperturbed seeded run normally misses this jump.
-fn near_miss(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> (DuckEvent, Edge) {
+fn near_miss(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> (TestDuck, Edge) {
     near_miss_toward(aspect, direction, profile, 1.0)
 }
 
@@ -18,8 +18,8 @@ fn near_miss_toward(
     direction: f32,
     profile: ClockDuckJumpProfile,
     route: f32,
-) -> (DuckEvent, Edge) {
-    let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
+) -> (TestDuck, Edge) {
+    let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
     duck.direction = direction;
     duck.controller.profile = profile;
     for _ in 0..EXIT_DELAY_TICKS {
@@ -32,7 +32,7 @@ fn near_miss_toward(
             && duck.controller.direction == route
         {
             let target = duck.controller.navigator.plan.unwrap().target;
-            let edge = edges(&duck)
+            let edge = edges(&duck, duck.world.as_ref().unwrap())
                 .into_iter()
                 .flatten()
                 .find(|edge| {
@@ -47,7 +47,7 @@ fn near_miss_toward(
     panic!("no ordinary takeoff: {:?}", duck.diagnostics());
 }
 
-fn stage_miss(duck: &mut DuckEvent, edge: Edge) {
+fn stage_miss(duck: &mut TestDuck, edge: Edge) {
     let r = duck.radius;
     let world = duck.world.as_mut().unwrap();
     let anchor = edge.anchor(world).unwrap();
@@ -60,7 +60,7 @@ fn stage_miss(duck: &mut DuckEvent, edge: Edge) {
     world.set_velocity(DUCK_BODY, Vec2::new(-edge.outward * r * 3.0, -r), 0.0, true);
 }
 
-fn wait_for_hang(duck: &mut DuckEvent) {
+fn wait_for_hang(duck: &mut TestDuck) {
     for _ in 0..40 {
         duck.step();
         if duck.ledge_state().phase == Phase::Hanging {
@@ -70,7 +70,7 @@ fn wait_for_hang(duck: &mut DuckEvent) {
     panic!("no automatic hang: {:?}", duck.diagnostics());
 }
 
-fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) -> PhysicsId {
+fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) -> PhysicsId {
     let id = PhysicsId::new(9000);
     assert!(duck.world.as_mut().unwrap().insert_body(
         BodyId::new(id, BodyRole::PRIMARY),
@@ -342,7 +342,7 @@ fn clean_seeded_visits_keep_their_normal_jumps_without_ledge_attempts() {
     for aspect in ASPECTS {
         for direction in [-1.0, 1.0] {
             for profile in PROFILES {
-                let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
+                let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
                 duck.direction = direction;
                 duck.controller.profile = profile;
                 for _ in 0..DUCK_TICKS {
@@ -420,7 +420,7 @@ fn a_fully_open_exit_flap_is_local_recovery_support_and_retires_with_its_arena()
                 duck.advance_flaps();
                 duck.world.as_mut().unwrap().step(DT);
             }
-            let edge = edges(&duck)
+            let edge = edges(&duck, duck.world.as_ref().unwrap())
                 .into_iter()
                 .flatten()
                 .find(|e| e.flap.is_some_and(|(side, _)| side == 1))
@@ -457,13 +457,17 @@ fn a_fully_open_exit_flap_is_local_recovery_support_and_retires_with_its_arena()
                 );
                 continue;
             }
-            let mut arena = VisitArena::claim(&mut duck);
-            arena.retain(Box::new(duck));
-            let vacant = arena.vacant().unwrap();
+            let TestDuck {
+                mut duck,
+                world: mut arena,
+            } = duck;
+            let mut lease = VisitArena::claim(&mut duck, &mut arena);
+            lease.retain(Box::new(duck), arena.as_mut().unwrap());
+            let vacant = lease.vacant().unwrap();
             assert!(!vacant.ledge_attached());
             assert!(!vacant.ledge.automatic.stats.active);
             assert!(vacant.door_panels().iter().all(Option::is_none));
-            let rejoined = arena.rejoin(10, 1).unwrap();
+            let rejoined = lease.rejoin(&mut arena, 10, 1).unwrap();
             assert_eq!(rejoined.ledge.automatic.stats, Default::default());
         }
     }
@@ -499,7 +503,7 @@ fn automatic_ledge_scene_fixtures_replay_pause_and_render_at_target_sizes() {
                         )],
                         Duration::ZERO,
                     );
-                    state.duck_visit = Some(Box::new(duck));
+                    duck.admit(&mut state);
                     let mut frames = Vec::new();
                     for _ in 0..ATTEMPT_TICKS {
                         ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));

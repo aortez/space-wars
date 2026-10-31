@@ -26,15 +26,18 @@ struct CellBodies {
 }
 
 impl SharedMeltdown {
-    pub fn new(player: &mut DuckEvent, count: usize) -> Self {
+    pub fn new(player: &mut DuckEvent, world: &mut Option<PhysicsWorld>, count: usize) -> Self {
         assert!(count <= MAX_MELTDOWN_CELLS);
         let supports = if player.responsive_floor().is_some() {
             canonical::RESPONSIVE_PANELS
         } else {
             canonical::course_surfaces(player.course.as_ref().expect("duck course").surfaces.len())
         };
-        let arena = VisitArena::claim(player);
-        player.arena_world_mut().reserve(count, count, 0);
+        let arena = VisitArena::claim(player, world);
+        world
+            .as_mut()
+            .expect("claimed arena")
+            .reserve(count, count, 0);
         Self {
             arena,
             bodies: CellBodies {
@@ -56,6 +59,7 @@ impl SharedMeltdown {
 impl MeltdownEvent {
     pub fn join_player(
         &mut self,
+        arena: &mut Option<PhysicsWorld>,
         layout: Layout,
         seed: u64,
         session: u64,
@@ -76,16 +80,18 @@ impl MeltdownEvent {
             seat,
             if seed.is_multiple_of(2) { 1.0 } else { -1.0 },
             floor,
-            None,
         ));
-        let mut shared = SharedMeltdown::new(&mut duck, self.cells.len());
+        let mut shared = SharedMeltdown::new(&mut duck, arena, self.cells.len());
         duck.preserve_arena_opacity(self.floor_opacity());
         // Promote only the surviving, already-released cells at their exact
         // current pose and velocity. Neither water nor either clock advances.
         // Unreleased cells retain their seeded release times; liquid is untouched.
-        shared
-            .bodies
-            .release_due(duck.arena_world_mut(), &self.cells, layout, self.tick);
+        shared.bodies.release_due(
+            arena.as_mut().expect("claimed arena"),
+            &self.cells,
+            layout,
+            self.tick,
+        );
         self.shared = Some(shared);
         Some(duck)
     }
@@ -106,23 +112,27 @@ impl MeltdownEvent {
         }
     }
 
-    pub fn retain_arena(&mut self, duck: Box<DuckEvent>) {
+    pub fn retain_arena(&mut self, duck: Box<DuckEvent>, world: &mut PhysicsWorld) {
         self.shared
             .as_mut()
             .expect("shared Meltdown")
             .arena
-            .retain(duck);
+            .retain(duck, world);
     }
 
-    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
-        self.shared.as_mut()?.arena.rejoin(session, seat)
+    pub fn rejoin(
+        &mut self,
+        world: &mut Option<PhysicsWorld>,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
+        self.shared.as_mut()?.arena.rejoin(world, session, seat)
     }
 
-    pub fn release(&mut self, player: Option<&mut DuckEvent>) {
+    pub fn release(&mut self, player: Option<&mut DuckEvent>, world: &mut Option<PhysicsWorld>) {
         if let Some(shared) = &mut self.shared {
-            let duck = shared.arena.get_mut(player);
-            shared.bodies.remove(duck.arena_world_mut());
-            duck.release_arena();
+            shared.bodies.remove(world.as_mut().expect("leased arena"));
+            shared.arena.get_mut(player).release_arena(world);
         }
     }
 
@@ -130,13 +140,17 @@ impl MeltdownEvent {
         &mut self,
         mut context: EventContext<'_>,
         mut player: Option<&mut DuckEvent>,
+        world: &mut Option<PhysicsWorld>,
     ) -> bool {
         let soil = context.soil.take();
         // Move the small lease/batch handles temporarily, not the world or its
         // allocations. This lets both material paths share reformation code.
         let mut shared = self.shared.take().expect("shared Meltdown");
         self.tick += 1;
-        let hull = shared.arena.get(player.as_deref()).clearance_hull();
+        let hull = shared
+            .arena
+            .get(player.as_deref())
+            .clearance_hull(world.as_ref().expect("leased arena"));
         if let Some(floor) = &mut self.floor {
             floor.step(&mut self.water, f64::from(DT), hull);
             shared
@@ -149,31 +163,23 @@ impl MeltdownEvent {
         if material {
             self.water.step(1.0 / 60.0).expect("fixed water step");
             shared.bodies.release_due(
-                shared
-                    .arena
-                    .get_mut(player.as_deref_mut())
-                    .arena_world_mut(),
+                world.as_mut().expect("leased arena"),
                 &self.cells,
                 layout,
                 self.tick,
             );
         } else {
             if self.tick == MELTING_TICKS + DRAINING_TICKS {
-                shared.bodies.remove(
-                    shared
-                        .arena
-                        .get_mut(player.as_deref_mut())
-                        .arena_world_mut(),
-                );
+                shared.bodies.remove(world.as_mut().expect("leased arena"));
             }
             self.reform(context);
         }
-        let duck = shared
+        shared
             .arena
-            .step_with_soil(player, Some(&self.water), true, soil);
+            .step_with_soil(player, world, Some(&self.water), true, soil);
         if material {
             self.exited_solid_area += shared.bodies.synchronize(
-                duck.arena_world_mut(),
+                world.as_mut().expect("leased arena"),
                 &mut self.cells,
                 &mut self.water,
                 layout,

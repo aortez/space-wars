@@ -1,8 +1,8 @@
 use super::*;
 use engine_common::ClockDuckJumpProfile;
 
-fn at_moment(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, moment: u8) -> DuckEvent {
-    let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
+fn at_moment(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, moment: u8) -> TestDuck {
+    let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
     duck.direction = direction;
     duck.select_jump_profile(Some(profile));
     loop {

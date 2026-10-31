@@ -1,3 +1,4 @@
+use engine_rapier::world::PhysicsWorld;
 use rand::{SeedableRng, rngs::StdRng};
 
 use super::{
@@ -30,29 +31,18 @@ pub(crate) struct FallingEvent {
 }
 
 impl FallingEvent {
-    pub fn canonical_world<'a>(
-        &'a self,
-        player: Option<&'a DuckEvent>,
-    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
+    /// The standalone world, before any player joins. A shared batch lives
+    /// in the run's arena instead.
+    pub fn own_world(&self) -> Option<&PhysicsWorld> {
         match &self.mechanics {
             Mechanics::Standalone(world) => world.as_ref().map(|w| w.world()),
-            Mechanics::Shared { arena, .. } => Some(arena.get(player).arena_world()),
+            Mechanics::Shared { .. } => None,
         }
     }
-    pub fn canonical_world_mut<'a>(
-        &'a mut self,
-        player: Option<&'a mut DuckEvent>,
-    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
+    pub fn own_world_mut(&mut self) -> Option<&mut PhysicsWorld> {
         match &mut self.mechanics {
             Mechanics::Standalone(world) => world.as_mut().map(|w| w.world_mut()),
-            Mechanics::Shared { arena, .. } => Some(arena.get_mut(player).arena_world_mut()),
-        }
-    }
-    #[cfg(test)]
-    pub fn soil_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
-        match &self.mechanics {
-            Mechanics::Standalone(world) => world.as_ref().map(|w| w.world()),
-            _ => None,
+            Mechanics::Shared { .. } => None,
         }
     }
 
@@ -73,11 +63,16 @@ impl FallingEvent {
         }
     }
 
-    pub fn with_visit(context: EventContext<'_>, seed: u64, player: &mut DuckEvent) -> Self {
+    pub fn with_visit(
+        context: EventContext<'_>,
+        seed: u64,
+        player: &mut DuckEvent,
+        world: &mut Option<PhysicsWorld>,
+    ) -> Self {
         let letters = Self::letters_for(&context);
-        let arena = VisitArena::claim(player);
+        let arena = VisitArena::claim(player, world);
         let bodies = FallingBodies::insert(
-            player.arena_world_mut(),
+            world.as_mut().expect("claimed arena"),
             context.layout,
             context.segments,
             letters.as_ref().map_or(&[], |l| l.as_slice()),
@@ -95,7 +90,13 @@ impl FallingEvent {
         }
     }
 
-    pub fn join_player(&mut self, seed: u64, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
+    pub fn join_player(
+        &mut self,
+        arena: &mut Option<PhysicsWorld>,
+        seed: u64,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
         let Mechanics::Standalone(world) = &mut self.mechanics else {
             return None;
         };
@@ -112,13 +113,16 @@ impl FallingEvent {
             None => (FallingWorld::arena(drain), None),
         };
         let mut duck = Box::new(DuckEvent::new_drain_player(
-            drain, seed, session, seat, world,
+            drain, seed, session, seat, arena, world,
         ));
         if let Some(bodies) = &bodies {
-            bodies.match_gravity(duck.arena_world_mut());
+            bodies.match_gravity(arena.as_mut().unwrap());
         }
-        let arena = VisitArena::claim(&mut duck);
-        self.mechanics = Mechanics::Shared { bodies, arena };
+        let lease = VisitArena::claim(&mut duck, arena);
+        self.mechanics = Mechanics::Shared {
+            bodies,
+            arena: lease,
+        };
         Some(duck)
     }
 
@@ -132,11 +136,11 @@ impl FallingEvent {
         matches!(self.mechanics, Mechanics::Shared { .. })
     }
 
-    pub fn retain_arena(&mut self, duck: Box<DuckEvent>) {
+    pub fn retain_arena(&mut self, duck: Box<DuckEvent>, world: &mut PhysicsWorld) {
         let Mechanics::Shared { arena, .. } = &mut self.mechanics else {
             panic!("shared Falling arena");
         };
-        arena.retain(duck);
+        arena.retain(duck, world);
     }
 
     pub fn vacant_arena(&self) -> Option<&DuckEvent> {
@@ -154,14 +158,24 @@ impl FallingEvent {
         }
     }
 
-    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
+    pub fn rejoin(
+        &mut self,
+        world: &mut Option<PhysicsWorld>,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
         let Mechanics::Shared { arena, .. } = &mut self.mechanics else {
             return None;
         };
-        arena.rejoin(session, seat)
+        arena.rejoin(world, session, seat)
     }
 
-    pub fn step(&mut self, mut context: EventContext<'_>, player: Option<&mut DuckEvent>) -> bool {
+    pub fn step(
+        &mut self,
+        mut context: EventContext<'_>,
+        player: Option<&mut DuckEvent>,
+        world: &mut Option<PhysicsWorld>,
+    ) -> bool {
         let soil = context.soil.take();
         let letters = self
             .letters
@@ -170,21 +184,22 @@ impl FallingEvent {
         self.tick += 1;
         let reform = self.phase == EventPhase::Falling && self.tick >= FALLING_TICKS;
         match &mut self.mechanics {
-            Mechanics::Standalone(world) => {
-                if let Some(world) = world {
-                    world.step(context.segments, letters);
+            Mechanics::Standalone(own) => {
+                if let Some(own) = own {
+                    own.step(context.segments, letters);
                 }
                 if reform {
-                    *world = None;
+                    *own = None;
                 }
             }
             Mechanics::Shared { bodies, arena } => {
-                let duck = arena.step_with_soil(player, None, false, soil);
+                arena.step_with_soil(player, world, None, false, soil);
+                let world = world.as_mut().expect("leased arena");
                 if let Some(bodies) = bodies {
-                    bodies.synchronize(duck.arena_world(), context.segments, letters);
+                    bodies.synchronize(world, context.segments, letters);
                 }
                 if reform && let Some(bodies) = bodies.take() {
-                    bodies.remove(duck.arena_world_mut());
+                    bodies.remove(world);
                 }
             }
         }
@@ -201,13 +216,12 @@ impl FallingEvent {
 
     /// Only the event's batch is removed; the live player's floor and character
     /// survive replacement, reformation and completion unchanged.
-    pub fn release(&mut self, player: Option<&mut DuckEvent>) {
+    pub fn release(&mut self, player: Option<&mut DuckEvent>, world: &mut Option<PhysicsWorld>) {
         if let Mechanics::Shared { bodies, arena } = &mut self.mechanics {
-            let duck = arena.get_mut(player);
             if let Some(bodies) = bodies.take() {
-                bodies.remove(duck.arena_world_mut());
+                bodies.remove(world.as_mut().expect("leased arena"));
             }
-            duck.release_arena();
+            arena.get_mut(player).release_arena(world);
         }
     }
 
@@ -226,10 +240,8 @@ impl FallingEvent {
             Mechanics::Standalone(world) => world
                 .as_ref()
                 .map_or((0, 0), |w| (w.body_count(), w.collider_count())),
-            // An occupied shared world is counted by ClockState's player.
-            Mechanics::Shared { arena, .. } => {
-                arena.vacant().map_or((0, 0), |d| d.physics_counts())
-            }
+            // A shared world is the run's arena, which ClockState counts once.
+            Mechanics::Shared { .. } => (0, 0),
         }
     }
 }

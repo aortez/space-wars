@@ -40,7 +40,7 @@ fn promotion_preserves_every_solid_pose_velocity_release_time_and_water_sample()
             assert_eq!(duck.arena_opacity(), opacity);
             assert_eq!(duck.responsive_floor().unwrap().opening, floor.opening);
             assert_eq!(duck.responsive_floor().unwrap().load, floor.load);
-            let world = duck.arena_world();
+            let world = state.arena.as_ref().unwrap();
             let mut released = 0;
             for (index, cell) in cells.iter().enumerate() {
                 let id = BodyId::new(PhysicsId::new(4001 + index as u64), BodyRole::PRIMARY);

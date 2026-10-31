@@ -4,13 +4,13 @@ use engine_common::{
     ClockDuckFlapDetourOutcome as Outcome, ClockDuckFlapDetourPhase as DetourPhase,
 };
 
-fn direct(aspect: f32, direction: f32) -> DuckEvent {
+fn direct(aspect: f32, direction: f32) -> TestDuck {
     let mut duck = ordinary(aspect, direction, PROFILES[0]);
     duck.select_direct_flap_landing(true);
     duck
 }
 
-fn finished(duck: &DuckEvent) -> bool {
+fn finished(duck: &TestDuck) -> bool {
     duck.ledge.detour.stats.phase == DetourPhase::Finished
 }
 
@@ -67,7 +67,7 @@ fn direct_flap_lands_perches_returns_and_resumes_from_normal_spawn() {
 fn direct_flap_keeps_seeded_selection_and_course_geometry() {
     assert!(!crate::ClockConfig::default().duck_direct_flap_landing);
     for seed in 0..40 {
-        let mut duck = DuckEvent::new_course(Layout::new(ASPECTS[0]), seed, None);
+        let mut duck = TestDuck::new_course(Layout::new(ASPECTS[0]), seed, None);
         let surfaces = duck.course.as_ref().unwrap().surfaces.clone();
         let direction = duck.direction;
         duck.select_direct_flap_landing(true);
@@ -174,11 +174,11 @@ fn direct_flap_late_or_disrupted_landing_ends_without_retry() {
         if late {
             duck.ledge.detour.age = 100;
         } else {
-            duck.world.as_mut().unwrap().apply_velocity_delta(
-                DUCK_BODY,
-                Vec2::new(duck.radius * 50.0, 0.0),
-                true,
-            );
+            let delta = Vec2::new(duck.radius * 50.0, 0.0);
+            duck.world
+                .as_mut()
+                .unwrap()
+                .apply_velocity_delta(DUCK_BODY, delta, true);
         }
         until(&mut duck, finished);
         assert_eq!(duck.ledge.detour.stats.outcome, Some(Outcome::Expired));

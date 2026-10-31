@@ -110,7 +110,7 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
             }
             let mut contacted = std::collections::HashSet::new();
             for step in 0..35 {
-                let world = joined.duck_visit.as_ref().unwrap().arena_world();
+                let world = joined.arena.as_ref().unwrap();
                 for id in world.collider_ids() {
                     if world.surface_contacts(id).next().is_some() {
                         contacted.insert(id.entity);
@@ -122,7 +122,7 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
                     (joined.event_kind(), joined.phase_tick()),
                     (baseline.event_kind(), baseline.phase_tick())
                 );
-                let world = joined.duck_visit.as_ref().unwrap().arena_world();
+                let world = joined.arena.as_ref().unwrap();
                 for id in world.collider_ids() {
                     if world.surface_contacts(id).next().is_some() {
                         contacted.insert(id.entity);
@@ -193,9 +193,9 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
             }
             assert_eq!(state.event_kind(), None);
             assert_eq!(opacity, 1.0);
-            assert!(state.duck_visit.as_ref().unwrap().grounded());
+            assert!(state.duck_scene().unwrap().grounded());
             assert!(state.body_count() <= 5 + state.flap_body_count());
-            let duck = state.duck_visit.as_ref().unwrap();
+            let duck = state.duck_scene().unwrap();
             let start_y = duck.position().unwrap().y;
             let radius = duck.radius;
             let jump = input(&state, 0, true);
@@ -203,25 +203,25 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
             let mut peak = start_y;
             for _ in 0..80 {
                 tick(&mut state, &[]);
-                peak = peak.max(state.duck_visit.as_ref().unwrap().position().unwrap().y);
+                peak = peak.max(state.duck_scene().unwrap().position().unwrap().y);
             }
             assert!(
                 (radius * 3.5..radius * 5.5).contains(&(peak - start_y)),
                 "calibrated jump survives adopted solver settings"
             );
-            assert!(state.duck_visit.as_ref().unwrap().grounded());
+            assert!(state.duck_scene().unwrap().grounded());
             if kind == ClockEventKind::Falling {
                 // Both original walls stay for the bars; the actor exits at the
                 // far door's threshold instead of getting stuck behind it.
-                let duck = state.duck_visit.as_mut().unwrap();
+                let duck = state.duck_visit.as_ref().unwrap();
                 let position = duck.render_position(Vec2::new(
                     duck.width - duck.radius * 2.5,
                     duck.layout.floor_y + duck.radius * 1.01,
                 ));
                 let direction = duck.direction;
-                duck.arena_world_mut().set_pose(body, position, 0.0, true);
-                duck.arena_world_mut()
-                    .set_velocity(body, Vec2::ZERO, 0.0, true);
+                let world = state.arena.as_mut().unwrap();
+                world.set_pose(body, position, 0.0, true);
+                world.set_velocity(body, Vec2::ZERO, 0.0, true);
                 let action = input(&state, (direction * 1000.0) as i16, false);
                 tick(&mut state, &[action]);
                 ticks(&mut state, 15);

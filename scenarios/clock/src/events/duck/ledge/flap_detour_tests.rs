@@ -9,15 +9,15 @@ pub(super) const PROFILES: [ClockDuckJumpProfile; 2] =
     [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing];
 const SEED: u64 = 3;
 
-pub(super) fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> DuckEvent {
+pub(super) fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> TestDuck {
     assert!(flap_detour::selected(SEED));
-    let mut duck = DuckEvent::new_platforms(Layout::new(aspect), SEED);
+    let mut duck = TestDuck::new_platforms(Layout::new(aspect), SEED);
     duck.direction = direction;
     duck.controller.profile = profile;
     duck
 }
 
-pub(super) fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool) {
+pub(super) fn until(duck: &mut TestDuck, predicate: impl Fn(&TestDuck) -> bool) {
     for _ in 0..400 {
         if predicate(duck) {
             return;
@@ -27,7 +27,7 @@ pub(super) fn until(duck: &mut DuckEvent, predicate: impl Fn(&DuckEvent) -> bool
     panic!("stage not reached: {:?}", duck.diagnostics());
 }
 
-pub(super) fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) {
+pub(super) fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) {
     let entity = PhysicsId::new(9000);
     assert!(duck.world.as_mut().unwrap().insert_body(
         BodyId::new(entity, BodyRole::PRIMARY),
@@ -44,7 +44,7 @@ pub(super) fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) {
     ));
 }
 
-fn anchor(duck: &DuckEvent) -> Vec2 {
+fn anchor(duck: &TestDuck) -> Vec2 {
     let panel = duck.door_panels()[0].unwrap();
     panel.point(Vec2::new(
         panel.hinge.x + panel.inward * panel.width,
@@ -119,7 +119,7 @@ fn detours_are_seeded_occasional_and_do_not_reroll_the_course() {
     assert!((160..=240).contains(&selected), "{selected}");
     assert!(!flap_detour::selected(42));
     for seed in 0..40 {
-        let mut duck = DuckEvent::new_course(Layout::new(ASPECTS[0]), seed, None);
+        let mut duck = TestDuck::new_course(Layout::new(ASPECTS[0]), seed, None);
         let surfaces = duck.course.as_ref().unwrap().surfaces.clone();
         let direction = duck.direction;
         until(&mut duck, |d| {
@@ -207,7 +207,7 @@ fn changed_flap_failed_catch_and_late_return_block_end_the_single_attempt() {
     }
 }
 
-pub(super) fn flood(duck: &DuckEvent) -> WaterWorld {
+pub(super) fn flood(duck: &TestDuck) -> WaterWorld {
     use engine_water::{Boundary, PoolSpec, WaterConfig};
     let mut water = WaterWorld::new(
         WaterConfig::default(),
@@ -249,11 +249,11 @@ fn wet_interruption_timeout_deadline_and_lost_support_release_the_detour() {
                     .remove_entity(PhysicsId::new(1000));
             }
             _ => {
-                duck.world.as_mut().unwrap().apply_velocity_delta(
-                    DUCK_BODY,
-                    Vec2::new(duck.radius * 40.0, 0.0),
-                    true,
-                );
+                let delta = Vec2::new(duck.radius * 40.0, 0.0);
+                duck.world
+                    .as_mut()
+                    .unwrap()
+                    .apply_velocity_delta(DUCK_BODY, delta, true);
             }
         }
         for _ in 0..3 {
@@ -306,13 +306,20 @@ fn takeover_and_arena_retirement_keep_body_ownership_and_clear_autonomous_intent
     }
     let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[0]);
     until(&mut duck, |d| d.ledge.stats.phase == Phase::Hanging);
-    let mut arena = VisitArena::claim(&mut duck);
-    arena.retain(Box::new(duck));
-    let vacant = arena.vacant().unwrap();
+    let TestDuck {
+        mut duck,
+        world: mut arena,
+    } = duck;
+    let mut lease = VisitArena::claim(&mut duck, &mut arena);
+    lease.retain(Box::new(duck), arena.as_mut().unwrap());
+    let vacant = lease.vacant().unwrap();
     assert!(!vacant.ledge_attached());
-    assert!(vacant.world.as_ref().unwrap().motion(DUCK_BODY).is_none());
+    assert!(arena.as_ref().unwrap().motion(DUCK_BODY).is_none());
     assert_eq!(vacant.door_openness(), (0.0, 0.0));
-    let mut rejoined = arena.rejoin(2, 1).unwrap();
+    let mut rejoined = TestDuck {
+        duck: *lease.rejoin(&mut arena, 2, 1).unwrap(),
+        world: arena,
+    };
     for _ in 0..100 {
         rejoined.step();
     }

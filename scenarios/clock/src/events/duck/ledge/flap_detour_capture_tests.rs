@@ -74,7 +74,7 @@ fn capture_visit(direct: bool) {
                     let mut last_tick = 0;
                     for _ in 0..DUCK_TICKS {
                         ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
-                        let Some(duck) = state.duck_scene().map(DuckEvent::diagnostics) else {
+                        let Some(duck) = state.duck_scene().map(|duck| duck.diagnostics()) else {
                             break;
                         };
                         let nav = duck.navigation.unwrap();

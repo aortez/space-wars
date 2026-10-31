@@ -79,12 +79,12 @@ struct RunStats {
     skipped_directions: [u32; 2],
 }
 
-fn run(event: DuckEvent, label: &str) -> (u32, u64) {
+fn run(event: TestDuck, label: &str) -> (u32, u64) {
     let stats = run_stats(event, label);
     (stats.landings, stats.exit_tick)
 }
 
-fn run_stats(mut event: DuckEvent, label: &str) -> RunStats {
+fn run_stats(mut event: TestDuck, label: &str) -> RunStats {
     let mut stats = RunStats::default();
     let mut landings = 0;
     let mut exit_tick = None;
@@ -256,8 +256,8 @@ fn compare_profiles(seeds: std::ops::Range<u64>) {
     let cases = (seeds.end - seeds.start) as usize * ASPECTS.len();
     for aspect in ASPECTS {
         for seed in seeds.clone() {
-            let careful = DuckEvent::new_platforms(Layout::new(aspect), seed);
-            let mut flowing = DuckEvent::new_platforms(Layout::new(aspect), seed);
+            let careful = TestDuck::new_platforms(Layout::new(aspect), seed);
+            let mut flowing = TestDuck::new_platforms(Layout::new(aspect), seed);
             flowing.select_jump_profile(Some(ClockDuckJumpProfile::Flowing));
             assert_eq!(
                 careful.course.as_ref().unwrap().surfaces,
@@ -323,7 +323,7 @@ fn authored_routes_prove_linked_jumps_and_shortcuts_in_the_real_solver() {
     .flat_map(|(pattern, profile)| {
         [800.0 / 480.0, 1024.0 / 768.0].map(|aspect| (pattern, profile, aspect))
     }) {
-        let mut event = DuckEvent::new_platforms(Layout::new(aspect), 42);
+        let mut event = TestDuck::new_platforms(Layout::new(aspect), 42);
         event.course = Some(Course::authored(event.width, event.radius, pattern));
         event.select_jump_profile(Some(profile));
         let stats = run_stats(event, &format!("{pattern:?} {profile:?}"));
@@ -376,7 +376,7 @@ fn pattern_matrix(seeds: std::ops::Range<u64>) {
                         .into_iter()
                         .enumerate()
                 {
-                    let mut event = DuckEvent::new_course(Layout::new(aspect), seed, Some(pattern));
+                    let mut event = TestDuck::new_course(Layout::new(aspect), seed, Some(pattern));
                     let course = event.course.as_ref().unwrap();
                     assert_eq!(course.pattern, pattern);
                     assert!(!course.fallback);
@@ -408,7 +408,7 @@ fn pattern_matrix(seeds: std::ops::Range<u64>) {
 fn fixed_platform_step_and_gap_courses_land_in_both_directions() {
     for aspect in ASPECTS {
         for fixture in 0..3 {
-            let mut event = DuckEvent::new_platforms(Layout::new(aspect), 42);
+            let mut event = TestDuck::new_platforms(Layout::new(aspect), 42);
             event.course = Some(Course::fixed(event.width, event.radius, fixture));
             run(event, &format!("aspect={aspect} fixture={fixture}"));
         }
@@ -422,7 +422,7 @@ fn generated_platform_courses_have_confirmed_landings_and_bounded_exits() {
 
 #[test]
 fn wide_course_can_depart_without_completing_a_return_crossing() {
-    let event = DuckEvent::new_platforms(Layout::new(4.0), 79);
+    let event = TestDuck::new_platforms(Layout::new(4.0), 79);
     let crossing_landings = event.course.as_ref().unwrap().surfaces.len() as u32 - 1;
     let stats = run_stats(event, "wide departure after the first crossing");
     assert_eq!(stats.landings, crossing_landings);
@@ -443,7 +443,7 @@ fn generated_matrix(seeds: std::ops::Range<u64>) {
     let mut fallbacks = 0;
     for aspect in ASPECTS {
         for seed in seeds.clone() {
-            let event = DuckEvent::new_platforms(Layout::new(aspect), seed);
+            let event = TestDuck::new_platforms(Layout::new(aspect), seed);
             fallbacks += usize::from(event.course.as_ref().unwrap().fallback);
             let (count, exit) = run(event, &format!("aspect={aspect} seed={seed}"));
             landings += count;
@@ -459,7 +459,7 @@ fn generated_matrix(seeds: std::ops::Range<u64>) {
 #[test]
 fn exhausted_generation_budget_uses_a_playable_fallback_and_seeds_vary_geometry() {
     for aspect in ASPECTS {
-        let mut event = DuckEvent::new_platforms(Layout::new(aspect), 42);
+        let mut event = TestDuck::new_platforms(Layout::new(aspect), 42);
         let course = Course::generate_with_budget(event.width, event.radius, 42, 0);
         assert!(course.fallback);
         event.course = Some(course);
@@ -476,7 +476,7 @@ fn exhausted_generation_budget_uses_a_playable_fallback_and_seeds_vary_geometry(
 #[test]
 fn forced_bad_landings_are_classified_using_real_supports_not_proximity() {
     for kind in 0..3 {
-        let mut event = DuckEvent::new_platforms(Layout::new(800.0 / 480.0), 42);
+        let mut event = TestDuck::new_platforms(Layout::new(800.0 / 480.0), 42);
         while event.jumps < 3 || event.grounded() {
             assert!(event.tick < 500);
             event.step();
@@ -541,7 +541,7 @@ fn forced_bad_landings_are_classified_using_real_supports_not_proximity() {
 
 #[test]
 fn unreachable_platform_is_refused_and_event_still_cleans_up() {
-    let mut event = DuckEvent::new_platforms(Layout::new(800.0 / 480.0), 42);
+    let mut event = TestDuck::new_platforms(Layout::new(800.0 / 480.0), 42);
     event.course.as_mut().unwrap().surfaces[1].height = event.radius * 20.0;
     for _ in 0..DUCK_TICKS {
         event.step();
@@ -639,10 +639,10 @@ fn platform_preview_pause_resize_and_debug_overlay_do_not_change_physics() {
 #[test]
 fn careful_fixture_is_preserved_and_profiles_share_physics_and_calibration() {
     let layout = Layout::new(800.0 / 480.0);
-    let mut default = DuckEvent::new_platforms(layout, 42);
-    let mut explicit = DuckEvent::new_platforms(layout, 42);
+    let mut default = TestDuck::new_platforms(layout, 42);
+    let mut explicit = TestDuck::new_platforms(layout, 42);
     explicit.select_jump_profile(Some(engine_common::ClockDuckJumpProfile::Careful));
-    let mut flowing = DuckEvent::new_platforms(layout, 42);
+    let mut flowing = TestDuck::new_platforms(layout, 42);
     flowing.select_jump_profile(Some(engine_common::ClockDuckJumpProfile::Flowing));
     for _ in 0..DUCK_TICKS {
         assert_eq!(default.diagnostics(), explicit.diagnostics());
@@ -751,7 +751,7 @@ fn mixed_spawns_replay_both_personalities_without_changing_courses_or_schedules(
 
 #[test]
 fn failed_running_takeoff_brakes_and_finishes_with_careful_fallback() {
-    let mut event = DuckEvent::new_platforms(Layout::new(800.0 / 480.0), 42);
+    let mut event = TestDuck::new_platforms(Layout::new(800.0 / 480.0), 42);
     event.select_jump_profile(Some(engine_common::ClockDuckJumpProfile::Flowing));
     // Find an approach with enough lead to inject a lost-speed disturbance.
     loop {

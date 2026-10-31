@@ -499,9 +499,9 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     if let Some(event) = state.duck_scene() {
         let shared = matches!(&state.active_event, Some(crate::events::ActiveEvent::Rain(rain)) if rain.course().is_some());
         if shared || shared_mechanics_arena(state).is_some() || event.responsive_floor().is_some() {
-            duck::render_with_course(frame, event, state.config.duck_debug_overlay, false);
+            duck::render_with_course(frame, &event, state.config.duck_debug_overlay, false);
         } else {
-            duck::render(frame, event, state.config.duck_debug_overlay);
+            duck::render(frame, &event, state.config.duck_debug_overlay);
         }
     }
     if let Some((_, player)) = state.player_duck_session() {

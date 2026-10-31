@@ -17,31 +17,36 @@
 
 use engine_rapier::world::PhysicsWorld;
 
-use crate::events::{ActiveEvent, duck::DuckEvent};
+use crate::events::ActiveEvent;
 
-/// The one rigid world this run is simulating, whoever currently owns it.
+/// The one rigid world this run is simulating, whoever is using it.
 ///
-/// Ownership is still the visit's: a shared-arena event answers through the duck
-/// that holds the world, so both the event and the live player have to be passed
-/// in. They are taken as separate borrows rather than through `ClockState`
-/// because callers hold the soil and the plants at the same time.
+/// That is the run's `arena` whenever a visit holds it or an event leases it,
+/// and otherwise a standalone event's own world: Falling's or Explosion's
+/// before a player joins, Meltdown's water lab, or Rain's floats. `visit` says
+/// whether a visit exists, because Rain's floats stop being canonical as soon
+/// as one does, before its first step has built the arena. The parts are taken
+/// as separate borrows rather than through `ClockState` because callers hold
+/// the soil and the plants at the same time.
 pub(crate) fn canonical_world<'a>(
     event: &'a Option<ActiveEvent>,
-    duck: Option<&'a DuckEvent>,
+    visit: bool,
+    arena: &'a Option<PhysicsWorld>,
 ) -> Option<&'a PhysicsWorld> {
     match event {
-        Some(event) => event.canonical_world(duck),
-        None => duck.and_then(DuckEvent::existing_world),
+        Some(event) if event.simulates_apart(visit) => event.own_world(),
+        _ => arena.as_ref(),
     }
 }
 
 pub(crate) fn canonical_world_mut<'a>(
     event: &'a mut Option<ActiveEvent>,
-    duck: Option<&'a mut DuckEvent>,
+    visit: bool,
+    arena: &'a mut Option<PhysicsWorld>,
 ) -> Option<&'a mut PhysicsWorld> {
     match event {
-        Some(event) => event.canonical_world_mut(duck),
-        None => duck.and_then(DuckEvent::existing_world_mut),
+        Some(event) if event.simulates_apart(visit) => event.own_world_mut(),
+        _ => arena.as_mut(),
     }
 }
 

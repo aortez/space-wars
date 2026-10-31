@@ -68,7 +68,7 @@ fn taking_control_of_a_wet_automatic_duck_preserves_rain_motion_and_its_clock() 
         state.phase_tick(),
         state.event_id(),
     );
-    let world = state.duck_visit.as_ref().unwrap().arena_world() as *const _;
+    let worlds = engine_rapier::world::physics_activity().worlds;
     state.toggle_player_duck(2);
     assert_eq!(state.duck_state(), None);
     let player = state.player_duck_state().unwrap();
@@ -85,8 +85,9 @@ fn taking_control_of_a_wet_automatic_duck_preserves_rain_motion_and_its_clock() 
         time
     );
     assert_eq!(
-        state.duck_visit.as_ref().unwrap().arena_world() as *const _,
-        world
+        engine_rapier::world::physics_activity().worlds,
+        worlds,
+        "the visit keeps its world"
     );
 }
 

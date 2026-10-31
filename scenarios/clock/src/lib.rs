@@ -473,6 +473,10 @@ pub struct ClockState {
     // One physical visit, independent of the event scheduler and command source.
     // Automatic ducks keep their own bounded lifetime; players may stay longer.
     duck_visit: Option<Box<events::duck::DuckEvent>>,
+    // The shared rigid world. A visit builds it on its first step or when an
+    // event claims it, and it stays here while that visit or an event leasing
+    // it needs it. Standalone events keep their own worlds.
+    arena: Option<engine_rapier::world::PhysicsWorld>,
     crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -677,7 +681,8 @@ impl ClockState {
         let Some(soil) = self.soil.as_ref() else {
             return;
         };
-        let world = arena::canonical_world(&self.active_event, self.duck_visit.as_deref());
+        let world =
+            arena::canonical_world(&self.active_event, self.duck_visit.is_some(), &self.arena);
         if let Some(world) = world {
             self.plants.crush(soil, world);
         }
@@ -719,7 +724,8 @@ impl ClockState {
             .map(|s| (s.left, s.right))
             .filter(|(a, b)| a < b)
             .collect();
-        let world = arena::canonical_world(&self.active_event, self.duck_visit.as_deref());
+        let world =
+            arena::canonical_world(&self.active_event, self.duck_visit.is_some(), &self.arena);
         let soil = self
             .soil
             .get_or_insert_with(|| grass::SoilHabitat::new(layout));
@@ -826,9 +832,11 @@ impl ClockState {
         let (surfaces, kind) = self.soil_surfaces();
         let soil = self.soil.as_mut().unwrap();
         soil.set_surfaces(surfaces, kind);
-        if let Some(world) =
-            arena::canonical_world_mut(&mut self.active_event, self.duck_visit.as_deref_mut())
-        {
+        if let Some(world) = arena::canonical_world_mut(
+            &mut self.active_event,
+            self.duck_visit.is_some(),
+            &mut self.arena,
+        ) {
             soil.bind_current(world);
         }
         self.plants.revalidate(soil);
@@ -991,19 +999,16 @@ impl ClockState {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().0)
-            + self
-                .duck_visit
-                .as_ref()
-                .map_or(0, |duck| duck.physics_counts().0)
+            + self.arena.as_ref().map_or(0, |world| world.body_count())
     }
     pub fn collider_count(&self) -> usize {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().1)
             + self
-                .duck_visit
+                .arena
                 .as_ref()
-                .map_or(0, |duck| duck.physics_counts().1)
+                .map_or(0, |world| world.collider_count())
     }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
@@ -1013,7 +1018,7 @@ impl ClockState {
     }
 
     pub fn duck_state(&self) -> Option<engine_common::ClockDuckState> {
-        let duck = self.duck_visit.as_ref()?;
+        let duck = self.duck_scene()?;
         duck.player_session().is_none().then(|| duck.diagnostics())
     }
     pub fn marquee_state(&self) -> Option<engine_common::ClockMarqueeState> {
@@ -1188,6 +1193,7 @@ impl ClockState {
                 events::duck::DuckEvent::new_course(layout, seed, self.config.duck_course_pattern);
             duck.select_jump_profile(self.config.duck_jump_profile);
             duck.select_direct_flap_landing(self.config.duck_direct_flap_landing);
+            assert!(self.arena.is_none(), "a new visit builds its own arena");
             self.floor.acquire_visit();
             self.duck_visit = Some(Box::new(duck));
             // Admission uses the ordinary cadence/cooldown, but does not hold
@@ -1235,18 +1241,19 @@ impl ClockState {
                 floor: self.floor.geometry(layout),
                 soil: self.soil.as_mut(),
             };
+            let arena = &mut self.arena;
             self.active_event = Some(match kind {
                 ClockEventKind::Aquarium => ActiveEvent::Aquarium(Box::new(
-                    events::aquarium::AquariumEvent::with_visit(context, seed, duck),
+                    events::aquarium::AquariumEvent::with_visit(context, seed, duck, arena),
                 )),
                 ClockEventKind::Falling => ActiveEvent::Falling(
-                    events::falling::FallingEvent::with_visit(context, seed, duck),
+                    events::falling::FallingEvent::with_visit(context, seed, duck, arena),
                 ),
                 ClockEventKind::Explosion => ActiveEvent::Explosion(
-                    events::explosion::ExplosionEvent::with_visit(context, seed, duck),
+                    events::explosion::ExplosionEvent::with_visit(context, seed, duck, arena),
                 ),
                 ClockEventKind::Meltdown => ActiveEvent::Meltdown(Box::new(
-                    events::meltdown::MeltdownEvent::with_visit(context, seed, duck),
+                    events::meltdown::MeltdownEvent::with_visit(context, seed, duck, arena),
                 )),
                 _ => unreachable!(),
             });
@@ -1274,7 +1281,7 @@ impl ClockState {
             if kind == ClockEventKind::Grass {
                 self.event_notice = None;
             }
-            event.release_arena(self.duck_visit.as_deref_mut());
+            event.release_arena(self.duck_visit.as_deref_mut(), &mut self.arena);
             if let ActiveEvent::Rain(rain) = &event
                 && let Some(floor) = rain.responsive_floor()
                 && let Some(duck) = &mut self.duck_visit
@@ -1282,6 +1289,10 @@ impl ClockState {
                 duck.sync_responsive_floor(floor);
             }
             drop(event);
+            // An arena the event kept after its visit left goes with it.
+            if self.duck_visit.is_none() {
+                self.arena = None;
+            }
             self.schedule.finish(kind);
             self.floor.release(kind);
         }
@@ -1303,8 +1314,9 @@ impl ClockState {
         }
         let layout = Layout::new(self.aspect_ratio());
         let panels_advanced = matches!(&self.active_event, Some(ActiveEvent::Rain(rain)) if rain.responsive_floor().is_some());
+        let hull = self.duck_scene().and_then(|duck| duck.clearance_hull());
         if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event {
-            rain.set_duck_hull(self.duck_visit.as_ref().and_then(|d| d.clearance_hull()));
+            rain.set_duck_hull(hull);
         }
         let visit_advanced = if self.active_event.is_some() {
             self.step_active_event(layout)
@@ -1343,6 +1355,7 @@ impl ClockState {
                 duck.visit_finished()
             } else {
                 duck.step_with_soil(
+                    &mut self.arena,
                     water,
                     panels_advanced || water.is_some(),
                     self.soil.as_mut(),
@@ -1404,16 +1417,14 @@ impl ClockState {
             floor: self.floor.geometry(layout),
             soil: self.soil.as_mut(),
         };
+        let visit = self.duck_visit.as_deref_mut();
+        let arena = &mut self.arena;
         let finished = match event {
-            ActiveEvent::Aquarium(event) => event.step(context, self.duck_visit.as_deref_mut()),
-            ActiveEvent::Falling(falling) => falling.step(context, self.duck_visit.as_deref_mut()),
-            ActiveEvent::Explosion(explosion) => {
-                explosion.step(context, self.duck_visit.as_deref_mut())
-            }
-            ActiveEvent::Meltdown(meltdown) => {
-                meltdown.step_with_visit(context, self.duck_visit.as_deref_mut())
-            }
-            _ => event.step(context),
+            ActiveEvent::Aquarium(event) => event.step(context, visit, arena),
+            ActiveEvent::Falling(falling) => falling.step(context, visit, arena),
+            ActiveEvent::Explosion(explosion) => explosion.step(context, visit, arena),
+            ActiveEvent::Meltdown(meltdown) => meltdown.step_with_visit(context, visit, arena),
+            _ => event.step(context, arena),
         };
         if finished {
             self.finish_event();
@@ -1540,6 +1551,7 @@ impl Scenario for ClockScenario {
             last_started_event: None,
             event_notice: None,
             duck_visit: None,
+            arena: None,
             crow_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,

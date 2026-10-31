@@ -309,7 +309,9 @@ fn run(case: Case) -> Row {
         assert_eq!(state.segments(), replay.segments(), "{case:?} tick={tick}");
         check_state(&state, case, tick);
         if metrics.outcome.is_none()
-            && let Some(sample) = state.duck_visit.as_ref().and_then(|d| d.trace_sample())
+            && let Some(duck) = state.duck_visit.as_ref()
+            && let Some(world) = state.arena.as_ref()
+            && let Some(sample) = duck.trace_sample(world)
         {
             if trace.len() == 120 {
                 trace.pop_front();

@@ -79,7 +79,7 @@ fn capture_swimming_review() {
                 .collect::<Vec<_>>();
             let duck = state.duck_visit.as_ref().and_then(|d| {
                 d.actor_body().and_then(|b| {
-                    d.arena_world().motion(b).map(|m| {
+                    state.arena.as_ref()?.motion(b).map(|m| {
                         [
                             round(m.position.x / pitch),
                             round(m.position.y / pitch),

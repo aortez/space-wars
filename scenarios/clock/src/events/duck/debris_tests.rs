@@ -7,8 +7,8 @@ fn perched(
     profile: ClockDuckJumpProfile,
     direction: f32,
     half_width: f32,
-) -> (DuckEvent, BodyId, f32) {
-    let mut duck = DuckEvent::new_platforms(Layout::new(800.0 / 480.0), 42);
+) -> (TestDuck, BodyId, f32) {
+    let mut duck = TestDuck::new_platforms(Layout::new(800.0 / 480.0), 42);
     duck.direction = direction;
     duck.controller.profile = profile;
     let width = duck.width;
@@ -27,6 +27,7 @@ fn perched(
     // Supply already measured capabilities; the regression concerns recovery,
     // not whether a duck can calibrate while perched on a foreign body.
     for _ in 0..9 {
+        let duck = &mut duck.duck;
         duck.controller.heights.push(duck.movement.jump_height);
         duck.controller
             .flight_ticks

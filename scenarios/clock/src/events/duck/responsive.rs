@@ -9,7 +9,6 @@ impl DuckEvent {
         seat: u8,
         facing: f32,
         floor: ResponsiveFloor,
-        motion: Option<(Vec2, Vec2)>,
     ) -> Self {
         // No obstacle generation/planning is needed to join existing panels.
         let mut duck = Self::with_player(Self::new(layout, seed), session_id, seat);
@@ -17,23 +16,30 @@ impl DuckEvent {
         duck.direction = facing;
         duck.responsive_floor = Some(floor);
         duck.preserve_arena_opacity(1.0);
-        if let Some((mut position, velocity)) = motion {
-            // Preserve an existing floating actor in place. When it is already
-            // resting on a panel, give the round player hull minimal clearance
-            // above that face rather than introducing a solver penetration.
-            let floor = duck.responsive_floor.as_ref().unwrap();
-            if f64::from(position.x.abs())
-                > floor.opening * floor.shape.max_gap + f64::from(duck.radius)
-                && position.y > layout.floor_y - floor.shape.max_drop as f32 - duck.radius
-            {
-                position.y = position.y.max(duck.panel_spawn_y(position.x));
-            }
-            duck.spawn_motion = Some((position, velocity));
-            duck.spawn();
-            duck.tick = OPENING_TICKS + PLAYER_EXIT_DELAY_TICKS;
-            duck.enter(EventPhase::Exiting);
-        }
         duck
+    }
+
+    /// Continue Rain's passive actor from its exact translation, already past
+    /// the entrance, instead of walking a fresh one in.
+    pub fn adopt_passive_actor(
+        &mut self,
+        arena: &mut Option<PhysicsWorld>,
+        (mut position, velocity): (Vec2, Vec2),
+    ) {
+        // Preserve an existing floating actor in place. When it is already
+        // resting on a panel, give the round player hull minimal clearance
+        // above that face rather than introducing a solver penetration.
+        let floor = self.responsive_floor.as_ref().unwrap();
+        if f64::from(position.x.abs())
+            > floor.opening * floor.shape.max_gap + f64::from(self.radius)
+            && position.y > self.layout.floor_y - floor.shape.max_drop as f32 - self.radius
+        {
+            position.y = position.y.max(self.panel_spawn_y(position.x));
+        }
+        self.spawn_motion = Some((position, velocity));
+        self.spawn(arena);
+        self.tick = OPENING_TICKS + PLAYER_EXIT_DELAY_TICKS;
+        self.enter(EventPhase::Exiting);
     }
 
     pub fn responsive_floor(&self) -> Option<&ResponsiveFloor> {
@@ -46,8 +52,8 @@ impl DuckEvent {
     }
 
     /// Only one character can own this arena, so clearance is one bounded hull.
-    pub fn clearance_hull(&self) -> Option<(Vec2, f64)> {
-        self.position()
+    pub fn clearance_hull(&self, world: &PhysicsWorld) -> Option<(Vec2, f64)> {
+        self.position(world)
             .map(|p| (self.render_position(p), f64::from(self.radius)))
     }
 

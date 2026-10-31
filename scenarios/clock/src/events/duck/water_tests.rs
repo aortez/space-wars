@@ -1,8 +1,8 @@
 use super::*;
 use engine_water::{Boundary, PoolSpec, WaterConfig};
 
-fn floating_player(direction: f32) -> (DuckEvent, WaterWorld) {
-    let mut duck = DuckEvent::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
+fn floating_player(direction: f32) -> (TestDuck, WaterWorld) {
+    let mut duck = TestDuck::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
     duck.direction = direction;
     for _ in 0..90 {
         duck.step();
@@ -14,7 +14,7 @@ fn floating_player(direction: f32) -> (DuckEvent, WaterWorld) {
     (duck, water)
 }
 
-fn deep_pool(duck: &DuckEvent) -> WaterWorld {
+fn deep_pool(duck: &TestDuck) -> WaterWorld {
     let half = duck.width * 0.5;
     let mut water = WaterWorld::new(
         WaterConfig::default(),
@@ -45,7 +45,7 @@ fn automatic_duck_paddles_without_learning_from_water_then_resumes_dry_jumps() {
             engine_common::ClockDuckJumpProfile::Careful,
             engine_common::ClockDuckJumpProfile::Flowing,
         ] {
-            let mut duck = DuckEvent::new_platforms(Layout::new(4.0 / 3.0), 42);
+            let mut duck = TestDuck::new_platforms(Layout::new(4.0 / 3.0), 42);
             duck.direction = direction;
             duck.select_jump_profile(Some(profile));
             // Interrupt the very first airborne warm-up rather than resetting

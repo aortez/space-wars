@@ -31,9 +31,15 @@ pub(crate) use shared::VisitArena;
 #[cfg(test)]
 mod takeover_tests;
 #[cfg(test)]
+mod test_duck;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
+pub(crate) use test_duck::TestDuck;
+#[cfg(test)]
 pub(crate) mod trace;
+mod view;
+pub(crate) use view::DuckView;
 #[cfg(test)]
 mod water_tests;
 
@@ -98,8 +104,7 @@ pub(crate) struct DuckEvent {
     // A joined Falling keeps its original two banks and side walls.
     pub(crate) drain_floor: Option<crate::floor::DrainGeometry>,
     spawn_motion: Option<(Vec2, Vec2)>,
-    world: Option<PhysicsWorld>,
-    // A physical event can lease this world across entry, dismissal and exit.
+    // A physical event can lease the arena across entry, dismissal and exit.
     // It owns its bodies; the visit must remove only the character on reset.
     arena_claimed: bool,
     // An existing floor must not disappear while the new entrance door opens.
@@ -141,7 +146,12 @@ impl DuckEvent {
 
     /// Change the command source, never the actor, course or physics clock.
     /// A resetting visit has already removed its actor and cannot be taken over.
-    pub fn take_control(&mut self, session_id: u64, seat: u8) -> bool {
+    pub fn take_control(
+        &mut self,
+        world: Option<&mut PhysicsWorld>,
+        session_id: u64,
+        seat: u8,
+    ) -> bool {
         if self.player.is_some() || self.phase == EventPhase::Resetting {
             return false;
         }
@@ -160,8 +170,8 @@ impl DuckEvent {
             self.controller.facing(),
             exit_at_tick,
         ));
-        if self.world.is_some() {
-            self.insert_entrance_wall();
+        if let Some(world) = world {
+            self.insert_entrance_wall(world);
         }
         true
     }
@@ -207,13 +217,16 @@ impl DuckEvent {
         player.jump_held = jump;
     }
 
-    pub fn dismiss_player(&mut self) {
+    pub fn dismiss_player(&mut self, world: Option<&mut PhysicsWorld>) {
         if self.player.is_some() && self.phase != EventPhase::Resetting {
-            self.reset(ClockDuckOutcome::Dismissed);
+            self.reset(world, ClockDuckOutcome::Dismissed);
         }
     }
 
-    pub fn player_diagnostics(&self) -> Option<engine_common::ClockPlayerDuckState> {
+    pub fn player_diagnostics(
+        &self,
+        world: Option<&PhysicsWorld>,
+    ) -> Option<engine_common::ClockPlayerDuckState> {
         let player = self.player.as_ref()?;
         Some(engine_common::ClockPlayerDuckState {
             session_id: player.session_id,
@@ -234,17 +247,13 @@ impl DuckEvent {
                 .as_ref()
                 .map(|f| (f.opening * 1000.0).round() as u32),
             submerged_milli: (self.water_report.submerged_fraction * 1000.0).round() as u32,
-            velocity_milli: self
-                .world
-                .as_ref()
-                .and_then(|w| w.motion(DUCK_BODY))
-                .map(|m| {
-                    [
-                        (m.linear_velocity.x * 1000.0).round() as i32,
-                        (m.linear_velocity.y * 1000.0).round() as i32,
-                    ]
-                }),
-            duck: self.diagnostics(),
+            velocity_milli: world.and_then(|w| w.motion(DUCK_BODY)).map(|m| {
+                [
+                    (m.linear_velocity.x * 1000.0).round() as i32,
+                    (m.linear_velocity.y * 1000.0).round() as i32,
+                ]
+            }),
+            duck: self.diagnostics(world),
         })
     }
 
@@ -314,7 +323,6 @@ impl DuckEvent {
                 },
                 last,
             ],
-            world: None,
             arena_claimed: false,
             entry_arena_opacity: None,
             buoyant: None,
@@ -338,9 +346,11 @@ impl DuckEvent {
         }
     }
 
-    fn ensure_world(&mut self) {
-        if self.world.is_some() {
-            return;
+    /// The visit builds the arena on its first step, or when an event claims
+    /// it first. The world itself lives in the run's `arena` slot.
+    fn ensure_world<'w>(&self, arena: &'w mut Option<PhysicsWorld>) -> &'w mut PhysicsWorld {
+        if arena.is_some() {
+            return arena.as_mut().unwrap();
         }
         let mut world = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -self.movement.gravity),
@@ -430,18 +440,19 @@ impl DuckEvent {
                 &[collider],
             ));
         }
-        self.world = Some(world);
+        let world = arena.insert(world);
         if self.player.is_some() {
-            self.insert_entrance_wall();
+            self.insert_entrance_wall(world);
         }
+        world
     }
 
-    fn insert_entrance_wall(&mut self) {
+    fn insert_entrance_wall(&self, world: &mut PhysicsWorld) {
         // A physical screen-edge wall replaces the bot's turnaround rule.
         // The far end remains open so the player can walk through the exit.
         let entity = PhysicsId::new(canonical::ENTRANCE_WALL.start);
         let id = BodyId::new(entity, BodyRole::PRIMARY);
-        if self.world.as_ref().unwrap().motion(id).is_some() {
+        if world.motion(id).is_some() {
             return;
         }
         let height = self.layout.bounds_max.y - self.layout.bounds_min.y;
@@ -455,7 +466,7 @@ impl DuckEvent {
             height * 0.5,
         );
         wall.friction = 0.0;
-        assert!(self.world.as_mut().unwrap().insert_body(
+        assert!(world.insert_body(
             id,
             BodySpec {
                 kind: BodyKind::Fixed,
@@ -466,8 +477,8 @@ impl DuckEvent {
         ));
     }
 
-    fn spawn(&mut self) {
-        self.ensure_world();
+    fn spawn(&mut self, arena: &mut Option<PhysicsWorld>) {
+        let world = self.ensure_world(arena);
         let floor = self.layout.floor_y;
         let (position, linear_velocity) = self.spawn_motion.take().unwrap_or_else(|| {
             (
@@ -475,7 +486,6 @@ impl DuckEvent {
                 Vec2::ZERO,
             )
         });
-        let world = self.world.as_mut().unwrap();
         let spec = BodySpec {
             position,
             linear_velocity,
@@ -509,8 +519,8 @@ impl DuckEvent {
         self.render_position(p)
     }
 
-    pub fn position(&self) -> Option<Vec2> {
-        self.world.as_ref()?.motion(DUCK_BODY).map(|motion| {
+    pub fn position(&self, world: &PhysicsWorld) -> Option<Vec2> {
+        world.motion(DUCK_BODY).map(|motion| {
             Vec2::new(
                 motion.position.x * self.direction + self.width * 0.5,
                 motion.position.y,
@@ -518,21 +528,16 @@ impl DuckEvent {
         })
     }
 
-    pub fn grounded(&self) -> bool {
+    pub fn grounded(&self, world: &PhysicsWorld) -> bool {
         if self.ledge_attached() {
             return false;
         }
-        self.world.as_ref().is_some_and(|world| {
-            world
-                .surface_contacts(DUCK_COLLIDER)
-                .any(|contact| contact.normal.y > 0.7 && contact.separation <= self.radius * 0.05)
-        })
+        world
+            .surface_contacts(DUCK_COLLIDER)
+            .any(|contact| contact.normal.y > 0.7 && contact.separation <= self.radius * 0.05)
     }
 
-    pub fn feet_moving(&self) -> bool {
-        let Some(world) = &self.world else {
-            return false;
-        };
+    pub fn feet_moving(&self, world: &PhysicsWorld) -> bool {
         let Some(motion) = world.motion(DUCK_BODY) else {
             return false;
         };
@@ -548,8 +553,7 @@ impl DuckEvent {
         }
     }
 
-    fn supported_surface(&self) -> Option<usize> {
-        let world = self.world.as_ref()?;
+    fn supported_surface(&self, world: &PhysicsWorld) -> Option<usize> {
         let course = self.course.as_ref()?;
         world.surface_contacts(DUCK_COLLIDER).find_map(|contact| {
             if contact.normal.y > 0.7 && contact.separation <= self.radius * 0.05 {
@@ -590,8 +594,7 @@ impl DuckEvent {
         })
     }
 
-    fn run(&mut self, water: Option<&WaterWorld>) {
-        let Some(world) = &mut self.world else { return };
+    fn run(&mut self, world: &mut PhysicsWorld, water: Option<&WaterWorld>) {
         world.clear_forces();
         self.water_report = match (&self.buoyant, water) {
             (Some(hull), Some(water)) => hull
@@ -600,25 +603,25 @@ impl DuckEvent {
             _ => BuoyancyReport::default(),
         };
         if self.player.is_none() && self.exit_visible() {
-            let motion = self.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+            let motion = world.motion(DUCK_BODY).unwrap();
             let x = motion.position.x * self.direction + self.width * 0.5;
             let wall = self.radius * 3.0;
             // Only finish a tag already within one body length on the same
             // bank. A fresh jump, wet recovery or flap perch gets no detour.
             let near_wall = (wall - self.radius * 0.3..=wall + self.radius * 2.0).contains(&x)
                 && motion.linear_velocity.x * self.direction < 0.0
-                && self.grounded()
+                && self.grounded(world)
                 && self.water_report.submerged_fraction <= 0.05
                 && self
                     .course
                     .as_ref()
-                    .is_none_or(|_| self.supported_surface() == Some(0));
+                    .is_none_or(|_| self.supported_surface(world) == Some(0));
             self.controller.notice_exit(self.tick, near_wall);
         }
         self.decide_player_ledge();
-        self.decide_automatic_ledge();
-        let detour_command = self.decide_flap_detour(water);
-        let ledge_driven = self.drive_ledge();
+        self.decide_automatic_ledge(world);
+        let detour_command = self.decide_flap_detour(world, water);
+        let ledge_driven = self.drive_ledge(world);
         self.observe_automatic_ledge();
         if ledge_driven {
             self.paddling = false;
@@ -626,14 +629,13 @@ impl DuckEvent {
                 player.jump_pending = false;
                 player.diving = false;
             }
-            self.world.as_mut().unwrap().step(DT);
-            self.finish_ledge_step();
+            world.step(DT);
+            self.finish_ledge_step(world);
             self.observe_automatic_ledge();
             return;
         }
-        let grounded = self.grounded();
-        let support = self.supported_surface();
-        let Some(world) = &mut self.world else { return };
+        let grounded = self.grounded(world);
+        let support = self.supported_surface(world);
         let motion = world.motion(DUCK_BODY).expect("live duck body");
         let screen = self.direction;
         let contact = if grounded {
@@ -753,9 +755,9 @@ impl DuckEvent {
         self.phase_tick = 0;
     }
 
-    fn reset(&mut self, outcome: ClockDuckOutcome) {
+    fn reset(&mut self, world: Option<&mut PhysicsWorld>, outcome: ClockDuckOutcome) {
         self.outcome = Some(outcome);
-        if let Some(world) = &mut self.world {
+        if let Some(world) = world {
             world.remove_entity(DUCK_ENTITY);
         }
         self.reset_ledge();
@@ -773,48 +775,33 @@ impl DuckEvent {
         self.enter(EventPhase::Resetting);
     }
 
-    #[cfg(test)]
-    pub fn step(&mut self) -> bool {
-        self.step_with_water(None)
-    }
-
-    #[cfg(test)]
-    pub fn step_with_water(&mut self, water: Option<&WaterWorld>) -> bool {
-        self.step_with_environment(water, water.is_some())
-    }
-
-    #[cfg(test)]
-    pub fn step_with_environment(
-        &mut self,
-        water: Option<&WaterWorld>,
-        panels_advanced: bool,
-    ) -> bool {
-        self.step_with_soil(water, panels_advanced, None)
-    }
-
+    /// Advance the visit one tick in `arena`, building the world if this is
+    /// its first step and dropping it once nothing still needs it.
     pub fn step_with_soil(
         &mut self,
+        arena: &mut Option<PhysicsWorld>,
         water: Option<&WaterWorld>,
         panels_advanced: bool,
         soil: Option<&mut crate::grass::SoilHabitat>,
     ) -> bool {
-        self.advance_panels(panels_advanced);
+        self.advance_panels(arena.as_mut(), panels_advanced);
         self.tick += 1;
         self.phase_tick += 1;
         if self.phase != EventPhase::Resetting {
-            self.ensure_world();
+            self.ensure_world(arena);
         }
-        self.synchronize_soil(soil);
+        self.synchronize_soil(arena.as_mut(), soil);
         if self.phase == EventPhase::Opening {
-            self.advance_flaps();
-            self.world.as_mut().unwrap().step(DT);
+            let world = arena.as_mut().unwrap();
+            self.advance_flaps(world);
+            world.step(DT);
             // Preserve the actor's first simulation tick. Shared scenery steps
             // once before spawning, just as it does before a visit joins.
             if self.phase_tick >= OPENING_TICKS {
                 if self.responsive_floor.is_some() {
                     self.prepare_responsive_spawn(water);
                 }
-                self.spawn();
+                self.spawn(arena);
                 self.enter(EventPhase::Running);
             }
             return false;
@@ -822,13 +809,14 @@ impl DuckEvent {
         if self.phase == EventPhase::Running && self.exit_visible() {
             self.enter(EventPhase::Exiting);
         }
-        if self.world.is_some() {
-            self.advance_flaps();
+        if let Some(world) = arena {
+            self.advance_flaps(world);
         }
         match self.phase {
             EventPhase::Running | EventPhase::Exiting => {
-                self.run(water);
-                let position = self.position().expect("running duck");
+                let world = arena.as_mut().expect("a running visit's arena");
+                self.run(world, water);
+                let position = self.position(world).expect("running duck");
                 if !position.x.is_finite()
                     || !position.y.is_finite()
                     || position.y
@@ -838,7 +826,7 @@ impl DuckEvent {
                             self.layout.floor_y - self.radius * 5.0
                         }
                 {
-                    self.reset(ClockDuckOutcome::Fell);
+                    self.reset(Some(world), ClockDuckOutcome::Fell);
                 } else if self.exit_visible()
                     && position.x
                         > self.width
@@ -849,13 +837,13 @@ impl DuckEvent {
                                     2.0
                                 }
                 {
-                    self.reset(ClockDuckOutcome::Exited);
+                    self.reset(Some(world), ClockDuckOutcome::Exited);
                 } else if self.player.is_none() && self.tick >= DUCK_TICKS - RESET_TICKS {
-                    self.reset(ClockDuckOutcome::TimedOut);
+                    self.reset(Some(world), ClockDuckOutcome::TimedOut);
                 }
             }
             _ => {
-                if let Some(world) = &mut self.world {
+                if let Some(world) = arena {
                     world.step(DT);
                 }
             }
@@ -864,7 +852,7 @@ impl DuckEvent {
             && !self.arena_claimed
             && self.door_panels().iter().all(Option::is_none)
         {
-            self.world = None;
+            *arena = None;
         }
         // Keep the catalog's fixed envelope even after an early recovery. The
         // course and doors finish closing, and live time continues.
@@ -933,13 +921,7 @@ impl DuckEvent {
         Vec2::new((position.x - self.width * 0.5) * self.direction, position.y)
     }
 
-    pub fn physics_counts(&self) -> (usize, usize) {
-        self.world
-            .as_ref()
-            .map_or((0, 0), |world| (world.body_count(), world.collider_count()))
-    }
-
-    pub fn diagnostics(&self) -> ClockDuckState {
+    pub fn diagnostics(&self, world: Option<&PhysicsWorld>) -> ClockDuckState {
         let (entrance, exit) = self.door_openness();
         ClockDuckState {
             visit: Some(engine_common::ClockDuckVisitState {
@@ -953,23 +935,19 @@ impl DuckEvent {
                 phase_tick: self.phase_tick,
                 tick: self.tick,
                 submerged_milli: (self.water_report.submerged_fraction * 1000.0).round() as u32,
-                velocity_milli: self
-                    .world
-                    .as_ref()
-                    .and_then(|world| world.motion(DUCK_BODY))
-                    .map(|m| {
-                        [
-                            (m.linear_velocity.x * 1000.0).round() as i32,
-                            (m.linear_velocity.y * 1000.0).round() as i32,
-                        ]
-                    }),
+                velocity_milli: world.and_then(|w| w.motion(DUCK_BODY)).map(|m| {
+                    [
+                        (m.linear_velocity.x * 1000.0).round() as i32,
+                        (m.linear_velocity.y * 1000.0).round() as i32,
+                    ]
+                }),
             }),
             left_to_right: self.direction > 0.0,
-            position_milli: self.position().map(|p| {
+            position_milli: world.and_then(|w| self.position(w)).map(|p| {
                 let p = self.render_position(p);
                 [(p.x * 1000.0).round() as i32, (p.y * 1000.0).round() as i32]
             }),
-            grounded: self.grounded(),
+            grounded: world.is_some_and(|w| self.grounded(w)),
             jumps: self.jumps,
             cleared_obstacles: if self.soil_navigation_owners.is_empty() {
                 self.controller.cleared
@@ -991,7 +969,7 @@ impl DuckEvent {
             },
             entrance_open_milli: (entrance * 1000.0).round() as u32,
             exit_open_milli: (exit * 1000.0).round() as u32,
-            flaps: self.flap_diagnostics(),
+            flaps: self.flap_diagnostics(world),
             ledge: self.ledge.stats,
             outcome: self.outcome,
             navigation: self.player.is_none().then(|| ClockDuckNavigationState {
@@ -1049,7 +1027,7 @@ impl DuckEvent {
                         ClockDuckPlanningState {
                             pattern: course.pattern,
                             surface_count: course.surfaces.len(),
-                            support: self.supported_surface(),
+                            support: world.and_then(|w| self.supported_surface(w)),
                             plan: navigator.plan.map(|plan| ClockDuckPlanState {
                                 source: plan.source,
                                 target: plan.target,

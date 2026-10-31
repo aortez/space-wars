@@ -1,7 +1,7 @@
 //! One duck visit owns its course/panels independently of the timed scheduler.
 //! Player input is a command source, not a different actor or physics world.
 use super::*;
-use events::duck::DuckEvent;
+use events::duck::{DuckEvent, DuckView};
 
 /// A complete setpoint, guarded against another controller or an old visit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,7 +62,7 @@ impl ClockState {
     }
 
     pub fn player_duck_state(&self) -> Option<engine_common::ClockPlayerDuckState> {
-        self.duck_visit.as_ref()?.player_diagnostics()
+        self.duck_scene()?.player_diagnostics()
     }
 
     pub fn automatic_events_suspended(&self) -> bool {
@@ -104,8 +104,10 @@ impl ClockState {
             .configure(self.config.event_profile, effective);
     }
 
-    pub(crate) fn duck_scene(&self) -> Option<&DuckEvent> {
-        self.duck_visit.as_deref()
+    /// The live visit, read together with the arena it moves in.
+    pub(crate) fn duck_scene(&self) -> Option<DuckView<'_>> {
+        let duck = self.duck_visit.as_deref()?;
+        Some(DuckView::new(duck, self.arena.as_ref()))
     }
 
     pub(super) fn toggle_player_duck(&mut self, player: u8) {
@@ -118,9 +120,9 @@ impl ClockState {
                 .player_session()
                 .is_some_and(|(_, owner)| owner == player)
             {
-                duck.dismiss_player();
+                duck.dismiss_player(self.arena.as_mut());
             }
-            if duck.take_control(session, player) {
+            if duck.take_control(self.arena.as_mut(), session, player) {
                 self.player_duck_sequence = session;
                 self.schedule.retire(ClockEventKind::Duck);
                 self.announce_player(player);
@@ -136,7 +138,7 @@ impl ClockState {
         let layout = Layout::new(self.aspect_ratio());
         let seed = self.player_seed.wrapping_add(session);
         if let Some(event) = &mut self.active_event
-            && let Some(duck) = event.join_arena(layout, seed, session, player)
+            && let Some(duck) = event.join_arena(&mut self.arena, layout, seed, session, player)
         {
             self.player_duck_sequence += 1;
             self.floor.acquire_visit();
@@ -154,19 +156,23 @@ impl ClockState {
         }
         self.player_duck_sequence += 1;
         self.floor.acquire_visit();
+        assert!(self.arena.is_none(), "a new visit builds its own arena");
         let duck = if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event
             && let Some(floor) = rain.responsive_floor().cloned()
         {
             let motion = rain.join_player();
-            DuckEvent::new_responsive_player(
+            let mut duck = DuckEvent::new_responsive_player(
                 layout,
                 seed,
                 self.player_duck_sequence,
                 player,
                 rain.facing,
                 floor,
-                motion,
-            )
+            );
+            if let Some(motion) = motion {
+                duck.adopt_passive_actor(&mut self.arena, motion);
+            }
+            duck
         } else {
             let mut duck = DuckEvent::new_player(
                 layout,
@@ -212,7 +218,10 @@ impl ClockState {
             if let Some(event) = &mut self.active_event
                 && event.shares_visit_arena()
             {
-                event.retain_arena(duck);
+                event.retain_arena(duck, self.arena.as_mut().expect("leased arena"));
+            } else {
+                // Unless an event retains it, the arena leaves with its visit.
+                self.arena = None;
             }
             self.floor.release_visit();
             self.sync_event_schedule();

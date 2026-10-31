@@ -3,8 +3,8 @@ use super::*;
 use engine_water::{Boundary, PoolSpec, WaterConfig};
 use planner::Surface;
 
-fn flat_player(aspect: f32, direction: f32) -> DuckEvent {
-    let mut duck = DuckEvent::new_player(Layout::new(aspect), 42, None, 1, 1);
+fn flat_player(aspect: f32, direction: f32) -> TestDuck {
+    let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
     duck.direction = direction;
     duck.course.as_mut().unwrap().surfaces = vec![Surface {
         start: 0.0,
@@ -26,7 +26,7 @@ fn flat_player(aspect: f32, direction: f32) -> DuckEvent {
     duck
 }
 
-fn pool(duck: &DuckEvent, depth: f32) -> WaterWorld {
+fn pool(duck: &TestDuck, depth: f32) -> WaterWorld {
     let half = duck.width * 0.5;
     let columns = 64;
     let mut water = WaterWorld::new(
@@ -51,7 +51,7 @@ fn pool(duck: &DuckEvent, depth: f32) -> WaterWorld {
     water
 }
 
-fn floating() -> (DuckEvent, WaterWorld) {
+fn floating() -> (TestDuck, WaterWorld) {
     let mut duck = flat_player(4.0 / 3.0, 1.0);
     let water = pool(&duck, duck.radius * 4.0);
     for _ in 0..480 {
@@ -284,7 +284,7 @@ fn shallow_water_uses_ground_jumps_and_down_does_not_push_through_the_floor() {
 fn swim_can_clear_a_low_bank_that_paddling_alone_cannot() {
     for direction in [-1.0, 1.0] {
         for swim in [false, true] {
-            let mut duck = DuckEvent::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
+            let mut duck = TestDuck::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
             duck.direction = direction;
             let bank = duck.width * 0.6;
             duck.course.as_mut().unwrap().surfaces = vec![
@@ -356,12 +356,11 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
             .y;
         // A left-high surface makes a right-going current through the real
         // water solver. The player paddles left against it; no synthetic flow.
-        duck.world.as_mut().unwrap().set_pose(
-            DUCK_BODY,
-            Vec2::new(-duck.radius * 3.0, y),
-            0.0,
-            true,
-        );
+        let start = Vec2::new(-duck.radius * 3.0, y);
+        duck.world
+            .as_mut()
+            .unwrap()
+            .set_pose(DUCK_BODY, start, 0.0, true);
         let left = water.pools()[0]
             .columns()
             .take(32)

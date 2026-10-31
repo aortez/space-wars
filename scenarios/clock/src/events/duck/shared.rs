@@ -1,17 +1,20 @@
 //! A visit's physical arena can outlive its character while a timed event uses
-//! it. Ownership moves (never clones) to that event when the duck leaves, and
-//! can move back on rejoin. There is one world and one step in either case.
+//! it. The world itself stays in the run's `arena` slot; what moves (never
+//! clones) to the event when the duck leaves is the visit that knows the
+//! course, and it can move back on rejoin. There is one world and one step in
+//! either case.
 use super::*;
 
-/// A physical event leases a visit's world, retaining it if the character leaves.
-/// It never creates a second world or owns the visit's controller/lifetime.
+/// A physical event leases a visit's arena, retaining the visit if the
+/// character leaves. It never creates a second world or owns the visit's
+/// controller/lifetime.
 pub(crate) struct VisitArena {
     vacant: Option<Box<DuckEvent>>,
 }
 
 impl VisitArena {
-    pub fn claim(player: &mut DuckEvent) -> Self {
-        player.claim_arena();
+    pub fn claim(player: &mut DuckEvent, arena: &mut Option<PhysicsWorld>) -> Self {
+        player.claim_arena(arena);
         Self { vacant: None }
     }
 
@@ -34,31 +37,27 @@ impl VisitArena {
         self.vacant.as_deref()
     }
 
-    pub fn retain(&mut self, mut duck: Box<DuckEvent>) {
+    pub fn retain(&mut self, mut duck: Box<DuckEvent>, world: &mut PhysicsWorld) {
         assert!(self.vacant.is_none());
-        duck.retire_from_arena();
+        duck.retire_from_arena(world);
         self.vacant = Some(duck);
     }
 
-    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
+    pub fn rejoin(
+        &mut self,
+        arena: &mut Option<PhysicsWorld>,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
         let mut duck = self.vacant.take()?;
-        duck.rejoin_arena(session, seat);
+        duck.rejoin_arena(arena.as_mut().expect("leased arena"), session, seat);
         Some(duck)
-    }
-
-    #[cfg(test)]
-    pub fn step<'a>(
-        &'a mut self,
-        player: Option<&'a mut DuckEvent>,
-        water: Option<&WaterWorld>,
-        panels_advanced: bool,
-    ) -> &'a mut DuckEvent {
-        self.step_with_soil(player, water, panels_advanced, None)
     }
 
     pub fn step_with_soil<'a>(
         &'a mut self,
         player: Option<&'a mut DuckEvent>,
+        arena: &mut Option<PhysicsWorld>,
         water: Option<&WaterWorld>,
         panels_advanced: bool,
         soil: Option<&mut crate::grass::SoilHabitat>,
@@ -66,22 +65,21 @@ impl VisitArena {
         let occupied = player.is_some();
         let duck = self.get_mut(player);
         if occupied {
-            duck.step_with_soil(water, panels_advanced, soil);
+            duck.step_with_soil(arena, water, panels_advanced, soil);
         } else {
-            duck.step_unoccupied_arena(panels_advanced, soil);
+            let world = arena.as_mut().expect("leased arena");
+            duck.step_unoccupied_arena(world, panels_advanced, soil);
         }
         duck
     }
 }
 
 impl DuckEvent {
-    pub fn existing_world(&self) -> Option<&PhysicsWorld> {
-        self.world.as_ref()
-    }
-    pub fn existing_world_mut(&mut self) -> Option<&mut PhysicsWorld> {
-        self.world.as_mut()
-    }
-    pub(super) fn synchronize_soil(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) {
+    pub(super) fn synchronize_soil(
+        &mut self,
+        world: Option<&mut PhysicsWorld>,
+        soil: Option<&mut crate::grass::SoilHabitat>,
+    ) {
         self.soil_supports.clear();
         self.soil_course = None;
         self.soil_navigation_owners.clear();
@@ -94,7 +92,7 @@ impl DuckEvent {
                 crate::grass::SoilSupportState::Course
             };
             soil.set_surfaces(crate::grass::surfaces::duck(self), state);
-            if let Some(world) = &mut self.world {
+            if let Some(world) = world {
                 soil.bind_current(world);
             }
             // Only retained material on the actual fixed course inherits course
@@ -211,39 +209,31 @@ impl DuckEvent {
         self.buoyant.as_ref().map(BuoyantBody::body)
     }
 
-    pub fn claim_arena(&mut self) -> &mut PhysicsWorld {
+    pub fn claim_arena(&mut self, arena: &mut Option<PhysicsWorld>) {
         assert!(!self.arena_claimed);
-        self.ensure_world();
+        self.ensure_world(arena);
         self.arena_claimed = true;
-        self.world.as_mut().unwrap()
     }
 
-    pub fn arena_world(&self) -> &PhysicsWorld {
-        self.world.as_ref().expect("leased arena")
-    }
-
-    pub fn arena_world_mut(&mut self) -> &mut PhysicsWorld {
-        self.world.as_mut().expect("leased arena")
-    }
-
-    pub fn release_arena(&mut self) {
+    /// Drops the world as well when the visit has already finished with it.
+    pub fn release_arena(&mut self, arena: &mut Option<PhysicsWorld>) {
         assert!(self.arena_claimed);
         self.arena_claimed = false;
         if self.phase == EventPhase::Resetting && self.door_panels().iter().all(Option::is_none) {
-            self.world = None;
+            *arena = None;
         }
     }
 
-    pub fn retire_from_arena(&mut self) {
+    pub fn retire_from_arena(&mut self, world: &mut PhysicsWorld) {
         assert!(self.arena_claimed);
-        self.reset(ClockDuckOutcome::Dismissed);
-        self.remove_flaps();
+        self.reset(Some(world), ClockDuckOutcome::Dismissed);
+        self.remove_flaps(world);
         self.player = None;
     }
 
-    pub fn rejoin_arena(&mut self, session_id: u64, seat: u8) {
+    pub fn rejoin_arena(&mut self, world: &mut PhysicsWorld, session_id: u64, seat: u8) {
         assert!(self.arena_claimed && self.player.is_none());
-        self.remove_flaps();
+        self.remove_flaps(world);
         if self.entry_arena_opacity.is_some() {
             self.entry_arena_opacity = Some(self.arena_opacity());
         }
@@ -256,7 +246,7 @@ impl DuckEvent {
         if self.course.is_some() {
             // An automatic visitor did not need this wall, but a new player
             // needs the same entrance boundary as an ordinary player spawn.
-            self.insert_entrance_wall();
+            self.insert_entrance_wall(world);
         }
         self.tick = 0;
         self.jumps = 0;
@@ -298,24 +288,30 @@ impl DuckEvent {
 
     fn step_unoccupied_arena(
         &mut self,
+        world: &mut PhysicsWorld,
         panels_advanced: bool,
         soil: Option<&mut crate::grass::SoilHabitat>,
     ) {
         assert!(self.arena_claimed && self.player.is_none());
-        self.advance_panels(panels_advanced);
-        self.synchronize_soil(soil);
-        let world = self.arena_world_mut();
+        self.advance_panels(Some(world), panels_advanced);
+        self.synchronize_soil(Some(world), soil);
         world.clear_forces();
         world.step(DT);
     }
 
-    pub(super) fn advance_panels(&mut self, already_advanced: bool) {
-        let hull = self.clearance_hull();
+    pub(super) fn advance_panels(
+        &mut self,
+        world: Option<&mut PhysicsWorld>,
+        already_advanced: bool,
+    ) {
+        let hull = world
+            .as_deref()
+            .and_then(|world| self.clearance_hull(world));
         if let Some(floor) = &mut self.responsive_floor {
             if !already_advanced {
                 floor.step_dry(f64::from(DT), hull);
             }
-            if let Some(world) = &mut self.world {
+            if let Some(world) = world {
                 floor.move_panels(world);
             }
         }
@@ -330,7 +326,7 @@ mod soil_tests {
     fn clock_grass_contract_partial_soil_maps_only_retained_supported_material() {
         for direction in [-1.0, 1.0] {
             let layout = Layout::new(800.0 / 480.0);
-            let mut duck = DuckEvent::new_platforms(layout, 42);
+            let mut duck = TestDuck::new_platforms(layout, 42);
             duck.direction = direction;
             duck.spawn();
             let mut soil = crate::grass::SoilHabitat::new(layout);
@@ -360,13 +356,9 @@ mod soil_tests {
             );
             // Settle onto actual dirt through the canonical solver.
             let (index, min, max) = duck.soil_supports[0];
+            let rest = Vec2::new((min.x + max.x) * 0.5, max.y + duck.radius);
             let world = duck.world.as_mut().unwrap();
-            world.set_pose(
-                DUCK_BODY,
-                Vec2::new((min.x + max.x) * 0.5, max.y + duck.radius),
-                0.0,
-                true,
-            );
+            world.set_pose(DUCK_BODY, rest, 0.0, true);
             for _ in 0..30 {
                 world.step(DT);
             }
@@ -390,7 +382,6 @@ mod soil_tests {
 
 #[cfg(test)]
 mod navigation_contract {
-    use super::*;
     use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
     use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
     use std::time::Duration;

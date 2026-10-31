@@ -72,10 +72,10 @@ pub(crate) struct RainEvent {
 }
 
 impl RainEvent {
-    pub fn canonical_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
+    pub fn own_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
         self.floats.as_ref().map(|f| &f.world)
     }
-    pub fn canonical_world_mut(&mut self) -> Option<&mut engine_rapier::world::PhysicsWorld> {
+    pub fn own_world_mut(&mut self) -> Option<&mut engine_rapier::world::PhysicsWorld> {
         self.floats.as_mut().map(|f| &mut f.world)
     }
     pub fn new(

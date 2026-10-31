@@ -341,7 +341,7 @@ fn clock_grass_contract_all_floor_adapters_and_shared_arena_preserve_material_id
             assert_eq!(a.added, a.retained as u64 + a.exported);
             assert_eq!(a.added, 1200);
             if let Some(world) =
-                crate::arena::canonical_world(&s.active_event, s.duck_visit.as_deref())
+                crate::arena::canonical_world(&s.active_event, s.duck_visit.is_some(), &s.arena)
             {
                 assert!(
                     world.contains_entity(PhysicsId::new(SOIL_PHYSICS_ID)),

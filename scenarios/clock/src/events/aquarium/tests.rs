@@ -1,6 +1,7 @@
 use super::*;
 use crate::{ActiveEvent, ClockConfig, ClockReading, ClockScenario, ClockState};
 use engine_common::{ClockEventKind, ClockEventProfile, ClockFont, Scenario};
+use engine_rapier::world::physics_activity;
 
 mod duck_contacts;
 mod swimming;
@@ -257,7 +258,7 @@ fn joining_leaving_and_rejoining_keep_the_same_water_fish_and_native_world() {
         .map(|f| f.position)
         .collect::<Vec<_>>();
     state.toggle_player_duck(1);
-    let pointer = state.duck_visit.as_ref().unwrap().arena_world() as *const _ as usize;
+    let worlds = physics_activity().worlds;
     assert_eq!(event(&state).diagnostics().water_steps, before.water_steps);
     assert_eq!(
         event(&state).diagnostics().injected_microunits,
@@ -277,20 +278,15 @@ fn joining_leaving_and_rejoining_keep_the_same_water_fish_and_native_world() {
     let session = state.player_duck_session().unwrap();
     assert_eq!(event(&state).diagnostics().native_steps, 180);
     state.finish_duck_visit();
-    assert_eq!(
-        event(&state).vacant_arena().unwrap().arena_world() as *const _ as usize,
-        pointer
-    );
+    assert!(event(&state).vacant_arena().is_some());
+    assert_eq!(physics_activity().worlds, worlds);
     assert!(state.body_count() > 0);
     for _ in 0..60 {
         state.advance_tick();
     }
     state.toggle_player_duck(1);
     assert_ne!(state.player_duck_session().unwrap(), session);
-    assert_eq!(
-        state.duck_visit.as_ref().unwrap().arena_world() as *const _ as usize,
-        pointer
-    );
+    assert_eq!(physics_activity().worlds, worlds);
     let next_session = state.player_duck_session();
     while event(&state).tick < AQUARIUM_TICKS - 1 {
         let before = state.player_duck_state();
@@ -333,8 +329,8 @@ fn existing_player_keeps_course_controller_pose_and_world_and_releases_only_the_
     }
     let player = state.player_duck_state();
     let bodies = state.body_count();
+    let worlds = physics_activity().worlds;
     let duck = state.duck_visit.as_ref().unwrap();
-    let pointer = duck.arena_world() as *const _ as usize;
     let course = duck
         .course
         .as_ref()
@@ -368,10 +364,7 @@ fn existing_player_keeps_course_controller_pose_and_world_and_releases_only_the_
         state.advance_tick();
     }
     assert_eq!(event(&state).diagnostics().native_steps, 900);
-    assert_eq!(
-        state.duck_visit.as_ref().unwrap().arena_world() as *const _ as usize,
-        pointer
-    );
+    assert_eq!(physics_activity().worlds, worlds);
     let player = state.player_duck_state();
     state.finish_event();
     assert_eq!(state.player_duck_state(), player);

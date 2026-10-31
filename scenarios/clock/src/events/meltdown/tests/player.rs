@@ -53,12 +53,7 @@ fn event_mut(state: &mut ClockState) -> &mut MeltdownEvent {
 }
 
 fn world(state: &ClockState) -> &PhysicsWorld {
-    state
-        .duck_visit
-        .as_deref()
-        .or_else(|| event(state).vacant_arena())
-        .unwrap()
-        .arena_world()
+    state.arena.as_ref().expect("shared arena")
 }
 
 fn isolate_block(state: &mut ClockState, position: Vec2, velocity: Vec2) {
@@ -290,7 +285,7 @@ fn block_pushes_duck_without_melting_then_liquefies_on_the_actual_floor() {
     let duck = state.duck_visit.as_ref().unwrap();
     let layout = duck.layout;
     let radius = duck.radius;
-    let origin = duck.arena_world().motion(DUCK).unwrap().position;
+    let origin = world(&state).motion(DUCK).unwrap().position;
     // Land an ordinary square onto the actor, with a small sideways offset so
     // the same live solver contact pushes it. Other cells stay unreleased.
     isolate_block(
@@ -377,7 +372,7 @@ fn conversion_backpressure_keeps_the_whole_solid_then_retries_without_loss() {
     state.preview_event(ClockEventKind::Meltdown);
     let duck = state.duck_visit.as_ref().unwrap();
     let layout = duck.layout;
-    let x = duck.arena_world().motion(DUCK).unwrap().position.x * 0.85;
+    let x = world(&state).motion(DUCK).unwrap().position.x * 0.85;
     isolate_block(
         &mut state,
         Vec2::new(x, layout.floor_y + layout.pitch * 0.4 + 1.0),

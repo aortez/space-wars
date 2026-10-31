@@ -2,26 +2,31 @@ use super::*;
 use engine_common::ClockDuckFlapHold;
 use engine_rapier::world::RayCastOptions;
 
-impl DuckEvent {
+fn flap_body_count(world: Option<&PhysicsWorld>) -> usize {
+    (0..2)
+        .filter(|side| world.is_some_and(|w| w.contains_body(flaps::body(*side))))
+        .count()
+}
+
+impl TestDuck {
     pub(crate) fn flap_body_count(&self) -> usize {
-        (0..2)
-            .filter(|side| {
-                self.world
-                    .as_ref()
-                    .is_some_and(|w| w.contains_body(flaps::body(*side)))
-            })
-            .count()
+        flap_body_count(self.world.as_ref())
     }
 }
 
 impl crate::ClockState {
+    /// The live visit's flaps; a vacant arena's were removed on retirement.
     pub(crate) fn flap_body_count(&self) -> usize {
-        self.duck_scene().map_or(0, DuckEvent::flap_body_count)
+        if self.duck_visit.is_some() {
+            flap_body_count(self.arena.as_ref())
+        } else {
+            0
+        }
     }
 }
 
-fn open_player(aspect: f32, direction: f32) -> DuckEvent {
-    let mut duck = DuckEvent::new_player(Layout::new(aspect), 42, None, 1, 1);
+fn open_player(aspect: f32, direction: f32) -> TestDuck {
+    let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
     duck.direction = direction;
     for _ in 0..OPENING_TICKS {
         duck.step();
@@ -30,13 +35,13 @@ fn open_player(aspect: f32, direction: f32) -> DuckEvent {
     duck
 }
 
-fn place(duck: &mut DuckEvent, position: Vec2) {
+fn place(duck: &mut TestDuck, position: Vec2) {
     let world = duck.world.as_mut().unwrap();
     assert!(world.set_pose(DUCK_BODY, position, 0.0, true));
     assert!(world.set_velocity(DUCK_BODY, Vec2::ZERO, 0.0, true));
 }
 
-fn land_on_flap(duck: &mut DuckEvent) {
+fn land_on_flap(duck: &mut TestDuck) {
     let panel = duck.door_panels()[0].unwrap();
     place(
         duck,
@@ -221,7 +226,7 @@ fn a_duck_in_the_closing_sweep_holds_the_last_safe_pose_without_snapping() {
 fn flap_render_geometry_matches_rays_bounds_and_motion_in_every_layout() {
     for aspect in [5.0 / 3.0, 4.0 / 3.0, 0.6] {
         for direction in [-1.0, 1.0] {
-            let mut duck = DuckEvent::new_player(Layout::new(aspect), 42, None, 1, 1);
+            let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
             duck.direction = direction;
             for tick in 1..=110 {
                 duck.step();
@@ -277,10 +282,16 @@ fn flap_render_geometry_matches_rays_bounds_and_motion_in_every_layout() {
 fn retiring_flaps_removes_only_the_visits_bodies_and_claims() {
     let mut duck = open_player(5.0 / 3.0, 1.0);
     land_on_flap(&mut duck);
-    let mut arena = VisitArena::claim(&mut duck);
+    let TestDuck {
+        duck,
+        world: mut arena,
+    } = duck;
+    let mut duck = Box::new(duck);
+    let mut lease = VisitArena::claim(&mut duck, &mut arena);
+    let world = arena.as_mut().unwrap();
     let foreign = PhysicsId::new(3001);
     let id = BodyId::new(foreign, BodyRole::PRIMARY);
-    assert!(duck.arena_world_mut().insert_body(
+    assert!(world.insert_body(
         id,
         BodySpec {
             position: Vec2::new(0.0, 100.0),
@@ -291,25 +302,29 @@ fn retiring_flaps_removes_only_the_visits_bodies_and_claims() {
             2.0
         )]
     ));
-    let count = duck.physics_counts().0;
-    let foreign_motion = duck.arena_world().motion(id);
-    arena.retain(Box::new(duck));
-    let duck = arena.vacant().unwrap();
+    let count = world.body_count();
+    let foreign_motion = world.motion(id);
+    lease.retain(duck, world);
+    let world = arena.as_ref().unwrap();
     assert_eq!(
-        duck.physics_counts().0,
+        world.body_count(),
         count - 2,
         "character and one open flap retire"
     );
-    assert_eq!(duck.arena_world().motion(id), foreign_motion);
-    assert!(duck.door_panels().iter().all(Option::is_none));
-    let duck = arena.step(None, None, false);
-    let after = duck.arena_world().motion(id).unwrap();
+    assert_eq!(world.motion(id), foreign_motion);
+    let vacant = lease.vacant().unwrap();
+    assert!(vacant.door_panels().iter().all(Option::is_none));
+    let duck = lease.step_with_soil(None, &mut arena, None, false, None);
+    let after = arena.as_ref().unwrap().motion(id).unwrap();
     assert!(
         (after.linear_velocity.y + duck.movement.gravity * DT).abs() < 0.001,
         "one shared step"
     );
-    duck.release_arena();
-    assert_eq!(duck.physics_counts(), (0, 0));
+    duck.release_arena(&mut arena);
+    assert!(
+        arena.is_none(),
+        "the finished visit's arena goes with the lease"
+    );
 }
 
 #[test]
@@ -428,9 +443,9 @@ fn rigid_flap_scene_fixtures_cover_pause_floor_motion_and_target_viewports() {
                         0.0,
                     );
                     floor.opening = 0.9;
-                    DuckEvent::new_responsive_player(layout, 42, 1, 1, direction, floor, None)
+                    TestDuck::new_responsive_player(layout, 42, 1, 1, direction, floor)
                 } else {
-                    let mut duck = DuckEvent::new_player(layout, 42, None, 1, 1);
+                    let mut duck = TestDuck::new_player(layout, 42, None, 1, 1);
                     duck.direction = direction;
                     duck
                 };
@@ -438,7 +453,7 @@ fn rigid_flap_scene_fixtures_cover_pause_floor_motion_and_target_viewports() {
                     duck.step();
                 }
                 land_on_flap(&mut duck);
-                state.duck_visit = Some(Box::new(duck));
+                duck.admit(&mut state);
                 let step = |state: &mut crate::ClockState, count| {
                     for _ in 0..count {
                         ClockScenario::step(state, &[], Duration::from_nanos(16_666_667));

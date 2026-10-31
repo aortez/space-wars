@@ -4,8 +4,8 @@ use engine_common::{
 };
 use ledge::LedgeCommand;
 
-fn entrance(aspect: f32, direction: f32) -> DuckEvent {
-    let mut duck = DuckEvent::new_player(Layout::new(aspect), 42, None, 1, 1);
+fn entrance(aspect: f32, direction: f32) -> TestDuck {
+    let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
     duck.direction = direction;
     for _ in 0..OPENING_TICKS {
         duck.step();
@@ -13,7 +13,7 @@ fn entrance(aspect: f32, direction: f32) -> DuckEvent {
     duck
 }
 
-fn catch_flap(duck: &mut DuckEvent) {
+fn catch_flap(duck: &mut TestDuck) {
     let mut trace = Vec::new();
     for _ in 0..65 {
         let jump = duck.jumps == 0 && duck.grounded();
@@ -46,7 +46,7 @@ fn catch_flap(duck: &mut DuckEvent) {
     );
 }
 
-fn climb(duck: &mut DuckEvent) {
+fn climb(duck: &mut TestDuck) {
     duck.set_ledge_command(LedgeCommand::Climb);
     for _ in 0..150 {
         duck.step();
@@ -124,7 +124,7 @@ fn deliberate_drop_keeps_momentum_and_requires_rearming() {
     assert!(!duck.diagnostics().ledge.rearm_required);
 }
 
-fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) -> PhysicsId {
+fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) -> PhysicsId {
     let id = PhysicsId::new(9000);
     assert!(duck.world.as_mut().unwrap().insert_body(
         BodyId::new(id, BodyRole::PRIMARY),
@@ -343,13 +343,17 @@ fn takeover_and_retirement_preserve_then_release_attachment_ownership() {
             0,
             "old source's uncommitted drop is discarded"
         );
-        let mut arena = VisitArena::claim(&mut duck);
-        arena.retain(Box::new(duck));
-        let vacant = arena.vacant().unwrap();
+        let TestDuck {
+            mut duck,
+            world: mut arena,
+        } = duck;
+        let mut lease = VisitArena::claim(&mut duck, &mut arena);
+        lease.retain(Box::new(duck), arena.as_mut().unwrap());
+        let vacant = DuckView::new(lease.vacant().unwrap(), arena.as_ref());
         assert!(vacant.ledge_anchor().is_none());
         assert_eq!(vacant.ledge_state(), Default::default());
         assert!(vacant.door_panels().iter().all(Option::is_none));
-        let rejoined = arena.rejoin(9, 1).unwrap();
+        let rejoined = lease.rejoin(&mut arena, 9, 1).unwrap();
         assert_eq!(rejoined.ledge_state(), Default::default());
     }
 }
@@ -435,7 +439,7 @@ fn nearby_foreign_solids_are_not_grab_targets_and_blocked_hangs_are_refused() {
 #[test]
 fn a_course_near_miss_uses_the_same_shared_climb_in_both_directions() {
     for direction in [-1.0, 1.0] {
-        let mut duck = DuckEvent::new_player(Layout::new(5.0 / 3.0), 42, None, 1, 1);
+        let mut duck = TestDuck::new_player(Layout::new(5.0 / 3.0), 42, None, 1, 1);
         duck.direction = direction;
         let r = duck.radius;
         duck.course.as_mut().unwrap().surfaces = vec![
@@ -503,7 +507,7 @@ fn ledge_scene_fixtures_replay_and_render_with_pause_and_teardown() {
                     )],
                     Duration::ZERO,
                 );
-                state.duck_visit = Some(Box::new(entrance(aspect, direction)));
+                entrance(aspect, direction).admit(&mut state);
                 let step = |state: &mut crate::ClockState| {
                     ClockScenario::step(state, &[], Duration::from_nanos(16_666_667))
                 };
@@ -529,8 +533,9 @@ fn ledge_scene_fixtures_replay_and_render_with_pause_and_teardown() {
                 };
                 for _ in 0..65 {
                     let duck = state.duck_visit.as_mut().unwrap();
-                    let jump = duck.jumps == 0 && duck.grounded();
-                    let steer = if duck.position().unwrap().x > duck.radius * 5.6 {
+                    let world = state.arena.as_ref().unwrap();
+                    let jump = duck.jumps == 0 && duck.grounded(world);
+                    let steer = if duck.position(world).unwrap().x > duck.radius * 5.6 {
                         (-direction * 300.0) as i16
                     } else {
                         0
@@ -600,7 +605,7 @@ fn ledge_scene_fixtures_replay_and_render_with_pause_and_teardown() {
                 let mut duck = entrance(aspect, direction);
                 catch_flap(&mut duck);
                 duck.set_ledge_command(LedgeCommand::Release);
-                state.duck_visit = Some(Box::new(duck));
+                duck.admit(&mut state);
                 for _ in 0..3 {
                     step(&mut state);
                 }

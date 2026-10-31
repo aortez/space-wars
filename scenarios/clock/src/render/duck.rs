@@ -1,13 +1,13 @@
 use super::*;
-use crate::events::duck::DuckEvent;
+use crate::events::duck::{DuckEvent, DuckView};
 
-pub(super) fn render(frame: &mut RenderFrame, event: &DuckEvent, debug: bool) {
+pub(super) fn render(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool) {
     render_with_course(frame, event, debug, true);
 }
 
 pub(super) fn render_with_course(
     frame: &mut RenderFrame,
-    event: &DuckEvent,
+    event: &DuckView<'_>,
     debug: bool,
     draw_course: bool,
 ) {
@@ -65,7 +65,7 @@ pub(super) fn render_arena(frame: &mut RenderFrame, event: &DuckEvent, opacity: 
     }
 }
 
-fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity: f32) {
+fn render_actor(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool, opacity: f32) {
     let radius = event.radius;
     let orange = RenderColor::rgb(1.0, 0.48, 0.08);
     if debug && let Some(arc) = event.debug_arc() {

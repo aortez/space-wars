@@ -50,11 +50,11 @@ fn taken_over_visit_composes_with_events_and_cleans_up_across_dismissal_and_resi
         ClockEventKind::Meltdown,
     ] {
         let mut state = automatic(4.0 / 3.0, 42, 70);
-        let world = state.duck_scene().unwrap().arena_world() as *const _;
+        let worlds = engine_rapier::world::physics_activity().worlds;
         toggle(&mut state, 1);
         assert_eq!(
-            state.duck_visit.as_ref().unwrap().arena_world() as *const _,
-            world,
+            engine_rapier::world::physics_activity().worlds,
+            worlds,
             "the world is moved, not reconstructed"
         );
         let player = state.player_duck_state().unwrap();

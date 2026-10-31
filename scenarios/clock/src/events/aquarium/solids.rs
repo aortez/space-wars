@@ -1,10 +1,10 @@
 //! Aquarium-owned native digit cells, matching the fish/render geometry.
-//! One fixed body lives in the leased duck world and is removed on release.
+//! One fixed body lives in the leased arena and is removed on release.
 use super::{DuckEvent, Obstacle};
 use engine_core::Vec2;
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, CollisionGroups,
-    PhysicsId,
+    PhysicsId, PhysicsWorld,
 };
 
 const DIGITS: PhysicsId = PhysicsId::new(crate::arena::ids::canonical::AQUARIUM_DIGITS.start);
@@ -15,16 +15,16 @@ pub(super) struct DigitSolids {
 }
 
 impl DigitSolids {
-    pub fn new(cells: &[Obstacle], duck: &mut DuckEvent) -> Self {
+    pub fn new(cells: &[Obstacle], duck: &DuckEvent, world: &mut PhysicsWorld) -> Self {
         let mut result = Self {
             cells: Vec::new(),
             corrections: 0,
         };
-        result.synchronize(cells, duck);
+        result.synchronize(cells, duck, world);
         result
     }
 
-    pub fn synchronize(&mut self, cells: &[Obstacle], duck: &mut DuckEvent) {
+    pub fn synchronize(&mut self, cells: &[Obstacle], duck: &DuckEvent, world: &mut PhysicsWorld) {
         if self.cells == cells {
             return;
         }
@@ -47,7 +47,6 @@ impl DigitSolids {
                 c
             })
             .collect();
-        let world = duck.arena_world_mut();
         let body = BodyId::new(DIGITS, BodyRole::PRIMARY);
         if world.contains_entity(DIGITS) {
             assert!(world.replace_colliders(body, ColliderRole::PRIMARY, &colliders));
@@ -63,11 +62,11 @@ impl DigitSolids {
         }
         self.cells.clear();
         self.cells.extend_from_slice(cells);
-        self.clear_new_geometry(duck);
+        self.clear_new_geometry(duck, world);
     }
 
-    fn clear_new_geometry(&mut self, duck: &mut DuckEvent) {
-        let Some((position, radius)) = duck.clearance_hull() else {
+    fn clear_new_geometry(&mut self, duck: &DuckEvent, world: &mut PhysicsWorld) {
+        let Some((position, radius)) = duck.clearance_hull(world) else {
             return;
         };
         let radius = radius as f32;
@@ -108,7 +107,6 @@ impl DigitSolids {
                 .length_squared()
                 .total_cmp(&(*b - position).length_squared())
         });
-        let world = duck.arena_world_mut();
         if let Some(next) = candidates.into_iter().find(|p| {
             world.current_cuboid_is_clear(
                 *p,
@@ -124,7 +122,7 @@ impl DigitSolids {
         }
     }
 
-    pub fn remove(&self, duck: &mut DuckEvent) {
-        assert!(duck.arena_world_mut().remove_entity(DIGITS));
+    pub fn remove(&self, world: &mut PhysicsWorld) {
+        assert!(world.remove_entity(DIGITS));
     }
 }

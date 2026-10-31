@@ -349,40 +349,44 @@ impl ActiveEvent {
         }
     }
 
-    /// The rigid world this event is simulating, if it has one. A shared-arena
-    /// event answers through the visit that owns the world, so the caller must
-    /// pass the live player when there is one. Rain's floats are its own world
-    /// and are canonical only while no visit has taken over.
-    pub fn canonical_world<'a>(
-        &'a self,
-        duck: Option<&'a duck::DuckEvent>,
-    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
+    /// Whether the rigid world the run is simulating is this event's own
+    /// rather than the arena. A shared-arena event's never is, and Rain's
+    /// floats stop being canonical as soon as a visit exists, before its first
+    /// step has built the arena.
+    pub fn simulates_apart(&self, visit: bool) -> bool {
         match self {
-            Self::Falling(event) => event.canonical_world(duck),
-            Self::Explosion(event) => event.canonical_world(duck),
-            Self::Meltdown(event) => event.canonical_world(duck),
-            Self::Aquarium(event) => event.canonical_world(duck),
-            Self::Rain(event) if duck.is_none() => event.canonical_world(),
-            _ => duck.and_then(duck::DuckEvent::existing_world),
+            Self::Falling(_) | Self::Explosion(_) | Self::Meltdown(_) | Self::Aquarium(_) => {
+                !self.shares_visit_arena()
+            }
+            Self::Rain(_) => !visit,
+            _ => false,
         }
     }
 
-    pub fn canonical_world_mut<'a>(
-        &'a mut self,
-        duck: Option<&'a mut duck::DuckEvent>,
-    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
+    /// The rigid world this event owns apart from the arena, if it has one.
+    pub fn own_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
         match self {
-            Self::Falling(event) => event.canonical_world_mut(duck),
-            Self::Explosion(event) => event.canonical_world_mut(duck),
-            Self::Meltdown(event) => event.canonical_world_mut(duck),
-            Self::Aquarium(event) => event.canonical_world_mut(duck),
-            Self::Rain(event) if duck.is_none() => event.canonical_world_mut(),
-            _ => duck.and_then(duck::DuckEvent::existing_world_mut),
+            Self::Falling(event) => event.own_world(),
+            Self::Explosion(event) => event.own_world(),
+            Self::Meltdown(event) => event.own_world(),
+            Self::Rain(event) => event.own_world(),
+            _ => None,
+        }
+    }
+
+    pub fn own_world_mut(&mut self) -> Option<&mut engine_rapier::world::PhysicsWorld> {
+        match self {
+            Self::Falling(event) => event.own_world_mut(),
+            Self::Explosion(event) => event.own_world_mut(),
+            Self::Meltdown(event) => event.own_world_mut(),
+            Self::Rain(event) => event.own_world_mut(),
+            _ => None,
         }
     }
 
     pub fn join_arena(
         &mut self,
+        arena: &mut Option<engine_rapier::world::PhysicsWorld>,
         layout: Layout,
         seed: u64,
         session: u64,
@@ -390,50 +394,63 @@ impl ActiveEvent {
     ) -> Option<Box<duck::DuckEvent>> {
         match self {
             Self::Aquarium(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
+                .rejoin(arena, session, seat)
+                .or_else(|| event.join_player(arena, seed, session, seat)),
             Self::Falling(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
+                .rejoin(arena, session, seat)
+                .or_else(|| event.join_player(arena, seed, session, seat)),
             Self::Explosion(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
+                .rejoin(arena, session, seat)
+                .or_else(|| event.join_player(arena, seed, session, seat)),
             Self::Meltdown(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(layout, seed, session, seat)),
+                .rejoin(arena, session, seat)
+                .or_else(|| event.join_player(arena, layout, seed, session, seat)),
             _ => None,
         }
     }
 
-    pub fn retain_arena(&mut self, duck: Box<duck::DuckEvent>) {
+    pub fn retain_arena(
+        &mut self,
+        duck: Box<duck::DuckEvent>,
+        world: &mut engine_rapier::world::PhysicsWorld,
+    ) {
         match self {
-            Self::Aquarium(event) => event.retain_arena(duck),
-            Self::Falling(event) => event.retain_arena(duck),
-            Self::Explosion(event) => event.retain_arena(duck),
-            Self::Meltdown(event) => event.retain_arena(duck),
+            Self::Aquarium(event) => event.retain_arena(duck, world),
+            Self::Falling(event) => event.retain_arena(duck, world),
+            Self::Explosion(event) => event.retain_arena(duck, world),
+            Self::Meltdown(event) => event.retain_arena(duck, world),
             _ => unreachable!("only leased mechanics arenas outlive the visit"),
         }
     }
 
-    pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>) {
+    pub fn release_arena(
+        &mut self,
+        player: Option<&mut duck::DuckEvent>,
+        arena: &mut Option<engine_rapier::world::PhysicsWorld>,
+    ) {
         match self {
-            Self::Aquarium(event) => event.release(player),
-            Self::Falling(event) => event.release(player),
-            Self::Explosion(event) => event.release(player),
-            Self::Meltdown(event) => event.release(player),
+            Self::Aquarium(event) => event.release(player, arena),
+            Self::Falling(event) => event.release(player, arena),
+            Self::Explosion(event) => event.release(player, arena),
+            Self::Meltdown(event) => event.release(player, arena),
             _ => (),
         }
     }
 
-    /// Returns true when the event has finished.
-    pub fn step(&mut self, context: EventContext<'_>) -> bool {
+    /// Returns true when the event has finished. A shared-arena event steps
+    /// `arena` here only once its character has left.
+    pub fn step(
+        &mut self,
+        context: EventContext<'_>,
+        arena: &mut Option<engine_rapier::world::PhysicsWorld>,
+    ) -> bool {
         match self {
             Self::Grass(event) => event.step(),
-            Self::Aquarium(event) => event.step(context, None),
-            Self::Falling(event) => event.step(context, None),
-            Self::Explosion(event) => event.step(context, None),
+            Self::Aquarium(event) => event.step(context, None, arena),
+            Self::Falling(event) => event.step(context, None, arena),
+            Self::Explosion(event) => event.step(context, None, arena),
             Self::ColorCycle(event) => event.step(),
-            Self::Meltdown(event) => event.step(context),
+            Self::Meltdown(event) => event.step_with_visit(context, None, arena),
             Self::Marquee(event) => event.step(),
             Self::DigitSlide(event) => event.step(),
             Self::CellSwap(event) => event.step(),
@@ -488,10 +505,11 @@ impl ActiveEvent {
         }
     }
 
+    /// Only an event's own world. The arena is counted once by `ClockState`,
+    /// whoever is using it, and a standalone Aquarium has no rigid world.
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
-            Self::Grass(_) => (0, 0),
-            Self::Aquarium(event) => event.physics_counts(),
+            Self::Grass(_) | Self::Aquarium(_) => (0, 0),
             Self::Falling(event) => event.physics_counts(),
             Self::Explosion(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),

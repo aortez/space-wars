@@ -1,11 +1,11 @@
 use super::*;
 use crate::floor::responsive::FloorShape;
 
-fn player(opening: f64, direction: f32) -> DuckEvent {
+fn player(opening: f64, direction: f32) -> TestDuck {
     let layout = Layout::new(4.0 / 3.0);
     let mut floor = ResponsiveFloor::new(FloorShape::clock(layout), 0.0);
     floor.opening = opening;
-    DuckEvent::new_responsive_player(layout, 42, 1, 1, direction, floor, None)
+    TestDuck::new_responsive_player(layout, 42, 1, 1, direction, floor)
 }
 
 #[test]

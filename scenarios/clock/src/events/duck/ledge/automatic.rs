@@ -26,7 +26,7 @@ impl DuckEvent {
         }
     }
 
-    pub(in crate::events::duck) fn decide_automatic_ledge(&mut self) {
+    pub(in crate::events::duck) fn decide_automatic_ledge(&mut self, world: &PhysicsWorld) {
         if self.player.is_some() {
             return;
         }
@@ -59,7 +59,7 @@ impl DuckEvent {
         }
         if self.ledge_attached()
             || self.ledge.detour.active()
-            || self.grounded()
+            || self.grounded(world)
             || !self.controller.ledge_ready()
             || self.water_report.submerged_fraction >= 0.15
             || self.ledge.stats.cooldown_ticks > 0
@@ -69,7 +69,7 @@ impl DuckEvent {
         {
             return;
         }
-        let Some(edge) = self.automatic_ledge_target() else {
+        let Some(edge) = self.automatic_ledge_target(world) else {
             return;
         };
         self.start_automatic_ledge(edge);
@@ -90,8 +90,7 @@ impl DuckEvent {
         auto.climbs_before = self.ledge.stats.climbs;
     }
 
-    fn automatic_ledge_target(&mut self) -> Option<Edge> {
-        let world = self.world.as_ref().unwrap();
+    fn automatic_ledge_target(&mut self, world: &PhysicsWorld) -> Option<Edge> {
         let motion = world.motion(DUCK_BODY).unwrap();
         let caps = self.controller.capabilities().unwrap();
         let gravity = 8.0 * caps.height / caps.flight.powi(2);
@@ -112,13 +111,13 @@ impl DuckEvent {
         };
         let mut best = None;
         let mut distance = f32::INFINITY;
-        for edge in edges(self).into_iter().flatten() {
+        for edge in edges(self, world).into_iter().flatten() {
             self.ledge.automatic.stats.candidates_checked += 1;
             if edge.outward * self.direction * direction >= 0.0
                 || target.is_some_and(|index| {
                     edge.body.entity != crate::arena::ids::canonical::course_surface(index)
                 })
-                || !edge.in_reach(self)
+                || !edge.in_reach(self, world)
             {
                 continue;
             }

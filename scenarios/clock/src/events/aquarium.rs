@@ -18,7 +18,7 @@ use crate::{
 };
 use engine_common::ClockAquariumState;
 use engine_core::Vec2;
-use engine_rapier::world::PhysicsId;
+use engine_rapier::world::{PhysicsId, PhysicsWorld};
 use engine_water::{WaterConfig, WaterWorld};
 use fish::School;
 pub(crate) use fish::{Fish, Species};
@@ -63,22 +63,6 @@ pub(crate) fn fish_radius(layout: Layout) -> f32 {
 }
 
 impl AquariumEvent {
-    pub fn canonical_world<'a>(
-        &'a self,
-        player: Option<&'a DuckEvent>,
-    ) -> Option<&'a engine_rapier::world::PhysicsWorld> {
-        self.shared
-            .as_ref()
-            .map(|s| s.arena.get(player).arena_world())
-    }
-    pub fn canonical_world_mut<'a>(
-        &'a mut self,
-        player: Option<&'a mut DuckEvent>,
-    ) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
-        self.shared
-            .as_mut()
-            .map(|s| s.arena.get_mut(player).arena_world_mut())
-    }
     pub fn new(context: EventContext<'_>, seed: u64) -> Self {
         Self::build(context, seed, false)
     }
@@ -130,7 +114,12 @@ impl AquariumEvent {
         result
     }
 
-    pub fn with_visit(context: EventContext<'_>, seed: u64, duck: &mut DuckEvent) -> Self {
+    pub fn with_visit(
+        context: EventContext<'_>,
+        seed: u64,
+        duck: &mut DuckEvent,
+        world: &mut Option<PhysicsWorld>,
+    ) -> Self {
         let mut result = Self::build(context, seed, true);
         if let Some(floor) = duck.responsive_floor() {
             for side in 0..2 {
@@ -157,13 +146,12 @@ impl AquariumEvent {
                 });
             }
         }
-        let arena = VisitArena::claim(duck);
-        result
-            .floor
-            .insert_panels_at(duck.arena_world_mut(), LINER_ID);
+        let arena = VisitArena::claim(duck, world);
+        let world = world.as_mut().expect("claimed arena");
+        result.floor.insert_panels_at(world, LINER_ID);
         result.shared = Some(SharedAquarium {
             arena,
-            digits: solids::DigitSolids::new(&result.glyphs, duck),
+            digits: solids::DigitSolids::new(&result.glyphs, duck, world),
             extra_liner: true,
         });
         result
@@ -215,6 +203,7 @@ impl AquariumEvent {
         &mut self,
         mut context: EventContext<'_>,
         mut player: Option<&mut DuckEvent>,
+        world: &mut Option<PhysicsWorld>,
     ) -> bool {
         let soil = context.soil.take();
         self.synchronize(context.display, context.segments);
@@ -240,10 +229,10 @@ impl AquariumEvent {
             self.school.finish_departure();
         }
         if self.tick >= DRAIN_AT {
-            let hull = self
-                .shared
-                .as_ref()
-                .and_then(|s| s.arena.get(player.as_deref()).clearance_hull());
+            let hull = self.shared.as_ref().and_then(|s| {
+                let world = world.as_ref().expect("leased arena");
+                s.arena.get(player.as_deref()).clearance_hull(world)
+            });
             self.floor.step_retained(
                 &mut self.water,
                 f64::from(DT),
@@ -264,15 +253,16 @@ impl AquariumEvent {
         }
         if let Some(mut shared) = self.shared.take() {
             let duck = shared.arena.get_mut(player.as_deref_mut());
-            shared.digits.synchronize(&self.glyphs, duck);
+            let leased = world.as_mut().expect("leased arena");
+            shared.digits.synchronize(&self.glyphs, duck, leased);
             if shared.extra_liner {
-                self.floor.move_panels_at(duck.arena_world_mut(), LINER_ID);
+                self.floor.move_panels_at(leased, LINER_ID);
             } else {
                 duck.sync_responsive_floor(&self.floor);
             }
             let duck = shared
                 .arena
-                .step_with_soil(player, Some(&self.water), true, soil);
+                .step_with_soil(player, world, Some(&self.water), true, soil);
             self.native_steps += 1;
             if self.tick < DRAIN_AT {
                 self.school.step(
@@ -280,7 +270,7 @@ impl AquariumEvent {
                     self.layout,
                     self.port,
                     self.tick,
-                    duck.clearance_hull(),
+                    world.as_ref().and_then(|world| duck.clearance_hull(world)),
                 );
             }
             self.shared = Some(shared);
@@ -321,22 +311,29 @@ impl AquariumEvent {
     pub fn vacant_arena(&self) -> Option<&DuckEvent> {
         self.shared.as_ref()?.arena.vacant()
     }
-    pub fn physics_counts(&self) -> (usize, usize) {
-        self.vacant_arena()
-            .map_or((0, 0), DuckEvent::physics_counts)
-    }
-    pub fn retain_arena(&mut self, duck: Box<DuckEvent>) {
+    pub fn retain_arena(&mut self, duck: Box<DuckEvent>, world: &mut PhysicsWorld) {
         self.shared
             .as_mut()
             .expect("aquarium arena")
             .arena
-            .retain(duck);
+            .retain(duck, world);
     }
-    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
-        self.shared.as_mut()?.arena.rejoin(session, seat)
+    pub fn rejoin(
+        &mut self,
+        world: &mut Option<PhysicsWorld>,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
+        self.shared.as_mut()?.arena.rejoin(world, session, seat)
     }
 
-    pub fn join_player(&mut self, seed: u64, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
+    pub fn join_player(
+        &mut self,
+        arena: &mut Option<PhysicsWorld>,
+        seed: u64,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
         if self.shared.is_some() {
             return None;
         }
@@ -347,26 +344,27 @@ impl AquariumEvent {
             seat,
             1.0,
             self.floor.clone(),
-            None,
         ));
+        let lease = VisitArena::claim(&mut duck, arena);
+        let world = arena.as_mut().expect("claimed arena");
         self.shared = Some(SharedAquarium {
-            arena: VisitArena::claim(&mut duck),
-            digits: solids::DigitSolids::new(&self.glyphs, &mut duck),
+            arena: lease,
+            digits: solids::DigitSolids::new(&self.glyphs, &duck, world),
             extra_liner: false,
         });
         Some(duck)
     }
 
-    pub fn release(&mut self, player: Option<&mut DuckEvent>) {
+    pub fn release(&mut self, player: Option<&mut DuckEvent>, world: &mut Option<PhysicsWorld>) {
         if let Some(shared) = &mut self.shared {
-            let duck = shared.arena.get_mut(player);
-            shared.digits.remove(duck);
+            let leased = world.as_mut().expect("leased arena");
+            shared.digits.remove(leased);
             if shared.extra_liner {
                 for id in LINER_ID..LINER_ID + 2 {
-                    duck.arena_world_mut().remove_entity(PhysicsId::new(id));
+                    leased.remove_entity(PhysicsId::new(id));
                 }
             }
-            duck.release_arena();
+            shared.arena.get_mut(player).release_arena(world);
         }
     }
 

@@ -3,8 +3,8 @@ use engine_common::{
     ClockDuckFlapHold, ClockDuckLedgePhase as Phase, ClockDuckLedgeReason as Reason,
 };
 
-fn ready(aspect: f32, direction: f32) -> DuckEvent {
-    let mut duck = DuckEvent::new_player(Layout::new(aspect), 42, None, 1, 1);
+fn ready(aspect: f32, direction: f32) -> TestDuck {
+    let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
     duck.direction = direction;
     for _ in 0..OPENING_TICKS {
         duck.step();
@@ -13,7 +13,7 @@ fn ready(aspect: f32, direction: f32) -> DuckEvent {
 }
 
 // Ordinary spawn and controls only: no actuator commands or body placement.
-fn jump_to_flap(duck: &mut DuckEvent, hold: bool) {
+fn jump_to_flap(duck: &mut TestDuck, hold: bool) {
     for _ in 0..65 {
         let steer = if duck.position().unwrap().x > duck.radius * 5.6 {
             (-duck.direction * 300.0) as i16

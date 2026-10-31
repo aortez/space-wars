@@ -198,8 +198,8 @@ mod tests {
             assert_eq!(soil.terrain.cell(CellCoord::new(200, 0)), Some(Cell::VOID));
             // This is the actual event world; binding did not require a new arena.
             let world = match s.active_event.as_ref().unwrap() {
-                crate::ActiveEvent::Falling(e) => e.soil_world().unwrap(),
-                crate::ActiveEvent::Explosion(e) => e.soil_world().unwrap(),
+                crate::ActiveEvent::Falling(e) => e.own_world().unwrap(),
+                crate::ActiveEvent::Explosion(e) => e.own_world().unwrap(),
                 _ => unreachable!(),
             };
             assert!(world.contains_entity(PhysicsId::new(SOIL_PHYSICS_ID)));
@@ -222,8 +222,8 @@ mod tests {
             ));
             ClockScenario::step(&mut s, &[], Duration::from_nanos(16_666_667));
             let world = match s.active_event.as_ref().unwrap() {
-                crate::ActiveEvent::Falling(e) => e.soil_world().unwrap(),
-                crate::ActiveEvent::Explosion(e) => e.soil_world().unwrap(),
+                crate::ActiveEvent::Falling(e) => e.own_world().unwrap(),
+                crate::ActiveEvent::Explosion(e) => e.own_world().unwrap(),
                 _ => unreachable!(),
             };
             // The layer is inset, so a ray from above meets the supporting bank
