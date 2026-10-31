@@ -798,3 +798,313 @@ fn surface_contract_a_previewed_slide_carries_the_face_out_and_brings_a_new_one_
     );
     assert_eq!(markers.attached().count(), 0);
 }
+
+/// Where the canonical world has a body this step.
+pub(crate) fn body_pose(
+    state: &ClockState,
+    body: engine_rapier::world::BodyId,
+) -> Option<(Vec2, f32)> {
+    let world = state
+        .active_event
+        .as_ref()
+        .and_then(|event| event.own_world())
+        .or_else(|| state.arena.world())?;
+    let motion = world.motion(body)?;
+    Some((motion.position, motion.angle))
+}
+
+/// Ink by drawn cell: surfaces at one pose share one cell.
+fn shared_ink(surfaces: &[DigitSurface]) -> Vec<(SurfaceId, f32)> {
+    surfaces
+        .iter()
+        .map(|surface| (surface.id, shared_opacity(surfaces, surface)))
+        .collect()
+}
+
+/// Checks a rigid piece stays where its body puts it: the same offset in the
+/// body's frame on every step, and the body's own turn.
+fn assert_on_bodies(
+    state: &ClockState,
+    surfaces: &[DigitSurface],
+    offsets: &mut Vec<(SurfaceId, Vec2)>,
+    context: &str,
+) {
+    for surface in surfaces.iter().filter(|s| s.source == SurfaceSource::Rigid) {
+        let body = surface.body.expect("a rigid surface names its body");
+        let (position, angle) = body_pose(state, body).expect("its body is in the world");
+        assert!((surface.angle - angle).abs() < 1e-5, "{context}");
+        let offset = (surface.origin - position).rotate_radians(-angle);
+        match offsets.iter().find(|(id, _)| *id == surface.id) {
+            Some((_, first)) => assert!(
+                (offset - *first).length() < 1e-3,
+                "{context}: surface {} moves with its body",
+                surface.id.get()
+            ),
+            None => offsets.push((surface.id, offset)),
+        }
+    }
+}
+
+#[test]
+fn surface_contract_falling_pieces_ride_their_bodies_and_come_home_as_themselves() {
+    for font in FONTS {
+        for aspect in ASPECTS {
+            let context = format!("{font:?} at {aspect}");
+            let at = reading(12, 34, 10);
+            let mut state = clock(aspect, font, ClockTimeFormat::TwentyFourHour, at);
+            let local = Vec2::new(0.25, 0.1);
+            let mut markers = Markers::attach(&state, |_| Some(local));
+            let before = state.digit_surfaces();
+            sync(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Falling)],
+            );
+            markers.follow(&state);
+            let mut offsets = Vec::new();
+            let mut fastest = 0.0_f32;
+            let mut ticks = 0;
+            while state.event_kind() == Some(ClockEventKind::Falling) {
+                let surfaces = if ticks % 3 == 0 {
+                    assert_face_agreement(&state, &format!("{context}, tick {ticks}"))
+                } else {
+                    state.digit_surfaces()
+                };
+                assert_on_bodies(&state, &surfaces, &mut offsets, &context);
+                assert_eq!(
+                    surfaces.len(),
+                    before.len(),
+                    "{context}: nothing added or lost"
+                );
+                tick(&mut state, &[]);
+                markers.follow(&state);
+                ticks += 1;
+                let moved = markers.attached().map(|m| m.moved).fold(0.0, f32::max);
+                if state.event_phase() == Some(EventPhase::Reforming) && state.phase_tick() == 0 {
+                    assert!(
+                        moved <= fastest + 0.01 * Layout::new(aspect).pitch,
+                        "{context}: the hand-off to the return path does not jump"
+                    );
+                }
+                fastest = moved;
+            }
+            assert_eq!(
+                ticks as u64,
+                FALLING_TICKS + REFORMING_TICKS,
+                "{context}: the event ran to its end"
+            );
+            let after = assert_face_agreement(&state, &context);
+            assert_eq!(
+                ids(&after),
+                ids(&before),
+                "{context}: the same pieces came home"
+            );
+            assert_eq!(markers.attached().count(), before.len(), "{context}");
+            let layout = Layout::new(aspect);
+            for marker in markers.attached() {
+                let surface = after.iter().find(|s| s.id == marker.surface).unwrap();
+                let home = layout.slot_cell_center(usize::from(surface.slot), surface.cell);
+                assert!((marker.world - (home + local * layout.pitch)).length() < 1e-3);
+            }
+            for surface in &before {
+                let handoffs: Vec<_> = markers
+                    .handoffs
+                    .iter()
+                    .filter(|(id, _, _)| *id == surface.id)
+                    .map(|(_, from, to)| (*from, *to))
+                    .collect();
+                assert_eq!(
+                    handoffs,
+                    [
+                        (SurfaceSource::Anchored, SurfaceSource::Rigid),
+                        (SurfaceSource::Rigid, SurfaceSource::Return),
+                        (SurfaceSource::Return, SurfaceSource::Anchored),
+                    ],
+                    "{context}: each hand-off is recorded exactly once"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn surface_contract_a_reading_changed_on_the_way_home_keeps_survivors_and_fades_the_rest() {
+    for font in FONTS {
+        let context = format!("{font:?}");
+        let mut state = clock(
+            800.0 / 480.0,
+            font,
+            ClockTimeFormat::TwentyFourHour,
+            reading(12, 34, 10),
+        );
+        let mut markers = Markers::attach(&state, |_| Some(Vec2::new(-0.2, 0.3)));
+        let fallen = state.digit_surfaces();
+        sync(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Falling)],
+        );
+        markers.follow(&state);
+        while state.event_phase() != Some(EventPhase::Reforming) || state.phase_tick() < 30 {
+            tick(&mut state, &[]);
+            markers.follow(&state);
+        }
+        let mut ink = shared_ink(&state.digit_surfaces());
+        let mut steps = 0;
+        let mut actions = vec![ClockAction::set_reading(reading(12, 35, 0))];
+        while state.event_kind() == Some(ClockEventKind::Falling) {
+            tick(&mut state, &std::mem::take(&mut actions));
+            let surfaces = markers.follow(&state);
+            assert_face_agreement(&state, &format!("{context}, step {steps}"));
+            let next = shared_ink(&surfaces);
+            for (id, value) in &next {
+                let previous = ink.iter().find(|(old, _)| old == id).map(|(_, v)| *v);
+                let co_located = surfaces
+                    .iter()
+                    .find(|s| s.id == *id)
+                    .map(|surface| {
+                        surfaces
+                            .iter()
+                            .filter(|other| (other.origin - surface.origin).length() < 1e-3)
+                            .filter_map(|other| ink.iter().find(|(old, _)| *old == other.id))
+                            .map(|(_, v)| *v)
+                            .fold(0.0, f32::max)
+                    })
+                    .unwrap_or(0.0);
+                let before = previous.unwrap_or(co_located);
+                assert!(
+                    (value - before).abs() <= 0.06,
+                    "{context}, step {steps}: a cell's ink moves from {before} to {value}"
+                );
+            }
+            // One piece per cell is ever coming home.
+            let homing: Vec<_> = surfaces.iter().filter(|s| !s.departing).collect();
+            for (index, surface) in homing.iter().enumerate() {
+                assert!(
+                    homing[index + 1..]
+                        .iter()
+                        .all(|other| (other.origin - surface.origin).length() > 1e-3),
+                    "{context}: no cell is duplicated"
+                );
+            }
+            ink = next;
+            steps += 1;
+        }
+        let after = assert_face_agreement(&state, &context);
+        let fresh = clock(
+            800.0 / 480.0,
+            font,
+            ClockTimeFormat::TwentyFourHour,
+            reading(12, 35, 0),
+        );
+        assert_eq!(after.len(), fresh.digit_surfaces().len(), "{context}");
+        let glyphs = |minute: u8| crate::fonts::glyph(font, Some(minute));
+        let survives =
+            |surface: &DigitSurface| surface.slot != 3 || glyphs(5).contains(surface.cell);
+        for surface in &fallen {
+            let kept = after.iter().any(|s| s.id == surface.id);
+            assert_eq!(
+                kept,
+                survives(surface),
+                "{context}: slot {} {:?}",
+                surface.slot,
+                surface.cell
+            );
+            let marker = markers
+                .markers
+                .iter()
+                .find(|m| m.surface == surface.id)
+                .unwrap();
+            assert_eq!(
+                marker.lost,
+                (!kept).then_some(Loss::Retired(Retirement::Replaced)),
+                "{context}"
+            );
+        }
+        let arrived: Vec<_> = after
+            .iter()
+            .filter(|s| fallen.iter().all(|old| old.id != s.id))
+            .collect();
+        assert_eq!(
+            arrived.len(),
+            (glyphs(5).0 & !glyphs(4).0).count_ones() as usize,
+            "{context}: exactly the cells the new reading adds are new"
+        );
+        assert!(arrived.iter().all(|s| s.slot == 3
+            && glyphs(5).contains(s.cell)
+            && !markers.markers.iter().any(|m| m.surface == s.id)));
+    }
+}
+
+#[test]
+fn surface_contract_falling_cut_short_or_paused_neither_snaps_nor_moves_its_pieces() {
+    let mut state = clock(
+        800.0 / 480.0,
+        ClockFont::Classic,
+        ClockTimeFormat::TwentyFourHour,
+        reading(7, 15, 0),
+    );
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Falling)],
+    );
+    for _ in 0..50 {
+        tick(&mut state, &[]);
+        markers.follow(&state);
+    }
+    let falling = state.digit_surfaces();
+    for _ in 0..3 {
+        sync(&mut state, &[]);
+        assert_eq!(state.digit_surfaces(), falling, "a pause moves nothing");
+    }
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::ColorCycle)],
+    );
+    let after = markers.follow(&state);
+    assert_face_agreement(&state, "after the fall was cut short");
+    assert!(
+        after
+            .iter()
+            .all(|s| falling.iter().all(|old| old.id != s.id))
+    );
+    assert!(
+        markers
+            .markers
+            .iter()
+            .all(|m| m.lost == Some(Loss::Retired(Retirement::Interrupted))),
+        "a piece in mid-air is not carried home with what it holds"
+    );
+}
+
+#[test]
+fn surface_contract_falling_with_a_player_follows_the_arenas_bodies() {
+    let mut state = clock(
+        800.0 / 480.0,
+        ClockFont::Sans,
+        ClockTimeFormat::TwentyFourHour,
+        reading(16, 20, 0),
+    );
+    sync(&mut state, &[ClockAction::toggle_player_duck(1)]);
+    assert!(state.player_duck_session().is_some());
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::new(0.3, 0.3)));
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Falling)],
+    );
+    assert!(
+        state
+            .active_event
+            .as_ref()
+            .is_some_and(|event| event.shares_visit_arena())
+    );
+    let mut offsets = Vec::new();
+    while state.event_kind() == Some(ClockEventKind::Falling) {
+        let surfaces = state.digit_surfaces();
+        assert_on_bodies(&state, &surfaces, &mut offsets, "shared");
+        tick(&mut state, &[]);
+        markers.follow(&state);
+    }
+    assert!(!offsets.is_empty());
+    assert_face_agreement(&state, "after a shared fall");
+    assert_eq!(markers.attached().count(), markers.markers.len());
+}

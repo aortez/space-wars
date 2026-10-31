@@ -1517,7 +1517,7 @@ impl ClockState {
             {
                 duck.terrain.sync_responsive_floor(floor);
             }
-            event.release_surfaces(&mut self.surfaces);
+            event.release_surfaces(&self.segments, &mut self.surfaces);
             for slot in 0..DIGIT_SLOT_COUNT {
                 if self.surfaces.held(slot) {
                     self.surfaces.release(slot);

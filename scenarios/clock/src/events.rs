@@ -561,18 +561,27 @@ impl ActiveEvent {
     pub fn surfaces(
         &self,
         layout: Layout,
+        segments: &[SegmentState],
         out: &mut Vec<(crate::SurfaceId, crate::digit_surfaces::SurfacePose)>,
     ) {
-        if let Self::DigitSlide(event) = self {
-            event.surfaces(layout, out);
+        match self {
+            Self::DigitSlide(event) => event.surfaces(layout, out),
+            Self::Falling(event) => event.surfaces(layout, segments, out),
+            _ => (),
         }
     }
 
     /// Gives the slots this event holds back to the face, with whatever it
     /// settled there, and retires the rest of its pieces.
-    pub fn release_surfaces(&mut self, surfaces: &mut crate::digit_surfaces::SurfaceLedger) {
-        if let Self::DigitSlide(event) = self {
-            event.release_surfaces(surfaces);
+    pub fn release_surfaces(
+        &mut self,
+        segments: &[SegmentState],
+        surfaces: &mut crate::digit_surfaces::SurfaceLedger,
+    ) {
+        match self {
+            Self::DigitSlide(event) => event.release_surfaces(surfaces),
+            Self::Falling(event) => event.release_surfaces(segments, surfaces),
+            _ => (),
         }
     }
 
@@ -580,11 +589,9 @@ impl ActiveEvent {
     pub fn vacates_face(&self) -> bool {
         match self {
             Self::Meltdown(event) => !event.lab,
-            Self::Falling(_)
-            | Self::Explosion(_)
-            | Self::CellSwap(_)
-            | Self::SlotMachine(_)
-            | Self::Marquee(_) => true,
+            Self::Explosion(_) | Self::CellSwap(_) | Self::SlotMachine(_) | Self::Marquee(_) => {
+                true
+            }
             _ => false,
         }
     }

@@ -653,7 +653,17 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
     let palette = state.palette();
     let t = (state.phase_tick() as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
     let progress = t * t * (3.0 - 2.0 * t);
-    for segment in state.segments() {
+    // Falling's return draws the ink its pieces carry, which a reading that
+    // changes on the way can fade from one glyph to another without a jump.
+    let falling = match &state.active_event {
+        Some(crate::events::ActiveEvent::Falling(event))
+            if event.phase() == crate::events::EventPhase::Reforming =>
+        {
+            Some(event)
+        }
+        _ => None,
+    };
+    for (index, segment) in state.segments().iter().enumerate() {
         let anchor = layout.segment_center(segment.id);
         for cell in segment.guides() {
             let brightness = if segment.representation == SegmentRepresentation::Anchored
@@ -673,23 +683,36 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
                 palette,
             );
         }
-        let (position, angle, was_lit, mix) = match segment.representation {
+        if let Some(event) = falling {
+            if let Some((position, angle)) = event.segment_pose(segment, layout) {
+                for (cell, ink) in event.return_ink(index) {
+                    render_square(
+                        frame,
+                        position
+                            + (layout.cell_center(segment.id, cell) - anchor).rotate_radians(angle),
+                        layout.pitch,
+                        angle,
+                        ink,
+                        palette,
+                    );
+                }
+            }
+            continue;
+        }
+        let (position, angle, previous, mix) = match segment.representation {
             SegmentRepresentation::Anchored | SegmentRepresentation::Disintegrated => continue,
-            SegmentRepresentation::Rigid { position, angle } => (position, angle, true, 0.0),
+            SegmentRepresentation::Rigid { position, angle } => {
+                (position, angle, segment.shape, 0.0)
+            }
             SegmentRepresentation::Reforming(reformation) => (
                 reformation.position() + (anchor - reformation.position()) * progress,
                 reformation.angle() * (1.0 - progress),
-                reformation.was_lit(),
+                reformation.from(),
                 progress,
             ),
         };
-        let previous = if matches!(segment.representation, SegmentRepresentation::Reforming(_)) {
-            segment.previous_shape
-        } else {
-            segment.shape
-        };
         for cell in crate::fonts::CellMask(previous.0 | segment.shape.0).cells() {
-            let brightness = f32::from(was_lit && previous.contains(cell)) * (1.0 - mix)
+            let brightness = f32::from(previous.contains(cell)) * (1.0 - mix)
                 + f32::from(segment.lit && segment.shape.contains(cell)) * mix;
             if brightness > 0.0 {
                 let center = layout.cell_center(segment.id, cell);

@@ -458,10 +458,6 @@ impl SurfaceLedger {
         }
     }
 
-    pub fn is_live(&self, id: SurfaceId) -> bool {
-        self.live.contains_key(&id)
-    }
-
     fn record(&mut self, id: SurfaceId, kind: SurfaceChangeKind) {
         self.accounting.sequence += 1;
         if self.changes.len() == MAX_RETAINED_CHANGES {
@@ -660,7 +656,7 @@ pub(crate) fn publish(state: &ClockState) -> Vec<DigitSurface> {
         }
     }
     if let Some(event) = &state.active_event {
-        event.surfaces(layout, &mut poses);
+        event.surfaces(layout, &state.segments, &mut poses);
     }
     poses
         .into_iter()
