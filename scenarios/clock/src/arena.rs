@@ -29,6 +29,7 @@ use engine_rapier::world::{PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsW
 
 use crate::{
     events::{ActiveEvent, duck::ArenaTerrain},
+    grass::SoilHabitat,
     layout::Layout,
 };
 
@@ -222,6 +223,22 @@ impl ClockArena {
         } else {
             self.claim(owner)
         }
+    }
+
+    /// The soil's body takes the soil's current shape. The run calls this once
+    /// per tick that moves time, just before the arena's step, where contacts
+    /// with the soil form. Soil with material claims the arena the first time,
+    /// and keeps it for the rest of the run.
+    pub fn bind_soil(&mut self, soil: &mut SoilHabitat, layout: Layout) {
+        if soil.accounting().added == 0 {
+            return;
+        }
+        let world = if self.holds(Owner::Soil) {
+            self.world.as_mut().expect("the soil's claim keeps a world")
+        } else {
+            self.claim_resident(Owner::Soil, layout)
+        };
+        soil.bind_current(world);
     }
 
     /// `owner` brings `world`, which becomes the arena's world as it is, with

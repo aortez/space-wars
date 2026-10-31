@@ -27,7 +27,7 @@ pub(crate) fn prepare_vacant(
 ) {
     let (terrain, world) = arena.vacant_with_world().expect("one shared arena owner");
     terrain.advance_panels(Some(world), panels, None);
-    terrain.synchronize_soil(Some(world), soil);
+    terrain.synchronize_soil(soil);
     world.clear_forces();
 }
 

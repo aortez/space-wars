@@ -203,14 +203,16 @@ mod tests {
                     _ => unreachable!(),
                 }
             }
-            // Soil keeps the run's arena as a resident. The standalone event's
-            // own world never holds it.
+            let center = soil.terrain.cell_center(CellCoord::new(0, 2)) + soil.origin;
+            let floor_line = soil.floor_y;
+            // Soil keeps the run's arena as a resident, which it enters with
+            // the first tick that moves time. The standalone event's own world
+            // never holds it.
+            assert!(s.arena.world().is_none(), "a paused clock binds nothing");
+            ClockScenario::step(&mut s, &[], Duration::from_nanos(16_666_667));
             let world = s.arena.held(crate::arena::Owner::Soil).unwrap();
             assert!(world.contains_entity(PhysicsId::new(SOIL_PHYSICS_ID)));
             assert!(!event_world(&s).contains_entity(PhysicsId::new(SOIL_PHYSICS_ID)));
-            let center = soil.terrain.cell_center(CellCoord::new(0, 2)) + soil.origin;
-            let floor_line = soil.floor_y;
-            // Current-shape checks include unstepped insertions at paused control boundaries.
             assert!(!world.current_cuboid_is_clear(
                 center,
                 0.0,
@@ -219,13 +221,12 @@ mod tests {
                 &[]
             ));
             assert!(world.current_cuboid_is_clear(
-                Vec2::new(0.0, soil.floor_y + 3.0),
+                Vec2::new(0.0, floor_line + 3.0),
                 0.0,
                 Vec2::new(0.5, 0.5),
                 CollisionGroups::ALL,
                 &[]
             ));
-            ClockScenario::step(&mut s, &[], Duration::from_nanos(16_666_667));
             // The layer is inset, so a ray from above meets the event's
             // supporting bank no lower than the soil. The retained cell's own
             // collision geometry is still canonical: the soil body reaches the

@@ -819,25 +819,16 @@ impl ClockState {
         }
     }
 
-    /// Soil with material is a resident of the arena, which it keeps for the
-    /// rest of the run. A standalone event's own world never holds it.
+    /// Where the soil rests now, and which plants it still holds. Its body
+    /// follows at the next tick that moves time, in `ClockArena::bind_soil`,
+    /// so a paused clock never changes the arena for it.
     fn synchronize_soil(&mut self) {
         if self.soil.is_none() {
             return;
         }
-        let layout = Layout::new(self.aspect_ratio());
         let (surfaces, kind) = self.soil_surfaces();
         let soil = self.soil.as_mut().unwrap();
         soil.set_surfaces(surfaces, kind);
-        // Soil has a body once any material has been added.
-        if soil.accounting().added > 0 {
-            let world = if self.arena.holds(arena::Owner::Soil) {
-                self.arena.world_mut().unwrap()
-            } else {
-                self.arena.claim_resident(arena::Owner::Soil, layout)
-            };
-            soil.bind_current(world);
-        }
         self.plants.revalidate(soil);
     }
 
@@ -1368,6 +1359,11 @@ impl ClockState {
                 None
             }
         };
+        // Soil with material is a resident of the arena, which it keeps for
+        // the rest of the run, and its body takes its shape only here.
+        if let Some(soil) = &mut self.soil {
+            self.arena.bind_soil(soil, layout);
+        }
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
         let visit_finished = match (&mut self.duck_visit, visit) {

@@ -3,9 +3,14 @@
 //! event sharing it, a lease left vacant and a resident such as soil all move
 //! in that one step, and a tick that does not move time steps nothing.
 //! Standalone events still step worlds of their own beside it, so the count
-//! that proves this is the arena's, not the thread's.
+//! that proves this is the arena's, not the thread's. Soil takes its shape in
+//! the arena just before that step, so a paused clock never changes the arena
+//! for it.
 
-use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState, arena::Owner};
+use crate::{
+    ArenaAccounting, ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState,
+    arena::Owner,
+};
 use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
 use engine_rapier::world::physics_activity;
 use std::time::Duration;
@@ -64,11 +69,11 @@ fn advance(state: &mut ClockState, ticks: usize, arena: u64, worlds: u64, what: 
 fn arena_contract_steps_once_per_tick_whoever_holds_it() {
     let mut state = plain();
     state.admit_soil();
+    advance(&mut state, 30, 1, 1, "soil alone");
     assert!(
         state.arena.holds(Owner::Soil),
         "delivered soil keeps the arena"
     );
-    advance(&mut state, 30, 1, 1, "soil alone");
 
     // A standalone Falling steps its own world beside the arena until a
     // player joins, when the arena adopts that world.
@@ -115,6 +120,23 @@ fn arena_contract_steps_once_per_tick_whoever_holds_it() {
     }
     assert_eq!(state.arena_accounting(), before.0);
     assert_eq!(physics_activity().steps, before.1);
+}
+
+#[test]
+fn arena_contract_soil_delivered_while_paused_enters_with_the_next_moving_tick() {
+    let mut state = plain();
+    state.admit_soil();
+    for _ in 0..30 {
+        ClockScenario::step(&mut state, &[], Duration::ZERO);
+    }
+    assert_eq!(
+        state.arena_accounting(),
+        ArenaAccounting::default(),
+        "a paused clock changes nothing in the arena"
+    );
+    advance(&mut state, 1, 1, 1, "the first tick that moves time");
+    let arena = state.arena_accounting();
+    assert_eq!((arena.claims, arena.residents, arena.bodies), (1, 1, 1));
 }
 
 #[test]

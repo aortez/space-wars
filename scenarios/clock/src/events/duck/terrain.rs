@@ -211,20 +211,13 @@ impl ArenaTerrain {
         }
     }
 
-    pub(super) fn synchronize_soil(
-        &mut self,
-        world: Option<&mut PhysicsWorld>,
-        soil: Option<&mut crate::grass::SoilHabitat>,
-    ) {
+    pub(super) fn synchronize_soil(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) {
         self.soil_supports.clear();
         self.soil_course = None;
         self.soil_navigation_owners.clear();
         if let Some(soil) = soil {
             let state = self.support_state();
             soil.set_surfaces(crate::grass::surfaces::terrain(self), state);
-            if let Some(world) = world {
-                soil.bind_current(world);
-            }
             // Only retained material on the actual fixed course inherits course
             // identity. Drain/panel contacts and foreign bodies keep their own rules.
             if state == crate::grass::SoilSupportState::Course {

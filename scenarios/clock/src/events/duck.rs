@@ -754,8 +754,7 @@ impl DuckEvent {
         if self.phase != EventPhase::Resetting {
             self.ensure_world(arena);
         }
-        self.terrain
-            .synchronize_soil(arena.held_mut(Owner::Visit), soil);
+        self.terrain.synchronize_soil(soil);
         if self.phase == EventPhase::Opening {
             self.advance_flaps(arena.held_mut(Owner::Visit).unwrap());
             return VisitStep::Opening;

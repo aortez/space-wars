@@ -140,10 +140,13 @@ impl TestDuck {
         self.duck.dismiss_player(self.arena.world_mut());
     }
 
-    pub fn synchronize_soil(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) {
-        self.duck
-            .terrain
-            .synchronize_soil(self.arena.world_mut(), soil);
+    /// The soil rests on the terrain, and its body takes that shape in the
+    /// arena, as before `ClockState` steps it.
+    pub fn synchronize_soil(&mut self, mut soil: Option<&mut crate::grass::SoilHabitat>) {
+        self.duck.terrain.synchronize_soil(soil.as_deref_mut());
+        if let (Some(soil), Some(world)) = (soil, self.arena.world_mut()) {
+            soil.bind_current(world);
+        }
     }
 
     /// Leave the arena while an event's lease keeps it, checking that the

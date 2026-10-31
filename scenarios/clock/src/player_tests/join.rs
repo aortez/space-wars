@@ -13,7 +13,9 @@ fn standalone_beside(kind: ClockEventKind, elapsed: usize, aspect: f32, soil: bo
     settings.time_format = engine_common::ClockTimeFormat::TwelveHour;
     state.configure(settings);
     if soil {
+        // Delivered soil enters the arena with the next tick that moves time.
         state.admit_soil();
+        tick(&mut state, &[]);
     }
     state.preview_event(kind);
     ticks(&mut state, elapsed);
