@@ -108,7 +108,7 @@ impl ClockState {
     /// The live visit, read together with the arena it moves in.
     pub(crate) fn duck_scene(&self) -> Option<DuckView<'_>> {
         let duck = self.duck_visit.as_deref()?;
-        Some(DuckView::new(duck, self.arena.world()))
+        Some(DuckView::new(duck, self.arena.held(Owner::Visit)))
     }
 
     pub(super) fn toggle_player_duck(&mut self, player: u8) {
@@ -121,9 +121,9 @@ impl ClockState {
                 .player_session()
                 .is_some_and(|(_, owner)| owner == player)
             {
-                duck.dismiss_player(self.arena.world_mut());
+                duck.dismiss_player(self.arena.held_mut(Owner::Visit));
             }
-            if duck.take_control(self.arena.world_mut(), session, player) {
+            if duck.take_control(self.arena.held_mut(Owner::Visit), session, player) {
                 self.player_duck_sequence = session;
                 self.schedule.retire(ClockEventKind::Duck);
                 self.announce_player(player);
@@ -157,7 +157,10 @@ impl ClockState {
         }
         self.player_duck_sequence += 1;
         self.floor.acquire_visit();
-        assert!(self.arena.idle(), "a new visit builds its own arena");
+        assert!(
+            !self.arena.holds(Owner::Visit),
+            "one visit holds the arena at a time"
+        );
         let duck = if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event
             && let Some(floor) = rain.responsive_floor().cloned()
         {

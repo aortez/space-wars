@@ -72,12 +72,6 @@ impl ExplosionEvent {
             Mechanics::Shared => None,
         }
     }
-    pub fn own_world_mut(&mut self) -> Option<&mut PhysicsWorld> {
-        match &mut self.mechanics {
-            Mechanics::Standalone(world) => world.as_deref_mut(),
-            Mechanics::Shared => None,
-        }
-    }
 
     pub fn new(context: EventContext<'_>, seed: u64) -> Self {
         let drain = context.floor.drain().expect("Explosion owns the drain");

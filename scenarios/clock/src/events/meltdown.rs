@@ -55,9 +55,6 @@ impl MeltdownEvent {
     pub fn own_world(&self) -> Option<&PhysicsWorld> {
         self.floats.as_ref().map(|f| &f.world)
     }
-    pub fn own_world_mut(&mut self) -> Option<&mut PhysicsWorld> {
-        self.floats.as_mut().map(|f| &mut f.world)
-    }
     pub fn new(context: EventContext<'_>, seed: u64, mode: ClockWaterLab) -> Self {
         Self::in_arena(context, seed, mode, None)
     }

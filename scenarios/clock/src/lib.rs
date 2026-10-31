@@ -816,18 +816,23 @@ impl ClockState {
         }
     }
 
+    /// Soil with material is a resident of the arena, which it keeps for the
+    /// rest of the run. A standalone event's own world never holds it.
     fn synchronize_soil(&mut self) {
         if self.soil.is_none() {
             return;
         }
+        let layout = Layout::new(self.aspect_ratio());
         let (surfaces, kind) = self.soil_surfaces();
         let soil = self.soil.as_mut().unwrap();
         soil.set_surfaces(surfaces, kind);
-        if let Some(world) = arena::canonical_world_mut(
-            &mut self.active_event,
-            self.duck_visit.is_some(),
-            &mut self.arena,
-        ) {
+        // Soil has a body once any material has been added.
+        if soil.accounting().added > 0 {
+            let world = if self.arena.holds(arena::Owner::Soil) {
+                self.arena.world_mut().unwrap()
+            } else {
+                self.arena.claim_resident(arena::Owner::Soil, layout)
+            };
             soil.bind_current(world);
         }
         self.plants.revalidate(soil);
@@ -1181,7 +1186,10 @@ impl ClockState {
                 events::duck::DuckEvent::new_course(layout, seed, self.config.duck_course_pattern);
             duck.select_jump_profile(self.config.duck_jump_profile);
             duck.select_direct_flap_landing(self.config.duck_direct_flap_landing);
-            assert!(self.arena.idle(), "a new visit builds its own arena");
+            assert!(
+                !self.arena.holds(arena::Owner::Visit),
+                "one visit holds the arena at a time"
+            );
             self.floor.acquire_visit();
             self.duck_visit = Some(Box::new(duck));
             // Admission uses the ordinary cadence/cooldown, but does not hold
@@ -1278,8 +1286,8 @@ impl ClockState {
             }
             drop(event);
             debug_assert!(
-                self.duck_visit.is_some() || self.arena.idle(),
-                "an arena the event kept after its visit left went with its lease"
+                self.duck_visit.is_some() || !self.arena.holds(arena::Owner::Visit),
+                "the terrain the event kept after its visit left went with its lease"
             );
             self.schedule.finish(kind);
             self.floor.release(kind);

@@ -1,8 +1,10 @@
 //! The run's shared rigid arena, and who owns which physical identity in it.
 //!
-//! A visit and the events that lease its arena all simulate in one world,
-//! [`ClockArena`]. The world exists exactly while an [`Owner`] holds it: the
-//! first owner to need it builds it, and the last to let go takes it away.
+//! A visit, the events that lease its arena and the run's residents all
+//! simulate in one world, [`ClockArena`]. The world exists exactly while an
+//! [`Owner`] holds it: the first owner to need it builds it, and the last to
+//! let go takes it away. An owner that lets go while others stay takes its own
+//! bodies with it, by the identities [`ids::canonical`] gives it.
 //!
 //! Every body, collider and joint in a Clock world is addressed by a
 //! scenario-chosen `PhysicsId`. Those numbers used to be reserved in comments
@@ -19,10 +21,16 @@
 //! contract, and its ranges must be disjoint apart from the two aliases it
 //! declares.
 
-use engine_common::ClockEventKind;
-use engine_rapier::world::PhysicsWorld;
+use std::ops::Range;
 
-use crate::events::{ActiveEvent, duck::ArenaTerrain};
+use engine_common::ClockEventKind;
+use engine_core::Vec2;
+use engine_rapier::world::{PhysicsId, PhysicsWorld, PhysicsWorldConfig};
+
+use crate::{
+    events::{ActiveEvent, duck::ArenaTerrain},
+    layout::Layout,
+};
 
 /// Who holds the shared arena.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,10 +41,59 @@ pub(crate) enum Owner {
     Visit,
     /// An event leasing the visit's arena.
     Event(ClockEventKind),
+    /// Retained soil. It is a resident: once it has material it keeps the
+    /// arena for the rest of the run, with or without a visit.
+    Soil,
 }
 
-/// The world a visit and its leasing events simulate in, the owners that keep
-/// it, and the terrain a visit's character left while an event held it.
+impl Owner {
+    /// The identities this owner's bodies take. While other owners keep the
+    /// world, letting go removes whatever is left in them.
+    fn ranges(self) -> &'static [Range<u64>] {
+        use ids::canonical::*;
+        match self {
+            // A drain-joined visit holds both of Falling's walls.
+            Self::Visit => &[
+                DUCK,
+                HURDLES,
+                COURSE,
+                RESPONSIVE_PANELS,
+                FALLING_WALLS,
+                FLAPS,
+            ],
+            Self::Event(ClockEventKind::Aquarium) => &[AQUARIUM_LINER, AQUARIUM_DIGITS],
+            Self::Event(ClockEventKind::Explosion) => &[EXPLOSION_CELLS],
+            Self::Event(ClockEventKind::Falling) => &[FALLING_SEGMENTS, FALLING_LETTERS],
+            Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
+            Self::Event(_) => &[],
+            Self::Soil => &[SOIL],
+        }
+    }
+}
+
+/// The settings every arena world is built with. Whoever builds it chooses its
+/// gravity and the solver's length scale, and a visit that enters it later
+/// sets its own.
+pub(crate) fn world_config(gravity: Vec2, length_unit: f32) -> PhysicsWorldConfig {
+    PhysicsWorldConfig {
+        gravity,
+        length_unit,
+        max_ccd_substeps: 2,
+        collect_events: false,
+        ..PhysicsWorldConfig::default()
+    }
+}
+
+/// The settings of a world no visit has entered: a standalone Falling or
+/// Explosion world, or the one residents build. Clock's own mechanics are
+/// tuned to this gravity.
+pub(crate) fn mechanics_config(layout: Layout) -> PhysicsWorldConfig {
+    world_config(Vec2::new(0.0, -400.0), layout.pitch)
+}
+
+/// The world a visit, the events leasing its arena and the run's residents
+/// simulate in, the owners that keep it, and the terrain a visit's character
+/// left while an event held the arena.
 #[derive(Default)]
 pub(crate) struct ClockArena {
     world: Option<PhysicsWorld>,
@@ -53,6 +110,20 @@ impl ClockArena {
 
     pub fn world_mut(&mut self) -> Option<&mut PhysicsWorld> {
         self.world.as_mut()
+    }
+
+    /// The world, while `owner` holds it. A visit that has let go no longer
+    /// reaches the world residents keep after it.
+    pub fn held(&self, owner: Owner) -> Option<&PhysicsWorld> {
+        self.world.as_ref().filter(|_| self.holds(owner))
+    }
+
+    pub fn held_mut(&mut self, owner: Owner) -> Option<&mut PhysicsWorld> {
+        if self.holds(owner) {
+            self.world.as_mut()
+        } else {
+            None
+        }
     }
 
     /// Nobody holds the arena, so there is no world.
@@ -72,22 +143,67 @@ impl ClockArena {
     }
 
     /// `owner` joins the world another owner built.
-    pub fn claim(&mut self, owner: Owner) {
-        assert!(self.world.is_some(), "a claim joins an existing world");
+    pub fn claim(&mut self, owner: Owner) -> &mut PhysicsWorld {
         assert!(!self.holds(owner), "{owner:?} already holds the arena");
+        let world = self
+            .world
+            .as_mut()
+            .expect("a claim joins an existing world");
         self.owners.push(owner);
+        world
+    }
+
+    /// A resident claims the arena, building the world if nobody holds one.
+    pub fn claim_resident(&mut self, owner: Owner, layout: Layout) -> &mut PhysicsWorld {
+        if self.idle() {
+            self.build(owner, PhysicsWorld::new(mechanics_config(layout)))
+        } else {
+            self.claim(owner)
+        }
+    }
+
+    /// `owner` brings `world`, which becomes the arena's world as it is, with
+    /// its contacts and settings. Residents that already keep a world move
+    /// their bodies into it, which leaves only their contact history behind.
+    pub fn adopt(&mut self, owner: Owner, mut world: PhysicsWorld) -> &mut PhysicsWorld {
+        assert!(!self.holds(owner), "{owner:?} already holds the arena");
+        if let Some(mut kept) = self.world.take() {
+            let entities: Vec<_> = kept.entity_ids().collect();
+            for entity in entities {
+                assert!(
+                    kept.transfer_entity(entity, &mut world),
+                    "{entity:?} moves into the adopted world"
+                );
+            }
+        }
+        self.owners.push(owner);
+        self.world.insert(world)
     }
 
     /// `owner` lets go, if it held the arena. The last owner to leave takes the
-    /// world with it.
+    /// world with it. Otherwise only `owner`'s own bodies go.
     pub fn release(&mut self, owner: Owner) {
-        self.owners.retain(|held| *held != owner);
+        if owner == Owner::Visit {
+            assert!(
+                self.vacant.is_none(),
+                "vacant terrain keeps its visit's claim"
+            );
+        }
+        let held = self.holds(owner);
+        self.owners.retain(|other| *other != owner);
         if self.owners.is_empty() {
             assert!(
                 self.vacant.is_none(),
                 "vacant terrain keeps its visit's claim"
             );
             self.world = None;
+        } else if held {
+            let world = self.world.as_mut().expect("a held arena");
+            for range in owner.ranges() {
+                for id in range.clone() {
+                    world.remove_entity(PhysicsId::new(id));
+                }
+            }
         }
     }
 
@@ -97,15 +213,15 @@ impl ClockArena {
     }
 }
 
-/// The one rigid world this run is simulating, whoever is using it.
+/// The rigid world the run's events are simulating, whoever is using it.
 ///
-/// That is the run's arena whenever a visit holds it or an event leases it,
-/// and otherwise a standalone event's own world: Falling's or Explosion's
-/// before a player joins, Meltdown's water lab, or Rain's floats. `visit` says
-/// whether a visit exists, because Rain's floats stop being canonical as soon
-/// as one does, before its first step has built the arena. The parts are taken
-/// as separate borrows rather than through `ClockState` because callers hold
-/// the soil and the plants at the same time.
+/// That is the run's arena unless an event simulates in its own world:
+/// Falling's or Explosion's before a player joins, Meltdown's water lab, or
+/// Rain's floats. Residents such as soil stay in the arena meanwhile, apart
+/// from that event. `visit` says whether a visit exists, because Rain's floats
+/// stop being canonical as soon as one does, before its first step has built
+/// the arena. The parts are taken as separate borrows rather than through
+/// `ClockState` because callers hold the soil and the plants at the same time.
 pub(crate) fn canonical_world<'a>(
     event: &'a Option<ActiveEvent>,
     visit: bool,
@@ -114,17 +230,6 @@ pub(crate) fn canonical_world<'a>(
     match event {
         Some(event) if event.simulates_apart(visit) => event.own_world(),
         _ => arena.world(),
-    }
-}
-
-pub(crate) fn canonical_world_mut<'a>(
-    event: &'a mut Option<ActiveEvent>,
-    visit: bool,
-    arena: &'a mut ClockArena,
-) -> Option<&'a mut PhysicsWorld> {
-    match event {
-        Some(event) if event.simulates_apart(visit) => event.own_world_mut(),
-        _ => arena.world_mut(),
     }
 }
 

@@ -366,16 +366,6 @@ impl ActiveEvent {
         }
     }
 
-    pub fn own_world_mut(&mut self) -> Option<&mut engine_rapier::world::PhysicsWorld> {
-        match self {
-            Self::Falling(event) => event.own_world_mut(),
-            Self::Explosion(event) => event.own_world_mut(),
-            Self::Meltdown(event) => event.own_world_mut(),
-            Self::Rain(event) => event.own_world_mut(),
-            _ => None,
-        }
-    }
-
     /// A player's character in this event's arena: a new one on the terrain a
     /// departed character left, or the first, which the event's own world
     /// becomes the arena for.
@@ -426,7 +416,7 @@ impl ActiveEvent {
             Self::CellSwap(event) => event.step(),
             Self::Rain(event) => {
                 event.synchronize(context.display, context.segments);
-                event.step_with_soil(context.soil)
+                event.step()
             }
         }
     }

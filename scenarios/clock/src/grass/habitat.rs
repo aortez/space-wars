@@ -196,13 +196,18 @@ mod tests {
             assert_eq!(opened.retained as u64 + opened.exported, opened.added);
             assert_eq!(soil.terrain.cell(CellCoord::new(0, 0)), Some(side));
             assert_eq!(soil.terrain.cell(CellCoord::new(200, 0)), Some(Cell::VOID));
-            // This is the actual event world; binding did not require a new arena.
-            let world = match s.active_event.as_ref().unwrap() {
-                crate::ActiveEvent::Falling(e) => e.own_world().unwrap(),
-                crate::ActiveEvent::Explosion(e) => e.own_world().unwrap(),
-                _ => unreachable!(),
-            };
+            fn event_world(s: &crate::ClockState) -> &PhysicsWorld {
+                match s.active_event.as_ref().unwrap() {
+                    crate::ActiveEvent::Falling(e) => e.own_world().unwrap(),
+                    crate::ActiveEvent::Explosion(e) => e.own_world().unwrap(),
+                    _ => unreachable!(),
+                }
+            }
+            // Soil keeps the run's arena as a resident. The standalone event's
+            // own world never holds it.
+            let world = s.arena.held(crate::arena::Owner::Soil).unwrap();
             assert!(world.contains_entity(PhysicsId::new(SOIL_PHYSICS_ID)));
+            assert!(!event_world(&s).contains_entity(PhysicsId::new(SOIL_PHYSICS_ID)));
             let center = soil.terrain.cell_center(CellCoord::new(0, 2)) + soil.origin;
             let floor_line = soil.floor_y;
             // Current-shape checks include unstepped insertions at paused control boundaries.
@@ -221,15 +226,11 @@ mod tests {
                 &[]
             ));
             ClockScenario::step(&mut s, &[], Duration::from_nanos(16_666_667));
-            let world = match s.active_event.as_ref().unwrap() {
-                crate::ActiveEvent::Falling(e) => e.own_world().unwrap(),
-                crate::ActiveEvent::Explosion(e) => e.own_world().unwrap(),
-                _ => unreachable!(),
-            };
-            // The layer is inset, so a ray from above meets the supporting bank
-            // first. The retained cell's own collision geometry is still
-            // canonical: the soil body reaches the floor line and covers it.
-            let hit = world
+            // The layer is inset, so a ray from above meets the event's
+            // supporting bank no lower than the soil. The retained cell's own
+            // collision geometry is still canonical: the soil body reaches the
+            // floor line and covers it.
+            let hit = event_world(&s)
                 .cast_ray(
                     center + Vec2::new(0.0, 5.0),
                     Vec2::new(0.0, -1.0),
@@ -239,7 +240,10 @@ mod tests {
                     },
                 )
                 .unwrap();
-            assert_ne!(hit.collider.entity, PhysicsId::new(SOIL_PHYSICS_ID));
+            assert!(
+                crate::arena::ids::canonical::DRAIN_BANKS.contains(&hit.collider.entity.value())
+            );
+            let world = s.arena.held(crate::arena::Owner::Soil).unwrap();
             let (low, high) = world
                 .body_solid_bounds(BodyId::new(
                     PhysicsId::new(SOIL_PHYSICS_ID),
@@ -249,6 +253,7 @@ mod tests {
             assert!(low.x <= center.x && center.x <= high.x);
             assert!(low.y <= center.y && center.y <= high.y);
             assert!((high.y - floor_line).abs() < 1e-3);
+            assert!(high.y <= hit.point.y + 1e-3);
             s.finish_event();
             ClockScenario::step(&mut s, &[], Duration::ZERO);
             capture(&format!("{kind:?}-floor-restored"), &s);

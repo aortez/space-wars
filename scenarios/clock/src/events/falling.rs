@@ -38,12 +38,6 @@ impl FallingEvent {
             Mechanics::Shared { .. } => None,
         }
     }
-    pub fn own_world_mut(&mut self) -> Option<&mut PhysicsWorld> {
-        match &mut self.mechanics {
-            Mechanics::Standalone(world) => world.as_mut().map(|w| w.world_mut()),
-            Mechanics::Shared { .. } => None,
-        }
-    }
 
     pub fn new(context: EventContext<'_>, seed: u64) -> Self {
         let letters = Self::letters_for(&context);

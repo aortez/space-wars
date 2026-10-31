@@ -335,19 +335,13 @@ impl DuckEvent {
     }
 
     /// The visit builds the arena on its first step, or when an event claims
-    /// it first, and holds it as its owner.
+    /// it first, and holds it as its owner. When residents already keep the
+    /// world, the visit brings its terrain into theirs instead.
     fn ensure_world<'w>(&self, arena: &'w mut ClockArena) -> &'w mut PhysicsWorld {
-        if arena.world().is_some() {
-            debug_assert!(arena.holds(Owner::Visit), "a visit builds its own arena");
+        if arena.holds(Owner::Visit) {
             return arena.world_mut().unwrap();
         }
-        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
-            gravity: Vec2::new(0.0, -self.movement.gravity),
-            length_unit: self.radius,
-            max_ccd_substeps: 2,
-            collect_events: false,
-            ..PhysicsWorldConfig::default()
-        });
+        let gravity = Vec2::new(0.0, -self.movement.gravity);
         debug_assert_eq!(
             (self.width, self.radius, self.direction),
             (
@@ -368,9 +362,19 @@ impl DuckEvent {
         } else {
             count + usize::from(self.player.is_some())
         };
+        let world = if arena.idle() {
+            let config = crate::arena::world_config(gravity, self.radius);
+            arena.build(Owner::Visit, PhysicsWorld::new(config))
+        } else {
+            // The visit's movement is calibrated for its own gravity, and the
+            // solver's tolerances for its character's size, as in a world it
+            // built.
+            let world = arena.claim(Owner::Visit);
+            assert!(world.set_gravity(gravity) && world.set_length_unit(self.radius));
+            world
+        };
         world.reserve(count + 2, count + 2, 0);
-        self.terrain.insert_bodies(&mut world);
-        let world = arena.build(Owner::Visit, world);
+        self.terrain.insert_bodies(world);
         if self.player.is_some() {
             self.insert_entrance_wall(world);
         }
@@ -719,17 +723,20 @@ impl DuckEvent {
         panels_advanced: bool,
         soil: Option<&mut crate::grass::SoilHabitat>,
     ) -> bool {
-        let hull = arena.world().and_then(|world| self.clearance_hull(world));
+        let hull = arena
+            .held(Owner::Visit)
+            .and_then(|world| self.clearance_hull(world));
         self.terrain
-            .advance_panels(arena.world_mut(), panels_advanced, hull);
+            .advance_panels(arena.held_mut(Owner::Visit), panels_advanced, hull);
         self.tick += 1;
         self.phase_tick += 1;
         if self.phase != EventPhase::Resetting {
             self.ensure_world(arena);
         }
-        self.terrain.synchronize_soil(arena.world_mut(), soil);
+        self.terrain
+            .synchronize_soil(arena.held_mut(Owner::Visit), soil);
         if self.phase == EventPhase::Opening {
-            let world = arena.world_mut().unwrap();
+            let world = arena.held_mut(Owner::Visit).unwrap();
             self.advance_flaps(world);
             world.step(DT);
             // Preserve the actor's first simulation tick. Shared scenery steps
@@ -746,12 +753,14 @@ impl DuckEvent {
         if self.phase == EventPhase::Running && self.exit_visible() {
             self.enter(EventPhase::Exiting);
         }
-        if let Some(world) = arena.world_mut() {
+        if let Some(world) = arena.held_mut(Owner::Visit) {
             self.advance_flaps(world);
         }
         match self.phase {
             EventPhase::Running | EventPhase::Exiting => {
-                let world = arena.world_mut().expect("a running visit's arena");
+                let world = arena
+                    .held_mut(Owner::Visit)
+                    .expect("a running visit's arena");
                 self.run(world, water);
                 let position = self.position(world).expect("running duck");
                 if !position.x.is_finite()
@@ -782,7 +791,7 @@ impl DuckEvent {
                 }
             }
             _ => {
-                if let Some(world) = arena.world_mut() {
+                if let Some(world) = arena.held_mut(Owner::Visit) {
                     world.step(DT);
                 }
             }

@@ -152,7 +152,11 @@ mod tests {
                 assert_eq!(a.reading().unwrap().minute(), 8);
                 if (tick + 1) % case.cycle_ticks() == 0 {
                     assert_eq!(a.lifecycle(), scenario_clock::EventLifecycle::Idle);
-                    assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+                    // Delivered soil is a resident, which keeps its one body in
+                    // the arena for the rest of the run.
+                    let soil = usize::from(a.grass_state().soil_added > 0);
+                    assert_eq!(a.body_count(), soil);
+                    assert_eq!(a.collider_count() > 0, soil > 0);
                 }
             }
             assert_eq!(active > 0, case != ClockBenchmarkCase::Idle);

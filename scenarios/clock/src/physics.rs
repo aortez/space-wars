@@ -1,7 +1,7 @@
 use engine_core::Vec2;
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
-    PhysicsWorld, PhysicsWorldConfig,
+    PhysicsWorld,
 };
 use rand::{Rng, rngs::StdRng};
 
@@ -58,9 +58,6 @@ impl FallingWorld {
     pub fn world(&self) -> &PhysicsWorld {
         &self.world
     }
-    pub fn world_mut(&mut self) -> &mut PhysicsWorld {
-        &mut self.world
-    }
 
     pub fn into_parts(self) -> (PhysicsWorld, FallingBodies) {
         (self.world, self.bodies)
@@ -68,13 +65,7 @@ impl FallingWorld {
 
     pub fn arena(drain: DrainGeometry) -> PhysicsWorld {
         let layout = drain.layout();
-        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
-            gravity: Vec2::new(0.0, -400.0),
-            length_unit: layout.pitch,
-            max_ccd_substeps: 2,
-            collect_events: false,
-            ..PhysicsWorldConfig::default()
-        });
+        let mut world = PhysicsWorld::new(crate::arena::mechanics_config(layout));
         world.reserve(4, 4, 0);
         for (index, (min, max)) in drain
             .slabs()
