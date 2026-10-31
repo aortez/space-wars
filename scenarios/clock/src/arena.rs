@@ -14,6 +14,11 @@
 //! In debug builds each step audits that the world holds what its owners
 //! claim and nothing else.
 //!
+//! A resize brings the resting residents within the new view as they are.
+//! When they cannot come in that way, the arena keeps its world as it was and
+//! takes no visit or event that uses the floor until a resize they fit, as
+//! [`ClockArena::remap`] says.
+//!
 //! Every body, collider and joint in a Clock world is addressed by a
 //! scenario-chosen `PhysicsId`. Those numbers used to be reserved in comments
 //! beside the code that allocated them, which left five sites reading a range
@@ -243,6 +248,9 @@ pub enum Unavailable {
     Residents,
     /// The owners' budgets together would be more than the arena holds.
     Capacity,
+    /// The resting residents have not fitted the view since a resize, so
+    /// the arena takes no visit or event that uses the floor.
+    LayoutIncompatible,
 }
 
 impl Unavailable {
@@ -251,6 +259,7 @@ impl Unavailable {
         match self {
             Self::Residents => "The arena holds all the residents it can",
             Self::Capacity => "The arena has no room for this",
+            Self::LayoutIncompatible => "The arena's residents do not fit this view",
         }
     }
 }
@@ -336,6 +345,19 @@ impl PanelAuthority {
     }
 }
 
+/// What a resize did to the arena's resting residents.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Remap {
+    /// Every resting resident lies within the new view, so none moved.
+    Exact,
+    /// `moved` resting residents lay beyond the new view's edges and came in
+    /// just far enough to lie within them.
+    Clamped { moved: usize },
+    /// A resting resident could not come in without landing in another
+    /// resident or in the floor, or is wider than the view. Nothing moved.
+    Declined,
+}
+
 /// What the arena holds now, and what it has done over the run.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ArenaAccounting {
@@ -350,13 +372,19 @@ pub struct ArenaAccounting {
     pub granted: u64,
     /// Claims let go over the run.
     pub released: u64,
-    /// Claims the arena could not take over the run.
+    /// Claims and events the arena refused over the run.
     pub refused: u64,
     /// Rigid steps over the run. Exactly one per positive tick while a world
     /// exists.
     pub steps: u64,
     /// Worlds the arena has held over the run.
     pub worlds: u64,
+    /// The resting residents have not fitted the view since a resize. The
+    /// arena keeps the floor they last fitted and takes no visit or event
+    /// that uses the floor.
+    pub layout_incompatible: bool,
+    /// What the last resize did to the resting residents.
+    pub last_remap: Option<Remap>,
 }
 
 /// The settings every arena world is built with. Whoever builds it chooses its
@@ -435,6 +463,11 @@ pub(crate) struct ClockArena {
     floor: KeptFloor,
     /// The world gravity resting residents' bodies were last scaled against.
     resident_gravity: Option<f32>,
+    /// While the resting residents have not fitted the view since a resize,
+    /// the layout they last fitted, whose floor the arena keeps under them.
+    fitted: Option<Layout>,
+    /// What the last resize did to the resting residents.
+    last_remap: Option<Remap>,
     /// The last step's timings and populations.
     metrics: PhysicsStepMetrics,
     granted: u64,
@@ -482,9 +515,26 @@ impl ClockArena {
     }
 
     /// Whether the arena can take `owners` together, as [`admits`] says,
-    /// counting a refusal. Changes nothing else.
+    /// unless a visit or an event is among them while the resting residents
+    /// do not fit the view. Changes nothing.
+    pub fn admissible(&self, owners: &[Owner]) -> Result<(), Unavailable> {
+        if self.fitted.is_some() && owners.iter().any(|owner| !owner.resident()) {
+            return Err(Unavailable::LayoutIncompatible);
+        }
+        admits(owners)
+    }
+
+    /// Whether the arena can take `owners` together, as
+    /// [`ClockArena::admissible`] says, counting a refusal. Changes nothing
+    /// else.
     pub fn admit(&mut self, owners: &[Owner]) -> Result<(), Unavailable> {
-        admits(owners).inspect_err(|_| self.refused += 1)
+        self.admissible(owners).inspect_err(|_| self.refused += 1)
+    }
+
+    /// Counts a refusal made on the arena's behalf, as of an event that
+    /// would use the floor while the resting residents do not fit the view.
+    pub fn count_refusal(&mut self) {
+        self.refused += 1;
     }
 
     /// Every claim is admitted before whatever asks for it changes anything.
@@ -493,7 +543,7 @@ impl ClockArena {
             let mut owners = self.owners.clone();
             owners.push(owner);
             assert!(
-                admits(&owners).is_ok(),
+                self.admissible(&owners).is_ok(),
                 "{owner:?} claims the arena beside {:?} unadmitted",
                 self.owners
             );
@@ -597,6 +647,7 @@ impl ClockArena {
             self.world = None;
             self.floor = KeptFloor::None;
             self.resident_gravity = None;
+            self.fitted = None;
         } else if held {
             let world = self.world.as_mut().expect("a held arena");
             for range in owner.ranges() {
@@ -607,6 +658,8 @@ impl ClockArena {
             if owner.rests() && !self.owners.iter().any(|owner| owner.rests()) {
                 remove_floor(world);
                 self.floor = KeptFloor::None;
+                // Nothing left beyond the view.
+                self.fitted = None;
             }
         }
     }
@@ -619,6 +672,112 @@ impl ClockArena {
     /// A resting resident holds the arena, which keeps a floor under it.
     pub fn keeps_floor(&self) -> bool {
         self.owners.iter().any(|owner| owner.rests())
+    }
+
+    /// The resting residents have not fitted the view since a resize.
+    pub fn layout_incompatible(&self) -> bool {
+        self.fitted.is_some()
+    }
+
+    /// The layout of the floor under resting residents: the view's, unless
+    /// they have not fitted it since a resize, when it is the one they last
+    /// fitted.
+    pub fn floor_layout(&self, view: Layout) -> Layout {
+        self.fitted.unwrap_or(view)
+    }
+
+    /// The arena's part of a resize to `floor`'s layout from `previous`, once
+    /// visits and events have finished and only residents hold it. A resting
+    /// resident that lies beyond the new view's edges moves in just far
+    /// enough to lie within them, keeping its height, angle and motion, so
+    /// the world creates, heals and resets nothing. The solver's length scale
+    /// becomes the new layout's, as a world built for it would have. Soil
+    /// keeps its own coordinates and accounts what a narrower view loses.
+    ///
+    /// A resident that could only come in by landing in another resident or
+    /// in `floor`, or that is wider than the view, cannot come in that way.
+    /// The arena then declines the remap and keeps the world exactly as it
+    /// was, with the floor of the layout its residents last fitted. The view
+    /// shows the part of that world within its bounds, and the arena takes no
+    /// visit or event that uses the floor until a resize the residents fit,
+    /// or until the last of them leaves.
+    pub fn remap(&mut self, floor: FloorGeometry, previous: Layout) -> Remap {
+        let layout = floor.layout();
+        let Some(world) = &mut self.world else {
+            return *self.last_remap.insert(Remap::Exact);
+        };
+        debug_assert!(
+            self.owners.iter().all(|owner| owner.resident()),
+            "a resize finishes visits and events first: {:?}",
+            self.owners
+        );
+        // Each resting body's box, and how far it moves to lie within the view.
+        let mut bodies = Vec::new();
+        let mut fits = true;
+        for owner in self.owners.iter().filter(|owner| owner.rests()) {
+            for range in owner.ranges() {
+                for id in range.clone() {
+                    let body = BodyId::new(PhysicsId::new(id), BodyRole::PRIMARY);
+                    let Some((min, max)) = world.body_solid_bounds(body) else {
+                        continue;
+                    };
+                    fits &= max.x - min.x <= layout.bounds_max.x - layout.bounds_min.x;
+                    let shift = if min.x < layout.bounds_min.x {
+                        layout.bounds_min.x - min.x
+                    } else {
+                        (layout.bounds_max.x - max.x).min(0.0)
+                    };
+                    bodies.push((body, min, max, shift));
+                }
+            }
+        }
+        // Resting bodies in contact overlap by the solver's allowed error, a
+        // thousandth of its length unit. Ten times that is a landing.
+        let slack = world.length_unit() * 0.01;
+        let meet = |(a_min, a_max): (Vec2, Vec2), (b_min, b_max): (Vec2, Vec2)| {
+            a_max.x.min(b_max.x) - a_min.x.max(b_min.x) > slack
+                && a_max.y.min(b_max.y) - a_min.y.max(b_min.y) > slack
+        };
+        let landed = |&(_, min, max, shift): &(BodyId, Vec2, Vec2, f32)| {
+            let shift = Vec2::new(shift, 0.0);
+            (min + shift, max + shift)
+        };
+        let slabs: Vec<_> = floor.support().collect();
+        // Each body that moves lands clear of the floor and of every body that
+        // moves otherwise. Bodies that move together, as a stack does, keep
+        // their places to each other.
+        fits &= bodies.iter().filter(|body| body.3 != 0.0).all(|moving| {
+            let place = landed(moving);
+            !slabs.iter().any(|slab| meet(place, *slab))
+                && !bodies
+                    .iter()
+                    .any(|other| other.3 != moving.3 && meet(place, landed(other)))
+        });
+        let remap = if fits {
+            let mut moved = 0;
+            for &(body, _, _, shift) in bodies.iter().filter(|body| body.3 != 0.0) {
+                let motion = world.motion(body).expect("a resting resident's body");
+                assert!(world.set_pose(
+                    body,
+                    motion.position + Vec2::new(shift, 0.0),
+                    motion.angle,
+                    false
+                ));
+                moved += 1;
+            }
+            assert!(world.set_length_unit(layout.pitch));
+            self.fitted = None;
+            if moved == 0 {
+                Remap::Exact
+            } else {
+                Remap::Clamped { moved }
+            }
+        } else {
+            self.fitted.get_or_insert(previous);
+            Remap::Declined
+        };
+        self.last_remap = Some(remap);
+        remap
     }
 
     /// The floor under resting residents takes the shape of what actually
@@ -725,7 +884,7 @@ impl ClockArena {
         }
         assert!(self.owners.len() <= MAX_ARENA_CLAIMS, "{:?}", self.owners);
         assert!(
-            admits(&self.owners).is_ok(),
+            self.admissible(&self.owners).is_ok(),
             "{:?} hold the arena unadmitted",
             self.owners
         );
@@ -799,6 +958,8 @@ impl ClockArena {
             refused: self.refused,
             steps: self.steps,
             worlds: self.worlds,
+            layout_incompatible: self.layout_incompatible(),
+            last_remap: self.last_remap,
         }
     }
 }
@@ -874,6 +1035,101 @@ mod tests {
             }
         );
         assert!(arena.idle());
+    }
+
+    /// A box of fixture 0's at `center`, as a resting resident with any
+    /// shape would be.
+    fn resident_box(arena: &mut ClockArena, slot: u64, center: Vec2, half: Vec2) -> BodyId {
+        let entity = PhysicsId::new(ids::canonical::FIXTURE_OWNER_BALLS[0][0].start + slot);
+        let body = BodyId::new(entity, BodyRole::PRIMARY);
+        let world = arena.world_mut().expect("the fixture's world");
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                position: center,
+                ..BodySpec::default()
+            },
+            &[ColliderSpec::cuboid(
+                ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+                half.x,
+                half.y
+            )],
+        ));
+        body
+    }
+
+    #[test]
+    fn a_resize_brings_residents_in_together_or_keeps_the_world_as_it_was() {
+        let (wide, narrow, narrower) = (
+            Layout::new(800.0 / 480.0),
+            Layout::new(1.0),
+            Layout::new(0.5),
+        );
+        let mut arena = ClockArena::default();
+        assert_eq!(
+            arena.remap(FloorGeometry::closed(narrow), wide),
+            Remap::Exact,
+            "no world"
+        );
+        arena.claim_resident(Owner::Soil, wide);
+        arena.claim_resident(Owner::Fixture(0), wide);
+        // One box resting on another, overlapping it, both beyond the right
+        // edge of the narrower view. They move together.
+        let half = Vec2::new(10.0, 10.0);
+        let lower = resident_box(&mut arena, 0, Vec2::new(300.0, 0.0), half);
+        let upper = resident_box(&mut arena, 1, Vec2::new(300.0, 15.0), half);
+        assert_eq!(
+            arena.remap(FloorGeometry::closed(narrow), wide),
+            Remap::Clamped { moved: 2 }
+        );
+        let world = arena.world().expect("the world");
+        let at = |body| world.motion(body).expect("a resident").position;
+        assert_eq!(
+            (at(lower), at(upper)),
+            (Vec2::new(230.0, 0.0), Vec2::new(230.0, 15.0))
+        );
+        assert!(!arena.layout_incompatible());
+
+        // A resident wider than the view cannot come in, so nothing moves.
+        let wide_box = resident_box(&mut arena, 2, Vec2::new(0.0, 100.0), Vec2::new(130.0, 5.0));
+        let poses = |arena: &ClockArena| {
+            let world = arena.world().expect("the world");
+            [lower, upper, wide_box].map(|body| world.motion(body).expect("a resident").position)
+        };
+        let before = poses(&arena);
+        assert_eq!(
+            arena.remap(FloorGeometry::closed(narrower), narrow),
+            Remap::Declined
+        );
+        assert_eq!(poses(&arena), before);
+        assert!(arena.layout_incompatible());
+        assert_eq!(
+            arena.floor_layout(narrower).bounds_max.x,
+            narrow.bounds_max.x
+        );
+        assert_eq!(
+            arena.admissible(&[Owner::Soil, Owner::Fixture(0), Owner::Visit]),
+            Err(Unavailable::LayoutIncompatible)
+        );
+        assert_eq!(
+            arena.admissible(&[Owner::Soil, Owner::Fixture(0), Owner::Fixture(1)]),
+            Ok(())
+        );
+        // A further resize that still does not fit keeps the layout the
+        // residents last fitted.
+        assert_eq!(
+            arena.remap(FloorGeometry::closed(Layout::new(0.4)), narrower),
+            Remap::Declined
+        );
+        assert_eq!(
+            arena.floor_layout(narrower).bounds_max.x,
+            narrow.bounds_max.x
+        );
+        assert_eq!(arena.accounting().last_remap, Some(Remap::Declined));
+        // Without its resting residents the world fits any view.
+        arena.release(Owner::Fixture(0));
+        assert!(!arena.layout_incompatible());
+        assert_eq!(arena.admissible(&[Owner::Soil, Owner::Visit]), Ok(()));
     }
 
     /// Debug builds catch a claim nobody admitted.

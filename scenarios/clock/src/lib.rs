@@ -51,7 +51,8 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
 pub use arena::{
-    ARENA_CAPACITY, ArenaAccounting, MAX_ARENA_CLAIMS, MAX_RESIDENT_CLAIMS, Population, Unavailable,
+    ARENA_CAPACITY, ArenaAccounting, MAX_ARENA_CLAIMS, MAX_RESIDENT_CLAIMS, Population, Remap,
+    Unavailable,
 };
 pub use digits::{
     DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
@@ -942,15 +943,21 @@ impl ClockState {
         if self.config.aspect_ratio == aspect_ratio {
             return;
         }
+        let previous = Layout::new(self.config.aspect_ratio);
         self.cancel_ceiling();
         self.config.aspect_ratio = aspect_ratio;
-        // A resize changes both anchors and floor geometry. Recover immediately
-        // instead of leaving bodies in the old arena or teleporting colliders.
+        // A resize changes both anchors and floor geometry. Visits and events
+        // finish at once instead of leaving bodies in the old arena or
+        // teleporting colliders. The run's residents stay, brought within the
+        // new view if they can come in as they are.
         self.finish_duck_visit();
         self.finish_crow_visit();
         if self.active_event.is_some() {
             self.finish_event();
         }
+        let layout = Layout::new(aspect_ratio);
+        self.arena.remap(self.floor.geometry(layout), previous);
+        self.sync_event_schedule();
         self.synchronize_soil();
     }
 
@@ -1113,10 +1120,21 @@ impl ClockState {
         Some(owners)
     }
 
-    /// Whether the arena has no room for what starting `kind` would add.
+    /// Why the arena would refuse to start `kind`, if it would: it has no
+    /// room for what `kind` adds, or `kind` uses the floor while the resting
+    /// residents do not fit the view, so that its floor would be one they do
+    /// not stand on.
+    fn arena_refusal(&self, kind: ClockEventKind) -> Option<Unavailable> {
+        if self.arena.layout_incompatible() && EVENT_CATALOG[kind as usize].uses_floor() {
+            return Some(Unavailable::LayoutIncompatible);
+        }
+        let owners = self.arena_owners_for_event(kind)?;
+        self.arena.admissible(&owners).err()
+    }
+
+    /// Whether the arena would refuse to start `kind`.
     pub fn event_blocked_by_arena(&self, kind: ClockEventKind) -> bool {
-        self.arena_owners_for_event(kind)
-            .is_some_and(|owners| arena::admits(&owners).is_err())
+        self.arena_refusal(kind).is_some()
     }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
@@ -1226,9 +1244,8 @@ impl ClockState {
             }
             // The arena refuses before anything changes, the event this one
             // would replace included.
-            if let Some(owners) = self.arena_owners_for_event(kind)
-                && let Err(unavailable) = self.arena.admit(&owners)
-            {
+            if let Some(unavailable) = self.arena_refusal(kind) {
+                self.arena.count_refusal();
                 self.event_notice = Some((
                     unavailable.notice(),
                     self.schedule.tick + 2 * u64::from(FIXED_HZ),
@@ -1486,9 +1503,10 @@ impl ClockState {
         if let Some(soil) = &mut self.soil {
             self.arena.bind_soil(soil, layout);
         }
-        // So does the floor under resting residents.
-        self.arena
-            .bind_floor(self.active_event.as_ref(), self.floor.geometry(layout));
+        // So does the floor under resting residents, which keeps the layout
+        // they last fitted while they do not fit the view.
+        let floor = self.floor.geometry(self.arena.floor_layout(layout));
+        self.arena.bind_floor(self.active_event.as_ref(), floor);
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
         // Fixture balls that fell out of the view leave the arena, and a

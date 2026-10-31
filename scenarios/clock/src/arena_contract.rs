@@ -23,16 +23,23 @@
 //! were. Debug builds audit every step: each body belongs to exactly one
 //! owner holding the arena, within its budget, and the world's identities
 //! name live objects one to one.
+//!
+//! A resize still finishes visits and events, but the residents stay in the
+//! same world. A ball beyond a narrower view comes in just far enough to lie
+//! within it, keeping its height and motion. Balls that could only come in
+//! by landing in each other stay where they are instead, with the floor they
+//! stood on, and the arena takes nothing that uses the floor until a resize
+//! they fit or their leaving.
 
 use crate::{
     ArenaAccounting, ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState,
-    MAX_RESIDENT_CLAIMS, Unavailable,
+    EVENT_CATALOG, MAX_RESIDENT_CLAIMS, Remap, Unavailable,
     arena::{Owner, ids::canonical::ARENA_FLOOR},
     arena_fixture::{ArenaFixture, FixtureBall, FixtureBallState},
     events::{COOLDOWN_TICKS, EventLifecycle, EventPhase, duck::arena::CourseGeometry},
     layout::Layout,
 };
-use engine_common::{Action, ClockEventKind, ClockEventProfile, Scenario};
+use engine_common::{Action, ClockEventKind, ClockEventProfile, ClockEvents, Scenario};
 use engine_core::Vec2;
 use engine_rapier::world::physics_activity;
 use std::time::Duration;
@@ -49,14 +56,16 @@ fn plain() -> ClockState {
 }
 
 fn plain_at(aspect_ratio: f32) -> ClockState {
-    let mut state = ClockScenario::init(
-        ClockConfig {
-            aspect_ratio,
-            event_profile: ClockEventProfile::Off,
-            ..ClockConfig::default()
-        },
-        SEED,
-    );
+    ready(ClockConfig {
+        aspect_ratio,
+        event_profile: ClockEventProfile::Off,
+        ..ClockConfig::default()
+    })
+}
+
+/// A run with `config`, showing the time.
+fn ready(config: ClockConfig) -> ClockState {
+    let mut state = ClockScenario::init(config, SEED);
     ClockScenario::step(
         &mut state,
         &[ClockAction::set_reading(
@@ -838,6 +847,266 @@ fn arena_contract_holds_no_more_residents_than_its_limit() {
     keep(&mut state, 10, "soil arriving");
     assert!(state.arena.holds(Owner::Soil));
     assert_eq!(state.arena_accounting().residents, MAX_RESIDENT_CLAIMS);
+}
+
+/// A view 480 wide, narrower than the ordinary 800, so that balls resting
+/// beyond 240 to either side lie outside it.
+const NARROW: f32 = 1.0;
+
+/// How far the arena's own floor reaches to either side.
+fn floor_reach(state: &ClockState) -> Option<(f32, f32)> {
+    let world = state.arena.world()?;
+    world
+        .body_ids()
+        .filter(|body| ARENA_FLOOR.contains(&body.entity.value()))
+        .filter_map(|body| world.body_solid_bounds(body))
+        .map(|(min, max)| (min.x, max.x))
+        .reduce(|(left, right), (min, max)| (left.min(min), right.max(max)))
+}
+
+#[test]
+fn arena_contract_fixture_comes_within_a_narrower_view_as_it_is() {
+    let mut state = plain();
+    let rolling = |x: f32, speed: f32| FixtureBall {
+        position: resting(x),
+        velocity: Vec2::new(speed, 0.0),
+    };
+    assert_eq!(
+        state.admit_arena_fixture(&[
+            rolling(-320.0, 30.0),
+            at_rest(resting(0.0)),
+            rolling(320.0, -30.0)
+        ]),
+        Ok(0)
+    );
+    assert!(keep(&mut state, 30, "rolling inward").is_empty());
+    // A player's visit holds the arena when the view changes.
+    toggle(&mut state, 1);
+    assert!(keep(&mut state, 30, "beside a player").is_empty());
+    assert!(state.arena.holds(Owner::Visit));
+    let arena = state.arena_accounting();
+    let before = balls(&state);
+
+    state.set_aspect_ratio(NARROW);
+    assert!(!state.has_duck_visit(), "a resize still finishes the visit");
+    let after = balls(&state);
+    let radius = ArenaFixture::radius(Layout::new(ASPECT));
+    let edge = Layout::new(NARROW).bounds_max.x - radius;
+    let expected = [-edge, before[1].position.x, edge];
+    for ((ball, was), x) in after.iter().zip(&before).zip(expected) {
+        assert_eq!(ball.slot, was.slot);
+        assert!(
+            (ball.position.x - x).abs() < 1.0e-3,
+            "ball {} at {:?}, not {x}",
+            ball.slot,
+            ball.position
+        );
+        assert_eq!(
+            ball.position.y, was.position.y,
+            "ball {} keeps its height",
+            ball.slot
+        );
+        assert_eq!(
+            ball.velocity, was.velocity,
+            "ball {} keeps its motion",
+            ball.slot
+        );
+    }
+    assert_eq!(after[1], before[1], "the ball within the view stays put");
+    let resized = state.arena_accounting();
+    assert_eq!(resized.last_remap, Some(Remap::Clamped { moved: 2 }));
+    assert!(!resized.layout_incompatible);
+    assert_eq!(resized.worlds, arena.worlds, "the same world");
+    assert_eq!(state.arena.owners(), [Owner::Fixture(0)]);
+    // The floor follows the view from the next tick, and the balls roll on.
+    assert!(keep(&mut state, 60, "in the narrower view").is_empty());
+    assert_eq!(floor_reach(&state), Some((-240.0, 240.0)));
+    assert_eq!(
+        state.arena.world().map(|world| world.length_unit()),
+        Some(Layout::new(NARROW).pitch)
+    );
+    assert!(
+        balls(&state)
+            .iter()
+            .all(|ball| ball.position.x.abs() < 240.0)
+    );
+
+    // A wider view has room for everything where it is.
+    let before = balls(&state);
+    state.set_aspect_ratio(ASPECT);
+    assert_eq!(balls(&state), before);
+    assert_eq!(state.arena_accounting().last_remap, Some(Remap::Exact));
+    assert!(keep(&mut state, 30, "in the wider view").is_empty());
+    assert_eq!(floor_reach(&state), Some((-400.0, 400.0)));
+    assert_eq!(state.arena_accounting().worlds, arena.worlds);
+}
+
+/// Two balls beyond the narrower view's right edge, which would come in to
+/// the same place, and one within it.
+fn crowded_edge() -> [FixtureBall; 3] {
+    [
+        at_rest(resting(-100.0)),
+        at_rest(resting(300.0)),
+        at_rest(resting(330.0)),
+    ]
+}
+
+#[test]
+fn arena_contract_keeps_its_world_when_the_fixture_cannot_come_in_as_it_is() {
+    let mut state = plain();
+    assert_eq!(state.admit_arena_fixture(&crowded_edge()), Ok(0));
+    assert!(keep(&mut state, 30, "settling").is_empty());
+    let arena = state.arena_accounting();
+    let before = untouched(&state);
+
+    state.set_aspect_ratio(NARROW);
+    assert_eq!(untouched(&state), before, "nothing moved");
+    let declined = state.arena_accounting();
+    assert_eq!(declined.last_remap, Some(Remap::Declined));
+    assert!(declined.layout_incompatible);
+    assert_eq!(declined.worlds, arena.worlds, "the same world");
+    // The world keeps the floor the balls stand on, out of the view.
+    assert!(keep(&mut state, 60, "beyond the view").is_empty());
+    assert_eq!(floor_reach(&state), Some((-400.0, 400.0)));
+    assert_eq!(balls(&state).len(), 3);
+
+    // Nothing that uses the floor starts meanwhile.
+    for kind in ClockEventKind::ALL {
+        assert_eq!(
+            state.event_blocked_by_arena(kind),
+            EVENT_CATALOG[kind as usize].uses_floor(),
+            "{kind:?}"
+        );
+    }
+    let before = untouched(&state);
+    let refused = state.arena_accounting().refused;
+    state.preview_event(ClockEventKind::Falling);
+    assert_eq!(untouched(&state), before, "no Falling");
+    assert_eq!(
+        state.event_notice.map(|(notice, _)| notice),
+        Some(Unavailable::LayoutIncompatible.notice())
+    );
+    toggle(&mut state, 1);
+    assert_eq!(untouched(&state), before, "no player");
+    assert_eq!(state.arena_accounting().refused, refused + 2);
+    // An event that leaves the floor alone starts, and a resident joins.
+    state.preview_event(ClockEventKind::ColorCycle);
+    assert_eq!(state.event_kind(), Some(ClockEventKind::ColorCycle));
+    assert_eq!(
+        state.admit_arena_fixture(&[at_rest(resting(0.0) + Vec2::new(0.0, 40.0))]),
+        Ok(1)
+    );
+    assert!(keep(&mut state, 60, "a second fixture").is_empty());
+
+    // A view the balls fit, even narrowed, ends it.
+    let before = balls(&state);
+    state.set_aspect_ratio(1.4);
+    assert_eq!(
+        state.arena_accounting().last_remap,
+        Some(Remap::Clamped { moved: 1 })
+    );
+    assert!(!state.arena_accounting().layout_incompatible);
+    let after = balls(&state);
+    assert_eq!((after[0], after[1]), (before[0], before[1]));
+    assert!(after[2].position.x < before[2].position.x);
+    assert!(keep(&mut state, 30, "in a view they fit").is_empty());
+    assert_eq!(floor_reach(&state), Some((-336.0, 336.0)));
+    assert!(!state.event_blocked_by_arena(ClockEventKind::Duck));
+    toggle(&mut state, 1);
+    assert!(state.player_duck_session().is_some(), "the player joins");
+}
+
+#[test]
+fn arena_contract_keeps_its_world_rather_than_bring_a_falling_ball_into_the_floor() {
+    let mut state = plain();
+    let rolling_off = FixtureBall {
+        position: resting(395.0),
+        velocity: Vec2::new(60.0, 0.0),
+    };
+    assert_eq!(
+        state.admit_arena_fixture(&[at_rest(resting(0.0)), rolling_off]),
+        Ok(0)
+    );
+    // The ball rolls off the floor's end and falls beside it.
+    let floor_y = Layout::new(ASPECT).floor_y;
+    while balls(&state)[1].position.y > floor_y {
+        assert!(keep(&mut state, 1, "rolling off").is_empty());
+    }
+    let before = untouched(&state);
+    state.set_aspect_ratio(NARROW);
+    assert_eq!(untouched(&state), before, "nothing moved");
+    assert_eq!(state.arena_accounting().last_remap, Some(Remap::Declined));
+    // It falls out of the view as it would have.
+    let mut fell = Vec::new();
+    while fell.is_empty() {
+        fell = keep(&mut state, 1, "falling beside the floor");
+    }
+    assert_eq!(fell, [(0, 1)]);
+    assert!(state.arena_accounting().layout_incompatible);
+    state.set_aspect_ratio(ASPECT);
+    assert_eq!(state.arena_accounting().last_remap, Some(Remap::Exact));
+    assert!(!state.arena_accounting().layout_incompatible);
+}
+
+#[test]
+fn arena_contract_schedule_starts_nothing_that_uses_the_floor_while_residents_do_not_fit() {
+    let mut state = ready(ClockConfig {
+        aspect_ratio: ASPECT,
+        event_profile: ClockEventProfile::Demo,
+        events: ClockEvents {
+            falling: true,
+            color_cycle: false,
+            meltdown: false,
+            duck: false,
+            marquee: false,
+            digit_slide: false,
+            rain: false,
+            crow: false,
+            explosion: false,
+            aquarium: false,
+            cell_swap: false,
+            grass: false,
+        },
+        ..ClockConfig::default()
+    });
+    assert_eq!(state.admit_arena_fixture(&crowded_edge()), Ok(0));
+    state.set_aspect_ratio(NARROW);
+    assert!(state.arena_accounting().layout_incompatible);
+    assert_eq!(state.next_event_tick(), None, "nothing to wait for");
+    // The schedule starts Falling every six to ten seconds otherwise.
+    assert!(keep(&mut state, 11 * 60, "no Falling").is_empty());
+    assert_eq!(state.event_kind(), None);
+    state.set_aspect_ratio(ASPECT);
+    assert!(state.next_event_tick().is_some());
+    let mut ticks = 0;
+    while state.event_kind().is_none() {
+        assert!(keep(&mut state, 1, "Falling coming back").is_empty());
+        ticks += 1;
+        assert!(ticks <= 11 * 60, "Falling starts again");
+    }
+    assert_eq!(state.event_kind(), Some(ClockEventKind::Falling));
+}
+
+#[test]
+fn arena_contract_a_declined_resize_ends_with_the_residents_that_did_not_fit() {
+    let mut state = plain();
+    state.admit_soil();
+    assert_eq!(state.admit_arena_fixture(&crowded_edge()), Ok(0));
+    assert!(keep(&mut state, 30, "settling").is_empty());
+    state.set_aspect_ratio(NARROW);
+    assert!(state.arena_accounting().layout_incompatible);
+    assert!(state.event_blocked_by_arena(ClockEventKind::Duck));
+
+    assert!(state.remove_arena_fixture(0));
+    assert!(!state.arena_accounting().layout_incompatible);
+    assert!(!state.event_blocked_by_arena(ClockEventKind::Duck));
+    assert_eq!(
+        state.arena.owners(),
+        [Owner::Soil],
+        "the soil keeps the world"
+    );
+    keep(&mut state, 1, "the soil alone");
+    assert_eq!(floor_reach(&state), None);
 }
 
 /// Debug builds audit the arena before each step.

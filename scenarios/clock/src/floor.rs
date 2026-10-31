@@ -162,6 +162,10 @@ impl FloorGeometry {
         }
     }
 
+    pub fn layout(self) -> Layout {
+        self.layout
+    }
+
     /// The same bounds are consumed by rendering and event colliders.
     pub fn slabs(self) -> impl Iterator<Item = (Vec2, Vec2)> {
         let layout = self.layout;
