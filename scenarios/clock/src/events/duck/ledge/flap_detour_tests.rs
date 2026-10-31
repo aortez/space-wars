@@ -12,7 +12,7 @@ const SEED: u64 = 3;
 pub(super) fn ordinary(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> TestDuck {
     assert!(flap_detour::selected(SEED));
     let mut duck = TestDuck::new_platforms(Layout::new(aspect), SEED);
-    duck.direction = direction;
+    duck.face(direction);
     duck.controller.profile = profile;
     duck
 }
@@ -120,12 +120,12 @@ fn detours_are_seeded_occasional_and_do_not_reroll_the_course() {
     assert!(!flap_detour::selected(42));
     for seed in 0..40 {
         let mut duck = TestDuck::new_course(Layout::new(ASPECTS[0]), seed, None);
-        let surfaces = duck.course.as_ref().unwrap().surfaces.clone();
+        let surfaces = duck.terrain.course.as_ref().unwrap().surfaces.clone();
         let direction = duck.direction;
         until(&mut duck, |d| {
             d.ledge.detour.stats.phase == DetourPhase::Finished
         });
-        assert_eq!(duck.course.as_ref().unwrap().surfaces, surfaces);
+        assert_eq!(duck.terrain.course.as_ref().unwrap().surfaces, surfaces);
         assert_eq!(duck.direction, direction);
         assert_eq!(
             duck.ledge.detour.stats.outcome,
@@ -332,7 +332,8 @@ fn stationary_responsive_support_can_return_but_moving_slopes_are_skipped() {
     for aspect in ASPECTS {
         for direction in [-1.0, 1.0] {
             let mut duck = ordinary(aspect, direction, PROFILES[0]);
-            duck.responsive_floor = Some(ResponsiveFloor::new(FloorShape::clock(duck.layout), 0.0));
+            duck.terrain.responsive_floor =
+                Some(ResponsiveFloor::new(FloorShape::clock(duck.layout), 0.0));
             until(&mut duck, |d| {
                 d.ledge.detour.stats.phase == DetourPhase::Finished
             });
@@ -345,7 +346,7 @@ fn stationary_responsive_support_can_return_but_moving_slopes_are_skipped() {
             let mut duck = ordinary(aspect, direction, PROFILES[1]);
             let mut floor = ResponsiveFloor::new(FloorShape::clock(duck.layout), 0.0);
             floor.opening = 0.9;
-            duck.responsive_floor = Some(floor);
+            duck.terrain.responsive_floor = Some(floor);
             until(&mut duck, |d| {
                 d.ledge.detour.stats.phase == DetourPhase::Finished
             });

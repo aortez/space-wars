@@ -251,6 +251,7 @@ fn run(case: Case) -> Row {
     let mut state = start(case);
     let duck = state.duck_visit.as_ref().unwrap();
     let course = duck
+        .terrain
         .course
         .as_ref()
         .unwrap()

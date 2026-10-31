@@ -100,7 +100,7 @@ impl DuckEvent {
     pub(in crate::events::duck) fn panel_at(&self, side: usize, open: f32) -> DoorPanel {
         let local_x = if side == 0 { 0.0 } else { self.width };
         let x = self.render_position(Vec2::new(local_x, 0.0)).x;
-        let bottom = self.door_floor(local_x);
+        let bottom = self.terrain.door_floor(local_x);
         let top = bottom + self.radius * 4.25;
         let inward = if x < 0.0 { 1.0 } else { -1.0 };
         DoorPanel {

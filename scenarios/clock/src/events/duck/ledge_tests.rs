@@ -6,7 +6,7 @@ use ledge::LedgeCommand;
 
 fn entrance(aspect: f32, direction: f32) -> TestDuck {
     let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
-    duck.direction = direction;
+    duck.face(direction);
     for _ in 0..OPENING_TICKS {
         duck.step();
     }
@@ -440,9 +440,9 @@ fn nearby_foreign_solids_are_not_grab_targets_and_blocked_hangs_are_refused() {
 fn a_course_near_miss_uses_the_same_shared_climb_in_both_directions() {
     for direction in [-1.0, 1.0] {
         let mut duck = TestDuck::new_player(Layout::new(5.0 / 3.0), 42, None, 1, 1);
-        duck.direction = direction;
+        duck.face(direction);
         let r = duck.radius;
-        duck.course.as_mut().unwrap().surfaces = vec![
+        duck.terrain.course.as_mut().unwrap().surfaces = vec![
             planner::Surface {
                 start: 0.0,
                 end: r * 12.0,

@@ -5,8 +5,8 @@ use planner::Surface;
 
 fn flat_player(aspect: f32, direction: f32) -> TestDuck {
     let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
-    duck.direction = direction;
-    duck.course.as_mut().unwrap().surfaces = vec![Surface {
+    duck.face(direction);
+    duck.terrain.course.as_mut().unwrap().surfaces = vec![Surface {
         start: 0.0,
         end: duck.width,
         height: 0.0,
@@ -285,9 +285,9 @@ fn swim_can_clear_a_low_bank_that_paddling_alone_cannot() {
     for direction in [-1.0, 1.0] {
         for swim in [false, true] {
             let mut duck = TestDuck::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
-            duck.direction = direction;
+            duck.face(direction);
             let bank = duck.width * 0.6;
-            duck.course.as_mut().unwrap().surfaces = vec![
+            duck.terrain.course.as_mut().unwrap().surfaces = vec![
                 Surface {
                     start: 0.0,
                     end: bank,
@@ -306,7 +306,7 @@ fn swim_can_clear_a_low_bank_that_paddling_alone_cannot() {
                 )),
                 Vec2::ZERO,
             ));
-            let geometry = arena::CourseGeometry::from_duck(&duck);
+            let geometry = arena::CourseGeometry::from_terrain(&duck.terrain);
             let mut water =
                 WaterWorld::new(WaterConfig::default(), geometry.water_pools()).unwrap();
             let wet_pool = usize::from(direction < 0.0);

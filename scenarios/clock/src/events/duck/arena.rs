@@ -1,6 +1,6 @@
 //! Immutable course geometry shared by character collision, rain supports and
 //! rendering. Copies happen only at event/visit boundaries, never per tick.
-use super::{DuckEvent, planner::Course};
+use super::{ArenaTerrain, planner::Course};
 use crate::layout::Layout;
 use engine_core::Vec2;
 use engine_water::{Boundary, PoolSpec};
@@ -15,13 +15,13 @@ pub(crate) struct CourseGeometry {
 }
 
 impl CourseGeometry {
-    pub fn from_duck(duck: &DuckEvent) -> Self {
+    pub fn from_terrain(terrain: &ArenaTerrain) -> Self {
         Self {
-            layout: duck.layout,
-            width: duck.width,
-            radius: duck.radius,
-            direction: duck.direction,
-            course: duck.course.clone().expect("duck course"),
+            layout: terrain.layout,
+            width: terrain.width,
+            radius: terrain.radius,
+            direction: terrain.direction,
+            course: terrain.course.clone().expect("duck course"),
         }
     }
 

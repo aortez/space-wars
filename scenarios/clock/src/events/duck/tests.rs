@@ -311,7 +311,7 @@ fn speed_measurement_excludes_airborne_blocked_and_accelerating_motion() {
                     blocked,
                     support: None,
                 },
-                &event.obstacles,
+                &event.terrain.obstacles,
                 event.width,
                 event.radius,
             );

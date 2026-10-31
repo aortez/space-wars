@@ -38,8 +38,11 @@ fn promotion_preserves_every_solid_pose_velocity_release_time_and_water_sample()
             assert_eq!(after.water.stats(), stats);
             let duck = state.duck_visit.as_ref().unwrap();
             assert_eq!(duck.arena_opacity(), opacity);
-            assert_eq!(duck.responsive_floor().unwrap().opening, floor.opening);
-            assert_eq!(duck.responsive_floor().unwrap().load, floor.load);
+            assert_eq!(
+                duck.terrain.responsive_floor().unwrap().opening,
+                floor.opening
+            );
+            assert_eq!(duck.terrain.responsive_floor().unwrap().load, floor.load);
             let world = state.arena.as_ref().unwrap();
             let mut released = 0;
             for (index, cell) in cells.iter().enumerate() {

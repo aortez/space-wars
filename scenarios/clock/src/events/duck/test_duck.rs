@@ -142,7 +142,9 @@ impl TestDuck {
     }
 
     pub fn synchronize_soil(&mut self, soil: Option<&mut crate::grass::SoilHabitat>) {
-        self.duck.synchronize_soil(self.world.as_mut(), soil);
+        self.duck
+            .terrain
+            .synchronize_soil(self.world.as_mut(), soil);
     }
 
     pub fn claim_arena(&mut self) {

@@ -23,7 +23,7 @@ fn scene(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> ClockSta
         Duration::ZERO,
     );
     let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
-    duck.direction = direction;
+    duck.face(direction);
     duck.controller.profile = profile;
     duck.admit(&mut state);
     state
@@ -202,7 +202,7 @@ fn near_wall_allowance_has_a_body_scaled_boundary_in_both_controller_paths() {
                 } else {
                     TestDuck::new(Layout::new(800.0 / 480.0), 42)
                 };
-                duck.direction = direction;
+                duck.face(direction);
                 duck.skip_flap_detour_for_fixture();
                 for _ in 0..EXIT_DELAY_TICKS {
                     duck.step();
@@ -237,7 +237,7 @@ fn opening_mid_jump_finishes_the_physical_landing_before_replanning() {
         for direction in [-1.0, 1.0] {
             for profile in [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing] {
                 let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
-                duck.direction = direction;
+                duck.face(direction);
                 duck.controller.profile = profile;
                 for _ in 0..EXIT_DELAY_TICKS {
                     duck.step();

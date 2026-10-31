@@ -27,7 +27,7 @@ impl crate::ClockState {
 
 fn open_player(aspect: f32, direction: f32) -> TestDuck {
     let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
-    duck.direction = direction;
+    duck.face(direction);
     for _ in 0..OPENING_TICKS {
         duck.step();
     }
@@ -227,7 +227,7 @@ fn flap_render_geometry_matches_rays_bounds_and_motion_in_every_layout() {
     for aspect in [5.0 / 3.0, 4.0 / 3.0, 0.6] {
         for direction in [-1.0, 1.0] {
             let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
-            duck.direction = direction;
+            duck.face(direction);
             for tick in 1..=110 {
                 duck.step();
                 for (side, panel) in duck.door_panels().into_iter().enumerate() {
@@ -446,7 +446,7 @@ fn rigid_flap_scene_fixtures_cover_pause_floor_motion_and_target_viewports() {
                     TestDuck::new_responsive_player(layout, 42, 1, 1, direction, floor)
                 } else {
                     let mut duck = TestDuck::new_player(layout, 42, None, 1, 1);
-                    duck.direction = direction;
+                    duck.face(direction);
                     duck
                 };
                 for _ in 0..OPENING_TICKS {

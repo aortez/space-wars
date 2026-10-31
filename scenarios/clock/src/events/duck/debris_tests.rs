@@ -9,10 +9,10 @@ fn perched(
     half_width: f32,
 ) -> (TestDuck, BodyId, f32) {
     let mut duck = TestDuck::new_platforms(Layout::new(800.0 / 480.0), 42);
-    duck.direction = direction;
+    duck.face(direction);
     duck.controller.profile = profile;
     let width = duck.width;
-    duck.course = Some(planner::Course {
+    duck.terrain.course = Some(planner::Course {
         surfaces: [(0.0, 0.4), (0.48, 0.64), (0.72, 1.0)]
             .map(|(start, end)| planner::Surface {
                 start: start * width,

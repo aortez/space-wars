@@ -20,7 +20,7 @@ fn near_miss_toward(
     route: f32,
 ) -> (TestDuck, Edge) {
     let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
-    duck.direction = direction;
+    duck.face(direction);
     duck.controller.profile = profile;
     for _ in 0..EXIT_DELAY_TICKS {
         duck.step();
@@ -343,7 +343,7 @@ fn clean_seeded_visits_keep_their_normal_jumps_without_ledge_attempts() {
         for direction in [-1.0, 1.0] {
             for profile in PROFILES {
                 let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
-                duck.direction = direction;
+                duck.face(direction);
                 duck.controller.profile = profile;
                 for _ in 0..DUCK_TICKS {
                     duck.step();

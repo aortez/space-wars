@@ -157,8 +157,9 @@ fn dismiss_and_rejoin_keep_the_same_wet_arena_then_resize_cleans_both() {
     assert_ne!(state.player_duck_session(), session);
     assert_eq!(state.player_duck_session().unwrap().1, 2);
     assert_eq!(state.event_id(), id);
-    let geometry =
-        events::duck::arena::CourseGeometry::from_duck(state.duck_visit.as_ref().unwrap());
+    let geometry = events::duck::arena::CourseGeometry::from_terrain(
+        &state.duck_visit.as_ref().unwrap().terrain,
+    );
     assert_eq!(geometry.water_pools(), pools);
     assert!(state.body_count() <= 9);
     let player = state.player_duck_state();

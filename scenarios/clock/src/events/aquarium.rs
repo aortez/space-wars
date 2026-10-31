@@ -121,7 +121,7 @@ impl AquariumEvent {
         world: &mut Option<PhysicsWorld>,
     ) -> Self {
         let mut result = Self::build(context, seed, true);
-        if let Some(floor) = duck.responsive_floor() {
+        if let Some(floor) = duck.terrain.responsive_floor() {
             for side in 0..2 {
                 let points = floor.shape.panel_points(side, floor.opening);
                 result.supports.push(Obstacle {
@@ -136,7 +136,7 @@ impl AquariumEvent {
                 });
             }
         } else {
-            let course = super::duck::arena::CourseGeometry::from_duck(duck);
+            let course = super::duck::arena::CourseGeometry::from_terrain(&duck.terrain);
             for surface in &course.course.surfaces {
                 let a = course.screen_position(Vec2::new(surface.start, 0.0)).x;
                 let b = course.screen_position(Vec2::new(surface.end, 0.0)).x;
@@ -258,7 +258,7 @@ impl AquariumEvent {
             if shared.extra_liner {
                 self.floor.move_panels_at(leased, LINER_ID);
             } else {
-                duck.sync_responsive_floor(&self.floor);
+                duck.terrain.sync_responsive_floor(&self.floor);
             }
             let duck = shared
                 .arena

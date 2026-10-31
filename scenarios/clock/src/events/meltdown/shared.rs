@@ -28,10 +28,18 @@ struct CellBodies {
 impl SharedMeltdown {
     pub fn new(player: &mut DuckEvent, world: &mut Option<PhysicsWorld>, count: usize) -> Self {
         assert!(count <= MAX_MELTDOWN_CELLS);
-        let supports = if player.responsive_floor().is_some() {
+        let supports = if player.terrain.responsive_floor().is_some() {
             canonical::RESPONSIVE_PANELS
         } else {
-            canonical::course_surfaces(player.course.as_ref().expect("duck course").surfaces.len())
+            canonical::course_surfaces(
+                player
+                    .terrain
+                    .course
+                    .as_ref()
+                    .expect("duck course")
+                    .surfaces
+                    .len(),
+            )
         };
         let arena = VisitArena::claim(player, world);
         world
@@ -156,6 +164,7 @@ impl MeltdownEvent {
             shared
                 .arena
                 .get_mut(player.as_deref_mut())
+                .terrain
                 .sync_responsive_floor(floor);
         }
         let material = self.tick < MELTING_TICKS + DRAINING_TICKS;

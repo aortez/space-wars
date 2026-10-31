@@ -216,7 +216,7 @@ fn contact_fixture() -> (ClockState, BodyId) {
     state.configure(settings);
     toggle(&mut state, 1);
     let duck = state.duck_visit.as_mut().unwrap();
-    duck.course.as_mut().unwrap().surfaces = vec![Surface {
+    duck.terrain.course.as_mut().unwrap().surfaces = vec![Surface {
         start: 0.0,
         end: duck.width,
         height: 0.0,

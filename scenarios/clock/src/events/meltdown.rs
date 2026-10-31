@@ -118,7 +118,7 @@ impl MeltdownEvent {
         let cell_area = (Self::water_pitch(context.layout, mode) * 0.8).powi(2);
         let player = visit.as_ref().map(|(duck, _)| &**duck);
         let floor = match player {
-            Some(duck) => duck.responsive_floor().cloned(),
+            Some(duck) => duck.terrain.responsive_floor().cloned(),
             None => (!lab).then(|| ResponsiveFloor::new(FloorShape::clock(context.layout), 0.0)),
         };
         let mut water = if lab {
@@ -127,7 +127,8 @@ impl MeltdownEvent {
             let pools = if let Some(floor) = &floor {
                 floor.shape.pools_at(floor.opening).into()
             } else {
-                super::duck::arena::CourseGeometry::from_duck(player.unwrap()).water_pools()
+                super::duck::arena::CourseGeometry::from_terrain(&player.unwrap().terrain)
+                    .water_pools()
             };
             let mut water = WaterWorld::new(
                 WaterConfig {

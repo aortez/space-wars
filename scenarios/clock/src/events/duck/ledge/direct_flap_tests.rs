@@ -68,7 +68,7 @@ fn direct_flap_keeps_seeded_selection_and_course_geometry() {
     assert!(!crate::ClockConfig::default().duck_direct_flap_landing);
     for seed in 0..40 {
         let mut duck = TestDuck::new_course(Layout::new(ASPECTS[0]), seed, None);
-        let surfaces = duck.course.as_ref().unwrap().surfaces.clone();
+        let surfaces = duck.terrain.course.as_ref().unwrap().surfaces.clone();
         let direction = duck.direction;
         duck.select_direct_flap_landing(true);
         until(&mut duck, finished);
@@ -82,7 +82,7 @@ fn direct_flap_keeps_seeded_selection_and_course_geometry() {
             "seed={seed}: {:?}",
             duck.diagnostics()
         );
-        assert_eq!(duck.course.as_ref().unwrap().surfaces, surfaces);
+        assert_eq!(duck.terrain.course.as_ref().unwrap().surfaces, surfaces);
         assert_eq!(duck.direction, direction);
     }
 }
@@ -260,7 +260,7 @@ fn direct_flap_accepts_closed_responsive_floor_and_refuses_moving_support() {
                 if moving {
                     floor.opening = 0.9;
                 }
-                duck.responsive_floor = Some(floor);
+                duck.terrain.responsive_floor = Some(floor);
                 until(&mut duck, finished);
                 if moving {
                     assert!(matches!(

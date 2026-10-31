@@ -3,7 +3,7 @@ use engine_common::ClockDuckJumpProfile;
 
 fn at_moment(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, moment: u8) -> TestDuck {
     let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
-    duck.direction = direction;
+    duck.face(direction);
     duck.select_jump_profile(Some(profile));
     loop {
         let motion = duck.world.as_ref().and_then(|w| w.motion(DUCK_BODY));

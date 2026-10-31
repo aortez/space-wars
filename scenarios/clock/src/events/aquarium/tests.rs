@@ -310,6 +310,7 @@ fn joining_leaving_and_rejoining_keep_the_same_water_fish_and_native_world() {
             .duck_visit
             .as_ref()
             .unwrap()
+            .terrain
             .responsive_floor()
             .is_some()
     );
@@ -332,6 +333,7 @@ fn existing_player_keeps_course_controller_pose_and_world_and_releases_only_the_
     let worlds = physics_activity().worlds;
     let duck = state.duck_visit.as_ref().unwrap();
     let course = duck
+        .terrain
         .course
         .as_ref()
         .unwrap()
@@ -351,6 +353,7 @@ fn existing_player_keeps_course_controller_pose_and_world_and_releases_only_the_
             .duck_visit
             .as_ref()
             .unwrap()
+            .terrain
             .course
             .as_ref()
             .unwrap()

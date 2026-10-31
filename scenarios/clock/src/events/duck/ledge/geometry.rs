@@ -61,9 +61,9 @@ impl Edge {
 pub(super) fn edges(duck: &DuckEvent, world: &PhysicsWorld) -> [Option<Edge>; MAX_EDGES] {
     let mut result = [None; MAX_EDGES];
     let mut count = 0;
-    if duck.responsive_floor.is_none()
-        && duck.drain_floor.is_none()
-        && let Some(course) = &duck.course
+    if duck.terrain.responsive_floor.is_none()
+        && duck.terrain.drain_floor.is_none()
+        && let Some(course) = &duck.terrain.course
     {
         for index in 0..course.surfaces.len().min(planner::MAX_SURFACES) {
             let body = BodyId::new(

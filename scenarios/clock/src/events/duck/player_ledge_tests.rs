@@ -5,7 +5,7 @@ use engine_common::{
 
 fn ready(aspect: f32, direction: f32) -> TestDuck {
     let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
-    duck.direction = direction;
+    duck.face(direction);
     for _ in 0..OPENING_TICKS {
         duck.step();
     }

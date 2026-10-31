@@ -200,7 +200,7 @@ fn run_stats(mut event: TestDuck, label: &str) -> RunStats {
                 outcome,
                 ClockDuckOutcome::Exited,
                 "{label} tick={tick} {after:?} course={:?}",
-                event.course
+                event.terrain.course
             );
             exit_tick.get_or_insert(tick);
         }
@@ -227,7 +227,7 @@ fn run_stats(mut event: TestDuck, label: &str) -> RunStats {
     // crossings are no longer the visit's contract.
     assert!(
         landings + planning.skipped_platforms
-            >= (event.course.as_ref().unwrap().surfaces.len() - 1) as u32,
+            >= (event.terrain.course.as_ref().unwrap().surfaces.len() - 1) as u32,
         "{label}: {final_state:?}"
     );
     stats.landings = landings;
@@ -260,8 +260,8 @@ fn compare_profiles(seeds: std::ops::Range<u64>) {
             let mut flowing = TestDuck::new_platforms(Layout::new(aspect), seed);
             flowing.select_jump_profile(Some(ClockDuckJumpProfile::Flowing));
             assert_eq!(
-                careful.course.as_ref().unwrap().surfaces,
-                flowing.course.as_ref().unwrap().surfaces
+                careful.terrain.course.as_ref().unwrap().surfaces,
+                flowing.terrain.course.as_ref().unwrap().surfaces
             );
             for (index, event) in [careful, flowing].into_iter().enumerate() {
                 let result = run_stats(
@@ -324,7 +324,7 @@ fn authored_routes_prove_linked_jumps_and_shortcuts_in_the_real_solver() {
         [800.0 / 480.0, 1024.0 / 768.0].map(|aspect| (pattern, profile, aspect))
     }) {
         let mut event = TestDuck::new_platforms(Layout::new(aspect), 42);
-        event.course = Some(Course::authored(event.width, event.radius, pattern));
+        event.terrain.course = Some(Course::authored(event.width, event.radius, pattern));
         event.select_jump_profile(Some(profile));
         let stats = run_stats(event, &format!("{pattern:?} {profile:?}"));
         eprintln!("authored {pattern:?} {profile:?} aspect={aspect}: {stats:?}");
@@ -377,7 +377,7 @@ fn pattern_matrix(seeds: std::ops::Range<u64>) {
                         .enumerate()
                 {
                     let mut event = TestDuck::new_course(Layout::new(aspect), seed, Some(pattern));
-                    let course = event.course.as_ref().unwrap();
+                    let course = event.terrain.course.as_ref().unwrap();
                     assert_eq!(course.pattern, pattern);
                     assert!(!course.fallback);
                     assert_eq!(
@@ -409,7 +409,7 @@ fn fixed_platform_step_and_gap_courses_land_in_both_directions() {
     for aspect in ASPECTS {
         for fixture in 0..3 {
             let mut event = TestDuck::new_platforms(Layout::new(aspect), 42);
-            event.course = Some(Course::fixed(event.width, event.radius, fixture));
+            event.terrain.course = Some(Course::fixed(event.width, event.radius, fixture));
             run(event, &format!("aspect={aspect} fixture={fixture}"));
         }
     }
@@ -423,7 +423,7 @@ fn generated_platform_courses_have_confirmed_landings_and_bounded_exits() {
 #[test]
 fn wide_course_can_depart_without_completing_a_return_crossing() {
     let event = TestDuck::new_platforms(Layout::new(4.0), 79);
-    let crossing_landings = event.course.as_ref().unwrap().surfaces.len() as u32 - 1;
+    let crossing_landings = event.terrain.course.as_ref().unwrap().surfaces.len() as u32 - 1;
     let stats = run_stats(event, "wide departure after the first crossing");
     assert_eq!(stats.landings, crossing_landings);
     assert!(stats.first_crossing < OPENING_TICKS + EXIT_DELAY_TICKS);
@@ -444,7 +444,7 @@ fn generated_matrix(seeds: std::ops::Range<u64>) {
     for aspect in ASPECTS {
         for seed in seeds.clone() {
             let event = TestDuck::new_platforms(Layout::new(aspect), seed);
-            fallbacks += usize::from(event.course.as_ref().unwrap().fallback);
+            fallbacks += usize::from(event.terrain.course.as_ref().unwrap().fallback);
             let (count, exit) = run(event, &format!("aspect={aspect} seed={seed}"));
             landings += count;
             exits[0] = exits[0].min(exit);
@@ -462,7 +462,7 @@ fn exhausted_generation_budget_uses_a_playable_fallback_and_seeds_vary_geometry(
         let mut event = TestDuck::new_platforms(Layout::new(aspect), 42);
         let course = Course::generate_with_budget(event.width, event.radius, 42, 0);
         assert!(course.fallback);
-        event.course = Some(course);
+        event.terrain.course = Some(course);
         run(event, "forced fallback");
     }
     let a = Course::generated(800.0, 8.0, 42);
@@ -542,7 +542,7 @@ fn forced_bad_landings_are_classified_using_real_supports_not_proximity() {
 #[test]
 fn unreachable_platform_is_refused_and_event_still_cleans_up() {
     let mut event = TestDuck::new_platforms(Layout::new(800.0 / 480.0), 42);
-    event.course.as_mut().unwrap().surfaces[1].height = event.radius * 20.0;
+    event.terrain.course.as_mut().unwrap().surfaces[1].height = event.radius * 20.0;
     for _ in 0..DUCK_TICKS {
         event.step();
     }
@@ -696,7 +696,7 @@ fn mixed_spawns_replay_both_personalities_without_changing_courses_or_schedules(
     };
     let geometry = |state: &ClockState| {
         let event = state.duck_visit.as_ref().expect("expected duck");
-        event.course.as_ref().unwrap().surfaces.clone()
+        event.terrain.course.as_ref().unwrap().surfaces.clone()
     };
     assert_eq!(ClockConfig::default().duck_jump_profile, None);
     let mut mixed = init(None);

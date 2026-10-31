@@ -17,7 +17,7 @@ fn entrance_panel_returns_flush_after_closing_and_stays_closed() {
     for aspect in [1024.0 / 768.0, 800.0 / 480.0] {
         for direction in [-1.0, 1.0] {
             let mut event = TestDuck::new_platforms(Layout::new(aspect), 42);
-            event.direction = direction;
+            event.face(direction);
             assert_eq!(moving_panels(&event), [false, false], "initially flush");
             event.step();
             assert_eq!(moving_panels(&event), [true, false], "entrance opens alone");

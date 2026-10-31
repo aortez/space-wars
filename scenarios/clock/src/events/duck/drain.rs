@@ -17,7 +17,7 @@ impl DuckEvent {
         let mut duck = Self::with_player(Self::new(layout, seed), session, seat);
         duck.fit_character();
         let lip = layout.drain_half_width();
-        duck.course = Some(planner::Course {
+        duck.terrain.course = Some(planner::Course {
             surfaces: vec![
                 planner::Surface {
                     start: 0.0,
@@ -43,7 +43,7 @@ impl DuckEvent {
             "a standalone event's world is the only one"
         );
         *arena = Some(world);
-        duck.drain_floor = Some(drain);
+        duck.terrain.drain_floor = Some(drain);
         duck.preserve_arena_opacity(1.0);
         // Both old walls stay physical for the bars. The far backstage door
         // ends the visit at its visible threshold, before the wall behind it.

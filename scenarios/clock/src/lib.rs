@@ -775,7 +775,7 @@ impl ClockState {
             let authoritative = match &self.active_event {
                 Some(ActiveEvent::Rain(e)) => e.responsive_floor(),
                 Some(ActiveEvent::Meltdown(e)) => e.floor.as_ref(),
-                Some(ActiveEvent::Aquarium(e)) if visit.responsive_floor().is_some() => {
+                Some(ActiveEvent::Aquarium(e)) if visit.terrain.responsive_floor().is_some() => {
                     Some(&e.floor)
                 }
                 _ => None,
@@ -787,14 +787,8 @@ impl ClockState {
                 );
             }
             return (
-                surfaces::duck(visit),
-                if visit.responsive_floor().is_some() {
-                    SoilSupportState::Responsive
-                } else if visit.drain_floor.is_some() {
-                    SoilSupportState::Drain
-                } else {
-                    SoilSupportState::Course
-                },
+                surfaces::terrain(&visit.terrain),
+                visit.terrain.support_state(),
             );
         }
         let floor = match &self.active_event {
@@ -1206,7 +1200,7 @@ impl ClockState {
             && let Some(duck) = &self.duck_visit
         {
             self.floor.acquire_visit_event(kind);
-            let rain = if let Some(floor) = duck.responsive_floor() {
+            let rain = if let Some(floor) = duck.terrain.responsive_floor() {
                 rain::RainEvent::on_responsive_floor(
                     layout,
                     seed,
@@ -1216,7 +1210,7 @@ impl ClockState {
                 )
             } else {
                 rain::RainEvent::on_course(
-                    events::duck::arena::CourseGeometry::from_duck(duck),
+                    events::duck::arena::CourseGeometry::from_terrain(&duck.terrain),
                     seed,
                     self.config.rain_amount,
                     self.display,
@@ -1286,7 +1280,7 @@ impl ClockState {
                 && let Some(floor) = rain.responsive_floor()
                 && let Some(duck) = &mut self.duck_visit
             {
-                duck.sync_responsive_floor(floor);
+                duck.terrain.sync_responsive_floor(floor);
             }
             drop(event);
             // An arena the event kept after its visit left goes with it.
@@ -1344,7 +1338,7 @@ impl ClockState {
                 if let Some(duck) = &mut self.duck_visit
                     && let Some(floor) = rain.responsive_floor()
                 {
-                    duck.sync_responsive_floor(floor);
+                    duck.terrain.sync_responsive_floor(floor);
                 }
                 Some(&rain.water)
             }
@@ -1377,7 +1371,7 @@ impl ClockState {
                 _ => self
                     .duck_visit
                     .as_ref()
-                    .and_then(|duck| duck.responsive_floor()),
+                    .and_then(|duck| duck.terrain.responsive_floor()),
             },
             water: match &self.active_event {
                 Some(ActiveEvent::Aquarium(event)) => Some(&event.water),

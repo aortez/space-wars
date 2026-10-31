@@ -1,7 +1,7 @@
 //! Real floor geometry expressed as transforms from retained material coordinates.
 use super::*;
 use crate::{
-    events::duck::{DuckEvent, arena::CourseGeometry},
+    events::duck::{ArenaTerrain, arena::CourseGeometry},
     floor::{FloorGeometry, responsive::ResponsiveFloor},
     layout::Layout,
 };
@@ -81,13 +81,13 @@ pub(crate) fn course(course: &CourseGeometry) -> Vec<Surface> {
         })
         .collect()
 }
-pub(crate) fn duck(duck: &DuckEvent) -> Vec<Surface> {
-    if let Some(floor) = duck.responsive_floor() {
-        responsive(duck.layout, floor)
-    } else if let Some(floor) = duck.drain_floor {
+pub(crate) fn terrain(terrain: &ArenaTerrain) -> Vec<Surface> {
+    if let Some(floor) = terrain.responsive_floor() {
+        responsive(terrain.layout, floor)
+    } else if let Some(floor) = terrain.drain_floor {
         ordinary(floor.geometry())
-    } else if duck.course.is_some() {
-        course(&CourseGeometry::from_duck(duck))
+    } else if terrain.course.is_some() {
+        course(&CourseGeometry::from_terrain(terrain))
     } else {
         Vec::new()
     }

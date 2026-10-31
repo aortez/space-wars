@@ -119,7 +119,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         } else {
             state.active_event.as_ref().unwrap().arena_opacity()
         };
-        if let Some(panels) = event.responsive_floor() {
+        if let Some(panels) = event.terrain.responsive_floor() {
             floor::responsive(&mut frame, panels, layout, opacity);
         } else {
             render_floor(
@@ -128,7 +128,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
                 layout.pitch,
                 1.0 - opacity,
             );
-            duck::render_arena(&mut frame, event, opacity);
+            duck::render_arena(&mut frame, &event.terrain, opacity);
         }
     } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event
         && let Some(course) = event.course()
@@ -159,7 +159,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             },
         );
     } else if let Some(duck) = &state.duck_visit
-        && let Some(panels) = duck.responsive_floor()
+        && let Some(panels) = duck.terrain.responsive_floor()
     {
         floor::responsive(&mut frame, panels, layout, duck.arena_opacity());
     } else if let Some(event) = state.duck_scene() {
@@ -498,7 +498,10 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     // retain their own opacity and geometry while clock content transforms.
     if let Some(event) = state.duck_scene() {
         let shared = matches!(&state.active_event, Some(crate::events::ActiveEvent::Rain(rain)) if rain.course().is_some());
-        if shared || shared_mechanics_arena(state).is_some() || event.responsive_floor().is_some() {
+        if shared
+            || shared_mechanics_arena(state).is_some()
+            || event.terrain.responsive_floor().is_some()
+        {
             duck::render_with_course(frame, &event, state.config.duck_debug_overlay, false);
         } else {
             duck::render(frame, &event, state.config.duck_debug_overlay);

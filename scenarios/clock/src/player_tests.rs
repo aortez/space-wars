@@ -326,7 +326,7 @@ fn screen_relative_movement_back_wall_and_real_exit_work_in_both_directions() {
             directions[usize::from(direction > 0.0)] = true;
             // A flat authored fixture isolates entry, screen mirroring and exit
             // from obstacle planning. Movement still goes through real Rapier.
-            scene.course.as_mut().unwrap().surfaces = vec![Surface {
+            scene.terrain.course.as_mut().unwrap().surfaces = vec![Surface {
                 start: -scene.radius * 8.0,
                 end: scene.width + scene.radius * 8.0,
                 height: 0.0,
@@ -375,7 +375,7 @@ fn missing_a_gap_falls_and_releases_player_resources() {
     toggle(&mut state, 1);
     let scene = state.duck_visit.as_mut().unwrap();
     let axis = (scene.direction * 1000.0) as i16;
-    scene.course.as_mut().unwrap().surfaces = vec![
+    scene.terrain.course.as_mut().unwrap().surfaces = vec![
         Surface {
             start: -64.0,
             end: scene.width * 0.3,

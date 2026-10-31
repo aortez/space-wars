@@ -37,7 +37,7 @@ fn scene(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, direct: boo
         if !flap_detour::selected(duck.seed) {
             continue;
         }
-        duck.direction = direction;
+        duck.face(direction);
         return state;
     }
     panic!("no selected visit in seed fixture range");
