@@ -15,7 +15,7 @@ pub(super) struct DigitSolids {
 }
 
 impl DigitSolids {
-    pub fn new(cells: &[Obstacle], duck: &DuckEvent, world: &mut PhysicsWorld) -> Self {
+    pub fn new(cells: &[Obstacle], duck: Option<&DuckEvent>, world: &mut PhysicsWorld) -> Self {
         let mut result = Self {
             cells: Vec::new(),
             corrections: 0,
@@ -24,7 +24,12 @@ impl DigitSolids {
         result
     }
 
-    pub fn synchronize(&mut self, cells: &[Obstacle], duck: &DuckEvent, world: &mut PhysicsWorld) {
+    pub fn synchronize(
+        &mut self,
+        cells: &[Obstacle],
+        duck: Option<&DuckEvent>,
+        world: &mut PhysicsWorld,
+    ) {
         if self.cells == cells {
             return;
         }
@@ -65,7 +70,11 @@ impl DigitSolids {
         self.clear_new_geometry(duck, world);
     }
 
-    fn clear_new_geometry(&mut self, duck: &DuckEvent, world: &mut PhysicsWorld) {
+    fn clear_new_geometry(&mut self, duck: Option<&DuckEvent>, world: &mut PhysicsWorld) {
+        // A vacant arena has no character to keep clear.
+        let Some(duck) = duck else {
+            return;
+        };
         let Some((position, radius)) = duck.clearance_hull(world) else {
             return;
         };

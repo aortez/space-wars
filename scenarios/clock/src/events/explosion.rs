@@ -8,7 +8,7 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::{
     EventContext, EventPhase, REFORMING_TICKS,
-    duck::{DuckEvent, VisitArena},
+    duck::{ArenaTerrain, DuckEvent, VisitArena},
 };
 use crate::{
     SegmentRepresentation, digits,
@@ -196,7 +196,7 @@ impl ExplosionEvent {
     pub fn shares_visit_arena(&self) -> bool {
         matches!(self.mechanics, Mechanics::Shared(_))
     }
-    pub fn vacant_arena(&self) -> Option<&DuckEvent> {
+    pub fn vacant_arena(&self) -> Option<&ArenaTerrain> {
         match &self.mechanics {
             Mechanics::Shared(arena) => arena.vacant(),
             _ => None,
@@ -221,8 +221,9 @@ impl ExplosionEvent {
         session: u64,
         seat: u8,
     ) -> Option<Box<DuckEvent>> {
+        let opacity = self.arena_opacity();
         match &mut self.mechanics {
-            Mechanics::Shared(arena) => arena.rejoin(world, session, seat),
+            Mechanics::Shared(arena) => arena.rejoin(world, opacity, session, seat),
             _ => None,
         }
     }
@@ -379,7 +380,7 @@ impl ExplosionEvent {
                 Self::remove_bodies(arena.as_mut().expect("leased arena"), &self.cells);
                 self.live_bodies = false;
             }
-            lease.get_mut(duck).release_arena(arena);
+            lease.release(duck, arena);
         }
     }
     pub fn physics_counts(&self) -> (usize, usize) {

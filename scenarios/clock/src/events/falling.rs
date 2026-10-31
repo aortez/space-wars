@@ -3,7 +3,7 @@ use rand::{SeedableRng, rngs::StdRng};
 
 use super::{
     EventContext, EventPhase,
-    duck::{DuckEvent, VisitArena},
+    duck::{ArenaTerrain, DuckEvent, VisitArena},
 };
 use crate::{
     digits,
@@ -143,7 +143,7 @@ impl FallingEvent {
         arena.retain(duck, world);
     }
 
-    pub fn vacant_arena(&self) -> Option<&DuckEvent> {
+    pub fn vacant_arena(&self) -> Option<&ArenaTerrain> {
         match &self.mechanics {
             Mechanics::Shared { arena, .. } => arena.vacant(),
             _ => None,
@@ -164,10 +164,11 @@ impl FallingEvent {
         session: u64,
         seat: u8,
     ) -> Option<Box<DuckEvent>> {
+        let opacity = self.arena_opacity();
         let Mechanics::Shared { arena, .. } = &mut self.mechanics else {
             return None;
         };
-        arena.rejoin(world, session, seat)
+        arena.rejoin(world, opacity, session, seat)
     }
 
     pub fn step(
@@ -221,7 +222,7 @@ impl FallingEvent {
             if let Some(bodies) = bodies.take() {
                 bodies.remove(world.as_mut().expect("leased arena"));
             }
-            arena.get_mut(player).release_arena(world);
+            arena.release(player, world);
         }
     }
 

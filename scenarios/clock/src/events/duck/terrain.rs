@@ -7,6 +7,9 @@ use super::*;
 use crate::floor::DrainGeometry;
 
 pub(crate) struct ArenaTerrain {
+    /// The visit seed this terrain was laid out from. A character's own seeded
+    /// choices draw separate streams from it.
+    pub seed: u64,
     pub layout: Layout,
     pub width: f32,
     pub radius: f32,
@@ -52,6 +55,7 @@ impl ArenaTerrain {
             height: 0.0,
         };
         Self {
+            seed,
             layout,
             width,
             radius,

@@ -313,7 +313,7 @@ impl DuckEvent {
                 self.ledge.stats.reason = Some(Reason::Obstructed);
                 continue;
             }
-            // Registration validates the same local anchor and visit generation.
+            // Registration validates the same local anchor and flap generation.
             if let Some((_, handle)) = edge.flap
                 && !self.attach_to_flap(world, handle, edge.local_anchor)
             {

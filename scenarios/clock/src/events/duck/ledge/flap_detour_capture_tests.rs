@@ -34,7 +34,7 @@ fn scene(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, direct: boo
         // Select a reproducible visit that chooses the optional stunt itself.
         // No fixture poses or movement commands drive the duck.
         let duck = state.duck_visit.as_mut().unwrap();
-        if !flap_detour::selected(duck.seed) {
+        if !flap_detour::selected(duck.terrain.seed) {
             continue;
         }
         duck.face(direction);

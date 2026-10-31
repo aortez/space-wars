@@ -147,18 +147,29 @@ impl TestDuck {
             .synchronize_soil(self.world.as_mut(), soil);
     }
 
-    pub fn claim_arena(&mut self) {
-        self.duck.claim_arena(&mut self.world);
+    /// Leave the arena as an event's lease keeps it, checking that the
+    /// character took its body and flaps with it.
+    pub fn leave(self) -> (VisitArena, Option<PhysicsWorld>) {
+        let TestDuck {
+            mut duck,
+            mut world,
+        } = self;
+        let mut lease = VisitArena::claim(&mut duck, &mut world);
+        lease.retain(Box::new(duck), world.as_mut().expect("leased arena"));
+        let left = world.as_ref().unwrap();
+        assert!(left.motion(DUCK_BODY).is_none(), "the body leaves");
+        assert!(
+            (0..2).all(|side| !left.contains_body(flaps::body(side))),
+            "the flaps leave"
+        );
+        (lease, world)
     }
 
-    pub fn retire_from_arena(&mut self) {
-        self.duck
-            .retire_from_arena(self.world.as_mut().expect("leased arena"));
-    }
-
-    pub fn rejoin_arena(&mut self, session_id: u64, seat: u8) {
-        self.duck
-            .rejoin_arena(self.world.as_mut().expect("leased arena"), session_id, seat);
+    /// Leave, then come back as a new player character on the same terrain.
+    pub fn rejoin(self, session_id: u64, seat: u8) -> Self {
+        let (mut lease, mut world) = self.leave();
+        let duck = *lease.rejoin(&mut world, 1.0, session_id, seat).unwrap();
+        Self { duck, world }
     }
 
     pub fn run(&mut self, water: Option<&WaterWorld>) {

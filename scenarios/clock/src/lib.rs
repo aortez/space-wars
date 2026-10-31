@@ -766,16 +766,20 @@ impl ClockState {
     fn soil_surfaces(&self) -> (Vec<grass::surfaces::Surface>, grass::SoilSupportState) {
         use grass::{SoilSupportState, surfaces};
         let layout = Layout::new(self.aspect_ratio());
-        let visit = self.duck_visit.as_deref().or_else(|| {
-            self.active_event
-                .as_ref()
-                .and_then(ActiveEvent::vacant_arena)
-        });
-        if let Some(visit) = visit {
+        let terrain = self
+            .duck_visit
+            .as_deref()
+            .map(|visit| &visit.terrain)
+            .or_else(|| {
+                self.active_event
+                    .as_ref()
+                    .and_then(ActiveEvent::vacant_arena)
+            });
+        if let Some(terrain) = terrain {
             let authoritative = match &self.active_event {
                 Some(ActiveEvent::Rain(e)) => e.responsive_floor(),
                 Some(ActiveEvent::Meltdown(e)) => e.floor.as_ref(),
-                Some(ActiveEvent::Aquarium(e)) if visit.terrain.responsive_floor().is_some() => {
+                Some(ActiveEvent::Aquarium(e)) if terrain.responsive_floor().is_some() => {
                     Some(&e.floor)
                 }
                 _ => None,
@@ -786,10 +790,7 @@ impl ClockState {
                     SoilSupportState::Responsive,
                 );
             }
-            return (
-                surfaces::terrain(&visit.terrain),
-                visit.terrain.support_state(),
-            );
+            return (surfaces::terrain(terrain), terrain.support_state());
         }
         let floor = match &self.active_event {
             Some(ActiveEvent::Rain(e)) => {

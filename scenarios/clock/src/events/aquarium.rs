@@ -9,7 +9,7 @@ mod tests;
 
 use super::{
     EventContext, EventPhase,
-    duck::{DuckEvent, VisitArena},
+    duck::{ArenaTerrain, DuckEvent, VisitArena},
 };
 use crate::{
     DisplaySnapshot, SegmentState, digits,
@@ -151,7 +151,7 @@ impl AquariumEvent {
         result.floor.insert_panels_at(world, LINER_ID);
         result.shared = Some(SharedAquarium {
             arena,
-            digits: solids::DigitSolids::new(&result.glyphs, duck, world),
+            digits: solids::DigitSolids::new(&result.glyphs, Some(duck), world),
             extra_liner: true,
         });
         result
@@ -229,10 +229,12 @@ impl AquariumEvent {
             self.school.finish_departure();
         }
         if self.tick >= DRAIN_AT {
-            let hull = self.shared.as_ref().and_then(|s| {
-                let world = world.as_ref().expect("leased arena");
-                s.arena.get(player.as_deref()).clearance_hull(world)
-            });
+            // Only a character in the leased arena keeps the floor clear.
+            let hull = self
+                .shared
+                .as_ref()
+                .and(player.as_deref())
+                .and_then(|duck| duck.clearance_hull(world.as_ref().expect("leased arena")));
             self.floor.step_retained(
                 &mut self.water,
                 f64::from(DT),
@@ -252,13 +254,17 @@ impl AquariumEvent {
                 .expect("bounded aquarium recovery");
         }
         if let Some(mut shared) = self.shared.take() {
-            let duck = shared.arena.get_mut(player.as_deref_mut());
             let leased = world.as_mut().expect("leased arena");
-            shared.digits.synchronize(&self.glyphs, duck, leased);
+            shared
+                .digits
+                .synchronize(&self.glyphs, player.as_deref(), leased);
             if shared.extra_liner {
                 self.floor.move_panels_at(leased, LINER_ID);
             } else {
-                duck.terrain.sync_responsive_floor(&self.floor);
+                shared
+                    .arena
+                    .terrain_mut(player.as_deref_mut())
+                    .sync_responsive_floor(&self.floor);
             }
             let duck = shared
                 .arena
@@ -270,7 +276,8 @@ impl AquariumEvent {
                     self.layout,
                     self.port,
                     self.tick,
-                    world.as_ref().and_then(|world| duck.clearance_hull(world)),
+                    duck.zip(world.as_ref())
+                        .and_then(|(duck, world)| duck.clearance_hull(world)),
                 );
             }
             self.shared = Some(shared);
@@ -308,7 +315,7 @@ impl AquariumEvent {
     pub fn shares_visit_arena(&self) -> bool {
         self.shared.is_some()
     }
-    pub fn vacant_arena(&self) -> Option<&DuckEvent> {
+    pub fn vacant_arena(&self) -> Option<&ArenaTerrain> {
         self.shared.as_ref()?.arena.vacant()
     }
     pub fn retain_arena(&mut self, duck: Box<DuckEvent>, world: &mut PhysicsWorld) {
@@ -324,7 +331,11 @@ impl AquariumEvent {
         session: u64,
         seat: u8,
     ) -> Option<Box<DuckEvent>> {
-        self.shared.as_mut()?.arena.rejoin(world, session, seat)
+        // The Aquarium never fades its arena.
+        self.shared
+            .as_mut()?
+            .arena
+            .rejoin(world, 1.0, session, seat)
     }
 
     pub fn join_player(
@@ -349,7 +360,7 @@ impl AquariumEvent {
         let world = arena.as_mut().expect("claimed arena");
         self.shared = Some(SharedAquarium {
             arena: lease,
-            digits: solids::DigitSolids::new(&self.glyphs, &duck, world),
+            digits: solids::DigitSolids::new(&self.glyphs, Some(&duck), world),
             extra_liner: false,
         });
         Some(duck)
@@ -364,7 +375,7 @@ impl AquariumEvent {
                     leased.remove_entity(PhysicsId::new(id));
                 }
             }
-            shared.arena.get_mut(player).release_arena(world);
+            shared.arena.release(player, world);
         }
     }
 

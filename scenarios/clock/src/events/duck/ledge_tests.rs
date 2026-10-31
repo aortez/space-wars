@@ -343,17 +343,9 @@ fn takeover_and_retirement_preserve_then_release_attachment_ownership() {
             0,
             "old source's uncommitted drop is discarded"
         );
-        let TestDuck {
-            mut duck,
-            world: mut arena,
-        } = duck;
-        let mut lease = VisitArena::claim(&mut duck, &mut arena);
-        lease.retain(Box::new(duck), arena.as_mut().unwrap());
-        let vacant = DuckView::new(lease.vacant().unwrap(), arena.as_ref());
-        assert!(vacant.ledge_anchor().is_none());
-        assert_eq!(vacant.ledge_state(), Default::default());
-        assert!(vacant.door_panels().iter().all(Option::is_none));
-        let rejoined = lease.rejoin(&mut arena, 9, 1).unwrap();
+        // Leaving takes the attachment with the character's body and flaps.
+        let rejoined = duck.rejoin(9, 1);
+        assert!(rejoined.ledge_anchor().is_none());
         assert_eq!(rejoined.ledge_state(), Default::default());
     }
 }

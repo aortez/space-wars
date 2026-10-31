@@ -65,7 +65,7 @@ struct Flap {
     hold: Option<ClockDuckFlapHold>,
 }
 
-/// A claim cannot survive retirement/rejoining of the same shared arena.
+/// A claim cannot survive its flap's removal, even if the flap reopens.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FlapHandle {
     generation: u64,

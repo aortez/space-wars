@@ -457,17 +457,8 @@ fn a_fully_open_exit_flap_is_local_recovery_support_and_retires_with_its_arena()
                 );
                 continue;
             }
-            let TestDuck {
-                mut duck,
-                world: mut arena,
-            } = duck;
-            let mut lease = VisitArena::claim(&mut duck, &mut arena);
-            lease.retain(Box::new(duck), arena.as_mut().unwrap());
-            let vacant = lease.vacant().unwrap();
-            assert!(!vacant.ledge_attached());
-            assert!(!vacant.ledge.automatic.stats.active);
-            assert!(vacant.door_panels().iter().all(Option::is_none));
-            let rejoined = lease.rejoin(&mut arena, 10, 1).unwrap();
+            let rejoined = duck.rejoin(10, 1);
+            assert!(!rejoined.ledge_attached());
             assert_eq!(rejoined.ledge.automatic.stats, Default::default());
         }
     }

@@ -3,7 +3,7 @@
 //! release schedule, material budget, water solver and reformation lifecycle.
 use super::*;
 use crate::arena::ids::canonical;
-use crate::events::duck::VisitArena;
+use crate::events::duck::{ArenaTerrain, VisitArena};
 use engine_rapier::world::{
     BodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId, PhysicsWorld,
 };
@@ -108,7 +108,7 @@ impl MeltdownEvent {
         self.shared.is_some()
     }
 
-    pub fn vacant_arena(&self) -> Option<&DuckEvent> {
+    pub fn vacant_arena(&self) -> Option<&ArenaTerrain> {
         self.shared.as_ref()?.arena.vacant()
     }
 
@@ -134,13 +134,17 @@ impl MeltdownEvent {
         session: u64,
         seat: u8,
     ) -> Option<Box<DuckEvent>> {
-        self.shared.as_mut()?.arena.rejoin(world, session, seat)
+        let opacity = self.arena_opacity();
+        self.shared
+            .as_mut()?
+            .arena
+            .rejoin(world, opacity, session, seat)
     }
 
     pub fn release(&mut self, player: Option<&mut DuckEvent>, world: &mut Option<PhysicsWorld>) {
         if let Some(shared) = &mut self.shared {
             shared.bodies.remove(world.as_mut().expect("leased arena"));
-            shared.arena.get_mut(player).release_arena(world);
+            shared.arena.release(player, world);
         }
     }
 
@@ -155,16 +159,14 @@ impl MeltdownEvent {
         // allocations. This lets both material paths share reformation code.
         let mut shared = self.shared.take().expect("shared Meltdown");
         self.tick += 1;
-        let hull = shared
-            .arena
-            .get(player.as_deref())
-            .clearance_hull(world.as_ref().expect("leased arena"));
+        let hull = player
+            .as_deref()
+            .and_then(|duck| duck.clearance_hull(world.as_ref().expect("leased arena")));
         if let Some(floor) = &mut self.floor {
             floor.step(&mut self.water, f64::from(DT), hull);
             shared
                 .arena
-                .get_mut(player.as_deref_mut())
-                .terrain
+                .terrain_mut(player.as_deref_mut())
                 .sync_responsive_floor(floor);
         }
         let material = self.tick < MELTING_TICKS + DRAINING_TICKS;

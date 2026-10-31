@@ -107,7 +107,6 @@ pub(crate) struct DuckEvent {
     buoyant: Option<BuoyantBody>,
     water_report: BuoyancyReport,
     paddling: bool,
-    seed: u64,
     movement: Movement,
     controller: Controller,
     jumps: u32,
@@ -305,7 +304,11 @@ impl DuckEvent {
     }
 
     pub fn new(layout: Layout, seed: u64) -> Self {
-        let terrain = ArenaTerrain::new(layout, seed);
+        Self::on_terrain(ArenaTerrain::new(layout, seed))
+    }
+
+    /// A character about to enter `terrain`, which may already be in a world.
+    fn on_terrain(terrain: ArenaTerrain) -> Self {
         Self {
             phase: EventPhase::Opening,
             phase_tick: 0,
@@ -322,7 +325,6 @@ impl DuckEvent {
             water_report: BuoyancyReport::default(),
             paddling: false,
             spawn_motion: None,
-            seed,
             controller: Controller::new(),
             jumps: 0,
             outcome: None,
@@ -918,7 +920,7 @@ impl DuckEvent {
                 recovery: self.controller.recovery.stats,
                 water: self.controller.water.stats,
                 jump_profile: self.controller.profile,
-                course_seed: self.seed,
+                course_seed: self.terrain.seed,
                 behavior: self.controller.behavior,
                 facing_right: self.controller.facing() * self.direction > 0.0,
                 wall_tags: if self.direction > 0.0 {
@@ -1010,7 +1012,7 @@ impl DuckEvent {
         // A separate seeded stream keeps personality independent of course
         // generation, entrance side, and the automatic event schedule.
         self.controller.profile = profile.unwrap_or_else(|| {
-            let mut rng = StdRng::seed_from_u64(self.seed ^ 0x4455_434b_5354_594c);
+            let mut rng = StdRng::seed_from_u64(self.terrain.seed ^ 0x4455_434b_5354_594c);
             if rng.random_bool(0.5) {
                 engine_common::ClockDuckJumpProfile::Careful
             } else {

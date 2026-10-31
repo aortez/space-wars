@@ -84,7 +84,7 @@ impl DuckEvent {
             return None;
         }
         self.ledge.detour.age += 1;
-        if self.ledge.detour.stats.phase == DetourPhase::Pending && !selected(self.seed) {
+        if self.ledge.detour.stats.phase == DetourPhase::Pending && !selected(self.terrain.seed) {
             self.finish_flap_detour(Outcome::NotSelected);
             return None;
         }

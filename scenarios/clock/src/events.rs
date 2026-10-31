@@ -330,7 +330,8 @@ impl ActiveEvent {
         }
     }
 
-    pub fn vacant_arena(&self) -> Option<&duck::DuckEvent> {
+    /// The terrain of a leased arena whose character has left.
+    pub fn vacant_arena(&self) -> Option<&duck::ArenaTerrain> {
         match self {
             Self::Aquarium(event) => event.vacant_arena(),
             Self::Falling(event) => event.vacant_arena(),

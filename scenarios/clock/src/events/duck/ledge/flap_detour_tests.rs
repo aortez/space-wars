@@ -306,20 +306,8 @@ fn takeover_and_arena_retirement_keep_body_ownership_and_clear_autonomous_intent
     }
     let mut duck = ordinary(ASPECTS[0], 1.0, PROFILES[0]);
     until(&mut duck, |d| d.ledge.stats.phase == Phase::Hanging);
-    let TestDuck {
-        mut duck,
-        world: mut arena,
-    } = duck;
-    let mut lease = VisitArena::claim(&mut duck, &mut arena);
-    lease.retain(Box::new(duck), arena.as_mut().unwrap());
-    let vacant = lease.vacant().unwrap();
-    assert!(!vacant.ledge_attached());
-    assert!(arena.as_ref().unwrap().motion(DUCK_BODY).is_none());
-    assert_eq!(vacant.door_openness(), (0.0, 0.0));
-    let mut rejoined = TestDuck {
-        duck: *lease.rejoin(&mut arena, 2, 1).unwrap(),
-        world: arena,
-    };
+    let mut rejoined = duck.rejoin(2, 1);
+    assert!(!rejoined.ledge_attached());
     for _ in 0..100 {
         rejoined.step();
     }

@@ -159,9 +159,8 @@ fn attachment_is_bounded_by_live_geometry_reach_and_visit_identity() {
         !duck.attach_to_flap(handle, local),
         "closed panel cannot be attached"
     );
-    duck.claim_arena();
-    duck.retire_from_arena();
-    duck.rejoin_arena(2, 1);
+    // A rejoin is a new character, which starts with no attachment.
+    let mut duck = duck.rejoin(2, 1);
     for _ in 0..OPENING_TICKS {
         duck.step();
     }
@@ -169,9 +168,9 @@ fn attachment_is_bounded_by_live_geometry_reach_and_visit_identity() {
     let hand = panel.center() + local.rotate_radians(panel.angle);
     let radius = duck.radius;
     place(&mut duck, hand + Vec2::new(0.0, -radius * 2.0));
-    assert!(
-        !duck.attach_to_flap(handle, local),
-        "retired visit claims stay stale"
+    assert_ne!(
+        duck.diagnostics().flaps[0].hold,
+        Some(ClockDuckFlapHold::Attachment)
     );
     assert!(duck.attach_to_flap(duck.flap_handle(0).unwrap(), local));
 }
@@ -312,15 +311,19 @@ fn retiring_flaps_removes_only_the_visits_bodies_and_claims() {
         "character and one open flap retire"
     );
     assert_eq!(world.motion(id), foreign_motion);
-    let vacant = lease.vacant().unwrap();
-    assert!(vacant.door_panels().iter().all(Option::is_none));
-    let duck = lease.step_with_soil(None, &mut arena, None, false, None);
+    assert_eq!(flap_body_count(Some(world)), 0);
+    let gravity = world.gravity().y;
+    assert!(
+        lease
+            .step_with_soil(None, &mut arena, None, false, None)
+            .is_none()
+    );
     let after = arena.as_ref().unwrap().motion(id).unwrap();
     assert!(
-        (after.linear_velocity.y + duck.movement.gravity * DT).abs() < 0.001,
+        (after.linear_velocity.y - gravity * DT).abs() < 0.001,
         "one shared step"
     );
-    duck.release_arena(&mut arena);
+    lease.release(None, &mut arena);
     assert!(
         arena.is_none(),
         "the finished visit's arena goes with the lease"

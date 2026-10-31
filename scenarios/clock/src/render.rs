@@ -113,13 +113,12 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         aquarium::water(&mut frame, event);
         floor::responsive(&mut frame, &event.floor, layout, 1.0);
     }
-    if let Some(event) = shared_mechanics_arena(state) {
-        let opacity = if state.duck_visit.is_some() {
-            event.arena_opacity()
-        } else {
-            state.active_event.as_ref().unwrap().arena_opacity()
+    if let Some(terrain) = shared_mechanics_arena(state) {
+        let opacity = match &state.duck_visit {
+            Some(duck) => duck.arena_opacity(),
+            None => state.active_event.as_ref().unwrap().arena_opacity(),
         };
-        if let Some(panels) = event.terrain.responsive_floor() {
+        if let Some(panels) = terrain.responsive_floor() {
             floor::responsive(&mut frame, panels, layout, opacity);
         } else {
             render_floor(
@@ -128,7 +127,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
                 layout.pitch,
                 1.0 - opacity,
             );
-            duck::render_arena(&mut frame, &event.terrain, opacity);
+            duck::render_arena(&mut frame, terrain, opacity);
         }
     } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event
         && let Some(course) = event.course()
@@ -521,11 +520,19 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     }
 }
 
-fn shared_mechanics_arena(state: &ClockState) -> Option<&crate::events::duck::DuckEvent> {
+/// The terrain of the arena a shared-mechanics event leases, with or without
+/// its character.
+fn shared_mechanics_arena(state: &ClockState) -> Option<&crate::events::duck::ArenaTerrain> {
     let event = state.active_event.as_ref()?;
     event
         .shares_visit_arena()
-        .then(|| state.duck_visit.as_deref().or(event.vacant_arena()))
+        .then(|| {
+            state
+                .duck_visit
+                .as_deref()
+                .map(|duck| &duck.terrain)
+                .or(event.vacant_arena())
+        })
         .flatten()
 }
 
