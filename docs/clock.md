@@ -2194,7 +2194,9 @@ runs the same sequence under Xvfb. It then restarts mid-visit and starts again
 from the launcher, each time finding the fixtures alone in a fresh world.
 `client_scenarios::clock::arena_tests` draws a settled two-owner run through
 both render adapters; set `SPACEWARS_CLOCK_ARTIFACTS=DIR` to keep its PNG and
-SVG captures.
+SVG captures. The `residents`
+[benchmark fixture](clock-performance-lab.md#fixed-workload-benchmarks) is idle
+Clock with the same two owners, and measures what residents cost at rest.
 
 Known limits:
 

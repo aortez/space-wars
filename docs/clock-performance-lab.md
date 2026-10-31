@@ -357,7 +357,7 @@ cargo build --locked --release -p engine-client
 ./benchmark-clock.sh
 ```
 
-The wrapper runs all ten cases at 1024×768, raster scales 1 and 2, three
+The wrapper runs all eleven cases at 1024×768, raster scales 1 and 2, three
 independent processes per combination. Each run warms up for two simulated
 seconds, resets the seeded scenario, then measures 15 simulated seconds.
 Each CSV row represents exactly 60 fixed steps and 60 rendered/prepared frames,
@@ -401,6 +401,11 @@ run were retained locally under `target/clock-benchmarks/run.zhYlok3O/`.
 # 60+ seconds measure the established lawn under the beam.
 ./benchmark-clock.sh --cases idle,grass --seconds 60 --repeats 3
 
+# Idle residents: the development arena fixture's two owners in the run's
+# arena. They settle within three seconds, so 60-second runs measure them
+# almost entirely at rest.
+./benchmark-clock.sh --cases idle,residents --seconds 60 --repeats 3
+
 # A single raw run, without the wrapper.
 target/release/engine-client --scenario clock --benchmark-headless --seed 7 \
   --clock-benchmark-case meltdown --renderer raster --raster-scale 2 \
@@ -411,10 +416,14 @@ target/release/engine-client --scenario clock --benchmark-headless --seed 7 \
 
 Fixtures ignore wall time, physical input, and saved Clock settings. They show
 24-hour **08:08**, refresh the seconds/colon once per simulated second, and use
-the fixed seed. `idle` stays anchored. Each other case previews its named event,
-including construction, active phases, cleanup, the normal two-second cooldown,
-and one second of idle before repeating. Digit Slide intentionally rolls all
-four digits as a dense preview; ordinary minute changes usually move fewer.
+the fixed seed. `idle` stays anchored, and so does `residents`, which starts
+with the development arena fixture's two owners: five balls dropped onto the
+closed floor of the run's arena, which steps every tick (see [Sharing the run's
+physics arena](clock.md#sharing-the-runs-physics-arena)). Each other case
+previews its named event, including construction, active phases, cleanup, the
+normal two-second cooldown, and one second of idle before repeating. Digit Slide
+intentionally rolls all four digits as a dense preview; ordinary minute changes
+usually move fewer.
 Marquee uses the specified recipe and the fixed default `SPACE WARS` message.
 Its 15-second cycle is the longest; use at least 15 seconds to cover every phase.
 
