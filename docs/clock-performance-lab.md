@@ -501,12 +501,43 @@ The `residents` fixture is `idle` with the development arena fixture's two
 owners in the run's arena: five balls dropped onto the closed floor as the run
 starts, all asleep within three seconds, in an arena that steps every tick while
 nothing else happens. It measures what idle residents cost: that step, the floor
-the arena keeps under them and five filled circles. Workstation (AMD Ryzen 7
-9800X3D, Linux 7.0.0-38-generic, powersave governor), release client
-`5e3ad018…` built with Rust 1.89 from `0f0b3dc8`, headless 1024×768 raster,
-seed 7, two warm-up seconds, 60 measured seconds, three processes per
-combination. Values are medians of per-run means; p95 is the worst row of any
-run:
+the arena keeps under them and five filled circles.
+
+Pi 4 `sw-picade-2` (Raspberry Pi 4 Model B Rev 1.2, Linux 6.6.63-v8, ondemand
+governor, 57–64 °C), release `pi-kiosk-gpu` client `8dfb6e4b…`, built by the
+Yocto recipe with Rust 1.94 from a clean `6eb6bddc` and run from `/tmp`,
+headless 1024×768 raster, seed 7, two warm-up seconds, 60 measured seconds.
+Three invocations of the wrapper ran one process per case and scale, the second
+in the opposite case order, with the kiosk on its App Settings page. Values are
+medians of per-run means; p95 is the worst row of any run:
+
+| Case | Scale | Step ms | Scene ms | Prepare ms | Total ms/frame | Worst row p95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| idle | 1 | 0.011 | 0.140 | 6.300 | 6.458 | 7.130 |
+| residents | 1 | 0.064 | 0.136 | 6.315 | 6.520 | 7.217 |
+| idle | 2 | 0.011 | 0.140 | 19.451 | 19.609 | 21.550 |
+| residents | 2 | 0.063 | 0.137 | 19.404 | 19.609 | 21.308 |
+
+Residents add about 0.05 ms of simulation per frame at either scale, which is
+the arena's step with every ball asleep: 0.3% of the 16.7 ms frame budget.
+While the balls drop, in the first three seconds, the step takes about 0.1 ms.
+Drawing them costs nothing measurable: raster preparation differs from idle's
+by less than it varies between runs, and scene generation is a few microseconds
+lower, not higher. The arena holds 6 bodies and 6 colliders throughout, the
+five balls and the floor kept under them, and no event runs. Raw reports are
+retained under `target/clock-benchmarks/picade-residents-20261031/`.
+
+A first run, with the kiosk returned to its launcher, measured a similar step
+cost of 0.06 ms. But the launcher's Auto-start had started Clock again 10 s
+after it was shown, before that run began, so a live Clock shared the device
+throughout and moved preparation at 2× by up to 0.35 ms between the cases. On
+App Settings, which suspends Auto-start, the kiosk took about a fifth of one
+core, against a third for a live Clock and half for a paused one. That run's
+reports are kept beside the others in `with-live-clock.run.E6LboJvA/`.
+
+The workstation (AMD Ryzen 7 9800X3D, Linux 7.0.0-38-generic, powersave
+governor) ran release client `5e3ad018…`, built with Rust 1.89 from `0f0b3dc8`,
+with three processes per combination in case order:
 
 | Case | Scale | Step ms | Scene ms | Prepare ms | Total ms/frame | Worst row p95 ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -515,22 +546,11 @@ run:
 | idle | 2 | 0.000 | 0.011 | 5.353 | 5.364 | 6.068 |
 | residents | 2 | 0.002 | 0.011 | 5.353 | 5.365 | 5.770 |
 
-Residents add about 2 µs of simulation per frame, which is the arena's step with
-every ball asleep, and under 1 µs of scene generation. Raster preparation
-differs by no more than it varies between runs, and so do the worst p95 rows.
-While the balls drop, the step takes 3 µs; leaving out those first three seconds
-changes no median above by more than 1 µs. The arena holds 6 bodies and 6
-colliders throughout: the five balls and the floor kept under them. These are
-CPU-only headless samples, not displayed FPS; raw reports are retained under
-`target/clock-benchmarks/run.Oa2hOXuL/`.
-
-The Pi 4 profile of the same fixture is owed. Collect it as in the [Picade
-procedure](#picade-procedure), with a client built from the same source:
-
-```sh
-bash /tmp/benchmark-clock.sh --client /tmp/engine-client \
-  --cases idle,residents --seconds 60 --repeats 3 --output /tmp/clock-benchmarks
-```
+There residents add about 2 µs of simulation per frame and under 1 µs of scene
+generation. Raster preparation differs by no more than it varies between runs,
+and so do the worst p95 rows. Leaving out the first three seconds changes no
+median by more than 1 µs. These are CPU-only headless samples, not displayed
+FPS; raw reports are retained under `target/clock-benchmarks/run.Oa2hOXuL/`.
 
 ## Live CPU timings
 
@@ -566,9 +586,11 @@ comparisons. Time values are observations, never unit-test thresholds.
 Use the Pi 4 `picade.local`, not another checkout's Pi 5 target. Deploy a matching
 client with the usual updater, then return the kiosk to its launcher before
 running headless tests so an active scenario does not compete for CPU/memory
-bandwidth. Avoid screenshots during measured runs. Keep cooling, CPU governor,
-power supply, display mode and background load comparable; collect multiple
-runs and note throttling/temperature when investigating device results.
+bandwidth. With [Auto-start](auto-start.md) on, the root launcher starts its
+activity again after the idle delay, so open App Settings from the launcher,
+which suspends it. Avoid screenshots during measured runs. Keep cooling, CPU
+governor, power supply, display mode and background load comparable; collect
+multiple runs and note throttling/temperature when investigating device results.
 
 ```sh
 scp benchmark-clock.sh spacewars@picade.local:/tmp/benchmark-clock.sh
