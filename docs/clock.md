@@ -384,10 +384,11 @@ without adding an invisible ceiling collider.
 At most **239 cells** exist (216 digit-grid cells plus 23 label pixels); Classic
 uses at most 119. Standalone
 events use four fixed floor/wall bodies and the existing center drain. With a
-duck, the cells instead enter its **existing mechanics world**, which advances
-once per tick. Debris can hit the duck; controller ownership and motion continue.
-Departure/rejoining hands the same arena back and forth without duplicating
-bodies. The crow leaves when the digit perches disappear.
+duck, the cells instead enter the run's arena beside the visit, which advances
+once per tick. Debris can hit the duck and any resting residents; controller
+ownership and motion continue. Departure and rejoining leave the debris in the
+same world without duplicating bodies. The crow leaves when the digit perches
+disappear.
 
 At reformation, only the event's debris bodies are removed. Their last poses
 become **fully opaque returning blocks**, not a fading overlay on a second face.
@@ -603,8 +604,8 @@ instead; they do not also open the ordinary drain. Their physical floor/pit/tank
 geometry is unchanged. The Duck course keeps its entrance/exit fade to the
 ordinary closed floor; water labs return to it on completion.
 
-One small scenario-owned manager tracks the timed event and resident visit's
-independent claims; the floor closes only after both have released it.
+One small scenario-owned manager tracks the timed event's and the visit's
+independent floor claims; the floor closes only after both have released it.
 Its fixed geometry supplies Falling's slabs. Rain and Meltdown's shared
 event-owned actuator updates only each event's two existing
 floor pools, conservatively remapping retained water and releasing uncovered
@@ -659,7 +660,8 @@ With Classic, the event uses **320 columns, at most 512 water parcels, and one d
 128 floor columns plus 192 digit columns; 192 parcel slots are protected for
 atomic digit retirement. With a duck there are four bodies/five colliders: one
 duck, two persistent moving panels and a fixed pair of side walls. The rigid
-world is allocated only for the duck's visit and released when it exits.
+world is the run's arena, which the visit claims and lets go when it exits; the
+world goes with it unless residents keep the arena.
 Source admission
 reserves two new parcel slots for this tick's outlets; already airborne outlet
 parcels count toward the same budget. Capacity pressure defers unadmitted rain
@@ -746,19 +748,20 @@ geometry moves to the nearest reachable clearance point without changing its
 identity; `clearance_corrections` counts these exceptional adjustments. Font
 changes defer until the event ends.
 
-Joining leases one native duck world, stepped once after the water. An existing
-visit retains its controller, session, position and course/panels; two visible
-lower liner bodies retain water beneath course gaps. New player visits use the
-Aquarium panels. Dismissal retains the vacant arena for rejoining. Completion,
-replacement and cancellation remove only event-owned resources, preserving a
-continuing duck. The crow's existing water sensors cause it to leave a wet perch.
+Joining claims the run's arena beside the event, stepped once after the water.
+An existing visit retains its controller, session, position and course/panels;
+two visible lower liner bodies retain water beneath course gaps. New player
+visits use the Aquarium panels. Dismissal removes the character, and the
+visit's claim stays with its terrain for rejoining. Completion, replacement and
+cancellation remove only event-owned resources, preserving a continuing duck.
+The crow's existing water sensors cause it to leave a wet perch.
 
 One event-owned fixed body provides cuboid colliders for every visible lit cell,
 including the dim/bright colon and visible AM/PM. The duck collides with sides,
 tops and undersides. Reading/format changes replace only this bounded cell list.
 If a newly lit cell overlaps the duck, a nearest-clear-side correction preserves
 its body/session and increments `duck_clearance_corrections`. Normal swimming
-uses native contacts. The digit body is removed when Aquarium releases the arena.
+uses native contacts. The digit body is removed when Aquarium lets its claim go.
 
 **Hold Down to dive**, with up to four seconds of downward strokes. Releasing
 Down restores ordinary buoyancy. Two seconds resting at the surface refills an
@@ -1202,11 +1205,13 @@ still blocked at 34.5 seconds enters reset; successful exits normally occur soon
 `exiting` starts when the door appears, even if the duck is still heading toward
 the entrance before its final return crossing.
 Reset immediately removes the actor and releases attachments. The flaps finish
-closing within the half-second reset; an unleased world is then released. The
-course fades over that half second and keeps the
+closing within the half-second reset; unless an event still holds the arena, the
+visit then lets its claim go, and the world goes too unless residents keep it.
+The course fades over that half second and keeps the
 last outcome until the fixed 35-second visit envelope ends. Rain/Falling/Meltdown
-retain their course/material until their own cleanup. Resize/restart release both
-lifetimes; compatible previews preserve the visit. Narrow
+retain their course/material until their own cleanup. Resize finishes both the
+visit and the event, and restart ends the run; compatible previews preserve the
+visit. Narrow
 layouts scale the duck and jump height down; wider layouts increase running
 speed and horizontal course spacing while keeping the action below the face.
 
@@ -1422,15 +1427,17 @@ batch limit. IDs occupy separate bounded
 namespaces; geometry and the body-ID list are allocated at event boundaries,
 not rebuilt each tick. Rendering reads the same body poses used for contacts.
 
-Dismissal, falling out or walking out removes only the character. Falling then
-owns the exact existing arena until completion, so the remaining bars keep
-moving. A new visit can take that arena back with a fresh controller/session ID;
-it does not reset the bars, floor or event clock. An occupied arena stays opaque.
+Dismissal, falling out or walking out removes only the character. The visit's
+claim stays with its terrain while Falling holds the arena, so the remaining
+bars keep moving on the same ground until completion. A new visit takes that
+claim back with a fresh controller/session ID; it does not reset the bars, floor
+or event clock. An occupied arena stays opaque.
 After 210 falling ticks the event removes **only its batch** before the 90-tick
 visual reformation, so there are no invisible bars flying back through the duck.
 A duck formerly standing on a bar becomes airborne normally. Finishing or
-replacing Falling preserves a live player; if nobody remains, the last floor
-claim and world are released.
+replacing Falling preserves a live player. If no character remains, the
+visit's terrain goes with Falling's claim, and the world goes too unless
+residents keep the arena.
 
 **Joining standalone Falling:** The existing Rapier world moves into the player
 arena intact, retaining every body, collider, contact, mass, pose and velocity.
@@ -1500,7 +1507,7 @@ dismiss/rejoin, subsequent events, deterministic replay and cleanup. Production
 raster/vector captures exercise live and late entry on Picade, HyperPixel and
 portrait layouts; the world raster is unchanged at the join action itself.
 
-Falling and Meltdown share the same arena lease lifecycle. Leaving retains the
+Falling and Meltdown hold the arena the same way. Leaving retains the
 exact world for the event; rejoining uses a fresh session without resetting
 blocks, water or event time. Finishing/replacing the event removes only its own
 material and leaves the player/floor intact. Responsive panels continue their
@@ -1992,8 +1999,10 @@ Falling releases Rapier at reformation; automatic Duck releases it on exit/reset
 at most 28 moving bars plus two AM/PM letters and four arena bodies, with
 123 colliders for Falling (32 bodies / 100 colliders without AM/PM),
 or eight bodies/colliders at the Duck course ceiling, with no accumulating debris.
-Player visits keep their own arena across compatible events, with shared Falling/Meltdown
-resource/lifetime bounds described above.
+Player visits keep the run's arena across compatible events, with shared Falling/Meltdown
+resource/lifetime bounds described above. Residents keep it for the whole run;
+[Sharing the run's physics arena](#sharing-the-runs-physics-arena) gives its
+bounds.
 
 ## Extending the event system
 
@@ -2006,7 +2015,8 @@ Animation randomness uses a separate per-event seed, never the schedule's RNG.
 The catalog declares each event's trigger (`periodic` or `time-change`), affected area and timing. Add a kind, its
 settings/launcher control, catalog entry, and an enum implementation when adding
 an event; keep shared lifecycle tests and add event-specific tests. Finishing or
-resizing drops the active event and restores the latest face and base palette.
+resizing drops the active event and restores the latest face and base palette;
+residents of the run's physics arena stay through a resize, as below.
 Restart/relaunch constructs a fresh scenario. There is no plugin framework and
 no concurrent scheduler events: affected-area metadata does not permit overlap.
 Marquee composes presentation passes *inside* one event; it does not opt out of
@@ -2079,6 +2089,122 @@ hold 90.00 of 90 for the whole visit, while Clock chase and Digit spin floor at
 49.93 and 48.26, which is their own chase and sweep patterns dimming cells to
 half rather than anything being put out. `render::face_handover_contract` holds
 all of this, with the floor set at 45% of the face's ink.
+
+### Sharing the run's physics arena
+
+Rigid bodies that meet a visiting duck, or outlive the event that made them,
+live in the run's one arena: `ClockArena` in `scenarios/clock/src/arena.rs`.
+Its module comment states the rules, and `arena_contract.rs` holds them:
+
+- **One world, one step.** There is at most one arena world, and every tick
+  that moves time steps it exactly once, whoever holds it. A tick that does not
+  move time steps nothing.
+- **Owners claim it.** A visit claims it for its terrain and character, and
+  one event at a time shares it beside a visit: Aquarium, Explosion, Falling or
+  Meltdown. Residents keep it for the rest of the run: retained soil, and the
+  development arena fixtures. The first claim builds the world and the last to
+  let go takes it away. Each owner's bodies take identities from its own
+  ranges in `arena::ids::canonical`, and an owner that lets go takes only
+  those.
+- **Claims are bounded.** Each owner declares a budget of bodies, colliders
+  and joints. The arena holds at most **255 bodies / 288 colliders** and no
+  joints: a visit, the largest event, soil and one fixture together, so
+  everything Clock ships fits. At most **6** owners hold it at once, and at
+  most **4** of them are residents, soil included. A claim beyond those is
+  refused before anything changes, as `residents` or `capacity`. So is a visit
+  or event that uses the floor while the residents do not fit the view, as
+  `layout-incompatible`. Debug builds audit every step: each body belongs to
+  exactly one owner holding the arena, or to the floor kept under resting
+  residents, and no owner exceeds its budget.
+- **Residents rest on real support.** Soil is fixed in place. A fixture's
+  balls rest on a visit's terrain while the visit holds the arena, on an
+  event's own floor, or otherwise on the floor the arena keeps under them,
+  closed or open at the drain. They are never pinned to support that has gone,
+  and they leave the arena only by falling out of the view.
+- **A resize keeps residents.** It still finishes visits and events, but the
+  residents stay in the same world. A resting ball beyond a narrower view comes
+  in just far enough to lie within it, keeping its height and motion
+  (`clamped`). Balls that could only come in by landing in each other or in the
+  floor stay where they are, with the floor they stood on (`declined`), and the
+  arena takes nothing that uses the floor until a resize they fit, or their
+  leaving.
+- **The run ends once.** Restart and leaving Clock each drop every world the
+  run held, exactly once, and the next run starts with no residents, claims or
+  world. Nothing of a run is kept on disk, so an application restart starts
+  clean too.
+
+An event that needs rigid bodies in the shared world declares an `Owner` with
+its identity ranges and budget, asks `arena::admits` before it changes
+anything, claims the arena rather than building a world of its own, and lets
+go of only its own claim. If its budget raises `ARENA_CAPACITY`, record the new
+caps here. Standalone Falling and Explosion still step worlds of their own, so
+their bodies meet residents only once a player joins and the arena adopts that
+world. Clock's state publishes all of this in its
+[`arena` object](#public-controls-and-synchronized-captures) and each event's
+`blocked_by_arena`, and `clock trigger` fails an event the arena would refuse
+with `action-unavailable` and the arena's notice.
+
+To see residents in the real client, start Clock with the development arena
+fixture. `SPACEWARS_CLOCK_ARENA_FIXTURE=default` drops the ordinary fixture's
+three balls onto the floor, and `two-owners` adds a second owner with two balls
+near the walls, where every visit's course has ground. Any other value, as in
+ordinary Clock, starts none. The balls are drawn pale, like the wood they rest
+on.
+
+Start the client with the switch and choose Clock in the launcher, so that the
+run starts in the window's own view. A direct `--scenario clock` start can build
+the run before the window has a size, in the default 1280×720 view. A 1024×768
+window then brings the outer balls in (`clamped`), but a near-square or portrait
+window is narrower than the fixtures fit: the arena declines them as after any
+such resize, and `clock state` shows `layout incompatible=true`.
+
+```sh
+SPACEWARS_CLOCK_ARENA_FIXTURE=two-owners cargo run --release -p engine-client
+# Choose Clock in the launcher and start it, then:
+spacewars-cli clock state
+spacewars-cli clock trigger duck
+spacewars-cli clock trigger meltdown
+spacewars-cli clock events
+```
+
+At rest, the two owners hold the arena with all five balls asleep on the closed
+floor (timings vary by machine):
+
+```text
+Arena: 2 claims, 2 residents (at most 6 and 4); 6 bodies, 6 colliders, 0 joints (at most 255, 288, 0); floor 1 bodies
+Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders
+Arena run: 1 worlds, 183 steps; granted=2 released=0 refused=0; layout incompatible=false, last remap=None
+Arena step: 3 us (collision detection 2 us, solver 0 us); bodies active=0 sleeping=5; pairs candidate=5 contact=5, contacts=5, CCD substeps=1
+```
+
+The duck's visit joins their world as a third claim, and its course takes the
+place of the floor the arena kept. Beside it the two owners leave no room for
+Meltdown, so `clock trigger meltdown` fails with `action-unavailable: The arena
+has no room for this`, and `clock events` shows `blocked by arena=capacity` for
+Meltdown, Explosion and Aquarium:
+
+```text
+Arena: 3 claims, 2 residents (at most 6 and 4); 10 bodies, 10 colliders, 0 joints (at most 255, 288, 0); floor 0 bodies
+Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders; visit 5/11 bodies, 5/11 colliders
+```
+
+The PR smoke workflow
+`clock::arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run`
+runs the same sequence under Xvfb. It then restarts mid-visit and starts again
+from the launcher, each time finding the fixtures alone in a fresh world.
+`client_scenarios::clock::arena_tests` draws a settled two-owner run through
+both render adapters; set `SPACEWARS_CLOCK_ARTIFACTS=DIR` to keep its PNG and
+SVG captures.
+
+Known limits:
+
+- An automatic visit's duck can push a resting ball out through its door. The
+  ball then leaves the arena like any other fall.
+- A floor that closes at once, as Rain's panels do when Rain finishes part-way
+  open, can appear under a resident resting below its surface, and the solver
+  lifts the resident out.
+- A declined resize lasts until a resize the residents fit, or until they leave.
+- Standalone Falling and Explosion meet residents only after a player joins.
 
 ### Composed Marquee effects
 
