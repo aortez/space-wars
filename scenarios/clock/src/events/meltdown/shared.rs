@@ -26,6 +26,12 @@ struct CellBodies {
 }
 
 impl SharedMeltdown {
+    /// The body carrying cell `index`, once it has fallen.
+    pub fn body(&self, index: usize) -> Option<BodyId> {
+        let body = self.bodies.cells.get(index)?;
+        body.released.then_some(body.id)
+    }
+
     pub fn new(player: &mut DuckEvent, arena: &mut ClockArena, count: usize) -> Self {
         assert!(count <= MAX_MELTDOWN_CELLS);
         let supports = if player.terrain.responsive_floor().is_some() {
@@ -175,6 +181,7 @@ impl MeltdownEvent {
                 &mut self.water,
                 context.layout,
                 self.cell_area,
+                context.surfaces,
             );
         }
         self.tick >= MELTING_TICKS + DRAINING_TICKS + REFORMING_TICKS
@@ -227,6 +234,7 @@ impl CellBodies {
         water: &mut WaterWorld,
         layout: Layout,
         cell_area: f64,
+        surfaces: &mut SurfaceLedger,
     ) -> f64 {
         let mut kept = 0;
         let mut exited = 0.0;
@@ -248,6 +256,9 @@ impl CellBodies {
                 if escaped {
                     exited += area;
                     remove = true;
+                    if let Some(piece) = cell.piece {
+                        surfaces.retire(piece.id, Retirement::Exited);
+                    }
                 } else {
                     // No melting on the duck, other blocks, side walls, water,
                     // or a guessed floor plane across a real course/drain gap.
@@ -259,6 +270,9 @@ impl CellBodies {
                                 && c.separation <= layout.pitch * 0.005
                         });
                     remove = floor_contact && material::liquefy(&cell, water, area, layout);
+                    if remove && let Some(piece) = cell.piece {
+                        surfaces.retire(piece.id, Retirement::Melted);
+                    }
                 }
                 if remove {
                     world.remove_entity(body.id.entity);

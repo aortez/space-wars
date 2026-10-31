@@ -8,6 +8,7 @@ mod player;
 mod presentation;
 mod responsive;
 mod spilling;
+mod surfaces;
 
 fn ready(aspect: f32, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(
@@ -31,6 +32,18 @@ fn ready(aspect: f32, seed: u64) -> ClockState {
 
 fn tick(state: &mut ClockState) {
     ClockScenario::step(state, &[], Duration::from_secs_f64(1.0 / 60.0));
+}
+
+impl MeltdownEvent {
+    /// Swaps the event's blocks for fixtures. The surfaces the old ones carried
+    /// are retired, as an event cut short would.
+    fn replace_cells(&mut self, cells: Vec<MeltCell>, surfaces: &mut SurfaceLedger) {
+        for cell in std::mem::replace(&mut self.cells, cells) {
+            if let Some(piece) = cell.piece {
+                surfaces.retire(piece.id, Retirement::Interrupted);
+            }
+        }
+    }
 }
 
 #[test]
@@ -738,7 +751,7 @@ fn pool_passes_are_symmetric_nonnegative_and_conservative() {
     let Some(crate::events::ActiveEvent::Meltdown(event)) = &mut state.active_event else {
         panic!()
     };
-    event.cells.clear();
+    event.replace_cells(Vec::new(), &mut state.surfaces);
     // Exercise the symmetric pool/floor solve without the deliberately uneven
     // drain fan. Live splashes have separate replay/conservation coverage.
     let floor = event.floor.as_ref().unwrap();
@@ -765,7 +778,7 @@ fn pool_passes_are_symmetric_nonnegative_and_conservative() {
     event.initial_cells = 96;
     event.initial_area = 96.0 * event.cell_area;
     for _ in 0..300 {
-        event.step_material(Layout::new(800.0 / 480.0));
+        event.step_material(Layout::new(800.0 / 480.0), &mut state.surfaces);
         let left: Vec<_> = event.water.pools()[0].columns().collect();
         let right: Vec<_> = event.water.pools()[1].columns().collect();
         for i in 0..SIDE_COLUMNS {

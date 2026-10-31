@@ -568,6 +568,7 @@ impl ActiveEvent {
             Self::DigitSlide(event) => event.surfaces(layout, out),
             Self::Explosion(event) => event.surfaces(layout, out),
             Self::Falling(event) => event.surfaces(layout, segments, out),
+            Self::Meltdown(event) => event.surfaces(layout, out),
             _ => (),
         }
     }
@@ -583,17 +584,17 @@ impl ActiveEvent {
             Self::DigitSlide(event) => event.release_surfaces(surfaces),
             Self::Explosion(event) => event.release_surfaces(segments, surfaces),
             Self::Falling(event) => event.release_surfaces(segments, surfaces),
+            Self::Meltdown(event) => event.release_surfaces(segments, surfaces),
             _ => (),
         }
     }
 
     /// Events whose moving pieces are not published as surfaces yet.
     pub fn vacates_face(&self) -> bool {
-        match self {
-            Self::Meltdown(event) => !event.lab,
-            Self::CellSwap(_) | Self::SlotMachine(_) | Self::Marquee(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::CellSwap(_) | Self::SlotMachine(_) | Self::Marquee(_)
+        )
     }
 
     pub fn holds_lit_segments(&self) -> bool {

@@ -1703,3 +1703,320 @@ fn surface_contract_an_explosion_with_a_player_follows_the_arenas_bodies() {
     assert_face_agreement(&state, "after a shared explosion");
     assert_eq!(markers.attached().count(), markers.markers.len());
 }
+
+/// The solid digit blocks a Meltdown still has.
+fn solids(state: &ClockState) -> usize {
+    match &state.active_event {
+        Some(crate::events::ActiveEvent::Meltdown(event)) => {
+            event.cells.iter().filter(|cell| !cell.meridiem).count()
+        }
+        _ => 0,
+    }
+}
+
+#[test]
+fn surface_contract_meltdown_blocks_keep_their_surfaces_until_they_melt_leave_or_are_reclaimed() {
+    for (index, font) in FONTS.into_iter().enumerate() {
+        for aspect in ASPECTS {
+            let context = format!("{font:?} at {aspect}");
+            // The AM/PM pixels melt too, and are not surfaces.
+            let format = if index % 2 == 0 {
+                ClockTimeFormat::TwelveHour
+            } else {
+                ClockTimeFormat::TwentyFourHour
+            };
+            let mut state = clock(aspect, font, format, reading(20, 8, 10));
+            let mut markers = Markers::attach(&state, |_| Some(Vec2::new(0.2, 0.2)));
+            let face = state.digit_surfaces();
+            let admitted = state.surface_accounting().admitted;
+            sync(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Meltdown)],
+            );
+            let mut ticks = 0;
+            let mut refill: Vec<DigitSurface> = Vec::new();
+            let mut exited = 0;
+            while state.event_kind() == Some(ClockEventKind::Meltdown) {
+                let surfaces = markers.follow(&state);
+                if state.event_phase() != Some(EventPhase::Reforming) {
+                    exited = state.meltdown_state().unwrap().exited_solid_microunits;
+                }
+                let context = format!("{context}, tick {ticks}");
+                if ticks % 5 == 0 {
+                    assert_face_agreement(&state, &context);
+                }
+                if state.event_phase() == Some(EventPhase::Reforming) {
+                    // The refill is new surfaces, growing as the face is drawn.
+                    assert!(surfaces.iter().all(|s| s.source == SurfaceSource::Refill
+                        && face.iter().all(|old| old.id != s.id)));
+                    for surface in &surfaces {
+                        if let Some(old) = refill.iter().find(|old| old.id == surface.id) {
+                            assert!(surface.footprint.max.y >= old.footprint.max.y, "{context}");
+                            assert_eq!(surface.origin, old.origin, "{context}");
+                        }
+                    }
+                    refill = surfaces;
+                } else {
+                    // Water and the AM/PM pixels are not surfaces.
+                    assert_eq!(surfaces.len(), solids(&state), "{context}");
+                    assert!(surfaces.iter().all(|s| s.body.is_none()
+                        && matches!(s.source, SurfaceSource::Anchored | SurfaceSource::Ballistic)));
+                }
+                tick(&mut state, &[]);
+                ticks += 1;
+            }
+            assert_eq!(
+                ticks as u64,
+                MELTING_TICKS + DRAINING_TICKS + REFORMING_TICKS,
+                "{context}"
+            );
+            let after = markers.follow(&state);
+            assert_face_agreement(&state, &context);
+            assert_eq!(
+                ids(&after),
+                ids(&refill),
+                "{context}: the refill is the face"
+            );
+            let accounting = state.surface_accounting();
+            assert_eq!(
+                accounting.admitted - admitted,
+                after.len() as u64,
+                "{context}"
+            );
+            let gone = [
+                Retirement::Melted,
+                Retirement::Exited,
+                Retirement::Reclaimed,
+            ]
+            .map(|reason| accounting.retired(reason))
+            .iter()
+            .sum::<u64>();
+            assert_eq!(gone as usize, face.len(), "{context}");
+            assert!(accounting.retired(Retirement::Melted) > 0, "{context}");
+            if format == ClockTimeFormat::TwentyFourHour {
+                // Every solid that left the view was a digit block.
+                assert_eq!(
+                    accounting.retired(Retirement::Exited) * 1_000_000,
+                    exited,
+                    "{context}"
+                );
+            }
+            for marker in &markers.markers {
+                assert!(
+                    matches!(
+                        marker.lost,
+                        Some(Loss::Retired(
+                            Retirement::Melted | Retirement::Exited | Retirement::Reclaimed
+                        ))
+                    ),
+                    "{context}: {:?}",
+                    marker.lost
+                );
+            }
+            for surface in &face {
+                let handoffs: Vec<_> = markers
+                    .handoffs
+                    .iter()
+                    .filter(|(id, _, _)| *id == surface.id)
+                    .map(|(_, from, to)| (*from, *to))
+                    .collect();
+                assert!(
+                    handoffs.is_empty()
+                        || handoffs == [(SurfaceSource::Anchored, SurfaceSource::Ballistic)],
+                    "{context}: {handoffs:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn surface_contract_meltdown_with_a_player_rides_the_arenas_bodies() {
+    let mut state = clock(
+        800.0 / 480.0,
+        ClockFont::Classic,
+        ClockTimeFormat::TwentyFourHour,
+        reading(18, 48, 0),
+    );
+    sync(&mut state, &[ClockAction::toggle_player_duck(1)]);
+    assert!(state.player_duck_session().is_some());
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::new(-0.3, 0.1)));
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Meltdown)],
+    );
+    let mut offsets = Vec::new();
+    let mut ticks = 0;
+    while state.event_kind() == Some(ClockEventKind::Meltdown) {
+        let surfaces = markers.follow(&state);
+        if ticks % 5 == 0 {
+            assert_face_agreement(&state, &format!("shared, tick {ticks}"));
+        }
+        assert_on_bodies(&state, &surfaces, &mut offsets, "shared");
+        if state.event_phase() != Some(EventPhase::Reforming) {
+            assert_eq!(surfaces.len(), solids(&state));
+        }
+        tick(&mut state, &[]);
+        ticks += 1;
+    }
+    assert!(!offsets.is_empty(), "the blocks fell on the arena's bodies");
+    markers.follow(&state);
+    assert_face_agreement(&state, "after a shared meltdown");
+    assert!(markers.markers.iter().all(|m| matches!(
+        m.lost,
+        Some(Loss::Retired(
+            Retirement::Melted | Retirement::Exited | Retirement::Reclaimed
+        ))
+    )));
+    assert!(
+        markers
+            .handoffs
+            .iter()
+            .all(|(_, from, to)| (*from, *to) == (SurfaceSource::Anchored, SurfaceSource::Rigid))
+    );
+}
+
+#[test]
+fn surface_contract_a_meltdown_cut_short_gives_back_what_never_left_and_the_refill() {
+    let start = MELTING_TICKS + DRAINING_TICKS;
+    for stop in [30, start + 40] {
+        let context = format!("stopped at {stop}");
+        let mut state = clock(
+            800.0 / 480.0,
+            ClockFont::Sans,
+            ClockTimeFormat::TwentyFourHour,
+            reading(10, 10, 0),
+        );
+        let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+        sync(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Meltdown)],
+        );
+        for _ in 0..stop {
+            tick(&mut state, &[]);
+            markers.follow(&state);
+        }
+        let held = state.digit_surfaces();
+        let waiting: Vec<_> = held
+            .iter()
+            .filter(|s| matches!(s.source, SurfaceSource::Anchored | SurfaceSource::Refill))
+            .map(|s| s.id)
+            .collect();
+        let low = Vec2::new(0.0, -0.3);
+        let mut late = Markers::attach(&state, |s| s.supports(low).then_some(low));
+        sync(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::ColorCycle)],
+        );
+        let after = markers.follow(&state);
+        late.follow(&state);
+        assert_face_agreement(&state, &context);
+        assert!(!waiting.is_empty(), "{context}");
+        for id in &waiting {
+            assert!(after.iter().any(|s| s.id == *id), "{context}: {}", id.get());
+        }
+        if stop < start {
+            assert!(waiting.len() < held.len(), "{context}: some blocks fell");
+            for marker in &markers.markers {
+                assert_eq!(
+                    marker.lost,
+                    (!waiting.contains(&marker.surface))
+                        .then_some(Loss::Retired(Retirement::Interrupted)),
+                    "{context}"
+                );
+            }
+        } else {
+            assert_eq!(waiting.len(), held.len(), "{context}");
+            assert!(
+                !late.markers.is_empty(),
+                "{context}: the refill is eligible"
+            );
+            assert_eq!(late.attached().count(), late.markers.len(), "{context}");
+        }
+    }
+}
+
+#[test]
+fn surface_contract_a_reading_changed_during_the_refill_replaces_only_the_changed_cells() {
+    for font in FONTS {
+        let context = format!("{font:?}");
+        let mut state = clock(
+            800.0 / 480.0,
+            font,
+            ClockTimeFormat::TwentyFourHour,
+            reading(12, 34, 0),
+        );
+        sync(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Meltdown)],
+        );
+        while state.event_phase() != Some(EventPhase::Reforming) || state.phase_tick() < 45 {
+            tick(&mut state, &[]);
+        }
+        let before = state.digit_surfaces();
+        let mut markers = Markers::attach(&state, |_| Some(Vec2::new(0.0, -0.35)));
+        tick(&mut state, &[ClockAction::set_reading(reading(12, 35, 0))]);
+        let after = markers.follow(&state);
+        assert_face_agreement(&state, &context);
+        let glyph = |digit: u8| crate::fonts::glyph(font, Some(digit));
+        for surface in &before {
+            let kept = after.iter().any(|s| s.id == surface.id);
+            assert_eq!(
+                kept,
+                surface.slot != 3 || glyph(5).contains(surface.cell),
+                "{context}"
+            );
+        }
+        let new: Vec<_> = after
+            .iter()
+            .filter(|s| before.iter().all(|old| old.id != s.id))
+            .collect();
+        assert_eq!(new.len(), (glyph(5).0 & !glyph(4).0).count_ones() as usize);
+        assert!(
+            new.iter()
+                .all(|s| s.slot == 3 && s.source == SurfaceSource::Refill)
+        );
+        for marker in &markers.markers {
+            let kept = after.iter().any(|s| s.id == marker.surface);
+            assert_eq!(
+                marker.lost,
+                (!kept).then_some(Loss::Retired(Retirement::Replaced)),
+                "{context}"
+            );
+        }
+    }
+}
+
+#[test]
+fn surface_contract_the_water_lab_leaves_the_face_alone() {
+    let mut state = ClockScenario::init(
+        ClockConfig {
+            water_lab: ClockWaterLab::Floating,
+            ..config(
+                800.0 / 480.0,
+                ClockFont::Classic,
+                ClockTimeFormat::TwentyFourHour,
+            )
+        },
+        7,
+    );
+    sync(&mut state, &[ClockAction::set_reading(reading(9, 41, 0))]);
+    let face = state.digit_surfaces();
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Meltdown)],
+    );
+    let mut ticks = 0;
+    while state.event_kind() == Some(ClockEventKind::Meltdown) {
+        tick(&mut state, &[]);
+        let surfaces = markers.follow(&state);
+        if ticks % 30 == 0 {
+            assert_face_agreement(&state, &format!("lab, tick {ticks}"));
+        }
+        assert_eq!(surfaces, face);
+        ticks += 1;
+    }
+    assert!(ticks > 0);
+    assert_eq!(markers.attached().count(), face.len());
+}

@@ -498,6 +498,9 @@ pub(crate) fn digit_cell_polygons(state: &ClockState) -> Vec<(Vec<Vec2>, f32)> {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::default();
     render_segments(&mut frame, state, layout);
+    if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
+        meltdown::render_solids(&mut frame, event, layout);
+    }
     filled_polygons_with_alpha(&frame, ACTIVE_CELL_LAYER)
 }
 

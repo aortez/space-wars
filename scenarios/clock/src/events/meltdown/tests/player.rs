@@ -153,6 +153,7 @@ fn block_block_contacts_do_not_trigger_the_material_change() {
     );
     let second = MeltCell {
         position: event(&state).cells[0].position + Vec2::new(0.0, layout.pitch * 0.79),
+        piece: event(&state).cells[1].piece,
         ..event(&state).cells[0]
     };
     event_mut(&mut state).cells[1] = second;

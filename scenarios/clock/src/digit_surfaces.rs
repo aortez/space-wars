@@ -348,6 +348,21 @@ impl Glyph {
 
     /// What the anchored face draws in a slot.
     pub fn anchored(segments: &[SegmentState], slot: usize) -> Self {
+        Self::lit_where(segments, slot, |segment| {
+            segment.representation == SegmentRepresentation::Anchored
+        })
+    }
+
+    /// The lit cells of a slot, wherever its segments are.
+    pub fn lit(segments: &[SegmentState], slot: usize) -> Self {
+        Self::lit_where(segments, slot, |_| true)
+    }
+
+    fn lit_where(
+        segments: &[SegmentState],
+        slot: usize,
+        drawn: impl Fn(&SegmentState) -> bool,
+    ) -> Self {
         let mut glyph = Self {
             font: ClockFont::Classic,
             mask: CellMask(0),
@@ -357,11 +372,22 @@ impl Glyph {
             .filter(|segment| usize::from(segment.id.digit_slot) == slot)
         {
             glyph.font = segment.font;
-            if segment.lit && segment.representation == SegmentRepresentation::Anchored {
+            if segment.lit && drawn(segment) {
                 glyph.mask.0 |= segment.shape.0;
             }
         }
         glyph
+    }
+
+    /// The cells of `ids`, in `font`.
+    pub fn of(font: ClockFont, ids: &SlotIds) -> Self {
+        let mut mask = CellMask(0);
+        for (bit, id) in ids.iter().enumerate() {
+            if id.is_some() {
+                mask.0 |= 1 << bit;
+            }
+        }
+        Self { font, mask }
     }
 }
 

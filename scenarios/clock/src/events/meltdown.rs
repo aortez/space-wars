@@ -1,5 +1,9 @@
 //! Clock adaptation of the bounded pool/spill model. One melted square supplies
 //! its world-space area; digit animation and event cleanup remain scenario-owned.
+//! Every digit block carries its face cell's surface until it is gone: melted
+//! on the floor, out of the view or reclaimed with the solids left at the
+//! refill. Water is not a surface. The refilled face is new surfaces, each
+//! growing upward with its row.
 use engine_common::ClockMeltdownState;
 use engine_core::Vec2;
 use engine_rapier::world::PhysicsWorld;
@@ -8,8 +12,12 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::{EventContext, EventPhase, REFORMING_TICKS, duck::DuckEvent};
 use crate::{
-    ClockWaterLab, SegmentRepresentation,
+    ClockWaterLab, DIGIT_SLOT_COUNT, GridCell, SegmentRepresentation, SegmentState,
     arena::ClockArena,
+    digit_surfaces::{
+        CELL_HALF, Footprint, GRID_CELLS, Glyph, Retirement, SlotIds, SurfaceId, SurfaceLedger,
+        SurfacePose, SurfaceSource, bit,
+    },
     digits,
     floor::responsive::{FloorShape, ResponsiveFloor},
     layout::Layout,
@@ -35,6 +43,21 @@ mod water_lab;
 
 pub(crate) use material::{MeltCell, soften};
 
+/// A digit block's face cell and the surface it carries.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Piece {
+    id: SurfaceId,
+    slot: u8,
+    cell: GridCell,
+}
+
+/// How far the refill has grown a cell in row `row`, which the face and its
+/// surfaces both read. Each row starts a little after the one below it.
+pub(crate) fn reform_progress(phase_tick: u64, row: i8) -> f32 {
+    let delay = row.max(0) as u64 * 4;
+    soften(phase_tick.saturating_sub(delay) as f32 / (REFORMING_TICKS - 1 - 32) as f32)
+}
+
 pub(crate) struct MeltdownEvent {
     pub tick: u64,
     pub cells: Vec<MeltCell>,
@@ -43,6 +66,10 @@ pub(crate) struct MeltdownEvent {
     pub floats: Option<water_lab::WaterLab>,
     pub floor: Option<ResponsiveFloor>,
     shared: Option<shared::SharedMeltdown>,
+    /// The glyph each slot's face had when it melted.
+    melted: [Glyph; DIGIT_SLOT_COUNT],
+    /// The refilled face's surfaces.
+    refill: [SlotIds; DIGIT_SLOT_COUNT],
     initial_cells: usize,
     initial_area: f64,
     cell_area: f64,
@@ -77,9 +104,17 @@ impl MeltdownEvent {
         let lab = mode != ClockWaterLab::Off;
         let mut rng = StdRng::seed_from_u64(seed);
         let mut cells = Vec::with_capacity(MAX_MELTDOWN_CELLS);
+        let melted: [Glyph; DIGIT_SLOT_COUNT] =
+            std::array::from_fn(|slot| Glyph::anchored(context.segments, slot));
         if !lab {
+            let faces: [SlotIds; DIGIT_SLOT_COUNT] = std::array::from_fn(|slot| {
+                context
+                    .surfaces
+                    .take(slot, melted[slot], SurfaceSource::Anchored)
+            });
             for segment in context.segments.iter_mut() {
                 if segment.lit {
+                    let slot = segment.id.digit_slot;
                     for cell in segment.cells() {
                         assert!(cells.len() < MAX_MELTDOWN_CELLS);
                         cells.push(MeltCell {
@@ -92,6 +127,12 @@ impl MeltdownEvent {
                             // Release solid blocks bottom-up with small seeded
                             // variation. Only floor contact changes the material.
                             release_tick: 24 + cell.y as u64 * 4 + rng.random_range(0..24),
+                            piece: Some(Piece {
+                                id: faces[usize::from(slot)][bit(cell)]
+                                    .expect("every lit cell has a surface"),
+                                slot,
+                                cell,
+                            }),
                         });
                     }
                 }
@@ -109,6 +150,7 @@ impl MeltdownEvent {
                             angle: 0.0,
                             spin: rng.random_range(-0.4..0.4),
                             release_tick: 24 + cell.y as u64 * 4 + rng.random_range(0..24),
+                            piece: None,
                         });
                     }
                 }
@@ -180,6 +222,8 @@ impl MeltdownEvent {
             floats,
             floor,
             shared,
+            melted,
+            refill: [[None; GRID_CELLS]; DIGIT_SLOT_COUNT],
             cell_area,
             reclaimed_area: 0.0,
             exited_solid_area: 0.0,
@@ -300,7 +344,7 @@ impl MeltdownEvent {
             floats.prepare_displacement(&mut self.water, self.tick);
         }
         if self.tick < MELTING_TICKS + DRAINING_TICKS {
-            self.step_material(context.layout);
+            self.step_material(context.layout, context.surfaces);
         } else {
             self.step_floor();
             self.reform(context);
@@ -318,13 +362,20 @@ impl MeltdownEvent {
                 .iter()
                 .map(|cell| self.cell_area * cell.area_scale())
                 .sum();
-            self.cells = Vec::new();
+            for cell in std::mem::take(&mut self.cells) {
+                if let Some(piece) = cell.piece {
+                    context.surfaces.retire(piece.id, Retirement::Reclaimed);
+                }
+            }
             if !self.lab {
                 for segment in context.segments.iter_mut() {
                     segment.begin_reforming(context.layout.segment_center(segment.id));
                 }
             }
             digits::apply_snapshot(context.segments, context.display);
+        }
+        if !self.lab {
+            self.refill(context.segments, context.surfaces);
         }
         let remaining =
             (MELTING_TICKS + DRAINING_TICKS + REFORMING_TICKS).saturating_sub(self.tick);
@@ -372,7 +423,115 @@ impl MeltdownEvent {
         }
     }
 
-    fn step_material(&mut self, layout: Layout) {
+    /// Brings the refilled face up to the reading the segments show. A cell the
+    /// reading no longer has is replaced, and one without a surface gets a new
+    /// one, at whatever height its row has grown to.
+    fn refill(&mut self, segments: &[SegmentState], surfaces: &mut SurfaceLedger) {
+        for (slot, ids) in self.refill.iter_mut().enumerate() {
+            let glyph = Glyph::lit(segments, slot);
+            for (bit, id) in ids.iter_mut().enumerate() {
+                if glyph.mask.0 & (1 << bit) == 0
+                    && let Some(id) = id.take()
+                {
+                    surfaces.retire(id, Retirement::Replaced);
+                }
+            }
+            for cell in glyph.mask.cells() {
+                if ids[bit(cell)].is_none() {
+                    ids[bit(cell)] = Some(surfaces.admit(slot as u8, cell, SurfaceSource::Refill));
+                }
+            }
+        }
+    }
+
+    pub fn surfaces(&self, layout: Layout, out: &mut Vec<(SurfaceId, SurfacePose)>) {
+        if self.phase() == EventPhase::Reforming {
+            for (slot, ids) in self.refill.iter().enumerate() {
+                for (bit, id) in ids.iter().enumerate() {
+                    let Some(id) = *id else {
+                        continue;
+                    };
+                    let cell = GridCell {
+                        x: (bit % 6) as i8,
+                        y: (bit / 6) as i8,
+                    };
+                    let progress = reform_progress(self.phase_tick(), cell.y);
+                    out.push((
+                        id,
+                        SurfacePose {
+                            footprint: Footprint {
+                                min: Vec2::new(-CELL_HALF, -CELL_HALF),
+                                max: Vec2::new(CELL_HALF, CELL_HALF * (2.0 * progress - 1.0)),
+                            },
+                            source: SurfaceSource::Refill,
+                            opacity: progress,
+                            ..SurfacePose::anchored(layout, slot, cell)
+                        },
+                    ));
+                }
+            }
+            return;
+        }
+        for (index, cell) in self.cells.iter().enumerate() {
+            let Some(piece) = cell.piece else {
+                continue;
+            };
+            let body = self.shared.as_ref().and_then(|shared| shared.body(index));
+            out.push((
+                piece.id,
+                SurfacePose {
+                    origin: cell.position,
+                    angle: cell.angle,
+                    scale: layout.pitch,
+                    footprint: Footprint::CELL,
+                    source: if self.tick <= cell.release_tick {
+                        SurfaceSource::Anchored
+                    } else if body.is_some() {
+                        SurfaceSource::Rigid
+                    } else {
+                        SurfaceSource::Ballistic
+                    },
+                    body,
+                    departing: false,
+                    opacity: 1.0,
+                    clip: None,
+                },
+            ));
+        }
+    }
+
+    /// Gives the face back what rests at its cells: the blocks still waiting
+    /// to fall, or the refilled face, grown or not. A Meltdown cut short
+    /// retires the blocks that have fallen where they are.
+    pub fn release_surfaces(&mut self, segments: &[SegmentState], surfaces: &mut SurfaceLedger) {
+        if self.lab {
+            return;
+        }
+        if self.phase() == EventPhase::Reforming {
+            let refill =
+                std::mem::replace(&mut self.refill, [[None; GRID_CELLS]; DIGIT_SLOT_COUNT]);
+            for (slot, ids) in refill.into_iter().enumerate() {
+                surfaces.hand_back(slot, Glyph::of(segments[0].font, &ids), ids);
+            }
+            return;
+        }
+        let mut ids: [SlotIds; DIGIT_SLOT_COUNT] = [[None; GRID_CELLS]; DIGIT_SLOT_COUNT];
+        for cell in std::mem::take(&mut self.cells) {
+            let Some(piece) = cell.piece else {
+                continue;
+            };
+            if self.tick <= cell.release_tick {
+                ids[usize::from(piece.slot)][bit(piece.cell)] = Some(piece.id);
+            } else {
+                surfaces.retire(piece.id, Retirement::Interrupted);
+            }
+        }
+        for (slot, ids) in ids.into_iter().enumerate() {
+            surfaces.hand_back(slot, self.melted[slot], ids);
+        }
+    }
+
+    fn step_material(&mut self, layout: Layout, surfaces: &mut SurfaceLedger) {
         self.step_floor();
         self.water.step(1.0 / 60.0).expect("fixed water step");
         let water = &mut self.water;
@@ -403,12 +562,18 @@ impl MeltdownEvent {
                     .as_ref()
                     .expect("normal cells own a responsive floor"),
             ) {
+                if let Some(piece) = cell.piece {
+                    surfaces.retire(piece.id, Retirement::Melted);
+                }
                 return false;
             }
             if cell.position.y + extent.y < layout.bounds_min.y {
                 // A block fitting through the gap remains solid until it exits.
                 // Never count this as injected water or cleanup reclamation.
                 self.exited_solid_area += area;
+                if let Some(piece) = cell.piece {
+                    surfaces.retire(piece.id, Retirement::Exited);
+                }
                 return false;
             }
             true
