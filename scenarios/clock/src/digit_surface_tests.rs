@@ -1108,3 +1108,527 @@ fn surface_contract_falling_with_a_player_follows_the_arenas_bodies() {
     assert_face_agreement(&state, "after a shared fall");
     assert_eq!(markers.attached().count(), markers.markers.len());
 }
+
+/// Lit digit cells a reading draws in all four slots.
+fn glyph_cells(font: ClockFont, digits: [Option<u8>; DIGIT_SLOT_COUNT]) -> usize {
+    digits
+        .iter()
+        .map(|digit| crate::fonts::glyph(font, *digit).cells().count())
+        .sum()
+}
+
+/// Runs an Explosion until its return has run `ticks`, following `fixtures`.
+fn explode_until_return(state: &mut ClockState, ticks: u64, fixtures: &mut [&mut Markers]) {
+    sync(
+        state,
+        &[ClockAction::preview_event(ClockEventKind::Explosion)],
+    );
+    for fixture in fixtures.iter_mut() {
+        fixture.follow(state);
+    }
+    while state.event_phase() != Some(EventPhase::Reforming) || state.phase_tick() < ticks {
+        tick(state, &[]);
+        for fixture in fixtures.iter_mut() {
+            fixture.follow(state);
+        }
+    }
+}
+
+/// Checks that no surface moves much further on one step than it did on the
+/// step before, which a piece put somewhere else would.
+fn assert_no_jump(steps: [&[DigitSurface]; 3], pitch: f32, context: &str) {
+    let [older, before, after] = steps;
+    let origin = |surfaces: &[DigitSurface], id| {
+        surfaces
+            .iter()
+            .find(|surface| surface.id == id)
+            .map(|surface| surface.origin)
+    };
+    for surface in after {
+        let Some(previous) = origin(before, surface.id) else {
+            continue;
+        };
+        let speed = origin(older, surface.id).map_or(0.0, |o| (previous - o).length());
+        assert!(
+            (surface.origin - previous).length() <= speed * 1.25 + 0.25 * pitch,
+            "{context}: surface {} jumps from {previous:?} to {:?}",
+            surface.id.get(),
+            surface.origin
+        );
+    }
+}
+
+/// Follows one step of `fixtures` and returns the publication.
+fn follow_all(state: &ClockState, fixtures: &mut [&mut Markers]) -> Vec<DigitSurface> {
+    for fixture in fixtures.iter_mut() {
+        fixture.follow(state);
+    }
+    state.digit_surfaces()
+}
+
+/// Checks that no two surfaces coming home are going to the same place, so
+/// the face never ends up with a cell twice.
+fn assert_one_per_cell(surfaces: &[DigitSurface], context: &str) {
+    let homing: Vec<_> = surfaces.iter().filter(|s| !s.departing).collect();
+    for (index, surface) in homing.iter().enumerate() {
+        assert!(
+            homing[index + 1..]
+                .iter()
+                .all(|other| (other.origin - surface.origin).length() > 1e-3),
+            "{context}: two surfaces share a cell at {:?}",
+            surface.origin
+        );
+    }
+}
+
+#[test]
+fn surface_contract_explosion_blocks_ride_their_bodies_and_come_home_as_themselves() {
+    for font in FONTS {
+        for aspect in ASPECTS {
+            let context = format!("{font:?} at {aspect}");
+            let layout = Layout::new(aspect);
+            // The AM/PM pixels explode too, and are not surfaces.
+            let mut state = clock(
+                aspect,
+                font,
+                ClockTimeFormat::TwelveHour,
+                reading(12, 34, 10),
+            );
+            let local = Vec2::new(-0.25, 0.2);
+            let mut markers = Markers::attach(&state, |_| Some(local));
+            let before = state.digit_surfaces();
+            let mut sorted = ids(&before);
+            sorted.sort_unstable();
+            sync(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Explosion)],
+            );
+            markers.follow(&state);
+            let mut offsets = Vec::new();
+            let mut fastest = 0.0_f32;
+            let mut ticks = 0;
+            while state.event_kind() == Some(ClockEventKind::Explosion) {
+                let surfaces = if ticks % 3 == 0 {
+                    assert_face_agreement(&state, &format!("{context}, tick {ticks}"))
+                } else {
+                    state.digit_surfaces()
+                };
+                assert_on_bodies(&state, &surfaces, &mut offsets, &context);
+                let mut current = ids(&surfaces);
+                current.sort_unstable();
+                assert_eq!(current, sorted, "{context}: the same blocks throughout");
+                tick(&mut state, &[]);
+                markers.follow(&state);
+                ticks += 1;
+                let moved = markers.attached().map(|m| m.moved).fold(0.0, f32::max);
+                if state.event_phase() == Some(EventPhase::Reforming) && state.phase_tick() == 0 {
+                    assert!(
+                        moved <= fastest + 0.01 * layout.pitch,
+                        "{context}: the hand-off to the return path does not jump"
+                    );
+                }
+                fastest = moved;
+            }
+            assert_eq!(
+                ticks as u64,
+                crate::events::explosion::EXPLOSION_TICKS,
+                "{context}: the event ran to its end"
+            );
+            assert!(!offsets.is_empty(), "{context}: the blocks rode bodies");
+            let after = assert_face_agreement(&state, &context);
+            assert_eq!(
+                ids(&after),
+                ids(&before),
+                "{context}: the same blocks came home"
+            );
+            assert_eq!(markers.attached().count(), before.len(), "{context}");
+            for marker in markers.attached() {
+                let surface = after.iter().find(|s| s.id == marker.surface).unwrap();
+                let home = layout.slot_cell_center(usize::from(surface.slot), surface.cell);
+                assert!((marker.world - (home + local * layout.pitch)).length() < 1e-3);
+            }
+            for surface in &before {
+                let handoffs: Vec<_> = markers
+                    .handoffs
+                    .iter()
+                    .filter(|(id, _, _)| *id == surface.id)
+                    .map(|(_, from, to)| (*from, *to))
+                    .collect();
+                assert_eq!(
+                    handoffs,
+                    [
+                        (SurfaceSource::Anchored, SurfaceSource::Rigid),
+                        (SurfaceSource::Rigid, SurfaceSource::Return),
+                        (SurfaceSource::Return, SurfaceSource::Anchored),
+                    ],
+                    "{context}: each hand-off is recorded exactly once"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn surface_contract_a_sparser_reading_on_the_way_home_merges_surplus_blocks_away() {
+    for font in FONTS {
+        let context = format!("{font:?}");
+        let pitch = Layout::new(800.0 / 480.0).pitch;
+        let mut state = clock(
+            800.0 / 480.0,
+            font,
+            ClockTimeFormat::TwentyFourHour,
+            reading(20, 8, 10),
+        );
+        let mut centred = Markers::attach(&state, |_| Some(Vec2::ZERO));
+        let mut cornered = Markers::attach(&state, |_| Some(Vec2::new(0.3, 0.3)));
+        let exploded = state.digit_surfaces();
+        let admitted = state.surface_accounting().admitted;
+        explode_until_return(&mut state, 30, &mut [&mut centred, &mut cornered]);
+        let mut older = state.digit_surfaces();
+        tick(&mut state, &[]);
+        let mut previous = follow_all(&state, &mut [&mut centred, &mut cornered]);
+        let mut actions = vec![ClockAction::set_reading(reading(20, 1, 0))];
+        let mut steps = 0;
+        while state.event_kind() == Some(ClockEventKind::Explosion) {
+            tick(&mut state, &std::mem::take(&mut actions));
+            let surfaces = follow_all(&state, &mut [&mut centred, &mut cornered]);
+            let context = format!("{context}, step {steps}");
+            assert_face_agreement(&state, &context);
+            assert_no_jump([&older, &previous, &surfaces], pitch, &context);
+            older = std::mem::replace(&mut previous, surfaces);
+            steps += 1;
+        }
+        let after = assert_face_agreement(&state, &context);
+        assert_one_per_cell(&after, &context);
+        let merged = glyph_cells(font, [Some(2), Some(0), Some(0), Some(8)])
+            - glyph_cells(font, [Some(2), Some(0), Some(0), Some(1)]);
+        assert!(merged > 0, "{context}");
+        assert_eq!(
+            state.surface_accounting().admitted,
+            admitted,
+            "{context}: a sparser reading needs no new surfaces"
+        );
+        assert_eq!(
+            state.surface_accounting().retired(Retirement::MergedAway) as usize,
+            merged,
+            "{context}"
+        );
+        assert!(
+            after
+                .iter()
+                .all(|s| exploded.iter().any(|old| old.id == s.id)),
+            "{context}: every block that came home is the surface it was, even one sent to \
+             another cell"
+        );
+        for surface in &exploded {
+            let kept = after.iter().any(|s| s.id == surface.id);
+            let centre = centred.markers.iter().find(|m| m.surface == surface.id);
+            let corner = cornered.markers.iter().find(|m| m.surface == surface.id);
+            if kept {
+                assert!(centre.unwrap().lost.is_none() && corner.unwrap().lost.is_none());
+            } else {
+                assert_eq!(surface.slot, 3, "{context}: only the changed digit merges");
+                assert!(cornered.departed.contains(&surface.id), "{context}");
+                // A shrinking block stops holding its corners long before it
+                // is gone, and is lost with what it still holds at the end.
+                assert_eq!(corner.unwrap().lost, Some(Loss::Unsupported), "{context}");
+                assert_eq!(
+                    centre.unwrap().lost,
+                    Some(Loss::Retired(Retirement::MergedAway)),
+                    "{context}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn surface_contract_a_denser_reading_on_the_way_home_splits_new_blocks_off_the_debris() {
+    for font in FONTS {
+        let context = format!("{font:?}");
+        let pitch = Layout::new(800.0 / 480.0).pitch;
+        let mut state = clock(
+            800.0 / 480.0,
+            font,
+            ClockTimeFormat::TwentyFourHour,
+            reading(11, 11, 10),
+        );
+        let mut markers = Markers::attach(&state, |_| Some(Vec2::new(0.1, -0.2)));
+        let exploded = state.digit_surfaces();
+        let admitted = state.surface_accounting().admitted;
+        explode_until_return(&mut state, 30, &mut [&mut markers]);
+        let mut older = state.digit_surfaces();
+        tick(&mut state, &[]);
+        let mut previous = markers.follow(&state);
+        let mut actions = vec![ClockAction::set_reading(reading(20, 8, 0))];
+        let mut steps = 0;
+        while state.event_kind() == Some(ClockEventKind::Explosion) {
+            tick(&mut state, &std::mem::take(&mut actions));
+            let surfaces = markers.follow(&state);
+            assert_face_agreement(&state, &format!("{context}, step {steps}"));
+            assert_no_jump([&older, &previous, &surfaces], pitch, &context);
+            for surface in surfaces.iter().filter(|s| {
+                state.event_kind().is_some() && exploded.iter().all(|old| old.id != s.id)
+            }) {
+                assert_eq!(surface.source, SurfaceSource::Return, "{context}");
+                assert!(!surface.departing, "{context}");
+                let half = surface.footprint.max.x;
+                match previous.iter().find(|old| old.id == surface.id) {
+                    // A split block grows from nothing, never appearing whole.
+                    None => assert!(half < 0.01, "{context}: a new block starts at {half}"),
+                    Some(old) => assert!(half >= old.footprint.max.x, "{context}"),
+                }
+            }
+            older = std::mem::replace(&mut previous, surfaces);
+            steps += 1;
+        }
+        let after = assert_face_agreement(&state, &context);
+        assert_one_per_cell(&after, &context);
+        let split = glyph_cells(font, [Some(2), Some(0), Some(0), Some(8)])
+            - glyph_cells(font, [Some(1), Some(1), Some(1), Some(1)]);
+        assert_eq!(
+            state.surface_accounting().admitted - admitted,
+            split as u64,
+            "{context}: exactly the blocks the reading lacks are new"
+        );
+        assert_eq!(state.surface_accounting().total_retired(), 0, "{context}");
+        assert!(
+            exploded
+                .iter()
+                .all(|old| after.iter().any(|s| s.id == old.id)),
+            "{context}: every exploded block came home as itself"
+        );
+        assert_eq!(
+            markers.attached().count(),
+            exploded.len(),
+            "{context}: no marker was lost, and none was copied onto a new block"
+        );
+        assert!(
+            after
+                .iter()
+                .filter(|s| exploded.iter().all(|old| old.id != s.id))
+                .all(|s| !markers.markers.iter().any(|m| m.surface == s.id))
+        );
+    }
+}
+
+#[test]
+fn surface_contract_a_reading_changed_back_on_the_way_home_reenlists_merging_blocks_as_new() {
+    for font in FONTS {
+        let context = format!("{font:?}");
+        let mut state = clock(
+            800.0 / 480.0,
+            font,
+            ClockTimeFormat::TwentyFourHour,
+            reading(20, 8, 10),
+        );
+        let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+        let exploded = state.digit_surfaces();
+        let admitted = state.surface_accounting().admitted;
+        explode_until_return(&mut state, 20, &mut [&mut markers]);
+        let mut actions = vec![ClockAction::set_reading(reading(20, 1, 0))];
+        while state.phase_tick() < 40 {
+            tick(&mut state, &std::mem::take(&mut actions));
+            markers.follow(&state);
+        }
+        let merging: Vec<_> = state
+            .digit_surfaces()
+            .into_iter()
+            .filter(|s| s.departing)
+            .map(|s| s.id)
+            .collect();
+        let mut actions = vec![ClockAction::set_reading(reading(20, 8, 0))];
+        let mut steps = 0;
+        while state.event_kind() == Some(ClockEventKind::Explosion) {
+            tick(&mut state, &std::mem::take(&mut actions));
+            markers.follow(&state);
+            assert_face_agreement(&state, &format!("{context}, step {steps}"));
+            steps += 1;
+        }
+        let after = assert_face_agreement(&state, &context);
+        assert_one_per_cell(&after, &context);
+        assert_eq!(after.len(), exploded.len(), "{context}");
+        assert_eq!(
+            merging.len(),
+            glyph_cells(font, [Some(2), Some(0), Some(0), Some(8)])
+                - glyph_cells(font, [Some(2), Some(0), Some(0), Some(1)]),
+            "{context}"
+        );
+        let accounting = state.surface_accounting();
+        assert_eq!(
+            accounting.admitted - admitted,
+            merging.len() as u64,
+            "{context}: a departing block is never brought back as itself"
+        );
+        assert_eq!(
+            accounting.retired(Retirement::Replaced) as usize,
+            merging.len(),
+            "{context}"
+        );
+        assert_eq!(accounting.retired(Retirement::MergedAway), 0, "{context}");
+        for marker in &markers.markers {
+            assert_eq!(
+                marker.lost,
+                merging
+                    .contains(&marker.surface)
+                    .then_some(Loss::Retired(Retirement::Replaced)),
+                "{context}"
+            );
+        }
+    }
+}
+
+#[test]
+fn surface_contract_am_pm_pixels_on_the_way_home_are_never_surfaces() {
+    let at = reading(13, 45, 10);
+    for (from, to) in [
+        (ClockTimeFormat::TwentyFourHour, ClockTimeFormat::TwelveHour),
+        (ClockTimeFormat::TwelveHour, ClockTimeFormat::TwentyFourHour),
+    ] {
+        for font in FONTS {
+            let context = format!("{font:?} from {from:?}");
+            let mut state = clock(800.0 / 480.0, font, from, at);
+            let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+            let exploded = state.digit_surfaces();
+            let admitted = state.surface_accounting().admitted;
+            let before = state.display().digits;
+            explode_until_return(&mut state, 30, &mut [&mut markers]);
+            let mut settings = state.settings();
+            settings.time_format = to;
+            let mut actions = vec![ClockAction::configure(settings)];
+            let mut steps = 0;
+            while state.event_kind() == Some(ClockEventKind::Explosion) {
+                tick(&mut state, &std::mem::take(&mut actions));
+                markers.follow(&state);
+                assert_face_agreement(&state, &format!("{context}, step {steps}"));
+                steps += 1;
+            }
+            let after = assert_face_agreement(&state, &context);
+            assert_one_per_cell(&after, &context);
+            let fresh = clock(800.0 / 480.0, font, to, at);
+            assert_eq!(after.len(), fresh.digit_surfaces().len(), "{context}");
+            let accounting = state.surface_accounting();
+            let old = glyph_cells(font, before);
+            let new = glyph_cells(font, state.display().digits);
+            // Digit blocks first come home to digit cells. Spare ones become
+            // pixels or merge away, and a digit cell short of a digit block
+            // gets a new surface, whether its block was a pixel or split off.
+            assert_eq!(
+                (accounting.admitted - admitted) as usize,
+                new.saturating_sub(old),
+                "{context}"
+            );
+            assert_eq!(
+                accounting.total_retired() as usize,
+                old.saturating_sub(new),
+                "{context}"
+            );
+            for marker in &markers.markers {
+                let kept = after.iter().any(|s| s.id == marker.surface);
+                assert_eq!(marker.lost.is_none(), kept, "{context}");
+                assert!(
+                    matches!(
+                        marker.lost,
+                        None | Some(Loss::Retired(Retirement::Replaced | Retirement::MergedAway))
+                    ),
+                    "{context}: {:?}",
+                    marker.lost
+                );
+            }
+            assert!(exploded.len() == old);
+        }
+    }
+}
+
+#[test]
+fn surface_contract_an_explosion_cut_short_or_paused_neither_snaps_nor_moves_its_blocks() {
+    for (stop, phase) in [
+        (10, EventPhase::Warning),
+        (80, EventPhase::Exploding),
+        (
+            crate::events::explosion::WARNING_TICKS + crate::events::explosion::BURST_TICKS + 30,
+            EventPhase::Reforming,
+        ),
+    ] {
+        let context = format!("{phase:?}");
+        let mut state = clock(
+            800.0 / 480.0,
+            ClockFont::Matrix,
+            ClockTimeFormat::TwentyFourHour,
+            reading(7, 15, 0),
+        );
+        let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+        let face = state.digit_surfaces();
+        sync(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Explosion)],
+        );
+        for _ in 0..stop {
+            tick(&mut state, &[]);
+            markers.follow(&state);
+        }
+        assert_eq!(state.event_phase(), Some(phase));
+        let held = state.digit_surfaces();
+        for _ in 0..3 {
+            sync(&mut state, &[]);
+            assert_eq!(
+                state.digit_surfaces(),
+                held,
+                "{context}: a pause moves nothing"
+            );
+        }
+        sync(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::ColorCycle)],
+        );
+        let after = markers.follow(&state);
+        assert_face_agreement(&state, &context);
+        assert!(after.iter().all(|s| face.iter().all(|old| old.id != s.id)));
+        assert!(
+            markers
+                .markers
+                .iter()
+                .all(|m| m.lost == Some(Loss::Retired(Retirement::Interrupted))),
+            "{context}: a block away from home is not carried there with what it holds"
+        );
+    }
+}
+
+#[test]
+fn surface_contract_an_explosion_with_a_player_follows_the_arenas_bodies() {
+    let mut state = clock(
+        800.0 / 480.0,
+        ClockFont::Serif,
+        ClockTimeFormat::TwentyFourHour,
+        reading(16, 20, 0),
+    );
+    sync(&mut state, &[ClockAction::toggle_player_duck(1)]);
+    assert!(state.player_duck_session().is_some());
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::new(0.3, -0.3)));
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Explosion)],
+    );
+    assert!(
+        state
+            .active_event
+            .as_ref()
+            .is_some_and(|event| event.shares_visit_arena())
+    );
+    let mut offsets = Vec::new();
+    let mut ticks = 0;
+    while state.event_kind() == Some(ClockEventKind::Explosion) {
+        let surfaces = if ticks % 5 == 0 {
+            assert_face_agreement(&state, &format!("shared, tick {ticks}"))
+        } else {
+            state.digit_surfaces()
+        };
+        assert_on_bodies(&state, &surfaces, &mut offsets, "shared");
+        tick(&mut state, &[]);
+        markers.follow(&state);
+        ticks += 1;
+    }
+    assert!(!offsets.is_empty());
+    assert_face_agreement(&state, "after a shared explosion");
+    assert_eq!(markers.attached().count(), markers.markers.len());
+}

@@ -566,6 +566,7 @@ impl ActiveEvent {
     ) {
         match self {
             Self::DigitSlide(event) => event.surfaces(layout, out),
+            Self::Explosion(event) => event.surfaces(layout, out),
             Self::Falling(event) => event.surfaces(layout, segments, out),
             _ => (),
         }
@@ -580,6 +581,7 @@ impl ActiveEvent {
     ) {
         match self {
             Self::DigitSlide(event) => event.release_surfaces(surfaces),
+            Self::Explosion(event) => event.release_surfaces(segments, surfaces),
             Self::Falling(event) => event.release_surfaces(segments, surfaces),
             _ => (),
         }
@@ -589,9 +591,7 @@ impl ActiveEvent {
     pub fn vacates_face(&self) -> bool {
         match self {
             Self::Meltdown(event) => !event.lab,
-            Self::Explosion(_) | Self::CellSwap(_) | Self::SlotMachine(_) | Self::Marquee(_) => {
-                true
-            }
+            Self::CellSwap(_) | Self::SlotMachine(_) | Self::Marquee(_) => true,
             _ => false,
         }
     }
