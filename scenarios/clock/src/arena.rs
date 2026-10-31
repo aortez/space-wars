@@ -34,9 +34,12 @@
 //! contract, and its ranges must be disjoint apart from the two aliases it
 //! declares.
 
-use std::ops::Range;
+use std::{ops::Range, time::Duration};
 
-use engine_common::ClockEventKind;
+use engine_common::{
+    ClockArenaClaim, ClockArenaLimits, ClockArenaOwner, ClockArenaState, ClockArenaStep,
+    ClockEventKind,
+};
 use engine_core::Vec2;
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
@@ -53,6 +56,12 @@ use crate::{
     floor::{FloorGeometry, responsive::ResponsiveFloor},
     grass::{MAX_SOIL_BODIES, MAX_SOIL_CHUNK_COLLIDERS, SoilHabitat},
     layout::Layout,
+};
+
+// The arena publishes its counts, refusals and remaps as they are.
+pub use engine_common::{
+    ClockArenaAccounting as ArenaAccounting, ClockArenaPopulation as Population,
+    ClockArenaRemap as Remap, ClockArenaUnavailable as Unavailable,
 };
 
 /// Who holds the shared arena.
@@ -83,6 +92,11 @@ impl Owner {
     /// while no visit's terrain is one. Soil is fixed in place and needs none.
     fn rests(self) -> bool {
         matches!(self, Self::Fixture(_))
+    }
+
+    /// Whether the entity `id` is one of this owner's.
+    fn declares(self, id: u64) -> bool {
+        self.ranges().iter().any(|range| range.contains(&id))
     }
 
     /// The most bodies, colliders and joints this owner has in the arena at
@@ -148,55 +162,19 @@ impl Owner {
     }
 }
 
+impl From<Owner> for ClockArenaOwner {
+    fn from(owner: Owner) -> Self {
+        match owner {
+            Owner::Visit => Self::Visit,
+            Owner::Event(event) => Self::Event { event },
+            Owner::Soil => Self::Soil,
+            Owner::Fixture(index) => Self::Fixture { index },
+        }
+    }
+}
+
 const fn count(range: &Range<u64>) -> usize {
     (range.end - range.start) as usize
-}
-
-/// How many bodies, colliders and joints there are, or may be.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Population {
-    pub bodies: usize,
-    pub colliders: usize,
-    pub joints: usize,
-}
-
-impl Population {
-    pub const NONE: Self = Self::new(0, 0);
-
-    /// Bodies and colliders without joints.
-    pub const fn new(bodies: usize, colliders: usize) -> Self {
-        Self {
-            bodies,
-            colliders,
-            joints: 0,
-        }
-    }
-
-    pub const fn plus(self, other: Self) -> Self {
-        Self {
-            bodies: self.bodies + other.bodies,
-            colliders: self.colliders + other.colliders,
-            joints: self.joints + other.joints,
-        }
-    }
-
-    /// The larger of each count.
-    const fn max(self, other: Self) -> Self {
-        const fn larger(a: usize, b: usize) -> usize {
-            if a > b { a } else { b }
-        }
-        Self {
-            bodies: larger(self.bodies, other.bodies),
-            colliders: larger(self.colliders, other.colliders),
-            joints: larger(self.joints, other.joints),
-        }
-    }
-
-    pub const fn within(self, limit: Self) -> bool {
-        self.bodies <= limit.bodies
-            && self.colliders <= limit.colliders
-            && self.joints <= limit.joints
-    }
 }
 
 /// The most the floor kept under resting residents has: a slab for each of a
@@ -239,30 +217,6 @@ const _: () = assert!(
         .plus(Owner::Soil.budget())
         .within(ARENA_CAPACITY)
 );
-
-/// Why the arena could not take a claim. Nothing changed: the arena, its
-/// owners and their bodies are as they were.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Unavailable {
-    /// The arena already holds as many residents as it may.
-    Residents,
-    /// The owners' budgets together would be more than the arena holds.
-    Capacity,
-    /// The resting residents have not fitted the view since a resize, so
-    /// the arena takes no visit or event that uses the floor.
-    LayoutIncompatible,
-}
-
-impl Unavailable {
-    /// What a person asking for the claim is told.
-    pub fn notice(self) -> &'static str {
-        match self {
-            Self::Residents => "The arena holds all the residents it can",
-            Self::Capacity => "The arena has no room for this",
-            Self::LayoutIncompatible => "The arena's residents do not fit this view",
-        }
-    }
-}
 
 /// Whether `owners` can hold the arena together: no more residents than it
 /// may hold, and budgets that together fit its capacity, with the floor kept
@@ -343,48 +297,6 @@ impl PanelAuthority {
             _ => Self::Visit,
         }
     }
-}
-
-/// What a resize did to the arena's resting residents.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Remap {
-    /// Every resting resident lies within the new view, so none moved.
-    Exact,
-    /// `moved` resting residents lay beyond the new view's edges and came in
-    /// just far enough to lie within them.
-    Clamped { moved: usize },
-    /// A resting resident could not come in without landing in another
-    /// resident or in the floor, or is wider than the view. Nothing moved.
-    Declined,
-}
-
-/// What the arena holds now, and what it has done over the run.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ArenaAccounting {
-    /// Owners holding the arena now.
-    pub claims: usize,
-    /// Those of them that are residents.
-    pub residents: usize,
-    pub bodies: usize,
-    pub colliders: usize,
-    pub joints: usize,
-    /// Claims granted over the run.
-    pub granted: u64,
-    /// Claims let go over the run.
-    pub released: u64,
-    /// Claims and events the arena refused over the run.
-    pub refused: u64,
-    /// Rigid steps over the run. Exactly one per positive tick while a world
-    /// exists.
-    pub steps: u64,
-    /// Worlds the arena has held over the run.
-    pub worlds: u64,
-    /// The resting residents have not fitted the view since a resize. The
-    /// arena keeps the floor they last fitted and takes no visit or event
-    /// that uses the floor.
-    pub layout_incompatible: bool,
-    /// What the last resize did to the resting residents.
-    pub last_remap: Option<Remap>,
 }
 
 /// The settings every arena world is built with. Whoever builds it chooses its
@@ -892,39 +804,28 @@ impl ClockArena {
             panic!("the arena's identities: {fault}");
         }
         let floor = self.keeps_floor() && !self.holds(Owner::Visit);
-        // The holder of each entity, as an index into `owners`, or the floor.
-        let holder = |entity: PhysicsId| {
+        for entity in world.entity_ids() {
             let id = entity.value();
             #[cfg(test)]
             if ids::canonical::TEST_OBSTACLES.contains(&id) {
-                return None;
+                continue;
             }
             if ids::canonical::ARENA_FLOOR.contains(&id) {
                 assert!(floor, "floor {id} with no resting resident on it");
-                return Some(self.owners.len());
+                continue;
             }
-            let mut holders = self
+            match self
                 .owners
                 .iter()
-                .enumerate()
-                .filter(|(_, owner)| owner.ranges().iter().any(|range| range.contains(&id)));
-            let (index, _) = holders
-                .next()
-                .unwrap_or_else(|| panic!("entity {id} belongs to no owner of {:?}", self.owners));
-            assert!(holders.next().is_none(), "entity {id} has two owners");
-            Some(index)
-        };
-        let mut populations = vec![Population::NONE; self.owners.len() + 1];
-        for body in world.body_ids() {
-            if let Some(index) = holder(body.entity) {
-                populations[index].bodies += 1;
+                .filter(|owner| owner.declares(id))
+                .count()
+            {
+                0 => panic!("entity {id} belongs to no owner of {:?}", self.owners),
+                1 => {}
+                _ => panic!("entity {id} has two owners"),
             }
         }
-        for collider in world.collider_ids() {
-            if let Some(index) = holder(collider.entity) {
-                populations[index].colliders += 1;
-            }
-        }
+        let (populations, floor) = self.populations();
         for (owner, population) in self.owners.iter().zip(&populations) {
             let budget = owner.budget();
             assert!(
@@ -932,12 +833,37 @@ impl ClockArena {
                 "{owner:?} has {population:?}, more than {budget:?}"
             );
         }
-        let floor = populations[self.owners.len()];
         assert!(
             floor.within(FLOOR_BUDGET),
             "the floor has {floor:?}, more than {FLOOR_BUDGET:?}"
         );
         assert_eq!(world.joint_count(), 0, "no owner has joints");
+    }
+
+    /// What each owner holding the arena has in its world, in the order they
+    /// claimed it, and what the floor kept under resting residents has. An
+    /// entity no owner declares counts for nobody.
+    fn populations(&self) -> (Vec<Population>, Population) {
+        let mut owners = vec![Population::NONE; self.owners.len()];
+        let mut floor = Population::NONE;
+        let Some(world) = &self.world else {
+            return (owners, floor);
+        };
+        let mut tally = |entity: PhysicsId, add: fn(&mut Population)| {
+            let id = entity.value();
+            if ids::canonical::ARENA_FLOOR.contains(&id) {
+                add(&mut floor);
+            } else if let Some(index) = self.owners.iter().position(|owner| owner.declares(id)) {
+                add(&mut owners[index]);
+            }
+        };
+        for body in world.body_ids() {
+            tally(body.entity, |population| population.bodies += 1);
+        }
+        for collider in world.collider_ids() {
+            tally(collider.entity, |population| population.colliders += 1);
+        }
+        (owners, floor)
     }
 
     /// The last step's timings and populations.
@@ -960,6 +886,45 @@ impl ClockArena {
             worlds: self.worlds,
             layout_incompatible: self.layout_incompatible(),
             last_remap: self.last_remap,
+        }
+    }
+
+    /// What the arena publishes: its accounting, what each of its owners and
+    /// its floor have in its world, its last step and its limits.
+    pub fn state(&self) -> ClockArenaState {
+        let (populations, floor) = self.populations();
+        let micros = |time: Duration| time.as_micros() as u64;
+        let metrics = self.metrics;
+        ClockArenaState {
+            accounting: self.accounting(),
+            claims: self
+                .owners
+                .iter()
+                .zip(populations)
+                .map(|(&owner, population)| ClockArenaClaim {
+                    owner: owner.into(),
+                    resident: owner.resident(),
+                    population,
+                    budget: owner.budget(),
+                })
+                .collect(),
+            floor,
+            last_step: (self.steps > 0).then(|| ClockArenaStep {
+                wall_us: micros(metrics.wall_time),
+                collision_detection_us: micros(metrics.collision_detection_time),
+                solver_us: micros(metrics.solver_time),
+                ccd_substeps: metrics.ccd_substeps,
+                active_bodies: metrics.active_bodies,
+                sleeping_bodies: metrics.sleeping_bodies,
+                candidate_pairs: metrics.candidate_pairs,
+                contact_pairs: metrics.contact_pairs,
+                contacts: metrics.contacts,
+            }),
+            limits: ClockArenaLimits {
+                claims: MAX_ARENA_CLAIMS,
+                residents: MAX_RESIDENT_CLAIMS,
+                capacity: ARENA_CAPACITY,
+            },
         }
     }
 }

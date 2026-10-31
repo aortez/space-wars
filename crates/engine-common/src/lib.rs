@@ -11,11 +11,16 @@ use serde::{
 };
 
 mod activity_settings;
+mod clock_arena;
 mod clock_font;
 mod clock_message;
 mod controller;
 mod dirt_settings;
 pub use activity_settings::{AutostartSettings, MatchSettings};
+pub use clock_arena::{
+    ClockArenaAccounting, ClockArenaClaim, ClockArenaLimits, ClockArenaOwner, ClockArenaPopulation,
+    ClockArenaRemap, ClockArenaState, ClockArenaStep, ClockArenaUnavailable,
+};
 pub use clock_font::{ClockFont, ClockFontPool, ClockFontSettings};
 pub use controller::{ControllerBinding, ControllerControl, ControllerProfile, ControllerSource};
 pub use dirt_settings::DirtMode;

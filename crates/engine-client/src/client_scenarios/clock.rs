@@ -14,6 +14,8 @@ use super::{
 use crate::input::ClientInput;
 use crate::render::{FrameLayout, Viewport};
 
+#[cfg(test)]
+mod arena_tests;
 pub(super) mod benchmark;
 #[cfg(test)]
 mod floor_tests;
@@ -238,6 +240,7 @@ impl ClientScenario for ClockClientScenario {
                     blocked_by_player: self.state.event_blocked_by_player(event.kind),
                     blocked_by_duck: self.state.event_blocked_by_duck(event.kind),
                     blocked_by_crow: self.state.event_blocked_by_crow(event.kind),
+                    blocked_by_arena: self.state.event_blocked_by_arena(event.kind),
                     automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
                 })
                 .collect(),
@@ -248,6 +251,7 @@ impl ClientScenario for ClockClientScenario {
             body_count: self.state.body_count(),
             collider_count: self.state.collider_count(),
             floor: self.state.floor_mode(),
+            arena: Some(self.state.arena_state()),
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
             crow: self.state.crow_state(),

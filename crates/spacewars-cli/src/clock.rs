@@ -1,5 +1,6 @@
 use super::{CliError, control_error, human_error, parse_timeout};
 use clap::Subcommand;
+use engine_common::{ClockArenaOwner, ClockArenaState, ClockArenaUnavailable};
 use spacewars_control::{
     ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState, ClockStatePredicate,
     ClockTriggerRequest, ControlClient,
@@ -104,7 +105,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={}, blocked by arena={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -114,7 +115,10 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.cooldown_ticks,
                         event.automatic_ready_at_tick,
                         event.blocked_by_duck,
-                        event.blocked_by_crow
+                        event.blocked_by_crow,
+                        event
+                            .blocked_by_arena
+                            .map_or("none", ClockArenaUnavailable::as_str)
                     );
                 }
             }
@@ -260,6 +264,9 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         );
         if let Some(error) = &state.settings_error {
             println!("Settings warning: {error}");
+        }
+        if let Some(arena) = &state.arena {
+            print_arena(arena);
         }
         if let Some(explosion) = &state.explosion {
             println!(
@@ -528,6 +535,75 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
     }
     Ok(())
+}
+
+fn print_arena(arena: &ClockArenaState) {
+    let (accounting, limits) = (arena.accounting, arena.limits);
+    println!(
+        "Arena: {} claims, {} residents (at most {} and {}); {} bodies, {} colliders, {} joints (at most {}, {}, {}); floor {} bodies",
+        accounting.claims,
+        accounting.residents,
+        limits.claims,
+        limits.residents,
+        accounting.bodies,
+        accounting.colliders,
+        accounting.joints,
+        limits.capacity.bodies,
+        limits.capacity.colliders,
+        limits.capacity.joints,
+        arena.floor.bodies
+    );
+    let claims: Vec<_> = arena
+        .claims
+        .iter()
+        .map(|claim| {
+            let owner = match claim.owner {
+                ClockArenaOwner::Visit => "visit".into(),
+                ClockArenaOwner::Event { event } => format!("event {}", event.as_str()),
+                ClockArenaOwner::Soil => "soil".into(),
+                ClockArenaOwner::Fixture { index } => format!("fixture {index}"),
+            };
+            format!(
+                "{owner} {}/{} bodies, {}/{} colliders",
+                claim.population.bodies,
+                claim.budget.bodies,
+                claim.population.colliders,
+                claim.budget.colliders
+            )
+        })
+        .collect();
+    println!(
+        "Arena claims: {}",
+        if claims.is_empty() {
+            "none".into()
+        } else {
+            claims.join("; ")
+        }
+    );
+    println!(
+        "Arena run: {} worlds, {} steps; granted={} released={} refused={}; layout incompatible={}, last remap={:?}",
+        accounting.worlds,
+        accounting.steps,
+        accounting.granted,
+        accounting.released,
+        accounting.refused,
+        accounting.layout_incompatible,
+        accounting.last_remap
+    );
+    if let Some(step) = arena.last_step {
+        println!(
+            "Arena step: {} us (collision detection {} us, solver {} us); bodies active={} sleeping={}; pairs candidate={} contact={}, contacts={}, CCD substeps={}",
+            step.wall_us,
+            step.collision_detection_us,
+            step.solver_us,
+            step.active_bodies,
+            step.sleeping_bodies,
+            step.candidate_pairs,
+            step.contact_pairs,
+            step.contacts,
+            step.ccd_substeps
+        );
+    }
 }
 
 #[cfg(test)]

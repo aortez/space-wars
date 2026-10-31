@@ -1017,6 +1017,11 @@ impl ClockState {
         self.arena.accounting()
     }
 
+    /// The run's arena as Clock's state publishes it.
+    pub fn arena_state(&self) -> engine_common::ClockArenaState {
+        self.arena.state()
+    }
+
     /// Timings and populations from the arena's last step.
     pub fn last_arena_step_metrics(&self) -> engine_rapier::world::PhysicsStepMetrics {
         self.arena.metrics()
@@ -1124,17 +1129,12 @@ impl ClockState {
     /// room for what `kind` adds, or `kind` uses the floor while the resting
     /// residents do not fit the view, so that its floor would be one they do
     /// not stand on.
-    fn arena_refusal(&self, kind: ClockEventKind) -> Option<Unavailable> {
+    pub fn event_blocked_by_arena(&self, kind: ClockEventKind) -> Option<Unavailable> {
         if self.arena.layout_incompatible() && EVENT_CATALOG[kind as usize].uses_floor() {
             return Some(Unavailable::LayoutIncompatible);
         }
         let owners = self.arena_owners_for_event(kind)?;
         self.arena.admissible(&owners).err()
-    }
-
-    /// Whether the arena would refuse to start `kind`.
-    pub fn event_blocked_by_arena(&self, kind: ClockEventKind) -> bool {
-        self.arena_refusal(kind).is_some()
     }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
@@ -1171,7 +1171,7 @@ impl ClockState {
     fn event_blocked(&self, kind: ClockEventKind) -> bool {
         self.event_blocked_by_duck(kind)
             || self.event_blocked_by_crow(kind)
-            || self.event_blocked_by_arena(kind)
+            || self.event_blocked_by_arena(kind).is_some()
             || kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed
     }
 
@@ -1244,7 +1244,7 @@ impl ClockState {
             }
             // The arena refuses before anything changes, the event this one
             // would replace included.
-            if let Some(unavailable) = self.arena_refusal(kind) {
+            if let Some(unavailable) = self.event_blocked_by_arena(kind) {
                 self.arena.count_refusal();
                 self.event_notice = Some((
                     unavailable.notice(),

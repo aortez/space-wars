@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 20;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 21;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -25,6 +25,9 @@ pub struct ClockEventInfo {
     pub blocked_by_duck: bool,
     #[serde(default)]
     pub blocked_by_crow: bool,
+    /// Why the run's arena would refuse the event now, if it would.
+    #[serde(default)]
+    pub blocked_by_arena: Option<engine_common::ClockArenaUnavailable>,
     pub automatic_ready_at_tick: u64,
 }
 
@@ -49,6 +52,10 @@ pub struct ClockState {
     pub body_count: usize,
     pub collider_count: usize,
     pub floor: engine_common::ClockFloorMode,
+    /// The run's shared rigid arena: who holds it, what each holder has in its
+    /// world, its last step and the bounds it takes claims within.
+    #[serde(default)]
+    pub arena: Option<engine_common::ClockArenaState>,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
     #[serde(default)]
@@ -415,6 +422,7 @@ mod tests {
             body_count: 0,
             collider_count: 0,
             floor: engine_common::ClockFloorMode::Closed,
+            arena: None,
             meltdown: None,
             duck: None,
             crow: None,
@@ -451,6 +459,83 @@ mod tests {
             assert!(json.contains(&format!("\"floor\":\"{}\"", mode.as_str())));
             assert_eq!(ClockState::from_json(&json).unwrap(), state);
         }
+    }
+
+    #[test]
+    fn arena_diagnostics_round_trip_with_named_owners_and_refusals() {
+        use engine_common::{
+            ClockArenaAccounting, ClockArenaClaim, ClockArenaLimits, ClockArenaOwner,
+            ClockArenaPopulation, ClockArenaRemap, ClockArenaState, ClockArenaStep,
+            ClockArenaUnavailable,
+        };
+        let mut state = clock_state();
+        let claim = |owner, resident, bodies| ClockArenaClaim {
+            owner,
+            resident,
+            population: ClockArenaPopulation::new(bodies, bodies),
+            budget: ClockArenaPopulation::new(4, 4),
+        };
+        state.arena = Some(ClockArenaState {
+            accounting: ClockArenaAccounting {
+                claims: 3,
+                residents: 2,
+                bodies: 7,
+                colliders: 7,
+                refused: 2,
+                steps: 600,
+                worlds: 1,
+                layout_incompatible: true,
+                last_remap: Some(ClockArenaRemap::Declined),
+                ..ClockArenaAccounting::default()
+            },
+            claims: vec![
+                claim(ClockArenaOwner::Soil, true, 1),
+                claim(ClockArenaOwner::Fixture { index: 0 }, true, 3),
+                claim(
+                    ClockArenaOwner::Event {
+                        event: ClockEventKind::Falling,
+                    },
+                    false,
+                    0,
+                ),
+            ],
+            floor: ClockArenaPopulation::new(3, 3),
+            last_step: Some(ClockArenaStep {
+                wall_us: 41,
+                sleeping_bodies: 3,
+                ..ClockArenaStep::default()
+            }),
+            limits: ClockArenaLimits {
+                claims: 6,
+                residents: 4,
+                capacity: ClockArenaPopulation::new(255, 288),
+            },
+        });
+        state.events.push(ClockEventInfo {
+            kind: ClockEventKind::Falling,
+            label: "Falling".into(),
+            effect: "physics".into(),
+            trigger: engine_common::ClockEventTrigger::Periodic,
+            duration_ticks: 600,
+            cooldown_ticks: 120,
+            enabled: true,
+            blocked_by_player: false,
+            blocked_by_duck: false,
+            blocked_by_crow: false,
+            blocked_by_arena: Some(ClockArenaUnavailable::LayoutIncompatible),
+            automatic_ready_at_tick: 0,
+        });
+        let json = state.to_json().unwrap();
+        for named in [
+            r#"{"kind":"soil"}"#,
+            r#"{"kind":"fixture","index":0}"#,
+            r#"{"kind":"event","event":"falling"}"#,
+            r#""last_remap":{"kind":"declined"}"#,
+            r#""blocked_by_arena":"layout-incompatible""#,
+        ] {
+            assert!(json.contains(named), "{named} in {json}");
+        }
+        assert_eq!(ClockState::from_json(&json).unwrap(), state);
     }
 
     #[test]
@@ -1218,6 +1303,7 @@ mod tests {
             blocked_by_player: false,
             blocked_by_duck: false,
             blocked_by_crow: false,
+            blocked_by_arena: None,
             automatic_ready_at_tick: 0,
         });
         assert_eq!(

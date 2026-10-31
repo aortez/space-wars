@@ -2230,11 +2230,11 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **20** and reports scenario-instance revision,
+`clock state` uses schema version **21** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
-reading/target digits, active font, palette RGB, physics counts, floor ownership mode, and typed live `settings`.
+reading/target digits, active font, palette RGB, physics counts, floor ownership mode, the run's `arena`, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
@@ -2312,7 +2312,7 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 19 and
+after completion or cancellation. Use matching client/CLI builds: schema 20 and
 older requests are rejected. The internal Clock action payload is version 12;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
 little-endian u16 switch mask (bits 0–10, reserved bits rejected),
@@ -2324,8 +2324,29 @@ same bytes followed by a little-endian u16 year and u8 month/day. Version 1–11
 actions are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 
+The `arena` object reports the run's shared rigid arena. Its `accounting` gives
+the owners holding the arena now (`claims`, of which `residents`), the bodies,
+colliders and joints in its world, and over the run the claims `granted`,
+`released` and `refused` (refused also counts events the arena declined), its
+`steps` and `worlds`, `layout_incompatible`, and `last_remap` (`exact`,
+`clamped` with the number `moved`, or `declined`). `claims` lists each owner in
+the order it claimed the arena (`visit`, `event` with its kind, `soil`, or
+`fixture` with its index), whether it is a resident, and its bodies and colliders
+beside its budget. `floor` counts the floor the arena keeps under resting
+residents while no visit's terrain is one; the claims and the floor together
+account for everything in the world. `last_step` is the arena's last step: wall,
+collision-detection and solver time in microseconds, CCD substeps, active and
+sleeping bodies, candidate and contact pairs, and contacts. It is null before the
+first step. `limits` gives the most claims and residents the arena holds at once,
+and its capacity in bodies, colliders and joints. Each catalog entry's
+`blocked_by_arena` is null, or the reason the arena would refuse that event now:
+`residents`, `capacity` or `layout-incompatible`. `clock trigger` then fails with
+`action-unavailable` and the arena's notice. Text `clock state` prints the
+arena's counts, claims, run totals and last step, and `clock events` shows each
+event's refusal.
+
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 20, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 21, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -2342,7 +2363,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 20, `event`
+tick. A raw `clock trigger` request must include schema version 21, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, or `cell-swap`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

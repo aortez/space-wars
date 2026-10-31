@@ -36,14 +36,18 @@
 //! no claims and no world. Nothing of a run is kept on disk.
 
 use crate::{
-    ArenaAccounting, ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState,
-    EVENT_CATALOG, MAX_RESIDENT_CLAIMS, Remap, Unavailable,
+    ARENA_CAPACITY, ArenaAccounting, ClockAction, ClockConfig, ClockReading, ClockScenario,
+    ClockState, EVENT_CATALOG, MAX_ARENA_CLAIMS, MAX_RESIDENT_CLAIMS, Population, Remap,
+    Unavailable,
     arena::{Owner, ids::canonical::ARENA_FLOOR},
     arena_fixture::{ArenaFixture, FixtureBall, FixtureBallState},
     events::{COOLDOWN_TICKS, EventLifecycle, EventPhase, duck::arena::CourseGeometry},
     layout::Layout,
 };
-use engine_common::{Action, ClockEventKind, ClockEventProfile, ClockEvents, Scenario};
+use engine_common::{
+    Action, ClockArenaLimits, ClockArenaOwner, ClockArenaState, ClockEventKind, ClockEventProfile,
+    ClockEvents, Scenario,
+};
 use engine_core::Vec2;
 use engine_rapier::world::{PhysicsActivity, physics_activity};
 use std::time::Duration;
@@ -738,14 +742,18 @@ fn arena_contract_refuses_an_event_it_has_no_room_for_before_anything_changes() 
         ClockEventKind::Explosion,
         ClockEventKind::Meltdown,
     ] {
-        assert!(state.event_blocked_by_arena(kind), "{kind:?}");
+        assert_eq!(
+            state.event_blocked_by_arena(kind),
+            Some(Unavailable::Capacity),
+            "{kind:?}"
+        );
     }
     for kind in [
         ClockEventKind::Falling,
         ClockEventKind::Rain,
         ClockEventKind::ColorCycle,
     ] {
-        assert!(!state.event_blocked_by_arena(kind), "{kind:?}");
+        assert_eq!(state.event_blocked_by_arena(kind), None, "{kind:?}");
     }
 
     let before = untouched(&state);
@@ -782,12 +790,15 @@ fn arena_contract_refuses_an_event_it_has_no_room_for_before_anything_changes() 
     // With the second fixture gone there is room, and Meltdown shares the
     // visit's arena with the first.
     assert!(state.remove_arena_fixture(1));
-    assert!(!state.event_blocked_by_arena(ClockEventKind::Meltdown));
+    assert_eq!(state.event_blocked_by_arena(ClockEventKind::Meltdown), None);
     state.preview_event(ClockEventKind::Meltdown);
     assert!(state.arena.holds(Owner::Event(ClockEventKind::Meltdown)));
     keep(&mut state, 30, "Meltdown beside the fixture");
     // The event a preview replaces leaves its room to the next.
-    assert!(!state.event_blocked_by_arena(ClockEventKind::Explosion));
+    assert_eq!(
+        state.event_blocked_by_arena(ClockEventKind::Explosion),
+        None
+    );
     state.preview_event(ClockEventKind::Explosion);
     assert!(state.arena.holds(Owner::Event(ClockEventKind::Explosion)));
     keep(&mut state, 30, "Explosion beside the fixture");
@@ -978,7 +989,9 @@ fn arena_contract_keeps_its_world_when_the_fixture_cannot_come_in_as_it_is() {
     for kind in ClockEventKind::ALL {
         assert_eq!(
             state.event_blocked_by_arena(kind),
-            EVENT_CATALOG[kind as usize].uses_floor(),
+            EVENT_CATALOG[kind as usize]
+                .uses_floor()
+                .then_some(Unavailable::LayoutIncompatible),
             "{kind:?}"
         );
     }
@@ -1015,7 +1028,7 @@ fn arena_contract_keeps_its_world_when_the_fixture_cannot_come_in_as_it_is() {
     assert!(after[2].position.x < before[2].position.x);
     assert!(keep(&mut state, 30, "in a view they fit").is_empty());
     assert_eq!(floor_reach(&state), Some((-336.0, 336.0)));
-    assert!(!state.event_blocked_by_arena(ClockEventKind::Duck));
+    assert_eq!(state.event_blocked_by_arena(ClockEventKind::Duck), None);
     toggle(&mut state, 1);
     assert!(state.player_duck_session().is_some(), "the player joins");
 }
@@ -1099,11 +1112,14 @@ fn arena_contract_a_declined_resize_ends_with_the_residents_that_did_not_fit() {
     assert!(keep(&mut state, 30, "settling").is_empty());
     state.set_aspect_ratio(NARROW);
     assert!(state.arena_accounting().layout_incompatible);
-    assert!(state.event_blocked_by_arena(ClockEventKind::Duck));
+    assert_eq!(
+        state.event_blocked_by_arena(ClockEventKind::Duck),
+        Some(Unavailable::LayoutIncompatible)
+    );
 
     assert!(state.remove_arena_fixture(0));
     assert!(!state.arena_accounting().layout_incompatible);
-    assert!(!state.event_blocked_by_arena(ClockEventKind::Duck));
+    assert_eq!(state.event_blocked_by_arena(ClockEventKind::Duck), None);
     assert_eq!(
         state.arena.owners(),
         [Owner::Soil],
@@ -1176,6 +1192,108 @@ fn arena_contract_a_restart_or_exit_ends_the_run_once() {
     );
     assert!(keep(&mut restarted, 10, "the new run's fixture").is_empty());
     assert_eq!(restarted.arena_accounting().worlds, 1);
+}
+
+/// The claims and the floor together, which is everything in the world.
+fn census(arena: &ClockArenaState) -> Population {
+    arena
+        .claims
+        .iter()
+        .fold(arena.floor, |sum, claim| sum.plus(claim.population))
+}
+
+#[test]
+fn arena_contract_publishes_what_each_owner_and_the_floor_have() {
+    let mut state = plain();
+    let limits = ClockArenaLimits {
+        claims: MAX_ARENA_CLAIMS,
+        residents: MAX_RESIDENT_CLAIMS,
+        capacity: ARENA_CAPACITY,
+    };
+    assert_eq!(
+        state.arena_state(),
+        ClockArenaState {
+            accounting: ArenaAccounting::default(),
+            claims: Vec::new(),
+            floor: Population::NONE,
+            last_step: None,
+            limits,
+        },
+        "no world, and no step"
+    );
+
+    state.admit_soil();
+    let fixture = state.default_arena_fixture();
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
+    assert_eq!(state.admit_arena_fixture(&second_fixture()[..1]), Ok(1));
+    keep(&mut state, 120, "settling");
+    let arena = state.arena_state();
+    let accounting = state.arena_accounting();
+    assert_eq!(arena.accounting, accounting);
+    assert_eq!(arena.limits, limits);
+    let soil = &arena.claims[2];
+    assert_eq!(
+        arena.claims[..2]
+            .iter()
+            .map(|claim| (claim.owner, claim.resident, claim.population))
+            .collect::<Vec<_>>(),
+        [
+            (
+                ClockArenaOwner::Fixture { index: 0 },
+                true,
+                Population::new(3, 3)
+            ),
+            (
+                ClockArenaOwner::Fixture { index: 1 },
+                true,
+                Population::new(1, 1)
+            ),
+        ],
+        "each fixture has its own balls, in the order the owners claimed"
+    );
+    assert_eq!(
+        (soil.owner, soil.resident, soil.population.bodies),
+        (ClockArenaOwner::Soil, true, 1),
+        "the soil, which claims at its first step"
+    );
+    for claim in &arena.claims {
+        assert!(claim.population.within(claim.budget), "{claim:?}");
+    }
+    assert_eq!(arena.floor, Population::new(1, 1), "the closed floor");
+    assert_eq!(
+        census(&arena),
+        Population {
+            bodies: accounting.bodies,
+            colliders: accounting.colliders,
+            joints: accounting.joints,
+        }
+    );
+    let step = arena.last_step.expect("the last step");
+    assert_eq!(step.active_bodies + step.sleeping_bodies, 4, "the balls");
+    assert!(step.contact_pairs >= 4, "each ball on the floor: {step:?}");
+
+    // While a player's visit holds the arena, its terrain is the floor.
+    toggle(&mut state, 1);
+    keep(&mut state, 2, "the player joining");
+    let arena = state.arena_state();
+    assert_eq!(arena.claims.len(), 4);
+    let visit = &arena.claims[3];
+    assert_eq!(
+        (visit.owner, visit.resident),
+        (ClockArenaOwner::Visit, false)
+    );
+    assert!(visit.population.bodies > 0, "{visit:?}");
+    assert!(visit.population.within(visit.budget), "{visit:?}");
+    assert_eq!(arena.floor, Population::NONE);
+    let accounting = arena.accounting;
+    assert_eq!(
+        census(&arena),
+        Population {
+            bodies: accounting.bodies,
+            colliders: accounting.colliders,
+            joints: accounting.joints,
+        }
+    );
 }
 
 /// Debug builds audit the arena before each step.
