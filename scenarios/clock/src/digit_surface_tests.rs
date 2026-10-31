@@ -821,6 +821,38 @@ fn shared_ink(surfaces: &[DigitSurface]) -> Vec<(SurfaceId, f32)> {
         .collect()
 }
 
+/// Checks every drawn cell's ink carries on from the last step, changing by
+/// at most `limit`, whichever surfaces carry it now. Returns this step's ink.
+fn assert_ink_continues(
+    ink: &[(SurfaceId, f32)],
+    surfaces: &[DigitSurface],
+    limit: f32,
+    context: &str,
+) -> Vec<(SurfaceId, f32)> {
+    let next = shared_ink(surfaces);
+    for (id, value) in &next {
+        let previous = ink.iter().find(|(old, _)| old == id).map(|(_, v)| *v);
+        let co_located = surfaces
+            .iter()
+            .find(|s| s.id == *id)
+            .map(|surface| {
+                surfaces
+                    .iter()
+                    .filter(|other| (other.origin - surface.origin).length() < 1e-3)
+                    .filter_map(|other| ink.iter().find(|(old, _)| *old == other.id))
+                    .map(|(_, v)| *v)
+                    .fold(0.0, f32::max)
+            })
+            .unwrap_or(0.0);
+        let before = previous.unwrap_or(co_located);
+        assert!(
+            (value - before).abs() <= limit,
+            "{context}: a cell's ink moves from {before} to {value}"
+        );
+    }
+    next
+}
+
 /// Checks a rigid piece stays where its body puts it: the same offset in the
 /// body's frame on every step, and the body's own turn.
 fn assert_on_bodies(
@@ -953,39 +985,10 @@ fn surface_contract_a_reading_changed_on_the_way_home_keeps_survivors_and_fades_
         while state.event_kind() == Some(ClockEventKind::Falling) {
             tick(&mut state, &std::mem::take(&mut actions));
             let surfaces = markers.follow(&state);
-            assert_face_agreement(&state, &format!("{context}, step {steps}"));
-            let next = shared_ink(&surfaces);
-            for (id, value) in &next {
-                let previous = ink.iter().find(|(old, _)| old == id).map(|(_, v)| *v);
-                let co_located = surfaces
-                    .iter()
-                    .find(|s| s.id == *id)
-                    .map(|surface| {
-                        surfaces
-                            .iter()
-                            .filter(|other| (other.origin - surface.origin).length() < 1e-3)
-                            .filter_map(|other| ink.iter().find(|(old, _)| *old == other.id))
-                            .map(|(_, v)| *v)
-                            .fold(0.0, f32::max)
-                    })
-                    .unwrap_or(0.0);
-                let before = previous.unwrap_or(co_located);
-                assert!(
-                    (value - before).abs() <= 0.06,
-                    "{context}, step {steps}: a cell's ink moves from {before} to {value}"
-                );
-            }
-            // One piece per cell is ever coming home.
-            let homing: Vec<_> = surfaces.iter().filter(|s| !s.departing).collect();
-            for (index, surface) in homing.iter().enumerate() {
-                assert!(
-                    homing[index + 1..]
-                        .iter()
-                        .all(|other| (other.origin - surface.origin).length() > 1e-3),
-                    "{context}: no cell is duplicated"
-                );
-            }
-            ink = next;
+            let context = format!("{context}, step {steps}");
+            assert_face_agreement(&state, &context);
+            ink = assert_ink_continues(&ink, &surfaces, 0.06, &context);
+            assert_one_per_cell(&surfaces, &context);
             steps += 1;
         }
         let after = assert_face_agreement(&state, &context);
@@ -1031,6 +1034,67 @@ fn surface_contract_a_reading_changed_on_the_way_home_keeps_survivors_and_fades_
         assert!(arrived.iter().all(|s| s.slot == 3
             && glyphs(5).contains(s.cell)
             && !markers.markers.iter().any(|m| m.surface == s.id)));
+    }
+}
+
+#[test]
+fn surface_contract_a_reading_that_keeps_changing_on_the_way_home_never_jumps_or_duplicates() {
+    // The minute's cell that a 4 has and a 5 lacks fades out, back in as a
+    // new piece and out again, so two fading pieces share it and merge.
+    for font in FONTS {
+        let context = format!("{font:?}");
+        let mut state = clock(
+            800.0 / 480.0,
+            font,
+            ClockTimeFormat::TwentyFourHour,
+            reading(12, 34, 10),
+        );
+        sync(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Falling)],
+        );
+        while state.event_phase() != Some(EventPhase::Reforming) || state.phase_tick() < 20 {
+            tick(&mut state, &[]);
+        }
+        let progress = |state: &ClockState| match &state.active_event {
+            Some(crate::events::ActiveEvent::Falling(event)) => event.progress(),
+            _ => 1.0,
+        };
+        let mut ink = shared_ink(&state.digit_surfaces());
+        let peak = state.surface_accounting().live;
+        let mut window = 0.0;
+        let mut steps = 0;
+        while state.event_kind() == Some(ClockEventKind::Falling) {
+            let minute = 34 + (state.phase_tick() / 10) % 2;
+            let before = progress(&state);
+            if state.display().digits[3] != Some(minute as u8 % 10) {
+                window = before;
+            }
+            tick(
+                &mut state,
+                &[ClockAction::set_reading(reading(12, minute as u8, 0))],
+            );
+            let surfaces = state.digit_surfaces();
+            let context = format!("{context}, step {steps}");
+            assert_face_agreement(&state, &context);
+            // No cell fades faster than the time left for its fade allows.
+            let limit = 0.01 + (progress(&state) - before) / (1.0 - window);
+            ink = assert_ink_continues(&ink, &surfaces, limit, &context);
+            assert_one_per_cell(&surfaces, &context);
+            assert!(
+                surfaces.len() <= 2 * peak,
+                "{context}: fading pieces do not pile up"
+            );
+            steps += 1;
+        }
+        let after = assert_face_agreement(&state, &context);
+        let fresh = clock(
+            800.0 / 480.0,
+            font,
+            ClockTimeFormat::TwentyFourHour,
+            state.reading().unwrap(),
+        );
+        assert_eq!(after.len(), fresh.digit_surfaces().len(), "{context}");
     }
 }
 
@@ -1542,6 +1606,8 @@ fn surface_contract_am_pm_pixels_on_the_way_home_are_never_surfaces() {
 
 #[test]
 fn surface_contract_an_explosion_cut_short_or_paused_neither_snaps_nor_moves_its_blocks() {
+    // Before the burst every block still rests at its cell, so the face keeps
+    // them; after it, none is carried home with what it holds.
     for (stop, phase) in [
         (10, EventPhase::Warning),
         (80, EventPhase::Exploding),
@@ -1583,6 +1649,11 @@ fn surface_contract_an_explosion_cut_short_or_paused_neither_snaps_nor_moves_its
         );
         let after = markers.follow(&state);
         assert_face_agreement(&state, &context);
+        if phase == EventPhase::Warning {
+            assert_eq!(ids(&after), ids(&face), "{context}");
+            assert_eq!(markers.attached().count(), face.len(), "{context}");
+            continue;
+        }
         assert!(after.iter().all(|s| face.iter().all(|old| old.id != s.id)));
         assert!(
             markers

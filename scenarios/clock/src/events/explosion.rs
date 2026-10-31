@@ -407,14 +407,10 @@ impl ExplosionEvent {
         };
         self.pieces.resize(self.cells.len(), None);
         for (index, piece) in self.pieces.iter_mut().enumerate() {
-            match (reassembly.destination(index), *piece) {
-                (
-                    Destination::Cell(_),
-                    Some(Piece {
-                        departing: false, ..
-                    }),
-                ) => (),
-                (Destination::Cell((slot, cell)), _) => {
+            let surviving = piece.is_some_and(|piece| !piece.departing);
+            match reassembly.destination(index) {
+                Destination::Cell(_) if surviving => (),
+                Destination::Cell((slot, cell)) => {
                     if let Some(old) = piece.take() {
                         surfaces.retire(old.id, Retirement::Replaced);
                     }
@@ -423,12 +419,12 @@ impl ExplosionEvent {
                         departing: false,
                     });
                 }
-                (Destination::Label, _) => {
+                Destination::Label => {
                     if let Some(old) = piece.take() {
                         surfaces.retire(old.id, Retirement::Replaced);
                     }
                 }
-                (Destination::Merging, _) => {
+                Destination::Merging => {
                     if let Some(piece) = piece {
                         piece.departing = true;
                     }
@@ -464,40 +460,48 @@ impl ExplosionEvent {
         }
     }
 
-    /// A finished return hands each block's surface to the face at the cell
-    /// it came home to. One cut short retires them where they are instead of
-    /// snapping them home, and a surplus block's surface is merged away
-    /// either way.
+    /// The cell a block rests at, if it is resting at one: every digit block
+    /// before the burst, and every block a finished return brought home.
+    fn resting(&self, index: usize) -> Option<Home> {
+        match self.phase {
+            EventPhase::Warning => self.cells[index].home,
+            EventPhase::Reforming if self.tick >= REFORMING_TICKS => {
+                match self.reassembly.as_ref()?.destination(index) {
+                    Destination::Cell(home) => Some(home),
+                    Destination::Label | Destination::Merging => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Gives the face back the surfaces of the blocks resting at their cells.
+    /// An explosion cut short anywhere else retires its blocks where they are
+    /// instead of snapping them home, and a surplus block's surface is merged
+    /// away either way.
     pub fn release_surfaces(&mut self, segments: &[SegmentState], surfaces: &mut SurfaceLedger) {
-        let settled = self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS;
+        let resting = self.phase == EventPhase::Warning
+            || self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS;
         let mut ids: [SlotIds; DIGIT_SLOT_COUNT] =
             [[None; digit_surfaces::GRID_CELLS]; DIGIT_SLOT_COUNT];
         let mut glyphs = [digit_surfaces::Glyph::new(segments[0].font, None); DIGIT_SLOT_COUNT];
-        for (index, piece) in self.pieces.drain(..).enumerate() {
+        for index in 0..self.cells.len() {
+            if let Some((slot, cell)) = self.resting(index) {
+                glyphs[usize::from(slot)].mask.0 |= 1 << bit(cell);
+            }
+        }
+        for (index, piece) in std::mem::take(&mut self.pieces).into_iter().enumerate() {
             let Some(piece) = piece else {
                 continue;
             };
-            let destination = self
-                .reassembly
-                .as_ref()
-                .map(|reassembly| reassembly.destination(index));
-            match (piece.departing, settled, destination) {
-                (true, ..) => surfaces.retire(piece.id, Retirement::MergedAway),
-                (false, true, Some(Destination::Cell((slot, cell)))) => {
-                    ids[usize::from(slot)][bit(cell)] = Some(piece.id);
-                }
-                _ => surfaces.retire(piece.id, Retirement::Interrupted),
-            }
-        }
-        if let Some(reassembly) = self.reassembly.as_ref().filter(|_| settled) {
-            for index in 0..self.cells.len() {
-                if let Destination::Cell((slot, cell)) = reassembly.destination(index) {
-                    glyphs[usize::from(slot)].mask.0 |= 1 << bit(cell);
-                }
+            match (piece.departing, self.resting(index)) {
+                (true, _) => surfaces.retire(piece.id, Retirement::MergedAway),
+                (false, Some((slot, cell))) => ids[usize::from(slot)][bit(cell)] = Some(piece.id),
+                (false, None) => surfaces.retire(piece.id, Retirement::Interrupted),
             }
         }
         for (slot, ids) in ids.into_iter().enumerate() {
-            if settled {
+            if resting {
                 surfaces.hand_back(slot, glyphs[slot], ids);
             } else {
                 surfaces.release(slot);
