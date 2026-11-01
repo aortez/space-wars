@@ -39,12 +39,14 @@ mod quarter_turn;
 pub use quarter_turn::QuarterTurn;
 mod query_snapshot;
 mod surface_drive;
+mod tether;
 pub use query_snapshot::{
     AreaValidation, CapsuleQuery, LightingVisibility, MAX_LIGHT_COLLIDERS, MAX_LIGHT_FOOTPRINTS,
     MAX_OPTICAL_EXCLUSIONS, OpaqueFootprint, QueryArea, QueryChange, QueryColliderState,
     QueryFrame, QueryRegion, QuerySnapshot, RegionChanges, VisibilityCounters, light_collider_id,
 };
 pub use surface_drive::SurfaceDrive;
+pub use tether::{TetherSpec, TetherState};
 
 const SNAPSHOT_VERSION: u32 = 1;
 const LOADING_SNAPSHOT_VERSION: u32 = 2;
@@ -67,6 +69,9 @@ const FALLING_SUPPORT_SNAPSHOT_TAG: u64 = 0x4641_4c4c_5355_5050;
 const REBOUND_SNAPSHOT_TAG: u64 = 0x5245_424f_554e_4432;
 const DYNAMIC_COMPRESSION_SNAPSHOT_TAG: u64 = 0x4459_4e43_4f4d_5052;
 const COMPRESSION_SNAPSHOT_TAG: u64 = 0x434f_4d50_5245_5353;
+/// Marks the weights carried into a step not yet taken, which follow
+/// whatever else a snapshot holds and only when there are any.
+const CARRIED_WEIGHT_SNAPSHOT_TAG: u64 = 0x4341_5252_4945_4457;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -580,6 +585,24 @@ impl Default for RayCastOptions {
     }
 }
 
+/// What [`PhysicsWorld::colliders_within`] looks for, and how much it may look.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NearbyOptions {
+    pub collision_groups: CollisionGroups,
+    pub exclude_entity: Option<PhysicsId>,
+    /// The most colliders looked at, whatever they turn out to be.
+    pub max_visited: usize,
+    /// The most returned.
+    pub max_found: usize,
+}
+
+/// Colliders near a point, nearest first, and how many were looked at.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Nearby {
+    pub colliders: Vec<ColliderId>,
+    pub visited: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RayHit {
     pub collider: ColliderId,
@@ -680,6 +703,8 @@ pub struct PhysicsWorld {
     sensor_intersections: Vec<SensorIntersection>,
     collect_events: bool,
     loading: Option<loading::LoadingState>,
+    /// Bodies whose weight the next step carries; see [`Self::carry_weight`].
+    carried_weights: Vec<RigidBodyHandle>,
 }
 
 impl Clone for PhysicsWorld {
@@ -822,6 +847,7 @@ impl PhysicsWorld {
             sensor_intersections: Vec::new(),
             collect_events: config.collect_events,
             loading: None,
+            carried_weights: Vec::new(),
         }
     }
 
@@ -990,6 +1016,10 @@ impl PhysicsWorld {
 
     pub fn contains_body(&self, id: BodyId) -> bool {
         self.body_indices.contains_key(&id)
+    }
+
+    pub fn contains_joint(&self, id: JointId) -> bool {
+        self.joint_indices.contains_key(&id)
     }
 
     pub fn insert_body(&mut self, id: BodyId, spec: BodySpec, colliders: &[ColliderSpec]) -> bool {
@@ -1247,6 +1277,33 @@ impl PhysicsWorld {
             })
     }
 
+    /// A point fixed to a body, where it is now, by the body's own pose and
+    /// with no trigonometry of its own.
+    pub fn body_point_to_world(&self, id: BodyId, local: Vec2) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        finite_vec2(local).then(|| from_rapier(*body.position() * to_rapier(local)))
+    }
+
+    /// Where a world point sits in a body's own frame, the inverse of
+    /// [`Self::body_point_to_world`].
+    pub fn world_point_to_body(&self, id: BodyId, point: Vec2) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        finite_vec2(point).then(|| from_rapier(body.position().inverse() * to_rapier(point)))
+    }
+
+    /// A direction fixed to a body, turned with it into world coordinates.
+    pub fn body_vector_to_world(&self, id: BodyId, local: Vec2) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        finite_vec2(local).then(|| from_rapier(body.position().rotation * to_rapier(local)))
+    }
+
+    /// A world direction turned into a body's own frame.
+    pub fn world_vector_to_body(&self, id: BodyId, vector: Vec2) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        finite_vec2(vector)
+            .then(|| from_rapier(body.position().rotation.inverse() * to_rapier(vector)))
+    }
+
     /// Velocity at a world-space point, accounting for an off-center mass.
     /// `BodyMotion::position` is the body origin, whereas its linear velocity
     /// is Rapier's center-of-mass velocity. They need not coincide.
@@ -1256,6 +1313,24 @@ impl PhysicsWorld {
         }
         let body = self.raw.bodies.get(self.body_handle(id)?)?;
         Some(from_rapier(body.velocity_at_point(to_rapier(point))))
+    }
+
+    /// Velocity at a world point fixed to a body through the coming step of
+    /// `dt`. A position-driven body moves as its next pose prescribes, which
+    /// its solved velocity, a step old, need not show.
+    pub fn incoming_velocity_at_point(&self, id: BodyId, point: Vec2, dt: f32) -> Option<Vec2> {
+        if !finite_vec2(point) || !dt.is_finite() || dt <= 0.0 {
+            return None;
+        }
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        let point = to_rapier(point);
+        Some(from_rapier(if body.is_fixed() {
+            Vector::ZERO
+        } else if body.body_type() == RigidBodyType::KinematicPositionBased {
+            (*body.next_position() * (body.position().inverse() * point) - point) / dt
+        } else {
+            body.velocity_at_point(point)
+        }))
     }
 
     pub fn motions(&self) -> impl ExactSizeIterator<Item = BodyMotionRecord> + '_ {
@@ -1327,6 +1402,37 @@ impl PhysicsWorld {
         let before = body.body_type();
         body.set_body_type(kind.to_rapier(), wake_up);
         if body.body_type() != before {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
+        true
+    }
+
+    pub fn gravity_scale(&self, id: BodyId) -> Option<f32> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        Some(body.gravity_scale())
+    }
+
+    /// Carry a dynamic body's weight through the next step only. That step
+    /// applies the body's whole weight as one impulse before it solves, and
+    /// keeps gravity off the body while it does. Impulses that hold a body up
+    /// then meet its weight at once, not across the solver's substeps, which
+    /// would let them lift it faster than they mean to. A body nobody carries
+    /// again falls as every other body does. Refused for a body that is
+    /// missing or not dynamic.
+    pub fn carry_weight(&mut self, id: BodyId) -> bool {
+        let Some(handle) = self.body_handle(id) else {
+            return false;
+        };
+        if !self
+            .raw
+            .bodies
+            .get(handle)
+            .is_some_and(RigidBody::is_dynamic)
+        {
+            return false;
+        }
+        if !self.carried_weights.contains(&handle) {
+            self.carried_weights.push(handle);
             self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         }
         true
@@ -1645,6 +1751,23 @@ impl PhysicsWorld {
             }
         }
 
+        // A carried body meets its whole weight now, and none of it across
+        // the solver's substeps. Its own gravity scale returns after the solve.
+        let gravity = self.raw.gravity;
+        let carried: Vec<(RigidBodyHandle, f32)> = std::mem::take(&mut self.carried_weights)
+            .into_iter()
+            .filter_map(|handle| {
+                let body = self.raw.bodies.get_mut(handle)?;
+                if !body.is_dynamic() || !body.is_enabled() {
+                    return None;
+                }
+                let scale = body.gravity_scale();
+                body.apply_impulse(gravity * (scale * body.mass() * dt_seconds), true);
+                body.set_gravity_scale(0.0, false);
+                Some((handle, scale))
+            })
+            .collect();
+
         let capture_loading = self.loading.is_some();
         let hooks = loading::Hooks {
             report_applied_contact_impulses: false,
@@ -1671,6 +1794,11 @@ impl PhysicsWorld {
             self.raw.step();
         }
         let wall_time = started.elapsed();
+        for (handle, scale) in carried {
+            if let Some(body) = self.raw.bodies.get_mut(handle) {
+                body.set_gravity_scale(scale, false);
+            }
+        }
         for (handle, flags) in restored_hooks {
             if let Some(collider) = self.raw.colliders.get_mut(handle) {
                 collider.set_active_hooks(flags);
@@ -2075,6 +2203,115 @@ impl PhysicsWorld {
             normal: from_rapier(intersection.normal),
             distance: intersection.time_of_impact,
         })
+    }
+
+    /// Solid colliders other than `exclude_entity`'s that `keep` accepts and
+    /// whose geometry comes within `radius` of `center`, nearest first. At
+    /// most `max_visited` colliders whose indexed bounds meet the ball's are
+    /// looked at, whatever they turn out to be, so the work stays bounded
+    /// however crowded the spot is. The index is the last step's, and each
+    /// collider is measured where its body is now.
+    pub fn colliders_within(
+        &self,
+        center: Vec2,
+        radius: f32,
+        options: NearbyOptions,
+        keep: impl Fn(ColliderId) -> bool,
+    ) -> Nearby {
+        if !finite_vec2(center) || !radius.is_finite() || radius <= 0.0 {
+            return Nearby::default();
+        }
+        use rapier2d::parry::bounding_volume::Aabb;
+        let center = to_rapier(center);
+        let reach = Vector::new(radius, radius);
+        let groups = options.collision_groups.to_rapier();
+        let mut visited = 0;
+        let mut found = Vec::new();
+        for (_, collider) in self
+            .raw
+            .intersect_aabb_conservative(
+                Aabb::new(center - reach, center + reach),
+                QueryFilter::default(),
+            )
+            .take(options.max_visited)
+        {
+            visited += 1;
+            let Some(id) = decode_collider(collider.user_data) else {
+                continue;
+            };
+            if collider.is_sensor()
+                || !collider.collision_groups().test(groups)
+                || Some(id.entity) == options.exclude_entity
+                || !keep(id)
+            {
+                continue;
+            }
+            let pose = self.current_collider_pose(collider);
+            let nearest = collider.shape().project_point(&pose, center, true).point;
+            let distance = (nearest - center).length();
+            if distance <= radius {
+                found.push((distance, id));
+            }
+        }
+        found.sort_by(|a, b| a.0.total_cmp(&b.0));
+        found.truncate(options.max_found);
+        Nearby {
+            colliders: found.into_iter().map(|(_, id)| id).collect(),
+            visited,
+        }
+    }
+
+    /// The point of a collider's boundary nearest `point`, and whether `point`
+    /// lies inside the collider, with the collider where its body is now.
+    pub fn nearest_boundary_point(
+        &self,
+        collider: ColliderId,
+        point: Vec2,
+    ) -> Option<(Vec2, bool)> {
+        if !finite_vec2(point) {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(collider)?)?;
+        let pose = self.current_collider_pose(collider);
+        let projection = collider
+            .shape()
+            .project_point(&pose, to_rapier(point), false);
+        Some((from_rapier(projection.point), projection.is_inside))
+    }
+
+    /// Where a collider is now: on its body's pose, which the collider's own
+    /// pose and the spatial index catch up with only at the next step.
+    fn current_collider_pose(&self, collider: &Collider) -> Pose {
+        match (collider.parent(), collider.position_wrt_parent()) {
+            (Some(parent), Some(offset)) => self
+                .raw
+                .bodies
+                .get(parent)
+                .map_or(*collider.position(), |body| *body.position() * *offset),
+            _ => *collider.position(),
+        }
+    }
+
+    /// Where a point a query found on a collider sits in the frame of the
+    /// collider's body. Queries see each collider where the last step left
+    /// it, so the point stays on the collider when its body has been moved
+    /// since.
+    pub fn queried_point_to_body(&self, collider: ColliderId, point: Vec2) -> Option<Vec2> {
+        let pose = self.queried_body_pose(collider)?;
+        finite_vec2(point).then(|| from_rapier(pose.inverse() * to_rapier(point)))
+    }
+
+    /// A direction a query found at a collider, turned into the frame of the
+    /// collider's body as [`Self::queried_point_to_body`] does a point.
+    pub fn queried_vector_to_body(&self, collider: ColliderId, vector: Vec2) -> Option<Vec2> {
+        let pose = self.queried_body_pose(collider)?;
+        finite_vec2(vector).then(|| from_rapier(pose.rotation.inverse() * to_rapier(vector)))
+    }
+
+    /// The pose of a collider's body as queries see it.
+    fn queried_body_pose(&self, collider: ColliderId) -> Option<Pose> {
+        let collider = self.raw.colliders.get(self.collider_handle(collider)?)?;
+        Some(*collider.position() * collider.position_wrt_parent()?.inverse())
     }
 
     /// Linear, metered route queries. Every collider (including rejected ones)
@@ -2607,6 +2844,12 @@ impl PhysicsWorld {
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
             }
         }
+        if !self.carried_weights.is_empty() {
+            bincode::serialize_into(&mut bytes, &CARRIED_WEIGHT_SNAPSHOT_TAG)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            bincode::serialize_into(&mut bytes, &self.carried_weights)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+        }
         Ok(bytes)
     }
 
@@ -2764,6 +3007,16 @@ impl PhysicsWorld {
                 ));
             }
         }
+        let mut carried_weights = Vec::new();
+        if reader.position() < bytes.len() as u64 {
+            let tag: u64 = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            if tag != CARRIED_WEIGHT_SNAPSHOT_TAG {
+                return Err(PhysicsWorldError("trailing physics snapshot data".into()));
+            }
+            carried_weights = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+        }
         if reader.position() != bytes.len() as u64 {
             return Err(PhysicsWorldError("trailing physics snapshot data".into()));
         }
@@ -2819,6 +3072,7 @@ impl PhysicsWorld {
             sensor_intersections: Vec::new(),
             collect_events: snapshot.collect_events,
             loading,
+            carried_weights,
         };
         if world
             .loading
@@ -3380,8 +3634,11 @@ pub(crate) fn from_rapier(value: Vector) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    mod carry;
     mod compound;
     mod contact_impulses;
+    mod proximity;
+    mod tether;
 
     const BALL_ROLE: BodyRole = BodyRole::new(1);
     const BALL_COLLIDER: ColliderRole = ColliderRole::new(1);
