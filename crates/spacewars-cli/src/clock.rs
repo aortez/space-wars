@@ -568,6 +568,7 @@ fn print_arena(arena: &ClockArenaState) {
                 ClockArenaOwner::Event { event } => format!("event {}", event.as_str()),
                 ClockArenaOwner::Soil => "soil".into(),
                 ClockArenaOwner::Fixture { index } => format!("fixture {index}"),
+                ClockArenaOwner::Spider => "spider".into(),
             };
             format!(
                 "{owner} {}/{} bodies, {}/{} colliders",

@@ -106,7 +106,7 @@ fn surface_contract_a_slot_machine_carries_the_face_out_and_locks_new_surfaces_i
                     assert_eq!(surface.departing, opening, "{context}");
                     assert_eq!(frame.round() == 0.0, opening, "{context}");
                     // An opening cell is retired as it leaves the slot.
-                    assert!(!opening || visible(surface).is_some(), "{context}");
+                    assert!(!opening || surface.visible().is_some(), "{context}");
                 }
                 if ticks % 4 == 0 || ticks + 3 > SLOT_MACHINE_TICKS {
                     assert_reel_agreement(&state, &context);

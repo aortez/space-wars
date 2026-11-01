@@ -79,6 +79,10 @@ pub(crate) enum Owner {
     /// One of the arena fixture's owners, each with balls of its own: a
     /// resident that rests on whatever actually supports it.
     Fixture(u8),
+    /// The spider: a temporary actor with its body, its silk line, the frame
+    /// it climbs and a proxy for each digit cell it may hold. It comes and
+    /// goes like a visit, and a resize cancels it.
+    Spider,
 }
 
 impl Owner {
@@ -88,10 +92,10 @@ impl Owner {
         matches!(self, Self::Soil | Self::Fixture(_))
     }
 
-    /// A resident that rests on the floor, so the arena keeps a floor under it
+    /// An owner that rests on the floor, so the arena keeps a floor under it
     /// while no visit's terrain is one. Soil is fixed in place and needs none.
     fn rests(self) -> bool {
-        matches!(self, Self::Fixture(_))
+        matches!(self, Self::Fixture(_) | Self::Spider)
     }
 
     /// Whether the entity `id` is one of this owner's.
@@ -100,7 +104,7 @@ impl Owner {
     }
 
     /// The most bodies, colliders and joints this owner has in the arena at
-    /// once. No owner has joints.
+    /// once. Only the spider has a joint: its silk line.
     pub(crate) const fn budget(self) -> Population {
         match self {
             // A character, a course of at most `MAX_SURFACES` surfaces with
@@ -134,6 +138,18 @@ impl Owner {
             Self::Event(_) => Population::NONE,
             Self::Soil => Population::new(MAX_SOIL_BODIES, MAX_SOIL_CHUNK_COLLIDERS),
             Self::Fixture(_) => Population::new(MAX_FIXTURE_BALLS, MAX_FIXTURE_BALLS),
+            // Its body, the frame's parts and its proxies for the digit
+            // surfaces, each with one collider, and its line.
+            Self::Spider => {
+                let bodies = count(&ids::canonical::SPIDER)
+                    + count(&ids::canonical::SPIDER_FRAME)
+                    + count(&ids::canonical::SPIDER_SURFACES);
+                Population {
+                    bodies,
+                    colliders: bodies,
+                    joints: 1,
+                }
+            }
         }
     }
 
@@ -158,6 +174,7 @@ impl Owner {
             Self::Event(_) => &[],
             Self::Soil => &[SOIL],
             Self::Fixture(index) => &FIXTURE_OWNER_BALLS[index as usize],
+            Self::Spider => &[SPIDER, SPIDER_FRAME, SPIDER_SURFACES],
         }
     }
 }
@@ -169,6 +186,7 @@ impl From<Owner> for ClockArenaOwner {
             Owner::Event(event) => Self::Event { event },
             Owner::Soil => Self::Soil,
             Owner::Fixture(index) => Self::Fixture { index },
+            Owner::Spider => Self::Spider,
         }
     }
 }
@@ -196,20 +214,34 @@ const LARGEST_EVENT: Population = {
 };
 
 /// The most bodies, colliders and joints the arena holds at once: a visit
-/// and the largest event sharing its arena, with soil and one arena fixture.
-/// Everything Clock ships fits, so only residents beyond those make the arena
-/// refuse a claim.
+/// and the largest event sharing its arena, with soil and one arena fixture,
+/// and the spider's line. The spider takes no more room than the largest
+/// event, so beside a visit and the residents it fits where an event would,
+/// and it never shares the arena with an event that has bodies, because the
+/// two together do not. Everything Clock ships fits, so only residents beyond
+/// those make the arena refuse a claim.
 pub const ARENA_CAPACITY: Population = Owner::Visit
     .budget()
     .plus(LARGEST_EVENT)
     .plus(Owner::Soil.budget())
-    .plus(Owner::Fixture(0).budget());
+    .plus(Owner::Fixture(0).budget())
+    .plus(Population {
+        bodies: 0,
+        colliders: 0,
+        joints: Owner::Spider.budget().joints,
+    });
+
+const _: () = assert!(
+    Owner::Spider.budget().bodies <= LARGEST_EVENT.bodies
+        && Owner::Spider.budget().colliders <= LARGEST_EVENT.colliders,
+    "the spider takes no more room than the largest event"
+);
 
 /// The most residents that hold the arena at once, soil included.
 pub const MAX_RESIDENT_CLAIMS: usize = 4;
 
 /// The most owners that hold the arena at once: a visit, one event sharing
-/// its arena, and the residents.
+/// its arena or the spider, and the residents.
 pub const MAX_ARENA_CLAIMS: usize = 2 + MAX_RESIDENT_CLAIMS;
 
 const _: () = assert!(
@@ -487,7 +519,8 @@ impl ClockArena {
         world
     }
 
-    /// A resident claims the arena, building the world if nobody holds one.
+    /// An owner that brings no world of its own, as a resident or the spider
+    /// does, claims the arena, building the world if nobody holds one.
     pub fn claim_resident(&mut self, owner: Owner, layout: Layout) -> &mut PhysicsWorld {
         if self.idle() {
             self.build(owner, PhysicsWorld::new(mechanics_config(layout)))
@@ -581,7 +614,7 @@ impl ClockArena {
         Some((self.vacant.as_mut()?, self.world.as_mut()?))
     }
 
-    /// A resting resident holds the arena, which keeps a floor under it.
+    /// A resting owner holds the arena, which keeps a floor under it.
     pub fn keeps_floor(&self) -> bool {
         self.owners.iter().any(|owner| owner.rests())
     }
@@ -777,15 +810,16 @@ impl ClockArena {
         };
         let gravity = world.gravity().y;
         if self.resident_gravity != Some(gravity) {
-            for owner in self.owners.iter().filter(|owner| owner.rests()) {
-                for range in owner.ranges() {
-                    for id in range.clone() {
-                        let body = BodyId::new(PhysicsId::new(id), BodyRole::PRIMARY);
-                        if world.contains_body(body) {
-                            assert!(world.set_gravity_scale(body, scale, false));
-                        }
-                    }
-                }
+            let bodies: Vec<BodyId> = world
+                .body_ids()
+                .filter(|body| {
+                    self.owners
+                        .iter()
+                        .any(|owner| owner.rests() && owner.declares(body.entity.value()))
+                })
+                .collect();
+            for body in bodies {
+                assert!(world.set_gravity_scale(body, scale, false));
             }
             self.resident_gravity = Some(gravity);
         }
@@ -801,8 +835,8 @@ impl ClockArena {
     /// The world's identities and Rapier's objects name each other one to
     /// one. Every entity belongs to exactly one owner holding the arena, by
     /// the identities it declares, or to the floor kept under resting
-    /// residents while no visit's terrain is one. Each owner has no more than
-    /// its budget.
+    /// owners while no visit's terrain is one. Each owner has no more than
+    /// its budget, joints included.
     #[cfg(debug_assertions)]
     fn audit(&self) {
         let world = self.world.as_ref().expect("a held arena");
@@ -829,7 +863,7 @@ impl ClockArena {
                 continue;
             }
             if ids::canonical::ARENA_FLOOR.contains(&id) {
-                assert!(floor, "floor {id} with no resting resident on it");
+                assert!(floor, "floor {id} with no resting owner on it");
                 continue;
             }
             match self
@@ -855,12 +889,12 @@ impl ClockArena {
             floor.within(FLOOR_BUDGET),
             "the floor has {floor:?}, more than {FLOOR_BUDGET:?}"
         );
-        assert_eq!(world.joint_count(), 0, "no owner has joints");
     }
 
     /// What each owner holding the arena has in its world, in the order they
-    /// claimed it, and what the floor kept under resting residents has. An
-    /// entity no owner declares counts for nobody.
+    /// claimed it, and what the floor kept under resting owners has. An
+    /// entity no owner declares counts for nobody, and a joint counts for the
+    /// owner of the entity it is named by.
     fn populations(&self) -> (Vec<Population>, Population) {
         let mut owners = vec![Population::NONE; self.owners.len()];
         let mut floor = Population::NONE;
@@ -880,6 +914,9 @@ impl ClockArena {
         }
         for collider in world.collider_ids() {
             tally(collider.entity, |population| population.colliders += 1);
+        }
+        for joint in world.joint_ids() {
+            tally(joint.entity, |population| population.joints += 1);
         }
         (owners, floor)
     }
@@ -1200,6 +1237,15 @@ pub(crate) mod ids {
             }
             owners
         };
+        /// The spider's body.
+        pub(crate) const SPIDER: Range<u64> = 8001..8002;
+        /// The frame the spider climbs: the two side rails, the ceiling on
+        /// either side of its hatch, and the beam above the hatch.
+        pub(crate) const SPIDER_FRAME: Range<u64> = 8010..8015;
+        /// The spider's proxies for the digit surfaces, by the proxy table's
+        /// index.
+        pub(crate) const SPIDER_SURFACES: Range<u64> =
+            8100..8100 + crate::spider::MAX_PROXIES as u64;
         /// Retained soil, the one resident today that outlives its admitting
         /// event.
         pub(crate) const SOIL: Range<u64> = 900_001..900_002;
@@ -1267,6 +1313,9 @@ pub(crate) mod ids {
             ("AQUARIUM_LINER", AQUARIUM_LINER),
             ("AQUARIUM_DIGITS", AQUARIUM_DIGITS),
             ("FIXTURE_BALLS", FIXTURE_BALLS),
+            ("SPIDER", SPIDER),
+            ("SPIDER_FRAME", SPIDER_FRAME),
+            ("SPIDER_SURFACES", SPIDER_SURFACES),
             ("SOIL", SOIL),
             ("TEST_OBSTACLES", TEST_OBSTACLES),
         ];
