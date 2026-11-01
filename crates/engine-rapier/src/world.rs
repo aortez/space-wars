@@ -39,12 +39,14 @@ mod quarter_turn;
 pub use quarter_turn::QuarterTurn;
 mod query_snapshot;
 mod surface_drive;
+mod tether;
 pub use query_snapshot::{
     AreaValidation, CapsuleQuery, LightingVisibility, MAX_LIGHT_COLLIDERS, MAX_LIGHT_FOOTPRINTS,
     MAX_OPTICAL_EXCLUSIONS, OpaqueFootprint, QueryArea, QueryChange, QueryColliderState,
     QueryFrame, QueryRegion, QuerySnapshot, RegionChanges, VisibilityCounters, light_collider_id,
 };
 pub use surface_drive::SurfaceDrive;
+pub use tether::{TetherSpec, TetherState};
 
 const SNAPSHOT_VERSION: u32 = 1;
 const LOADING_SNAPSHOT_VERSION: u32 = 2;
@@ -992,6 +994,10 @@ impl PhysicsWorld {
         self.body_indices.contains_key(&id)
     }
 
+    pub fn contains_joint(&self, id: JointId) -> bool {
+        self.joint_indices.contains_key(&id)
+    }
+
     pub fn insert_body(&mut self, id: BodyId, spec: BodySpec, colliders: &[ColliderSpec]) -> bool {
         if self.body_indices.contains_key(&id)
             || !valid_body_spec(spec)
@@ -1245,6 +1251,33 @@ impl PhysicsWorld {
                     Vec2::new(max.x.max(next_max.x), max.y.max(next_max.y)),
                 )
             })
+    }
+
+    /// A point fixed to a body, where it is now, by the body's own pose and
+    /// with no trigonometry of its own.
+    pub fn body_point_to_world(&self, id: BodyId, local: Vec2) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        finite_vec2(local).then(|| from_rapier(*body.position() * to_rapier(local)))
+    }
+
+    /// Where a world point sits in a body's own frame, the inverse of
+    /// [`Self::body_point_to_world`].
+    pub fn world_point_to_body(&self, id: BodyId, point: Vec2) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        finite_vec2(point).then(|| from_rapier(body.position().inverse() * to_rapier(point)))
+    }
+
+    /// A direction fixed to a body, turned with it into world coordinates.
+    pub fn body_vector_to_world(&self, id: BodyId, local: Vec2) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        finite_vec2(local).then(|| from_rapier(body.position().rotation * to_rapier(local)))
+    }
+
+    /// A world direction turned into a body's own frame.
+    pub fn world_vector_to_body(&self, id: BodyId, vector: Vec2) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        finite_vec2(vector)
+            .then(|| from_rapier(body.position().rotation.inverse() * to_rapier(vector)))
     }
 
     /// Velocity at a world-space point, accounting for an off-center mass.
@@ -2075,6 +2108,58 @@ impl PhysicsWorld {
             normal: from_rapier(intersection.normal),
             distance: intersection.time_of_impact,
         })
+    }
+
+    /// Up to `limit` solid colliders, other than `exclude_entity`'s, whose
+    /// geometry comes within `radius` of `center`, in the spatial index's
+    /// order. The limit bounds the work as well as the answer.
+    pub fn colliders_within(
+        &self,
+        center: Vec2,
+        radius: f32,
+        groups: CollisionGroups,
+        exclude_entity: Option<PhysicsId>,
+        limit: usize,
+    ) -> Vec<ColliderId> {
+        if !finite_vec2(center) || !radius.is_finite() || radius <= 0.0 {
+            return Vec::new();
+        }
+        let predicate = |_: ColliderHandle, collider: &Collider| {
+            decode_collider(collider.user_data).is_some_and(|id| Some(id.entity) != exclude_entity)
+        };
+        let ball = rapier2d::parry::shape::Ball::new(radius);
+        self.raw
+            .intersect_shape(
+                Pose::new(to_rapier(center), 0.0),
+                &ball,
+                QueryFilter {
+                    flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                    groups: Some(groups.to_rapier()),
+                    predicate: Some(&predicate),
+                    ..QueryFilter::default()
+                },
+            )
+            .filter_map(|(_, collider)| decode_collider(collider.user_data))
+            .take(limit)
+            .collect()
+    }
+
+    /// The point of a collider's boundary nearest `point`, and whether `point`
+    /// lies inside the collider.
+    pub fn nearest_boundary_point(
+        &self,
+        collider: ColliderId,
+        point: Vec2,
+    ) -> Option<(Vec2, bool)> {
+        if !finite_vec2(point) {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(collider)?)?;
+        let projection =
+            collider
+                .shape()
+                .project_point(collider.position(), to_rapier(point), false);
+        Some((from_rapier(projection.point), projection.is_inside))
     }
 
     /// Linear, metered route queries. Every collider (including rejected ones)
@@ -2909,7 +2994,8 @@ impl PhysicsWorld {
         }
     }
 
-    fn remove_joint(&mut self, id: JointId) -> bool {
+    /// Remove one joint, leaving both bodies and every other joint in place.
+    pub fn remove_joint(&mut self, id: JointId) -> bool {
         let Some(index) = self.joint_indices.remove(&id) else {
             return false;
         };
@@ -3382,6 +3468,7 @@ mod tests {
     use super::*;
     mod compound;
     mod contact_impulses;
+    mod tether;
 
     const BALL_ROLE: BodyRole = BodyRole::new(1);
     const BALL_COLLIDER: ColliderRole = ColliderRole::new(1);
