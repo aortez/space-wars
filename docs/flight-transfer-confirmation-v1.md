@@ -23,7 +23,8 @@ and under the 8-second stream its seats hand off as often as the native
 seats. Handoffs are now counted against both the native seats the learned
 seats replace and their native opponents in the same matches, which
 corrects the "more handoffs" of the LF-091 summaries. The legs that stall
-beside the sun are the next deficiency.
+beside the sun are the next deficiency, taken up by
+[LF-093](flight-long-transfers-v1.md).
 
 ## The first goal
 

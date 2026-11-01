@@ -155,23 +155,28 @@ struct TaskRow {
 /// keeps its seeded gravity and planet spin.
 fn generate(seed: u64, per_family: usize, max_rounds: u64, envelope: Envelope) -> Vec<TaskRow> {
     if envelope == Envelope::Transfer {
-        return generation::transfer::generate_transfers(seed, per_family, max_rounds.min(8192))
-            .expect("transfer batch")
-            .into_iter()
-            .filter(|a| a.admitted)
-            .enumerate()
-            .map(|(index, a)| TaskRow {
-                index,
-                family: "transfer".into(),
-                recipe: "transfer".into(),
-                candidate_index: a.candidate.index,
-                reference_time_seconds: a.reference_time_seconds,
-                gravity: true,
-                planet_spin: 0.0,
-                goal_speed: 0.0,
-                task: a.candidate.task,
-            })
-            .collect();
+        return generation::transfer::generate_transfers(
+            seed,
+            per_family,
+            max_rounds.min(8192),
+            generation::transfer::TransferRange::Standard,
+        )
+        .expect("transfer batch")
+        .into_iter()
+        .filter(|a| a.admitted)
+        .enumerate()
+        .map(|(index, a)| TaskRow {
+            index,
+            family: "transfer".into(),
+            recipe: "transfer".into(),
+            candidate_index: a.candidate.index,
+            reference_time_seconds: a.reference_time_seconds,
+            gravity: true,
+            planet_spin: 0.0,
+            goal_speed: 0.0,
+            task: a.candidate.task,
+        })
+        .collect();
     }
     let batch = FlightTaskBatch::generate(seed, per_family, max_rounds).expect("task batch");
     assert!(batch.complete, "task generation quota incomplete");

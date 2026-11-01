@@ -15,13 +15,46 @@ pub const HANDOFF_ALTITUDE: f32 = 105.0;
 pub const TERRAIN_CLEARANCE: f32 = 25.0;
 pub const MIN_DISTANCE: f32 = 100.0;
 pub const MAX_DISTANCE: f32 = 600.0;
+/// The long range's farthest start, beyond any leg of the standard arena.
+pub const LONG_MAX_DISTANCE: f32 = 3000.0;
 const BODY_MARGIN: f32 = 30.0;
+
+/// The start distances a transfer batch admits. Each candidate index draws
+/// the same task in either range, deadline included: a long leg gets the
+/// 1,800 ticks of a mission's learned transfer attempt, which the observation's
+/// remaining time is read against.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransferRange {
+    /// The archived family: 100 to 600 units.
+    #[default]
+    Standard,
+    /// Beyond 600 units: the legs a mission flies across the arena, between
+    /// planets on opposite sides of the sun.
+    Long,
+}
+
+impl TransferRange {
+    fn admits(self, distance: f32) -> bool {
+        match self {
+            Self::Standard => (MIN_DISTANCE..=MAX_DISTANCE).contains(&distance),
+            Self::Long => distance > MAX_DISTANCE && distance <= LONG_MAX_DISTANCE,
+        }
+    }
+
+    fn is_standard(&self) -> bool {
+        *self == Self::Standard
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TransferCandidate {
     pub generator_version: u32,
     pub seed: u64,
     pub index: u64,
+    /// Absent from the standard range's records, which stay as archived.
+    #[serde(default, skip_serializing_if = "TransferRange::is_standard")]
+    pub range: TransferRange,
     pub task: FlightTask,
 }
 
@@ -38,7 +71,7 @@ pub struct TransferAdmission {
 
 impl TransferCandidate {
     /// Every index produces exactly one candidate on its own generated arena.
-    pub fn generate(seed: u64, index: u64) -> Self {
+    pub fn generate(seed: u64, index: u64, range: TransferRange) -> Self {
         let mut rng = Rng(seed ^ index.wrapping_mul(0x9e37_79b9_7f4a_7c15));
         let layout = mission::ArenaLayout::STANDARD;
         let start_planet = (rng.next() % layout.planets as u64) as usize;
@@ -93,6 +126,7 @@ impl TransferCandidate {
             generator_version: TRANSFER_GENERATOR_VERSION,
             seed,
             index,
+            range,
             task,
         }
     }
@@ -167,7 +201,7 @@ impl TransferCandidate {
             return rejected("start inside the solar hazard");
         }
         let distance = frame.errors.position;
-        if !(MIN_DISTANCE..=MAX_DISTANCE).contains(&distance) {
+        if !self.range.admits(distance) {
             return rejected("transfer distance outside the family's range");
         }
         TransferAdmission {
@@ -186,6 +220,7 @@ pub fn generate_transfers(
     seed: u64,
     count: usize,
     max_attempts: u64,
+    range: TransferRange,
 ) -> Result<Vec<TransferAdmission>, &'static str> {
     if count == 0 || count > 1024 || max_attempts == 0 || max_attempts > 8192 {
         return Err("invalid transfer batch budget");
@@ -196,7 +231,7 @@ pub fn generate_transfers(
         if admitted == count {
             break;
         }
-        let report = TransferCandidate::generate(seed, index).inspect();
+        let report = TransferCandidate::generate(seed, index, range).inspect();
         admitted += usize::from(report.admitted);
         attempts.push(report);
     }
@@ -212,8 +247,8 @@ mod tests {
 
     #[test]
     fn transfer_goals_ride_their_planet_and_tasks_stay_reproducible() {
-        let batch = generate_transfers(11, 2, 40).unwrap();
-        let again = generate_transfers(11, 2, 40).unwrap();
+        let batch = generate_transfers(11, 2, 40, TransferRange::Standard).unwrap();
+        let again = generate_transfers(11, 2, 40, TransferRange::Standard).unwrap();
         assert_eq!(
             batch.iter().map(|a| &a.candidate).collect::<Vec<_>>(),
             again.iter().map(|a| &a.candidate).collect::<Vec<_>>()
@@ -264,5 +299,29 @@ mod tests {
         let mut bad = task;
         bad.start.gravity = false;
         assert!(FlightEnvironment::new(bad).is_err());
+    }
+
+    #[test]
+    fn long_transfers_draw_the_same_tasks_beyond_the_standard_range() {
+        let standard = generate_transfers(11, 2, 40, TransferRange::Standard).unwrap();
+        let record = serde_json::to_value(&standard[0].candidate).unwrap();
+        assert!(
+            record.get("range").is_none(),
+            "standard records stay as archived"
+        );
+        let long = generate_transfers(11, 2, 400, TransferRange::Long).unwrap();
+        let admitted: Vec<_> = long.iter().filter(|a| a.admitted).collect();
+        assert_eq!(admitted.len(), 2);
+        for admission in admitted {
+            let candidate = &admission.candidate;
+            assert!(admission.distance.unwrap() > MAX_DISTANCE);
+            let same = TransferCandidate::generate(11, candidate.index, TransferRange::Standard);
+            assert_eq!(same.task, candidate.task, "the same draw in either range");
+            assert!(!same.inspect().admitted);
+            let record = serde_json::to_value(candidate).unwrap();
+            assert_eq!(record["range"], "long");
+            let back: TransferCandidate = serde_json::from_value(record).unwrap();
+            assert_eq!(&back, candidate);
+        }
     }
 }

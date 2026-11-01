@@ -4,23 +4,23 @@
     "hold_ticks": 6,
     "motor_hz": 60,
     "command_contract": "navigation-command-v2",
-    "envelope": "match worlds: gravity, orbiting and spinning planets, the sun's heat and the boundary, speeds to 60 units per second, goals resting in a planet's spinning frame, the four practice families with seeded gravity and spin, and transfers between the planets of a generated arena"
+    "envelope": "match worlds: gravity, orbiting and spinning planets, the sun's heat and the boundary, speeds to 60 units per second, goals resting in a planet's spinning frame, the four practice families with seeded gravity and spin, and transfers between the planets of a generated arena, starting up to 3,000 units from their entry"
   },
   "navigation": {
     "file": "navigation.json",
-    "sha256": "277ea2f05d6211ce84d55a5f21ed8c14f404796dfa6c377d1e8fa21feb0f7748",
+    "sha256": "57b9546e4d64e7669a969029bc9697e276593c48068ff17012922f693767cb53",
     "format_version": 5,
     "architecture": "polar-conv8x8-coordinates-set-attention32-mlp64x64-v1",
-    "experiment": "LF-091",
-    "report": "docs/flight-motor-steering-v1.md",
-    "source": "data/training-experiments/learned-flight-mission-polish-v1-20261029/nav-fit-seed1/policy-final.json",
+    "experiment": "LF-093",
+    "report": "docs/flight-long-transfers-v1.md",
+    "source": "data/training-experiments/learned-flight-mission-polish-v1-20261029/nav-fit-long-r1/policy-final.json",
     "qualification": {
-      "development": "65 of 72 tasks: 24 transfers at seed 7700101 and 12 of each practice family at seed 7700002",
-      "held_out": "68 of 72 tasks: 24 transfers at seed 7700102 and 12 of each practice family at seed 7700003",
-      "law_held_out": "69 of 72 for the law the network imitates, with the LF-091 straight-line planner waypoint, flying the LF-091 motor network",
-      "native_parity": "3.3e-6 maximum head difference against the Python fit",
-      "matches": "seeds 1 to 24 against the recovery bot in both seat orders: of 48 identical first legs 9 faster than the native transfer law, 27 within five percent and 12 slower, the typical ratio 1.00; 128 handoffs against the native-only seats' 108; selected over a second fit by the same matches and validated on seeds 25 to 36: 9 faster, 9 within, 5 slower of 23, the typical ratio 0.97, 67 handoffs against the native-only seats' 65 and the same matches' native opponents' 73",
-      "predecessor": "LF-090 fit 9852ed042a5b3c792b081f1dd83bd3c80a538598bbbc241b74e93427726aa6fc over the LF-087 motor: on seeds 25 to 36 3 faster, 13 within and 7 slower of 23, 63 handoffs against 65, 37 refused ticks"
+      "development": "71 of 84 tasks: 24 transfers and 12 long transfers at seed 7700101 and 12 of each practice family at seed 7700002, 68 of the 72 standard tasks and 3 of the 12 long ones",
+      "held_out": "71 of 84 tasks: 24 transfers and 12 long transfers at seed 7700102 and 12 of each practice family at seed 7700003, 69 of the 72 standard tasks and 2 of the 12 long ones",
+      "law_held_out": "74 of 84 for the law the network imitates, 69 of the 72 standard tasks and 5 of the 12 long ones, flying the LF-091 motor network",
+      "native_parity": "2.9e-6 maximum head difference against the Python fit",
+      "matches": "whole ten-minute matches against the recovery bot in both seat orders under the default settings: on seeds 1 to 24 3 legs over 2,000 ticks against the LF-091 network's 6 and the native-only seats' 2, 1 budget replan against 6 and 1, 6.4 handoffs per ten minutes against the native-only seats' 6.7, identical first legs 13 faster, 23 within five percent and 11 slower of 47; selected over a second fit by the same matches and validated on seeds 49 to 60: 1 leg over 2,000 ticks against 2 and 2, 6.5 handoffs per ten minutes against 6.5; on seeds 37 to 48 6.8 handoffs per ten minutes against the native-only seats' 6.9 and 3 legs over 2,000 ticks against 4, and under the 8-second asteroid stream 7.9 handoffs against 7.0 and 5 legs over 2,000 ticks against 3",
+      "predecessor": "LF-091 fit 277ea2f05d6211ce84d55a5f21ed8c14f404796dfa6c377d1e8fa21feb0f7748: on seeds 37 to 48 5.8 handoffs per ten minutes against 6.9 and 7 legs over 2,000 ticks against 4; on seeds 1 to 24 6 legs over 2,000 ticks and 6 budget replans"
     }
   },
   "motor": {

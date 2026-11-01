@@ -38,6 +38,8 @@ enum Request {
         seed: u64,
         count: usize,
         max_attempts: u64,
+        #[serde(default)]
+        range: generation::transfer::TransferRange,
     },
     Reset {
         tasks: Vec<FlightTask>,
@@ -200,8 +202,10 @@ impl Bridge {
                 seed,
                 count,
                 max_attempts,
+                range,
             } => {
-                let attempts = generation::transfer::generate_transfers(seed, count, max_attempts)?;
+                let attempts =
+                    generation::transfer::generate_transfers(seed, count, max_attempts, range)?;
                 Ok(json!({"attempts":attempts}))
             }
             Request::Reset { tasks } => {

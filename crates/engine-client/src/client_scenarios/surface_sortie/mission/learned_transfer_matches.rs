@@ -19,6 +19,7 @@ use super::*;
 use engine_common::SpacewarsController::{self, LearnedFlightBot, RecoveryBot};
 use serde::Serialize;
 use spacewars_ai::mission_learned_transfer::LearnedTransferTelemetry;
+use spacewars_ai::mission_pilot::MissionGoal;
 
 const STEP: Duration = Duration::from_nanos(16_666_667);
 const SEEDS: [u64; 6] = [1, 2, 3, 4, 5, 6];
@@ -249,6 +250,19 @@ fn learned_transfer_matches_against_the_native_transfer_law() {
     }
 }
 
+/// Whether a dumped leg tick is written: every tick without a decision
+/// stride, or every stride-th navigation decision with one.
+fn sampled(decisions: &mut u64, every: Option<u64>, navigation: bool) -> bool {
+    let Some(every) = every else {
+        return true;
+    };
+    if !navigation {
+        return false;
+    }
+    *decisions += 1;
+    (*decisions - 1) % every == 0
+}
+
 /// A per-tick trace of one learned seat for a lifecycle diagnosis: what
 /// withdraws the leg, how the attempts run, and how the distance closes.
 #[test]
@@ -286,12 +300,21 @@ fn trace_learned_transfer_seat() {
     let mut out = std::io::BufWriter::new(
         std::fs::File::create(directory.join(format!("trace-seed{seed}-seat{seat}.tsv"))).unwrap(),
     );
-    // An optional window of ticks whose policy observations, stack commands
-    // and physical ship state are dumped for an offline law diagnosis.
+    // An optional window of leg ticks whose policy observations, stack
+    // commands and physical ship state are dumped for an offline law
+    // diagnosis, as `from:to`, or `from:to:n` for every n-th navigation
+    // decision only.
     let dump: Option<(u64, u64)> = std::env::var("SPACEWARS_TRACE_DUMP").ok().and_then(|s| {
-        s.split_once(':')
-            .map(|(a, b)| (a.parse().unwrap(), b.parse().unwrap()))
+        let mut parts = s.split(':');
+        Some((
+            parts.next()?.parse().unwrap(),
+            parts.next()?.parse().unwrap(),
+        ))
     });
+    let every: Option<u64> = std::env::var("SPACEWARS_TRACE_DUMP")
+        .ok()
+        .and_then(|s| s.split(':').nth(2).map(|n| n.parse().unwrap()));
+    let mut decisions = 0;
     let mut dumped = dump.map(|_| {
         let mut file = std::io::BufWriter::new(
             std::fs::File::create(
@@ -307,7 +330,7 @@ fn trace_learned_transfer_seat() {
         .unwrap();
         file
     });
-    writeln!(out, "tick\tgoal\treason\ttarget\tframe\taltitude\tleg\tflying\tattempt\telapsed\tdistance\tspeed_error\tship_speed\toutcome\tcommand_speed\tcommand_heading\theat_clearance\tsurface_clearance\tsteering\tthrust\tbrake\tspin\theading_error\tnavigation_tick\tlocation\tship_form\tship_health\tpilot_health\topponent_distance").unwrap();
+    writeln!(out, "tick\tgoal\treason\ttarget\tframe\taltitude\tleg\tflying\tattempt\telapsed\tdistance\tspeed_error\tship_speed\toutcome\tcommand_speed\tcommand_heading\theat_clearance\tsurface_clearance\tsteering\tthrust\tbrake\tspin\theading_error\tnavigation_tick\tlocation\tship_form\tship_health\tpilot_health\topponent_distance\twithheld").unwrap();
     for _ in 0..seconds() * 60 {
         client.step(&[], STEP);
         let host = client
@@ -342,9 +365,40 @@ fn trace_learned_transfer_seat() {
             .iter()
             .map(|planet| p.ship.position.distance_to(planet.motion.position) - planet.radius)
             .fold(f32::INFINITY, f32::min);
+        // Why a transfer tick has no published leg, by the entry rule of
+        // mission_transfer_approach.rs on the ordinary entry, 85 units above
+        // the target toward the ship: inside another planet's margin of 105,
+        // the sun's of 110 or the boundary's of 20, in that order, or none of
+        // them when another condition held the leg back.
+        let withheld = if telemetry.goal == MissionGoal::Transfer && leg.is_none() {
+            telemetry
+                .target
+                .and_then(|target| o.planets.iter().find(|v| v.index == target))
+                .map_or("no target", |target| {
+                    let radial = (p.ship.position - target.motion.position).normalized();
+                    let entry = target.motion.position + radial * (target.radius + 85.0);
+                    if o.planets.iter().any(|v| {
+                        v.index != target.index
+                            && entry.distance_to(v.motion.position) < v.radius + 105.0
+                    }) {
+                        "planet"
+                    } else if o
+                        .sun
+                        .is_some_and(|sun| entry.distance_to(sun.position) < sun.radius + 110.0)
+                    {
+                        "sun"
+                    } else if entry.distance_to(o.boundary.center) > o.boundary.radius - 20.0 {
+                        "boundary"
+                    } else {
+                        "other"
+                    }
+                })
+        } else {
+            "-"
+        };
         writeln!(
             out,
-            "{}\t{:?}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{:.2}\t{}\t{}\t{:?}\t{:?}\t{:.0}\t{:.0}\t{}",
+            "{}\t{:?}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{:.2}\t{}\t{}\t{:?}\t{:?}\t{:.0}\t{:.0}\t{}\t{}",
             host.sortie.state.tick(),
             telemetry.goal,
             telemetry.reason.unwrap_or(""),
@@ -379,11 +433,17 @@ fn trace_learned_transfer_seat() {
                 "{:.0}",
                 p.ship.position.distance_to(opponent.motion.position)
             )),
+            withheld,
         )
         .unwrap();
         if let Some(file) = &mut dumped
             && let (Some(leg), Some((from, to))) = (leg, dump)
             && (from..=to).contains(&host.sortie.state.tick())
+            && sampled(
+                &mut decisions,
+                every,
+                decision.is_some_and(|d| d.navigation.is_some()),
+            )
         {
             let state = &host.sortie.state;
             let own = state.free_flight_observation(seat).unwrap();

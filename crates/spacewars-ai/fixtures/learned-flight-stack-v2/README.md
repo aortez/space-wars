@@ -3,8 +3,10 @@
 The two exported networks of the match-envelope flight stack, embedded by
 `spacewars_ai::flight_stack::FlightStack::retained_v2`:
 
-- `navigation.json`: the [LF-091 refitted navigation network](../../../../docs/flight-motor-steering-v1.md)
-  of the [LF-088](../../../../docs/flight-navigation-v2.md) law with the
+- `navigation.json`: the [LF-093 navigation network](../../../../docs/flight-long-transfers-v1.md),
+  the [LF-091](../../../../docs/flight-motor-steering-v1.md) recipe with long
+  transfers of 600 to 3,000 units as a sixth family, of the
+  [LF-088](../../../../docs/flight-navigation-v2.md) law with the
   [LF-090](../../../../docs/flight-mission-polish-v1.md) side commitment and
   edge-aware detours and the LF-091 straight-line planner waypoint, fitted
   with the motor network below in the loop. It is the C3 flight encoder with
@@ -25,4 +27,5 @@ the motor network flies at 60 Hz, as the training bridge did. Its envelope
 is the match world: gravity, orbiting and spinning planets, the sun's heat,
 the boundary, goals resting in a planet's spinning frame, practice tasks of
 the four C3 families with their seeded gravity and spin, and transfers
-between the planets of a generated arena.
+between the planets of a generated arena, starting up to 3,000 units from
+their entry.

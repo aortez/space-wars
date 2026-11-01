@@ -5,8 +5,10 @@ every visited observation with the planet-frame command it would issue, the
 exported network issues every command in the refinement rounds and the
 evaluations, and the v2 motor network flies underneath. Tasks are the
 match-transfer family on generated arenas plus the practice generator's four
-families with their seeded gravity and spin. No scripted mask, override,
-fallback or takeover; the law is a training target, not a ceiling.
+families with their seeded gravity and spin, and optionally the long
+transfers beyond 600 units, drawn from the same seeds, which cross the arena
+as a mission's legs do. No scripted mask, override, fallback or takeover; the
+law is a training target, not a ceiling.
 """
 import argparse
 import json
@@ -27,7 +29,7 @@ from .model import CONTRACTS, NavigationModel, commands, tensor
 KIND = 'navigation-teacher-fit-v2'
 CONTRACT = 2
 MAX_SPEED = CONTRACTS[CONTRACT]['max_speed']
-FAMILIES = ('transfer', 'clear', 'moving', 'obstructed', 'altered')
+FAMILIES = ('transfer', 'clear', 'moving', 'obstructed', 'altered', 'long_transfer')
 HOLD = reference_v2.LAW['hold']
 PERTURBATION = {'rate': 1. / 30., 'max_decisions': 6}
 # Transfer and practice seeds for the development, held-out and training sets.
@@ -38,13 +40,19 @@ SOURCES = ('fit_v2.py', 'fit.py', 'model.py', 'reference_v2.py', 'reference.py',
 
 
 def label(inputs, bearings, edges, law=reference_v2.LAW):
-    command, info = reference_v2.command(inputs, bearings, law, edges)
-    return [command['heading_sin'], command['heading_cos'], command['speed']], command, info['distance']
+    """The law's target, command, goal distance and whether its global route rounds a body."""
+    trace = {}
+    command, info = reference_v2.command(inputs, bearings, law, edges, trace)
+    goal, routed = trace['goal'], trace['routed']
+    detour = math.hypot(routed[0] - goal[0], routed[1] - goal[1]) > 1.
+    return [command['heading_sin'], command['heading_cos'], command['speed']], command, info['distance'], detour
 
 
-def task_rows(bridge, seeds, transfers, per_family):
+def task_rows(bridge, seeds, transfers, per_family, long_transfers=0):
     rows = reference_v2.transfer_sets(bridge, seeds['transfer'], transfers) if transfers else []
     for row in reference_v2.generated_sets(bridge, seeds['generated'], per_family) if per_family else []:
+        row['index'] = len(rows); rows.append(row)
+    for row in reference_v2.transfer_sets(bridge, seeds['transfer'], long_transfers, distances='long') if long_transfers else []:
         row['index'] = len(rows); rows.append(row)
     return rows
 
@@ -57,9 +65,9 @@ def collect(bridge, rows, rng, driver='law', perturbation=PERTURBATION, log=None
         item = bridge.call('reset', tasks=[row['task']])['items'][0]
         burst = 0; burst_command = None; outcome = None
         while item['progress']['outcome'] is None:
-            target, command, distance = label(item['inputs'], bearings, edges)
+            target, command, distance, detour = label(item['inputs'], bearings, edges)
             x.append(torch.tensor(flatten(item['inputs']), dtype=torch.float32)); y.append(target)
-            meta.append([FAMILIES.index(row['family']), distance])
+            meta.append([FAMILIES.index(row['family']), distance, float(detour)])
             if driver == 'law' and perturbation and burst == 0 and rng.random() < perturbation['rate']:
                 burst = rng.randint(1, perturbation['max_decisions']); angle = rng.uniform(-math.pi, math.pi)
                 burst_command = {'heading_sin': math.sin(angle), 'heading_cos': math.cos(angle), 'speed': rng.uniform(0., MAX_SPEED)}
@@ -140,6 +148,7 @@ def error_summary(model, x, y, meta, batch=4096):
                 'speed': speed[mask].mean().item() if mask.any() else None}
     summary = block(torch.ones(len(x), dtype=torch.bool))
     summary['near_goal'] = block(meta[:, 1] < reference_v2.LAW['hold_radius'])
+    summary['routed'] = block(meta[:, 2] > 0.)
     summary['by_family'] = {family: block(meta[:, 0] == index) for index, family in enumerate(FAMILIES)}
     return summary
 
@@ -150,12 +159,14 @@ def error_summary(model, x, y, meta, batch=4096):
 NEAR_GOAL_WEIGHT = 3.
 
 
-def fit(model, x, y, meta, steps, batch, learning_rate, generator, log=print):
+def fit(model, x, y, meta, steps, batch, learning_rate, generator, log=print, routed_weight=1.):
+    """Rows whose global route rounds a body weigh routed_weight, since they are few and the law's side there is the hardest command to copy."""
     parameters = [p for name, p in model.named_parameters() if not name.startswith('critic') and name != 'log_std']
     optimizer = torch.optim.Adam(parameters, lr=learning_rate)
     schedule = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, steps)
     probe = torch.randperm(len(x), generator=generator)[:8192]
     near = torch.where(meta[:, 1] < reference_v2.LAW['hold_radius'], NEAR_GOAL_WEIGHT, 1.)
+    near = torch.where(meta[:, 2] > 0., routed_weight, near)
     for step in range(1, steps + 1):
         index = torch.randint(len(x), (batch,), generator=generator)
         actor, _ = model(x[index])
@@ -176,6 +187,9 @@ def main():
     p.add_argument('--transfers', type=int, default=96); p.add_argument('--per-family', type=int, default=72)
     p.add_argument('--rounds', type=int, default=4); p.add_argument('--round-transfers', type=int, default=48); p.add_argument('--round-per-family', type=int, default=36)
     p.add_argument('--evaluation-transfers', type=int, default=24); p.add_argument('--evaluation-per-family', type=int, default=12)
+    p.add_argument('--long-transfers', type=int, default=0); p.add_argument('--round-long-transfers', type=int, default=0)
+    p.add_argument('--evaluation-long-transfers', type=int, default=0)
+    p.add_argument('--routed-weight', type=float, default=1.)
     p.add_argument('--steps', type=int, default=8000); p.add_argument('--round-steps', type=int, default=5000)
     p.add_argument('--batch', type=int, default=512); p.add_argument('--learning-rate', type=float, default=1e-3)
     p.add_argument('--workers', type=int, default=12); p.add_argument('--threads', type=int, default=12)
@@ -196,17 +210,18 @@ def main():
     with Bridge(bridge_path) as bridge:
         bridge.call('load_motor_policy', path=motor)
         model = NavigationModel(bridge.contract['schema'], args.scaling, CONTRACT)
-        development = task_rows(bridge, SEEDS['development'], args.evaluation_transfers, args.evaluation_per_family)
-        held_out = task_rows(bridge, SEEDS['held_out'], args.evaluation_transfers, args.evaluation_per_family)
+        development = task_rows(bridge, SEEDS['development'], args.evaluation_transfers, args.evaluation_per_family, args.evaluation_long_transfers)
+        held_out = task_rows(bridge, SEEDS['held_out'], args.evaluation_transfers, args.evaluation_per_family, args.evaluation_long_transfers)
         training = [task_rows(bridge, SEEDS['training'][r], args.transfers if r == 0 else args.round_transfers,
-                              args.per_family if r == 0 else args.round_per_family) for r in range(args.rounds + 1)]
+                              args.per_family if r == 0 else args.round_per_family,
+                              args.long_transfers if r == 0 else args.round_long_transfers) for r in range(args.rounds + 1)]
         atomic_json(args.out / 'tasks-development.json', development); atomic_json(args.out / 'tasks-held-out.json', held_out)
         for r, rows in enumerate(training):
             atomic_json(args.out / f'tasks-training-round-{r}.json', rows)
         log('tasks: development %d, held out %d, training %s (%.0f s)' % (len(development), len(held_out), [len(t) for t in training], time.monotonic() - started))
         x, y, meta, outcomes = collect_parallel(bridge_path, motor, None, training[0], args.seed, args.out / 'shards', args.workers, 'round-0')
         log('round 0: %d rows from %d perturbed law episodes, outcomes %s (%.0f s)' % (len(x), len(training[0]), outcomes, time.monotonic() - started))
-        errors = fit(model, x, y, meta, args.steps, args.batch, args.learning_rate, generator, log)
+        errors = fit(model, x, y, meta, args.steps, args.batch, args.learning_rate, generator, log, args.routed_weight)
         rounds = [{'rows': len(x), 'episodes': len(training[0]), 'law_outcomes': outcomes, 'errors': errors}]
         log('round 0 errors: %s' % json.dumps(errors))
         for r in range(1, args.rounds + 1):
@@ -214,7 +229,7 @@ def main():
             visited, labels, visited_meta, outcomes = collect_parallel(bridge_path, motor, str(export.resolve()), training[r], args.seed + r, args.out / 'shards', args.workers, f'round-{r}')
             log('round %d: %d rows from %d network episodes, outcomes %s (%.0f s)' % (r, len(visited), len(training[r]), outcomes, time.monotonic() - started))
             x = torch.cat((x, visited)); y = torch.cat((y, labels)); meta = torch.cat((meta, visited_meta))
-            errors = fit(model, x, y, meta, args.round_steps, args.batch, args.learning_rate / 2, generator, log)
+            errors = fit(model, x, y, meta, args.round_steps, args.batch, args.learning_rate / 2, generator, log, args.routed_weight)
             rounds.append({'rows': len(x), 'episodes': len(training[r]), 'network_outcomes': outcomes, 'errors': errors})
             log('round %d errors: %s' % (r, json.dumps(errors)))
         export = args.out / 'policy-final.json'; model.export(export)

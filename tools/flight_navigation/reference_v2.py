@@ -455,13 +455,15 @@ def command(inputs, bearings, law=LAW, edges=None, trace=None):
             {'distance': distance, 'clearance': clearance, 'goal_speed': goal_speed, 'goal_velocity': math.hypot(*goal_velocity)})
 
 
-def transfer_sets(bridge, seed, count, max_attempts=None):
-    """Admitted match-transfer tasks from the generator, in attempt order."""
-    batch = bridge.call('generate_transfers', seed=seed, count=count, max_attempts=max_attempts or count * 8)
+def transfer_sets(bridge, seed, count, max_attempts=None, distances='standard'):
+    """Admitted match-transfer tasks from the generator, in attempt order: the standard range to 600 units, or the long range beyond it as the long_transfer family."""
+    long = distances == 'long'
+    batch = bridge.call('generate_transfers', seed=seed, count=count, max_attempts=max_attempts or count * (16 if long else 8), range=distances)
+    family = 'long_transfer' if long else 'transfer'
     rows = []
     for attempt in batch['attempts']:
         if attempt['admitted']:
-            rows.append({'index': len(rows), 'family': 'transfer', 'recipe': 'transfer',
+            rows.append({'index': len(rows), 'family': family, 'recipe': family,
                          'candidate_index': attempt['candidate']['index'], 'distance': attempt['distance'],
                          'reference_time_seconds': attempt['reference_time_seconds'], 'task': attempt['candidate']['task']})
     return rows
@@ -556,7 +558,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--out', type=Path, required=True); p.add_argument('--bridge', default=reference.DEFAULT_BRIDGE)
     p.add_argument('--motor', required=True, help='a v2 planet-frame motor export')
-    p.add_argument('--set', choices=('transfer', 'generated'), default='transfer')
+    p.add_argument('--set', choices=('transfer', 'long_transfer', 'generated'), default='transfer')
     p.add_argument('--seed', type=int, default=7700101); p.add_argument('--count', type=int, default=24)
     p.add_argument('--workers', type=int, default=8); p.add_argument('--law', type=json.loads, default=None)
     p.add_argument('--teacher', type=json.loads, default=None,
@@ -566,7 +568,10 @@ def main():
     args.out.mkdir(parents=True, exist_ok=False); started = time.monotonic()
     motor = str(Path(args.motor).resolve())
     with Bridge(args.bridge) as bridge:
-        rows = transfer_sets(bridge, args.seed, args.count) if args.set == 'transfer' else generated_sets(bridge, args.seed, args.count)
+        if args.set == 'generated':
+            rows = generated_sets(bridge, args.seed, args.count)
+        else:
+            rows = transfer_sets(bridge, args.seed, args.count, distances='long' if args.set == 'long_transfer' else 'standard')
     atomic_json(args.out / 'tasks.json', rows)
     results = run(args.bridge, motor, rows, law, args.workers, args.teacher)
     summary = {'law': law, 'set': args.set, 'seed': args.seed, 'motor': motor, 'motor_sha256': sha(motor), 'teacher': args.teacher,
