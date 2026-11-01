@@ -9,7 +9,9 @@ use crate::render::{
 use engine_common::{ClockEventKind, ClockFont, ClockTimeFormat};
 use engine_core::Vec2;
 
+mod cell_swap;
 mod marquee;
+mod slot_machine;
 
 pub(crate) const FONTS: [ClockFont; 4] = [
     ClockFont::Classic,

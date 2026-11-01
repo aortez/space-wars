@@ -8,6 +8,12 @@ pub(crate) use engine_common::{
     ClockMessageError as TextError, MAX_CLOCK_MESSAGE_BYTES as MAX_TEXT_BYTES,
 };
 pub(crate) const MAX_CONTENT_CELLS: usize = MAX_TEXT_BYTES * 35;
+/// Where clock content lays out: the four glyphs and the colon, with room for
+/// the AM/PM label below.
+pub(crate) const CLOCK_BOUNDS: Bounds = Bounds {
+    min: Vec2::new(0.0, -1.2),
+    max: Vec2::new(30.0, 10.2),
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Cell {
@@ -29,10 +35,7 @@ impl Content {
     pub fn clock(display: DisplaySnapshot) -> Self {
         let mut result = Self {
             cells: Vec::with_capacity(crate::fonts::MAX_DIGIT_CELLS + 32),
-            bounds: Bounds {
-                min: Vec2::new(0.0, -1.2),
-                max: Vec2::new(30.0, 10.2),
-            },
+            bounds: CLOCK_BOUNDS,
             groups: 5,
         };
         result.update_clock(display);

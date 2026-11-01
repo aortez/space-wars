@@ -553,19 +553,6 @@ impl SurfaceLedger {
         };
     }
 
-    /// Takes a slot from the face for an event that publishes no surfaces of
-    /// its own there, retiring what the face had.
-    pub fn vacate(&mut self, slot: usize, reason: Retirement) {
-        let ids = self.face[slot].ids;
-        debug_assert!(!self.face[slot].held, "one event holds a slot at a time");
-        self.face[slot] = FaceSlot {
-            glyph: None,
-            held: true,
-            ids: [None; GRID_CELLS],
-        };
-        self.retire_all(ids.into_iter().flatten(), reason);
-    }
-
     /// Retires the face's own surfaces in a slot no event holds, so the face
     /// admits whatever it draws there afresh at the end of the step.
     pub fn retire_face(&mut self, slot: usize, reason: Retirement) {

@@ -3,10 +3,28 @@
 //! "Returning digit cells to their places" rather than dissolving anything, and
 //! every reel position is sampled from the tick rather than accumulated, so a
 //! paused or replayed event cannot drift.
+//!
+//! The face's own surfaces ride the opening glyph out of each slot and are
+//! retired as each cell leaves it. The glyph a reel locks on is new surfaces
+//! from when its frame reaches the window. The frames between are texture and
+//! carry nothing.
 
 use engine_common::{ClockFont, ClockSlotMachinePhase, ClockSlotMachineState};
+use engine_core::Vec2;
 
-use crate::{DIGIT_SLOT_COUNT, DisplaySnapshot, fonts::CellMask};
+use crate::{
+    DIGIT_SLOT_COUNT, DigitPalette, DisplaySnapshot, GridCell,
+    digit_surfaces::{
+        GRID_CELLS, Glyph, Retirement, SlotIds, SurfaceId, SurfaceLedger, SurfacePose,
+        SurfaceSource, bit,
+    },
+    fonts::CellMask,
+    layout::Layout,
+    presentation::{
+        content::{CLOCK_BOUNDS, Cell, Content},
+        effects::Lighting,
+    },
+};
 
 pub const SPIN_UP_TICKS: u64 = 60;
 pub const SPINNING_TICKS: u64 = 120;
@@ -15,6 +33,13 @@ pub const DECELERATION_TICKS: u64 = 24;
 /// order is the thing that actually reads as a slot machine.
 pub const LOCK_STAGGER_TICKS: u64 = 22;
 pub const PAYOUT_TICKS: u64 = 30;
+/// A glyph is nine cells tall, and a reel moves one glyph per stop.
+const TRAVEL: f32 = 9.0;
+/// `Lighting::Chase` advances 0.45 of its trail a second, a clock path spans one
+/// unit, and each slot sits a further tenth behind the one on its left. Carrying
+/// the head that whole distance across the payout lights every cell once.
+const PAYOUT_SWEEP: f32 = 1.0 + 0.1 * (DIGIT_SLOT_COUNT as f32 - 1.0);
+const CHASE_RATE: f32 = 0.45;
 pub const SLOT_MACHINE_TICKS: u64 = SPIN_UP_TICKS
     + SPINNING_TICKS
     + LOCK_STAGGER_TICKS * (DIGIT_SLOT_COUNT as u64 - 1)
@@ -51,6 +76,11 @@ pub(crate) struct SlotMachineEvent {
     locked: [Option<Option<u8>>; DIGIT_SLOT_COUNT],
     retargets: u32,
     preview: bool,
+    /// The face's surfaces the opening glyph carries, until each cell is out.
+    outgoing: [SlotIds; DIGIT_SLOT_COUNT],
+    /// The surfaces of the glyph each reel will lock on, and that glyph.
+    incoming: [SlotIds; DIGIT_SLOT_COUNT],
+    incoming_glyph: [Option<Glyph>; DIGIT_SLOT_COUNT],
 }
 
 /// When a slot stops accelerating and starts easing to a halt.
@@ -106,6 +136,115 @@ impl SlotMachineEvent {
             locked: [None; DIGIT_SLOT_COUNT],
             retargets: 0,
             preview,
+            outgoing: [[None; GRID_CELLS]; DIGIT_SLOT_COUNT],
+            incoming: [[None; GRID_CELLS]; DIGIT_SLOT_COUNT],
+            incoming_glyph: [None; DIGIT_SLOT_COUNT],
+        }
+    }
+
+    /// Takes every slot from the face, whose surfaces ride the opening glyph.
+    pub fn hold(mut self, surfaces: &mut SurfaceLedger) -> Self {
+        self.outgoing = std::array::from_fn(|slot| {
+            surfaces.take(
+                slot,
+                Glyph::new(self.opening.font, self.opening.digits[slot]),
+                SurfaceSource::Reel,
+            )
+        });
+        self
+    }
+
+    /// Retires each opening cell once its reel has carried it out of the slot,
+    /// and admits the glyph a reel will lock on once that frame reaches the
+    /// window. A reading that changes before the reel locks replaces it.
+    pub fn carry_surfaces(&mut self, surfaces: &mut SurfaceLedger) {
+        for slot in 0..DIGIT_SLOT_COUNT {
+            let travel = self.travel(slot);
+            for (bit, id) in self.outgoing[slot].iter_mut().enumerate() {
+                if let Some(gone) = id.take_if(|_| !visible(bit, -travel * TRAVEL)) {
+                    surfaces.retire(gone, Retirement::Replaced);
+                }
+            }
+            if travel < stop_index(slot) as f32 - 1.0 {
+                continue;
+            }
+            let glyph = Glyph::new(self.display.font, self.target(slot));
+            if self.incoming_glyph[slot] == Some(glyph) {
+                continue;
+            }
+            surfaces.retire_all(
+                self.incoming[slot].iter_mut().filter_map(Option::take),
+                Retirement::Replaced,
+            );
+            for cell in glyph.mask.cells() {
+                self.incoming[slot][bit(cell)] =
+                    Some(surfaces.admit(slot as u8, cell, SurfaceSource::Reel));
+            }
+            self.incoming_glyph[slot] = Some(glyph);
+        }
+    }
+
+    /// Each reel's surfaces where its strip is: the opening glyph on its way
+    /// out, the locking glyph on its way in, clipped to the slot like the
+    /// cells they are. The payout lights the settled glyph with its chase.
+    pub fn surfaces(&self, layout: Layout, out: &mut Vec<(SurfaceId, SurfacePose)>) {
+        for slot in 0..DIGIT_SLOT_COUNT {
+            let travel = self.travel(slot);
+            for (ids, index, departing) in [
+                (&self.outgoing[slot], 0.0, true),
+                (&self.incoming[slot], stop_index(slot) as f32, false),
+            ] {
+                for (bit, id) in ids.iter().enumerate() {
+                    let Some(id) = *id else {
+                        continue;
+                    };
+                    let cell = GridCell {
+                        x: (bit % 6) as i8,
+                        y: (bit / 6) as i8,
+                    };
+                    let anchored = SurfacePose::anchored(layout, slot, cell);
+                    out.push((
+                        id,
+                        SurfacePose {
+                            origin: anchored.origin
+                                + Vec2::new(0.0, (index - travel) * TRAVEL * layout.pitch),
+                            source: SurfaceSource::Reel,
+                            departing,
+                            opacity: if departing || !self.paying_out() {
+                                1.0
+                            } else {
+                                self.payout_light(self.settled_cell(slot, cell)).1
+                            },
+                            clip: Some(layout.digit_band()),
+                            ..anchored
+                        },
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Gives each slot back to the face with the glyph its reel locked on. A
+    /// reel cut short before it locked leaves that glyph part way, so its
+    /// surfaces are retired rather than snapped home, and the opening glyph's
+    /// are retired either way.
+    pub fn release_surfaces(&mut self, surfaces: &mut SurfaceLedger) {
+        for slot in 0..DIGIT_SLOT_COUNT {
+            surfaces.retire_all(
+                self.outgoing[slot].iter_mut().filter_map(Option::take),
+                Retirement::Replaced,
+            );
+            let mut incoming = std::mem::replace(&mut self.incoming[slot], [None; GRID_CELLS]);
+            match (self.locked[slot], self.incoming_glyph[slot]) {
+                (Some(_), Some(glyph)) => surfaces.hand_back(slot, glyph, incoming),
+                _ => {
+                    surfaces.retire_all(
+                        incoming.iter_mut().filter_map(Option::take),
+                        Retirement::Interrupted,
+                    );
+                    surfaces.release(slot);
+                }
+            }
         }
     }
 
@@ -213,6 +352,31 @@ impl SlotMachineEvent {
         self.display.font
     }
 
+    /// A cell of the settled reading as clock content.
+    fn settled_cell(&self, slot: usize, cell: GridCell) -> Cell {
+        let font = self.display.font;
+        let kind = crate::fonts::segment_at(font, cell);
+        debug_assert!(kind.is_some(), "a lit cell lies in a segment");
+        Content::digit_cell(font, slot, kind.unwrap_or(crate::SegmentKind::Top), cell)
+    }
+
+    /// The chase the Marquee already uses, carried across every cell of the
+    /// settled reading once over the payout.
+    pub fn payout_light(&self, cell: Cell) -> (DigitPalette, f32) {
+        let seconds = (self.phase_tick() as f32 / PAYOUT_TICKS as f32) * PAYOUT_SWEEP / CHASE_RATE;
+        Lighting::Chase.sample(cell, CLOCK_BOUNDS, seconds, 1.0)
+    }
+
+    /// Whether a reel position is texture rather than a reading: the scramble
+    /// and the near misses before the lock.
+    #[cfg(test)]
+    pub fn texture(&self, slot: usize, index: u32) -> bool {
+        matches!(
+            self.frame(slot, index),
+            Frame::Scramble(_) | Frame::Digit(_)
+        )
+    }
+
     pub fn diagnostics(&self) -> ClockSlotMachineState {
         ClockSlotMachineState {
             phase: self.phase(),
@@ -227,6 +391,13 @@ impl SlotMachineEvent {
             preview: self.preview,
         }
     }
+}
+
+/// Whether a cell still shows inside its slot, `offset` cells from its place.
+fn visible(bit: usize, offset: f32) -> bool {
+    let centre = (bit / 6) as f32 + 0.5 + offset;
+    centre + crate::digit_surfaces::CELL_HALF > 0.0
+        && centre - crate::digit_surfaces::CELL_HALF < TRAVEL
 }
 
 /// Addressable by position rather than drawn from a stream, so any tick renders

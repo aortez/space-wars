@@ -49,8 +49,9 @@ fn mappings_are_seeded_permutations_of_only_occupied_cells_for_every_font() {
         ] {
             let state = ready(from, ClockTimeFormat::TwelveHour, font);
             for seed in 0..24 {
-                let swap = CellSwapEvent::new(state.display(), seed);
-                let replay = CellSwapEvent::new(state.display(), seed);
+                let ledger = crate::digit_surfaces::SurfaceLedger::new;
+                let swap = CellSwapEvent::new(state.display(), seed, &mut ledger());
+                let replay = CellSwapEvent::new(state.display(), seed, &mut ledger());
                 assert_eq!(swap.exchanges, replay.exchanges);
                 assert_eq!(swap.diagnostics(), replay.diagnostics());
                 patterns.push(swap.pattern);

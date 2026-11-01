@@ -1437,7 +1437,6 @@ impl ClockState {
                 )
             };
             self.active_event = Some(ActiveEvent::Rain(Box::new(rain)));
-            self.hold_event_surfaces();
             return;
         }
         if matches!(
@@ -1472,7 +1471,6 @@ impl ClockState {
                 )),
                 _ => unreachable!(),
             });
-            self.hold_event_surfaces();
             return;
         }
         self.floor.acquire(kind);
@@ -1490,21 +1488,6 @@ impl ClockState {
             previous_display,
             preview,
         ));
-        self.hold_event_surfaces();
-    }
-
-    /// An event that moves the face's cells but does not yet publish them
-    /// holds every slot with nothing in it.
-    fn hold_event_surfaces(&mut self) {
-        if self
-            .active_event
-            .as_ref()
-            .is_some_and(ActiveEvent::vacates_face)
-        {
-            for slot in 0..DIGIT_SLOT_COUNT {
-                self.surfaces.vacate(slot, Retirement::Interrupted);
-            }
-        }
     }
 
     fn finish_event(&mut self) {
@@ -1754,10 +1737,11 @@ impl ClockState {
             self.finish_event();
         }
         if let Some(ActiveEvent::CellSwap(event)) = &mut self.active_event {
-            event.synchronize(self.display);
+            event.synchronize(self.display, &mut self.surfaces);
         }
         if let Some(ActiveEvent::SlotMachine(event)) = &mut self.active_event {
             event.synchronize(self.display);
+            event.carry_surfaces(&mut self.surfaces);
         }
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);

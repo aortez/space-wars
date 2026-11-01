@@ -45,8 +45,7 @@ pub(super) fn render(
         for exchange in &event.exchanges {
             super::render_square(
                 frame,
-                exchange.from.center(layout)
-                    + (exchange.position(event.progress()) - exchange.from.point()) * layout.pitch,
+                exchange.centre(layout, event.progress()),
                 layout.pitch,
                 0.0,
                 1.0,
