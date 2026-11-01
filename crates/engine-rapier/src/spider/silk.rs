@@ -1,11 +1,18 @@
 //! The one silk line: shooting it, tying it to what the shot reached, reeling
 //! along it, and letting it go when its anchor goes or something solid comes
 //! between. A cut or replaced line leaves nothing behind.
+//!
+//! Silk gives a little. Stretched past its length, the line pulls the spider
+//! back like a damped spring, and it never pushes. The rope the world holds
+//! is longer than the line by as much as the line may give, and stops
+//! whatever the give has not.
 
 use super::*;
 use crate::world::{JointRole, TetherSpec, TetherState};
 
 impl Spider {
+    /// Let the line go if it may no longer be held, and otherwise let its
+    /// give pull on the spider.
     pub(super) fn keep_line(
         &mut self,
         world: &mut PhysicsWorld,
@@ -35,7 +42,7 @@ impl Spider {
             self.cut_line(world, SpiderReleaseReason::Obstructed);
             return;
         }
-        self.reel(
+        self.give(
             world,
             dt,
             line,
@@ -45,10 +52,10 @@ impl Spider {
         );
     }
 
-    /// Reeling in takes up slack for free and climbs a taut line with a
-    /// bounded pull, keeping whatever span the pull closed. Letting out
-    /// lengthens the line, and gravity does the rest.
-    fn reel(
+    /// Stretched past its length, the line pulls the spider back toward its
+    /// anchor as a damped spring would, through the coming step. Its damping
+    /// can at most stop the spider drawing away, and it never pushes.
+    fn give(
         &mut self,
         world: &mut PhysicsWorld,
         dt: f32,
@@ -57,12 +64,48 @@ impl Spider {
         velocity: Vec2,
         tether: TetherState,
     ) {
+        let distance = tether.anchor.distance_to(position);
+        let stretch = distance - line.length;
+        if stretch <= 0.0 {
+            return;
+        }
+        let inward = (tether.anchor - position) / distance;
+        let anchor = world
+            .incoming_velocity_at_point(line.anchor.body, tether.anchor, dt)
+            .unwrap_or(Vec2::ZERO);
+        let leaving = (anchor - velocity).dot(inward);
+        // Never stiffer than one step can follow.
+        let ring = self.spec.silk_ring().min(1.0 / dt);
+        let damping = (2.0 * self.spec.silk_damping * ring * dt).min(1.0);
+        let pull = ring * ring * stretch * dt + damping * leaving;
+        if pull <= 0.0 {
+            return;
+        }
+        let impulse = inward * (pull * self.mass(world));
+        world.apply_impulse(self.body(), impulse, true);
+        Self::react(world, line.anchor.body, impulse, tether.anchor);
+        self.pull += impulse.length() / dt;
+        self.carried = true;
+    }
+
+    /// Reeling in takes up slack for free and climbs a taut line with a
+    /// bounded pull, keeping whatever span the pull closed. Letting out
+    /// lengthens the line, and gravity does the rest.
+    pub(super) fn reel(&mut self, world: &mut PhysicsWorld, dt: f32) {
+        let Some(line) = self.line else {
+            return;
+        };
+        let (Some(motion), Some(tether)) = (world.motion(self.body()), world.tether(line.joint))
+        else {
+            return;
+        };
         let r = self.spec.radius;
         let shortest = self.spec.min_line * r;
         let longest = self.spec.max_line * r;
         let reel = self.intent.reel;
+        let position = motion.position;
         let distance = tether.anchor.distance_to(position);
-        let mut length = tether.length;
+        let mut length = line.length;
         if reel < 0.0 {
             length = (length - reel * self.spec.pay_out_speed * r * dt).min(longest);
         } else if reel > 0.0 {
@@ -75,10 +118,10 @@ impl Spider {
                 let anchor = world
                     .incoming_velocity_at_point(line.anchor.body, tether.anchor, dt)
                     .unwrap_or(Vec2::ZERO);
-                let climbing = (velocity - anchor).dot(inward);
+                let climbing = (motion.linear_velocity - anchor).dot(inward);
                 // The line keeps the span a climb closed, and only that. Never
-                // shorter than its span, the rope itself holds only what
-                // gravity and the swing put on it.
+                // shorter than its span, it holds only what gravity and the
+                // swing put on it.
                 if climbing > 0.0 {
                     length = length.min(distance);
                 }
@@ -88,18 +131,20 @@ impl Spider {
                 let needed = target - climbing - falling;
                 let most = self.spec.weight_acceleration(self.spec.reel_pull) * dt;
                 // A reel too weak to lift the spider holds it where it is, and
-                // the line carries the weight.
-                if distance > shortest && needed > 0.0 && most > -falling {
+                // the line carries the weight. One with no line left to take
+                // in leaves the weight to the line as well.
+                if length > shortest && needed > 0.0 && most > -falling {
                     let impulse = inward * (needed.min(most) * self.mass(world));
                     world.apply_impulse(self.body(), impulse, true);
                     Self::react(world, line.anchor.body, impulse, tether.anchor);
-                    self.pull = impulse.length() / dt;
+                    self.pull += impulse.length() / dt;
                     self.carried = true;
                 }
             }
         }
-        if length != tether.length {
-            world.set_tether_length(line.joint, length);
+        if length != line.length {
+            self.line = Some(Line { length, ..line });
+            world.set_tether_length(line.joint, length + self.spec.silk_give * r);
         }
     }
 
@@ -180,8 +225,9 @@ impl Spider {
         }
         let joint = self.fresh_joint(world);
         self.cut_line(world, SpiderReleaseReason::Replaced);
-        // As long as the span, the line is taut at once, and catches the
-        // spider as any line going taut does.
+        // As long as the span, the line is taut at once, and its give
+        // catches a spider drawing away as any line going taut does.
+        let length = distance.clamp(self.spec.min_line * r, self.spec.max_line * r);
         let tied = world.insert_tether(
             joint,
             TetherSpec {
@@ -189,7 +235,7 @@ impl Spider {
                 anchor: shot.target.local_point,
                 body: self.body(),
                 attachment: Vec2::ZERO,
-                length: distance.clamp(self.spec.min_line * r, self.spec.max_line * r),
+                length: length + self.spec.silk_give * r,
             },
         );
         if !tied {
@@ -198,6 +244,7 @@ impl Spider {
         self.line = Some(Line {
             joint,
             anchor: shot.target,
+            length,
         });
         self.counts.lines_tied += 1;
         Ok(())
