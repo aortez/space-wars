@@ -436,7 +436,8 @@ pub struct Spider {
     /// The force the line pulled the spider with on the last tick: its give
     /// and the reel.
     pull: f32,
-    /// Whether the legs or the reel carried the spider's weight this tick.
+    /// Whether the legs, the line's give or the reel carried the spider's
+    /// weight this tick.
     carried: bool,
     rearm: f32,
     next_line_role: u32,
@@ -760,5 +761,30 @@ impl Spider {
         if world.body_kind(support) == Some(BodyKind::Dynamic) {
             world.apply_impulse_at_point(support, -impulse, point, true);
         }
+    }
+
+    /// How freely a support gives way to an impulse at `point` along `along`:
+    /// its inverse mass there, its turning included. Zero for one not free to
+    /// move, which takes no reaction.
+    fn inverse_mass_at(world: &PhysicsWorld, support: BodyId, point: Vec2, along: Vec2) -> f32 {
+        if world.body_kind(support) != Some(BodyKind::Dynamic) {
+            return 0.0;
+        }
+        let Some(mass) = world.body_mass(support).filter(|mass| *mass > 0.0) else {
+            return 0.0;
+        };
+        let turning = match (
+            world.center_of_mass(support),
+            world.dynamic_body_inertia(support),
+            world.body_rotation_locked(support),
+        ) {
+            (Some(center), Some(inertia), Some(false)) if inertia > 0.0 => {
+                // The arm across the impulse.
+                let lever = (point - center).dot(Vec2::new(along.y, -along.x));
+                lever * lever / inertia
+            }
+            _ => 0.0,
+        };
+        1.0 / mass + turning
     }
 }

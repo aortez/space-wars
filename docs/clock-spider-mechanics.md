@@ -80,13 +80,22 @@ finds the spider unheld, and it falls.
   as soon as its target is farther than the longest line, so a target drawing
   away faster than the shot never keeps it going.
 - **Give.** Silk stretches a little. Drawn past its length, the line pulls the
-  spider back as a damped spring would through the coming step, with the
-  reaction on a dynamic anchor. It never pushes, and its damping at most stops
-  the spider drawing away. One weight stretches it 0.25 radii, so a hanging
-  spider rests that far past the line's length under a tension of one weight.
-  Its damping ratio of 0.7 sets how it settles: at 1 it settles without a
-  bounce, and the lower it is, the more it bounces. The line stretches at most
-  its give of 5 radii, and then holds fast.
+  spider and its anchor together as a damped spring would through the coming
+  step. It never pushes, and its damping at most stops the two drawing apart.
+  One weight stretches it 0.25 radii, so a hanging spider rests that far past
+  the line's length under a tension of one weight. Its damping ratio of 0.7
+  sets how it settles: at 1 it settles without a bounce, and the lower it is,
+  the more it bounces. The line stretches at most its give of 5 radii, and
+  then holds fast.
+- **Free anchors.** A dynamic anchor gives way by its mass at the anchor point,
+  turning included, so the line pulls the spider and the anchor as one pair,
+  and a light free anchor is drawn in without flinging the two together. The
+  spider cannot see what else holds an anchor up, so one hanging on its own
+  rope or resting on a shelf still counts only its own mass, and the line is
+  softer and bouncier on a light one than on a fixed anchor. Kicked down at 10
+  radii/s, a hanging spider rises 0.004 radii past its hang under the ceiling,
+  0.12 radii under a rope-hung block a quarter of its mass, and 0.42 radii
+  under one a sixteenth of its mass.
 - **The catch.** At Clock scale, a spider falling at 37 radii/s when a line
   straight above it ties draws the line out 1.2 radii. The give takes at most
   16 radii/s off it in a tick, where a line that held fast would take all 37 in
@@ -184,9 +193,9 @@ cargo +1.89.0 test --locked --profile ci -p engine-rapier
 cargo +1.89.0 check --locked --profile ci --workspace --all-targets
 ```
 
-The engine-rapier library passes 535 tests and ignores two capture tests, one
-of them the spider's. Its integration tests also pass. The mechanic has 54
-tests: 43 spider tests, 6 tether tests, and 5 tests of the world's carried
+The engine-rapier library passes 536 tests and ignores two capture tests, one
+of them the spider's. Its integration tests also pass. The mechanic has 55
+tests: 44 spider tests, 6 tether tests, and 5 tests of the world's carried
 weight and nearby queries. The spider tests use a room with a floor, walls, a ceiling and
 two mesas with a gap between them, plus single fixtures. The shared harness
 checks the ray and collider bounds on every tick it runs.
@@ -239,6 +248,9 @@ checks the ray and collider bounds on every tick it runs.
 **Weightless worlds**
 - Momentum conserved while reeling in a free block, while a line's give draws a
   free block along, and while crawling on a free plank.
+- A line giving to a free block a sixteenth of the spider's mass, tied under
+  its middle and off it: flung apart, the two close again no faster than they
+  parted and gain no energy.
 
 **Lifecycle**
 - Zero and invalid steps change nothing, and the spider never steps the world.

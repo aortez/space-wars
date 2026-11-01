@@ -52,9 +52,11 @@ impl Spider {
         );
     }
 
-    /// Stretched past its length, the line pulls the spider back toward its
-    /// anchor as a damped spring would, through the coming step. Its damping
-    /// can at most stop the spider drawing away, and it never pushes.
+    /// Stretched past its length, the line pulls the spider and its anchor
+    /// together as a damped spring would, through the coming step. A free
+    /// anchor gives way by its mass, so the line pulls on the two as one
+    /// pair. Its damping can at most stop them drawing apart, and it never
+    /// pushes.
     fn give(
         &mut self,
         world: &mut PhysicsWorld,
@@ -74,14 +76,21 @@ impl Spider {
             .incoming_velocity_at_point(line.anchor.body, tether.anchor, dt)
             .unwrap_or(Vec2::ZERO);
         let leaving = (anchor - velocity).dot(inward);
-        // Never stiffer than one step can follow.
-        let ring = self.spec.silk_ring().min(1.0 / dt);
+        // An impulse closes the pair faster than it moves the spider alone,
+        // by as much as the anchor gives way too.
+        let spider = self.mass(world);
+        let pair =
+            1.0 + spider * Self::inverse_mass_at(world, line.anchor.body, tether.anchor, inward);
+        // The pair rings faster than the spider would on a fixed anchor, but
+        // never faster than one step can follow.
+        let ring = (self.spec.silk_ring() * pair.sqrt()).min(1.0 / dt);
         let damping = (2.0 * self.spec.silk_damping * ring * dt).min(1.0);
+        // How much faster the two close after this tick.
         let pull = ring * ring * stretch * dt + damping * leaving;
         if pull <= 0.0 {
             return;
         }
-        let impulse = inward * (pull * self.mass(world));
+        let impulse = inward * (pull * spider / pair);
         world.apply_impulse(self.body(), impulse, true);
         Self::react(world, line.anchor.body, impulse, tether.anchor);
         self.pull += impulse.length() / dt;

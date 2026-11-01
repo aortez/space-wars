@@ -472,7 +472,7 @@ fn tie_while_falling(run: &mut Run, speed: f32) -> (SpiderState, SpiderState) {
 fn a_line_tied_across_a_fall_away_from_its_anchor_gives_to_catch_the_spider() {
     for scale in [CLOCK, METRES] {
         let r = scale.r;
-        for damping in [0.7, 0.3] {
+        for (damping, bounces) in [(0.7, false), (0.3, true)] {
             let spec = SpiderSpec {
                 silk_damping: damping,
                 ..SpiderSpec::new(r, scale.g)
@@ -535,10 +535,10 @@ fn a_line_tied_across_a_fall_away_from_its_anchor_gives_to_catch_the_spider() {
             // At the default damping it springs back barely past where it
             // comes to hang. Damped less, it bounces well past that.
             let rise = (highest - state.position.y) / r;
-            if damping == 0.7 {
-                assert!(rise < 0.05, "{rise}");
-            } else {
+            if bounces {
                 assert!(rise > 0.5, "{rise}");
+            } else {
+                assert!(rise < 0.05, "{rise}");
             }
         }
     }
@@ -856,6 +856,16 @@ fn momentum(run: &Run, other: BodyId) -> Vec2 {
     run.state().velocity * run.mass() + body
 }
 
+/// The spider's and another body's kinetic energy together, the other's
+/// turning included.
+fn kinetic_energy(run: &Run, other: BodyId) -> f32 {
+    let motion = run.world.motion(other).unwrap();
+    let inertia = run.world.dynamic_body_inertia(other).unwrap();
+    0.5 * (run.mass() * run.state().velocity.length_squared()
+        + run.world.body_mass(other).unwrap() * motion.linear_velocity.length_squared()
+        + inertia * motion.angular_velocity * motion.angular_velocity)
+}
+
 #[test]
 fn reeling_in_a_free_block_draws_both_together_and_conserves_momentum() {
     let scale = CLOCK;
@@ -913,7 +923,7 @@ fn a_line_giving_to_a_free_block_draws_it_along_and_conserves_momentum() {
     });
     run.until(30, idle(), |s| s.line.is_some()).unwrap();
     // Flung away from the block, the spider draws the line out, and the line
-    // pulls the two together until they move as one.
+    // draws the block after it.
     let body = run.spider.body();
     assert!(
         run.world
@@ -929,6 +939,65 @@ fn a_line_giving_to_a_free_block_draws_it_along_and_conserves_momentum() {
     }
     assert!(peak > 0.25 * scale.r, "{}", peak / scale.r);
     assert!(run.world.motion(block_body).unwrap().linear_velocity.y < 0.0);
+}
+
+#[test]
+fn a_line_giving_to_a_light_free_block_never_flings_the_two_together() {
+    let scale = CLOCK;
+    let r = scale.r;
+    let block_body = BodyId::new(SHELF, BodyRole::PRIMARY);
+    // A block a sixteenth of the spider's mass, tied under its middle, and
+    // tied off its middle, where the line turns it as well.
+    for x in [0.0, 0.4] {
+        let mut world = weightless(scale);
+        block_of(
+            &mut world,
+            scale,
+            SHELF,
+            Vec2::new(x, 20.0),
+            Vec2::new(0.5, 0.1),
+            BodyKind::Dynamic,
+        );
+        let mut run = Run::new(world, scale, Vec2::ZERO);
+        run.tick(idle());
+        run.tick(SpiderIntent {
+            shoot: Some(Vec2::Y),
+            ..idle()
+        });
+        run.until(30, idle(), |s| s.line.is_some()).unwrap();
+        assert!(run.world.body_mass(block_body).unwrap() < run.mass() / 15.0);
+        // Flung apart, the two are drawn together again no faster than they
+        // parted, and gain no energy from the line.
+        let parting = 20.0 * r;
+        let body = run.spider.body();
+        assert!(
+            run.world
+                .set_velocity(body, Vec2::new(0.0, -parting), 0.0, true)
+        );
+        let start = kinetic_energy(&run, block_body);
+        let mut fastest = 0.0_f32;
+        for tick in 0..120 {
+            let state = run.tick(idle());
+            let energy = kinetic_energy(&run, block_body) / start;
+            assert!(energy < 1.02, "x {x}, tick {tick}: {energy}");
+            // A block turned far enough comes between and lets the line go.
+            let Some(line) = state.line else {
+                break;
+            };
+            let anchor = run
+                .world
+                .velocity_at_point(block_body, line.anchor)
+                .unwrap();
+            let inward = (line.anchor - state.position).normalized();
+            fastest = fastest.max((state.velocity - anchor).dot(inward));
+        }
+        assert!(
+            fastest > 0.5 * parting && fastest < 1.01 * parting,
+            "x {x}: {}",
+            fastest / r
+        );
+        assert!(run.world.motion(block_body).unwrap().linear_velocity.y < 0.0);
+    }
 }
 
 #[test]
