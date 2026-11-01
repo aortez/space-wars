@@ -2102,9 +2102,11 @@ rules in its own comments:
 `SegmentRepresentation::Reforming` carries the rule in the type. Its payload is a
 `Reformation` whose fields are private and which only
 `SegmentState::begin_reforming` can build, from the segment's actual position,
-angle and lit state. There is no way to describe a segment as reforming at its
-own anchor having never been lit, which is precisely the case that renders as a
-reading appearing at the goal out of nothing.
+angle and the lit cells it came apart with. No later reading changes those
+cells, so a second ticking over during the return cannot redraw what is coming
+home. There is no way to describe a segment as reforming at its own anchor
+having never been lit, which is precisely the case that renders as a reading
+appearing at the goal out of nothing.
 
 A reading's light-blocking geometry is the reading. `render::plant_face_polygons`
 and the visible frame both go through `render_marquee_face`, so a digit carried
@@ -2151,6 +2153,110 @@ hold 90.00 of 90 for the whole visit, while Clock chase and Digit spin floor at
 49.93 and 48.26, which is their own chase and sweep patterns dimming cells to
 half rather than anything being put out. `render::face_handover_contract` holds
 all of this, with the floor set at 45% of the face's ink.
+
+### Following the digits: surfaces
+
+A resident that stands on a digit, such as a crow, a snail or a patch of moss,
+has to ride whatever the digit does. `scenarios/clock/src/digit_surfaces.rs`
+publishes each lit digit cell as a *surface* it can attach to, and its module
+comment states the contract. The colon only blinks in place and the AM/PM
+pixels are too small to carry anything, so neither is a surface.
+
+- **Identity.** A surface's id is the serial it was admitted with, which a run
+  never reuses. A restart is a new run and starts again from 1. Where a surface
+  was admitted (its slot and cell) is provenance, not identity: a swapped cell
+  keeps its id at its new place, and a replaced glyph's cells are new surfaces
+  even where they overlap the old ones.
+- **Frame.** `origin`, `angle` and `scale` map a local point in grid units to
+  the world, so a local point survives a resize. The `footprint` is the
+  supporting rectangle in the surface's own frame, a lit cell's being
+  0.4 grid units either side of its centre. A footprint that shrinks off a
+  local point drops that attachment, while the surface goes on.
+- **Lifecycle.** A surface is admitted once, handed off between geometry
+  sources any number of times, departs at most once and is retired once, with
+  a reason. A *departing* surface carries what is on it until it is retired
+  but takes nothing new. Nothing comes back from departing or retired.
+- **Presentation.** `opacity` and `clip` say how a surface is drawn, not
+  whether it exists. A surface can be invisible and still carry things, and
+  surfaces sharing one drawn cell sum to its ink.
+
+| Source | What moves the surface |
+| --- | --- |
+| `anchored` | At rest on its place in the face |
+| `slide` | Digit Slide's slide through its slot |
+| `rigid` | A rigid body in the event's world, named by `body` |
+| `ballistic` | Standalone Meltdown's ballistic step |
+| `return` | An authored path home after physical motion |
+| `refill` | Meltdown's refill, growing each new cell upward |
+| `swap` | Cell Swap's exchange paths and its correcting fade |
+| `reel` | A Slot Machine reel |
+| `marquee` | A Marquee carrying the face with its own transform |
+
+| Retirement | Why |
+| --- | --- |
+| `replaced` | Its glyph gave way to another: a new reading, font or format, or the glyph an event brings in |
+| `interrupted` | The event moving it ended early, away from its place |
+| `merged-away` | A surplus Explosion block shrank into its neighbour |
+| `melted` | Melted on contact with the floor |
+| `exited` | Left the view as a solid |
+| `reclaimed` | Solid material Meltdown reclaimed when the face refilled |
+
+What each event does with the face's surfaces:
+
+| Event | Surfaces |
+| --- | --- |
+| Face at rest | One per lit cell. Seconds, the colon, colour and a resize keep every id. A changed glyph, from a reading, font or format, is replaced |
+| Digit Slide | A changed slot's old glyph, or every slot's in a preview, slides out departing, and each cell is retired once it is clipped out. The new glyph is admitted sliding in and handed back at the end. Unchanged slots keep their ids |
+| Falling | Each cell rides its segment's body, then returns. Cells the new reading still lights come home as themselves, the rest fade out departing and new ones fade in |
+| Exploding digits | Blocks carry the cells' surfaces through the burst and the flight home. A surplus block departs and is merged away when it has shrunk to nothing. A block split off the debris is a new surface that grows from zero |
+| Meltdown | Solid blocks carry their surfaces until they melt, leave the view or are reclaimed. The refill is a new face that grows upward. Water is never a surface |
+| Marquee, clock recipes | The face's surfaces ride the recipe's transform, at the opacity the recipe draws. The fading anchored copy is presentation and owns nothing |
+| Marquee, text recipes | The face's surfaces are carried clear of the frame and brought back as themselves |
+| Cell Swap | Each surface rides its exchange to the cell it lands on. A reading that changes fades surfaces out and new ones in |
+| Slot Machine | The opening glyph rides its reel out departing. Each reel's lock glyph is admitted when it comes into the window. Scrambled frames are texture and carry nothing |
+| Color Cycle, Rain, Aquarium, visitors | The face stays anchored |
+
+An event cut short, by a preview, a resize or anything else that ends it
+early, never snaps a piece home. A departing piece is retired for its own
+reason wherever it is. Of the rest, a piece resting at its own cell is handed
+back, which includes every piece of an event that has not moved yet, and a
+piece away from it is retired `interrupted`. A Marquee that has moved the face
+retires it `interrupted`; Clock chase, which never moves it, hands it back.
+
+`ClockState::digit_surfaces` publishes every surface after each step, in a
+fixed order: the slots no event holds, then the active event's pieces.
+Publication is a read of the state that also draws the face, so a published
+pose is where the cell is drawn. Clock makes it once, at the end of each step
+or resize. The ledger finds that step's hand-offs and departures in it, and
+`digit_surfaces` and the control state serve it until the next. A reading or
+setting applied while paused arrives in a step that does not tick, and is
+published like any other. `surface_changes` keeps the last 1,296 lifecycle
+changes, numbered in sequence. That is a convenience, not a bound on a step: a
+step that ends an event and changes the reading, font and format at once
+records several changes for some surfaces. A consumer that finds a gap has
+missed some, and catches up from the publication: a surface it holds that is no
+longer published has been retired. At most 648 surfaces are alive at once, an
+outgoing and an incoming glyph in every slot with room for a retargeted
+cross-fade. The events keep within that by construction, and debug builds and
+the tests check it.
+
+Clock's control state reports them as `digit_surfaces`, from schema 22. Its
+`accounting` gives the surfaces `live` and `departing` now, `peak_live`, and
+over the run those `admitted`, `handed_off`, `departed` and `retired` by reason,
+with the last change's `sequence`. `sources` counts the live surfaces each source
+is moving. `sample` holds the lowest id in each slot for each source, departing
+or not, with its pose in world mill units, at most 16 of them. `recent` holds
+the latest 16 changes. `limits` gives those bounds. Text `clock state` prints
+the counts, the run, the sample and the latest changes.
+
+`digit_surface_tests.rs` holds the contract. Every check reads the rendered
+frame, so a pose the face does not actually draw fails. A marker fixture stands
+in for a resident: it attaches a local point to a surface and follows only what
+the contract publishes. The sweep runs every event at every layout, through all
+four fonts, resizes part way through each and before each moves, changes the
+reading, format and font while paused, and replays events cut short by each
+other, repeated and paused. It checks that each surface lives one lifecycle and
+that the same inputs record the same one.
 
 ### Sharing the run's physics arena
 
@@ -2429,11 +2535,11 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **21** and reports scenario-instance revision,
+`clock state` uses schema version **22** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
-reading/target digits, active font, palette RGB, physics counts, floor ownership mode, the run's `arena`, and typed live `settings`.
+reading/target digits, active font, palette RGB, physics counts, floor ownership mode, the run's `arena`, its `digit_surfaces`, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
@@ -2511,7 +2617,7 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 20 and
+after completion or cancellation. Use matching client/CLI builds: schema 21 and
 older requests are rejected. The internal Clock action payload is version 12;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
 little-endian u16 switch mask (bits 0–10, reserved bits rejected),
@@ -2547,7 +2653,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 21, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 22, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -2564,7 +2670,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 21, `event`
+tick. A raw `clock trigger` request must include schema version 22, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, or `cell-swap`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

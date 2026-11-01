@@ -1,6 +1,6 @@
 //! Meltdown uses bounded convex primitives in both render paths.
 use super::*;
-use crate::events::meltdown::{MeltdownEvent, soften};
+use crate::events::meltdown::{MeltdownEvent, reform_progress};
 use engine_water::{Column, Parcel};
 
 mod slopes;
@@ -110,11 +110,6 @@ fn clip_channel<const N: usize>(points: [Vec2; N], bounds: Option<[f64; 2]>) -> 
         .iter()
         .map(|p| RenderPoint::new(p.x, p.y))
         .collect()
-}
-
-pub(super) fn reform_progress(phase_tick: u64, row: i8) -> f32 {
-    let delay = row.max(0) as u64 * 4;
-    soften(phase_tick.saturating_sub(delay) as f32 / (REFORMING_TICKS - 1 - 32) as f32)
 }
 
 pub(super) fn render_reforming_face(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
@@ -278,22 +273,8 @@ pub(super) fn render_water_colors(
     }
 }
 
-pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Layout) {
-    if let Some(lab) = &event.floats {
-        for (min, max) in &lab.supports {
-            frame.push_primitive(
-                ARENA_LAYER,
-                rectangle(
-                    RenderPoint::new(min.x, min.y),
-                    RenderPoint::new(max.x, max.y),
-                    FLOOR_EDGE_COLOR,
-                    None,
-                ),
-            );
-        }
-    }
-    render_water(frame, &event.water, ACTIVE_CELL_LAYER, 1.0);
-    // Keep solid blocks legible as they pass through the pool to the floor.
+/// The solid blocks, kept legible as they pass through the pool to the floor.
+pub(super) fn render_solids(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Layout) {
     for cell in &event.cells {
         if cell.meridiem {
             super::meridiem::pixel(
@@ -314,6 +295,24 @@ pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Lay
             DigitPalette::default(),
         );
     }
+}
+
+pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Layout) {
+    if let Some(lab) = &event.floats {
+        for (min, max) in &lab.supports {
+            frame.push_primitive(
+                ARENA_LAYER,
+                rectangle(
+                    RenderPoint::new(min.x, min.y),
+                    RenderPoint::new(max.x, max.y),
+                    FLOOR_EDGE_COLOR,
+                    None,
+                ),
+            );
+        }
+    }
+    render_water(frame, &event.water, ACTIVE_CELL_LAYER, 1.0);
+    render_solids(frame, event, layout);
     if let Some(lab) = &event.floats {
         if let Some(y) = lab.reference_y {
             let spec = event.water.pools()[0].spec();

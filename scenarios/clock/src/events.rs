@@ -237,6 +237,7 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
 
 pub(super) struct EventContext<'a> {
     pub segments: &'a mut [SegmentState],
+    pub surfaces: &'a mut crate::digit_surfaces::SurfaceLedger,
     pub display: DisplaySnapshot,
     pub layout: Layout,
     pub floor: crate::floor::FloorGeometry,
@@ -301,19 +302,20 @@ impl ActiveEvent {
                 config.marquee_message,
                 context.display,
             ))),
-            ClockEventKind::DigitSlide => {
-                Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
-            }
+            ClockEventKind::DigitSlide => Self::DigitSlide(DigitSlideEvent::new(
+                previous_display,
+                context.display,
+                context.surfaces,
+            )),
             // A periodic event has no previous reading either, so the
             // admission has to say whether a person asked for this one.
-            ClockEventKind::SlotMachine => Self::SlotMachine(Box::new(SlotMachineEvent::new(
-                context.display,
-                seed,
-                preview,
-            ))),
+            ClockEventKind::SlotMachine => Self::SlotMachine(Box::new(
+                SlotMachineEvent::new(context.display, seed, preview).hold(context.surfaces),
+            )),
             ClockEventKind::CellSwap => Self::CellSwap(Box::new(cell_swap::CellSwapEvent::new(
                 context.display,
                 seed,
+                context.surfaces,
             ))),
             ClockEventKind::Rain => Self::Rain(Box::new(crate::rain::RainEvent::new(
                 context.layout,
@@ -453,9 +455,13 @@ impl ActiveEvent {
             Self::ColorCycle(event) => event.step(),
             Self::Meltdown(event) => event.step_with_visit(context, visit, arena),
             Self::Marquee(event) => event.step(),
-            Self::DigitSlide(event) => event.step(),
-            Self::SlotMachine(event) => event.step(),
-            Self::CellSwap(event) => event.step(),
+            Self::DigitSlide(event) => event.step(context.surfaces),
+            Self::SlotMachine(event) => {
+                let finished = event.step();
+                event.carry_surfaces(context.surfaces);
+                finished
+            }
+            Self::CellSwap(event) => event.step(context.surfaces),
             Self::Rain(event) => {
                 event.synchronize(context.display, context.segments);
                 event.step()
@@ -551,6 +557,65 @@ impl ActiveEvent {
         match self {
             Self::ColorCycle(event) => event.palette(),
             _ => DigitPalette::default(),
+        }
+    }
+
+    /// Where the face's own surface at `cell` of `slot` is, in a slot this
+    /// event does not hold. Only a takeover moves the face without holding it.
+    pub fn face_pose(
+        &self,
+        layout: Layout,
+        slot: usize,
+        cell: crate::GridCell,
+    ) -> crate::digit_surfaces::SurfacePose {
+        match self {
+            Self::Marquee(event) => event.face_pose(layout, slot, cell),
+            _ => crate::digit_surfaces::SurfacePose::anchored(layout, slot, cell),
+        }
+    }
+
+    /// What moves the face's own surfaces while this event runs.
+    pub fn face_source(&self) -> crate::digit_surfaces::SurfaceSource {
+        match self {
+            Self::Marquee(_) => crate::digit_surfaces::SurfaceSource::Marquee,
+            _ => crate::digit_surfaces::SurfaceSource::Anchored,
+        }
+    }
+
+    /// The surfaces of the slots this event holds, in its own order.
+    pub fn surfaces(
+        &self,
+        layout: Layout,
+        segments: &[SegmentState],
+        out: &mut Vec<(crate::SurfaceId, crate::digit_surfaces::SurfacePose)>,
+    ) {
+        match self {
+            Self::CellSwap(event) => event.surfaces(layout, out),
+            Self::DigitSlide(event) => event.surfaces(layout, out),
+            Self::Explosion(event) => event.surfaces(layout, out),
+            Self::Falling(event) => event.surfaces(layout, segments, out),
+            Self::Meltdown(event) => event.surfaces(layout, out),
+            Self::SlotMachine(event) => event.surfaces(layout, out),
+            _ => (),
+        }
+    }
+
+    /// Gives the slots this event holds back to the face, with whatever it
+    /// settled there, and retires the rest of its pieces.
+    pub fn release_surfaces(
+        &mut self,
+        segments: &[SegmentState],
+        surfaces: &mut crate::digit_surfaces::SurfaceLedger,
+    ) {
+        match self {
+            Self::CellSwap(event) => event.release_surfaces(surfaces),
+            Self::DigitSlide(event) => event.release_surfaces(surfaces),
+            Self::Explosion(event) => event.release_surfaces(segments, surfaces),
+            Self::Falling(event) => event.release_surfaces(segments, surfaces),
+            Self::Marquee(event) => event.release_surfaces(surfaces),
+            Self::Meltdown(event) => event.release_surfaces(segments, surfaces),
+            Self::SlotMachine(event) => event.release_surfaces(surfaces),
+            _ => (),
         }
     }
 

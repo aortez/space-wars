@@ -18,6 +18,9 @@ mod crow_tests;
 pub use calendar::ClockDate;
 #[cfg(test)]
 mod digit_slide_tests;
+#[cfg(test)]
+mod digit_surface_tests;
+pub mod digit_surfaces;
 mod digits;
 #[cfg(test)]
 mod event_tests;
@@ -61,6 +64,10 @@ pub use arena::{
 /// waiting on a request the host never applied.
 const MAX_EVENT_FLAGS_HIGH_BYTE: u8 = (((1u16 << ClockEventKind::ALL.len()) - 1) >> 8) as u8;
 
+pub use digit_surfaces::{
+    DigitSurface, Footprint, Retirement, SurfaceAccounting, SurfaceChange, SurfaceChangeKind,
+    SurfaceId, SurfaceSource,
+};
 pub use digits::{
     DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
     SegmentRepresentation, SegmentState,
@@ -481,6 +488,12 @@ pub struct ClockState {
     date_label: Option<String>,
     display: DisplaySnapshot,
     segments: Vec<SegmentState>,
+    // Who the lit digit cells are and what has happened to them. The face
+    // and the active event say where they are.
+    surfaces: digit_surfaces::SurfaceLedger,
+    // Where they stood at the end of the last step, as the ledger observed
+    // them there.
+    published: Vec<DigitSurface>,
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
     floor: floor::FloorManager,
@@ -940,6 +953,42 @@ impl ClockState {
         &self.segments
     }
 
+    /// Every lit digit cell as a surface something can attach to, where it
+    /// stood at the end of the last step: the face's slots in order, then the
+    /// pieces of whatever event holds the rest.
+    pub fn digit_surfaces(&self) -> Vec<DigitSurface> {
+        self.published.clone()
+    }
+
+    /// The lifecycle changes the ledger still retains, oldest first. A
+    /// consumer that finds a gap in their sequence numbers has missed some,
+    /// and catches up from `digit_surfaces`: a surface it holds that is not
+    /// published there has been retired.
+    pub fn surface_changes(&self) -> impl ExactSizeIterator<Item = &SurfaceChange> + Clone {
+        self.surfaces.changes()
+    }
+
+    pub fn surface_accounting(&self) -> SurfaceAccounting {
+        self.surfaces.accounting()
+    }
+
+    /// The digit surfaces as Clock's state publishes them.
+    pub fn digit_surface_state(&self) -> engine_common::ClockDigitSurfaceState {
+        digit_surfaces::diagnostics(self)
+    }
+
+    /// Brings the face's surfaces up to what it draws, publishes them and
+    /// records what the publication shows, before anything reads the step.
+    fn settle_surfaces(&mut self) {
+        let source = self
+            .active_event
+            .as_ref()
+            .map_or(SurfaceSource::Anchored, ActiveEvent::face_source);
+        self.surfaces.reconcile(&self.segments, source);
+        self.published = digit_surfaces::publish(self);
+        self.surfaces.observe(&self.published);
+    }
+
     pub fn time_format(&self) -> ClockTimeFormat {
         self.config.time_format
     }
@@ -973,6 +1022,9 @@ impl ClockState {
         self.arena.remap(self.floor.geometry(layout), previous);
         self.sync_event_schedule();
         self.synchronize_soil();
+        // A resize lands between steps, and whatever reads next must find the
+        // event's pieces already given back to the face.
+        self.settle_surfaces();
     }
 
     pub fn lifecycle(&self) -> EventLifecycle {
@@ -1409,6 +1461,7 @@ impl ClockState {
             self.floor.acquire_visit_event(kind);
             let context = EventContext {
                 segments: &mut self.segments,
+                surfaces: &mut self.surfaces,
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
@@ -1436,6 +1489,7 @@ impl ClockState {
             kind,
             EventContext {
                 segments: &mut self.segments,
+                surfaces: &mut self.surfaces,
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
@@ -1460,6 +1514,12 @@ impl ClockState {
             {
                 duck.terrain.sync_responsive_floor(floor);
             }
+            event.release_surfaces(&self.segments, &mut self.surfaces);
+            for slot in 0..DIGIT_SLOT_COUNT {
+                if self.surfaces.held(slot) {
+                    self.surfaces.release(slot);
+                }
+            }
             drop(event);
             debug_assert!(
                 self.duck_visit.is_some() || !self.arena.holds(arena::Owner::Visit),
@@ -1478,6 +1538,7 @@ impl ClockState {
 
     fn advance_tick(&mut self) {
         self.schedule.advance_tick();
+        self.surfaces.set_tick(self.schedule.tick);
         if self
             .event_notice
             .is_some_and(|(_, until)| self.schedule.tick >= until)
@@ -1617,6 +1678,7 @@ impl ClockState {
         let shared = event.shares_visit_arena();
         let context = EventContext {
             segments: &mut self.segments,
+            surfaces: &mut self.surfaces,
             display: self.display,
             layout,
             floor: self.floor.geometry(layout),
@@ -1637,6 +1699,7 @@ impl ClockState {
         let event = self.active_event.as_mut().expect("active event");
         let context = EventContext {
             segments: &mut self.segments,
+            surfaces: &mut self.surfaces,
             display: self.display,
             layout,
             floor: self.floor.geometry(layout),
@@ -1685,10 +1748,11 @@ impl ClockState {
             self.finish_event();
         }
         if let Some(ActiveEvent::CellSwap(event)) = &mut self.active_event {
-            event.synchronize(self.display);
+            event.synchronize(self.display, &mut self.surfaces);
         }
         if let Some(ActiveEvent::SlotMachine(event)) = &mut self.active_event {
             event.synchronize(self.display);
+            event.carry_surfaces(&mut self.surfaces);
         }
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);
@@ -1707,6 +1771,9 @@ impl ClockState {
             .is_some_and(ActiveEvent::holds_lit_segments)
         {
             digits::apply_snapshot(&mut self.segments, self.display);
+        }
+        if let Some(ActiveEvent::Meltdown(event)) = &mut self.active_event {
+            event.synchronize(&self.segments, &mut self.surfaces);
         }
         if slide && let Some(kind) = self.schedule.time_change_event() {
             self.start_event_from(kind, Some(previous), false);
@@ -1755,6 +1822,8 @@ impl Scenario for ClockScenario {
             date_label: None,
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),
+            surfaces: digit_surfaces::SurfaceLedger::new(),
+            published: Vec::new(),
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
             floor: floor::FloorManager::default(),
@@ -1785,6 +1854,7 @@ impl Scenario for ClockScenario {
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
+        state.surfaces.set_tick(state.schedule.tick);
         for action in actions.iter().filter_map(ClockAction::decode) {
             match action {
                 ClockAction::SetReading(reading) => state.apply_reading(reading, !dt.is_zero()),
@@ -1839,6 +1909,7 @@ impl Scenario for ClockScenario {
             Vec::new()
         };
         state.advance_plants(dt);
+        state.settle_surfaces();
         StepResult::default()
     }
 

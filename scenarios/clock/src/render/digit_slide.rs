@@ -11,8 +11,7 @@ pub(super) fn render(
     layout: Layout,
     palette: DigitPalette,
 ) {
-    let height = 9.0 * layout.pitch;
-    let progress = event.progress();
+    let [outgoing, incoming] = event.offsets();
     for slot in 0..crate::DIGIT_SLOT_COUNT {
         let from = crate::fonts::glyph(event.from_font, event.from[slot]);
         let to = crate::fonts::glyph(event.to_font, event.to[slot]);
@@ -48,10 +47,14 @@ pub(super) fn render(
                     continue;
                 }
                 super::render_square(frame, center, layout.pitch, 0.0, 0.0, palette);
-                for (glyph, offset) in [(from, -progress * height), (to, (1.0 - progress) * height)]
-                {
+                for (glyph, offset) in [(from, outgoing), (to, incoming)] {
                     if glyph.contains(cell) {
-                        clipped_cell(frame, center + Vec2::new(0.0, offset), layout, palette);
+                        clipped_cell(
+                            frame,
+                            center + Vec2::new(0.0, offset * layout.pitch),
+                            layout,
+                            palette,
+                        );
                     }
                 }
             }
@@ -68,8 +71,7 @@ pub(super) fn clipped_cell(
     layout: Layout,
     palette: DigitPalette,
 ) {
-    let lower = layout.face_origin.y;
-    let upper = lower + 9.0 * layout.pitch;
+    let [lower, upper] = layout.digit_band();
     let half = layout.pitch * 0.4;
     let stroke_half = (layout.pitch * 0.045).max(0.8) * 0.5;
     let min = RenderPoint::new(center.x - half, (center.y - half).max(lower));

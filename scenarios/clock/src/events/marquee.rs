@@ -1,15 +1,36 @@
 use engine_common::{ClockMarqueeMessage, ClockMarqueePreset, ClockMarqueeState};
+use engine_core::Vec2;
 
 use crate::{
-    DisplaySnapshot,
+    DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell,
+    digit_surfaces::{CELL_HALF, Footprint, Retirement, SurfaceLedger, SurfacePose, SurfaceSource},
+    layout::Layout,
     presentation::{
+        Bounds,
         content::Content,
-        effects::{Lighting, Playback, Recipe, Rotation, Target, Wave, smoothstep},
+        effects::{Lighting, Placement, Playback, Recipe, Rotation, Target, Wave, smoothstep},
     },
 };
 
 pub const MARQUEE_TICKS: u64 = 12 * 60;
 const FADE_TICKS: u64 = 45;
+
+/// How the anchored face is drawn beneath a takeover.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct FaceDraw {
+    /// How far its lit cells are carried along x.
+    pub offset: f32,
+    /// How much of their ink is left.
+    pub ink: f32,
+}
+
+/// The part of the view a takeover draws its content in.
+pub(crate) fn viewport(layout: Layout) -> Bounds {
+    Bounds {
+        min: Vec2::new(layout.bounds_min.x + 8.0, layout.floor_y + 8.0),
+        max: Vec2::new(layout.bounds_max.x - 8.0, layout.canopy_y - 8.0),
+    }
+}
 
 pub(crate) struct MarqueeEvent {
     pub tick: u64,
@@ -135,6 +156,98 @@ impl MarqueeEvent {
         } else {
             strength
         })
+    }
+
+    /// How the anchored face is drawn. A text takeover carries its lit cells
+    /// clear of the frame at full ink and has nothing left to draw once they
+    /// are clear. A clock preset leaves them where they stand and dissolves
+    /// them into its own copy of the reading, which carries the surfaces.
+    pub fn face(&self, layout: Layout) -> FaceDraw {
+        match self.face_sweep() {
+            Some(sweep) => FaceDraw {
+                offset: sweep * (layout.bounds_max.x - layout.bounds_min.x + layout.pitch),
+                ink: if sweep.abs() >= 1.0 { 0.0 } else { 1.0 },
+            },
+            None => FaceDraw {
+                offset: 0.0,
+                ink: (1.0 - self.playback().strength).max(0.0),
+            },
+        }
+    }
+
+    /// Where the recipe lays its content out. A clock preset's content is the
+    /// face's own reading, so this opens at the face's pitch and the recipe
+    /// eases any fit of its own in from there.
+    pub fn placement(&self, layout: Layout) -> Placement {
+        Placement {
+            content: self.content.bounds,
+            viewport: viewport(layout),
+            center: Vec2::new(0.0, layout.face_origin.y + 4.5 * layout.pitch),
+            pitch: layout.pitch * if self.uses_clock { 1.0 } else { 0.7 },
+        }
+    }
+
+    /// Where the face's own surface at `cell` of `slot` is while the takeover
+    /// runs. A clock preset carries it on the recipe's copy of the reading,
+    /// sampled the way that copy is drawn, so the copy dissolving in place
+    /// owns nothing. A text takeover carries it with the swept reading.
+    pub fn face_pose(&self, layout: Layout, slot: usize, cell: GridCell) -> SurfacePose {
+        let anchored = SurfacePose::anchored(layout, slot, cell);
+        if !self.uses_clock {
+            let face = self.face(layout);
+            return SurfacePose {
+                origin: anchored.origin + Vec2::new(face.offset, 0.0),
+                source: SurfaceSource::Marquee,
+                opacity: face.ink,
+                ..anchored
+            };
+        }
+        let font = self.display.font;
+        let kind = crate::fonts::segment_at(font, cell);
+        debug_assert!(kind.is_some(), "a lit cell lies in a segment");
+        let content =
+            Content::digit_cell(font, slot, kind.unwrap_or(crate::SegmentKind::Top), cell);
+        let playback = self.playback();
+        // A clock recipe moves each cell rigidly, so its quad is the cell
+        // turned, scaled and placed: the corners give the frame back.
+        let quad = self.recipe.quad(content, self.placement(layout), playback);
+        let edge = quad[1] - quad[0];
+        let (_, brightness) = self.recipe.lighting.sample(
+            content,
+            self.content.bounds,
+            playback.seconds,
+            playback.progress,
+        );
+        let pose = SurfacePose {
+            origin: (quad[0] + quad[2]) * 0.5,
+            angle: edge.y.atan2(edge.x),
+            scale: edge.length() / (2.0 * CELL_HALF * content.size),
+            footprint: Footprint::CELL,
+            source: SurfaceSource::Marquee,
+            opacity: playback.strength * brightness,
+            ..anchored
+        };
+        debug_assert!(
+            ((pose.origin + (Vec2::splat(CELL_HALF) * pose.scale).rotate_radians(pose.angle))
+                - quad[2])
+                .length()
+                <= 1e-3 * pose.scale,
+            "a clock recipe moves a cell rigidly"
+        );
+        pose
+    }
+
+    /// A takeover cut short leaves the face wherever it had carried it, so
+    /// the face's surfaces retire there rather than snap home, and the face
+    /// admits new ones. One that never moved the face hands nothing over.
+    pub fn release_surfaces(&self, surfaces: &mut SurfaceLedger) {
+        let moves =
+            !self.uses_clock || self.recipe.rotation.is_some() || self.recipe.wave.is_some();
+        if self.tick < MARQUEE_TICKS && moves && self.playback().strength > 0.0 {
+            for slot in 0..DIGIT_SLOT_COUNT {
+                surfaces.retire_face(slot, Retirement::Interrupted);
+            }
+        }
     }
 
     pub fn playback(&self) -> Playback {

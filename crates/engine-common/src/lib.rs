@@ -12,6 +12,7 @@ use serde::{
 
 mod activity_settings;
 mod clock_arena;
+mod clock_digit_surfaces;
 mod clock_font;
 mod clock_message;
 mod controller;
@@ -20,6 +21,11 @@ pub use activity_settings::{AutostartSettings, MatchSettings};
 pub use clock_arena::{
     ClockArenaAccounting, ClockArenaClaim, ClockArenaLimits, ClockArenaOwner, ClockArenaPopulation,
     ClockArenaRemap, ClockArenaState, ClockArenaStep, ClockArenaUnavailable,
+};
+pub use clock_digit_surfaces::{
+    ClockDigitSurface, ClockDigitSurfaceState, ClockSurfaceAccounting, ClockSurfaceChange,
+    ClockSurfaceChangeKind, ClockSurfaceLimits, ClockSurfaceRetirement, ClockSurfaceRetirements,
+    ClockSurfaceSource, ClockSurfaceSourceCount,
 };
 pub use clock_font::{ClockFont, ClockFontPool, ClockFontSettings};
 pub use controller::{ControllerBinding, ControllerControl, ControllerProfile, ControllerSource};

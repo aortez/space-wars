@@ -18,6 +18,8 @@ use crate::render::{FrameLayout, Viewport};
 mod arena_tests;
 pub(super) mod benchmark;
 #[cfg(test)]
+mod digit_surface_tests;
+#[cfg(test)]
 mod floor_tests;
 #[cfg(test)]
 mod layout_tests;
@@ -257,6 +259,7 @@ impl ClientScenario for ClockClientScenario {
             collider_count: self.state.collider_count(),
             floor: self.state.floor_mode(),
             arena: Some(self.state.arena_state()),
+            digit_surfaces: Some(self.state.digit_surface_state()),
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
             crow: self.state.crow_state(),

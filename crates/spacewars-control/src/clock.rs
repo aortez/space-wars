@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 21;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 22;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -56,6 +56,10 @@ pub struct ClockState {
     /// world, its last step and the bounds it takes claims within.
     #[serde(default)]
     pub arena: Option<engine_common::ClockArenaState>,
+    /// The lit digit cells a resident can attach to: a bounded sample of the
+    /// surfaces alive now, the latest changes to them and their accounting.
+    #[serde(default)]
+    pub digit_surfaces: Option<engine_common::ClockDigitSurfaceState>,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
     #[serde(default)]
@@ -425,6 +429,7 @@ mod tests {
             collider_count: 0,
             floor: engine_common::ClockFloorMode::Closed,
             arena: None,
+            digit_surfaces: None,
             meltdown: None,
             duck: None,
             crow: None,
@@ -539,6 +544,103 @@ mod tests {
             assert!(json.contains(named), "{named} in {json}");
         }
         assert_eq!(ClockState::from_json(&json).unwrap(), state);
+    }
+
+    #[test]
+    fn digit_surface_diagnostics_round_trip_with_named_sources_and_reasons() {
+        use engine_common::{
+            ClockDigitSurface, ClockDigitSurfaceState, ClockSurfaceAccounting, ClockSurfaceChange,
+            ClockSurfaceChangeKind, ClockSurfaceLimits, ClockSurfaceRetirement,
+            ClockSurfaceRetirements, ClockSurfaceSource, ClockSurfaceSourceCount,
+        };
+        let mut state = clock_state();
+        let change = |sequence, id, change| ClockSurfaceChange {
+            sequence,
+            tick: 420,
+            id,
+            change,
+        };
+        state.digit_surfaces = Some(ClockDigitSurfaceState {
+            accounting: ClockSurfaceAccounting {
+                live: 2,
+                departing: 1,
+                peak_live: 40,
+                admitted: 41,
+                handed_off: 3,
+                departed: 2,
+                retired: ClockSurfaceRetirements {
+                    replaced: 38,
+                    merged_away: 1,
+                    ..ClockSurfaceRetirements::default()
+                },
+                sequence: 85,
+            },
+            sources: vec![ClockSurfaceSourceCount {
+                source: ClockSurfaceSource::Slide,
+                live: 2,
+            }],
+            sample: vec![ClockDigitSurface {
+                id: 41,
+                slot: 3,
+                cell: [2, -1],
+                source: ClockSurfaceSource::Slide,
+                body: None,
+                origin_milli: [1250, -380],
+                angle_millidegrees: 0,
+                scale_milli: 600,
+                footprint_milli: [-400, -400, 400, 400],
+                departing: true,
+                opacity_milli: 1000,
+                clip_milli: Some([-2000, 3400]),
+            }],
+            recent: vec![
+                change(
+                    83,
+                    41,
+                    ClockSurfaceChangeKind::Admitted {
+                        slot: 3,
+                        cell: [2, -1],
+                        source: ClockSurfaceSource::Anchored,
+                    },
+                ),
+                change(
+                    84,
+                    41,
+                    ClockSurfaceChangeKind::HandedOff {
+                        from: ClockSurfaceSource::Anchored,
+                        to: ClockSurfaceSource::Slide,
+                    },
+                ),
+                change(
+                    85,
+                    40,
+                    ClockSurfaceChangeKind::Retired {
+                        reason: ClockSurfaceRetirement::MergedAway,
+                    },
+                ),
+            ],
+            limits: ClockSurfaceLimits {
+                live: 648,
+                retained_changes: 1296,
+                sample: 16,
+                recent: 16,
+            },
+        });
+        let json = state.to_json().unwrap();
+        for named in [
+            r#""source":"slide""#,
+            r#"{"kind":"admitted","slot":3,"cell":[2,-1],"source":"anchored"}"#,
+            r#"{"kind":"handed-off","from":"anchored","to":"slide"}"#,
+            r#"{"kind":"retired","reason":"merged-away"}"#,
+            r#""merged_away":1"#,
+        ] {
+            assert!(json.contains(named), "{named} in {json}");
+        }
+        assert_eq!(ClockState::from_json(&json).unwrap(), state);
+        let mut older: serde_json::Value = serde_json::from_str(&json).unwrap();
+        older.as_object_mut().unwrap().remove("digit_surfaces");
+        let older = ClockState::from_json(&older.to_string()).unwrap();
+        assert_eq!(older.digit_surfaces, None);
     }
 
     #[test]

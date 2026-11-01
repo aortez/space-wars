@@ -1,5 +1,9 @@
 //! A bounded batch of individual digit/AM-PM blocks in the existing mechanics
 //! arena. The event owns only its batch, never the duck or its controller.
+//! Every digit block carries the face's surface out, on its body, and home
+//! again. A block the return sends to another cell keeps its surface; a block
+//! split off for a denser reading is a new one, and a surplus block's surface
+//! departs as it shrinks and is retired as merged away.
 use engine_common::ClockEventKind;
 use engine_core::Vec2;
 use engine_rapier::world::{
@@ -12,8 +16,12 @@ use super::{
     duck::{self, DuckEvent},
 };
 use crate::{
-    DisplaySnapshot, SegmentRepresentation,
+    DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, SegmentRepresentation, SegmentState,
     arena::ClockArena,
+    digit_surfaces::{
+        self, Footprint, Retirement, SlotIds, SurfaceId, SurfaceLedger, SurfacePose, SurfaceSource,
+        bit,
+    },
     digits,
     floor::DrainGeometry,
     layout::Layout,
@@ -22,12 +30,15 @@ use crate::{
 };
 
 mod reassembly;
-use reassembly::Reassembly;
+use reassembly::{Destination, Reassembly};
 
 pub const WARNING_TICKS: u64 = 36;
 pub const BURST_TICKS: u64 = 210;
 pub const EXPLOSION_TICKS: u64 = WARNING_TICKS + BURST_TICKS + REFORMING_TICKS;
 pub const MAX_EXPLOSION_CELLS: usize = crate::fonts::MAX_DIGIT_CELLS + meridiem::MAX_CELLS;
+
+/// A digit cell: its slot and its place in the slot's grid.
+pub(crate) type Home = (u8, GridCell);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Cell {
@@ -36,8 +47,17 @@ pub(crate) struct Cell {
     pub angle: f32,
     pub side: f32,
     pub label: bool,
+    /// The digit cell it left, or is first split off for.
+    home: Option<Home>,
     velocity: Vec2,
     spin: f32,
+}
+
+/// The surface a digit block carries.
+#[derive(Clone, Copy, Debug)]
+struct Piece {
+    id: SurfaceId,
+    departing: bool,
 }
 
 enum Mechanics {
@@ -50,6 +70,8 @@ pub(crate) struct ExplosionEvent {
     tick: u64,
     gravity: f32,
     pub cells: Vec<Cell>,
+    /// Each block's surface, by block. AM/PM pixels have none.
+    pieces: Vec<Option<Piece>>,
     live_bodies: bool,
     mechanics: Mechanics,
     drain: Option<DrainGeometry>,
@@ -104,7 +126,15 @@ impl ExplosionEvent {
         let gravity = layout.pitch * 14.0;
         let mut rng = StdRng::seed_from_u64(seed);
         let mut cells = Vec::with_capacity(MAX_EXPLOSION_CELLS);
-        let mut add = |origin: Vec2, center: Vec2, side: f32, label: bool| {
+        let faces: [SlotIds; DIGIT_SLOT_COUNT] = std::array::from_fn(|slot| {
+            context.surfaces.take(
+                slot,
+                digit_surfaces::Glyph::anchored(context.segments, slot),
+                SurfaceSource::Anchored,
+            )
+        });
+        let mut pieces = Vec::with_capacity(MAX_EXPLOSION_CELLS);
+        let mut add = |origin: Vec2, center: Vec2, side: f32, home: Option<Home>| {
             let delta = origin - center;
             let direction = delta.normalized();
             let mut velocity = direction.rotate_radians(rng.random_range(-0.18..0.18))
@@ -119,10 +149,15 @@ impl ExplosionEvent {
                 position: origin,
                 angle: 0.0,
                 side,
-                label,
+                label: home.is_none(),
+                home,
                 velocity,
                 spin: rng.random_range(-7.0..7.0),
             });
+            pieces.push(home.map(|(slot, cell)| Piece {
+                id: faces[usize::from(slot)][bit(cell)].expect("every lit cell has a surface"),
+                departing: false,
+            }));
         };
         for segment in context.segments.iter().filter(|s| s.lit) {
             let origin = layout.digit_origin(segment.id.digit_slot as usize);
@@ -132,7 +167,7 @@ impl ExplosionEvent {
                     layout.cell_center(segment.id, cell),
                     center,
                     layout.pitch * 0.8,
-                    false,
+                    Some((segment.id.digit_slot, cell)),
                 );
             }
         }
@@ -147,7 +182,7 @@ impl ExplosionEvent {
                     glyph.cell_center(layout, cell),
                     glyph.center(layout),
                     layout.pitch * PIXEL_SIZE,
-                    true,
+                    None,
                 );
             }
         }
@@ -157,6 +192,7 @@ impl ExplosionEvent {
             tick: 0,
             gravity,
             cells,
+            pieces,
             live_bodies: false,
             mechanics,
             drain,
@@ -231,7 +267,12 @@ impl ExplosionEvent {
 
     /// One world step, including during warning/reformation when no debris is
     /// live. Only the event's bodies are retired; duck motion keeps advancing.
-    fn advance_phase(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+    fn advance_phase(
+        &mut self,
+        segments: &mut [SegmentState],
+        display: DisplaySnapshot,
+        arena: &mut ClockArena,
+    ) -> bool {
         self.tick += 1;
         let burst = self.phase == EventPhase::Warning && self.tick >= WARNING_TICKS;
         let reform = self.phase == EventPhase::Exploding && self.tick >= BURST_TICKS;
@@ -276,7 +317,7 @@ impl ExplosionEvent {
         }
         // The caller reborrows the visit for its single ordinary world step.
         if burst {
-            for segment in context.segments.iter_mut() {
+            for segment in segments.iter_mut() {
                 segment.representation = SegmentRepresentation::Disintegrated;
             }
             self.phase = EventPhase::Exploding;
@@ -287,7 +328,7 @@ impl ExplosionEvent {
             }
             self.phase = EventPhase::Reforming;
             self.tick = 0;
-            digits::apply_snapshot(context.segments, context.display);
+            digits::apply_snapshot(segments, display);
         }
         self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS
     }
@@ -296,21 +337,27 @@ impl ExplosionEvent {
     /// own world and finishes its tick here; a shared one reads the arena back
     /// in `observe`. Returns true when the event has finished.
     pub fn step(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+        let EventContext {
+            segments,
+            surfaces,
+            display,
+            layout,
+            ..
+        } = context;
         // Reading/control updates do not move paused debris. On the next tick,
         // redirect only changed destinations from their current visible poses.
         if let Some(reassembly) = &mut self.reassembly {
-            reassembly.synchronize(&mut self.cells, context.display, context.layout, self.tick);
+            reassembly.synchronize(&mut self.cells, display, layout, self.tick);
+            self.assign_pieces(surfaces);
         }
-        let display = context.display;
-        let layout = context.layout;
-        let finished = self.advance_phase(context, arena);
+        let finished = self.advance_phase(segments, display, arena);
         if let Mechanics::Standalone(world) = &mut self.mechanics {
             let world = world.as_deref_mut().map(|world| {
                 world.step(1.0 / 60.0);
                 &*world
             });
             Self::read_back(&mut self.cells, self.live_bodies, world);
-            self.sample_reassembly(display, layout);
+            self.sample_reassembly(display, layout, surfaces);
         }
         finished
     }
@@ -318,7 +365,7 @@ impl ExplosionEvent {
     /// The shared cells after the arena's step.
     pub fn observe(&mut self, context: EventContext<'_>, arena: &ClockArena) {
         Self::read_back(&mut self.cells, self.live_bodies, arena.world());
-        self.sample_reassembly(context.display, context.layout);
+        self.sample_reassembly(context.display, context.layout, context.surfaces);
     }
 
     /// Live cells take their bodies' poses.
@@ -332,12 +379,133 @@ impl ExplosionEvent {
         }
     }
 
-    fn sample_reassembly(&mut self, display: DisplaySnapshot, layout: Layout) {
+    fn sample_reassembly(
+        &mut self,
+        display: DisplaySnapshot,
+        layout: Layout,
+        surfaces: &mut SurfaceLedger,
+    ) {
         if self.phase == EventPhase::Reforming {
-            let reassembly = self
-                .reassembly
-                .get_or_insert_with(|| Reassembly::new(&mut self.cells, display, layout));
-            reassembly.sample(&mut self.cells, self.tick);
+            if self.reassembly.is_none() {
+                self.reassembly = Some(Reassembly::new(&mut self.cells, display, layout));
+                self.assign_pieces(surfaces);
+            }
+            if let Some(reassembly) = &self.reassembly {
+                reassembly.sample(&mut self.cells, self.tick);
+            }
+        }
+    }
+
+    /// Brings every block's surface up to where the return is taking it. A
+    /// block coming home to a digit cell keeps the surface it has, whichever
+    /// cell that is; one with none, or with one already departing, gets a new
+    /// surface for that cell. A block that turns into an AM/PM pixel gives its
+    /// surface up, and a surplus block's surface departs as it shrinks away.
+    fn assign_pieces(&mut self, surfaces: &mut SurfaceLedger) {
+        let Some(reassembly) = &self.reassembly else {
+            return;
+        };
+        self.pieces.resize(self.cells.len(), None);
+        for (index, piece) in self.pieces.iter_mut().enumerate() {
+            let surviving = piece.is_some_and(|piece| !piece.departing);
+            match reassembly.destination(index) {
+                Destination::Cell(_) if surviving => (),
+                Destination::Cell((slot, cell)) => {
+                    if let Some(old) = piece.take() {
+                        surfaces.retire(old.id, Retirement::Replaced);
+                    }
+                    *piece = Some(Piece {
+                        id: surfaces.admit(slot, cell, SurfaceSource::Return),
+                        departing: false,
+                    });
+                }
+                Destination::Label => {
+                    if let Some(old) = piece.take() {
+                        surfaces.retire(old.id, Retirement::Replaced);
+                    }
+                }
+                Destination::Merging => {
+                    if let Some(piece) = piece {
+                        piece.departing = true;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn surfaces(&self, layout: Layout, out: &mut Vec<(SurfaceId, SurfacePose)>) {
+        let source = match self.phase {
+            EventPhase::Warning => SurfaceSource::Anchored,
+            EventPhase::Reforming => SurfaceSource::Return,
+            _ => SurfaceSource::Rigid,
+        };
+        for (index, (cell, piece)) in self.cells.iter().zip(&self.pieces).enumerate() {
+            let Some(piece) = piece else {
+                continue;
+            };
+            out.push((
+                piece.id,
+                SurfacePose {
+                    origin: cell.position,
+                    angle: cell.angle,
+                    scale: layout.pitch,
+                    footprint: Footprint::square(cell.side * 0.5 / layout.pitch),
+                    source,
+                    body: self.live_bodies.then(|| body_id(index)),
+                    departing: piece.departing,
+                    opacity: 1.0,
+                    clip: None,
+                },
+            ));
+        }
+    }
+
+    /// The cell a block rests at, if it is resting at one: every digit block
+    /// before the burst, and every block a finished return brought home.
+    fn resting(&self, index: usize) -> Option<Home> {
+        match self.phase {
+            EventPhase::Warning => self.cells[index].home,
+            EventPhase::Reforming if self.tick >= REFORMING_TICKS => {
+                match self.reassembly.as_ref()?.destination(index) {
+                    Destination::Cell(home) => Some(home),
+                    Destination::Label | Destination::Merging => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Gives the face back the surfaces of the blocks resting at their cells.
+    /// An explosion cut short anywhere else retires its blocks where they are
+    /// instead of snapping them home, and a surplus block's surface is merged
+    /// away either way.
+    pub fn release_surfaces(&mut self, segments: &[SegmentState], surfaces: &mut SurfaceLedger) {
+        let resting = self.phase == EventPhase::Warning
+            || self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS;
+        let mut ids: [SlotIds; DIGIT_SLOT_COUNT] =
+            [[None; digit_surfaces::GRID_CELLS]; DIGIT_SLOT_COUNT];
+        let mut glyphs = [digit_surfaces::Glyph::new(segments[0].font, None); DIGIT_SLOT_COUNT];
+        for index in 0..self.cells.len() {
+            if let Some((slot, cell)) = self.resting(index) {
+                glyphs[usize::from(slot)].mask.0 |= 1 << bit(cell);
+            }
+        }
+        for (index, piece) in std::mem::take(&mut self.pieces).into_iter().enumerate() {
+            let Some(piece) = piece else {
+                continue;
+            };
+            match (piece.departing, self.resting(index)) {
+                (true, _) => surfaces.retire(piece.id, Retirement::MergedAway),
+                (false, Some((slot, cell))) => ids[usize::from(slot)][bit(cell)] = Some(piece.id),
+                (false, None) => surfaces.retire(piece.id, Retirement::Interrupted),
+            }
+        }
+        for (slot, ids) in ids.into_iter().enumerate() {
+            if resting {
+                surfaces.hand_back(slot, glyphs[slot], ids);
+            } else {
+                surfaces.release(slot);
+            }
         }
     }
 

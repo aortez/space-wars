@@ -169,6 +169,7 @@ fn changed_readings_reassemble_the_latest_face_before_the_final_handoff() {
                 assert!(event.step(
                     events::EventContext {
                         segments: &mut state.segments,
+                        surfaces: &mut state.surfaces,
                         display: state.display,
                         layout,
                         floor,

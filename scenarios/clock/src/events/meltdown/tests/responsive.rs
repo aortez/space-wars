@@ -120,13 +120,13 @@ fn a_block_fitting_the_gap_exits_as_solid_without_creating_water() {
         };
         event.initial_cells = 1;
         event.initial_area = event.cell_area * block.area_scale();
-        event.cells = vec![block];
+        event.replace_cells(vec![block], &mut state.surfaces);
         event.tick = 100;
-        event.step_material(layout);
+        event.step_material(layout, &mut state.surfaces);
         assert_eq!(event.cells.len(), 1, "a gap is not a floor impact");
         assert_eq!(event.diagnostics().drained_microunits, 0);
         for _ in 0..30 {
-            event.step_material(layout);
+            event.step_material(layout, &mut state.surfaces);
         }
         assert!(event.cells.is_empty());
         assert_eq!(event.water.stats().injected, 0.0);
@@ -266,15 +266,18 @@ fn fast_bank_crossing_impacts_before_the_world_exit_check() {
     let Some(crate::events::ActiveEvent::Meltdown(event)) = &mut state.active_event else {
         panic!()
     };
-    event.cells = vec![MeltCell {
-        velocity: Vec2::new(0.0, -10_000.0),
-        release_tick: 0,
-        ..cell(Vec2::new(-100.0, layout.floor_y + 20.0))
-    }];
+    event.replace_cells(
+        vec![MeltCell {
+            velocity: Vec2::new(0.0, -10_000.0),
+            release_tick: 0,
+            ..cell(Vec2::new(-100.0, layout.floor_y + 20.0))
+        }],
+        &mut state.surfaces,
+    );
     event.initial_cells = 1;
     event.initial_area = event.cell_area;
     event.tick = 100;
-    event.step_material(layout);
+    event.step_material(layout, &mut state.surfaces);
     assert!(event.cells.is_empty());
     assert_eq!(event.exited_solid_area, 0.0);
     assert!((event.water.stats().injected - event.cell_area).abs() < 1e-8);

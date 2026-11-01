@@ -61,7 +61,8 @@ pub enum SegmentRepresentation {
 pub struct Reformation {
     position: Vec2,
     angle: f32,
-    was_lit: bool,
+    /// The lit cells it comes back with, which no later reading can change.
+    from: crate::fonts::CellMask,
 }
 
 impl Reformation {
@@ -74,7 +75,11 @@ impl Reformation {
     }
 
     pub fn was_lit(self) -> bool {
-        self.was_lit
+        self.from.0 != 0
+    }
+
+    pub(crate) fn from(self) -> crate::fonts::CellMask {
+        self.from
     }
 }
 
@@ -85,7 +90,6 @@ pub struct SegmentState {
     pub representation: SegmentRepresentation,
     pub(crate) font: ClockFont,
     pub(crate) shape: crate::fonts::CellMask,
-    pub(crate) previous_shape: crate::fonts::CellMask,
 }
 
 impl SegmentState {
@@ -102,7 +106,11 @@ impl SegmentState {
         self.representation = SegmentRepresentation::Reforming(Reformation {
             position,
             angle,
-            was_lit: self.lit,
+            from: if self.lit {
+                self.shape
+            } else {
+                crate::fonts::CellMask(0)
+            },
         });
     }
 
@@ -218,7 +226,6 @@ pub fn create_segments() -> Vec<SegmentState> {
                 representation: SegmentRepresentation::Anchored,
                 font: ClockFont::Classic,
                 shape: crate::fonts::region(ClockFont::Classic, kind),
-                previous_shape: crate::fonts::region(ClockFont::Classic, kind),
             })
         })
         .collect()
@@ -227,7 +234,6 @@ pub fn create_segments() -> Vec<SegmentState> {
 pub fn apply_snapshot(segments: &mut [SegmentState], snapshot: DisplaySnapshot) {
     for segment in segments {
         let digit = snapshot.digits[usize::from(segment.id.digit_slot)];
-        segment.previous_shape = segment.shape;
         segment.font = snapshot.font;
         let region = crate::fonts::region(snapshot.font, segment.id.kind);
         let lit = crate::fonts::glyph(snapshot.font, digit);

@@ -462,7 +462,7 @@ fn clock_face_contract_a_clock_preset_opens_on_the_face_pose() {
             "{} opens before its own animation has any strength",
             preset.as_str()
         );
-        let placement = super::marquee::placement(event, layout);
+        let placement = event.placement(layout);
         for cell in &event.content.cells {
             let quad = event.recipe.quad(*cell, placement, playback);
             let centre = (quad[0] + quad[2]) * 0.5;
