@@ -10,10 +10,11 @@
 //! geometry sources any number of times, departs at most once and is retired
 //! once with a reason. Nothing comes back from departing or retired.
 //!
-//! Publication is a read of the state that also draws the face: the face table
+//! Publication is a read of the state that also draws the face, made at the
+//! end of every step and every resize and kept until the next: the face table
 //! for slots no event holds, and the event's own pieces for slots it does.
 //! Rendering never changes it. The ledger records admissions and retirements as
-//! they happen and finds hand-offs and departures by comparing each step's
+//! they happen and finds hand-offs and departures by comparing each
 //! publication with the last, so a consumer reading after a step, or after a
 //! resize, never sees a surface in a state the ledger has not recorded.
 
@@ -45,7 +46,9 @@ pub const CELL_HALF: f32 = 0.4;
 /// room for the departing cells a retargeted cross-fade can stack on a cell.
 pub const MAX_SURFACES: usize = 3 * crate::fonts::MAX_DIGIT_CELLS;
 /// Lifecycle changes kept for consumers that read less often than every step.
-/// One step records at most a retirement and an admission per live surface.
+/// No step is bound to fit: one that ends an event and changes the reading,
+/// font and format at once records several changes for some surfaces. A
+/// consumer that falls behind sees a gap and catches up from the publication.
 pub const MAX_RETAINED_CHANGES: usize = 2 * MAX_SURFACES;
 /// The most surfaces the diagnostics sample, one for each slot, source and
 /// departure.
@@ -617,7 +620,7 @@ pub(crate) fn publish(state: &ClockState) -> Vec<DigitSurface> {
 /// The surfaces as Clock's state publishes them: a bounded sample of those
 /// alive now, the latest changes and the run's accounting.
 pub(crate) fn diagnostics(state: &ClockState) -> ClockDigitSurfaceState {
-    let published = publish(state);
+    let published = &state.published;
     let accounting = state.surfaces.accounting();
     let sources = SurfaceSource::ALL
         .into_iter()
@@ -627,7 +630,7 @@ pub(crate) fn diagnostics(state: &ClockState) -> ClockDigitSurfaceState {
         })
         .collect();
     let mut sample: Vec<&DigitSurface> = Vec::new();
-    for surface in &published {
+    for surface in published {
         let key = |s: &DigitSurface| (s.slot, s.source, s.departing);
         match sample.iter().position(|first| key(first) == key(surface)) {
             Some(index) if surface.id < sample[index].id => sample[index] = surface,

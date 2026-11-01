@@ -2226,11 +2226,19 @@ retires it `interrupted`; Clock chase, which never moves it, hands it back.
 `ClockState::digit_surfaces` publishes every surface after each step, in a
 fixed order: the slots no event holds, then the active event's pieces.
 Publication is a read of the state that also draws the face, so a published
-pose is where the cell is drawn. `surface_changes` keeps the last 1,296 lifecycle
-changes, numbered in sequence. A consumer that finds a gap has missed some, and
-catches up from the publication: a surface it holds that is no longer published
-has been retired. At most 648 surfaces are alive at once, an outgoing and an
-incoming glyph in every slot with room for a retargeted cross-fade.
+pose is where the cell is drawn. Clock makes it once, at the end of each step
+or resize. The ledger finds that step's hand-offs and departures in it, and
+`digit_surfaces` and the control state serve it until the next. A reading or
+setting applied while paused arrives in a step that does not tick, and is
+published like any other. `surface_changes` keeps the last 1,296 lifecycle
+changes, numbered in sequence. That is a convenience, not a bound on a step: a
+step that ends an event and changes the reading, font and format at once
+records several changes for some surfaces. A consumer that finds a gap has
+missed some, and catches up from the publication: a surface it holds that is no
+longer published has been retired. At most 648 surfaces are alive at once, an
+outgoing and an incoming glyph in every slot with room for a retargeted
+cross-fade. The events keep within that by construction, and debug builds and
+the tests check it.
 
 Clock's control state reports them as `digit_surfaces`, from schema 22. Its
 `accounting` gives the surfaces `live` and `departing` now, `peak_live`, and

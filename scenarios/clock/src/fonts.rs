@@ -72,14 +72,6 @@ pub(crate) fn guides(font: ClockFont) -> CellMask {
 
 /// Seven stable body IDs also partition sampled glyphs into compact pieces.
 /// Classic retains its original bars, cell order, origins and physics seeds.
-/// The segment whose region holds a cell. A font's regions never overlap, and
-/// every lit cell lies in one.
-pub(crate) fn segment_at(font: ClockFont, cell: GridCell) -> Option<SegmentKind> {
-    SegmentKind::ALL
-        .into_iter()
-        .find(|kind| region(font, *kind).contains(cell))
-}
-
 pub(crate) fn region(font: ClockFont, kind: SegmentKind) -> CellMask {
     if font == ClockFont::Classic {
         return CellMask(
@@ -91,19 +83,35 @@ pub(crate) fn region(font: ClockFont, kind: SegmentKind) -> CellMask {
     CellMask(
         (0..54)
             .filter(|bit| {
-                let x = bit % 6;
-                let y = bit / 6;
-                let owner = match y {
-                    8 => SegmentKind::Top,
-                    4 => SegmentKind::Middle,
-                    0 => SegmentKind::Bottom,
-                    5..=7 if x < 3 => SegmentKind::UpperLeft,
-                    5..=7 => SegmentKind::UpperRight,
-                    _ if x < 3 => SegmentKind::LowerLeft,
-                    _ => SegmentKind::LowerRight,
-                };
-                owner == kind
+                sampled_segment(GridCell {
+                    x: (bit % 6) as i8,
+                    y: (bit / 6) as i8,
+                }) == kind
             })
             .fold(0, |mask, bit| mask | (1 << bit)),
     )
+}
+
+/// The segment whose region holds a cell. A font's regions never overlap, and
+/// every lit cell lies in one.
+pub(crate) fn segment_at(font: ClockFont, cell: GridCell) -> Option<SegmentKind> {
+    if font == ClockFont::Classic {
+        return SegmentKind::ALL
+            .into_iter()
+            .find(|kind| digits::cells(*kind).contains(&cell));
+    }
+    Some(sampled_segment(cell))
+}
+
+/// The segment that owns a cell of a sampled font's grid.
+fn sampled_segment(cell: GridCell) -> SegmentKind {
+    match cell.y {
+        8 => SegmentKind::Top,
+        4 => SegmentKind::Middle,
+        0 => SegmentKind::Bottom,
+        5..=7 if cell.x < 3 => SegmentKind::UpperLeft,
+        5..=7 => SegmentKind::UpperRight,
+        _ if cell.x < 3 => SegmentKind::LowerLeft,
+        _ => SegmentKind::LowerRight,
+    }
 }

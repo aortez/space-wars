@@ -1,9 +1,10 @@
 //! Every event against every font and layout, events cut short by each other,
 //! repeated and paused, read the way a consumer would: one lifecycle per
 //! surface, a publication that says what the changes say, bounded counts and
-//! diagnostics that tell the truth about all of it.
+//! diagnostics that tell the truth about all of it. A consumer that falls
+//! behind sees the gap and catches up.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::*;
 use crate::digit_surfaces::{
@@ -534,6 +535,74 @@ fn surface_contract_a_reading_or_setting_changed_while_paused_is_published_at_on
             assert_at_rest(&state, &context);
         }
     }
+}
+
+#[test]
+fn surface_contract_a_consumer_that_falls_behind_sees_the_gap_and_catches_up() {
+    let mut state = clock(
+        800.0 / 480.0,
+        ClockFont::Classic,
+        ClockTimeFormat::TwentyFourHour,
+        reading(20, 8, 0),
+    );
+    // All a consumer has after its last read.
+    let mut known: BTreeSet<_> = ids(&state.digit_surfaces()).into_iter().collect();
+    let mut seen = state.surface_accounting().sequence;
+    // Fonts and formats replace the face again and again while it reads
+    // nothing, until more has changed than Clock retains.
+    let mut steps = 0;
+    while state.surface_accounting().sequence - seen <= MAX_RETAINED_CHANGES as u64 {
+        assert!(steps < 100, "the face keeps changing");
+        let mut settings = state.settings();
+        settings.fonts.selected = FONTS[(steps + 1) % FONTS.len()];
+        settings.time_format = if steps % 2 == 0 {
+            ClockTimeFormat::TwelveHour
+        } else {
+            ClockTimeFormat::TwentyFourHour
+        };
+        sync(&mut state, &[ClockAction::configure(settings)]);
+        steps += 1;
+    }
+    let last = state.surface_accounting().sequence;
+    let retained: Vec<_> = state.surface_changes().copied().collect();
+    assert_eq!(retained.len(), MAX_RETAINED_CHANGES);
+    for (change, sequence) in retained.iter().zip(last + 1 - retained.len() as u64..) {
+        assert_eq!(change.sequence, sequence, "the latest changes, in order");
+    }
+    assert!(retained[0].sequence > seen + 1, "the consumer sees a gap");
+    // It catches up from the publication: what it held and no longer finds
+    // there has been retired, and what it finds there that it did not hold
+    // was admitted while it was behind.
+    let published: BTreeSet<_> = ids(&state.digit_surfaces()).into_iter().collect();
+    assert!(known.is_disjoint(&published), "every glyph was replaced");
+    let oldest = published.first().expect("a face");
+    assert!(known.iter().all(|id| id < oldest), "a newer serial");
+    known = published;
+    seen = last;
+    // From there it follows every change again.
+    tick(&mut state, &[ClockAction::set_reading(reading(20, 9, 0))]);
+    let changes: Vec<_> = state
+        .surface_changes()
+        .filter(|change| change.sequence > seen)
+        .copied()
+        .collect();
+    assert_eq!(
+        changes.first().map(|change| change.sequence),
+        Some(seen + 1)
+    );
+    for change in changes {
+        match change.kind {
+            SurfaceChangeKind::Admitted { .. } => assert!(known.insert(change.id)),
+            SurfaceChangeKind::Retired(_) => assert!(known.remove(&change.id)),
+            _ => assert!(known.contains(&change.id)),
+        }
+    }
+    assert_eq!(
+        known,
+        ids(&state.digit_surfaces())
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+    );
 }
 
 /// One run of events, each cut short by the next or run out, with pauses and

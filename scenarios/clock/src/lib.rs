@@ -491,6 +491,9 @@ pub struct ClockState {
     // Who the lit digit cells are and what has happened to them. The face
     // and the active event say where they are.
     surfaces: digit_surfaces::SurfaceLedger,
+    // Where they stood at the end of the last step, as the ledger observed
+    // them there.
+    published: Vec<DigitSurface>,
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
     floor: floor::FloorManager,
@@ -951,10 +954,10 @@ impl ClockState {
     }
 
     /// Every lit digit cell as a surface something can attach to, where it
-    /// stands after the last step: the face's slots in order, then the pieces
-    /// of whatever event holds the rest.
+    /// stood at the end of the last step: the face's slots in order, then the
+    /// pieces of whatever event holds the rest.
     pub fn digit_surfaces(&self) -> Vec<DigitSurface> {
-        digit_surfaces::publish(self)
+        self.published.clone()
     }
 
     /// The lifecycle changes the ledger still retains, oldest first. A
@@ -974,16 +977,16 @@ impl ClockState {
         digit_surfaces::diagnostics(self)
     }
 
-    /// Brings the face's surfaces up to what it draws and records what this
-    /// step's publication shows, before anything reads the step.
+    /// Brings the face's surfaces up to what it draws, publishes them and
+    /// records what the publication shows, before anything reads the step.
     fn settle_surfaces(&mut self) {
         let source = self
             .active_event
             .as_ref()
             .map_or(SurfaceSource::Anchored, ActiveEvent::face_source);
         self.surfaces.reconcile(&self.segments, source);
-        let published = self.digit_surfaces();
-        self.surfaces.observe(&published);
+        self.published = digit_surfaces::publish(self);
+        self.surfaces.observe(&self.published);
     }
 
     pub fn time_format(&self) -> ClockTimeFormat {
@@ -1820,6 +1823,7 @@ impl Scenario for ClockScenario {
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),
             surfaces: digit_surfaces::SurfaceLedger::new(),
+            published: Vec::new(),
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
             floor: floor::FloorManager::default(),

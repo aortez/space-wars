@@ -28,6 +28,8 @@ fn a_block_that_leaves_the_view_through_the_drain_retires_as_exited() {
         };
         event.tick += 1;
         event.step_material(layout, &mut state.surfaces);
+        // As a step ends, so the publication shows where the block went.
+        state.settle_surfaces();
         markers.follow(&state);
     }
     let marker = markers.markers.iter().find(|m| m.surface == piece).unwrap();
