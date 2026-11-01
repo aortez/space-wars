@@ -14,8 +14,8 @@
 //! for slots no event holds, and the event's own pieces for slots it does.
 //! Rendering never changes it. The ledger records admissions and retirements as
 //! they happen and finds hand-offs and departures by comparing each step's
-//! publication with the last, so a consumer reading after a step never sees a
-//! surface in a state the ledger has not recorded.
+//! publication with the last, so a consumer reading after a step, or after a
+//! resize, never sees a surface in a state the ledger has not recorded.
 
 use std::{
     collections::{BTreeMap, VecDeque},

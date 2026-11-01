@@ -1019,6 +1019,9 @@ impl ClockState {
         self.arena.remap(self.floor.geometry(layout), previous);
         self.sync_event_schedule();
         self.synchronize_soil();
+        // A resize lands between steps, and whatever reads next must find the
+        // event's pieces already given back to the face.
+        self.settle_surfaces();
     }
 
     pub fn lifecycle(&self) -> EventLifecycle {

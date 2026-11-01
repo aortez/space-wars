@@ -12,6 +12,7 @@ use engine_core::Vec2;
 mod cell_swap;
 mod marquee;
 mod slot_machine;
+mod sweep;
 
 pub(crate) const FONTS: [ClockFont; 4] = [
     ClockFont::Classic,
