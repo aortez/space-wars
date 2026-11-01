@@ -179,6 +179,10 @@ fn surface_contract_a_reading_changed_before_a_reel_locks_replaces_its_incoming_
             .any(|s| s.slot == 3 && !s.departing)
     };
     while !in_window(&state) {
+        assert!(
+            !locked(&state)[3],
+            "the last reel's glyph comes in before it locks"
+        );
         tick(&mut state, &[]);
     }
     tick(&mut state, &[]);
