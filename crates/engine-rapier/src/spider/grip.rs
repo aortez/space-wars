@@ -3,8 +3,8 @@
 //! than the legs can hold.
 //!
 //! Every surface is measured afresh each tick from where the body is now: the
-//! nearest point of each collider within reach, seen from the body's center
-//! with nothing solid between.
+//! nearest point of each collider it may hold within reach, seen from the
+//! body's center with nothing solid between.
 
 use super::*;
 
@@ -16,7 +16,7 @@ pub(super) struct Touch {
     point: Vec2,
     /// Out of the surface, toward the body's center.
     normal: Vec2,
-    /// The surface's own velocity at the point.
+    /// The surface's own velocity at the point through the coming step.
     velocity: Vec2,
     /// From the body's skin to the point.
     separation: f32,
@@ -29,45 +29,55 @@ fn tangent(normal: Vec2) -> Vec2 {
 
 impl Spider {
     /// Eligible surfaces within reach of the body, the held one among them
-    /// if it still is, from at most [`MAX_SURFACES`] colliders examined.
+    /// if it still is: of at most [`MAX_NEARBY`] colliders looked at, the
+    /// nearest [`MAX_SURFACES`] the spider may hold.
     pub(super) fn touching(
         &mut self,
         world: &PhysicsWorld,
+        dt: f32,
         eligible: &impl Fn(ColliderId) -> bool,
     ) -> Vec<Touch> {
         let Some(center) = world.motion(self.body()).map(|motion| motion.position) else {
             return Vec::new();
         };
-        let limit = MAX_SURFACES as usize;
-        // The held surface first, so a crowd of others never hides it.
-        let mut colliders: Vec<ColliderId> =
-            self.support.map(|held| held.collider).into_iter().collect();
-        let near = world.colliders_within(
+        let held = self
+            .support
+            .map(|held| held.collider)
+            .filter(|&collider| eligible(collider));
+        let nearby = world.colliders_within(
             center,
             self.spec.radius * (1.0 + self.spec.reach),
-            self.spec.collision_groups,
-            Some(self.entity),
-            limit,
+            NearbyOptions {
+                collision_groups: self.spec.collision_groups,
+                exclude_entity: Some(self.entity),
+                max_visited: MAX_NEARBY as usize,
+                max_found: MAX_SURFACES as usize,
+            },
+            |collider| Some(collider) != held && eligible(collider),
         );
-        for collider in near {
-            if colliders.len() == limit {
-                break;
-            }
-            if !colliders.contains(&collider) {
-                colliders.push(collider);
-            }
-        }
+        // The held surface first, so a crowd of others never hides it.
+        let colliders: Vec<ColliderId> = held
+            .into_iter()
+            .chain(nearby.colliders)
+            .take(MAX_SURFACES as usize)
+            .collect();
+        self.work.nearby = nearby.visited as u32;
         self.work.surfaces = colliders.len() as u32;
         colliders
             .into_iter()
-            .filter(|&collider| eligible(collider))
-            .filter_map(|collider| self.touch(world, center, collider))
+            .filter_map(|collider| self.touch(world, center, dt, collider))
             .collect()
     }
 
     /// A collider's surface as the body's center finds it, if it is within
     /// reach with nothing solid between.
-    fn touch(&mut self, world: &PhysicsWorld, center: Vec2, collider: ColliderId) -> Option<Touch> {
+    fn touch(
+        &mut self,
+        world: &PhysicsWorld,
+        center: Vec2,
+        dt: f32,
+        collider: ColliderId,
+    ) -> Option<Touch> {
         let r = self.spec.radius;
         let (point, inside) = world.nearest_boundary_point(collider, center)?;
         let offset = center - point;
@@ -100,7 +110,7 @@ impl Spider {
             surface,
             point,
             normal,
-            velocity: world.velocity_at_point(body, point)?,
+            velocity: world.incoming_velocity_at_point(body, point, dt)?,
             separation,
         })
     }
@@ -113,9 +123,7 @@ impl Spider {
         candidates: &[Touch],
     ) {
         if let Some(held) = self.support {
-            let reason = if !held.present(world) {
-                Some(SpiderReleaseReason::Removed)
-            } else if !eligible(held.collider) {
+            let reason = if !eligible(held.collider) {
                 Some(SpiderReleaseReason::Ineligible)
             } else if !self.intent.grip {
                 Some(SpiderReleaseReason::Requested)

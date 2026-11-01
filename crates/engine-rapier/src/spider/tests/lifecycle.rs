@@ -274,3 +274,100 @@ fn crosses_the_gap_by_swinging_on_a_line_at_both_scales() {
         assert!(lowest < 14.0, "{context}: {lowest}");
     }
 }
+
+#[test]
+fn a_step_without_a_drive_finds_the_spider_unheld_under_its_own_gravity() {
+    let scale = CLOCK;
+    let r = scale.r;
+    // Upside down on the ceiling, its body twice as heavy as the world's
+    // gravity makes it, as a host may scale it.
+    let mut run = Run::new(course(scale), scale, Vec2::new(0.0, 38.9));
+    let body = run.spider.body();
+    assert!(run.world.set_gravity_scale(body, 2.0, true));
+    run.until(30, grip(), |s| s.support.is_some()).unwrap();
+    let held = run.ticks(30, grip());
+    assert_eq!(held.support.unwrap().collider.entity, CEILING);
+    assert!(held.velocity.length() < 1e-3 * r, "{:?}", held.velocity);
+    // Carrying its weight never touched the scale the host gave it.
+    assert_eq!(run.world.gravity_scale(body), Some(2.0));
+    // The host steps on without driving it: nothing holds it up.
+    run.world.step(DT);
+    let after = run.state();
+    let change = (after.velocity - held.velocity) / DT;
+    assert!(
+        (change - Vec2::new(0.0, -2.0 * scale.g)).length() < 1e-3 * scale.g,
+        "{change:?}"
+    );
+    for _ in 0..30 {
+        run.world.step(DT);
+    }
+    assert!(run.state().position.y < held.position.y - 10.0 * r);
+}
+
+#[test]
+fn what_leaves_the_world_reads_as_let_go_before_the_next_drive() {
+    let scale = CLOCK;
+    let beam = PhysicsId::new(7);
+    let beam_at = Vec2::new(0.0, 30.0);
+    let half = Vec2::new(3.0, 1.0);
+    // Holding the beam from above, hanging from it, and shooting at it.
+    for case in ["support", "anchor", "target"] {
+        let mut world = course(scale);
+        block(&mut world, scale, beam, beam_at, half);
+        world.step(DT);
+        let mut run = match case {
+            "support" => {
+                let mut run = Run::new(world, scale, beam_at + Vec2::new(0.0, 2.0));
+                run.ticks(20, grip());
+                run
+            }
+            "anchor" => {
+                let mut run = Run::new(world, scale, Vec2::new(0.0, 20.0));
+                run.hang_from_ceiling();
+                run
+            }
+            _ => {
+                let mut run = Run::new(world, scale, Vec2::new(0.0, 1.0));
+                run.ticks(2, grip());
+                run.tick(shoot(Vec2::Y));
+                run
+            }
+        };
+        let before = run.state();
+        let held = before.support.map(|s| s.collider.entity);
+        let tied = before.line.map(|l| l.collider.entity);
+        let aimed = before.shot.map(|s| s.collider.entity);
+        let expected = match case {
+            "support" => held,
+            "anchor" => tied,
+            _ => aimed,
+        };
+        assert_eq!(expected, Some(beam), "{case}");
+        // Replaced under the same identities, far away.
+        assert!(run.world.remove_entity(beam));
+        block(&mut run.world, scale, beam, Vec2::new(40.0, 30.0), half);
+        let view = run.state();
+        assert_ne!(
+            view.support.map(|s| s.collider.entity),
+            Some(beam),
+            "{case}"
+        );
+        assert_eq!(view.line, None, "{case}");
+        assert_eq!(view.shot, None, "{case}");
+        assert_eq!(view.joints, 0, "{case}");
+        assert_owned(&run, &view, run.world.body_count() - 1);
+        match case {
+            "target" => assert_eq!(view.last_failure, Some(SilkFailure::TargetLost)),
+            _ => assert_eq!(
+                view.last_release.map(|r| r.reason),
+                Some(SpiderReleaseReason::Removed),
+                "{case}"
+            ),
+        }
+        // The next drive lets go of the same things, once.
+        let next = run.tick(grip());
+        assert_eq!(next.counts, view.counts, "{case}");
+        assert_eq!(next.last_release, view.last_release, "{case}");
+        assert_eq!(next.last_failure, view.last_failure, "{case}");
+    }
+}

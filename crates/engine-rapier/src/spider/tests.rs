@@ -138,7 +138,8 @@ impl Run {
         self.ticks += 1;
         let state = self.state();
         assert!(state.work.rays <= MAX_RAYS, "{:?}", state.work);
-        assert!(state.work.surfaces <= MAX_SURFACES);
+        assert!(state.work.nearby <= MAX_NEARBY, "{:?}", state.work);
+        assert!(state.work.surfaces <= MAX_SURFACES, "{:?}", state.work);
         assert!(state.position.x.is_finite() && state.position.y.is_finite());
         assert!(state.velocity.x.is_finite() && state.velocity.y.is_finite());
         state

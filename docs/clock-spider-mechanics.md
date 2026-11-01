@@ -15,21 +15,28 @@ the spider may hold. Automatic and manual intent meet the same limits. The
 spider applies bounded impulses to its own body and their reactions to dynamic
 supports, and ties at most one rope. It never steps the world. A zero or invalid
 `dt` changes nothing, and a paused host simply does not drive or step. No Rapier
-type crosses the API.
+type crosses the API. The world indexes a new solid at its next step, so
+`Spider::insert` refuses a spider inside a solid only once that solid has been
+through a step.
 
 ## Climbing
 
-Each tick the spider measures every collider within reach (at most eight) from
-where its body is now: the nearest boundary point, the normal toward the body,
-and the gap. A surface it is not touching must also be visible from the body's
-center, so a leg never reaches through a solid. Rapier's contact manifolds are
-not used, because they date from the start of the last step and drop out as
-soon as the body lifts a hair off a surface.
+Each tick the spider looks at no more than 32 colliders near its body, sensors
+included. Of those it may hold, it measures the nearest eight from where its
+body is now: the nearest boundary point, the normal toward the body, and the
+gap. The held surface is always measured first, so a crowd never hides it, but
+more than 32 colliders within reach can hide a new one. A surface it is not
+touching must also be visible from the body's center, so a leg never reaches
+through a solid. Rapier's contact manifolds are not used, because they date
+from the start of the last step and drop out as soon as the body lifts a hair
+off a surface.
 
 On the held surface the legs press with a quarter of a weight, close any gap
 within reach, and crawl at the asked speed relative to the surface. Gravity is
 compensated within the grip and drive limits, so a weak drive slips down a wall
-and a weak grip cannot hang from a ceiling. The reaction goes to a dynamic
+and a weak grip cannot hang from a ceiling. The legs follow the surface as it
+will move through the coming step, so a platform driven by its next pose
+carries the spider from the step it starts. The reaction goes to a dynamic
 support at the held point.
 
 - **Corners.** Crawling into a surface ahead turns onto it at an inside corner.
@@ -45,11 +52,15 @@ support at the held point.
   their limit, as when rounding a corner too fast for a weak grip. A spider that
   lost its hold waits 0.15 s before catching again.
 
-While the legs or the reel carry the spider, its weight is applied with their
-impulse, ahead of the step, and its body's gravity scale is zero for that step.
-The two cancel exactly instead of meeting across the solver's substeps, which
-would otherwise move a spider climbing against gravity faster than its speed
-limit. A free spider falls under ordinary gravity like every other body.
+While the legs or the reel carry the spider, it asks the world to carry its
+weight through the next step (`PhysicsWorld::carry_weight`). That step applies
+the whole weight as one impulse before it solves and keeps gravity off the body
+while it does. The legs' and the reel's impulses then meet the weight at once,
+instead of across the solver's substeps, which would let a spider climbing
+against gravity outrun its speed limit. The spider never sets its own gravity
+scale. It weighs, and falls, under whatever scale the host gives its body, as
+Clock's arena does for its residents. A step taken without a drive before it
+finds the spider unheld, and it falls.
 
 ## One silk line
 
@@ -60,13 +71,23 @@ limit. A free spider falls under ordinary gravity like every other body.
   checked again, along with a clear span from the body to it. The new line then
   ties as long as the span, between the shortest and the longest line, and
   replaces the old one. Each line takes a fresh joint identity and is retired
-  exactly once.
+  exactly once. The line ties taut and does not stretch, so tying is a catch
+  like any line going taut: whatever part of the spider's velocity points away
+  from the anchor stops within the step, and the rest swings it on round the
+  anchor. A spider falling straight away from its anchor stops dead.
 - **Failures.** A shot that cannot tie reports `NoTarget`, `Blocked`, `Busy`,
-  `TargetLost`, `Obstructed`, `OutOfRange` or `Cut`.
+  `TargetLost`, `Obstructed`, `OutOfRange` or `Cut`. It fails as `OutOfRange`
+  as soon as its target is farther than the longest line, so a target drawing
+  away faster than the shot never keeps it going.
 - **The rope.** The line is `PhysicsWorld::insert_tether`, a Rapier rope joint:
   unilateral, so it pulls but never pushes. The new scoped API reports its
-  length, distance and tension, where tension is the last solver substep's
-  impulse.
+  length, distance and tension. Tension is the last solver substep's impulse,
+  so it reads the steady load. A catch does not show in it, and neither does
+  weight passed on as an impulse before the step, such as that of a spider
+  holding on beneath what the rope carries. A rope is never shorter than the
+  span between its ends: it ties at least that long, and shortening stops at
+  the span, so the solver never drags its ends together through whatever lies
+  between.
 - **Reeling.** Reeling in gathers slack at up to the reel speed for free. On a
   taut line it climbs with at most the reel pull, keeping only the span a climb
   actually closed. A reel too weak to lift the spider holds it where it is, and
@@ -97,6 +118,7 @@ meaningful in a weightless world.
 | Line length | 1.25 to 60 radii |
 | Reel speed and pull | 6 radii/s, 2.5 weights |
 | Pay-out speed | 10 radii/s |
+| Colliders looked at per tick | at most 32 (`MAX_NEARBY`) |
 | Colliders measured per tick | at most 8 (`MAX_SURFACES`) |
 | Rays per tick | at most 11 (`MAX_RAYS`) |
 
@@ -105,6 +127,7 @@ The fixtures run at two scales at 60 Hz:
   66.7 radii/s² of gravity.
 - Metres: 9.81 m/s² and a 5 cm spider, so 196 radii/s².
 
+Those two bound the tested range: gravity from 66.7 to 196 radii/s² at 60 Hz.
 Tests below marked "at both scales" run at each. The rest run at Clock's.
 
 ## Diagnostics
@@ -118,8 +141,11 @@ Tests below marked "at both scales" run at each. The rest run at Clock's.
 - the last intent, the last release reason and the last shot failure;
 - running counts of catches, releases, shots, failures, lines tied and lines
   retired;
-- the last tick's ray and collider counts, and the bodies, colliders and joints
-  it owns.
+- the last tick's rays, colliders looked at and colliders measured;
+- the bodies, colliders and joints it owns, as the world has them.
+
+A support, anchor or shot target that has left the world since the last tick
+already reads as let go, with the counts the next drive will report.
 
 The counts balance:
 - shots = lines tied + failures + a shot still extending;
@@ -136,10 +162,12 @@ cargo +1.89.0 test --locked --profile ci -p engine-rapier
 cargo +1.89.0 check --locked --profile ci --workspace --all-targets
 ```
 
-The engine-rapier library passes 515 tests and ignores two capture tests, one
-of them the spider's. Its integration tests also pass. There are 34 new tests:
-29 spider tests and 5 tether tests. The spider tests use a room with a floor,
-walls, a ceiling and two mesas with a gap between them, plus single fixtures.
+The engine-rapier library passes 531 tests and ignores two capture tests, one
+of them the spider's. Its integration tests also pass. There are 50 new tests:
+39 spider tests, 6 tether tests, and 5 tests of the world's carried weight and
+nearby queries. The spider tests use a room with a floor, walls, a ceiling and
+two mesas with a gap between them, plus single fixtures. The shared harness
+checks the ray and collider bounds on every tick it runs.
 
 **Climbing**
 - Climbing the room at both scales: floor, inside corner, mesa face, outside
@@ -150,18 +178,30 @@ walls, a ceiling and two mesas with a gap between them, plus single fixtures.
 - A weak drive slipping down a wall at a fifth of gravity.
 - A weak grip released as `Overloaded` at a shelf's corner with its velocity
   kept, while a full grip goes on round underneath.
+- A quick spider, with grip enough to hang still from any face, parting from
+  a shelf's corner taken at full speed and going round it at half speed.
 - Catching what is within reach, but not 0.8 radii away and not through a pane.
+- A crowd of colliders it may not hold never hiding one it may, and a crowd of
+  sensors costing no more than the bound.
 
 **Supports**
 - Riding and crawling on platforms moving sideways and upward.
-- A support that is removed or replaced, made ineligible, or moved out of reach
-  in one tick.
+- A support that is removed or replaced, made ineligible, dropped away faster
+  than the grip can follow, or moved out of reach in one tick.
+- A free crate held from beneath: the crate and the spider together gain
+  momentum at their combined weight, within 0.1% every tick, so every push of
+  the legs reaches the crate.
 
 **The silk line**
-- The visible shot and its tie at both scales, and each shot failure.
+- The visible shot and its tie at both scales, and each shot failure, among
+  them a target drawing away faster than the shot.
+- A shot at a support moved since the last step tying where the support now is.
 - Hanging under a tension of one weight, and swinging within 0.5% of the
   pendulum period at both scales.
-- Reeling at 6 radii/s up to the shortest line at both scales.
+- A slack line letting the spider fly free until it goes taut and catches it,
+  and a line tied across a fall swinging it on at its speed.
+- Reeling at 6 radii/s up to the shortest line at both scales, and crawling and
+  reeling at once climbing no faster than the faster of the two.
 - A weak reel holding still, paying out, and gathering slack.
 - A cut, six replacements, an obstruction, and an anchor removed or replaced.
 - An anchor on a moving beam.
@@ -175,6 +215,10 @@ walls, a ceiling and two mesas with a gap between them, plus single fixtures.
   owned state bounded and the counts balanced.
 - Removal leaves the rest of the world intact, refusals add nothing, and a
   cloned world and spider run identically.
+- A step without a drive finding the spider unheld, falling under the gravity
+  scale the host gave it.
+- A support, anchor or target that leaves the world reading as let go before
+  the next drive, which then agrees.
 - A scripted brain crosses the gap at both scales: tie, pay out, let go over
   the edge, swing, catch the far face, climb, cut.
 
@@ -183,7 +227,16 @@ The tether tests cover:
 - a slack rope exerting no force;
 - length changes and refusals;
 - removal with either end;
-- snapshot round trips.
+- snapshot round trips;
+- a rope never shorter than the span between its ends, so shortening it never
+  drags a bob through a wall.
+
+The world tests cover:
+- a carried weight met at once for one step only, waiting through invalid
+  steps, kept by clones and snapshots, and gone with its body;
+- nearby colliders found nearest first within a bounded look;
+- a moved body measured where it is, and a point a ray found kept on it;
+- a position-driven body's velocity through the coming step.
 
 ## Captures
 

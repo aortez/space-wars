@@ -211,8 +211,8 @@ fn a_rope_leaves_with_either_end_and_alone_when_removed() {
         let bodies = world.body_count();
         match removed {
             None => {
-                assert!(world.remove_joint(rope_id()));
-                assert!(!world.remove_joint(rope_id()));
+                assert!(world.remove_tether(rope_id()));
+                assert!(!world.remove_tether(rope_id()));
                 assert_eq!(world.body_count(), bodies);
             }
             Some(entity) => assert!(world.remove_entity(entity)),
@@ -247,4 +247,41 @@ fn a_rope_survives_a_snapshot_with_its_identity_length_and_load() {
     }
     assert_eq!(restored.tether(rope_id()), world.tether(rope_id()));
     assert_eq!(restored.motion(bob_id()), world.motion(bob_id()));
+}
+
+#[test]
+fn a_rope_is_never_shorter_than_the_span_between_its_ends() {
+    let r = 6.0;
+    // A bob 19 radii below its post, and a wall half way between them.
+    let mut world = fixture(400.0, r, 20.0, Vec2::new(0.0, -20.0 * r), Vec2::ZERO);
+    let wall = PhysicsId::new(4);
+    assert!(world.insert_body(
+        BodyId::new(wall, BodyRole::PRIMARY),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: Vec2::new(0.0, -10.0 * r),
+            ..BodySpec::default()
+        },
+        &[ColliderSpec::cuboid(
+            ColliderId::new(wall, ColliderRole::PRIMARY, 0),
+            10.0 * r,
+            0.1 * r
+        )],
+    ));
+    // Tied shorter than the span, the rope starts as long as the span.
+    tie(&mut world, r, 2.0 * r);
+    assert!((world.tether(rope_id()).unwrap().length - 19.0 * r).abs() < 1e-3 * r);
+    for _ in 0..30 {
+        world.step(DT);
+    }
+    // Shortened below it, the rope stops at the span, so the solver never
+    // drags the bob through the wall to close it.
+    assert!(world.set_tether_length(rope_id(), 2.0 * r));
+    let rope = world.tether(rope_id()).unwrap();
+    assert_eq!(rope.length, rope.distance);
+    for _ in 0..30 {
+        world.step(DT);
+    }
+    let bob = world.motion(bob_id()).unwrap().position;
+    assert!(bob.y < -19.0 * r, "{bob:?}");
 }

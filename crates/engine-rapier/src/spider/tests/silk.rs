@@ -94,7 +94,7 @@ fn a_shot_that_cannot_tie_says_why_and_leaves_nothing_behind() {
     type During = fn(&mut Run);
     let none: Setup = |_, _| {};
     let nothing: During = |_| {};
-    let cases: [(&str, Setup, SpiderIntent, During, SilkFailure); 7] = [
+    let cases: [(&str, Setup, SpiderIntent, During, SilkFailure); 8] = [
         // Over the east mesa, the ceiling is 44 radii away that way.
         (
             "nothing in range",
@@ -195,6 +195,28 @@ fn a_shot_that_cannot_tie_says_why_and_leaves_nothing_behind() {
             },
             SilkFailure::Cut,
         ),
+        (
+            "the target draws away faster than the shot",
+            |world, scale| {
+                assert!(world.insert_body(
+                    BodyId::new(SHELF, BodyRole::PRIMARY),
+                    BodySpec {
+                        kind: BodyKind::KinematicVelocity,
+                        position: Vec2::new(0.0, 10.0) * scale.r,
+                        linear_velocity: Vec2::new(0.0, 170.0) * scale.r,
+                        ..BodySpec::default()
+                    },
+                    &[ColliderSpec::cuboid(
+                        ColliderId::new(SHELF, ColliderRole::PRIMARY, 0),
+                        3.0 * scale.r,
+                        scale.r,
+                    )],
+                ));
+            },
+            shoot_up(),
+            nothing,
+            SilkFailure::OutOfRange,
+        ),
     ];
     for (case, setup, aim, during, failure) in cases {
         let mut world = course(scale);
@@ -216,7 +238,7 @@ fn a_shot_that_cannot_tie_says_why_and_leaves_nothing_behind() {
         assert_eq!((state.line, state.shot), (None, None), "{case}");
         assert_eq!(run.world.joint_count(), 0, "{case}");
     }
-    // A line longer than the spider spins fails on arrival.
+    // A line longer than the spider spins fails as soon as it is shot.
     let spec = SpiderSpec {
         max_line: 30.0,
         ..SpiderSpec::new(scale.r, scale.g)
@@ -281,6 +303,13 @@ fn a_hanging_spider_swings_with_the_period_of_a_pendulum_its_length() {
 fn reeling_climbs_the_line_at_its_speed_until_it_is_as_short_as_it_gets() {
     for scale in [CLOCK, METRES] {
         let mut run = hanging(scale);
+        // Half the reel climbs at half the speed.
+        run.ticks(30, reel(0.5));
+        for _ in 0..30 {
+            let state = run.tick(reel(0.5));
+            let climbing = state.velocity.dot(state.up) / scale.r;
+            assert!((climbing - 3.0).abs() < 0.03, "{climbing}");
+        }
         run.ticks(30, reel(1.0));
         for _ in 0..30 {
             let state = run.tick(reel(1.0));
@@ -304,10 +333,147 @@ fn reeling_climbs_the_line_at_its_speed_until_it_is_as_short_as_it_gets() {
             line.length / scale.r
         );
         assert!(state.velocity.length() < 0.05 * scale.r);
-        // Halfway, it stops where it is, holding its weight.
-        let state = run.ticks(60, reel(0.5));
-        assert!((state.line.unwrap().length / scale.r - 1.25).abs() < 1e-3);
     }
+}
+
+#[test]
+fn crawling_and_reeling_at_once_climb_no_faster_than_the_faster_of_them() {
+    for scale in [CLOCK, METRES] {
+        // On the west mesa's face, tied to the ceiling straight above.
+        let mut run = Run::new(course(scale), scale, Vec2::new(-11.0, 5.0));
+        run.ticks(5, grip());
+        run.tick(shoot(Vec2::Y));
+        run.until(30, grip(), |s| s.line.is_some()).unwrap();
+        let both = SpiderIntent {
+            crawl: -1.0,
+            reel: 1.0,
+            ..grip()
+        };
+        let mut fastest: f32 = 0.0;
+        let mut state = run.state();
+        for _ in 0..40 {
+            state = run.tick(both);
+            assert_eq!(state.support.unwrap().collider.entity, WEST_MESA);
+            fastest = fastest.max(state.velocity.y / scale.r);
+        }
+        // The reel, the faster, sets the pace; the legs add nothing to it.
+        assert!(fastest < 6.0 * 1.01, "g {}: {fastest}", scale.g);
+        assert!(
+            (state.velocity.y / scale.r - 6.0).abs() < 0.03,
+            "g {}",
+            scale.g
+        );
+    }
+}
+
+#[test]
+fn a_slack_line_lets_the_spider_fly_free_until_it_goes_taut_and_catches_it() {
+    for scale in [CLOCK, METRES] {
+        let mut run = hanging(scale);
+        let hung = run.state();
+        // Tossed up its line, high enough to rise a radius: the line goes
+        // slack, and gravity alone moves the spider until the line catches it.
+        let toss = (2.0 * scale.g * scale.r).sqrt();
+        let body = run.spider.body();
+        assert!(
+            run.world
+                .set_velocity(body, Vec2::new(0.0, toss), 0.0, true)
+        );
+        let mut previous = run.state();
+        let mut flying = 0;
+        let mut caught = false;
+        for tick in 0..120 {
+            let state = run.tick(idle());
+            let line = state.line.expect("the line holds");
+            if !line.taut {
+                flying += 1;
+                assert_eq!(state.mode, SpiderMode::Free, "tick {tick}");
+                assert_eq!(line.tension, 0.0, "tick {tick}");
+                let change = (state.velocity - previous.velocity) / DT;
+                assert!(
+                    (change - Vec2::new(0.0, -scale.g)).length() < 1e-3 * scale.g,
+                    "tick {tick}: {change:?}"
+                );
+            } else if flying > 0 && !caught {
+                caught = true;
+                assert_eq!(state.mode, SpiderMode::Hanging, "tick {tick}");
+                assert!(line.distance <= line.length * (1.0 + 1e-3), "{line:?}");
+            }
+            previous = state;
+        }
+        assert!(flying > 8 && caught, "g {}: {flying}", scale.g);
+        // Caught along the line, it hangs where it was before.
+        assert!(run.state().position.distance_to(hung.position) < 0.01 * scale.r);
+    }
+}
+
+#[test]
+fn a_line_tied_across_a_fall_swings_the_spider_on_at_its_speed() {
+    let scale = CLOCK;
+    // Dropped in the open over the west mesa, it shoots at the left wall.
+    let mut run = Run::new(course(scale), scale, Vec2::new(-40.0, 34.0));
+    run.tick(idle());
+    let mut previous = run.tick(SpiderIntent {
+        shoot: Some(Vec2::new(-1.0, 0.0)),
+        ..idle()
+    });
+    let tied = loop {
+        let state = run.tick(idle());
+        if state.line.is_some() {
+            break state;
+        }
+        assert!(run.ticks < 30);
+        previous = state;
+    };
+    // The line runs across the fall, so tying it takes none of the speed:
+    // the spider swings on toward the wall as fast as gravity made it.
+    let line = tied.line.unwrap();
+    assert_eq!(line.collider.entity, LEFT_WALL);
+    let falling = previous.velocity + Vec2::new(0.0, -scale.g) * DT;
+    assert!(falling.length() > 5.0 * scale.r, "{falling:?}");
+    assert!(
+        (tied.velocity.length() / falling.length() - 1.0).abs() < 0.01,
+        "{:?} after {:?}",
+        tied.velocity,
+        falling
+    );
+    let state = run.ticks(30, idle());
+    assert_eq!(state.mode, SpiderMode::Hanging);
+    assert!(state.velocity.x < -2.0 * scale.r, "{:?}", state.velocity);
+}
+
+#[test]
+fn a_shot_at_a_support_moved_since_the_last_step_ties_to_it_where_it_is() {
+    let scale = CLOCK;
+    let r = scale.r;
+    let mut world = course(scale);
+    block(
+        &mut world,
+        scale,
+        SHELF,
+        Vec2::new(0.0, 20.0),
+        Vec2::new(3.0, 1.0),
+    );
+    let mut run = Run::new(world, scale, Vec2::new(0.0, 1.0));
+    run.ticks(5, grip());
+    // The host sets the shelf aside; rays still find it where the last step
+    // left it, straight overhead.
+    let shelf = BodyId::new(SHELF, BodyRole::PRIMARY);
+    assert!(
+        run.world
+            .set_pose(shelf, Vec2::new(10.0, 20.0) * r, 0.0, true)
+    );
+    run.tick(shoot(Vec2::Y));
+    run.until(30, grip(), |s| s.line.is_some()).unwrap();
+    // Tied to the middle of its underside, where the shelf now is.
+    let line = run.state().line.unwrap();
+    assert_eq!(line.collider.entity, SHELF);
+    assert!(
+        (line.local_anchor - Vec2::new(0.0, -r)).length() < 1e-3 * r,
+        "{:?}",
+        line.local_anchor / r
+    );
+    assert!((line.anchor - Vec2::new(10.0, 19.0) * r).length() < 1e-3 * r);
 }
 
 #[test]

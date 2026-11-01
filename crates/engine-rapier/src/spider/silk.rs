@@ -15,9 +15,7 @@ impl Spider {
         let Some(line) = self.line else {
             return;
         };
-        let reason = if !world.contains_joint(line.joint) || !line.anchor.present(world) {
-            Some(SpiderReleaseReason::Removed)
-        } else if !eligible(line.anchor.collider) {
+        let reason = if !eligible(line.anchor.collider) {
             Some(SpiderReleaseReason::Ineligible)
         } else if self.intent.cut {
             Some(SpiderReleaseReason::Requested)
@@ -75,7 +73,7 @@ impl Spider {
             } else {
                 let inward = (tether.anchor - position) / distance;
                 let anchor = world
-                    .velocity_at_point(line.anchor.body, tether.anchor)
+                    .incoming_velocity_at_point(line.anchor.body, tether.anchor, dt)
                     .unwrap_or(Vec2::ZERO);
                 let climbing = (velocity - anchor).dot(inward);
                 // The line keeps the span a climb closed, and only that. Never
@@ -158,9 +156,6 @@ impl Spider {
         mut shot: Shot,
         eligible: &impl Fn(ColliderId) -> bool,
     ) -> Result<(), SilkFailure> {
-        if !shot.target.present(world) {
-            return Err(SilkFailure::TargetLost);
-        }
         if !eligible(shot.target.collider) {
             return Err(SilkFailure::Blocked);
         }
@@ -170,19 +165,23 @@ impl Spider {
         };
         let r = self.spec.radius;
         let distance = target.distance_to(motion.position);
+        // Too far for any line, wherever its end has got to, so a target
+        // drawing away faster than the shot never keeps it going.
+        if distance > self.spec.max_line * r {
+            return Err(SilkFailure::OutOfRange);
+        }
         shot.travelled += self.spec.shot_speed * r * dt;
         if shot.travelled < distance {
             self.shot = Some(shot);
             return Ok(());
-        }
-        if distance > self.spec.max_line * r {
-            return Err(SilkFailure::OutOfRange);
         }
         if !self.clear_span(world, motion.position, target, shot.target.collider) {
             return Err(SilkFailure::Obstructed);
         }
         let joint = self.fresh_joint(world);
         self.cut_line(world, SpiderReleaseReason::Replaced);
+        // As long as the span, the line is taut at once, and catches the
+        // spider as any line going taut does.
         let tied = world.insert_tether(
             joint,
             TetherSpec {
@@ -221,14 +220,21 @@ impl Spider {
     /// Retire the line, once: its joint leaves the world and nothing of it
     /// stays behind.
     pub(super) fn cut_line(&mut self, world: &mut PhysicsWorld, reason: SpiderReleaseReason) {
-        if let Some(line) = self.line.take() {
-            world.remove_joint(line.joint);
-            self.counts.lines_retired += 1;
-            self.last_release = Some(SpiderRelease {
-                hold: SpiderHold::Line,
-                reason,
-            });
+        if let Some(joint) = self.retire_line(reason) {
+            world.remove_tether(joint);
         }
+    }
+
+    /// Let go of the line and count it retired, once, returning the joint the
+    /// caller takes out of the world.
+    pub(super) fn retire_line(&mut self, reason: SpiderReleaseReason) -> Option<JointId> {
+        let line = self.line.take()?;
+        self.counts.lines_retired += 1;
+        self.last_release = Some(SpiderRelease {
+            hold: SpiderHold::Line,
+            reason,
+        });
+        Some(line.joint)
     }
 
     pub(super) fn fail(&mut self, failure: SilkFailure) {

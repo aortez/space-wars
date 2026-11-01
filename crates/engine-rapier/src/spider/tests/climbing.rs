@@ -308,37 +308,48 @@ fn an_ineligible_or_unreachable_support_is_let_go() {
         state.last_release.map(|r| r.reason),
         Some(SpiderReleaseReason::Ineligible)
     );
-    // A platform that drops away faster than the legs can follow.
-    let platform = PhysicsId::new(7);
-    let mut world = world(scale);
-    assert!(world.insert_body(
-        BodyId::new(platform, BodyRole::PRIMARY),
-        BodySpec {
-            kind: BodyKind::KinematicPosition,
-            position: Vec2::new(0.0, 10.0) * scale.r,
-            ..BodySpec::default()
-        },
-        &[ColliderSpec::cuboid(
-            ColliderId::new(platform, ColliderRole::PRIMARY, 0),
-            20.0 * scale.r,
-            scale.r,
-        )],
-    ));
-    world.step(DT);
-    let mut run = Run::new(world, scale, Vec2::new(0.0, 12.0));
-    run.ticks(10, grip());
-    let body = BodyId::new(platform, BodyRole::PRIMARY);
-    assert!(
-        run.world
-            .set_next_kinematic_pose(body, Vec2::new(0.0, 7.0) * scale.r, 0.0)
-    );
-    run.tick(grip());
-    let state = run.tick(grip());
-    assert_eq!(state.support, None);
-    assert_eq!(
-        state.last_release.map(|r| r.reason),
-        Some(SpiderReleaseReason::OutOfReach)
-    );
+    // A platform that drops away faster than the legs can follow parts from
+    // them while they pull at their limit. One moved out of reach without
+    // passing through the space between is simply out of reach.
+    for teleported in [false, true] {
+        let platform = PhysicsId::new(7);
+        let mut world = world(scale);
+        assert!(world.insert_body(
+            BodyId::new(platform, BodyRole::PRIMARY),
+            BodySpec {
+                kind: BodyKind::KinematicPosition,
+                position: Vec2::new(0.0, 10.0) * scale.r,
+                ..BodySpec::default()
+            },
+            &[ColliderSpec::cuboid(
+                ColliderId::new(platform, ColliderRole::PRIMARY, 0),
+                20.0 * scale.r,
+                scale.r,
+            )],
+        ));
+        world.step(DT);
+        let mut run = Run::new(world, scale, Vec2::new(0.0, 12.0));
+        run.ticks(10, grip());
+        let body = BodyId::new(platform, BodyRole::PRIMARY);
+        let below = Vec2::new(0.0, 7.0) * scale.r;
+        if teleported {
+            assert!(run.world.set_pose(body, below, 0.0, true));
+        } else {
+            assert!(run.world.set_next_kinematic_pose(body, below, 0.0));
+        }
+        run.tick(grip());
+        let state = run.tick(grip());
+        assert_eq!(state.support, None, "teleported {teleported}");
+        assert_eq!(
+            state.last_release.map(|r| r.reason),
+            Some(if teleported {
+                SpiderReleaseReason::OutOfReach
+            } else {
+                SpiderReleaseReason::Overloaded
+            }),
+            "teleported {teleported}"
+        );
+    }
 }
 
 #[test]
@@ -391,5 +402,184 @@ fn crawls_across_a_seam_between_two_colliders_without_letting_go() {
             assert_eq!(state.counts.surface_releases, 0);
             assert!(run.at().x > 14.0, "{:?}", run.at());
         }
+    }
+}
+
+#[test]
+fn a_crowd_it_may_not_hold_never_hides_a_surface_it_may() {
+    let scale = CLOCK;
+    let pebble = |i: u64| PhysicsId::new(FOREIGN.value() + 10 + i);
+    // A row of tiny solids it may not hold, a quarter radius above its back,
+    // all along the floor to the west mesa's face: within reach, never in
+    // its way. It still turns up the face.
+    let mut room = course(scale);
+    for i in 0..40 {
+        let at = Vec2::new(-11.9 + 0.2 * i as f32, 2.3);
+        block(&mut room, scale, pebble(i), at, Vec2::new(0.05, 0.05));
+    }
+    let mut run = Run::new(room, scale, Vec2::new(-6.0, 1.0));
+    let turned = run.until(240, crawl(-1.0), |s| {
+        s.support
+            .is_some_and(|held| held.collider.entity == WEST_MESA && held.normal.x > 0.9)
+    });
+    assert!(turned.is_some(), "stuck at {:?}", run.at());
+    // Under such a row along a seam, it crosses onto the next tile.
+    let (west, east) = (PhysicsId::new(7), PhysicsId::new(8));
+    let mut world = world(scale);
+    block(
+        &mut world,
+        scale,
+        west,
+        Vec2::new(-10.0, 10.0),
+        Vec2::new(10.0, 1.0),
+    );
+    block(
+        &mut world,
+        scale,
+        east,
+        Vec2::new(10.0, 10.0),
+        Vec2::new(10.0, 1.0),
+    );
+    for i in 0..100 {
+        let at = Vec2::new(-10.0 + 0.2 * i as f32, 13.3);
+        block(&mut world, scale, pebble(i), at, Vec2::new(0.05, 0.05));
+    }
+    world.step(DT);
+    let mut run = Run::new(world, scale, Vec2::new(-5.0, 12.1));
+    run.until(30, grip(), |s| s.support.is_some()).unwrap();
+    let state = run.ticks(240, crawl(1.0));
+    assert_eq!(state.support.unwrap().collider.entity, east);
+    assert_eq!(state.counts.surface_releases, 0);
+    assert!(run.at().x > 14.0, "{:?}", run.at());
+}
+
+#[test]
+fn a_crowd_of_sensors_costs_no_more_than_the_bound() {
+    let scale = CLOCK;
+    let r = scale.r;
+    let mut run = Run::new(course(scale), scale, Vec2::new(0.0, 1.0));
+    run.ticks(10, grip());
+    // Hundreds of sensors around the body, each one somewhere to look.
+    for i in 0..400_u64 {
+        let id = PhysicsId::new(1000 + i);
+        let at = Vec2::new(-1.2 + 0.12 * (i % 20) as f32, 0.2 + 0.12 * (i / 20) as f32);
+        let mut sensor =
+            ColliderSpec::ball(ColliderId::new(id, ColliderRole::PRIMARY, 0), 0.01 * r);
+        sensor.sensor = true;
+        assert!(run.world.insert_body(
+            BodyId::new(id, BodyRole::PRIMARY),
+            BodySpec {
+                kind: BodyKind::Fixed,
+                position: at * r,
+                ..BodySpec::default()
+            },
+            &[sensor],
+        ));
+    }
+    run.world.step(DT);
+    for _ in 0..30 {
+        let state = run.tick(grip());
+        assert_eq!(state.work.nearby, MAX_NEARBY);
+        assert_eq!(state.support.unwrap().collider.entity, FLOOR);
+    }
+    // And it crawls out of them, holding the floor all the way.
+    let state = run.ticks(60, crawl(1.0));
+    assert_eq!(state.support.unwrap().collider.entity, FLOOR);
+    assert_eq!(state.counts.surface_releases, 0);
+    assert!(run.at().x > 4.0, "{:?}", run.at());
+}
+
+#[test]
+fn rounding_a_corner_too_fast_for_the_grip_parts_the_legs_from_it() {
+    let scale = CLOCK;
+    let shelf = PhysicsId::new(7);
+    // A quick spider with enough grip to hang still from any face, upside
+    // down included, but not to swing round the shelf's lower corner at its
+    // full speed as well.
+    let spec = SpiderSpec {
+        grip: 1.3,
+        crawl_speed: 10.0,
+        ..SpiderSpec::new(scale.r, scale.g)
+    };
+    for (speed, parts) in [(1.0, true), (0.5, false)] {
+        let mut world = course(scale);
+        block(
+            &mut world,
+            scale,
+            shelf,
+            Vec2::new(0.0, 26.0),
+            Vec2::new(6.0, 2.0),
+        );
+        let mut run = Run::with_spec(world, scale, Vec2::new(4.0, 29.0), spec);
+        run.until(30, grip(), |s| s.support.is_some()).unwrap();
+        let mut previous = run.state();
+        let mut underneath = false;
+        for _ in 0..600 {
+            let state = run.tick(crawl(speed));
+            underneath |= state
+                .support
+                .is_some_and(|s| s.collider.entity == shelf && s.normal.y < -0.999);
+            if state.support.is_none() {
+                assert!(parts, "speed {speed}: {:?}", state.last_release);
+                assert_eq!(
+                    state.last_release.map(|r| r.reason),
+                    Some(SpiderReleaseReason::Overloaded)
+                );
+                // Turning onto the underside, where holding still was well
+                // within the grip.
+                let normal = previous.support.unwrap().normal;
+                assert!(normal.x > 0.0 && normal.y < 0.0, "{normal:?}");
+                break;
+            }
+            previous = state;
+        }
+        assert_eq!(underneath, !parts, "speed {speed}");
+    }
+}
+
+#[test]
+fn a_dynamic_support_takes_the_legs_reaction_under_gravity() {
+    let scale = CLOCK;
+    let r = scale.r;
+    let crate_id = PhysicsId::new(7);
+    let crate_body = BodyId::new(crate_id, BodyRole::PRIMARY);
+    // A crate falling freely, the spider holding on upside down under it:
+    // the legs pull the two together against the spider's weight, and the
+    // pair's momentum changes by their weight alone, every tick.
+    let mut world = course(scale);
+    assert!(world.insert_body(
+        crate_body,
+        BodySpec {
+            position: Vec2::new(0.0, 36.0) * r,
+            lock_rotation: true,
+            ..BodySpec::default()
+        },
+        &[ColliderSpec::cuboid(
+            ColliderId::new(crate_id, ColliderRole::PRIMARY, 0),
+            3.0 * r,
+            r,
+        )],
+    ));
+    world.step(DT);
+    let mut run = Run::new(world, scale, Vec2::new(0.0, 33.9));
+    let crate_mass = run.world.body_mass(crate_body).unwrap();
+    let momentum = |run: &Run| {
+        run.state().velocity * run.mass()
+            + run.world.motion(crate_body).unwrap().linear_velocity * crate_mass
+    };
+    let weight = Vec2::new(0.0, -scale.g) * (run.mass() + crate_mass);
+    let mut before = momentum(&run);
+    for tick in 0..20 {
+        let state = run.tick(grip());
+        let held = state.support.expect("holds on");
+        assert_eq!(held.collider.entity, crate_id);
+        assert!(held.normal.y < -0.999);
+        let after = momentum(&run);
+        assert!(
+            ((after - before) / DT - weight).length() < 1e-3 * weight.length(),
+            "tick {tick}: {:?}",
+            (after - before) / DT / weight.length()
+        );
+        before = after;
     }
 }

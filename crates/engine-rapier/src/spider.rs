@@ -5,9 +5,11 @@
 //! before its own world step, along with which colliders the spider may hold.
 //! The spider answers with bounded impulses on its own body, their reactions on
 //! dynamic supports, and at most one rope tied to a real support. It never
-//! steps the world itself, and a zero step freezes it where it is. It owns its
-//! body's gravity scale: while its legs or reel carry it, its weight arrives
-//! with their impulses rather than across the solver's substeps.
+//! steps the world itself, and a zero step freezes it where it is. While its
+//! legs or reel carry it, the world carries its weight through the step that
+//! follows, so their impulses meet that weight at once rather than across the
+//! solver's substeps. Its body falls under whatever gravity scale the host
+//! gives it.
 //!
 //! The same intent carries an autonomous brain's requests and, later, a
 //! player's, and both meet the same limits in [`SpiderSpec`].
@@ -18,7 +20,7 @@ use serde::Serialize;
 
 use crate::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, CollisionGroups,
-    JointId, PhysicsId, PhysicsWorld, RayCastOptions, RayHit,
+    JointId, NearbyOptions, PhysicsId, PhysicsWorld, RayCastOptions, RayHit,
 };
 
 mod grip;
@@ -48,7 +50,9 @@ const AHEAD: f32 = -0.5;
 const TAUT: f32 = 0.02;
 /// How near its anchor, in radii, the anchor's own surface may stop a span.
 const SPAN_MARGIN: f32 = 0.5;
-/// Colliders examined for a surface to hold per tick.
+/// Colliders near the body looked at per tick, whatever they turn out to be.
+pub const MAX_NEARBY: u32 = 32;
+/// Colliders the spider may hold measured per tick, the nearest first.
 pub const MAX_SURFACES: u32 = 8;
 /// The most rays one tick casts: the line's span, a shot's arrival and a new
 /// shot, and a look at each surface examined that the body does not touch.
@@ -260,10 +264,13 @@ pub struct SpiderCounts {
     pub lines_retired: u64,
 }
 
-/// Queries the last tick made, within [`MAX_RAYS`] and [`MAX_SURFACES`].
+/// Queries the last tick made, within [`MAX_RAYS`], [`MAX_NEARBY`] and
+/// [`MAX_SURFACES`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct SpiderWork {
     pub rays: u32,
+    /// Colliders near the body looked at.
+    pub nearby: u32,
     /// Colliders measured for a surface to hold.
     pub surfaces: u32,
 }
@@ -332,7 +339,8 @@ pub struct SpiderState {
     pub last_failure: Option<SilkFailure>,
     pub counts: SpiderCounts,
     pub work: SpiderWork,
-    /// What the spider owns in the world: one body, one collider, and its line.
+    /// What the spider owns in the world, as the world has it: its body, its
+    /// collider and its line's joint.
     pub bodies: usize,
     pub colliders: usize,
     pub joints: usize,
@@ -350,14 +358,15 @@ struct Surface {
 }
 
 impl Surface {
+    /// Where a ray met a collider, kept on the collider even when its body
+    /// has moved since the step the ray saw.
     fn from_hit(world: &PhysicsWorld, hit: &RayHit) -> Option<Self> {
-        let body = world.collider_body(hit.collider)?;
         Some(Self {
             collider: hit.collider,
-            body,
+            body: world.collider_body(hit.collider)?,
             handle: world.collider_handle(hit.collider)?,
-            local_point: world.world_point_to_body(body, hit.point)?,
-            local_normal: world.world_vector_to_body(body, hit.normal)?,
+            local_point: world.queried_point_to_body(hit.collider, hit.point)?,
+            local_normal: world.queried_vector_to_body(hit.collider, hit.normal)?,
         })
     }
 
@@ -414,7 +423,9 @@ pub struct Spider {
 impl Spider {
     /// Add a spider's body at `position`, at rest and free. Refused when the
     /// entity already exists, the spec is malformed, or the body would start
-    /// inside something solid.
+    /// inside something solid. Solids are found through the world's spatial
+    /// index, which takes in new ones at its next step, so a spider inserted
+    /// in the same tick as a solid does not see it.
     pub fn insert(
         world: &mut PhysicsWorld,
         entity: PhysicsId,
@@ -495,8 +506,9 @@ impl Spider {
     /// Act on one tick's intent ahead of the host's world step of `dt`, which
     /// must follow before the next drive. Only colliders `eligible` accepts
     /// are held or tied to; everything else stays a solid obstacle. A zero or
-    /// invalid `dt` changes nothing. False when the spider's body is no longer
-    /// in the world.
+    /// invalid `dt` changes nothing. A step taken without a drive before it
+    /// finds the spider unheld, and it falls. False when the spider's body is
+    /// no longer in the world.
     pub fn drive(
         &mut self,
         world: &mut PhysicsWorld,
@@ -516,27 +528,54 @@ impl Spider {
         self.pull = 0.0;
         self.carried = false;
         self.rearm = (self.rearm - dt).max(0.0);
-        let candidates = self.touching(world, &eligible);
+        if let Some(joint) = self.settle(world) {
+            world.remove_tether(joint);
+        }
+        let candidates = self.touching(world, dt, &eligible);
+        // The legs act first, and the reel adds only what they left undone,
+        // so the two never take the same weight off the spider twice.
+        self.keep_hold(world, dt, &eligible, &candidates);
         self.keep_line(world, dt, &eligible);
         self.extend_shot(world, dt, &eligible);
-        self.keep_hold(world, dt, &eligible, &candidates);
-        // While the legs or the reel carry the spider, its weight comes with
-        // their impulse, ahead of the step, so the two cancel exactly rather
-        // than meeting across the solver's substeps. Free, it falls as every
-        // other body does.
-        world.set_gravity_scale(self.body(), if self.carried { 0.0 } else { 1.0 }, true);
+        // Their impulses held the weight up; the step brings it all at once.
+        // Free, the spider falls as every other body does.
         if self.carried {
-            let weight = self.gravity(world) * (self.mass(world) * dt);
-            world.apply_impulse(self.body(), weight, true);
+            world.carry_weight(self.body());
         }
         true
     }
 
-    /// The spider as the world now has it, or None once its body is gone.
+    /// Let go of what has left the world since the last tick: a support, an
+    /// anchor or a shot's target that is gone or replaced. Returns the line's
+    /// joint, when one was let go, for the caller to take out of the world.
+    fn settle(&mut self, world: &PhysicsWorld) -> Option<JointId> {
+        if self.support.is_some_and(|held| !held.present(world)) {
+            self.let_go(SpiderReleaseReason::Removed);
+        }
+        if self.shot.is_some_and(|shot| !shot.target.present(world)) {
+            self.shot = None;
+            self.fail(SilkFailure::TargetLost);
+        }
+        let lapsed = self
+            .line
+            .is_some_and(|line| !world.contains_joint(line.joint) || !line.anchor.present(world));
+        if lapsed {
+            self.retire_line(SpiderReleaseReason::Removed)
+        } else {
+            None
+        }
+    }
+
+    /// The spider as the world now has it, or None once its body is gone. A
+    /// support, anchor or target that has left the world since the last tick
+    /// reads as let go, as the next drive will let go of it.
     pub fn state(&self, world: &PhysicsWorld) -> Option<SpiderState> {
         let motion = world.motion(self.body())?;
         let position = motion.position;
-        let support = self.support.and_then(|surface| {
+        let mut settled = self.clone();
+        settled.settle(world);
+        let settled = &settled;
+        let support = settled.support.and_then(|surface| {
             Some(SpiderSupport {
                 collider: surface.collider,
                 body: surface.body,
@@ -546,7 +585,7 @@ impl Spider {
                 normal: surface.normal(world)?,
             })
         });
-        let line = self.line.and_then(|line| {
+        let line = settled.line.and_then(|line| {
             let tether = world.tether(line.joint)?;
             let distance = tether.anchor.distance_to(position);
             Some(SpiderLine {
@@ -564,7 +603,7 @@ impl Spider {
                 tension: tether.tension + self.pull,
             })
         });
-        let shot = self.shot.and_then(|shot| {
+        let shot = settled.shot.and_then(|shot| {
             let target = shot.target.point(world)?;
             let span = target - position;
             let tip = position + span.normalized() * shot.travelled.min(span.length());
@@ -600,14 +639,14 @@ impl Spider {
             support,
             line,
             shot,
-            intent: self.intent,
-            last_release: self.last_release,
-            last_failure: self.last_failure,
-            counts: self.counts,
-            work: self.work,
-            bodies: 1,
-            colliders: 1,
-            joints: usize::from(line.is_some()),
+            intent: settled.intent,
+            last_release: settled.last_release,
+            last_failure: settled.last_failure,
+            counts: settled.counts,
+            work: settled.work,
+            bodies: usize::from(world.contains_body(self.body())),
+            colliders: usize::from(world.collider_handle(self.collider()).is_some()),
+            joints: usize::from(line.is_some_and(|line| world.contains_joint(line.joint))),
         })
     }
 
@@ -617,8 +656,8 @@ impl Spider {
     /// retired and a shot still extending cut.
     pub fn remove(mut self, world: &mut PhysicsWorld) -> SpiderCounts {
         self.let_go(SpiderReleaseReason::Requested);
-        if self.line.take().is_some() {
-            self.counts.lines_retired += 1;
+        if let Some(joint) = self.retire_line(SpiderReleaseReason::Requested) {
+            world.remove_tether(joint);
         }
         if self.shot.take().is_some() {
             self.fail(SilkFailure::Cut);
@@ -675,10 +714,10 @@ impl Spider {
         }
     }
 
-    /// The spider's weight per unit mass: the world's gravity, whatever
-    /// scale the spider last gave its own body.
+    /// The spider's weight per unit mass: the world's gravity at its body's
+    /// own gravity scale.
     fn gravity(&self, world: &PhysicsWorld) -> Vec2 {
-        world.gravity()
+        world.gravity() * world.gravity_scale(self.body()).unwrap_or(1.0)
     }
 
     fn mass(&self, world: &PhysicsWorld) -> f32 {
