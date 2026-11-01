@@ -423,6 +423,14 @@ impl MeltdownEvent {
         }
     }
 
+    /// A reading applied between ticks reaches the refilled face as soon as it
+    /// reaches the segments the face is drawn from.
+    pub fn synchronize(&mut self, segments: &[SegmentState], surfaces: &mut SurfaceLedger) {
+        if !self.lab && self.phase() == EventPhase::Reforming {
+            self.refill(segments, surfaces);
+        }
+    }
+
     /// Brings the refilled face up to the reading the segments show. A cell the
     /// reading no longer has is replaced, and one without a surface gets a new
     /// one, at whatever height its row has grown to.

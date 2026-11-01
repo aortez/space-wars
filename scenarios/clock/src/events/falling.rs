@@ -420,11 +420,15 @@ impl FallingEvent {
         }
     }
 
-    /// A finished return hands its pieces to the face where they now stand;
-    /// one cut short retires them where they are instead of snapping them
-    /// home. Pieces fading out are retired either way.
+    /// A finished return hands its pieces to the face where they now stand,
+    /// and so does a fall cut short before its first tick, which has not moved
+    /// them. One cut short in between retires them where they are instead of
+    /// snapping them home. Pieces fading out are retired either way.
     pub fn release_surfaces(&mut self, segments: &[SegmentState], surfaces: &mut SurfaceLedger) {
-        let settled = self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS;
+        let settled = match self.phase {
+            EventPhase::Falling => self.tick == 0,
+            _ => self.tick >= REFORMING_TICKS,
+        };
         let mut ids: [SlotIds; DIGIT_SLOT_COUNT] =
             [[None; crate::digit_surfaces::GRID_CELLS]; DIGIT_SLOT_COUNT];
         for piece in self.pieces.drain(..) {
@@ -437,13 +441,9 @@ impl FallingEvent {
         }
         for (slot, ids) in ids.into_iter().enumerate() {
             if settled {
-                let mut glyph = Glyph::new(segments[0].font, None);
-                for (segment, state) in segments.iter().enumerate() {
-                    if usize::from(state.id.digit_slot) == slot {
-                        glyph.mask.0 |= self.targets[segment].0;
-                    }
-                }
-                surfaces.hand_back(slot, glyph, ids);
+                // Each cell the return or the fall still holds has exactly one
+                // piece coming home, so the pieces are the glyph.
+                surfaces.hand_back(slot, Glyph::of(segments[0].font, &ids), ids);
             } else {
                 surfaces.release(slot);
             }

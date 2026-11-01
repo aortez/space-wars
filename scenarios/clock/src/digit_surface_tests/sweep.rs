@@ -414,6 +414,128 @@ fn surface_contract_visitors_leave_the_face_where_it_is() {
     }
 }
 
+#[test]
+fn surface_contract_an_event_cut_short_before_it_moves_gives_back_what_rests_at_home() {
+    for kind in TIMED {
+        for (index, aspect) in ASPECTS.into_iter().enumerate() {
+            let font = FONTS[(kind as usize + index) % FONTS.len()];
+            let resized = ASPECTS[(index + 1) % ASPECTS.len()];
+            let context = format!("{} in {font:?} at {aspect}", kind.as_str());
+            let mut state = clock(
+                aspect,
+                font,
+                ClockTimeFormat::TwentyFourHour,
+                reading(12, 34, 0),
+            );
+            let mut lifecycle = Lifecycle::new(&state);
+            sync(&mut state, &[ClockAction::preview_event(kind)]);
+            assert_eq!(state.event_kind(), Some(kind), "{context}");
+            let held = lifecycle.read(&state, &context);
+            // A host that resizes before the event's first tick ends it there.
+            state.set_aspect_ratio(resized);
+            assert_eq!(state.event_kind(), None, "{context}");
+            let surfaces = lifecycle.read(&state, &context);
+            assert_at_rest(&state, &context);
+            let retired: BTreeMap<_, _> = lifecycle
+                .log
+                .iter()
+                .filter_map(|change| match change.kind {
+                    SurfaceChangeKind::Retired(reason) => Some((change.id, reason)),
+                    _ => None,
+                })
+                .collect();
+            // A fresh face, so each cell rests where it was admitted.
+            let layout = Layout::new(aspect);
+            for surface in &held {
+                let context = format!("{context}: surface {}", surface.id.get());
+                let kept = surfaces.iter().any(|s| s.id == surface.id);
+                let home = layout.slot_cell_center(usize::from(surface.slot), surface.cell);
+                if surface.departing {
+                    // It keeps its own reason wherever it stands.
+                    assert!(!kept, "{context}");
+                    assert!(
+                        retired
+                            .get(&surface.id)
+                            .is_some_and(|reason| *reason != Retirement::Interrupted),
+                        "{context}: {:?}",
+                        retired.get(&surface.id)
+                    );
+                } else if (surface.origin - home).length() < 1e-3 * layout.pitch
+                    && surface.angle.abs() < 1e-4
+                    && (surface.scale - layout.pitch).abs() < 1e-3 * layout.pitch
+                {
+                    assert!(kept, "{context}: it rests at home and is handed back");
+                } else {
+                    assert_eq!(
+                        retired.get(&surface.id),
+                        Some(&Retirement::Interrupted),
+                        "{context}: it was away from home"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn surface_contract_a_reading_or_setting_changed_while_paused_is_published_at_once() {
+    // Readings that change every slot, and between them the hour's format and
+    // the font, each applied by a step that does not tick, as a paused host
+    // applies them.
+    let readings = [
+        reading(13, 46, 0),
+        reading(20, 57, 0),
+        reading(9, 8, 0),
+        reading(17, 29, 0),
+    ];
+    for (index, kind) in TIMED.into_iter().enumerate() {
+        for (view, font) in FONTS.into_iter().enumerate() {
+            let aspect = ASPECTS[(index + view) % ASPECTS.len()];
+            let context = format!("{} in {font:?} at {aspect}", kind.as_str());
+            let mut state = clock(
+                aspect,
+                font,
+                ClockTimeFormat::TwentyFourHour,
+                reading(12, 34, 0),
+            );
+            let mut lifecycle = Lifecycle::new(&state);
+            sync(&mut state, &[ClockAction::preview_event(kind)]);
+            let limit = 2 * EVENT_CATALOG[kind as usize].duration_ticks + 600;
+            let mut ticks = 0;
+            let mut pauses = 0;
+            while state.event_kind() == Some(kind) {
+                assert!(ticks < limit, "{context}: the event ends");
+                if ticks % 23 == 11 {
+                    let actions = if pauses % 3 == 2 {
+                        let mut settings = state.settings();
+                        settings.time_format = match settings.time_format {
+                            ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
+                            ClockTimeFormat::TwentyFourHour => ClockTimeFormat::TwelveHour,
+                        };
+                        settings.fonts.selected = FONTS[(view + pauses) % FONTS.len()];
+                        ClockAction::configure(settings)
+                    } else {
+                        ClockAction::set_reading(readings[pauses % readings.len()])
+                    };
+                    pauses += 1;
+                    sync(&mut state, &[actions]);
+                    let context = format!("{context}, paused at tick {ticks}");
+                    let surfaces = lifecycle.read(&state, &context);
+                    assert_diagnostics(&state, &surfaces, &context);
+                    assert_agreement(&state, &context, |_, _| {
+                        matches!(kind, ClockEventKind::SlotMachine | ClockEventKind::Marquee)
+                    });
+                }
+                tick(&mut state, &[]);
+                ticks += 1;
+                lifecycle.read(&state, &format!("{context}, tick {ticks}"));
+            }
+            assert!(pauses > 0, "{context}");
+            assert_at_rest(&state, &context);
+        }
+    }
+}
+
 /// One run of events, each cut short by the next or run out, with pauses and
 /// readings between. Returns every change it recorded and the face it left.
 fn chain(aspect: f32, font: ClockFont) -> (Vec<SurfaceChange>, Vec<DigitSurface>) {

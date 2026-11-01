@@ -2194,7 +2194,7 @@ pixels are too small to carry anything, so neither is a surface.
 
 | Retirement | Why |
 | --- | --- |
-| `replaced` | Its glyph gave way to another reading, font or format |
+| `replaced` | Its glyph gave way to another: a new reading, font or format, or the glyph an event brings in |
 | `interrupted` | The event moving it ended early, away from its place |
 | `merged-away` | A surplus Explosion block shrank into its neighbour |
 | `melted` | Melted on contact with the floor |
@@ -2206,7 +2206,7 @@ What each event does with the face's surfaces:
 | Event | Surfaces |
 | --- | --- |
 | Face at rest | One per lit cell. Seconds, the colon, colour and a resize keep every id. A changed glyph, from a reading, font or format, is replaced |
-| Digit Slide | A changed slot's old glyph slides out departing, and each cell is retired once it is clipped out. The new glyph is admitted sliding in and handed back at the end. Unchanged slots keep their ids |
+| Digit Slide | A changed slot's old glyph, or every slot's in a preview, slides out departing, and each cell is retired once it is clipped out. The new glyph is admitted sliding in and handed back at the end. Unchanged slots keep their ids |
 | Falling | Each cell rides its segment's body, then returns. Cells the new reading still lights come home as themselves, the rest fade out departing and new ones fade in |
 | Exploding digits | Blocks carry the cells' surfaces through the burst and the flight home. A surplus block departs and is merged away when it has shrunk to nothing. A block split off the debris is a new surface that grows from zero |
 | Meltdown | Solid blocks carry their surfaces until they melt, leave the view or are reclaimed. The refill is a new face that grows upward. Water is never a surface |
@@ -2217,10 +2217,11 @@ What each event does with the face's surfaces:
 | Color Cycle, Rain, Aquarium, visitors | The face stays anchored |
 
 An event cut short, by a preview, a resize or anything else that ends it
-early, never snaps a piece home. A piece resting at its own cell is handed
-back, a piece in motion is retired `interrupted`, and a departing piece is
-retired for its own reason. A Marquee that has moved the face retires it
-`interrupted`; Clock chase, which never moves it, hands it back.
+early, never snaps a piece home. A departing piece is retired for its own
+reason wherever it is. Of the rest, a piece resting at its own cell is handed
+back, which includes every piece of an event that has not moved yet, and a
+piece away from it is retired `interrupted`. A Marquee that has moved the face
+retires it `interrupted`; Clock chase, which never moves it, hands it back.
 
 `ClockState::digit_surfaces` publishes every surface after each step, in a
 fixed order: the slots no event holds, then the active event's pieces.
@@ -2244,7 +2245,8 @@ the counts, the run, the sample and the latest changes.
 frame, so a pose the face does not actually draw fails. A marker fixture stands
 in for a resident: it attaches a local point to a surface and follows only what
 the contract publishes. The sweep runs every event at every layout, through all
-four fonts, resizes part way through each, and replays events cut short by each
+four fonts, resizes part way through each and before each moves, changes the
+reading, format and font while paused, and replays events cut short by each
 other, repeated and paused. It checks that each surface lives one lifecycle and
 that the same inputs record the same one.
 

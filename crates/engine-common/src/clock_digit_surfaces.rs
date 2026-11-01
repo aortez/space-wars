@@ -62,7 +62,8 @@ impl ClockSurfaceSource {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ClockSurfaceRetirement {
-    /// Its glyph gave way to another reading, font or format.
+    /// Its glyph gave way to another: a new reading, font or format, or the
+    /// glyph an event brings in.
     Replaced,
     /// The event moving it ended early, away from its place in the face.
     Interrupted,

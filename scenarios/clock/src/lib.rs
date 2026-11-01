@@ -1769,6 +1769,9 @@ impl ClockState {
         {
             digits::apply_snapshot(&mut self.segments, self.display);
         }
+        if let Some(ActiveEvent::Meltdown(event)) = &mut self.active_event {
+            event.synchronize(&self.segments, &mut self.surfaces);
+        }
         if slide && let Some(kind) = self.schedule.time_change_event() {
             self.start_event_from(kind, Some(previous), false);
         }
