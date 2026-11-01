@@ -1,39 +1,29 @@
 use engine_common::{Fill, RenderColor, RenderFrame, RenderPoint, RenderPolygon, RenderPrimitive};
-use engine_core::Vec2;
 
 use crate::{
-    events::marquee::MarqueeEvent,
+    events::marquee::{MarqueeEvent, viewport},
     layout::Layout,
-    presentation::{Bounds, clip_quad, effects::Placement},
+    presentation::{clip_quad, content::Cell},
 };
 
-pub(super) fn viewport(layout: Layout) -> Bounds {
-    Bounds {
-        min: Vec2::new(layout.bounds_min.x + 8.0, layout.floor_y + 8.0),
-        max: Vec2::new(layout.bounds_max.x - 8.0, layout.canopy_y - 8.0),
-    }
-}
-
-/// Where the recipe lays its content out. A clock preset's content is the face's
-/// own reading, so this opens at the face's pitch and the recipe eases any fit
-/// of its own in from there.
-pub(super) fn placement(event: &MarqueeEvent, layout: Layout) -> Placement {
-    Placement {
-        content: event.content.bounds,
-        viewport: viewport(layout),
-        center: Vec2::new(0.0, layout.face_origin.y + 4.5 * layout.pitch),
-        pitch: layout.pitch * if event.uses_clock { 1.0 } else { 0.7 },
-    }
-}
-
 pub(super) fn render(frame: &mut RenderFrame, event: &MarqueeEvent, layout: Layout) {
+    render_cells(frame, event, layout, |_| true);
+}
+
+/// Draws the content cells `keep` chooses.
+pub(super) fn render_cells(
+    frame: &mut RenderFrame,
+    event: &MarqueeEvent,
+    layout: Layout,
+    keep: impl Fn(&Cell) -> bool,
+) {
     let playback = event.playback();
     if playback.strength <= 0.0 {
         return;
     }
     let bounds = viewport(layout);
-    let placement = placement(event, layout);
-    for cell in &event.content.cells {
+    let placement = event.placement(layout);
+    for cell in event.content.cells.iter().filter(|cell| keep(cell)) {
         let quad = event.recipe.quad(*cell, placement, playback);
         let (points, count) = clip_quad(quad, bounds);
         if count < 3 {

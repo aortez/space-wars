@@ -72,6 +72,14 @@ pub(crate) fn guides(font: ClockFont) -> CellMask {
 
 /// Seven stable body IDs also partition sampled glyphs into compact pieces.
 /// Classic retains its original bars, cell order, origins and physics seeds.
+/// The segment whose region holds a cell. A font's regions never overlap, and
+/// every lit cell lies in one.
+pub(crate) fn segment_at(font: ClockFont, cell: GridCell) -> Option<SegmentKind> {
+    SegmentKind::ALL
+        .into_iter()
+        .find(|kind| region(font, *kind).contains(cell))
+}
+
 pub(crate) fn region(font: ClockFont, kind: SegmentKind) -> CellMask {
     if font == ClockFont::Classic {
         return CellMask(

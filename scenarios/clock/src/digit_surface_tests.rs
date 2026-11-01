@@ -9,6 +9,8 @@ use crate::render::{
 use engine_common::{ClockEventKind, ClockFont, ClockTimeFormat};
 use engine_core::Vec2;
 
+mod marquee;
+
 pub(crate) const FONTS: [ClockFont; 4] = [
     ClockFont::Classic,
     ClockFont::Matrix,
@@ -124,12 +126,12 @@ fn shared_opacity(surfaces: &[DigitSurface], surface: &DigitSurface) -> f32 {
 
 /// What the published surfaces and the rendered frame have to agree on: every
 /// visible surface is drawn where it says, with the ink it says, and every
-/// lit digit cell drawn belongs to a surface unless `unowned` says the face
-/// draws it without one.
+/// lit digit cell drawn belongs to a surface unless `unowned`, given its
+/// centroid and ink, says the face draws it without one.
 pub(crate) fn assert_agreement(
     state: &ClockState,
     context: &str,
-    unowned: impl Fn(Vec2) -> bool,
+    unowned: impl Fn(Vec2, f32) -> bool,
 ) -> Vec<DigitSurface> {
     let surfaces = state.digit_surfaces();
     let mut seen = ids(&surfaces);
@@ -181,7 +183,7 @@ pub(crate) fn assert_agreement(
             continue;
         }
         let centroid = polygon.iter().fold(Vec2::ZERO, |sum, p| sum + *p) / polygon.len() as f32;
-        if unowned(centroid) {
+        if unowned(centroid, alpha) {
             continue;
         }
         let owned = surfaces.iter().any(|surface| {
@@ -205,7 +207,7 @@ pub(crate) fn assert_agreement(
 }
 
 pub(crate) fn assert_face_agreement(state: &ClockState, context: &str) -> Vec<DigitSurface> {
-    assert_agreement(state, context, |_| false)
+    assert_agreement(state, context, |_, _| false)
 }
 
 /// Why a marker came off its surface.
@@ -1847,6 +1849,7 @@ fn surface_contract_meltdown_with_a_player_rides_the_arenas_bodies() {
     );
     let mut offsets = Vec::new();
     let mut ticks = 0;
+    let mut exited = 0;
     while state.event_kind() == Some(ClockEventKind::Meltdown) {
         let surfaces = markers.follow(&state);
         if ticks % 5 == 0 {
@@ -1855,6 +1858,7 @@ fn surface_contract_meltdown_with_a_player_rides_the_arenas_bodies() {
         assert_on_bodies(&state, &surfaces, &mut offsets, "shared");
         if state.event_phase() != Some(EventPhase::Reforming) {
             assert_eq!(surfaces.len(), solids(&state));
+            exited = state.meltdown_state().unwrap().exited_solid_microunits;
         }
         tick(&mut state, &[]);
         ticks += 1;
@@ -1862,6 +1866,11 @@ fn surface_contract_meltdown_with_a_player_rides_the_arenas_bodies() {
     assert!(!offsets.is_empty(), "the blocks fell on the arena's bodies");
     markers.follow(&state);
     assert_face_agreement(&state, "after a shared meltdown");
+    // The arena reports a block that melts and one that leaves the same way
+    // the event does on its own.
+    let accounting = state.surface_accounting();
+    assert!(accounting.retired(Retirement::Melted) > 0);
+    assert_eq!(accounting.retired(Retirement::Exited) * 1_000_000, exited);
     assert!(markers.markers.iter().all(|m| matches!(
         m.lost,
         Some(Loss::Retired(

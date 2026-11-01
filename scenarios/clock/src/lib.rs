@@ -972,8 +972,11 @@ impl ClockState {
     /// Brings the face's surfaces up to what it draws and records what this
     /// step's publication shows, before anything reads the step.
     fn settle_surfaces(&mut self) {
-        self.surfaces
-            .reconcile(&self.segments, SurfaceSource::Anchored);
+        let source = self
+            .active_event
+            .as_ref()
+            .map_or(SurfaceSource::Anchored, ActiveEvent::face_source);
+        self.surfaces.reconcile(&self.segments, source);
         let published = self.digit_surfaces();
         self.surfaces.observe(&published);
     }

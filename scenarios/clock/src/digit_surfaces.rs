@@ -566,6 +566,14 @@ impl SurfaceLedger {
         self.retire_all(ids.into_iter().flatten(), reason);
     }
 
+    /// Retires the face's own surfaces in a slot no event holds, so the face
+    /// admits whatever it draws there afresh at the end of the step.
+    pub fn retire_face(&mut self, slot: usize, reason: Retirement) {
+        debug_assert!(!self.face[slot].held, "an event's pieces are its own");
+        let ids = std::mem::replace(&mut self.face[slot].ids, [None; GRID_CELLS]);
+        self.retire_all(ids.into_iter().flatten(), reason);
+    }
+
     pub fn held(&self, slot: usize) -> bool {
         self.face[slot].held
     }
@@ -672,13 +680,18 @@ impl SurfaceLedger {
 }
 
 /// Every surface in a fixed order: the slots no event holds, slot by slot in
-/// cell order, then the active event's pieces in the event's own order.
+/// cell order and posed wherever the active event carries the face, then the
+/// active event's pieces in the event's own order.
 pub(crate) fn publish(state: &ClockState) -> Vec<DigitSurface> {
     let layout = Layout::new(state.aspect_ratio());
     let mut poses = Vec::with_capacity(state.surfaces.accounting().live);
     for slot in 0..DIGIT_SLOT_COUNT {
         for (cell, id) in state.surfaces.face(slot) {
-            poses.push((id, SurfacePose::anchored(layout, slot, cell)));
+            let pose = match &state.active_event {
+                Some(event) => event.face_pose(layout, slot, cell),
+                None => SurfacePose::anchored(layout, slot, cell),
+            };
+            poses.push((id, pose));
         }
     }
     if let Some(event) = &state.active_event {

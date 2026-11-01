@@ -557,6 +557,28 @@ impl ActiveEvent {
         }
     }
 
+    /// Where the face's own surface at `cell` of `slot` is, in a slot this
+    /// event does not hold. Only a takeover moves the face without holding it.
+    pub fn face_pose(
+        &self,
+        layout: Layout,
+        slot: usize,
+        cell: crate::GridCell,
+    ) -> crate::digit_surfaces::SurfacePose {
+        match self {
+            Self::Marquee(event) => event.face_pose(layout, slot, cell),
+            _ => crate::digit_surfaces::SurfacePose::anchored(layout, slot, cell),
+        }
+    }
+
+    /// What moves the face's own surfaces while this event runs.
+    pub fn face_source(&self) -> crate::digit_surfaces::SurfaceSource {
+        match self {
+            Self::Marquee(_) => crate::digit_surfaces::SurfaceSource::Marquee,
+            _ => crate::digit_surfaces::SurfaceSource::Anchored,
+        }
+    }
+
     /// The surfaces of the slots this event holds, in its own order.
     pub fn surfaces(
         &self,
@@ -584,6 +606,7 @@ impl ActiveEvent {
             Self::DigitSlide(event) => event.release_surfaces(surfaces),
             Self::Explosion(event) => event.release_surfaces(segments, surfaces),
             Self::Falling(event) => event.release_surfaces(segments, surfaces),
+            Self::Marquee(event) => event.release_surfaces(surfaces),
             Self::Meltdown(event) => event.release_surfaces(segments, surfaces),
             _ => (),
         }
@@ -591,10 +614,7 @@ impl ActiveEvent {
 
     /// Events whose moving pieces are not published as surfaces yet.
     pub fn vacates_face(&self) -> bool {
-        matches!(
-            self,
-            Self::CellSwap(_) | Self::SlotMachine(_) | Self::Marquee(_)
-        )
+        matches!(self, Self::CellSwap(_) | Self::SlotMachine(_))
     }
 
     pub fn holds_lit_segments(&self) -> bool {

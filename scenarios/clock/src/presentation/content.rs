@@ -1,9 +1,9 @@
 use engine_core::Vec2;
 
 use super::{Bounds, font};
-use crate::{DisplaySnapshot, SegmentKind};
+use crate::{DisplaySnapshot, GridCell, SegmentKind};
 
-use engine_common::ClockMarqueeMessage;
+use engine_common::{ClockFont, ClockMarqueeMessage};
 pub(crate) use engine_common::{
     ClockMessageError as TextError, MAX_CLOCK_MESSAGE_BYTES as MAX_TEXT_BYTES,
 };
@@ -41,7 +41,7 @@ impl Content {
 
     pub fn update_clock(&mut self, display: DisplaySnapshot) {
         self.cells.clear();
-        for (slot, origin) in crate::layout::DIGIT_ORIGINS.into_iter().enumerate() {
+        for slot in 0..crate::DIGIT_SLOT_COUNT {
             let Some(digit) = display.digits[slot] else {
                 continue;
             };
@@ -51,20 +51,8 @@ impl Content {
                         & crate::fonts::region(display.font, kind).0,
                 );
                 for cell in cells.cells() {
-                    self.cells.push(Cell {
-                        center: Vec2::new(
-                            origin + f32::from(cell.x) + 0.5,
-                            f32::from(cell.y) + 0.5,
-                        ),
-                        size: 1.0,
-                        glyph_pivot: Vec2::new(origin + 3.0, 4.5),
-                        group: slot as u8,
-                        path: if display.font == engine_common::ClockFont::Classic {
-                            clock_path(kind, cell.x, cell.y)
-                        } else {
-                            f32::from(cell.y * 6 + cell.x) / 54.0
-                        },
-                    });
+                    self.cells
+                        .push(Self::digit_cell(display.font, slot, kind, cell));
                 }
             }
         }
@@ -96,6 +84,23 @@ impl Content {
         }
         self.groups = if display.meridiem.is_some() { 6 } else { 5 };
         debug_assert!(self.cells.len() <= crate::fonts::MAX_DIGIT_CELLS + 32);
+    }
+
+    /// One lit cell of a digit slot's glyph as clock content. The surface the
+    /// face has at that cell is placed through this too, so the two agree.
+    pub fn digit_cell(font: ClockFont, slot: usize, kind: SegmentKind, cell: GridCell) -> Cell {
+        let origin = crate::layout::DIGIT_ORIGINS[slot];
+        Cell {
+            center: Vec2::new(origin + f32::from(cell.x) + 0.5, f32::from(cell.y) + 0.5),
+            size: 1.0,
+            glyph_pivot: Vec2::new(origin + 3.0, 4.5),
+            group: slot as u8,
+            path: if font == ClockFont::Classic {
+                clock_path(kind, cell.x, cell.y)
+            } else {
+                f32::from(cell.y * 6 + cell.x) / 54.0
+            },
+        }
     }
 
     pub fn text(message: &str) -> Result<Self, TextError> {

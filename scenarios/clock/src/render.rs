@@ -392,10 +392,22 @@ fn render_marquee_face(
     layout: Layout,
     event: &crate::events::marquee::MarqueeEvent,
 ) {
+    carry_marquee_face(frame, layout, event, |frame| {
+        render_segments(frame, state, layout);
+        render_colon(frame, state, layout);
+        render_meridiem(frame, state, layout);
+    });
+}
+
+/// Draws whatever `draw` puts on the face the way a marquee carries the face.
+fn carry_marquee_face(
+    frame: &mut RenderFrame,
+    layout: Layout,
+    event: &crate::events::marquee::MarqueeEvent,
+    draw: impl FnOnce(&mut RenderFrame),
+) {
     let before: Vec<usize> = frame.layers.iter().map(|l| l.primitives.len()).collect();
-    render_segments(frame, state, layout);
-    render_colon(frame, state, layout);
-    render_meridiem(frame, state, layout);
+    draw(frame);
     let strength = event.playback().strength;
     // Anchored lit cells replace their dim guides in the ordinary face. Once
     // the handover starts, expose those guides at the original positions too.
@@ -413,20 +425,17 @@ fn render_marquee_face(
             _ => None,
         })
         .collect();
-    // Hand over only the lit cells these three calls just drew. The dim anchors
-    // keep their places as the substrate, just as a fall or an explosion leaves
-    // them, and the arena, the floor and a visiting duck are never carried
-    // along. No offscreen image or extra frame allocation.
-    let sweep = event.face_sweep();
-    let clearance = layout.bounds_max.x - layout.bounds_min.x + layout.pitch;
-    let opacity = 1.0 - strength;
-    let gone = sweep.map_or(opacity <= 0.0, |sweep| sweep.abs() >= 1.0);
+    // Hand over only the lit cells `draw` just drew. The dim anchors keep their
+    // places as the substrate, just as a fall or an explosion leaves them, and
+    // the arena, the floor and a visiting duck are never carried along. No
+    // offscreen image or extra frame allocation.
+    let face = event.face(layout);
     for (index, layer) in frame.layers.iter_mut().enumerate() {
         if layer.z == INACTIVE_CELL_LAYER {
             continue;
         }
         let start = before.get(index).copied().unwrap_or(0);
-        if gone {
+        if face.ink <= 0.0 {
             // The reading is clear of the frame, or the recipe has taken it over
             // outright. Either way the face has nothing lit left to contribute.
             layer.primitives.truncate(start);
@@ -436,25 +445,21 @@ fn render_marquee_face(
             let RenderPrimitive::Polygon(polygon) = primitive else {
                 continue;
             };
-            match sweep {
-                // A text takeover carries the reading out the way the message
-                // travels, at full brightness for the whole journey.
-                Some(sweep) => {
-                    for point in &mut polygon.points {
-                        point.x += sweep * clearance;
-                    }
+            // A text takeover carries the reading out the way the message
+            // travels, at full brightness for the whole journey. A clock recipe
+            // animates these same cells and opens on the face's own pose, so
+            // the two are one reading dissolving into itself rather than into
+            // a differently placed copy of itself.
+            if face.offset != 0.0 {
+                for point in &mut polygon.points {
+                    point.x += face.offset;
                 }
-                // A clock recipe animates these same cells and opens on the
-                // face's own pose, so the two are one reading dissolving into
-                // itself rather than into a differently placed copy of itself.
-                None => {
-                    if let Some(fill) = &mut polygon.fill {
-                        fill.color.a *= opacity;
-                    }
-                    if let Some(stroke) = &mut polygon.stroke {
-                        stroke.color.a *= opacity;
-                    }
-                }
+            }
+            if let Some(fill) = &mut polygon.fill {
+                fill.color.a *= face.ink;
+            }
+            if let Some(stroke) = &mut polygon.stroke {
+                stroke.color.a *= face.ink;
             }
         }
     }
@@ -497,9 +502,22 @@ pub(crate) fn plant_actor_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
 pub(crate) fn digit_cell_polygons(state: &ClockState) -> Vec<(Vec<Vec2>, f32)> {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::default();
-    render_segments(&mut frame, state, layout);
-    if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
-        meltdown::render_solids(&mut frame, event, layout);
+    match &state.active_event {
+        Some(crate::events::ActiveEvent::Marquee(event)) => {
+            carry_marquee_face(&mut frame, layout, event, |frame| {
+                render_segments(frame, state, layout);
+            });
+            if event.uses_clock {
+                marquee::render_cells(&mut frame, event, layout, |cell| {
+                    usize::from(cell.group) < crate::DIGIT_SLOT_COUNT
+                });
+            }
+        }
+        Some(crate::events::ActiveEvent::Meltdown(event)) => {
+            render_segments(&mut frame, state, layout);
+            meltdown::render_solids(&mut frame, event, layout);
+        }
+        _ => render_segments(&mut frame, state, layout),
     }
     filled_polygons_with_alpha(&frame, ACTIVE_CELL_LAYER)
 }
