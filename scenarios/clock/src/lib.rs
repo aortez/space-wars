@@ -969,6 +969,11 @@ impl ClockState {
         self.surfaces.accounting()
     }
 
+    /// The digit surfaces as Clock's state publishes them.
+    pub fn digit_surface_state(&self) -> engine_common::ClockDigitSurfaceState {
+        digit_surfaces::diagnostics(self)
+    }
+
     /// Brings the face's surfaces up to what it draws and records what this
     /// step's publication shows, before anything reads the step.
     fn settle_surfaces(&mut self) {

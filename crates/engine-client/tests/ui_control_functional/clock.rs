@@ -732,6 +732,26 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
     });
 }
 
+/// The digit surfaces of a face no event is moving: all anchored and none
+/// departing, with every one the run admitted either live or retired.
+fn digit_surfaces_at_rest(state: &ClockState) -> engine_common::ClockSurfaceAccounting {
+    let surfaces = state.digit_surfaces.as_ref().expect("the digit surfaces");
+    let run = surfaces.accounting;
+    assert!(run.live > 0 && run.live <= surfaces.limits.live);
+    assert_eq!(run.departing, 0);
+    assert_eq!(
+        surfaces
+            .sources
+            .iter()
+            .map(|count| (count.source, count.live))
+            .collect::<Vec<_>>(),
+        [(engine_common::ClockSurfaceSource::Anchored, run.live)]
+    );
+    assert_eq!(run.admitted - run.retired.total(), run.live as u64);
+    assert!(!surfaces.sample.is_empty() && surfaces.sample.len() <= surfaces.limits.sample);
+    run
+}
+
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn digit_slide_controls_preview_cleanup_and_persistence() {
@@ -762,11 +782,16 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
             engine_common::ClockEventTrigger::TimeChange
         );
         assert_eq!(catalog.duration_ticks, scenario_clock::DIGIT_SLIDE_TICKS);
+        let face = digit_surfaces_at_rest(&initial);
         harness.clock_trigger_event(&initial, ClockEventKind::DigitSlide);
         // The animation lasts less than a second. Don't require a loaded CI
         // process to catch it: exact phases/pause/rendering are core tests.
         let recovered = harness.clock_wait(&initial, "idle", initial.event_id + 1, 0);
         assert!(recovered.digit_slide.is_none());
+        // The slide carried the face out and handed a new one back.
+        let slid = digit_surfaces_at_rest(&recovered);
+        assert!(slid.retired.replaced >= face.retired.replaced + face.live as u64);
+        assert!(slid.handed_off >= face.handed_off + 2 * face.live as u64);
         assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
         assert_eq!(recovered.next_event_tick, None);
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
@@ -802,6 +827,9 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
         let restarted = harness.clock_state();
         assert_eq!(restarted.event_id, 0);
         assert_eq!(restarted.settings, configured.settings);
+        // A restart is a new run, which admits a new face and nothing else.
+        let fresh = digit_surfaces_at_rest(&restarted);
+        assert!(fresh.admitted < digit_surfaces_at_rest(&recovered).admitted);
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.return-to-launcher", &menu);

@@ -22,7 +22,14 @@ use std::{
     num::NonZeroU32,
 };
 
-use engine_common::ClockFont;
+use engine_common::{
+    ClockDigitSurface, ClockDigitSurfaceState, ClockFont, ClockSurfaceAccounting,
+    ClockSurfaceChange, ClockSurfaceChangeKind, ClockSurfaceLimits, ClockSurfaceRetirements,
+    ClockSurfaceSourceCount,
+};
+pub use engine_common::{
+    ClockSurfaceRetirement as Retirement, ClockSurfaceSource as SurfaceSource,
+};
 use engine_core::Vec2;
 use engine_rapier::world::BodyId;
 
@@ -40,6 +47,11 @@ pub const MAX_SURFACES: usize = 3 * crate::fonts::MAX_DIGIT_CELLS;
 /// Lifecycle changes kept for consumers that read less often than every step.
 /// One step records at most a retirement and an admission per live surface.
 pub const MAX_RETAINED_CHANGES: usize = 2 * MAX_SURFACES;
+/// The most surfaces the diagnostics sample, one for each slot, source and
+/// departure.
+pub const MAX_SAMPLED_SURFACES: usize = 16;
+/// How many of the latest changes the diagnostics show.
+pub const MAX_RECENT_CHANGES: usize = 16;
 pub(crate) const GRID_CELLS: usize = 54;
 
 /// A surface's identity: the serial it was admitted with, which a run never
@@ -50,97 +62,6 @@ pub struct SurfaceId(NonZeroU32);
 impl SurfaceId {
     pub fn get(self) -> u32 {
         self.0.get()
-    }
-}
-
-/// What is moving a surface this step.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SurfaceSource {
-    /// At rest on its place in the face.
-    Anchored,
-    /// Digit Slide's authored slide through its slot.
-    Slide,
-    /// A rigid body in the event's canonical world, named by the surface.
-    Rigid,
-    /// Standalone Meltdown's ballistic step, which has no rigid world.
-    Ballistic,
-    /// An authored path back to the face after physical motion.
-    Return,
-    /// Meltdown's refill, which grows each new cell upward where it belongs.
-    Refill,
-    /// Cell Swap's exchange paths and its correcting fade.
-    Swap,
-    /// A Slot Machine reel.
-    Reel,
-    /// A Marquee carrying the face with its own transform.
-    Marquee,
-}
-
-impl SurfaceSource {
-    pub const ALL: [Self; 9] = [
-        Self::Anchored,
-        Self::Slide,
-        Self::Rigid,
-        Self::Ballistic,
-        Self::Return,
-        Self::Refill,
-        Self::Swap,
-        Self::Reel,
-        Self::Marquee,
-    ];
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Anchored => "anchored",
-            Self::Slide => "slide",
-            Self::Rigid => "rigid",
-            Self::Ballistic => "ballistic",
-            Self::Return => "return",
-            Self::Refill => "refill",
-            Self::Swap => "swap",
-            Self::Reel => "reel",
-            Self::Marquee => "marquee",
-        }
-    }
-}
-
-/// Why a surface stopped existing. Support is lost with it: nothing attached
-/// to a retired surface moves to another one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Retirement {
-    /// Its glyph gave way to another reading, font or format.
-    Replaced,
-    /// The event moving it ended early, away from its place in the face.
-    Interrupted,
-    /// A surplus Explosion block that shrank into its neighbour.
-    MergedAway,
-    /// Melted into water on contact with the floor.
-    Melted,
-    /// Left the view as a solid.
-    Exited,
-    /// Solid material Meltdown reclaimed when the face refilled.
-    Reclaimed,
-}
-
-impl Retirement {
-    pub const ALL: [Self; 6] = [
-        Self::Replaced,
-        Self::Interrupted,
-        Self::MergedAway,
-        Self::Melted,
-        Self::Exited,
-        Self::Reclaimed,
-    ];
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Replaced => "replaced",
-            Self::Interrupted => "interrupted",
-            Self::MergedAway => "merged-away",
-            Self::Melted => "melted",
-            Self::Exited => "exited",
-            Self::Reclaimed => "reclaimed",
-        }
     }
 }
 
@@ -691,4 +612,116 @@ pub(crate) fn publish(state: &ClockState) -> Vec<DigitSurface> {
             DigitSurface::new(id, slot, cell, pose)
         })
         .collect()
+}
+
+/// The surfaces as Clock's state publishes them: a bounded sample of those
+/// alive now, the latest changes and the run's accounting.
+pub(crate) fn diagnostics(state: &ClockState) -> ClockDigitSurfaceState {
+    let published = publish(state);
+    let accounting = state.surfaces.accounting();
+    let sources = SurfaceSource::ALL
+        .into_iter()
+        .filter_map(|source| {
+            let live = published.iter().filter(|s| s.source == source).count();
+            (live > 0).then_some(ClockSurfaceSourceCount { source, live })
+        })
+        .collect();
+    let mut sample: Vec<&DigitSurface> = Vec::new();
+    for surface in &published {
+        let key = |s: &DigitSurface| (s.slot, s.source, s.departing);
+        match sample.iter().position(|first| key(first) == key(surface)) {
+            Some(index) if surface.id < sample[index].id => sample[index] = surface,
+            Some(_) => {}
+            None => sample.push(surface),
+        }
+    }
+    let order = |surface: &&DigitSurface| {
+        let source = SurfaceSource::ALL.iter().position(|s| *s == surface.source);
+        (surface.slot, surface.departing, source)
+    };
+    sample.sort_by_key(order);
+    sample.truncate(MAX_SAMPLED_SURFACES);
+    let changes = state.surfaces.changes();
+    let recent = changes
+        .clone()
+        .skip(changes.len().saturating_sub(MAX_RECENT_CHANGES))
+        .map(SurfaceChange::diagnostics)
+        .collect();
+    ClockDigitSurfaceState {
+        accounting: ClockSurfaceAccounting {
+            live: accounting.live,
+            departing: published.iter().filter(|s| s.departing).count(),
+            peak_live: accounting.peak_live,
+            admitted: accounting.admitted,
+            handed_off: accounting.handed_off,
+            departed: accounting.departed,
+            retired: ClockSurfaceRetirements {
+                replaced: accounting.retired(Retirement::Replaced),
+                interrupted: accounting.retired(Retirement::Interrupted),
+                merged_away: accounting.retired(Retirement::MergedAway),
+                melted: accounting.retired(Retirement::Melted),
+                exited: accounting.retired(Retirement::Exited),
+                reclaimed: accounting.retired(Retirement::Reclaimed),
+            },
+            sequence: accounting.sequence,
+        },
+        sources,
+        sample: sample.into_iter().map(DigitSurface::diagnostics).collect(),
+        recent,
+        limits: ClockSurfaceLimits {
+            live: MAX_SURFACES,
+            retained_changes: MAX_RETAINED_CHANGES,
+            sample: MAX_SAMPLED_SURFACES,
+            recent: MAX_RECENT_CHANGES,
+        },
+    }
+}
+
+/// World or grid units in thousandths.
+fn milli(value: f32) -> i32 {
+    (value * 1000.0).round() as i32
+}
+
+impl DigitSurface {
+    fn diagnostics(&self) -> ClockDigitSurface {
+        let Footprint { min, max } = self.footprint;
+        ClockDigitSurface {
+            id: self.id.get(),
+            slot: self.slot,
+            cell: [self.cell.x, self.cell.y],
+            source: self.source,
+            body: self.body.map(|body| body.entity.value()),
+            origin_milli: [milli(self.origin.x), milli(self.origin.y)],
+            angle_millidegrees: milli(self.angle.to_degrees()),
+            scale_milli: milli(self.scale),
+            footprint_milli: [milli(min.x), milli(min.y), milli(max.x), milli(max.y)],
+            departing: self.departing,
+            opacity_milli: milli(self.opacity.clamp(0.0, 1.0)) as u16,
+            clip_milli: self.clip.map(|[low, high]| [milli(low), milli(high)]),
+        }
+    }
+}
+
+impl SurfaceChange {
+    fn diagnostics(&self) -> ClockSurfaceChange {
+        ClockSurfaceChange {
+            sequence: self.sequence,
+            tick: self.tick,
+            id: self.id.get(),
+            change: match self.kind {
+                SurfaceChangeKind::Admitted { slot, cell, source } => {
+                    ClockSurfaceChangeKind::Admitted {
+                        slot,
+                        cell: [cell.x, cell.y],
+                        source,
+                    }
+                }
+                SurfaceChangeKind::HandedOff { from, to } => {
+                    ClockSurfaceChangeKind::HandedOff { from, to }
+                }
+                SurfaceChangeKind::Departing => ClockSurfaceChangeKind::Departing,
+                SurfaceChangeKind::Retired(reason) => ClockSurfaceChangeKind::Retired { reason },
+            },
+        }
+    }
 }

@@ -2511,7 +2511,7 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 20 and
+after completion or cancellation. Use matching client/CLI builds: schema 21 and
 older requests are rejected. The internal Clock action payload is version 12;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
 little-endian u16 switch mask (bits 0–10, reserved bits rejected),
@@ -2547,7 +2547,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 21, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 22, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -2564,7 +2564,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 21, `event`
+tick. A raw `clock trigger` request must include schema version 22, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, or `cell-swap`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

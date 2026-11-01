@@ -1,6 +1,9 @@
 use super::{CliError, control_error, human_error, parse_timeout};
 use clap::Subcommand;
-use engine_common::{ClockArenaOwner, ClockArenaState, ClockArenaUnavailable};
+use engine_common::{
+    ClockArenaOwner, ClockArenaState, ClockArenaUnavailable, ClockDigitSurfaceState,
+    ClockSurfaceChangeKind, ClockSurfaceRetirement,
+};
 use spacewars_control::{
     ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState, ClockStatePredicate,
     ClockTriggerRequest, ControlClient,
@@ -267,6 +270,9 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
         if let Some(arena) = &state.arena {
             print_arena(arena);
+        }
+        if let Some(surfaces) = &state.digit_surfaces {
+            print_digit_surfaces(surfaces);
         }
         if let Some(explosion) = &state.explosion {
             println!(
@@ -604,6 +610,102 @@ fn print_arena(arena: &ClockArenaState) {
             step.ccd_substeps
         );
     }
+}
+
+fn print_digit_surfaces(surfaces: &ClockDigitSurfaceState) {
+    let accounting = surfaces.accounting;
+    let sources: Vec<_> = surfaces
+        .sources
+        .iter()
+        .map(|count| format!("{} {}", count.source.as_str(), count.live))
+        .collect();
+    println!(
+        "Digit surfaces: {} live, {} departing (peak {}, at most {}); sources: {}",
+        accounting.live,
+        accounting.departing,
+        accounting.peak_live,
+        surfaces.limits.live,
+        if sources.is_empty() {
+            "none".into()
+        } else {
+            sources.join(", ")
+        }
+    );
+    let reasons: Vec<_> = ClockSurfaceRetirement::ALL
+        .into_iter()
+        .filter(|reason| accounting.retired.get(*reason) > 0)
+        .map(|reason| format!("{} {}", reason.as_str(), accounting.retired.get(reason)))
+        .collect();
+    println!(
+        "Digit surface run: admitted={} handed off={} departed={} retired={}{}; last change #{}",
+        accounting.admitted,
+        accounting.handed_off,
+        accounting.departed,
+        accounting.retired.total(),
+        if reasons.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", reasons.join(", "))
+        },
+        accounting.sequence
+    );
+    let milli = |value: i32| value as f64 / 1000.0;
+    for surface in &surfaces.sample {
+        let [min_x, min_y, max_x, max_y] = surface.footprint_milli.map(milli);
+        println!(
+            "Digit surface {}: slot {} cell {:?}, {}{}, origin ({:.3}, {:.3}), angle {:.1} degrees, scale {:.3}, footprint ({min_x:.2}, {min_y:.2})..({max_x:.2}, {max_y:.2}), opacity {:.3}{}{}",
+            surface.id,
+            surface.slot,
+            surface.cell,
+            surface.source.as_str(),
+            if surface.departing { " departing" } else { "" },
+            milli(surface.origin_milli[0]),
+            milli(surface.origin_milli[1]),
+            milli(surface.angle_millidegrees),
+            milli(surface.scale_milli),
+            f64::from(surface.opacity_milli) / 1000.0,
+            surface
+                .clip_milli
+                .map_or(String::new(), |[low, high]| format!(
+                    ", clipped to y {:.3}..{:.3}",
+                    milli(low),
+                    milli(high)
+                )),
+            surface
+                .body
+                .map_or(String::new(), |body| format!(", body {body}"))
+        );
+    }
+    let changes: Vec<_> = surfaces
+        .recent
+        .iter()
+        .map(|change| {
+            let what = match change.change {
+                ClockSurfaceChangeKind::Admitted { slot, cell, source } => {
+                    format!("admitted in slot {slot} at {cell:?} by {}", source.as_str())
+                }
+                ClockSurfaceChangeKind::HandedOff { from, to } => {
+                    format!("handed off {} to {}", from.as_str(), to.as_str())
+                }
+                ClockSurfaceChangeKind::Departing => "departing".into(),
+                ClockSurfaceChangeKind::Retired { reason } => {
+                    format!("retired {}", reason.as_str())
+                }
+            };
+            format!(
+                "#{} tick {} surface {} {what}",
+                change.sequence, change.tick, change.id
+            )
+        })
+        .collect();
+    println!(
+        "Digit surface changes: {}",
+        if changes.is_empty() {
+            "none".into()
+        } else {
+            changes.join("; ")
+        }
+    );
 }
 
 #[cfg(test)]
