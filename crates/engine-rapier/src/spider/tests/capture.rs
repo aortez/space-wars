@@ -20,6 +20,10 @@ const SILK: &str = "#2f6db5";
 const HOLD: &str = "#e07b39";
 const TRAIL: &str = "#8d8d8d";
 const FALL: &str = "#c0392b";
+/// The chart of a catch: a line that gives, and one that holds fast.
+const GIVES: &str = "#2a78d6";
+const HOLDS: &str = "#eb6834";
+const GRID: &str = "#e2e0da";
 
 const SHELF: PhysicsId = PhysicsId::new(7);
 const PANE: PhysicsId = PhysicsId::new(FOREIGN.value() + 1);
@@ -234,11 +238,13 @@ fn draw_the_spider_for_the_docs() {
         std::env::var_os("SPACEWARS_SPIDER_CAPTURE").expect("set SPACEWARS_SPIDER_CAPTURE"),
     );
     std::fs::create_dir_all(dir.join("swing")).unwrap();
+    std::fs::create_dir_all(dir.join("catch")).unwrap();
     climb(&dir);
     swing(&dir);
     shot(&dir);
     grip_limit(&dir);
     let_go(&dir);
+    catch(&dir);
 }
 
 /// Around the room from the floor to the ceiling.
@@ -509,4 +515,238 @@ fn let_go(dir: &Path) {
         sketches.push((sketch, caption));
     }
     save(dir, "let-go.svg", &panels(sketches));
+}
+
+/// A fall caught by a line tied straight above it, once on a line that
+/// holds fast and once on silk that gives: frames side by side, a frame a
+/// tick, and a chart of the spider's height.
+fn catch(dir: &Path) {
+    let scale = CLOCK;
+    let r = scale.r;
+    let gives = SpiderSpec::new(r, scale.g);
+    // A give too small to see stops the spider where the line ties, as a
+    // line without any give did.
+    let holds = SpiderSpec {
+        silk_give: 0.001,
+        ..gives
+    };
+    let runs: Vec<(Vec<SpiderState>, usize)> = [holds, gives]
+        .into_iter()
+        .map(|spec| {
+            let mut run = Run::with_spec(course(scale), scale, Vec2::new(0.0, 36.0), spec);
+            let mut states = vec![run.state()];
+            while states.last().unwrap().velocity.y > -30.0 * r {
+                assert!(states.len() < 120, "the spider falls");
+                states.push(run.tick(SpiderIntent::default()));
+            }
+            states.push(run.tick(shoot(Vec2::Y)));
+            while states.last().unwrap().line.is_none() {
+                assert!(states.len() < 240, "the line ties");
+                states.push(run.tick(SpiderIntent::default()));
+            }
+            let tied = states.len() - 1;
+            for _ in 0..48 {
+                states.push(run.tick(SpiderIntent::default()));
+            }
+            (states, tied)
+        })
+        .collect();
+    let (_, tied) = runs[0];
+    assert_eq!(tied, runs[1].1, "both lines tie on the same tick");
+    let ends: Vec<f32> = runs
+        .iter()
+        .map(|(states, tied)| {
+            let line = states[*tied].line.unwrap();
+            (line.anchor.y - line.length) / r
+        })
+        .collect();
+    let lowest = runs
+        .iter()
+        .flat_map(|(states, _)| states.iter())
+        .map(|state| state.position.y / r)
+        .fold(f32::MAX, f32::min);
+    let (min, max) = (Vec2::new(-4.0, lowest - 2.0), Vec2::new(4.0, 41.0));
+    // From partway through the fall, before the shot.
+    let first = tied - 16;
+    for frame in first..runs[0].0.len() {
+        let sketches = runs
+            .iter()
+            .zip(&ends)
+            .zip(["holds fast", "gives"])
+            .map(|(((states, _), end), caption)| {
+                let mut sketch = Sketch::new(min, max, 16.0);
+                sketch.course();
+                sketch.path(
+                    &[Vec2::new(min.x, *end), Vec2::new(max.x, *end)],
+                    TRAIL,
+                    1.0,
+                    true,
+                );
+                sketch.spider(&states[frame], r, 1.0);
+                (sketch, caption)
+            })
+            .collect();
+        save(
+            &dir.join("catch"),
+            &format!("frame-{:04}.svg", frame - first),
+            &panels(sketches),
+        );
+    }
+    save(dir, "catch.svg", &catch_chart(&runs, &ends, r));
+}
+
+/// The spider's height over the line's end through the catch, for each run:
+/// a line that holds fast, then one that gives.
+fn catch_chart(runs: &[(Vec<SpiderState>, usize)], ends: &[f32], r: f32) -> String {
+    // A line ties in the drive that begins from the state before the first
+    // state with a line, and at the speed that state has.
+    let (states, tied) = &runs[1];
+    let speed = -states[tied - 1].velocity.y / r;
+    let (width, height) = (640.0_f32, 330.0_f32);
+    let (left, right, top, bottom) = (64.0, 24.0, 64.0, 46.0);
+    let (t0, t1) = (-0.05_f32, 0.8_f32);
+    let (y0, y1) = (-1.5_f32, 2.0_f32);
+    let x = |t: f32| left + (t - t0) / (t1 - t0) * (width - left - right);
+    let y = |h: f32| top + (y1 - h) / (y1 - y0) * (height - top - bottom);
+    let text = |svg: &mut String,
+                px: f32,
+                py: f32,
+                size: f32,
+                fill: &str,
+                anchor: &str,
+                body: &str| {
+        let _ = writeln!(
+            svg,
+            r#"<text x="{px:.1}" y="{py:.1}" font-family="DejaVu Sans, sans-serif" font-size="{size}" fill="{fill}" text-anchor="{anchor}">{body}</text>"#
+        );
+    };
+    let mut svg = format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+<rect width="{width}" height="{height}" fill="{PAPER}"/>
+"#
+    );
+    text(
+        &mut svg,
+        left,
+        24.0,
+        14.0,
+        INK,
+        "start",
+        &format!("Caught by a line tied straight above, falling at {speed:.0} radii/s"),
+    );
+    // The legend, then the grid and the axes' numbers.
+    for (i, (color, dash, name)) in [
+        (HOLDS, true, "a line that holds fast"),
+        (GIVES, false, "silk that gives"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let lx = left + i as f32 * 190.0;
+        let dash = if dash {
+            r#" stroke-dasharray="6 4""#
+        } else {
+            ""
+        };
+        let _ = writeln!(
+            svg,
+            r#"<path d="M{lx:.1},44 L{:.1},44" stroke="{color}" stroke-width="2"{dash}/>"#,
+            lx + 22.0
+        );
+        text(&mut svg, lx + 28.0, 48.0, 12.0, INK, "start", name);
+    }
+    for h in [-1.0_f32, 0.0, 1.0, 2.0] {
+        let py = y(h);
+        let _ = writeln!(
+            svg,
+            r#"<path d="M{left:.1},{py:.1} L{:.1},{py:.1}" stroke="{GRID}" stroke-width="1"/>"#,
+            width - right
+        );
+        text(
+            &mut svg,
+            left - 8.0,
+            py + 4.0,
+            11.0,
+            INK,
+            "end",
+            &format!("{h}"),
+        );
+    }
+    for t in [0.0_f32, 0.2, 0.4, 0.6, 0.8] {
+        text(
+            &mut svg,
+            x(t),
+            height - bottom + 18.0,
+            11.0,
+            INK,
+            "middle",
+            &format!("{t:.1}"),
+        );
+    }
+    let _ = writeln!(
+        svg,
+        r#"<text transform="translate(18,{:.1}) rotate(-90)" font-family="DejaVu Sans, sans-serif" font-size="11" fill="{INK}" text-anchor="middle">radii above the line's end</text>"#,
+        y((y0 + y1) / 2.0)
+    );
+    text(
+        &mut svg,
+        (left + width - right) / 2.0,
+        height - bottom + 36.0,
+        11.0,
+        INK,
+        "middle",
+        "seconds since the line tied",
+    );
+    for (((states, tied), end), (color, dash)) in
+        runs.iter().zip(ends).zip([(HOLDS, true), (GIVES, false)])
+    {
+        let mut d = String::new();
+        for (i, state) in states.iter().enumerate() {
+            let t = (i as f32 + 1.0 - *tied as f32) * DT;
+            if t < t0 || t > t1 {
+                continue;
+            }
+            let (px, py) = (x(t), y(state.position.y / r - end));
+            let _ = write!(
+                d,
+                "{}{px:.1},{py:.1} ",
+                if d.is_empty() { "M" } else { "L" }
+            );
+        }
+        let dash = if dash {
+            r#" stroke-dasharray="6 4""#
+        } else {
+            ""
+        };
+        let _ = writeln!(
+            svg,
+            r#"<path d="{d}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round"{dash}/>"#
+        );
+    }
+    // Direct labels where the two lines part.
+    let deepest = runs[1]
+        .0
+        .iter()
+        .map(|state| state.position.y / r - ends[1])
+        .fold(f32::MAX, f32::min);
+    text(
+        &mut svg,
+        x(0.12),
+        y(deepest) + 18.0,
+        12.0,
+        INK,
+        "start",
+        &format!("gives {:.1} radii, springs back", -deepest),
+    );
+    text(
+        &mut svg,
+        x(0.3),
+        y(0.0) - 8.0,
+        12.0,
+        INK,
+        "start",
+        "stops dead where it ties",
+    );
+    svg.push_str("</svg>\n");
+    svg
 }

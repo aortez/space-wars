@@ -52,10 +52,10 @@ support at the held point.
   their limit, as when rounding a corner too fast for a weak grip. A spider that
   lost its hold waits 0.15 s before catching again.
 
-While the legs or the reel carry the spider, it asks the world to carry its
-weight through the next step (`PhysicsWorld::carry_weight`). That step applies
-the whole weight as one impulse before it solves and keeps gravity off the body
-while it does. The legs' and the reel's impulses then meet the weight at once,
+While the legs, the line's give or the reel carry the spider, it asks the world
+to carry its weight through the next step (`PhysicsWorld::carry_weight`). That
+step applies the whole weight as one impulse before it solves and keeps gravity
+off the body while it does. Their impulses then meet the weight at once,
 instead of across the solver's substeps, which would let a spider climbing
 against gravity outrun its speed limit. The spider never sets its own gravity
 scale. It weighs, and falls, under whatever scale the host gives its body, as
@@ -71,27 +71,55 @@ finds the spider unheld, and it falls.
   checked again, along with a clear span from the body to it. The new line then
   ties as long as the span, between the shortest and the longest line, and
   replaces the old one. Each line takes a fresh joint identity and is retired
-  exactly once. The line ties taut and does not stretch, so tying is a catch
-  like any line going taut: whatever part of the spider's velocity points away
-  from the anchor stops within the step, and the rest swings it on round the
-  anchor. A spider falling straight away from its anchor stops dead.
+  exactly once. Tying takes nothing off the spider's speed. The line is taut
+  from the start, so its give catches a spider drawing away from the anchor as
+  it catches any line going taut, and the rest of the spider's velocity swings
+  it on round the anchor.
 - **Failures.** A shot that cannot tie reports `NoTarget`, `Blocked`, `Busy`,
   `TargetLost`, `Obstructed`, `OutOfRange` or `Cut`. It fails as `OutOfRange`
   as soon as its target is farther than the longest line, so a target drawing
   away faster than the shot never keeps it going.
-- **The rope.** The line is `PhysicsWorld::insert_tether`, a Rapier rope joint:
-  unilateral, so it pulls but never pushes. The new scoped API reports its
-  length, distance and tension. Tension is the last solver substep's impulse,
-  so it reads the steady load. A catch does not show in it, and neither does
-  weight passed on as an impulse before the step, such as that of a spider
-  holding on beneath what the rope carries. A rope is never shorter than the
-  span between its ends: it ties at least that long, and shortening stops at
-  the span, so the solver never drags its ends together through whatever lies
-  between.
+- **Give.** Silk stretches a little. Drawn past its length, the line pulls the
+  spider and its anchor together as a damped spring would through the coming
+  step. It never pushes, and its damping at most stops the two drawing apart.
+  One weight stretches it 0.25 radii, so a hanging spider rests that far past
+  the line's length under a tension of one weight. Its damping ratio of 0.7
+  sets how it settles: at 1 it settles without a bounce, and the lower it is,
+  the more it bounces. The line stretches at most its give of 5 radii, and
+  then holds fast.
+- **Free anchors.** A dynamic anchor gives way by its mass at the anchor point,
+  turning included, so the line pulls the spider and the anchor as one pair,
+  and a light free anchor is drawn in without flinging the two together. The
+  spider cannot see what else holds an anchor up, so one hanging on its own
+  rope or resting on a shelf still counts only its own mass, and the line is
+  softer and bouncier on a light one than on a fixed anchor. Kicked down at 10
+  radii/s, a hanging spider rises 0.004 radii past its hang under the ceiling,
+  0.12 radii under a rope-hung block a quarter of its mass, and 0.42 radii
+  under one a sixteenth of its mass.
+- **The catch.** At Clock scale, a spider falling at 37 radii/s when a line
+  straight above it ties draws the line out 1.2 radii. The give takes at most
+  16 radii/s off it in a tick, where a line that held fast would take all 37 in
+  the tick it tied on. The spider stops falling 0.07 s after the tie, springs
+  back 0.02 radii past where it comes to hang, and is still within about half a
+  second.
+- **The rope.** The world holds the line as a rope,
+  `PhysicsWorld::insert_tether`, a Rapier rope joint: unilateral, so it pulls
+  but never pushes. The world's tether API reports its length, distance and
+  tension. The rope is as long as the line and its give together, so it holds
+  only what the give has not stopped. A rope is never shorter than the span
+  between its ends: it ties at least that long, and shortening stops at the
+  span, so the solver never drags its ends together through whatever lies
+  between. The rope's tension is the last solver substep's impulse, so it reads
+  the steady load. A catch does not show in it, and neither does weight passed
+  on as an impulse before the step, such as that of a spider holding on beneath
+  what the rope carries. The line's own tension adds the give's and the reel's
+  pull to it.
 - **Reeling.** Reeling in gathers slack at up to the reel speed for free. On a
-  taut line it climbs with at most the reel pull, keeping only the span a climb
-  actually closed. A reel too weak to lift the spider holds it where it is, and
-  the line carries the weight. Paying out lengthens the line up to the longest.
+  taut line it climbs with at most the reel pull, adding only what the give and
+  the legs left undone, and keeps only the span a climb actually closed. A reel
+  too weak to lift the spider holds on without climbing, and a reel at the
+  shortest line stops pulling; either way the line carries the weight. Paying
+  out lengthens the line up to the longest.
 - **Release.** A cut keeps the body's velocity. A solid coming between the
   spider and its anchor releases the line as `Obstructed`; the line never wraps.
   An anchor that leaves or is replaced releases it as `Removed`, with no hidden
@@ -118,6 +146,9 @@ meaningful in a weightless world.
 | Line length | 1.25 to 60 radii |
 | Reel speed and pull | 6 radii/s, 2.5 weights |
 | Pay-out speed | 10 radii/s |
+| Silk stretch under one weight | 0.25 radii |
+| Silk damping ratio | 0.7 |
+| Silk give, the most a line stretches | 5 radii |
 | Colliders looked at per tick | at most 32 (`MAX_NEARBY`) |
 | Colliders measured per tick | at most 8 (`MAX_SURFACES`) |
 | Rays per tick | at most 11 (`MAX_RAYS`) |
@@ -136,7 +167,7 @@ Tests below marked "at both scales" run at each. The rest run at Clock's.
 - the mode (`Free`, `Crawling` or `Hanging`), position, velocity and `up`;
 - the support, with its identity, local and world point and normal;
 - the line, with joint and anchor identity, local and world anchor, length,
-  distance, slack, taut and tension;
+  distance, slack, stretch, taut and tension;
 - the shot, with its target and tip;
 - the last intent, the last release reason and the last shot failure;
 - running counts of catches, releases, shots, failures, lines tied and lines
@@ -162,10 +193,10 @@ cargo +1.89.0 test --locked --profile ci -p engine-rapier
 cargo +1.89.0 check --locked --profile ci --workspace --all-targets
 ```
 
-The engine-rapier library passes 531 tests and ignores two capture tests, one
-of them the spider's. Its integration tests also pass. There are 50 new tests:
-39 spider tests, 6 tether tests, and 5 tests of the world's carried weight and
-nearby queries. The spider tests use a room with a floor, walls, a ceiling and
+The engine-rapier library passes 536 tests and ignores two capture tests, one
+of them the spider's. Its integration tests also pass. The mechanic has 55
+tests: 44 spider tests, 6 tether tests, and 5 tests of the world's carried
+weight and nearby queries. The spider tests use a room with a floor, walls, a ceiling and
 two mesas with a gap between them, plus single fixtures. The shared harness
 checks the ray and collider bounds on every tick it runs.
 
@@ -196,10 +227,18 @@ checks the ray and collider bounds on every tick it runs.
 - The visible shot and its tie at both scales, and each shot failure, among
   them a target drawing away faster than the shot.
 - A shot at a support moved since the last step tying where the support now is.
-- Hanging under a tension of one weight, and swinging within 0.5% of the
-  pendulum period at both scales.
+- Hanging under a tension of one weight, as far past the line's length as one
+  weight stretches it, and swinging within 0.5% of the pendulum period at both
+  scales.
 - A slack line letting the spider fly free until it goes taut and catches it,
   and a line tied across a fall swinging it on at its speed.
+- A line tied across a fall straight away from its anchor, at both scales and
+  two dampings. Tying takes nothing off the fall, the give slows the spider
+  without stopping it in a tick, and the spider comes to hang stretched by its
+  weight alone. At the default damping it springs back barely past its hang;
+  damped less, it bounces well past.
+- A line drawn out to its give holding fast, and a stretched line pulling the
+  spider back but never pushing it.
 - Reeling at 6 radii/s up to the shortest line at both scales, and crawling and
   reeling at once climbing no faster than the faster of the two.
 - A weak reel holding still, paying out, and gathering slack.
@@ -207,7 +246,11 @@ checks the ray and collider bounds on every tick it runs.
 - An anchor on a moving beam.
 
 **Weightless worlds**
-- Momentum conserved while reeling in a free block and crawling on a free plank.
+- Momentum conserved while reeling in a free block, while a line's give draws a
+  free block along, and while crawling on a free plank.
+- A line giving to a free block a sixteenth of the spider's mass, tied under
+  its middle and off it: flung apart, the two close again no faster than they
+  parted and gain no energy.
 
 **Lifecycle**
 - Zero and invalid steps change nothing, and the spider never steps the world.
@@ -247,12 +290,23 @@ the Clock renderer, which arrives with #383.
 ```sh
 SPACEWARS_SPIDER_CAPTURE=/tmp/spider cargo +1.89.0 test --locked --profile ci -p engine-rapier --lib spider::tests::capture -- --ignored
 cd /tmp/spider
-inkscape --export-type=png climb.svg swing.svg shot.svg grip-limit.svg let-go.svg
-cd swing && inkscape --export-type=png frame-*.svg
+inkscape --export-type=png climb.svg swing.svg shot.svg grip-limit.svg let-go.svg catch.svg
+cd /tmp/spider/swing && inkscape --export-type=png frame-*.svg
 ffmpeg -framerate 20 -i frame-%04d.png -vf "split[a][b];[a]palettegen=max_colors=48:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../swing.gif
+cd /tmp/spider/catch && inkscape --export-type=png frame-*.svg
+ffmpeg -framerate 15 -i frame-%04d.png -vf "split[a][b];[a]palettegen=max_colors=48:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../catch.gif
 ```
 
 Faded bodies are earlier ticks. Orange marks the held point and blue the silk.
+
+The catch sets silk that gives beside a line that holds fast, drawn with a
+give of 0.001 radii. The dashed gray line marks the line's end at its length,
+where the spider was when the line tied. The animation shows one tick a frame,
+at a quarter of real time.
+
+| Catching a fall | Catching a fall, at a quarter of real time |
+| --- | --- |
+| ![Falling at 37 radii/s, a line that holds fast stops the spider where it ties, while silk gives 1.2 radii and springs back](screenshots/clock/spider-catch.png) | ![The catch tick by tick, holding fast and giving side by side](screenshots/clock/spider-catch.gif) |
 
 ![Crawling the room from the floor to the ceiling](screenshots/clock/spider-climb.png)
 

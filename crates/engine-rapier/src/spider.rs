@@ -6,10 +6,10 @@
 //! The spider answers with bounded impulses on its own body, their reactions on
 //! dynamic supports, and at most one rope tied to a real support. It never
 //! steps the world itself, and a zero step freezes it where it is. While its
-//! legs or reel carry it, the world carries its weight through the step that
-//! follows, so their impulses meet that weight at once rather than across the
-//! solver's substeps. Its body falls under whatever gravity scale the host
-//! gives it.
+//! legs, its line or its reel carry it, the world carries its weight through
+//! the step that follows, so their impulses meet that weight at once rather
+//! than across the solver's substeps. Its body falls under whatever gravity
+//! scale the host gives it.
 //!
 //! The same intent carries an autonomous brain's requests and, later, a
 //! player's, and both meet the same limits in [`SpiderSpec`].
@@ -90,6 +90,14 @@ pub struct SpiderSpec {
     pub reel_pull: f32,
     /// The top speed letting line out.
     pub pay_out_speed: f32,
+    /// How far a line stretches under one weight, which sets how stiff its
+    /// give is.
+    pub silk_stretch: f32,
+    /// How a stretched line settles, as a damping ratio: at 1 it settles
+    /// without a bounce, and the lower it is, the more it bounces.
+    pub silk_damping: f32,
+    /// The most a line stretches before it holds fast.
+    pub silk_give: f32,
 }
 
 impl SpiderSpec {
@@ -111,6 +119,9 @@ impl SpiderSpec {
             reel_speed: 6.0,
             reel_pull: 2.5,
             pay_out_speed: 10.0,
+            silk_stretch: 0.25,
+            silk_damping: 0.7,
+            silk_give: 5.0,
         }
     }
 
@@ -130,12 +141,21 @@ impl SpiderSpec {
             self.reel_speed,
             self.reel_pull,
             self.pay_out_speed,
+            self.silk_stretch,
+            self.silk_give,
         ];
         positive
             .iter()
             .all(|value| value.is_finite() && *value > 0.0)
+            && self.silk_damping.is_finite()
+            && self.silk_damping >= 0.0
             && self.min_line >= 1.0
             && self.min_line < self.max_line
+    }
+
+    /// How fast a stretched line rings back, in radians per second.
+    fn silk_ring(&self) -> f32 {
+        (self.gravity / (self.silk_stretch * self.radius)).sqrt()
     }
 
     fn weight_acceleration(&self, weights: f32) -> f32 {
@@ -296,15 +316,18 @@ pub struct SpiderLine {
     /// Where it is tied, in the anchor body's own frame and in the world.
     pub local_anchor: Vec2,
     pub anchor: Vec2,
+    /// Its length unstretched.
     pub length: f32,
     /// From the spider's center to the anchor.
     pub distance: f32,
     pub slack: f32,
+    /// How far past its length it is drawn.
+    pub stretch: f32,
     /// Holding the spider, or being reeled in.
     pub taut: bool,
-    /// What the line carried on the last tick, as a force: the rope's own
-    /// load at the end of the step, estimated from its last solver substep,
-    /// and the reel's pull.
+    /// What the line carried on the last tick, as a force: its give and the
+    /// reel's pull, and whatever the rope held beyond the give at the end of
+    /// the step, estimated from its last solver substep.
     pub tension: f32,
 }
 
@@ -389,6 +412,9 @@ impl Surface {
 struct Line {
     joint: JointId,
     anchor: Surface,
+    /// Its length unstretched. The rope the world holds is longer by as much
+    /// as the line may give.
+    length: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -407,9 +433,11 @@ pub struct Spider {
     shot: Option<Shot>,
     /// Whether the last tick's hold needed more pull than the grip has.
     straining: bool,
-    /// The force the reel pulled the line in with on the last tick.
+    /// The force the line pulled the spider with on the last tick: its give
+    /// and the reel.
     pull: f32,
-    /// Whether the legs or the reel carried the spider's weight this tick.
+    /// Whether the legs, the line's give or the reel carried the spider's
+    /// weight this tick.
     carried: bool,
     rearm: f32,
     next_line_role: u32,
@@ -532,10 +560,12 @@ impl Spider {
             world.remove_tether(joint);
         }
         let candidates = self.touching(world, dt, &eligible);
-        // The legs act first, and the reel adds only what they left undone,
-        // so the two never take the same weight off the spider twice.
-        self.keep_hold(world, dt, &eligible, &candidates);
+        // The line's give pulls first, then the legs act, and the reel adds
+        // only what they left undone, so no two of them take the same weight
+        // off the spider.
         self.keep_line(world, dt, &eligible);
+        self.keep_hold(world, dt, &eligible, &candidates);
+        self.reel(world, dt);
         self.extend_shot(world, dt, &eligible);
         // Their impulses held the weight up; the step brings it all at once.
         // Free, the spider falls as every other body does.
@@ -594,12 +624,13 @@ impl Spider {
                 body: line.anchor.body,
                 local_anchor: line.anchor.local_point,
                 anchor: tether.anchor,
-                length: tether.length,
+                length: line.length,
                 distance,
-                slack: (tether.length - distance).max(0.0),
-                // A reel pulling it in keeps the line taut, whatever span its
-                // pull closes within the tick.
-                taut: distance >= tether.length - TAUT * self.spec.radius || self.pull > 0.0,
+                slack: (line.length - distance).max(0.0),
+                stretch: (distance - line.length).max(0.0),
+                // A line pulling the spider in is taut, whatever span its pull
+                // closes within the tick.
+                taut: distance >= line.length - TAUT * self.spec.radius || self.pull > 0.0,
                 tension: tether.tension + self.pull,
             })
         });
@@ -730,5 +761,30 @@ impl Spider {
         if world.body_kind(support) == Some(BodyKind::Dynamic) {
             world.apply_impulse_at_point(support, -impulse, point, true);
         }
+    }
+
+    /// How freely a support gives way to an impulse at `point` along `along`:
+    /// its inverse mass there, its turning included. Zero for one not free to
+    /// move, which takes no reaction.
+    fn inverse_mass_at(world: &PhysicsWorld, support: BodyId, point: Vec2, along: Vec2) -> f32 {
+        if world.body_kind(support) != Some(BodyKind::Dynamic) {
+            return 0.0;
+        }
+        let Some(mass) = world.body_mass(support).filter(|mass| *mass > 0.0) else {
+            return 0.0;
+        };
+        let turning = match (
+            world.center_of_mass(support),
+            world.dynamic_body_inertia(support),
+            world.body_rotation_locked(support),
+        ) {
+            (Some(center), Some(inertia), Some(false)) if inertia > 0.0 => {
+                // The arm across the impulse.
+                let lever = (point - center).dot(Vec2::new(along.y, -along.x));
+                lever * lever / inertia
+            }
+            _ => 0.0,
+        };
+        1.0 / mass + turning
     }
 }

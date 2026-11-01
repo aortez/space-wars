@@ -271,9 +271,17 @@ fn a_hanging_spider_swings_with_the_period_of_a_pendulum_its_length() {
             line.tension / run.weight()
         );
         assert!((state.up - Vec2::Y).length() < 1e-3);
+        // Its weight draws the line out by the stretch one weight gives.
         assert!(line.slack < 1e-3 * scale.r);
-        // Pushed aside a tenth of a radian, it swings back and forth.
-        let length = line.length;
+        let stretch = SpiderSpec::new(scale.r, scale.g).silk_stretch;
+        assert!(
+            (line.stretch / scale.r - stretch).abs() < 1e-3,
+            "{}",
+            line.stretch / scale.r
+        );
+        // Pushed aside a tenth of a radian, it swings back and forth, as long
+        // as it hangs.
+        let length = line.distance;
         let push = 0.1 * (scale.g * length).sqrt();
         assert!(
             run.world
@@ -442,6 +450,147 @@ fn a_line_tied_across_a_fall_swings_the_spider_on_at_its_speed() {
     assert!(state.velocity.x < -2.0 * scale.r, "{:?}", state.velocity);
 }
 
+/// Fall until falling faster than `speed` radii per second, then shoot
+/// straight up at the ceiling. The states on the tick before the line ties
+/// and on the tick it ties.
+fn tie_while_falling(run: &mut Run, speed: f32) -> (SpiderState, SpiderState) {
+    let r = run.scale.r;
+    run.until(120, idle(), |s| s.velocity.y < -speed * r)
+        .unwrap();
+    let mut previous = run.tick(shoot(Vec2::Y));
+    loop {
+        let state = run.tick(idle());
+        if state.line.is_some() {
+            return (previous, state);
+        }
+        assert!(run.ticks < 240);
+        previous = state;
+    }
+}
+
+#[test]
+fn a_line_tied_across_a_fall_away_from_its_anchor_gives_to_catch_the_spider() {
+    for scale in [CLOCK, METRES] {
+        let r = scale.r;
+        for (damping, bounces) in [(0.7, false), (0.3, true)] {
+            let spec = SpiderSpec {
+                silk_damping: damping,
+                ..SpiderSpec::new(r, scale.g)
+            };
+            let mut run = Run::with_spec(course(scale), scale, Vec2::new(0.0, 36.0), spec);
+            let (previous, tied) = tie_while_falling(&mut run, 30.0);
+            // Tying takes nothing off the fall: through the tick it ties on,
+            // only gravity changes the spider.
+            let falling = previous.velocity + Vec2::new(0.0, -scale.g) * DT;
+            assert!(
+                (tied.velocity - falling).length() < 1e-3 * r,
+                "{:?} after {:?}",
+                tied.velocity,
+                falling
+            );
+            // The line gives, so the next tick slows the spider without
+            // stopping it.
+            let next = run.tick(idle());
+            assert!(
+                next.velocity.y < 0.0 && next.velocity.y > tied.velocity.y,
+                "{:?} after {:?}",
+                next.velocity,
+                tied.velocity
+            );
+            let mut peak = next.line.unwrap().stretch;
+            let mut stopped = None;
+            let mut highest = f32::MIN;
+            let mut state = next;
+            for _ in 0..240 {
+                state = run.tick(idle());
+                peak = peak.max(state.line.unwrap().stretch);
+                if state.velocity.y >= 0.0 {
+                    stopped.get_or_insert(run.ticks);
+                }
+                if stopped.is_some() {
+                    highest = highest.max(state.position.y);
+                }
+            }
+            // It drew the line out well past its weight's stretch, and no
+            // further than the line gives.
+            assert!(
+                peak > 2.0 * spec.silk_stretch * r && peak < spec.silk_give * r,
+                "{}",
+                peak / r
+            );
+            // Then it hangs on the line, stretched by its weight alone.
+            let line = state.line.unwrap();
+            assert_eq!(state.mode, SpiderMode::Hanging);
+            assert!(state.velocity.length() < 1e-2 * r, "{:?}", state.velocity);
+            assert!(
+                (line.stretch / r - spec.silk_stretch).abs() < 1e-3,
+                "{}",
+                line.stretch / r
+            );
+            assert!(
+                (line.tension / run.weight() - 1.0).abs() < 0.02,
+                "{}",
+                line.tension / run.weight()
+            );
+            // At the default damping it springs back barely past where it
+            // comes to hang. Damped less, it bounces well past that.
+            let rise = (highest - state.position.y) / r;
+            if bounces {
+                assert!(rise > 0.5, "{rise}");
+            } else {
+                assert!(rise < 0.05, "{rise}");
+            }
+        }
+    }
+}
+
+#[test]
+fn a_line_drawn_out_to_its_give_holds_fast() {
+    let scale = CLOCK;
+    let r = scale.r;
+    // A line that gives no more than half a radius, caught on a fall that
+    // would draw it out further.
+    let spec = SpiderSpec {
+        silk_give: 0.5,
+        ..SpiderSpec::new(r, scale.g)
+    };
+    let mut run = Run::with_spec(course(scale), scale, Vec2::new(0.0, 36.0), spec);
+    let (_, tied) = tie_while_falling(&mut run, 30.0);
+    let length = tied.line.unwrap().length;
+    let mut peak = 0.0_f32;
+    for _ in 0..60 {
+        let line = run.tick(idle()).line.unwrap();
+        assert!(line.distance < length + 0.501 * r, "{}", line.stretch / r);
+        peak = peak.max(line.stretch);
+    }
+    assert!(peak > 0.45 * r, "{}", peak / r);
+    assert!(run.state().velocity.length() < 1e-2 * r);
+}
+
+#[test]
+fn a_stretched_line_pulls_back_but_never_pushes() {
+    let scale = CLOCK;
+    let r = scale.r;
+    let mut run = hanging(scale);
+    assert!(run.state().line.unwrap().stretch > 0.2 * r);
+    // Flung toward its anchor faster than the line springs back, the spider
+    // feels no push from it, only gravity.
+    let body = run.spider.body();
+    assert!(
+        run.world
+            .set_velocity(body, Vec2::new(0.0, 4.0 * r), 0.0, true)
+    );
+    let state = run.tick(idle());
+    let line = state.line.unwrap();
+    assert!(line.stretch > 0.0, "{}", line.stretch / r);
+    assert_eq!(line.tension, 0.0);
+    assert!(
+        (state.velocity.y - (4.0 * r - scale.g * DT)).abs() < 1e-3 * r,
+        "{:?}",
+        state.velocity
+    );
+}
+
 #[test]
 fn a_shot_at_a_support_moved_since_the_last_step_ties_to_it_where_it_is() {
     let scale = CLOCK;
@@ -495,7 +644,11 @@ fn a_reel_weaker_than_the_weight_holds_on_but_cannot_climb() {
         "{}",
         line.tension / run.weight()
     );
-    assert_eq!(state.velocity, Vec2::ZERO);
+    assert!(
+        state.velocity.length() < 1e-3 * scale.r,
+        "{:?}",
+        state.velocity
+    );
 }
 
 #[test]
@@ -512,9 +665,15 @@ fn paying_out_lengthens_the_line_at_its_speed_up_to_the_longest() {
     assert!((paid - 12.0 * 10.0 * DT).abs() < 1e-3, "{paid}");
     // Gravity takes the spider down after it.
     assert!(state.velocity.y < -scale.r);
-    let state = run.ticks(60, reel(-1.0));
-    assert_eq!(state.line.unwrap().length, 25.0 * scale.r);
-    assert!(state.line.unwrap().distance <= 25.0 * scale.r + 0.01 * scale.r);
+    // At the longest it lets out no more, and the spider hangs from it.
+    let state = run.ticks(120, reel(-1.0));
+    let line = state.line.unwrap();
+    assert_eq!(line.length, 25.0 * scale.r);
+    assert!(
+        (line.stretch / scale.r - spec.silk_stretch).abs() < 1e-3,
+        "{}",
+        line.stretch / scale.r
+    );
 }
 
 #[test]
@@ -697,6 +856,16 @@ fn momentum(run: &Run, other: BodyId) -> Vec2 {
     run.state().velocity * run.mass() + body
 }
 
+/// The spider's and another body's kinetic energy together, the other's
+/// turning included.
+fn kinetic_energy(run: &Run, other: BodyId) -> f32 {
+    let motion = run.world.motion(other).unwrap();
+    let inertia = run.world.dynamic_body_inertia(other).unwrap();
+    0.5 * (run.mass() * run.state().velocity.length_squared()
+        + run.world.body_mass(other).unwrap() * motion.linear_velocity.length_squared()
+        + inertia * motion.angular_velocity * motion.angular_velocity)
+}
+
 #[test]
 fn reeling_in_a_free_block_draws_both_together_and_conserves_momentum() {
     let scale = CLOCK;
@@ -731,6 +900,104 @@ fn reeling_in_a_free_block_draws_both_together_and_conserves_momentum() {
         start / scale.r
     );
     assert!(run.world.motion(block_body).unwrap().linear_velocity.y < 0.0);
+}
+
+#[test]
+fn a_line_giving_to_a_free_block_draws_it_along_and_conserves_momentum() {
+    let scale = CLOCK;
+    let block_body = BodyId::new(SHELF, BodyRole::PRIMARY);
+    let mut world = weightless(scale);
+    block_of(
+        &mut world,
+        scale,
+        SHELF,
+        Vec2::new(0.0, 20.0),
+        Vec2::new(4.0, 1.0),
+        BodyKind::Dynamic,
+    );
+    let mut run = Run::new(world, scale, Vec2::ZERO);
+    run.tick(idle());
+    run.tick(SpiderIntent {
+        shoot: Some(Vec2::Y),
+        ..idle()
+    });
+    run.until(30, idle(), |s| s.line.is_some()).unwrap();
+    // Flung away from the block, the spider draws the line out, and the line
+    // draws the block after it.
+    let body = run.spider.body();
+    assert!(
+        run.world
+            .set_velocity(body, Vec2::new(0.0, -20.0 * scale.r), 0.0, true)
+    );
+    let start = momentum(&run, block_body);
+    let scale_of_momentum = run.mass() * scale.r;
+    let mut peak = 0.0_f32;
+    for _ in 0..60 {
+        let state = run.tick(idle());
+        peak = peak.max(state.line.unwrap().stretch);
+        assert!((momentum(&run, block_body) - start).length() < 1e-3 * scale_of_momentum);
+    }
+    assert!(peak > 0.25 * scale.r, "{}", peak / scale.r);
+    assert!(run.world.motion(block_body).unwrap().linear_velocity.y < 0.0);
+}
+
+#[test]
+fn a_line_giving_to_a_light_free_block_never_flings_the_two_together() {
+    let scale = CLOCK;
+    let r = scale.r;
+    let block_body = BodyId::new(SHELF, BodyRole::PRIMARY);
+    // A block a sixteenth of the spider's mass, tied under its middle, and
+    // tied off its middle, where the line turns it as well.
+    for x in [0.0, 0.4] {
+        let mut world = weightless(scale);
+        block_of(
+            &mut world,
+            scale,
+            SHELF,
+            Vec2::new(x, 20.0),
+            Vec2::new(0.5, 0.1),
+            BodyKind::Dynamic,
+        );
+        let mut run = Run::new(world, scale, Vec2::ZERO);
+        run.tick(idle());
+        run.tick(SpiderIntent {
+            shoot: Some(Vec2::Y),
+            ..idle()
+        });
+        run.until(30, idle(), |s| s.line.is_some()).unwrap();
+        assert!(run.world.body_mass(block_body).unwrap() < run.mass() / 15.0);
+        // Flung apart, the two are drawn together again no faster than they
+        // parted, and gain no energy from the line.
+        let parting = 20.0 * r;
+        let body = run.spider.body();
+        assert!(
+            run.world
+                .set_velocity(body, Vec2::new(0.0, -parting), 0.0, true)
+        );
+        let start = kinetic_energy(&run, block_body);
+        let mut fastest = 0.0_f32;
+        for tick in 0..120 {
+            let state = run.tick(idle());
+            let energy = kinetic_energy(&run, block_body) / start;
+            assert!(energy < 1.02, "x {x}, tick {tick}: {energy}");
+            // A block turned far enough comes between and lets the line go.
+            let Some(line) = state.line else {
+                break;
+            };
+            let anchor = run
+                .world
+                .velocity_at_point(block_body, line.anchor)
+                .unwrap();
+            let inward = (line.anchor - state.position).normalized();
+            fastest = fastest.max((state.velocity - anchor).dot(inward));
+        }
+        assert!(
+            fastest > 0.5 * parting && fastest < 1.01 * parting,
+            "x {x}: {}",
+            fastest / r
+        );
+        assert!(run.world.motion(block_body).unwrap().linear_velocity.y < 0.0);
+    }
 }
 
 #[test]
