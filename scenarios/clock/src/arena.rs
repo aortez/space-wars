@@ -775,16 +775,20 @@ impl ClockArena {
         }
     }
 
-    /// While only residents hold the arena, its world has the settings they
-    /// would build it with: Clock's own gravity, and the length scale of
-    /// `layout`, the one they last fitted. A visit that entered set its own
-    /// for as long as it held the arena. The run calls this once per tick that
-    /// moves time, just before the arena's step.
+    /// While only residents and the spider hold the arena, its world has the
+    /// settings they would build it with: Clock's own gravity, and the length
+    /// scale of `layout`, the one they last fitted. A visit that entered set
+    /// its own for as long as it held the arena. The run calls this once per
+    /// tick that moves time, just before the arena's step.
     pub fn bind_settings(&mut self, layout: Layout) {
         let Some(world) = &mut self.world else {
             return;
         };
-        if self.owners.iter().all(|owner| owner.resident()) {
+        if self
+            .owners
+            .iter()
+            .all(|owner| owner.resident() || *owner == Owner::Spider)
+        {
             let config = mechanics_config(layout);
             assert!(world.set_gravity(config.gravity) && world.set_length_unit(config.length_unit));
         }

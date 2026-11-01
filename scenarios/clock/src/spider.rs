@@ -5,7 +5,9 @@
 //! that says what the spider may hold.
 //!
 //! A surface the face publishes gets a kinematic proxy body with one cuboid:
-//! the part of its footprint that is drawn, posed in the surface's frame.
+//! the part of its footprint that is drawn, within the band it is clipped to
+//! and within the room, posed in the surface's frame. A surface drawn too
+//! faint to see, or carried out of the room, has none.
 //! The proxy keeps the surface's identity for as long as the surface is
 //! published, moves to where the next publication will put the surface just
 //! before each step, so a cell carries the spider with the velocity it
@@ -31,8 +33,8 @@ use engine_core::Vec2;
 use engine_rapier::{
     spider::{Spider, SpiderCounts, SpiderIntent, SpiderSpec, SpiderState},
     world::{
-        BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
-        PhysicsWorld,
+        BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
+        CollisionGroups, PhysicsId, PhysicsWorld,
     },
 };
 
@@ -52,13 +54,18 @@ const BEAM_RISE_PITCH: f32 = 1.0;
 const BEAM_THICKNESS_PITCH: f32 = 0.5;
 /// Friction of a digit cell's proxy, as the digits' other solids have.
 const CELL_FRICTION: f32 = 0.65;
-/// The most proxies the spider keeps at once. The face draws at most 159
-/// cells at once in the shipped fonts, during Falling's cross-fade in Sans,
-/// and this leaves room above that while keeping the spider within the room
-/// an event takes in the arena, so the arena's capacity stays as it was.
-/// Were the face ever to draw more, the proxies would stand for the cells
-/// nearest the spider and the rest be counted.
+/// The most proxies the spider keeps at once. Under ordinary readings the
+/// face draws at most 159 cells at once in the shipped fonts, during
+/// Falling's cross-fade in Sans, and this leaves room above that while
+/// keeping the spider within the room an event takes in the arena, so the
+/// arena's capacity stays as it was. A reading retargeted every few ticks
+/// during Falling's return draws more, 323 at one every two ticks, and then
+/// the proxies stand for the cells nearest the spider and the rest are
+/// counted.
 pub const MAX_PROXIES: usize = 233;
+/// A surface drawn fainter than this is not drawn, as the surface contract's
+/// own checks have it, and stands for nothing.
+const MIN_INK: f32 = 0.02;
 
 /// A part of the frame the spider climbs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -224,14 +231,37 @@ struct Pose {
 }
 
 impl Pose {
-    /// The proxy a surface wants, if it has a visible part and no rigid body
-    /// of its own in `world`. A body in an event's own world is not in the
-    /// arena, so its surface gets a proxy like any other.
-    fn of(surface: &DigitSurface, world: &PhysicsWorld) -> Option<Self> {
-        if surface.body.is_some_and(|body| world.contains_body(body)) {
+    /// The proxy a surface wants, if it is drawn, has a part within the band
+    /// it is clipped to and within `room`, and has no rigid body of its own
+    /// in `world`. A body in an event's own world is not in the arena, so its
+    /// surface gets a proxy like any other. An upright surface is clipped to
+    /// the room as to its band; one turned is left out unless it lies within.
+    fn of(surface: &DigitSurface, world: &PhysicsWorld, room: (Vec2, Vec2)) -> Option<Self> {
+        if surface.opacity < MIN_INK || surface.body.is_some_and(|body| world.contains_body(body)) {
             return None;
         }
-        let Footprint { min, max } = surface.visible()?;
+        let mut footprint = surface.visible()?;
+        let (low, high) = room;
+        if surface.angle.abs() < 1e-6 {
+            let (low, high) = (surface.local(low), surface.local(high));
+            footprint.min = Vec2::new(footprint.min.x.max(low.x), footprint.min.y.max(low.y));
+            footprint.max = Vec2::new(footprint.max.x.min(high.x), footprint.max.y.min(high.y));
+            if footprint.is_empty() {
+                return None;
+            }
+        } else {
+            let Footprint { min, max } = footprint;
+            let within = [min, Vec2::new(max.x, min.y), max, Vec2::new(min.x, max.y)]
+                .into_iter()
+                .map(|local| surface.world(local))
+                .all(|corner| {
+                    (low.x..=high.x).contains(&corner.x) && (low.y..=high.y).contains(&corner.y)
+                });
+            if !within {
+                return None;
+            }
+        }
+        let Footprint { min, max } = footprint;
         Some(Self {
             origin: surface.origin,
             angle: surface.angle,
@@ -271,9 +301,16 @@ fn distance_to_rect(point: Vec2, min: Vec2, max: Vec2) -> f32 {
 pub(crate) struct SpiderFixture {
     spider: Spider,
     intent: SpiderIntent,
+    /// The room's inside, between the rails and from the floor to the
+    /// ceiling, which nothing physical stands outside of.
+    room: (Vec2, Vec2),
     /// The proxy table: a surface's proxy takes the identity of its index.
     slots: Vec<Option<Proxy>>,
     indices: BTreeMap<SurfaceId, usize>,
+    /// Where every published surface stood at the last bind, so a proxy
+    /// born for a surface that was already there starts from there and
+    /// moves through its first step as the surface did.
+    previous: BTreeMap<SurfaceId, (Vec2, f32)>,
     /// The colliders of rigid bodies carrying surfaces the spider may hold,
     /// as of the last bind.
     rigid: Vec<ColliderId>,
@@ -287,6 +324,15 @@ impl SpiderFixture {
     /// The spider's radius at `layout`.
     pub(crate) fn radius(layout: Layout) -> f32 {
         RADIUS_PITCH * layout.pitch
+    }
+
+    /// The inside of the room at `layout`: between the rails, from the floor
+    /// to the ceiling.
+    pub(crate) fn room(layout: Layout) -> (Vec2, Vec2) {
+        (
+            Vec2::new(layout.bounds_min.x + layout.frame_width, layout.floor_y),
+            Vec2::new(layout.bounds_max.x - layout.frame_width, layout.canopy_y),
+        )
     }
 
     /// The spot just under the beam, above the hatch, where a spider starts
@@ -343,7 +389,12 @@ impl SpiderFixture {
         position: Vec2,
     ) -> Result<Self, SpiderRefusal> {
         let radius = Self::radius(layout);
-        if !Self::clear(layout, slabs, published, position, radius) {
+        // The room's own solids by their geometry, and whatever else is in
+        // the arena, as its index has it, before anything is claimed.
+        let clear = arena.world().is_none_or(|world| {
+            world.capsule_is_clear(position, 0.0, 0.0, radius, CollisionGroups::ALL)
+        });
+        if !clear || !Self::clear(layout, slabs, published, position, radius) {
             return Err(SpiderRefusal::Blocked);
         }
         arena.claim_resident(Owner::Spider, layout);
@@ -379,8 +430,10 @@ impl SpiderFixture {
             .ok_or(SpiderRefusal::Blocked)
             .inspect_err(|_| arena.release(Owner::Spider))?,
             intent: SpiderIntent::default(),
+            room: Self::room(layout),
             slots: vec![None; MAX_PROXIES],
             indices: BTreeMap::new(),
+            previous: BTreeMap::new(),
             rigid: Vec::new(),
             rigid_bodies: 0,
             unproxied: 0,
@@ -403,7 +456,9 @@ impl SpiderFixture {
     fn sync(&mut self, world: &mut PhysicsWorld, published: &[DigitSurface]) {
         let mut wanted: Vec<(SurfaceId, Pose)> = published
             .iter()
-            .filter_map(|surface| Pose::of(surface, world).map(|pose| (surface.id, pose)))
+            .filter_map(|surface| {
+                Pose::of(surface, world, self.room).map(|pose| (surface.id, pose))
+            })
             .collect();
         self.unproxied = wanted.len().saturating_sub(MAX_PROXIES);
         if self.unproxied > 0 {
@@ -441,12 +496,19 @@ impl SpiderFixture {
                     cuboid.local_position = pose.offset;
                     cuboid.friction = CELL_FRICTION;
                     cuboid.restitution = 0.0;
+                    // From where the surface stood, so the step moves the
+                    // proxy as it moves the surface.
+                    let (position, angle) = self
+                        .previous
+                        .get(&id)
+                        .copied()
+                        .unwrap_or((pose.origin, pose.angle));
                     assert!(world.insert_body(
                         proxy_body(index),
                         BodySpec {
                             kind: BodyKind::KinematicPosition,
-                            position: pose.origin,
-                            angle: pose.angle,
+                            position,
+                            angle,
                             ..BodySpec::default()
                         },
                         &[cuboid],
@@ -472,6 +534,10 @@ impl SpiderFixture {
             proxy.source = pose.source;
             proxy.departing = pose.departing;
         }
+        self.previous = published
+            .iter()
+            .map(|surface| (surface.id, (surface.origin, surface.angle)))
+            .collect();
         // The colliders of rigid bodies in the arena carrying a surface that
         // takes an attachment, which the spider holds as it holds any support.
         let mut bodies: Vec<BodyId> = published

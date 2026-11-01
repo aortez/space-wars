@@ -2414,19 +2414,25 @@ visit's brain, admits a spider, sets its intent each tick and reads it back.
   carries what is already on it and takes nothing new, counted as
   `departing`.
 - **Proxies.** A proxy is a kinematic body with one cuboid: the part of the
-  cell's footprint inside the band it is drawn in, posed in the surface's
-  frame, so collision and attachment follow the drawn geometry. Every moving
-  tick the face is published early, once the active event has stepped and
-  before the arena's step, so each proxy takes the pose the step ends at: a
-  sliding cell carries the spider with the velocity it has. A cell being
-  clipped reshapes its cuboid in place, keeping its collider and whatever
-  holds it (`PhysicsWorld::set_cuboid`), and a retired cell takes its proxy
-  away, so the spider loses that hold as from any support that has gone. The
-  spider keeps at most **233** proxies: the face draws at most 159 cells at
-  once in the shipped fonts, during Falling's cross-fade in Sans, and 233
-  keeps the spider within the room an event takes. Were the face ever to
-  draw more, the farthest cells from the spider would go without, counted as
-  `unproxied`.
+  cell's footprint inside the band it is drawn in and inside the room, between
+  the rails and from the floor to the ceiling, posed in the surface's frame,
+  so collision and attachment follow the drawn geometry. A cell drawn fainter
+  than the surface contract counts as drawn, or carried out of the room, as a
+  text Marquee sweeps the face past the rails, has none; a turned cell has
+  one only while it lies within the room. Every moving tick the face is
+  published early, once the active event has stepped and before the arena's
+  step, so each proxy takes the pose the step ends at: a sliding cell carries
+  the spider with the velocity it has, and a proxy born for a cell coming
+  into view starts from where the cell stood. A cell being clipped reshapes
+  its cuboid in place, keeping its collider and whatever holds it
+  (`PhysicsWorld::set_cuboid`), and a retired cell takes its proxy away, so
+  the spider loses that hold as from any support that has gone. The spider
+  keeps at most **233** proxies, which keeps it within the room an event
+  takes. Under ordinary readings the face draws at most 159 cells at once in
+  the shipped fonts, during Falling's cross-fade in Sans. A reading
+  retargeted every few ticks during Falling's return draws more, 323 at one
+  every two ticks, and then the farthest cells from the spider go without,
+  counted as `unproxied`.
 - **The frame.** The two side rails, the ceiling on either side of a hatch
   four pitches wide above the middle of the face, and a beam just above the
   view spanning the hatch. The spider comes in by tying a line to the beam
@@ -2453,7 +2459,9 @@ visit's brain, admits a spider, sets its intent each tick and reads it back.
   admitted beside soil and one fixture, or a visit, and refused beside two
   fixtures and a visit, as Meltdown is. A start inside the frame, the floor,
   a drawn cell or anything else solid, or outside the room, is refused as
-  `blocked`, and nothing of the spider stays.
+  `blocked` before anything is claimed. Once a visit has gone, Clock's own
+  gravity and solver scale return while the spider holds the arena, as they
+  do for residents alone.
 - **Size.** The spider's radius is 0.3 pitch, a little under a cell's 0.8,
   and its weights are measured under Clock's 400 units/s². The arena rescales
   its gravity with the other resting owners' whenever a visit changes the
@@ -2477,8 +2485,10 @@ against the published surface and the drawn face, every proxy against the
 drawn part of its cell through a preview slide, and the proxies and rigid
 bodies against every event's publication, visitors included. The rest covers
 a departing cell passing within reach and never caught, a glyph replaced
-under the spider, a glyph that comes between, the seconds and the colon, a
-resize, refusals, the paused clock and the end of the run.
+under the spider, a glyph that comes between, a text Marquee sweeping the
+face past the rails, the seconds and the colon, a resize, refusals, a visit
+leaving the arena's settings behind, a blocked start, a proxy's first step,
+the paused clock and the end of the run.
 
 Known limits:
 
@@ -2488,7 +2498,12 @@ Known limits:
   this is never seen in ordinary Clock.
 - A cell sliding out of its slot carries the spider down with it as its drawn
   part shrinks at the band's edge, so the spider is carried off the drawn
-  part before the cell is retired.
+  part before the cell is retired. A cell a text Marquee carries past a rail
+  is clipped at the rail the same way, and the spider holding it is let go
+  there, onto the rail.
+- Beside a duck visit the floor is the visit's course, which the spider may
+  not hold: it loses the floor as `Removed` when the visit starts and rests on
+  the course as on any obstacle until the visit has gone.
 
 The drawings come from an ignored test that records the acceptance route
 and the entrance, at Clock scale in Classic. They are diagnostic drawings of

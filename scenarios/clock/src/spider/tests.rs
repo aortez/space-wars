@@ -18,7 +18,7 @@ use crate::{
 };
 use engine_common::{
     ClockArenaOwner, ClockEventKind, ClockEventProfile, ClockEvents, ClockFont, ClockFontSettings,
-    ClockTimeFormat, Scenario,
+    ClockMarqueePreset, ClockTimeFormat, Scenario,
 };
 use engine_rapier::{
     spider::{MAX_NEARBY, MAX_RAYS, SpiderMode, SpiderReleaseReason},
@@ -309,9 +309,9 @@ fn assert_held_on_the_face(state: &ClockState, fixture: &SpiderFixtureState, con
     );
     let drawn = digit_cell_polygons(state);
     assert!(
-        drawn
-            .iter()
-            .any(|(polygon, _)| inside(polygon, support.point, 0.02 * layout.pitch)),
+        drawn.iter().any(|(polygon, ink)| {
+            *ink >= 0.02 && inside(polygon, support.point, 0.02 * layout.pitch)
+        }),
         "{context}: the held point {:?} is drawn",
         support.point
     );
@@ -324,10 +324,34 @@ fn assert_proxies_match_the_face(state: &ClockState, context: &str) {
     let world = state.arena.world().expect("the spider's world");
     let fixture = state.spider_state().expect("a spider");
     let surfaces = state.digit_surfaces();
+    let (low, high) = SpiderFixture::room(layout);
+    let within = |c: &Vec2| (low.x..=high.x).contains(&c.x) && (low.y..=high.y).contains(&c.y);
+    let in_room = |s: &DigitSurface| {
+        let Some(visible) = s.visible() else {
+            return false;
+        };
+        let corners = [
+            visible.min,
+            Vec2::new(visible.max.x, visible.min.y),
+            visible.max,
+            Vec2::new(visible.min.x, visible.max.y),
+        ]
+        .map(|local| s.world(local));
+        if s.angle.abs() < 1e-6 {
+            // Clipped to the room: some of it lies inside.
+            corners[0].x < high.x
+                && corners[2].x > low.x
+                && corners[0].y < high.y
+                && corners[2].y > low.y
+        } else {
+            corners.iter().all(within)
+        }
+    };
     let wanted: Vec<&DigitSurface> = surfaces
         .iter()
+        .filter(|s| s.opacity >= 0.02)
         .filter(|s| s.body.is_none_or(|body| !world.contains_body(body)))
-        .filter(|s| s.visible().is_some())
+        .filter(|s| in_room(s))
         .collect();
     assert_eq!(fixture.proxies, wanted.len(), "{context}");
     let mut proxied = 0;
@@ -349,12 +373,17 @@ fn assert_proxies_match_the_face(state: &ClockState, context: &str) {
             Vec2::new(visible.min.x, visible.max.y),
         ]
         .map(|local| surface.world(local));
-        let expected_min = corners.iter().fold(Vec2::new(f32::MAX, f32::MAX), |m, c| {
+        let mut expected_min = corners.iter().fold(Vec2::new(f32::MAX, f32::MAX), |m, c| {
             Vec2::new(m.x.min(c.x), m.y.min(c.y))
         });
-        let expected_max = corners.iter().fold(Vec2::new(f32::MIN, f32::MIN), |m, c| {
+        let mut expected_max = corners.iter().fold(Vec2::new(f32::MIN, f32::MIN), |m, c| {
             Vec2::new(m.x.max(c.x), m.y.max(c.y))
         });
+        if surface.angle.abs() < 1e-6 {
+            // An upright proxy stops at the room's inside.
+            expected_min = Vec2::new(expected_min.x.max(low.x), expected_min.y.max(low.y));
+            expected_max = Vec2::new(expected_max.x.min(high.x), expected_max.y.min(high.y));
+        }
         let tolerance = 2e-3 * layout.pitch;
         assert!(
             min.distance_to(expected_min) < tolerance && max.distance_to(expected_max) < tolerance,
@@ -1280,6 +1309,188 @@ fn the_spider_is_refused_while_the_residents_do_not_fit_the_view_and_beside_a_fu
     );
     assert_eq!(state.spider_accounting().refused, 2);
     assert!(state.arena_accounting().refused >= 2);
+}
+
+#[test]
+fn a_text_marquee_sweeps_the_face_past_the_rails_and_the_spider_stays_in_the_room() {
+    for font in [ClockFont::Matrix, ClockFont::Classic] {
+        let context = format!("{font:?}");
+        let mut state = clock(ASPECT, font);
+        let layout = Layout::new(ASPECT);
+        let r = SpiderFixture::radius(layout);
+        let (low, high) = SpiderFixture::room(layout);
+        // In the air beside the left rail, where the face sweeps out past it.
+        assert_eq!(state.admit_spider(Vec2::new(low.x + 2.0 * r, 0.0)), Ok(()));
+        let mut settings = state.settings();
+        settings.marquee_preset = ClockMarqueePreset::TextScroll;
+        sync(&mut state, &[ClockAction::configure(settings)]);
+        sync(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Marquee)],
+        );
+        assert_eq!(
+            state.event_kind(),
+            Some(ClockEventKind::Marquee),
+            "{context}"
+        );
+        let mut ticks = 0;
+        let mut swept = 0;
+        let mut held = 0;
+        while state.event_kind() == Some(ClockEventKind::Marquee) {
+            let intent = if ticks % 120 < 60 { crawl(1.0) } else { grip() };
+            let fixture = drive(&mut state, intent);
+            ticks += 1;
+            assert!(ticks <= 4000, "{context}");
+            let context = format!("{context}, tick {ticks}");
+            assert_proxies_match_the_face(&state, &context);
+            let surfaces = state.digit_surfaces();
+            // Cells carried beyond the rails or drawn without ink stand for
+            // nothing, so no proxy lies outside the room.
+            swept += surfaces
+                .iter()
+                .filter(|s| s.opacity < 0.02 || s.origin.x < low.x)
+                .count();
+            let world = state.arena.world().unwrap();
+            for index in 0..MAX_PROXIES {
+                if let Some((min, max)) = world.body_solid_bounds(proxy_body(index)) {
+                    assert!(
+                        min.x >= low.x - 1e-3 && max.x <= high.x + 1e-3,
+                        "{context}: proxy {index} from {min:?} to {max:?} is in the room"
+                    );
+                }
+            }
+            // The spider holds only what is drawn, and stays in the view.
+            if held_surface(&fixture).is_some() {
+                assert_held_on_the_face(&state, &fixture, &context);
+                held += 1;
+            }
+            assert!(
+                fixture.spider.position.x > layout.bounds_min.x
+                    && fixture.spider.position.x < layout.bounds_max.x,
+                "{context}: the spider is at {:?}",
+                fixture.spider.position
+            );
+        }
+        assert!(swept > 0, "{context}: the face was swept out");
+        assert!(held > 0, "{context}: the spider held a cell on the way");
+        assert_proxies_match_the_face(&state, &format!("{context}, after"));
+    }
+}
+
+#[test]
+fn the_arenas_own_settings_return_when_a_visit_leaves_beside_the_spider() {
+    // At this width the duck's gravity differs from Clock's, so both the
+    // gravity and the solver's length scale show the visit.
+    let aspect = 4.0;
+    let mut state = clock_with(
+        aspect,
+        ClockFont::Classic,
+        FixtureStart::Default,
+        reading(12, 39, 58),
+    );
+    let layout = Layout::new(aspect);
+    for _ in 0..240 {
+        tick(&mut state, &[]);
+    }
+    assert_eq!(state.admit_spider(on_floor_clear_of_balls(layout)), Ok(()));
+    drive_until(&mut state, 60, grip(), on_floor_still, "lands");
+    let own = (-crate::arena::MECHANICS_GRAVITY, layout.pitch);
+    let settings = |state: &ClockState| {
+        let world = state.arena.world().expect("the fixture keeps the world");
+        (world.gravity().y, world.length_unit())
+    };
+    assert_eq!(settings(&state), own);
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Duck)],
+    );
+    let mut ticks = 0;
+    let mut visited = false;
+    while state.duck_state().is_some() {
+        drive(&mut state, grip());
+        ticks += 1;
+        assert!(ticks < 6000, "the visit ends");
+        if state.arena.holds(Owner::Visit) {
+            assert_ne!(settings(&state), own, "the visit brings its own");
+            visited = true;
+        }
+    }
+    assert!(visited);
+    for _ in 0..5 {
+        drive(&mut state, grip());
+    }
+    assert!(!state.arena.holds(Owner::Visit));
+    assert!(state.arena.holds(Owner::Spider));
+    assert_eq!(settings(&state), own, "Clock's own settings are back");
+}
+
+#[test]
+fn a_start_blocked_by_a_resident_claims_nothing() {
+    let mut state = clock_with(
+        ASPECT,
+        ClockFont::Classic,
+        FixtureStart::Default,
+        reading(12, 39, 58),
+    );
+    for _ in 0..240 {
+        tick(&mut state, &[]);
+    }
+    let before = state.arena_accounting();
+    let ball = state.arena_fixtures()[0].balls[1].position;
+    assert_eq!(state.admit_spider(ball), Err(SpiderRefusal::Blocked));
+    let after = state.arena_accounting();
+    assert_eq!(
+        (after.granted, after.released, after.worlds),
+        (before.granted, before.released, before.worlds)
+    );
+    assert_eq!(after.claims, 1);
+    assert_eq!(state.spider_accounting().refused, 1);
+}
+
+#[test]
+fn a_proxy_born_as_a_cell_comes_into_view_moves_with_it_from_its_first_step() {
+    let mut state = clock(ASPECT, ClockFont::Sans);
+    let layout = Layout::new(ASPECT);
+    assert_eq!(state.admit_spider(on_floor(layout, 0.0)), Ok(()));
+    drive(&mut state, grip());
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::DigitSlide)],
+    );
+    let dt = 1.0 / 60.0;
+    let mut previous: Vec<DigitSurface> = state.digit_surfaces();
+    let mut born_moving = 0;
+    let mut proxied_before: BTreeSet<SurfaceId> = BTreeSet::new();
+    while state.event_kind() == Some(ClockEventKind::DigitSlide) {
+        drive(&mut state, grip());
+        let surfaces = state.digit_surfaces();
+        let world = state.arena.world().unwrap();
+        let fixture = state.spider.as_ref().unwrap();
+        let mut proxied_now = BTreeSet::new();
+        for (index, slot) in fixture.slots.iter().enumerate() {
+            let Some(proxy) = slot else {
+                continue;
+            };
+            proxied_now.insert(proxy.id);
+            let now = surfaces.iter().find(|s| s.id == proxy.id).unwrap();
+            let Some(was) = previous.iter().find(|s| s.id == proxy.id) else {
+                continue;
+            };
+            let moved = (now.origin - was.origin) / dt;
+            let velocity = world.motion(proxy_body(index)).unwrap().linear_velocity;
+            assert!(
+                (velocity - moved).length() < 1e-2 * layout.pitch,
+                "surface {} moved at {moved:?}, its proxy at {velocity:?}",
+                proxy.id.get()
+            );
+            if !proxied_before.contains(&proxy.id) && moved.length() > 0.0 {
+                born_moving += 1;
+            }
+        }
+        proxied_before = proxied_now;
+        previous = surfaces;
+    }
+    assert!(born_moving > 0, "cells came into the band on the move");
 }
 
 #[test]
