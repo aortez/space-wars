@@ -2525,11 +2525,11 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **21** and reports scenario-instance revision,
+`clock state` uses schema version **22** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
-reading/target digits, active font, palette RGB, physics counts, floor ownership mode, the run's `arena`, and typed live `settings`.
+reading/target digits, active font, palette RGB, physics counts, floor ownership mode, the run's `arena`, its `digit_surfaces`, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
