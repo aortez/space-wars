@@ -205,6 +205,22 @@ impl DigitSurface {
         let Footprint { min, max } = self.footprint;
         [min, Vec2::new(max.x, min.y), max, Vec2::new(min.x, max.y)].map(|local| self.world(local))
     }
+
+    /// The part of the footprint inside the clip band, in the surface's own
+    /// frame: where the surface is actually drawn. None when nothing of it
+    /// is. Only an upright surface is clipped to a band.
+    pub fn visible(&self) -> Option<Footprint> {
+        let mut footprint = self.footprint;
+        if let Some([lower, upper]) = self.clip {
+            debug_assert!(
+                self.angle.abs() < 1e-6,
+                "only an upright surface is clipped to a band"
+            );
+            footprint.min.y = footprint.min.y.max((lower - self.origin.y) / self.scale);
+            footprint.max.y = footprint.max.y.min((upper - self.origin.y) / self.scale);
+        }
+        (!footprint.is_empty()).then_some(footprint)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

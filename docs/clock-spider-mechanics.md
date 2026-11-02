@@ -7,6 +7,10 @@ surfaces in the canonical arena are [#382](https://github.com/aortez/space-wars/
 visits, controls and rendering are [#383](https://github.com/aortez/space-wars/issues/383),
 and qualification is [#384](https://github.com/aortez/space-wars/issues/384).
 
+[The spider on the digits](clock.md#the-spider-on-the-digits) is #382: the
+adapter that puts this mechanic in Clock's arena, on the actual digit cells
+and the frame.
+
 `engine_rapier::spider` holds one spider in a world it does not own. The whole
 body is one dynamic ball with its rotation locked; a renderer draws the legs.
 Each tick the host passes a `SpiderIntent` (crawl, grip, shoot, cut and reel) to

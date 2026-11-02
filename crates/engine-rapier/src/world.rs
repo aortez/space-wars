@@ -895,6 +895,11 @@ impl PhysicsWorld {
         self.bodies.iter().map(|entry| entry.id)
     }
 
+    /// Every joint's stable identity.
+    pub fn joint_ids(&self) -> impl ExactSizeIterator<Item = JointId> + '_ {
+        self.joints.iter().map(|entry| entry.id)
+    }
+
     /// The first place the stable identities and Rapier's own sets disagree,
     /// if any. In a consistent world every body, collider and joint identity
     /// names exactly one live Rapier object, which names it back, a collider's
@@ -1134,6 +1139,31 @@ impl PhysicsWorld {
             let handle = self.raw.insert_collider(collider, Some(parent_handle));
             self.register_collider(id, parent, handle);
         }
+        true
+    }
+
+    /// Reshape a cuboid collider where it is: `half` becomes its half extents
+    /// and `local_position` its place on its body. It keeps its identity and
+    /// its handle, so whatever holds on to it keeps holding, and the broad
+    /// phase takes the new shape in at the next step. False for a collider the
+    /// world does not have, one that is not a cuboid, or an extent that is not
+    /// positive.
+    pub fn set_cuboid(&mut self, id: ColliderId, half: Vec2, local_position: Vec2) -> bool {
+        if !finite_vec2(half) || half.x <= 0.0 || half.y <= 0.0 || !finite_vec2(local_position) {
+            return false;
+        }
+        let Some(handle) = self.collider_handle(id) else {
+            return false;
+        };
+        let Some(collider) = self.raw.colliders.get_mut(handle) else {
+            return false;
+        };
+        if collider.shape().as_cuboid().is_none() {
+            return false;
+        }
+        collider.set_shape(SharedShape::cuboid(half.x, half.y));
+        collider.set_translation_wrt_parent(to_rapier(local_position));
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         true
     }
 
@@ -4410,6 +4440,93 @@ mod tests {
         world.step(1.0 / 60.0);
 
         assert!(world.motion(dynamic).unwrap().linear_velocity.x > 0.0);
+    }
+
+    #[test]
+    fn a_cuboid_reshaped_in_place_keeps_its_handle_and_takes_its_new_extent() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let (entity, body, collider) = ball_ids(1);
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                kind: BodyKind::KinematicPosition,
+                ..BodySpec::default()
+            },
+            &[ColliderSpec::cuboid(collider, 1.0, 1.0)],
+        ));
+        world.step(1.0 / 60.0);
+        let handle = world.collider_handle(collider).unwrap();
+        let ray = |world: &PhysicsWorld| {
+            world
+                .cast_ray(
+                    Vec2::new(3.0, 0.0),
+                    Vec2::new(-1.0, 0.0),
+                    RayCastOptions {
+                        max_distance: 10.0,
+                        solid: true,
+                        include_sensors: false,
+                        collision_groups: CollisionGroups::ALL,
+                        exclude_entity: None,
+                    },
+                )
+                .map(|hit| hit.point)
+        };
+        assert_eq!(ray(&world), Some(Vec2::new(1.0, 0.0)));
+
+        // Half as wide, a quarter as tall, and raised off the body's centre.
+        assert!(world.set_cuboid(collider, Vec2::new(0.5, 0.25), Vec2::new(0.0, 0.5)));
+        assert_eq!(world.collider_handle(collider), Some(handle));
+        assert_eq!(
+            world.body_solid_bounds(body),
+            Some((Vec2::new(-0.5, 0.25), Vec2::new(0.5, 0.75)))
+        );
+        // The ray along the old centre line misses it once the broad phase
+        // has taken the new shape in.
+        world.step(1.0 / 60.0);
+        assert_eq!(ray(&world), None);
+
+        // A ball is not reshaped, and neither is a cuboid to nothing.
+        let (_, ball, round) = ball_ids(2);
+        assert!(world.insert_body(ball, BodySpec::default(), &[ColliderSpec::ball(round, 0.5)]));
+        assert!(!world.set_cuboid(round, Vec2::new(1.0, 1.0), Vec2::ZERO));
+        assert!(!world.set_cuboid(collider, Vec2::new(0.0, 1.0), Vec2::ZERO));
+        assert!(!world.set_cuboid(collider, Vec2::new(1.0, f32::NAN), Vec2::ZERO));
+        assert!(!world.set_cuboid(
+            ColliderId::new(PhysicsId::new(9), BALL_COLLIDER, 0),
+            Vec2::new(1.0, 1.0),
+            Vec2::ZERO
+        ));
+        assert_eq!(
+            world.body_solid_bounds(body),
+            Some((Vec2::new(-0.5, 0.25), Vec2::new(0.5, 0.75)))
+        );
+        assert!(world.contains_entity(entity));
+    }
+
+    #[test]
+    fn joint_ids_name_every_joint_and_go_with_either_end() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let anchor = insert_ball(&mut world, 1, Vec2::ZERO);
+        let bob = insert_ball(&mut world, 2, Vec2::new(0.0, -2.0));
+        assert_eq!(world.joint_ids().count(), 0);
+        let joint = JointId::new(bob.entity, JointRole::PRIMARY);
+        assert!(world.insert_tether(
+            joint,
+            TetherSpec {
+                anchor_body: anchor,
+                anchor: Vec2::ZERO,
+                body: bob,
+                attachment: Vec2::ZERO,
+                length: 2.0,
+            },
+        ));
+        assert_eq!(world.joint_ids().collect::<Vec<_>>(), vec![joint]);
+        // Removing the anchor's entity takes the joint with it, as removing
+        // the bob's would.
+        assert!(world.remove_entity(anchor.entity));
+        assert_eq!(world.joint_ids().count(), 0);
+        assert!(!world.contains_joint(joint));
+        assert!(world.contains_body(bob));
     }
 
     #[test]

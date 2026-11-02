@@ -65,6 +65,8 @@ pub enum ClockArenaOwner {
     Soil,
     /// One of the arena fixture's owners, a resident.
     Fixture { index: u8 },
+    /// The spider, a temporary actor that climbs the digits and the frame.
+    Spider,
 }
 
 /// Why the arena could not take a claim or start an event. Nothing changed:

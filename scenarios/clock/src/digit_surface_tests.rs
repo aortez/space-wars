@@ -76,7 +76,7 @@ pub(crate) fn lit_cells(state: &ClockState) -> [usize; DIGIT_SLOT_COUNT] {
     })
 }
 
-fn inside(polygon: &[Vec2], point: Vec2, tolerance: f32) -> bool {
+pub(crate) fn inside(polygon: &[Vec2], point: Vec2, tolerance: f32) -> bool {
     let area: f32 = (0..polygon.len())
         .map(|i| {
             let (a, b) = (polygon[i], polygon[(i + 1) % polygon.len()]);
@@ -90,26 +90,6 @@ fn inside(polygon: &[Vec2], point: Vec2, tolerance: f32) -> bool {
         let cross = edge.x * (point.y - a.y) - edge.y * (point.x - a.x);
         cross * winding >= -tolerance * edge.length()
     })
-}
-
-/// The part of a surface's footprint inside its clip band, in its own frame.
-fn visible(surface: &DigitSurface) -> Option<Footprint> {
-    let mut footprint = surface.footprint;
-    if let Some([lower, upper]) = surface.clip {
-        assert!(
-            surface.angle.abs() < 1e-6,
-            "only an upright surface is clipped to a band"
-        );
-        footprint.min.y = footprint
-            .min
-            .y
-            .max((lower - surface.origin.y) / surface.scale);
-        footprint.max.y = footprint
-            .max
-            .y
-            .min((upper - surface.origin.y) / surface.scale);
-    }
-    (!footprint.is_empty()).then_some(footprint)
 }
 
 /// Surfaces sharing one drawn cell sum to its ink.
@@ -146,7 +126,7 @@ pub(crate) fn assert_agreement(
     for surface in &surfaces {
         assert!(surface.scale > 0.0 && surface.opacity >= 0.0);
         let ink = shared_opacity(&surfaces, surface);
-        let Some(footprint) = visible(surface) else {
+        let Some(footprint) = surface.visible() else {
             continue;
         };
         if ink < 0.02 {
@@ -190,7 +170,7 @@ pub(crate) fn assert_agreement(
             continue;
         }
         let owned = surfaces.iter().any(|surface| {
-            let Some(footprint) = (surface.opacity > 0.0).then(|| visible(surface)).flatten()
+            let Some(footprint) = (surface.opacity > 0.0).then(|| surface.visible()).flatten()
             else {
                 return false;
             };

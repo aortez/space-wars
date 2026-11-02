@@ -2269,22 +2269,28 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   move time steps nothing.
 - **Owners claim it.** A visit claims it for its terrain and character, and
   one event at a time shares it beside a visit: Aquarium, Explosion, Falling or
-  Meltdown. Residents keep it for the rest of the run: retained soil, and the
-  development arena fixtures. The first claim builds the world and the last to
-  let go takes it away. Each owner's bodies take identities from its own
-  ranges in `arena::ids::canonical`, and an owner that lets go takes only
-  those. A visit brings its own gravity and solver scale while it holds the
-  arena, and the residents' own return once it has gone.
+  Meltdown. The spider claims it for its stay, with its body, its line, the
+  frame it climbs and a proxy for each digit cell
+  ([below](#the-spider-on-the-digits)). Residents keep it for the rest of the
+  run: retained soil, and the development arena fixtures. The first claim
+  builds the world and the last to let go takes it away. Each owner's bodies
+  take identities from its own ranges in `arena::ids::canonical`, and an owner
+  that lets go takes only those. A visit brings its own gravity and solver
+  scale while it holds the arena, and the residents' own return once it has
+  gone.
 - **Claims are bounded.** Each owner declares a budget of bodies, colliders
-  and joints. The arena holds at most **255 bodies / 288 colliders** and no
-  joints: a visit, the largest event, soil and one fixture together, so
-  everything Clock ships fits. At most **6** owners hold it at once, and at
-  most **4** of them are residents, soil included. A claim beyond those is
-  refused before anything changes, as `residents` or `capacity`. So is a visit
-  or event that uses the floor while the residents do not fit the view, as
+  and joints. The arena holds at most **255 bodies / 288 colliders** and one
+  joint, the spider's line: a visit, the largest event, soil and one fixture
+  together, so everything Clock ships fits. The spider takes no more room than
+  the largest event, so beside a visit and the residents it fits where an
+  event would, and it never shares the arena with an event that has bodies.
+  At most **6** owners hold it at once, and at most **4** of them are
+  residents, soil included. A claim beyond those is refused before anything
+  changes, as `residents` or `capacity`. So is a visit, an event or a spider
+  that uses the floor while the residents do not fit the view, as
   `layout-incompatible`. Debug builds audit every step: each body belongs to
-  exactly one owner holding the arena, or to the floor kept under resting
-  residents, and no owner exceeds its budget.
+  exactly one owner holding the arena, or to the floor kept under whoever
+  rests on it, and no owner exceeds its budget, joints included.
 - **Residents rest on real support.** Soil is fixed in place. A fixture's
   balls rest on a visit's terrain while the visit holds the arena, on an
   event's own floor, or otherwise on the floor the arena keeps under them,
@@ -2340,7 +2346,7 @@ At rest, the two owners hold the arena with all five balls asleep on the closed
 floor (timings vary by machine):
 
 ```text
-Arena: 2 claims, 2 residents (at most 6 and 4); 6 bodies, 6 colliders, 0 joints (at most 255, 288, 0); floor 1 bodies
+Arena: 2 claims, 2 residents (at most 6 and 4); 6 bodies, 6 colliders, 0 joints (at most 255, 288, 1); floor 1 bodies
 Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders
 Arena run: 1 worlds, 183 steps; granted=2 released=0 refused=0; layout incompatible=false, last remap=None
 Arena step: 3 us (collision detection 2 us, solver 0 us); bodies active=0 sleeping=5; pairs candidate=5 contact=5, contacts=5, CCD substeps=1
@@ -2353,7 +2359,7 @@ has no room for this`, and `clock events` shows `blocked by arena=capacity` for
 Meltdown, Explosion and Aquarium:
 
 ```text
-Arena: 3 claims, 2 residents (at most 6 and 4); 10 bodies, 10 colliders, 0 joints (at most 255, 288, 0); floor 0 bodies
+Arena: 3 claims, 2 residents (at most 6 and 4); 10 bodies, 10 colliders, 0 joints (at most 255, 288, 1); floor 0 bodies
 Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders; visit 5/11 bodies, 5/11 colliders
 ```
 
@@ -2384,6 +2390,141 @@ Known limits:
   fixture's balls neither crush plants nor block light or soil meanwhile. Soil,
   the one resident Clock ships, is unaffected, because those checks treat it
   separately.
+
+### The spider on the digits
+
+Issue [#382](https://github.com/aortez/space-wars/issues/382) puts the spider
+of [the mechanics document](clock-spider-mechanics.md) on the actual digits,
+in the run's arena. `scenarios/clock/src/spider.rs` is the adapter between
+the two, and its module comment states the contract. There is no rendering,
+event or public control for it yet; those come with
+[#383](https://github.com/aortez/space-wars/issues/383). A test, or later the
+visit's brain, admits a spider, sets its intent each tick and reads it back.
+
+- **What it holds.** The frame, the floor the arena keeps under it, and the
+  lit digit cells, through a proxy for each cell the face publishes. A cell
+  carried by a rigid body in the arena itself, as a shared Falling's or
+  Explosion's pieces are, has no proxy over that body: the spider holds the
+  body through its own colliders, as it holds any support. A cell carried by
+  a body in an event's own world, as a standalone Falling's or Explosion's
+  are, gets a proxy like any other, posed and turned as the piece is drawn.
+  Nothing else in the arena is a support. Soil, a fixture's balls, a visit's
+  character and course and an event's pieces that carry no surface stay solid
+  obstacles, and each refusal is counted as `foreign`. A departing cell
+  carries what is already on it and takes nothing new, counted as
+  `departing`.
+- **Proxies.** A proxy is a kinematic body with one cuboid: the part of the
+  cell's footprint inside the band it is drawn in and inside the room, between
+  the rails and from the floor to the ceiling, posed in the surface's frame,
+  so collision and attachment follow the drawn geometry. A cell drawn fainter
+  than the surface contract counts as drawn, or carried out of the room, as a
+  text Marquee sweeps the face past the rails, has none; a turned cell has
+  one only while it lies within the room. Every moving tick the face is
+  published early, once the active event has stepped and before the arena's
+  step, so each proxy takes the pose the step ends at: a sliding cell carries
+  the spider with the velocity it has, and a proxy born for a cell coming
+  into view starts from where the cell stood. A cell being clipped reshapes
+  its cuboid in place, keeping its collider and whatever holds it
+  (`PhysicsWorld::set_cuboid`), and a retired cell takes its proxy away, so
+  the spider loses that hold as from any support that has gone. The spider
+  keeps at most **233** proxies, which keeps it within the room an event
+  takes. Under ordinary readings the face draws at most 159 cells at once in
+  the shipped fonts, during Falling's cross-fade in Sans. A reading
+  retargeted every few ticks during Falling's return draws more, 323 at one
+  every two ticks, and then the farthest cells from the spider go without,
+  counted as `unproxied`.
+- **The frame.** The two side rails, the ceiling on either side of a hatch
+  four pitches wide above the middle of the face, and a beam just above the
+  view spanning the hatch. The spider comes in by tying a line to the beam
+  and letting it out through the hatch, and will leave the same way. The
+  hatch is open in the physics only; the renderer draws it with #383. The
+  floor is the arena's own, kept under the spider as under a resting fixture,
+  closed or open at the drain. A visit's course is not a support in this
+  release.
+- **Lifecycle.** The spider rides a departing cell until the cell is retired
+  as it leaves its slot, or until it is carried off the cell's drawn part on
+  the way, and then falls, or catches a cell of the new glyph within reach,
+  which is another surface. A glyph replaced by a reading, font or format
+  change is retired under it the same way. A glyph that comes between the
+  spider and its anchor cuts the line, as `obstructed`. Seconds and the colon
+  change nothing. A reading or setting applied while paused is published at
+  once, and the spider reads `retired` for a cell it still holds the proxy of
+  until the next moving tick takes it away. A tick that does not move time
+  freezes it. A resize cancels it, because its frame is the old view's, and
+  restarting or leaving Clock drops its world with the run.
+- **The claim.** `Owner::Spider` is not a resident: it comes and goes, it is
+  refused while the residents do not fit the view, and it rests, so the arena
+  keeps a floor under it. Its budget is **239 bodies / 239 colliders / 1
+  joint**: its body, five frame parts, the proxies and its line. It is
+  admitted beside soil and one fixture, or a visit, and refused beside two
+  fixtures and a visit, as Meltdown is. A start inside the frame, the floor,
+  a drawn cell or anything else solid, or outside the room, is refused as
+  `blocked` before anything is claimed. Once a visit has gone, Clock's own
+  gravity and solver scale return while the spider holds the arena, as they
+  do for residents alone.
+- **Size.** The spider's radius is 0.3 pitch, a little under a cell's 0.8,
+  and its weights are measured under Clock's 400 units/s². The arena rescales
+  its gravity with the other resting owners' whenever a visit changes the
+  world's.
+
+`ClockState` takes `admit_spider(position)`, `set_spider_intent(intent)`,
+`spider_state()` and `remove_spider()`, and reports `spider_accounting()`:
+spiders admitted, refused, removed and cancelled. The state names what the
+legs hold and what the line is tied to as a `Hold`: a surface with its id,
+source and whether it is departing, a retired surface, a rigid body, a frame
+part or the floor. It counts the proxies, the cells without one, the rigid
+bodies the spider may hold, the refusals of the last tick and the ticks the
+spider has been in the arena, beside the mechanic's own state.
+
+`spider/tests.rs` holds the contract, through every font and the wide,
+narrow and portrait views. The route it takes is the acceptance fixture: up
+to a digit on a line, along its underside across a cell seam, off the end into
+a swing on the line, back up, and out with the old glyph when the minute
+changes, with and without resident balls in the arena. Every hold is checked
+against the published surface and the drawn face, every proxy against the
+drawn part of its cell through a preview slide, and the proxies and rigid
+bodies against every event's publication, visitors included. The rest covers
+a departing cell passing within reach and never caught, a glyph replaced
+under the spider, a glyph that comes between, a text Marquee sweeping the
+face past the rails, the seconds and the colon, a resize, refusals, a visit
+leaving the arena's settings behind, a blocked start, a proxy's first step,
+the paused clock and the end of the run.
+
+Known limits:
+
+- A spider beside an event with its own solid face, as Aquarium's digit
+  compound or Meltdown's refill beside its melted blocks, has proxies standing
+  beside that event's bodies. The spider's visit excludes those events, so
+  this is never seen in ordinary Clock.
+- A cell sliding out of its slot carries the spider down with it as its drawn
+  part shrinks at the band's edge, so the spider is carried off the drawn
+  part before the cell is retired. A cell a text Marquee carries past a rail
+  is clipped at the rail the same way, and the spider holding it is let go
+  there, onto the rail.
+- Beside a duck visit the floor is the visit's course, which the spider may
+  not hold: it loses the floor as `Removed` when the visit starts and rests on
+  the course as on any obstacle until the visit has gone.
+
+The drawings come from an ignored test that records the acceptance route
+and the entrance, at Clock scale in Classic. They are diagnostic drawings of
+the physics state over the drawn face, not the Clock renderer. The dashed
+blue outlines are the proxies.
+
+```sh
+SPACEWARS_CLOCK_SPIDER_CAPTURE=/tmp/clock-spider cargo +1.89.0 test --locked --profile ci -p scenario-clock --lib spider::tests::capture -- --ignored
+cd /tmp/clock-spider
+inkscape --export-type=png climb.svg slide.svg descent.svg
+cd /tmp/clock-spider/route && inkscape --export-type=png frame-*.svg
+ffmpeg -framerate 30 -i frame-%04d.png -vf "split[a][b];[a]palettegen=max_colors=64:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../route.gif
+```
+
+![Up to the cell on a line, along the underside and off the end into a swing](screenshots/clock/spider-arena-climb.png)
+
+![The minute changes: the old 3 carries the spider out of its slot, and it falls past the new 4](screenshots/clock/spider-arena-slide.png)
+
+| In through the hatch | The whole route, in real time |
+| --- | --- |
+| ![Tied to the beam above the hatch, the spider lets itself down into the room](screenshots/clock/spider-arena-descent.png) | ![The acceptance route from the floor to the fall, one frame every other tick](screenshots/clock/spider-arena-route.gif) |
 
 ### Composed Marquee effects
 

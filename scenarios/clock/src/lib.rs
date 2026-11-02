@@ -48,6 +48,7 @@ mod player_tests;
 mod presentation;
 mod rain;
 mod render;
+pub mod spider;
 pub mod water_fixture;
 
 use rand::{Rng, SeedableRng, rngs::StdRng};
@@ -514,6 +515,10 @@ pub struct ClockState {
     // Residents of the arena for checking its standard, admitted only on
     // request.
     arena_fixtures: Vec<arena_fixture::ArenaFixture>,
+    // The spider in the arena, admitted only on request, and what became of
+    // the spiders the run has had.
+    spider: Option<spider::SpiderFixture>,
+    spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -1008,6 +1013,7 @@ impl ClockState {
         }
         let previous = Layout::new(self.config.aspect_ratio);
         self.cancel_ceiling();
+        self.cancel_spider();
         self.config.aspect_ratio = aspect_ratio;
         // A resize changes both anchors and floor geometry. Visits and events
         // finish at once instead of leaving bodies in the old arena or
@@ -1149,6 +1155,92 @@ impl ClockState {
             .iter()
             .map(|fixture| fixture.state(&self.arena))
             .collect()
+    }
+
+    /// Admits a spider at `position`, free and at rest, with its frame and a
+    /// proxy for every digit surface the face publishes. It stays until it is
+    /// removed or a resize cancels it. Refused, changing nothing, while there
+    /// is one, when the arena cannot take it, or when the start is inside
+    /// something solid or outside the room.
+    pub fn admit_spider(
+        &mut self,
+        position: engine_core::Vec2,
+    ) -> Result<(), spider::SpiderRefusal> {
+        let refused = |accounting: &mut spider::SpiderAccounting, refusal| {
+            accounting.refused += 1;
+            Err(refusal)
+        };
+        if self.spider.is_some() {
+            return refused(&mut self.spider_accounting, spider::SpiderRefusal::Present);
+        }
+        let mut owners = self.arena_owners();
+        owners.push(arena::Owner::Spider);
+        if let Err(unavailable) = self.arena.admit(&owners) {
+            return refused(
+                &mut self.spider_accounting,
+                spider::SpiderRefusal::Arena(unavailable),
+            );
+        }
+        let layout = Layout::new(self.aspect_ratio());
+        let slabs: Vec<_> = self.floor.geometry(layout).support().collect();
+        match spider::SpiderFixture::admit(
+            &mut self.arena,
+            layout,
+            &slabs,
+            &self.published,
+            position,
+        ) {
+            Ok(fixture) => {
+                self.spider = Some(fixture);
+                self.spider_accounting.admitted += 1;
+                self.sync_event_schedule();
+                Ok(())
+            }
+            Err(refusal) => refused(&mut self.spider_accounting, refusal),
+        }
+    }
+
+    /// What the spider is asked to do on the next moving tick. False when
+    /// there is no spider.
+    pub fn set_spider_intent(&mut self, intent: engine_rapier::spider::SpiderIntent) -> bool {
+        match &mut self.spider {
+            Some(spider) => {
+                spider.set_intent(intent);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// The spider as Clock has it now, while there is one.
+    pub fn spider_state(&self) -> Option<spider::SpiderFixtureState> {
+        self.spider
+            .as_ref()
+            .map(|spider| spider.state(&self.arena, &self.published))
+    }
+
+    pub fn spider_accounting(&self) -> spider::SpiderAccounting {
+        self.spider_accounting
+    }
+
+    /// Takes the spider out of the arena with its line, its frame and its
+    /// proxies, leaving every other owner as it is. False when there is none.
+    pub fn remove_spider(&mut self) -> bool {
+        let Some(spider) = self.spider.take() else {
+            return false;
+        };
+        spider.remove(&mut self.arena);
+        self.spider_accounting.removed += 1;
+        self.sync_event_schedule();
+        true
+    }
+
+    /// A resize ends the spider's stay, because its frame is the old view's.
+    fn cancel_spider(&mut self) {
+        if let Some(spider) = self.spider.take() {
+            spider.remove(&mut self.arena);
+            self.spider_accounting.cancelled += 1;
+        }
     }
 
     /// The owners holding the arena, and a visit, which claims it at its
@@ -1569,6 +1661,15 @@ impl ClockState {
         } else {
             None
         };
+        // The spider's part of the tick before the step: the face is
+        // published early, where the event has put it for this step, so the
+        // spider's proxies take the poses the step ends at, and the spider
+        // acts on its intent.
+        if self.spider.is_some() {
+            self.settle_surfaces();
+            let spider = self.spider.as_mut().expect("a spider");
+            spider.drive(&mut self.arena, &self.published, events::duck::DT);
+        }
         // Water advances once, then the one duck mechanics world samples it.
         // No second character world or frame-rate dependent force application.
         let water = match &self.active_event {
@@ -1607,6 +1708,9 @@ impl ClockState {
         self.arena.bind_settings(fitted);
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
+        if let Some(spider) = &mut self.spider {
+            spider.observe();
+        }
         // Fixture balls that fell out of the view leave the arena, and a
         // fixture with none left lets it go.
         let fixtures = self.arena_fixtures.len();
@@ -1837,6 +1941,8 @@ impl Scenario for ClockScenario {
             duck_visit: None,
             arena: arena::ClockArena::default(),
             arena_fixtures: Vec::new(),
+            spider: None,
+            spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,
