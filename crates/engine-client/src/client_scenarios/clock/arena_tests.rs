@@ -201,12 +201,13 @@ fn clock_state_publishes_the_arena_and_why_it_refuses_an_event() {
     let arena = clock.arena.as_ref().expect("the arena");
     assert!(arena.accounting.layout_incompatible);
     assert_eq!(arena.accounting.last_remap, Some(ClockArenaRemap::Declined));
+    // The spider, no resident, is refused while the residents do not fit.
     for event in &clock.events {
+        let refused = EVENT_CATALOG[event.kind as usize].uses_floor()
+            || event.kind == engine_common::ClockEventKind::Spider;
         assert_eq!(
             event.blocked_by_arena,
-            EVENT_CATALOG[event.kind as usize]
-                .uses_floor()
-                .then_some(ClockArenaUnavailable::LayoutIncompatible),
+            refused.then_some(ClockArenaUnavailable::LayoutIncompatible),
             "{:?}",
             event.kind
         );

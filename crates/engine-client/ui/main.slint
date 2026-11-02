@@ -742,6 +742,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-cell-swap-enabled: true;
     in-out property <bool> launcher-clock-grass-enabled: true;
     in-out property <bool> launcher-clock-slot-machine-enabled: true;
+    in-out property <bool> launcher-clock-spider-enabled: true;
     in-out property <bool> launcher-clock-rain-enabled: true;
     in-out property <string> launcher-clock-rain-amount: "Varied";
     in-out property <string> launcher-clock-marquee-preset: "Random";
@@ -1594,10 +1595,21 @@ export component MainWindow inherits Window {
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(17, 1); }
                 }
-                ChoiceRow {
+                MenuButton {
                     x: 214px;
                     y: 224px;
-                    width: parent.width - 214px;
+                    width: 94px;
+                    height: 48px;
+                    text: "Spider\n" + (root.launcher-clock-spider-enabled ? "On" : "Off");
+                    text-padding: 6px;
+                    selected: root.ingame-clock-focus-index == 21;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(21, 1); }
+                }
+                ChoiceRow {
+                    x: 316px;
+                    y: 224px;
+                    width: parent.width - 316px;
                     height: 48px;
                     label: "Recipe";
                     label-fraction: 0.25;
@@ -2398,7 +2410,7 @@ export component MainWindow inherits Window {
                         MenuButton {
                             x: 0px;
                             y: 104px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Events\n" + root.launcher-clock-event-profile;
                             selected: root.launcher-settings-focus-index == 4;
@@ -2408,22 +2420,31 @@ export component MainWindow inherits Window {
                             }
                         }
                         MenuButton {
-                            x: (parent.width + 8px) / 3;
+                            x: (parent.width + 8px) / 4;
                             y: 104px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Rain\n" + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
                             selected: root.launcher-settings-focus-index == 11;
                             activated => { root.launcher-settings-focus-index = 11; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: 2 * (parent.width + 8px) / 3;
+                            x: 2 * (parent.width + 8px) / 4;
                             y: 104px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Digit Slide\n" + (root.launcher-clock-digit-slide-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 3;
                             activated => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: 3 * (parent.width + 8px) / 4;
+                            y: 104px;
+                            width: (parent.width - 24px) / 4;
+                            height: 48px;
+                            text: "Spider\n" + (root.launcher-clock-spider-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 20;
+                            activated => { root.launcher-settings-focus-index = 20; root.ui-action(3); }
                         }
 
                         MenuButton {
@@ -2671,7 +2692,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 20 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 21 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }

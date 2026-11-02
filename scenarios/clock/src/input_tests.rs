@@ -53,9 +53,10 @@ fn next_cycles_enabled_events_in_all_profiles_without_changing_preferences() {
     ] {
         let mut state = ready(profile);
         let settings = state.settings();
+        // The spider waits for the duck and the crow, which visit throughout.
         let enabled: Vec<_> = ClockEventKind::ALL
             .into_iter()
-            .filter(|kind| settings.events.enabled(*kind))
+            .filter(|kind| settings.events.enabled(*kind) && *kind != ClockEventKind::Spider)
             .collect();
         let repeated = enabled
             .iter()
@@ -94,6 +95,7 @@ fn no_enabled_events_is_a_bounded_noop_and_feedback_expires_only_while_running()
         cell_swap: false,
         grass: false,
         slot_machine: false,
+        spider: false,
     };
     next(&mut state);
     assert_eq!(state.event_id(), 0);
@@ -144,6 +146,7 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
             cell_swap: false,
             grass: false,
             slot_machine: false,
+            spider: false,
         };
         ClockScenario::step(
             &mut state,
@@ -159,6 +162,15 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
         if kind == ClockEventKind::Duck {
             assert!(
                 state.duck_state().is_some(),
+                "next event preserves the visit"
+            );
+            assert_eq!(
+                state.body_count(),
+                state.arena.world().unwrap().body_count()
+            );
+        } else if kind == ClockEventKind::Spider {
+            assert!(
+                state.spider_state().is_some(),
                 "next event preserves the visit"
             );
             assert_eq!(
@@ -207,6 +219,7 @@ fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
             cell_swap: true,
             grass: true,
             slot_machine: true,
+            spider: true,
         };
         ClockScenario::step(
             &mut state,
@@ -214,9 +227,13 @@ fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
             Duration::ZERO,
         );
         next(&mut state);
-        assert_eq!(
-            state.last_started_event,
-            Some(ClockEventKind::ALL[(kind as usize + 1) % ClockEventKind::ALL.len()])
-        );
+        // The spider waits for the Slot Machine before it in the catalog,
+        // and Falling waits for the spider.
+        let expected = match kind {
+            ClockEventKind::SlotMachine => ClockEventKind::Falling,
+            ClockEventKind::Spider => ClockEventKind::ColorCycle,
+            _ => ClockEventKind::ALL[(kind as usize + 1) % ClockEventKind::ALL.len()],
+        };
+        assert_eq!(state.last_started_event, Some(expected));
     }
 }

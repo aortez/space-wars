@@ -286,7 +286,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, and **Slot Machine** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, **Slot Machine**, and **Spider** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -299,8 +299,8 @@ can also be changed live through **Pause → Clock Controls**, without relaunchi
 
 One global periodic schedule selects one enabled, eligible event, avoiding the previous
 kind when another is eligible. Adding event types does not multiply the trigger
-rate. Timed animations never overlap. Duck and Crow are admissions into separately
-timed visits: admitting either from idle immediately releases the animation slot into cooldown,
+rate. Timed animations never overlap. Duck, Crow and Spider are admissions into separately
+timed visits: admitting one from idle immediately releases the animation slot into cooldown,
 so an ordinary subsequent event can play on its course. After completion or cancellation, there is a shared
 2-second cooldown, followed by a new idle wait for periodic events. Digit Slide
 preserves the pending periodic deadline instead of restarting that wait; a
@@ -322,6 +322,7 @@ the Off profile still disables every automatic event.
 | `rain` | Variable showers, pools and a passive rubber duck | 20 s rain + 20 s drain + 2 s cleanup | 45 s |
 | `crow` | One visitor with wingbeat flight, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
+| `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
 
 ### Cell swaps
 
@@ -572,6 +573,106 @@ Actual device captures: [flight](screenshots/clock/picade-crow-flight-device.png
 [perched](screenshots/clock/picade-crow-perched-device.png),
 [hopping](screenshots/clock/picade-crow-hopping-device.png), and
 [rain](screenshots/clock/picade-crow-rain-device.png).
+
+### Spider visitor
+
+Set **Spider** on or off in Clock settings, or select **Spider → Preview &
+Resume** in Clock Controls. Next Event includes it in the normal enabled-event
+cycle. Previewing a spider adds one visitor; previewing it again, or asking
+for one while a duck, a crow or an event the spider would not keep live is
+running, reports why and changes nothing. Choosing **Off** prevents future
+automatic admissions, not the current visit. The switch is saved with the
+other event switches, and older settings files default it to On.
+
+The spider comes in on a line from a beam above the hatch in the canopy,
+lets itself down past the digits to just under them, shoots a line to the
+underside of the nearest digit by the hatch and swings in under it, climbs
+up and crawls round the digit, upward where the way is clear. From under a
+cell it ties a line at its feet, lets some out and drops to hang and swing
+on it, then climbs back; from the top of one digit it may cross to the
+other digit by the hatch on a line, swinging across. When its own reckoning
+of the way out says it is time, it crawls round to a top or a side with sky
+above it, shoots a line straight up to the ceiling, or to the beam through
+the hatch, climbs it, crawls along the ceiling to the hatch, up through it,
+and out of the view on a line to the beam. Every move is one of
+[the mechanic's](clock-spider-mechanics.md) intents on
+[the spider's physical body](#the-spider-on-the-digits): nothing is moved by
+hand, and there is one line at a time, so nothing is left behind.
+
+The visit is seeded and replays exactly. Where it ties its line is planned
+from the published surfaces, by the cells' drawn boxes: a crossing is shot
+only when the straight line to its mark passes no other cell, and a shot up
+on the way out only when the cell it would come to is the one the body
+meets on the way and is not a pocket, a cell whose row the spider could get
+round neither end of. The arena's own ray has the last word, and a shot that
+still fails is tried elsewhere. The time keeps running and the digits change
+normally: a digit retired from under the spider drops it, and it catches what
+is within reach, or lands on the floor, walks under the nearest digit and
+climbs it on a line.
+
+The visit is solo. Only Digit Slide and Color Cycle run beside it; every
+other event waits for it, and it waits for a duck visit, a player's duck, a
+crow and any event it does not keep live, taking nothing over. Those rules
+are in one place, `spider::visit::compatible_event`, an exhaustive match, so
+a new event kind has to say whether it may run beside the spider before
+Clock compiles. The scheduler resumes after departure through the ordinary
+30-second reuse delay, with no backlog.
+
+The visit's budget is **30 seconds**, entrance and exit included. It starts
+leaving when the time left, less a five-second reserve, is no more than its
+reckoning of the way out: seven seconds for the way round the digit and the
+climb to the ceiling, plus the crawl along the ceiling to the hatch at its
+crawl speed. A visit still inside ten seconds past its budget is reported as
+a **failed exit** for one tick and then taken away where it stands, which
+the accounting counts apart from departures; the reuse delay runs either
+way. Pause and zero-dt ticks freeze it. A resize cancels it, because its
+frame is the old view's, and restarting or leaving Clock drops it with the
+run. Resident balls and the arena's other owners are untouched throughout.
+
+`clock state` exposes `spider` separately from the timed `event_kind`: visit
+ID and seed, phase (`descending`, `crossing`, `climbing`, `crawling`,
+`swinging`, `recovering`, `leaving`), phase, age and remaining ticks,
+position, velocity and up vector in thousandths, the mechanic's mode
+(`free`, `crawling`, `hanging`), what the legs hold and what the line is tied
+to (a `surface` with its id and whether it is departing, a `rigid` body, a
+`frame` part or the `floor`), whether a shot is on its way, the line's
+length, counts of climbs, swings, falls and recoveries, the failed-exit flag
+and the proxies in the arena. The catalog's `blocked_by_spider` names an
+admission the spider rule refuses, in either direction. From idle:
+
+```sh
+spacewars-cli clock trigger spider
+spacewars-cli clock wait --event spider --phase crawling --timeout 20s
+spacewars-cli screenshot /tmp/clock-spider.png
+```
+
+The renderer draws the spider as a small eight-legged body with its back to
+whatever it holds, its legs stepping as it crawls and trailing when it hangs,
+its silk line and a shot on its way, and the hatch in the canopy while a
+spider is in the arena, on the shared code-native path of the raster and
+vector adapters. The time stays legible: the way out goes up through the
+canopy, not through the digits.
+
+The pictures come from the client's own renderer, through a capture test
+that always runs a sample and writes every other frame when given a
+directory:
+
+```sh
+SPACEWARS_SPIDER_VISIT_ARTIFACTS=/tmp/clock-spider-visit \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client spider_visit_renders
+cd /tmp/clock-spider-visit/800x480
+ffmpeg -framerate 30 -i frame-%04d.png -vf "scale=400:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../spider-visit.gif
+```
+
+| Down the line through the hatch | Round the digit |
+| --- | --- |
+| ![The spider lets itself down past the digits on a line from the beam above the hatch](screenshots/clock/spider-visit-descent.png) | ![The spider crawls round the 2 of 12:40](screenshots/clock/spider-visit-crawl.png) |
+
+| Hanging and swinging under the digit | Up to the ceiling by the hatch |
+| --- | --- |
+| ![The spider hangs on a line from under the digit](screenshots/clock/spider-visit-swing.png) | ![The spider climbs its line to the ceiling beside the open hatch](screenshots/clock/spider-visit-exit.png) |
+
+![The whole visit at 800×480, every other frame](screenshots/clock/spider-visit.gif)
 
 ### Managed floor and drain
 
@@ -1321,7 +1422,11 @@ if all are disabled, a brief “No events enabled” notice replaces no event.
 During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide, Rain and Crow without
 replacing the duck. If all enabled events need the arena, a brief notice asks
 you to wait for the duck to leave (or take control and dismiss it). Another Crow
-admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 12; `NextEvent`
+admission waits for its existing visit to end. During a spider visit it cycles
+Color Cycle and Digit Slide, the events that keep the digits where they are,
+and a request for any other reports that the spider is visiting; another
+Spider admission waits for its visit to end, and the spider itself waits for a
+duck, a crow or an event it would not keep live. Preferences are unchanged. The Clock action protocol is version 12; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -2396,10 +2501,11 @@ Known limits:
 Issue [#382](https://github.com/aortez/space-wars/issues/382) puts the spider
 of [the mechanics document](clock-spider-mechanics.md) on the actual digits,
 in the run's arena. `scenarios/clock/src/spider.rs` is the adapter between
-the two, and its module comment states the contract. There is no rendering,
-event or public control for it yet; those come with
-[#383](https://github.com/aortez/space-wars/issues/383). A test, or later the
-visit's brain, admits a spider, sets its intent each tick and reads it back.
+the two, and its module comment states the contract. The visit that comes
+and goes by it, its rendering and its controls are the
+[Spider visitor](#spider-visitor) section's, from
+[#383](https://github.com/aortez/space-wars/issues/383). A test, or the
+visit, admits a spider, sets its intent each tick and reads it back.
 
 - **What it holds.** The frame, the floor the arena keeps under it, and the
   lit digit cells, through a proxy for each cell the face publishes. A cell
@@ -2436,8 +2542,8 @@ visit's brain, admits a spider, sets its intent each tick and reads it back.
 - **The frame.** The two side rails, the ceiling on either side of a hatch
   four pitches wide above the middle of the face, and a beam just above the
   view spanning the hatch. The spider comes in by tying a line to the beam
-  and letting it out through the hatch, and will leave the same way. The
-  hatch is open in the physics only; the renderer draws it with #383. The
+  and letting it out through the hatch, and leaves the same way. The
+  renderer draws the hatch while a spider is in the arena. The
   floor is the arena's own, kept under the spider as under a resting fixture,
   closed or open at the drain. A visit's course is not a support in this
   release.
@@ -2462,10 +2568,13 @@ visit's brain, admits a spider, sets its intent each tick and reads it back.
   `blocked` before anything is claimed. Once a visit has gone, Clock's own
   gravity and solver scale return while the spider holds the arena, as they
   do for residents alone.
-- **Size.** The spider's radius is 0.3 pitch, a little under a cell's 0.8,
-  and its weights are measured under Clock's 400 units/s². The arena rescales
-  its gravity with the other resting owners' whenever a visit changes the
-  world's.
+- **Size and pace.** The spider's radius is 0.3 pitch, a little under a
+  cell's 0.8, and its weights are measured under Clock's 400 units/s². The
+  arena rescales its gravity with the other resting owners' whenever a visit
+  changes the world's. Its silk reaches across the room from the floor to
+  the beam, and is let out and taken in at whatever pace crosses the room in
+  three and four seconds, so a small spider in a tall view still comes in
+  and goes out within a visit; it crawls at seven radii per second.
 
 `ClockState` takes `admit_spider(position)`, `set_spider_intent(intent)`,
 `spider_state()` and `remove_spider()`, and reports `spider_accounting()`:
@@ -2676,7 +2785,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **22** and reports scenario-instance revision,
+`clock state` uses schema version **23** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
@@ -2724,6 +2833,12 @@ null until sampled. `left_to_right` remains the **entrance side**; use
 current crossing's surface transitions; total jumps include warm-up jumps. Navigation fields retain
 the final controller state during reset, not a claim of a still-live body.
 
+The optional `spider` object is present while a spider visits; the
+[Spider visitor](#spider-visitor) section lists its fields. `clock wait`
+accepts its phases (`descending`, `crossing`, `climbing`, `crawling`,
+`swinging`, `recovering`, `leaving`) with `--event spider`, matched against
+the visit rather than the timed event, as a crow's are.
+
 `navigation.planning` adds `pattern` (`platforms`, `terraces`, `two-jump`,
 `shortcut`), surface count, current physical support (null when
 airborne or despawned), generation attempts/fallback status, measured acceleration,
@@ -2758,10 +2873,10 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 21 and
+after completion or cancellation. Use matching client/CLI builds: schema 22 and
 older requests are rejected. The internal Clock action payload is version 12;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
-little-endian u16 switch mask (bits 0–10, reserved bits rejected),
+little-endian u16 switch mask (bits 0–13, reserved bits rejected),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 font ID, rotation (0/1) and nonempty four-bit font-pool bytes, a crow-water-tolerance
 byte (0 Varied, 1 Shy, 2 Hardy), and 1–32 message
@@ -2794,7 +2909,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 22, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 23, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -2811,8 +2926,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 22, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, or `cell-swap`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 23, `event`
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, or `spider`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification
