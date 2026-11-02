@@ -21,7 +21,8 @@ object and six variants of the law's routing did not do enough to adopt.
 The traces now say why a transfer tick has no learned leg: two of every
 five transfer ticks of the learned seats are withheld because the entry
 lies beside the sun or another planet, and the native law flies them.
-Flying those is the next step.
+Flying those is the next step, taken up by
+[LF-094](flight-withheld-legs-v1.md).
 
 ## The stalls
 

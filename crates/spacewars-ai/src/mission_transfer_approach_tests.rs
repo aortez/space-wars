@@ -225,3 +225,72 @@ fn changed_selection_cannot_reuse_a_previous_approach() {
         assert_eq!(bot.telemetry.transfer_approach, before);
     }
 }
+
+#[test]
+fn learned_leg_takes_the_nearest_clear_entry_and_keeps_it() {
+    let (mut bot, mut o) = fixture(false);
+    bot.configure_learned_transfer(true);
+    bot.intent(&o);
+    let leg = bot
+        .transfer_leg()
+        .expect("published though the pilot's entry is blocked");
+    let ship = o.local.combat.recovery.flight.pilot.ship.position;
+    let ordinary = (ship - o.planets[1].motion.position).normalized() * 125.0;
+    assert!(!clear_entry(&o, 1, ordinary));
+    assert!(clear_entry(&o, 1, leg.entry));
+    assert!((leg.entry.length() - 125.0).abs() < 0.001);
+    assert!(leg.entry.distance_to(ordinary) > 10.0);
+    assert_eq!(leg.entry_velocity, o.planets[1].velocity_at(leg.entry));
+    assert_eq!(
+        bot.telemetry.learned_entries,
+        Some(LearnedEntries {
+            ordinary_ticks: 0,
+            alternate_ticks: 1,
+            blocked_ticks: 0
+        })
+    );
+    // The bearing is kept on the next tick while it stays clear.
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    bot.intent(&o);
+    assert_eq!(bot.transfer_leg().unwrap().entry, leg.entry);
+    assert_eq!(bot.telemetry.learned_entries.unwrap().alternate_ticks, 2);
+}
+
+#[test]
+fn learned_leg_keeps_a_clear_pilot_entry_and_flies_a_blocked_one_when_none_is_clear() {
+    let (mut bot, mut o) = fixture(false);
+    bot.configure_learned_transfer(true);
+    o.planets[0].motion.position = Vec2::new(-1500.0, 0.0);
+    o.local.combat.recovery.flight.pilot.planet = o.planets[0].clone();
+    bot.intent(&o);
+    let ship = o.local.combat.recovery.flight.pilot.ship.position;
+    let ordinary = (ship - o.planets[1].motion.position).normalized() * 125.0;
+    assert!(bot.transfer_leg().unwrap().entry.distance_to(ordinary) < 0.001);
+    assert_eq!(
+        bot.telemetry.learned_entries,
+        Some(LearnedEntries {
+            ordinary_ticks: 1,
+            alternate_ticks: 0,
+            blocked_ticks: 0
+        })
+    );
+    // A sun at the destination blocks every bearing; the leg still flies the
+    // pilot's entry.
+    o.sun = Some(
+        scenario_spacewars::surface_sortie::mission::MissionObstacle {
+            position: o.planets[1].motion.position,
+            radius: 20.0,
+        },
+    );
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    bot.intent(&o);
+    assert!(bot.transfer_leg().unwrap().entry.distance_to(ordinary) < 0.001);
+    assert_eq!(
+        bot.telemetry.learned_entries,
+        Some(LearnedEntries {
+            ordinary_ticks: 1,
+            alternate_ticks: 0,
+            blocked_ticks: 1
+        })
+    );
+}

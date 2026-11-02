@@ -70,6 +70,9 @@ struct SeatReport {
     budget_replans: u32,
     recoveries: u32,
     learned: Option<LearnedTransferTelemetry>,
+    /// The entries the learned host was given, by tick, for a learned seat.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    learned_entries: Option<spacewars_ai::mission_pilot::LearnedEntries>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -186,6 +189,7 @@ fn run(seed: u64, controllers: [SpacewarsController; 2]) -> MatchReport {
                 .as_ref()
                 .filter(|_| host.pilots[seat].learned_transfer())
                 .map(|learned| learned.telemetry(seat).clone()),
+            learned_entries: host.pilots[seat].telemetry().learned_entries,
         }
     });
     let round = host.sortie.state.match_observation().unwrap();
@@ -330,7 +334,7 @@ fn trace_learned_transfer_seat() {
         .unwrap();
         file
     });
-    writeln!(out, "tick\tgoal\treason\ttarget\tframe\taltitude\tleg\tflying\tattempt\telapsed\tdistance\tspeed_error\tship_speed\toutcome\tcommand_speed\tcommand_heading\theat_clearance\tsurface_clearance\tsteering\tthrust\tbrake\tspin\theading_error\tnavigation_tick\tlocation\tship_form\tship_health\tpilot_health\topponent_distance\twithheld").unwrap();
+    writeln!(out, "tick\tgoal\treason\ttarget\tframe\taltitude\tleg\tflying\tattempt\telapsed\tdistance\tspeed_error\tship_speed\toutcome\tcommand_speed\tcommand_heading\theat_clearance\tsurface_clearance\tsteering\tthrust\tbrake\tspin\theading_error\tnavigation_tick\tlocation\tship_form\tship_health\tpilot_health\topponent_distance\twithheld\tentry").unwrap();
     for _ in 0..seconds() * 60 {
         client.step(&[], STEP);
         let host = client
@@ -365,40 +369,64 @@ fn trace_learned_transfer_seat() {
             .iter()
             .map(|planet| p.ship.position.distance_to(planet.motion.position) - planet.radius)
             .fold(f32::INFINITY, f32::min);
-        // Why a transfer tick has no published leg, by the entry rule of
-        // mission_transfer_approach.rs on the ordinary entry, 85 units above
-        // the target toward the ship: inside another planet's margin of 105,
-        // the sun's of 110 or the boundary's of 20, in that order, or none of
-        // them when another condition held the leg back.
+        // The entry rule of mission_transfer_approach.rs: the first margin a
+        // point lies inside, another planet's of 105, the sun's of 110 or the
+        // boundary's of 20, or none.
+        let inside = |point: engine_core::Vec2, target: usize| -> Option<&'static str> {
+            if o.planets.iter().any(|v| {
+                v.index != target && point.distance_to(v.motion.position) < v.radius + 105.0
+            }) {
+                Some("planet")
+            } else if o
+                .sun
+                .is_some_and(|sun| point.distance_to(sun.position) < sun.radius + 110.0)
+            {
+                Some("sun")
+            } else if point.distance_to(o.boundary.center) > o.boundary.radius - 20.0 {
+                Some("boundary")
+            } else {
+                None
+            }
+        };
+        // The pilot's ordinary entry, 85 units above the target toward the ship.
+        let ordinary = telemetry
+            .target
+            .and_then(|target| o.planets.iter().find(|v| v.index == target))
+            .map(|target| {
+                let radial = (p.ship.position - target.motion.position).normalized();
+                (
+                    target.index,
+                    target.motion.position + radial * (target.radius + 85.0),
+                )
+            });
+        // Why a transfer tick has no published leg: the margin the ordinary
+        // entry lies inside, or none of them when another condition held the
+        // leg back.
         let withheld = if telemetry.goal == MissionGoal::Transfer && leg.is_none() {
-            telemetry
-                .target
-                .and_then(|target| o.planets.iter().find(|v| v.index == target))
-                .map_or("no target", |target| {
-                    let radial = (p.ship.position - target.motion.position).normalized();
-                    let entry = target.motion.position + radial * (target.radius + 85.0);
-                    if o.planets.iter().any(|v| {
-                        v.index != target.index
-                            && entry.distance_to(v.motion.position) < v.radius + 105.0
-                    }) {
-                        "planet"
-                    } else if o
-                        .sun
-                        .is_some_and(|sun| entry.distance_to(sun.position) < sun.radius + 110.0)
-                    {
-                        "sun"
-                    } else if entry.distance_to(o.boundary.center) > o.boundary.radius - 20.0 {
-                        "boundary"
-                    } else {
-                        "other"
-                    }
-                })
+            ordinary.map_or("no target", |(target, entry)| {
+                inside(entry, target).unwrap_or("other")
+            })
         } else {
             "-"
         };
+        // The entry a published leg flies to: the ordinary one, a clear
+        // alternate bearing, or the ordinary one though blocked.
+        let entry = match (leg, ordinary) {
+            (Some(leg), Some((target, entry))) => {
+                if leg.entry.distance_to(entry) > 0.5 {
+                    "alternate"
+                } else if inside(leg.entry, target).is_some() {
+                    "blocked"
+                } else {
+                    "ordinary"
+                }
+            }
+            (Some(_), None) => "no target",
+            (None, _) => "-",
+        };
         writeln!(
             out,
-            "{}\t{:?}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{:.2}\t{}\t{}\t{:?}\t{:?}\t{:.0}\t{:.0}\t{}\t{}",
+            "{}\t{:?}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{:.2}\t{}\t{}\t{:?}\t{:?}\t{:.0}\t{:.0}\t{}\t{}\t{}",
             host.sortie.state.tick(),
             telemetry.goal,
             telemetry.reason.unwrap_or(""),
@@ -434,6 +462,7 @@ fn trace_learned_transfer_seat() {
                 p.ship.position.distance_to(opponent.motion.position)
             )),
             withheld,
+            entry,
         )
         .unwrap();
         if let Some(file) = &mut dumped

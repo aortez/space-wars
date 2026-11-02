@@ -33,7 +33,9 @@ mod escape_travel;
 pub use escape_travel::{ESCAPE_TRAVEL_PROFILE, EscapeTravel, EscapeTravelAttempt};
 #[path = "mission_transfer_approach.rs"]
 mod transfer_approach;
-pub use transfer_approach::{TRANSFER_APPROACH_PROFILE, TransferApproach, TransferApproachSample};
+pub use transfer_approach::{
+    LearnedEntries, TRANSFER_APPROACH_PROFILE, TransferApproach, TransferApproachSample,
+};
 #[path = "mission_transfer_speed.rs"]
 mod transfer_speed;
 pub use transfer_speed::{
@@ -212,6 +214,9 @@ pub struct MissionTelemetry {
     /// The flight stack a host flies the transfer legs with.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub learned_transfer: Option<&'static str>,
+    /// The entries the host was given for the legs, by tick.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learned_entries: Option<LearnedEntries>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -235,11 +240,14 @@ pub struct MissionAvoidance {
 }
 
 /// The transfer leg the pilot would fly with its own controls this tick,
-/// published for a learned flight host: the mission's entry point above the
-/// destination and that point's velocity in the world, both re-issued every
-/// tick as the entry rides the planet's orbit and spin. Published only while
-/// the pilot's priorities leave the ship to the transfer; the handoff, a
-/// recovery, a pursuit or a solar escape withdraws it.
+/// published for a learned flight host: an entry point above the
+/// destination, the pilot's own while it is clear of the other planets'
+/// margins, the sun's and the boundary and otherwise the nearest clear
+/// bearing around the destination, and that point's velocity in the world,
+/// both re-issued every tick as the entry rides the planet's orbit and spin.
+/// Published only while the pilot's priorities leave the ship to the
+/// transfer; the handoff, a recovery, a pursuit or a solar escape withdraws
+/// it.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct TransferLeg {
     pub tick: u64,
@@ -295,6 +303,7 @@ pub struct MaterialMissionPilot {
     /// The selection whose leg a learned host has been given: from then on
     /// the stack owns the ship's altitude until the handoff.
     learned_leg: Option<u64>,
+    learned_bearing: Option<transfer_approach::LearnedBearing>,
 }
 
 impl MaterialMissionPilot {
@@ -349,6 +358,7 @@ impl MaterialMissionPilot {
                 transfer_approach: None,
                 transfer_speed: None,
                 learned_transfer: None,
+                learned_entries: None,
             },
             capture: None,
             recovery: None,
@@ -384,6 +394,7 @@ impl MaterialMissionPilot {
             learned_transfer: false,
             transfer_leg: None,
             learned_leg: None,
+            learned_bearing: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -552,6 +563,7 @@ impl MaterialMissionPilot {
         );
         self.learned_transfer = enabled;
         self.telemetry.learned_transfer = enabled.then_some(crate::flight_stack::STACK_ID_V2);
+        self.telemetry.learned_entries = enabled.then_some(LearnedEntries::default());
     }
     pub fn learned_transfer(&self) -> bool {
         self.learned_transfer
@@ -1191,11 +1203,11 @@ impl MaterialMissionPilot {
         } else {
             self.goal(MissionGoal::Transfer, p.tick);
             self.record_transfer_approach_guidance(p.tick);
-            // The leg is published while the entry is one the mission would
-            // fly to itself: an entry that another planet's orbit has carried
-            // into its margin is left to the pilot's own detours until the
-            // orbits part, since the handoff cannot fire at another planet's
-            // surface and the stack would park there.
+            // The stack flies to the point it is given, so its leg takes a
+            // clear entry: one that another planet's orbit has carried into
+            // its margin would park the ship at that planet's surface, where
+            // the handoff cannot fire, and one inside the sun's margin would
+            // hold it at the heat. The pilot's own flight keeps its entry.
             if self.learned_transfer
                 && p.controls_armed
                 && p.ship_available
@@ -1203,8 +1215,8 @@ impl MaterialMissionPilot {
                 && c.recovery.flight.flight.enabled
                 && matches!(p.location, PilotLocation::Aboard(_))
                 && p.landing.supported_feet == 0
-                && transfer_approach::clear_entry(o, target.index, entry)
             {
+                let entry = self.learned_entry(o, target, entry);
                 self.transfer_leg = Some(TransferLeg {
                     tick: p.tick,
                     selected_tick: self.selected_tick,
