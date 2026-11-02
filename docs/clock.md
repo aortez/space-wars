@@ -655,6 +655,11 @@ spider is in the arena, on the shared code-native path of the raster and
 vector adapters. The time stays legible: the way out goes up through the
 canopy, not through the digits.
 
+[Spider visit qualification](#spider-visit-qualification-2026-11-02) under
+Verification records the route envelope over every view and font, what the
+tests prove, the caps and the benchmarks; `./benchmark-clock.sh --cases
+spider` measures one visit per cycle in the headless client.
+
 The pictures come from the client's own renderer, through a capture test
 that always runs a sample and writes every other frame when given a
 directory:
@@ -675,6 +680,12 @@ ffmpeg -framerate 30 -i frame-%04d.png -vf "scale=400:-1:flags=lanczos,split[a][
 | ![The spider hangs on a line from under the digit](screenshots/clock/spider-visit-swing.png) | ![The spider climbs its line to the ceiling beside the open hatch](screenshots/clock/spider-visit-exit.png) |
 
 ![The whole visit at 800×480, every other frame](screenshots/clock/spider-visit.gif)
+
+In the portrait view the same seed drops the spider three pitches under the
+2, the most a swing lets out, so a drop looks alike in a tall view and a
+wide one:
+
+![The spider hangs three pitches under the 2 in the 480×800 view](screenshots/clock/spider-visit-portrait.png)
 
 ### Managed floor and drain
 
@@ -3372,6 +3383,105 @@ of 250 draw primitives across the recipes and sizes with the default message. Th
 CPU construction costs, not Pi or end-to-end latency measurements.
 
 **Marquee has not been deployed or tested on the Pi.** Ask before deploying.
+
+### Spider visit qualification (2026-11-02)
+
+Issue [#384](https://github.com/aortez/space-wars/issues/384) is the
+completion gate for [#162](https://github.com/aortez/space-wars/issues/162):
+proof that the ordinary spider visit of [#383](#spider-visitor) delivers
+its route with the actual climbing and silk physics, readable rendering and
+a bounded lifetime. The proof is `spider/tests/qualify.rs` beside the
+visit's own tests, the route envelope below, the captures of the
+[Spider visitor](#spider-visitor) section, and the benchmarks.
+
+**Route envelope.** Every supported view and font over six seeds, from the
+ignored probe `spider::tests::qualify::probe_route_envelope` (the same visits
+`probe_visit_sweep` prints one line each for). A visit's length is from its
+admission to its departure; "left at" is when it started leaving. The budget
+is 30 s with up to 10 s more for the way out; nothing failed to leave.
+
+| View | Font | Departed | Swung | Fell | Visit (s) median / longest | Left at (s) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 800×480 | Classic | 6/6 | 6/6 | 1/6 | 20.8 / 30.1 | 16.3 |
+| 800×480 | Matrix | 6/6 | 6/6 | 1/6 | 20.6 / 22.9 | 15.5 |
+| 800×480 | Sans | 6/6 | 6/6 | 1/6 | 20.5 / 23.4 | 15.8 |
+| 800×480 | Serif | 6/6 | 6/6 | 0/6 | 20.6 / 22.0 | 15.6 |
+| 1024×768 | Classic | 6/6 | 6/6 | 0/6 | 21.1 / 22.3 | 16.1 |
+| 1024×768 | Matrix | 6/6 | 6/6 | 2/6 | 22.4 / 28.4 | 15.4 |
+| 1024×768 | Sans | 6/6 | 6/6 | 1/6 | 22.1 / 25.5 | 15.9 |
+| 1024×768 | Serif | 6/6 | 6/6 | 1/6 | 22.5 / 28.1 | 16.0 |
+| 4:1 | Classic | 6/6 | 4/6 | 6/6 | 20.7 / 20.9 | 15.8 |
+| 4:1 | Matrix | 6/6 | 6/6 | 1/6 | 24.6 / 29.1 | 16.2 |
+| 4:1 | Sans | 6/6 | 6/6 | 1/6 | 23.9 / 30.2 | 16.0 |
+| 4:1 | Serif | 6/6 | 6/6 | 0/6 | 21.1 / 25.6 | 15.9 |
+| 480×800 | Classic | 6/6 | 6/6 | 0/6 | 22.4 / 30.3 | 15.2 |
+| 480×800 | Matrix | 6/6 | 6/6 | 0/6 | 22.3 / 24.0 | 13.4 |
+| 480×800 | Sans | 6/6 | 6/6 | 0/6 | 22.2 / 22.6 | 15.5 |
+| 480×800 | Serif | 6/6 | 6/6 | 0/6 | 22.1 / 22.7 | 16.4 |
+
+Swings are missing only in the 4:1 view in Classic, where the digits sit
+under two pitches of floor room and the first underside the spider comes to
+has none to drop in. Falls are landings on the floor after a lost line or a
+cell gone from under the spider, every one recovered from.
+
+**What the tests prove.**
+
+- The drawn line is the physical one, every tick: exactly one line
+  primitive per silk line or shot, from the body to the anchor the physics
+  has, and nothing of the spider drawn once it has gone. The published
+  `anchor` and `shooting` agree with the fixture.
+- The spider stays on the drawn face while the digits move: through a
+  minute change by a contiguous forward minute, the old glyph slides out
+  under the spider, which rides the departing cell with its legs' hold
+  inside the cell's visible footprint and on a drawn cell every tick, is let
+  go at the band's edge and recovers; the time shows the new minute.
+- Visits repeat within their budgets beside residents: three automatic
+  Demo visits beside the fixture's three balls, the spider's claim within
+  its budget and the arena within capacity every tick, at most one joint,
+  at most 233 proxies, one physical step a tick, the balls still there
+  after each, the reuse delay set once per departure from its own tick, and
+  one world all along.
+- A first visit makes the run its world, kept for the run; two fixtures and
+  a duck visit leave the spider no room, which is reported as `capacity`
+  before anything is claimed, and the duck's visit goes on untouched.
+- Off admits no spider in two minutes while a manual preview still does;
+  Calm brings one in after its idle wait.
+- From #383: exact replay, bounded drawing, the schedule and reuse delay,
+  busy notices for a duck, a crow, a player's duck, Rain and Meltdown,
+  exclusion both ways for every kind, the time changing under a crawl and a
+  swing, a way out that keeps going from under the spider ending in a
+  reported failed exit, pause, disable, resize, residents preserved. From
+  #382: every hold against the published contract and the drawn face,
+  proxies against every event's publication, retirement under the spider,
+  a glyph coming between, the frame, refusals, the paused clock and the end
+  of the run. From #381: the mechanic's own contact, reach, grip, slack and
+  taut swings, reeling, line replacement, release velocity, occlusion and
+  anchor removal.
+
+**Caps and timing.** 30-second budget, five-second reserve, the way out
+reckoned at five seconds plus the climb to the ceiling at the reel's pace
+and the crawl along it, ten seconds of exit grace, 233 proxies, one line at
+a time, the spider's arena budget of 239 bodies, 239 colliders and one
+joint. Clock's silk crosses the room in three seconds down and four up, the
+spider crawls at seven radii a second, and a swing lets out at most three
+pitches of line.
+
+**Benchmarks.** `./benchmark-clock.sh --cases spider` runs one visit per
+cycle of the budget, the exit grace and the cooldown in the headless client,
+with the digits' proxies reposed as the seconds change. On the development
+workstation at 1024×768, raster scale 1, three independent 69-second runs
+each (CPU-only: no drawing, upload or vsync):
+
+| Case | step ms/frame | scene | prepare | total | worst row p95 |
+| --- | --- | --- | --- | --- | --- |
+| idle | 0.004–0.006 | 0.024–0.028 | 1.72–1.94 | 1.75–1.97 | 2.93–3.27 |
+| spider | 0.026–0.041 | 0.023–0.032 | 1.68–2.08 | 1.73–2.15 | 2.82–3.04 |
+| residents | 0.008–0.014 | 0.023–0.031 | 1.69–2.05 | 1.72–2.10 | 2.85–2.98 |
+
+The spider's physics, its frame and up to 233 proxies cost about 0.02–0.035
+ms a tick here, over the empty arena's step; the frame's cost is the raster
+preparation of the face in every case. Device numbers for the supported Pi
+targets go here once measured.
 
 ## Device captures
 

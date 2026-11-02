@@ -26,6 +26,7 @@ use engine_rapier::{
 };
 
 mod capture;
+mod qualify;
 mod visit;
 
 const SEED: u64 = 7;

@@ -92,6 +92,8 @@ pub use events::{
     EventLifecycle, EventPhase, FALLING_TICKS, FIXED_HZ, REFORMING_TICKS,
 };
 use layout::Layout;
+/// How long a spider's visit may go on past its budget on its way out.
+pub use spider::visit::EXIT_GRACE_TICKS as SPIDER_EXIT_GRACE_TICKS;
 
 pub const CLOCK_ACTION_VERSION: u16 = 13;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;

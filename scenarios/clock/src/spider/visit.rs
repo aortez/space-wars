@@ -47,6 +47,8 @@ const SLACK_TICKS: u64 = 24;
 /// the floor.
 const SWING_DROP: f32 = 1.5;
 const SWING_BOUNCE: f32 = 3.0;
+/// The most line a swing lets out, in pitches.
+const SWING_REACH_PITCH: f32 = 3.0;
 /// How long a climb, a crossing or a walk may take before it is given up.
 const STEP_LIMIT_TICKS: u64 = 6 * 60;
 /// How long the way out crawls on after a shot up that came to nothing
@@ -352,11 +354,13 @@ impl SpiderVisit {
     }
 
     /// How long a line to swing on from an anchor at `anchor_y` is: as much
-    /// as the slack ticks let out, and never so much that the drop, with
-    /// the bounce at the end of it, reaches the floor.
+    /// as the slack ticks let out, at most a few pitches so a drop looks the
+    /// same in a tall view as in a wide one, and never so much that the
+    /// drop, with the bounce at the end of it, reaches the floor.
     fn swing_line(&self, anchor_y: f32, radius: f32) -> f32 {
         let spec = SpiderFixture::spec(self.layout);
-        let let_out = SLACK_TICKS as f32 / FIXED_HZ as f32 * spec.pay_out_speed * radius;
+        let let_out = (SLACK_TICKS as f32 / FIXED_HZ as f32 * spec.pay_out_speed * radius)
+            .min(SWING_REACH_PITCH * self.layout.pitch);
         let room = anchor_y - self.layout.floor_y - SWING_BOUNCE * radius;
         (spec.min_line * radius + let_out).min(room)
     }
