@@ -284,6 +284,13 @@ fn manual_requests_add_one_spider_and_busy_ones_report_why() {
     assert!(state.event_blocked_by_spider(ClockEventKind::Duck));
     assert!(state.event_blocked_by_spider(ClockEventKind::Spider));
     assert!(!state.event_blocked_by_spider(ClockEventKind::DigitSlide));
+    // A player's duck summoned now waits as well.
+    let bodies = state.body_count();
+    sync(&mut state, &[ClockAction::toggle_player_duck(1)]);
+    assert_eq!(state.event_notice.unwrap().0, "Spider is visiting");
+    assert!(state.player_duck_session().is_none());
+    assert_eq!(state.spider_state(), before);
+    assert_eq!(state.body_count(), bodies);
 
     // The spider waits for a duck, a crow, a player's duck and an event it
     // would not keep live, and takes nothing over.
@@ -468,8 +475,9 @@ fn a_way_out_that_keeps_going_from_under_it_ends_in_a_reported_failed_exit() {
     let mut change = 0u8;
     let visit = run(&mut state, LONGEST, |state| {
         let spider = spider(state);
-        if spider.phase == ClockSpiderPhase::Leaving && spider.age_ticks % 60 == 0 {
-            // Both digits by the hatch change every second.
+        if spider.phase == ClockSpiderPhase::Leaving && spider.age_ticks % 20 == 0 {
+            // Both digits by the hatch change three times a second, faster
+            // than a line up one can be climbed.
             change = (change + 1) % 6;
             let at = reading(10 + change, 10 * change + 9, 30);
             sync(state, &[ClockAction::set_reading(at)]);

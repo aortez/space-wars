@@ -135,6 +135,14 @@ impl ClockState {
                 return;
             }
         }
+        // A new animal waits for the spider, as the spider waits for a duck.
+        if self.spider_visit.is_some() {
+            self.event_notice = Some((
+                "Spider is visiting",
+                self.schedule.tick + 2 * u64::from(FIXED_HZ),
+            ));
+            return;
+        }
         // A joining player's visit claims the arena, and brings a standalone
         // event it joins into it. The arena refuses before anything changes.
         let mut owners = self.arena_owners();

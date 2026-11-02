@@ -1074,9 +1074,12 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), Some((9, 1)));
     click(&window, 649.0, 334.0);
     assert_eq!(adjusted.get(), Some((10, 1)));
-    // Spider sits between Aquarium and the recipe in the Marquee row.
-    click(&window, 371.0, 334.0);
+    // Spider sits between Aquarium and the recipe in the Marquee row, each
+    // switch a fifth of the row wide.
+    click(&window, 404.0, 334.0);
     assert_eq!(adjusted.get(), Some((21, 1)));
+    click(&window, 285.0, 334.0);
+    assert_eq!(adjusted.get(), Some((17, 1)));
     // The extra launcher row must not overlap Back/Start at 800×480.
     window.set_ingame_menu_visible(false);
     window.set_launcher_visible(true);

@@ -424,6 +424,16 @@ fn replacing_events_and_player_visits_resize_and_repeated_cleanup_are_bounded() 
             ticks(&mut state, 90);
             let event_id = state.event_id();
             let active_at_spawn = state.event_kind();
+            if event == ClockEventKind::Spider {
+                // A player's duck waits for the spider's visit.
+                toggle(&mut state, 1);
+                assert_eq!(state.event_notice.unwrap().0, "Spider is visiting");
+                assert!(state.player_duck_state().is_none());
+                assert!(state.spider_state().is_some());
+                state.finish_spider_visit();
+                assert!(state.spider_state().is_none());
+                continue;
+            }
             toggle(&mut state, 1);
             assert_eq!(
                 state.event_id(),

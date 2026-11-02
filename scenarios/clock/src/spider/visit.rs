@@ -210,6 +210,10 @@ pub(crate) struct SpiderVisit {
     /// anything it passes.
     climb_from: Vec2,
     catch_all: bool,
+    /// Whether a crossing has tried the other digit by the hatch, and how
+    /// many crossings have been shot from a rail.
+    flipped: bool,
+    rail_crossings: u32,
     retries: u32,
     /// The crawl's direction and how long it goes on.
     direction: f32,
@@ -253,6 +257,8 @@ impl SpiderVisit {
             pick_direction: false,
             climb_from: Vec2::ZERO,
             catch_all: false,
+            flipped: false,
+            rail_crossings: 0,
             retries: 0,
             direction: 1.0,
             crawl_until: 0,
@@ -285,6 +291,7 @@ impl SpiderVisit {
         self.catching = false;
         self.landed = false;
         self.catch_all = false;
+        self.flipped = false;
     }
 
     /// Ticks left before the visit must be on its way out.
@@ -295,12 +302,13 @@ impl SpiderVisit {
     }
 
     /// A guess at how long the way out takes from `position`: the way round
-    /// the digit to clear sky and the climb to the ceiling, the crawl along
-    /// it to the hatch, and the way out above.
+    /// the digit to clear sky, the climb to the ceiling at the reel's pace,
+    /// the crawl along it to the hatch, and the way out above.
     fn exit_estimate(&self, position: Vec2, radius: f32) -> u64 {
-        let crawl = SpiderFixture::spec(self.layout).crawl_speed * radius;
-        let along = (position.x.abs() / crawl * FIXED_HZ as f32) as u64;
-        u64::from(FIXED_HZ) * 7 + along
+        let spec = SpiderFixture::spec(self.layout);
+        let along = position.x.abs() / (spec.crawl_speed * radius);
+        let up = (self.layout.canopy_y - position.y).max(0.0) / (spec.reel_speed * radius);
+        u64::from(FIXED_HZ) * 5 + ((along + up) * FIXED_HZ as f32) as u64
     }
 
     fn time_to_leave(&self, state: &SpiderFixtureState) -> bool {
@@ -353,12 +361,20 @@ impl SpiderVisit {
         (spec.min_line * radius + let_out).min(room)
     }
 
-    /// Whether a swing from where the spider holds on has room to drop.
-    fn can_swing(&self, state: &SpiderFixtureState) -> bool {
+    /// Whether a swing from where the spider holds on has room to drop:
+    /// under a cell, within its span, with room above the floor.
+    fn can_swing(&self, state: &SpiderFixtureState, boxes: &[CellBox]) -> bool {
         let radius = state.spider.radius;
+        let x = state.spider.position.x;
         Self::under_cell(state)
+            && Self::held_box(boxes, state).is_some_and(|held| held.lo.x <= x && x <= held.hi.x)
             && self.swing_line(state.spider.position.y + radius, radius)
                 >= (SpiderFixture::spec(self.layout).min_line + SWING_DROP) * radius
+    }
+
+    /// The box of the cell the spider holds, where it holds a published one.
+    fn held_box<'a>(boxes: &'a [CellBox], state: &SpiderFixtureState) -> Option<&'a CellBox> {
+        boxes.iter().find(|b| Some(b.id) == Self::held_id(state))
     }
 
     fn on_ceiling(state: &SpiderFixtureState) -> bool {
@@ -518,7 +534,7 @@ impl SpiderVisit {
         if state.spider.up.y.abs() < 0.7 {
             return None;
         }
-        let held = boxes.iter().find(|b| Some(b.id) == Self::held_id(state))?;
+        let held = Self::held_box(boxes, state)?;
         let underside = state.spider.up.y < 0.0;
         let [(left, left_free), (right, right_free)] = Self::row_ends(boxes, held, underside);
         let digit = boxes
@@ -665,7 +681,7 @@ impl SpiderVisit {
         let idle = SpiderIntent::default();
         let from_digit = Self::holds_digit(state);
         let hold = SpiderIntent {
-            grip: from_digit,
+            grip: state.support.is_some(),
             ..idle
         };
         if state.spider.shot.is_some() {
@@ -700,10 +716,12 @@ impl SpiderVisit {
             self.underside_marks(&boxes, self.slot, from, radius)
         };
         let Some(target) = marks.get(self.retries as usize).copied() else {
-            // Nothing on this side to tie to: the other side once.
-            if self.retries <= MAX_RETRIES && (self.slot == 1 || self.slot == 2) {
+            // Nothing on this side to tie to: the other side once, from its
+            // nearest mark.
+            if !self.flipped && (self.slot == 1 || self.slot == 2) {
                 self.slot = 3 - self.slot;
-                self.retries = MAX_RETRIES + 1;
+                self.retries = 0;
+                self.flipped = true;
                 return hold;
             }
             self.give_up_crossing(state);
@@ -782,9 +800,12 @@ impl SpiderVisit {
         };
         if self.phase_tick == 1 {
             let boxes = Self::boxes(published);
+            if let Some(held) = Self::held_box(&boxes, state) {
+                self.slot = held.slot;
+            }
             self.direction = self.climb_direction(state, &boxes);
             let [least, most] = CRAWL_TICKS;
-            self.crawl_until = if self.can_swing(state) && self.swings < MAX_SWINGS {
+            self.crawl_until = if self.can_swing(state, &boxes) && self.swings < MAX_SWINGS {
                 // A little way along the underside, and a swing from there.
                 self.rng.random_range(least / 4..=least / 2)
             } else {
@@ -808,12 +829,24 @@ impl SpiderVisit {
             ..grip
         };
         if self.phase_tick < self.crawl_until {
+            // The first underside it comes to is the first swing's.
+            if self.swings == 0
+                && self.phase_tick >= SLACK_TICKS
+                && self.can_swing(state, &Self::boxes(published))
+            {
+                self.enter(ClockSpiderPhase::Swinging);
+                return grip;
+            }
             return crawling;
         }
         // What next. A swing wants an underside to drop from, where the
         // line it hangs by cannot cross the cell it is tied to.
+        let boxes = Self::boxes(published);
         let roll: f32 = self.rng.random_range(0.0..1.0);
-        if self.can_swing(state) && self.swings < MAX_SWINGS && (self.swings == 0 || roll < 0.3) {
+        if self.can_swing(state, &boxes)
+            && self.swings < MAX_SWINGS
+            && (self.swings == 0 || roll < 0.3)
+        {
             self.enter(ClockSpiderPhase::Swinging);
             return grip;
         }
@@ -821,12 +854,12 @@ impl SpiderVisit {
             self.enter(ClockSpiderPhase::Crawling);
             return crawling;
         }
-        // Across to the other digit by the hatch, if a line reaches it.
-        let other = match self.slot {
-            1 => 2,
-            _ => 1,
+        // Across to the digit next door, if a line reaches it.
+        let other = if self.slot <= 1 {
+            self.slot + 1
+        } else {
+            self.slot - 1
         };
-        let boxes = Self::boxes(published);
         if self
             .side_marks(&boxes, other, state.spider.position, state.spider.radius)
             .is_empty()
@@ -859,13 +892,28 @@ impl SpiderVisit {
                     self.enter(ClockSpiderPhase::Crawling);
                     return grip;
                 }
-                let aim = state.spider.support.map_or(-state.spider.up, |s| -s.normal);
+                // At the legs' hold on the cell, which a shot along the
+                // cell's normal from a body on its corner would miss.
+                let aim = state
+                    .spider
+                    .support
+                    .map_or(-state.spider.up, |s| s.point - state.spider.position);
                 return SpiderIntent {
                     shoot: Some(aim),
                     ..grip
                 };
             }
             let line = state.spider.line.expect("a line");
+            let tied_here = matches!(
+                (state.anchor, state.support),
+                (Some(Hold::Surface { id: anchor, .. }), Some(Hold::Surface { id: held, .. }))
+                    if anchor == held
+            );
+            if !tied_here {
+                // Tied to something else: no swing from here.
+                self.enter(ClockSpiderPhase::Crawling);
+                return SpiderIntent { cut: true, ..grip };
+            }
             if line.length < self.swing_line(line.anchor.y, state.spider.radius) {
                 return SpiderIntent { reel: -1.0, ..grip };
             }
@@ -874,8 +922,10 @@ impl SpiderVisit {
             return grip;
         }
         if state.spider.line.is_none() {
-            self.enter(ClockSpiderPhase::Recovering);
-            return grip;
+            // Nothing tied, or a shot still on its way: the crawl goes on,
+            // or a fall is recovered from.
+            self.enter(ClockSpiderPhase::Crawling);
+            return SpiderIntent { cut: true, ..grip };
         }
         if self.phase_tick == letting_out + 1 {
             self.swings += 1;
@@ -943,8 +993,20 @@ impl SpiderVisit {
                     ..grip
                 }
             }
+            Some(Hold::Frame(FramePart::LeftRail | FramePart::RightRail)) => {
+                // On a rail: a line to the digit beside it, once, and after
+                // that the way out from here.
+                if self.rail_crossings > 0 || self.time_to_leave(state) {
+                    self.leave(state);
+                    return grip;
+                }
+                self.rail_crossings += 1;
+                self.slot = if state.spider.up.x > 0.0 { 0 } else { 3 };
+                self.enter(ClockSpiderPhase::Crossing);
+                self.cross(state, published)
+            }
             Some(Hold::Frame(_)) => {
-                // On a rail or the ceiling: a fine place to leave from.
+                // The ceiling: a fine place to leave from.
                 self.leave(state);
                 grip
             }

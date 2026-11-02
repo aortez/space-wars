@@ -608,21 +608,23 @@ round neither end of. The arena's own ray has the last word, and a shot that
 still fails is tried elsewhere. The time keeps running and the digits change
 normally: a digit retired from under the spider drops it, and it catches what
 is within reach, or lands on the floor, walks under the nearest digit and
-climbs it on a line.
+climbs it on a line. Flung onto a rail, it shoots a line to the digit beside
+the rail and climbs that, once; from the ceiling it simply leaves.
 
 The visit is solo. Only Digit Slide and Color Cycle run beside it; every
-other event waits for it, and it waits for a duck visit, a player's duck, a
-crow and any event it does not keep live, taking nothing over. Those rules
-are in one place, `spider::visit::compatible_event`, an exhaustive match, so
-a new event kind has to say whether it may run beside the spider before
-Clock compiles. The scheduler resumes after departure through the ordinary
-30-second reuse delay, with no backlog.
+other event waits for it, a player's duck summoned meanwhile is refused with
+the same notice, and the spider itself waits for a duck visit, a player's
+duck, a crow and any event it does not keep live, taking nothing over. Those
+rules are in one place, `spider::visit::compatible_event`, an exhaustive
+match, so a new event kind has to say whether it may run beside the spider
+before Clock compiles. The scheduler resumes after departure through the
+ordinary 30-second reuse delay, with no backlog.
 
 The visit's budget is **30 seconds**, entrance and exit included. It starts
 leaving when the time left, less a five-second reserve, is no more than its
-reckoning of the way out: seven seconds for the way round the digit and the
-climb to the ceiling, plus the crawl along the ceiling to the hatch at its
-crawl speed. A visit still inside ten seconds past its budget is reported as
+reckoning of the way out: five seconds for the way round the digit, the
+climb to the ceiling at its reel's pace, and the crawl along the ceiling to
+the hatch at its crawl speed. A visit still inside ten seconds past its budget is reported as
 a **failed exit** for one tick and then taken away where it stands, which
 the accounting counts apart from departures; the reuse delay runs either
 way. Pause and zero-dt ticks freeze it. A resize cancels it, because its
@@ -2577,11 +2579,13 @@ visit, admits a spider, sets its intent each tick and reads it back.
   and goes out within a visit; it crawls at seven radii per second.
 
 `ClockState` takes `admit_spider(position)`, `set_spider_intent(intent)`,
-`spider_state()` and `remove_spider()`, and reports `spider_accounting()`:
-spiders admitted, refused, removed and cancelled. The state names what the
-legs hold and what the line is tied to as a `Hold`: a surface with its id,
-source and whether it is departing, a retired surface, a rigid body, a frame
-part or the floor. It counts the proxies, the cells without one, the rigid
+which is refused while a visit drives the spider, `spider_fixture_state()`
+and `remove_spider()`, and reports `spider_accounting()`: spiders admitted,
+refused, removed and cancelled, and visits departed and failed to leave;
+`spider_state()` is the visit's published state, none for a spider a test
+admitted. The fixture's state names what the legs hold and what the line is
+tied to as a `Hold`: a surface with its id, source and whether it is
+departing, a retired surface, a rigid body, a frame part or the floor. It counts the proxies, the cells without one, the rigid
 bodies the spider may hold, the refusals of the last tick and the ticks the
 spider has been in the arena, beside the mechanic's own state.
 

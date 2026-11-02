@@ -2425,10 +2425,14 @@ fn arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run() 
         assert!(owners.contains(&(ClockArenaOwner::Visit, false)));
         let run = refused.arena.as_ref().unwrap().accounting;
         assert_eq!((run.refused, run.worlds), (0, 1));
+        // The spider's room is Meltdown's, so it is refused with them.
         for event in &refused.events {
             let largest = matches!(
                 event.kind,
-                ClockEventKind::Aquarium | ClockEventKind::Explosion | ClockEventKind::Meltdown
+                ClockEventKind::Aquarium
+                    | ClockEventKind::Explosion
+                    | ClockEventKind::Meltdown
+                    | ClockEventKind::Spider
             );
             assert_eq!(
                 event.blocked_by_arena,
