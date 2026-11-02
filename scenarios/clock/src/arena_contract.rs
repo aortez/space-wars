@@ -1087,13 +1087,13 @@ fn arena_contract_keeps_its_world_when_the_fixture_cannot_come_in_as_it_is() {
     assert_eq!(floor_reach(&state), Some((-400.0, 400.0)));
     assert_eq!(balls(&state).len(), 3);
 
-    // Nothing that uses the floor starts meanwhile.
+    // Nothing that uses the floor starts meanwhile, nor the spider, which
+    // is refused while the residents do not fit the view.
     for kind in ClockEventKind::ALL {
+        let refused = EVENT_CATALOG[kind as usize].uses_floor() || kind == ClockEventKind::Spider;
         assert_eq!(
             state.event_blocked_by_arena(kind),
-            EVENT_CATALOG[kind as usize]
-                .uses_floor()
-                .then_some(Unavailable::LayoutIncompatible),
+            refused.then_some(Unavailable::LayoutIncompatible),
             "{kind:?}"
         );
     }
@@ -1186,6 +1186,7 @@ fn arena_contract_schedule_starts_nothing_that_uses_the_floor_while_residents_do
             cell_swap: false,
             grass: false,
             slot_machine: false,
+            spider: false,
         },
         ..ClockConfig::default()
     });
@@ -1339,13 +1340,17 @@ fn arena_contract_a_run_can_start_with_its_fixtures() {
             "{ball:?} at rest on the closed floor: {at:?}"
         );
     }
-    // Beside a visit, the two leave no room for the largest events.
+    // Beside a visit, the two leave no room for the largest events, nor for
+    // the spider, whose room is Meltdown's.
     state.preview_event(ClockEventKind::Duck);
     keep(&mut state, 1, "the visit claiming the arena");
     for kind in ClockEventKind::ALL {
         let largest = matches!(
             kind,
-            ClockEventKind::Aquarium | ClockEventKind::Explosion | ClockEventKind::Meltdown
+            ClockEventKind::Aquarium
+                | ClockEventKind::Explosion
+                | ClockEventKind::Meltdown
+                | ClockEventKind::Spider
         );
         assert_eq!(
             state.event_blocked_by_arena(kind),

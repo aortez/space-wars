@@ -297,6 +297,7 @@ impl ClockAction {
                         cell_swap: payload[5] & 4 != 0,
                         grass: payload[5] & 8 != 0,
                         slot_machine: payload[5] & 16 != 0,
+                        spider: payload[5] & 32 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
@@ -518,6 +519,9 @@ pub struct ClockState {
     // The spider in the arena, admitted only on request, and what became of
     // the spiders the run has had.
     spider: Option<spider::SpiderFixture>,
+    // The brain of a spider admitted as a visit, which decides the spider's
+    // intent each tick. A spider admitted for a test has none.
+    spider_visit: Option<spider::visit::SpiderVisit>,
     spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
@@ -1204,16 +1208,16 @@ impl ClockState {
     /// there is no spider.
     pub fn set_spider_intent(&mut self, intent: engine_rapier::spider::SpiderIntent) -> bool {
         match &mut self.spider {
-            Some(spider) => {
+            Some(spider) if self.spider_visit.is_none() => {
                 spider.set_intent(intent);
                 true
             }
-            None => false,
+            _ => false,
         }
     }
 
     /// The spider as Clock has it now, while there is one.
-    pub fn spider_state(&self) -> Option<spider::SpiderFixtureState> {
+    pub fn spider_fixture_state(&self) -> Option<spider::SpiderFixtureState> {
         self.spider
             .as_ref()
             .map(|spider| spider.state(&self.arena, &self.published))
@@ -1224,22 +1228,30 @@ impl ClockState {
     }
 
     /// Takes the spider out of the arena with its line, its frame and its
-    /// proxies, leaving every other owner as it is. False when there is none.
+    /// proxies, leaving every other owner as it is, and ends its visit if it
+    /// was on one. False when there is none.
     pub fn remove_spider(&mut self) -> bool {
         let Some(spider) = self.spider.take() else {
             return false;
         };
         spider.remove(&mut self.arena);
         self.spider_accounting.removed += 1;
+        if self.spider_visit.take().is_some() {
+            self.schedule.retire(ClockEventKind::Spider);
+        }
         self.sync_event_schedule();
         true
     }
 
     /// A resize ends the spider's stay, because its frame is the old view's.
     fn cancel_spider(&mut self) {
+        let visiting = self.spider_visit.take().is_some();
         if let Some(spider) = self.spider.take() {
             spider.remove(&mut self.arena);
             self.spider_accounting.cancelled += 1;
+        }
+        if visiting {
+            self.schedule.retire(ClockEventKind::Spider);
         }
     }
 
@@ -1260,6 +1272,7 @@ impl ClockState {
     fn arena_owners_for_event(&self, kind: ClockEventKind) -> Option<Vec<arena::Owner>> {
         let adding = match kind {
             ClockEventKind::Duck => vec![arena::Owner::Visit],
+            ClockEventKind::Spider => vec![arena::Owner::Spider],
             ClockEventKind::Aquarium
             | ClockEventKind::Explosion
             | ClockEventKind::Falling
@@ -1326,9 +1339,49 @@ impl ClockState {
         kind == ClockEventKind::Crow && self.crow_visit.is_some()
     }
 
+    /// The spider visit as Clock's state publishes it, while there is one.
+    pub fn spider_state(&self) -> Option<engine_common::ClockSpiderState> {
+        let (visit, spider) = (self.spider_visit.as_ref()?, self.spider.as_ref()?);
+        Some(visit.diagnostics(&spider.state(&self.arena, &self.published)))
+    }
+
+    /// The spider rule, both ways: while the spider visits, every event the
+    /// visit does not keep live waits for it, and another spider does; and
+    /// the spider itself waits for a duck, a crow and any event it would not
+    /// keep live.
+    pub fn event_blocked_by_spider(&self, kind: ClockEventKind) -> bool {
+        if self.spider_visit.is_some() {
+            return !spider::visit::compatible_event(kind);
+        }
+        kind == ClockEventKind::Spider
+            && (self.duck_visit.is_some()
+                || self.crow_visit.is_some()
+                || self
+                    .active_event
+                    .as_ref()
+                    .is_some_and(|event| !spider::visit::compatible_event(event.kind())))
+    }
+
+    fn finish_spider_visit(&mut self) {
+        let Some(visit) = self.spider_visit.take() else {
+            return;
+        };
+        if visit.failed_exit() {
+            self.spider_accounting.failed_exits += 1;
+        } else {
+            self.spider_accounting.departed += 1;
+        }
+        if let Some(spider) = self.spider.take() {
+            spider.remove(&mut self.arena);
+        }
+        self.schedule.retire(ClockEventKind::Spider);
+        self.sync_event_schedule();
+    }
+
     fn event_blocked(&self, kind: ClockEventKind) -> bool {
         self.event_blocked_by_duck(kind)
             || self.event_blocked_by_crow(kind)
+            || self.event_blocked_by_spider(kind)
             || self.event_blocked_by_arena(kind).is_some()
             || kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed
     }
@@ -1395,6 +1448,17 @@ impl ClockState {
                 self.event_notice = Some(("Crow is already visiting", self.schedule.tick + 120));
                 return;
             }
+            if self.event_blocked_by_spider(kind) {
+                let notice = if self.spider_visit.is_none() {
+                    "The spider waits for the visitor or event to finish"
+                } else if kind == ClockEventKind::Spider {
+                    "Spider is already visiting"
+                } else {
+                    "Spider is visiting"
+                };
+                self.event_notice = Some((notice, self.schedule.tick + 2 * u64::from(FIXED_HZ)));
+                return;
+            }
             if self.event_blocked_by_duck(kind) {
                 self.event_notice = Some((
                     if self.player_duck_session().is_some() {
@@ -1418,7 +1482,8 @@ impl ClockState {
             }
             // A deliberate preview replaces an event, including its temporary
             // physics/appearance, but keeps the instance, clock and event IDs.
-            if kind != ClockEventKind::Crow {
+            // A visitor comes in beside whatever is running.
+            if !matches!(kind, ClockEventKind::Crow | ClockEventKind::Spider) {
                 self.finish_event();
             }
             self.start_preview(kind);
@@ -1448,6 +1513,12 @@ impl ClockState {
             "Waiting for the duck to leave"
         } else if self.crow_visit.is_some() && self.config.events.crow {
             "Crow is already visiting"
+        } else if self.spider_visit.is_some()
+            && ClockEventKind::ALL
+                .into_iter()
+                .any(|kind| self.config.events.enabled(kind))
+        {
+            "Spider is visiting"
         } else if let Some(unavailable) = ClockEventKind::ALL
             .into_iter()
             .filter(|kind| self.config.events.enabled(*kind))
@@ -1489,6 +1560,29 @@ impl ClockState {
                 &self.segments,
                 self.event_kind(),
             ));
+            self.sync_event_schedule();
+            return;
+        }
+        if kind == ClockEventKind::Spider {
+            let seed = self.schedule.admit_resident(kind);
+            let layout = Layout::new(self.aspect_ratio());
+            match self.admit_spider(spider::SpiderFixture::visit_start(layout)) {
+                Ok(()) => {
+                    self.spider_visit = Some(spider::visit::SpiderVisit::new(
+                        layout,
+                        seed,
+                        self.schedule.event_id,
+                    ));
+                }
+                Err(refusal) => {
+                    // Nothing of the spider stays, and the reuse delay runs
+                    // as after a visit.
+                    self.event_notice = Some((
+                        refusal.notice(),
+                        self.schedule.tick + 2 * u64::from(FIXED_HZ),
+                    ));
+                }
+            }
             self.sync_event_schedule();
             return;
         }
@@ -1668,6 +1762,10 @@ impl ClockState {
         if self.spider.is_some() {
             self.settle_surfaces();
             let spider = self.spider.as_mut().expect("a spider");
+            if let Some(visit) = &mut self.spider_visit {
+                let state = spider.state(&self.arena, &self.published);
+                spider.set_intent(visit.decide(&state, &self.published));
+            }
             spider.drive(&mut self.arena, &self.published, events::duck::DT);
         }
         // Water advances once, then the one duck mechanics world samples it.
@@ -1728,6 +1826,11 @@ impl ClockState {
         }
         if visit_finished {
             self.finish_duck_visit();
+        }
+        // A spider visit that got out, or ran out of time getting out,
+        // leaves the arena with its spider.
+        if self.spider_visit.as_ref().is_some_and(|visit| visit.done()) {
+            self.finish_spider_visit();
         }
         if fixture_left {
             self.sync_event_schedule();
@@ -1942,6 +2045,7 @@ impl Scenario for ClockScenario {
             arena: arena::ClockArena::default(),
             arena_fixtures: Vec::new(),
             spider: None,
+            spider_visit: None,
             spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
             player_duck_sequence: 0,

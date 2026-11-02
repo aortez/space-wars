@@ -682,10 +682,11 @@ pub enum ClockEventKind {
     CellSwap = 10,
     Grass = 11,
     SlotMachine = 12,
+    Spider = 13,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -699,6 +700,7 @@ impl ClockEventKind {
         Self::CellSwap,
         Self::Grass,
         Self::SlotMachine,
+        Self::Spider,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -716,6 +718,7 @@ impl ClockEventKind {
             Self::CellSwap => "cell-swap",
             Self::Grass => "grass",
             Self::SlotMachine => "slot-machine",
+            Self::Spider => "spider",
         }
     }
 
@@ -734,6 +737,7 @@ impl ClockEventKind {
             Self::CellSwap => "Cell Swap",
             Self::Grass => "Grass",
             Self::SlotMachine => "Slot Machine",
+            Self::Spider => "Spider",
         }
     }
 }
@@ -755,6 +759,7 @@ pub struct ClockEvents {
     pub cell_swap: bool,
     pub grass: bool,
     pub slot_machine: bool,
+    pub spider: bool,
 }
 
 impl Default for ClockEvents {
@@ -773,6 +778,7 @@ impl Default for ClockEvents {
             cell_swap: true,
             grass: true,
             slot_machine: true,
+            spider: true,
         }
     }
 }
@@ -793,6 +799,7 @@ impl ClockEvents {
             ClockEventKind::CellSwap => self.cell_swap,
             ClockEventKind::Grass => self.grass,
             ClockEventKind::SlotMachine => self.slot_machine,
+            ClockEventKind::Spider => self.spider,
         }
     }
 }
@@ -990,6 +997,113 @@ pub struct ClockCrowState {
 
 fn shy_crow_water_tolerance() -> ClockCrowWaterTolerance {
     ClockCrowWaterTolerance::Shy
+}
+
+/// Bounded Spider visitor diagnostics, independent of the timed animation.
+/// The spider is the one visitor that moves in the run's physics arena.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockSpiderState {
+    pub visit_id: u64,
+    pub seed: u64,
+    pub phase: ClockSpiderPhase,
+    pub phase_tick: u64,
+    pub age_ticks: u64,
+    /// Ticks left before the visit must be leaving, by its budget.
+    pub remaining_ticks: u64,
+    pub position_milli: [i32; 2],
+    pub velocity_milli: [i32; 2],
+    /// The way the spider's back faces, in thousandths of a unit vector.
+    pub up_milli: [i32; 2],
+    pub mode: ClockSpiderMode,
+    /// What the legs hold, if anything.
+    pub support: Option<ClockSpiderHold>,
+    /// What the silk line is tied to, if it is tied.
+    pub anchor: Option<ClockSpiderHold>,
+    /// Whether a shot's line is on its way.
+    pub shooting: bool,
+    pub line_length_milli: Option<u32>,
+    pub climbs: u32,
+    pub swings: u32,
+    pub falls: u32,
+    pub recoveries: u32,
+    /// The visit ran out of time without getting out, and was retired where
+    /// it stood.
+    pub failed_exit: bool,
+    pub proxies: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderPhase {
+    Descending,
+    Crossing,
+    Climbing,
+    Crawling,
+    Swinging,
+    Recovering,
+    Leaving,
+}
+
+impl ClockSpiderPhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Descending => "descending",
+            Self::Crossing => "crossing",
+            Self::Climbing => "climbing",
+            Self::Crawling => "crawling",
+            Self::Swinging => "swinging",
+            Self::Recovering => "recovering",
+            Self::Leaving => "leaving",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderMode {
+    Free,
+    Crawling,
+    Hanging,
+}
+
+impl ClockSpiderMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Free => "free",
+            Self::Crawling => "crawling",
+            Self::Hanging => "hanging",
+        }
+    }
+}
+
+/// What the spider holds or is tied to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum ClockSpiderHold {
+    /// A lit digit cell, by its surface id.
+    Surface {
+        id: u32,
+        departing: bool,
+    },
+    /// A rigid body carrying digit cells, by its entity.
+    Rigid {
+        entity: u64,
+    },
+    /// A part of the frame: a rail, the ceiling beside the hatch, or the beam.
+    Frame {
+        part: ClockSpiderFramePart,
+    },
+    Floor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderFramePart {
+    LeftRail,
+    RightRail,
+    CeilingLeft,
+    CeilingRight,
+    Beam,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

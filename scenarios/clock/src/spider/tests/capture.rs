@@ -5,7 +5,7 @@
 //!
 //! docs/clock.md says how they become the PNG and GIF files. They are
 //! diagnostic drawings of the physics state and the drawn face, not the
-//! Clock renderer, which draws the spider with #383.
+//! Clock renderer; the visit's pictures come from the client's capture.
 
 use std::{fmt::Write as _, path::Path};
 

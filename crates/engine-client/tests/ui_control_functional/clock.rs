@@ -1298,6 +1298,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.cell-swap", "Off", &page);
         page = harness.change_clock_setting("pause.clock.grass", "Off", &page);
         page = harness.change_clock_setting("pause.clock.slot-machine", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.spider", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -1607,6 +1608,12 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
             control_value(&state, "launcher.settings.clock.crow.next"),
             Some("Off")
         );
+        // The spider is a resident visit too, in the run's arena.
+        let state = harness.activate_guarded("launcher.settings.clock.spider.next", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.spider.next"),
+            Some("Off")
+        );
         assert_eq!(
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Demo")
@@ -1625,7 +1632,10 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
         );
         assert!(initial.events.iter().all(|event| event.enabled
             == (event.trigger == engine_common::ClockEventTrigger::Periodic
-                && !matches!(event.kind, ClockEventKind::Duck | ClockEventKind::Crow))));
+                && !matches!(
+                    event.kind,
+                    ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::Spider
+                ))));
         assert!((360..=600).contains(&initial.next_event_tick.unwrap()));
         let mut previous = None;
         for event_id in 1..=2 {
@@ -1671,7 +1681,10 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
                 | ClockEventKind::SlotMachine => {
                     assert_eq!((active.body_count, active.collider_count), (0, 0));
                 }
-                ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::DigitSlide => {
+                ClockEventKind::Duck
+                | ClockEventKind::Crow
+                | ClockEventKind::Spider
+                | ClockEventKind::DigitSlide => {
                     panic!("resident/time-change kind admitted to timed cadence smoke: {kind:?}");
                 }
             }
@@ -1710,6 +1723,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
             "launcher.settings.clock.slot-machine.next",
+            "launcher.settings.clock.spider.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);
@@ -2411,10 +2425,14 @@ fn arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run() 
         assert!(owners.contains(&(ClockArenaOwner::Visit, false)));
         let run = refused.arena.as_ref().unwrap().accounting;
         assert_eq!((run.refused, run.worlds), (0, 1));
+        // The spider's room is Meltdown's, so it is refused with them.
         for event in &refused.events {
             let largest = matches!(
                 event.kind,
-                ClockEventKind::Aquarium | ClockEventKind::Explosion | ClockEventKind::Meltdown
+                ClockEventKind::Aquarium
+                    | ClockEventKind::Explosion
+                    | ClockEventKind::Meltdown
+                    | ClockEventKind::Spider
             );
             assert_eq!(
                 event.blocked_by_arena,

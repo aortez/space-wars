@@ -54,6 +54,13 @@ const BEAM_RISE_PITCH: f32 = 1.0;
 const BEAM_THICKNESS_PITCH: f32 = 0.5;
 /// Friction of a digit cell's proxy, as the digits' other solids have.
 const CELL_FRICTION: f32 = 0.65;
+/// The longest the silk takes to let the spider down across the room, and
+/// to take it up across the room, in seconds.
+const ROOM_DESCENT_SECONDS: f32 = 3.0;
+const ROOM_CLIMB_SECONDS: f32 = 4.0;
+/// How fast the spider crawls, in radii per second: brisker than the
+/// mechanic's own, so a visit's way round a digit fits in the visit.
+const CRAWL_SPEED: f32 = 7.0;
 /// The most proxies the spider keeps at once. Under ordinary readings the
 /// face draws at most 159 cells at once in the shipped fonts, during
 /// Falling's cross-fade in Sans, and this leaves room above that while
@@ -197,6 +204,17 @@ pub enum SpiderRefusal {
     Blocked,
 }
 
+impl SpiderRefusal {
+    /// A short notice for the person who asked.
+    pub fn notice(self) -> &'static str {
+        match self {
+            Self::Present => "A spider is already visiting",
+            Self::Arena(unavailable) => unavailable.notice(),
+            Self::Blocked => "The way in is blocked",
+        }
+    }
+}
+
 /// Spiders admitted and gone over the run.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SpiderAccounting {
@@ -206,6 +224,10 @@ pub struct SpiderAccounting {
     pub removed: u64,
     /// Taken out by a resize.
     pub cancelled: u64,
+    /// Visits that got out through the hatch.
+    pub departed: u64,
+    /// Visits retired where they stood, out of time on the way out.
+    pub failed_exits: u64,
 }
 
 /// A proxy standing in the arena for one surface.
@@ -326,6 +348,26 @@ impl SpiderFixture {
         RADIUS_PITCH * layout.pitch
     }
 
+    /// The spider's limits at `layout`: the mechanic's own, with silk that
+    /// reaches across the room from the floor to the beam, let out and taken
+    /// in at a pace that crosses the room in a few seconds, so a small
+    /// spider in a tall view can still come in from the beam and go back out
+    /// to it within a visit, and a brisker crawl.
+    pub(crate) fn spec(layout: Layout) -> SpiderSpec {
+        let radius = Self::radius(layout);
+        let (_, beam_top) = FramePart::Beam.rect(layout);
+        let reach = (beam_top.y - layout.floor_y) / radius + 2.0;
+        let spec = SpiderSpec::new(radius, MECHANICS_GRAVITY);
+        SpiderSpec {
+            silk_range: spec.silk_range.max(reach),
+            max_line: spec.max_line.max(reach),
+            pay_out_speed: spec.pay_out_speed.max(reach / ROOM_DESCENT_SECONDS),
+            reel_speed: spec.reel_speed.max(reach / ROOM_CLIMB_SECONDS),
+            crawl_speed: CRAWL_SPEED,
+            ..spec
+        }
+    }
+
     /// The inside of the room at `layout`: between the rails, from the floor
     /// to the ceiling.
     pub(crate) fn room(layout: Layout) -> (Vec2, Vec2) {
@@ -425,7 +467,7 @@ impl SpiderFixture {
                 world,
                 PhysicsId::new(canonical::SPIDER.start),
                 position,
-                SpiderSpec::new(radius, MECHANICS_GRAVITY),
+                Self::spec(layout),
             )
             .ok_or(SpiderRefusal::Blocked)
             .inspect_err(|_| arena.release(Owner::Spider))?,
@@ -692,3 +734,4 @@ impl SpiderFixture {
 
 #[cfg(test)]
 mod tests;
+pub(crate) mod visit;

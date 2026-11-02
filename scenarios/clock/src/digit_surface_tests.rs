@@ -567,6 +567,7 @@ pub(crate) fn only(kind: ClockEventKind) -> ClockEvents {
         cell_swap: kind == ClockEventKind::CellSwap,
         grass: kind == ClockEventKind::Grass,
         slot_machine: kind == ClockEventKind::SlotMachine,
+        spider: kind == ClockEventKind::Spider,
     }
 }
 

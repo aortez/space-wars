@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 22;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 23;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -25,6 +25,10 @@ pub struct ClockEventInfo {
     pub blocked_by_duck: bool,
     #[serde(default)]
     pub blocked_by_crow: bool,
+    /// A spider is visiting, and this event waits for it to leave, or is
+    /// another spider.
+    #[serde(default)]
+    pub blocked_by_spider: bool,
     /// Why the run's arena would refuse the event now, if it would.
     #[serde(default)]
     pub blocked_by_arena: Option<engine_common::ClockArenaUnavailable>,
@@ -64,6 +68,8 @@ pub struct ClockState {
     pub duck: Option<engine_common::ClockDuckState>,
     #[serde(default)]
     pub crow: Option<engine_common::ClockCrowState>,
+    #[serde(default)]
+    pub spider: Option<engine_common::ClockSpiderState>,
     #[serde(default)]
     pub explosion: Option<engine_common::ClockExplosionState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
@@ -116,13 +122,17 @@ pub struct ClockTriggerRequest {
 }
 
 impl ClockTriggerRequest {
-    /// Queue acknowledgement is not admission. Ducks/crows become resident visits;
-    /// unlike timed animations, they do not remain in the Active lifecycle.
+    /// Queue acknowledgement is not admission. Ducks, crows and spiders become
+    /// resident visits; unlike timed animations, they do not remain in the
+    /// Active lifecycle.
     pub fn started_predicate(&self) -> ClockStatePredicate {
         ClockStatePredicate {
             scenario_revision: self.expected_scenario_revision,
-            lifecycle: (!matches!(self.event, ClockEventKind::Duck | ClockEventKind::Crow))
-                .then(|| "active".into()),
+            lifecycle: (!matches!(
+                self.event,
+                ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::Spider
+            ))
+            .then(|| "active".into()),
             event_kind: Some(self.event),
             phase: None,
             event_id: Some(self.expected_event_id.saturating_add(1)),
@@ -211,22 +221,33 @@ impl ClockStatePredicate {
                 duck.is_some()
             } else if kind == ClockEventKind::Crow {
                 state.crow.is_some()
+            } else if kind == ClockEventKind::Spider {
+                state.spider.is_some()
             } else {
                 Some(kind) == state.event_kind
             }
         });
-        let crow = (self.event_kind == Some(ClockEventKind::Crow))
-            .then_some(state.crow.as_ref())
-            .flatten();
-        let phase = crow.map(|crow| crow.phase.as_str()).or(duck
+        // A visitor's own phase, tick and identity, as the crow's and the
+        // spider's are, so a later animation never invalidates a wait for it.
+        let visitor = match self.event_kind {
+            Some(ClockEventKind::Crow) => state
+                .crow
+                .as_ref()
+                .map(|crow| (crow.phase.as_str(), crow.phase_tick, crow.visit_id)),
+            Some(ClockEventKind::Spider) => state
+                .spider
+                .as_ref()
+                .map(|spider| (spider.phase.as_str(), spider.phase_tick, spider.visit_id)),
+            _ => None,
+        };
+        let phase = visitor.map(|(phase, _, _)| phase).or(duck
             .map(|duck| duck.phase.as_str())
             .or(state.phase.as_deref()));
-        let phase_tick = crow.map_or_else(
+        let phase_tick = visitor.map_or_else(
             || duck.map_or(state.phase_tick, |duck| duck.phase_tick),
-            |crow| crow.phase_tick,
+            |(_, tick, _)| tick,
         );
-        // A later animation must not invalidate a wait for this crow visit.
-        let event_id = crow.map_or(state.event_id, |crow| crow.visit_id);
+        let event_id = visitor.map_or(state.event_id, |(_, _, id)| id);
         state.scenario_revision == self.scenario_revision
             && self
                 .lifecycle
@@ -433,6 +454,7 @@ mod tests {
             meltdown: None,
             duck: None,
             crow: None,
+            spider: None,
             explosion: None,
             player_duck: None,
             automatic_events_suspended: false,
@@ -530,6 +552,7 @@ mod tests {
             blocked_by_player: false,
             blocked_by_duck: false,
             blocked_by_crow: false,
+            blocked_by_spider: false,
             blocked_by_arena: Some(ClockArenaUnavailable::LayoutIncompatible),
             automatic_ready_at_tick: 0,
         });
@@ -1408,6 +1431,7 @@ mod tests {
             blocked_by_player: false,
             blocked_by_duck: false,
             blocked_by_crow: false,
+            blocked_by_spider: false,
             blocked_by_arena: None,
             automatic_ready_at_tick: 0,
         });

@@ -233,6 +233,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: SLOT_MACHINE_TICKS,
         cooldown_ticks: 30 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::Spider,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::Arena,
+        duration_ticks: crate::spider::visit::SPIDER_TICKS,
+        cooldown_ticks: 30 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -297,6 +304,9 @@ impl ActiveEvent {
             ))),
             ClockEventKind::Duck => unreachable!("a duck admission creates an independent visit"),
             ClockEventKind::Crow => unreachable!("a crow admission creates an independent visit"),
+            ClockEventKind::Spider => {
+                unreachable!("a spider admission creates an independent visit")
+            }
             ClockEventKind::Marquee => Self::Marquee(Box::new(MarqueeEvent::new(
                 resolve_marquee_preset(config.marquee_preset, seed),
                 config.marquee_message,

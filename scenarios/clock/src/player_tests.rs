@@ -227,13 +227,15 @@ fn player_visit_outlives_automatic_visual_events_and_keeps_live_time() {
     assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
     ticks(&mut state, COOLDOWN_TICKS as usize);
     assert!(state.next_event_tick().is_some());
+    // An animation or a visitor, the spider included, is an admission.
+    let id = state.event_id();
     for _ in 0..601 {
         tick(&mut state, &[]);
-        if state.event_kind().is_some() {
+        if state.event_id() > id {
             break;
         }
     }
-    assert!(state.event_kind().is_some(), "automatic schedule resumes");
+    assert!(state.event_id() > id, "automatic schedule resumes");
     assert_eq!(state.settings(), settings);
 }
 
@@ -256,6 +258,7 @@ fn disabled_events_and_off_profile_do_not_disable_player_visits_or_change_prefer
         cell_swap: false,
         grass: false,
         slot_machine: false,
+        spider: false,
     };
     ClockScenario::step(
         &mut state,
@@ -421,6 +424,16 @@ fn replacing_events_and_player_visits_resize_and_repeated_cleanup_are_bounded() 
             ticks(&mut state, 90);
             let event_id = state.event_id();
             let active_at_spawn = state.event_kind();
+            if event == ClockEventKind::Spider {
+                // A player's duck waits for the spider's visit.
+                toggle(&mut state, 1);
+                assert_eq!(state.event_notice.unwrap().0, "Spider is visiting");
+                assert!(state.player_duck_state().is_none());
+                assert!(state.spider_state().is_some());
+                state.finish_spider_visit();
+                assert!(state.spider_state().is_none());
+                continue;
+            }
             toggle(&mut state, 1);
             assert_eq!(
                 state.event_id(),

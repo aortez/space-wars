@@ -16,6 +16,7 @@ fn catalog_covers_every_kind_once_and_has_bounded_timing() {
             ClockEventKind::Crow => 22 * 60,
             ClockEventKind::Rain => 42 * 60,
             ClockEventKind::Aquarium => 66 * 60,
+            ClockEventKind::Spider => 30 * 60,
             _ => 12 * 60,
         };
         assert!(definition.duration_ticks > 0 && definition.duration_ticks <= max_duration);
@@ -66,6 +67,7 @@ fn automatic_selection_respects_enablement_and_each_events_reuse_delay() {
             cell_swap: kind == ClockEventKind::CellSwap,
             grass: kind == ClockEventKind::Grass,
             slot_machine: kind == ClockEventKind::SlotMachine,
+            spider: kind == ClockEventKind::Spider,
         };
         let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 2);
         let wait = schedule.next_event_tick.unwrap();
@@ -108,6 +110,7 @@ fn off_and_an_empty_enabled_set_never_schedule_automatic_events() {
                 cell_swap: false,
                 grass: false,
                 slot_machine: false,
+                spider: false,
             },
         ),
     ] {
@@ -158,6 +161,7 @@ fn slide_only_configuration_never_schedules_periodic_work() {
         cell_swap: false,
         grass: false,
         slot_machine: false,
+        spider: false,
     };
     let mut schedule = EventSchedule::new(ClockEventProfile::Calm, events, 4);
     assert_eq!(schedule.next_event_tick, None);
@@ -218,6 +222,7 @@ fn demo_smoke_seed_resident_id_does_not_imply_active_lifecycle() {
     let mut enabled = ClockEvents::default();
     enabled.duck = false;
     enabled.digit_slide = false;
+    enabled.spider = false;
     let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 4242);
     advance(&mut schedule, 420);
     assert_eq!(schedule.due_event(true), Some(ClockEventKind::ColorCycle));

@@ -26,6 +26,7 @@ use engine_rapier::{
 };
 
 mod capture;
+mod visit;
 
 const SEED: u64 = 7;
 /// Clock's wide landscape view.
@@ -60,7 +61,7 @@ fn trace(state: &ClockState) {
             let layout = Layout::new(state.aspect_ratio());
             frames.push(Frame {
                 phase: PHASE.with(Cell::get),
-                fixture: state.spider_state().expect("a spider"),
+                fixture: state.spider_fixture_state().expect("a spider"),
                 surfaces: state.digit_surfaces(),
                 drawn: digit_cell_polygons(state),
                 floor: state.floor.geometry(layout).support().collect(),
@@ -96,6 +97,7 @@ fn config(aspect: f32, font: ClockFont, fixture: FixtureStart) -> ClockConfig {
             cell_swap: false,
             grass: false,
             slot_machine: false,
+            spider: false,
         },
         time_format: ClockTimeFormat::TwentyFourHour,
         fonts: ClockFontSettings {
@@ -155,7 +157,7 @@ fn drive(state: &mut ClockState, intent: SpiderIntent) -> SpiderFixtureState {
     assert!(state.set_spider_intent(intent));
     tick(state, &[]);
     trace(state);
-    let fixture = state.spider_state().expect("the spider stays");
+    let fixture = state.spider_fixture_state().expect("the spider stays");
     assert!(
         fixture.spider.work.rays <= MAX_RAYS,
         "{:?}",
@@ -195,7 +197,7 @@ fn drive_until(
     }
     panic!(
         "{what}: not within {limit} ticks: {:?}",
-        state.spider_state()
+        state.spider_fixture_state()
     );
 }
 
@@ -236,7 +238,11 @@ fn lowest_cell(state: &ClockState, slot: u8) -> DigitSurface {
 /// off on the way, so the legs do not hold the spider to the floor against
 /// the reel, and on near the anchor.
 fn climb_the_line(state: &mut ClockState, context: &str) -> SpiderFixtureState {
-    let r = state.spider_state().expect("a spider").spider.radius;
+    let r = state
+        .spider_fixture_state()
+        .expect("a spider")
+        .spider
+        .radius;
     drive_until(
         state,
         600,
@@ -258,7 +264,7 @@ fn climb_the_line(state: &mut ClockState, context: &str) -> SpiderFixtureState {
 
 /// How many rigid bodies the spider may hold now.
 fn fixture_rigid_peak(state: &ClockState) -> usize {
-    state.spider_state().expect("a spider").rigid
+    state.spider_fixture_state().expect("a spider").rigid
 }
 
 /// Whether the spider holds a surface, and which.
@@ -322,7 +328,7 @@ fn assert_held_on_the_face(state: &ClockState, fixture: &SpiderFixtureState, con
 fn assert_proxies_match_the_face(state: &ClockState, context: &str) {
     let layout = Layout::new(state.aspect_ratio());
     let world = state.arena.world().expect("the spider's world");
-    let fixture = state.spider_state().expect("a spider");
+    let fixture = state.spider_fixture_state().expect("a spider");
     let surfaces = state.digit_surfaces();
     let (low, high) = SpiderFixture::room(layout);
     let within = |c: &Vec2| (low.x..=high.x).contains(&c.x) && (low.y..=high.y).contains(&c.y);
@@ -483,7 +489,7 @@ fn a_spider_is_refused_a_start_inside_the_rooms_solids_or_outside_it() {
             Err(SpiderRefusal::Blocked),
             "{case}"
         );
-        assert!(state.spider_state().is_none(), "{case}");
+        assert!(state.spider_fixture_state().is_none(), "{case}");
         assert!(state.arena.idle(), "{case}: nothing of the spider stays");
     }
     assert_eq!(state.spider_accounting().refused, starts.len() as u64);
@@ -517,8 +523,8 @@ fn climb_swing_and_ride_out(aspect: f32, font: ClockFont, residents: FixtureStar
     let target = lowest_cell(&state, 2);
     let face_bottom = target.origin.y - 0.4 * layout.pitch;
     // From the floor when the shot reaches the face from it, and otherwise
-    // from the air beneath the face, as in a portrait view.
-    let silk_range = 40.0 * r;
+    // from the air beneath the face.
+    let silk_range = SpiderFixture::spec(layout).silk_range * r;
     let from_floor = face_bottom - layout.floor_y < silk_range * 0.9;
     let start = if from_floor {
         on_floor_clear_of_balls(layout)
@@ -560,7 +566,10 @@ fn climb_swing_and_ride_out(aspect: f32, font: ClockFont, residents: FixtureStar
             |f| (f.spider.position.x - target.origin.x).abs() < 0.2 * r,
             &format!("{context}: walks under the cell"),
         );
-        assert_eq!(state.spider_state().unwrap().support, Some(Hold::Floor));
+        assert_eq!(
+            state.spider_fixture_state().unwrap().support,
+            Some(Hold::Floor)
+        );
     }
 
     // Straight up at the cell, which the line ties to.
@@ -615,7 +624,7 @@ fn climb_swing_and_ride_out(aspect: f32, font: ClockFont, residents: FixtureStar
         assert_eq!(fixture.refusals, Refusals::default(), "{context}");
     }
     assert!(held.len() >= 2, "{context}: crossed a seam: {held:?}");
-    let moved = state.spider_state().unwrap().spider.position.x - target.origin.x;
+    let moved = state.spider_fixture_state().unwrap().spider.position.x - target.origin.x;
     assert!(
         moved.abs() > 1.5 * r,
         "{context}: moved {} radii",
@@ -672,7 +681,7 @@ fn climb_swing_and_ride_out(aspect: f32, font: ClockFont, residents: FixtureStar
         let fixture = drive(&mut state, grip());
         assert_held_on_the_face(&state, &fixture, &format!("{context}: resting on the cell"));
     }
-    let riding = held_surface(&state.spider_state().unwrap()).unwrap();
+    let riding = held_surface(&state.spider_fixture_state().unwrap()).unwrap();
 
     // The minute changes: the old glyph slides out with the spider on it,
     // until the cell it holds is retired as it leaves the slot, or carries
@@ -684,7 +693,7 @@ fn climb_swing_and_ride_out(aspect: f32, font: ClockFont, residents: FixtureStar
     trace(&state);
     assert_held_on_the_face(
         &state,
-        &state.spider_state().unwrap(),
+        &state.spider_fixture_state().unwrap(),
         &format!("{context}: seconds"),
     );
     phase("rides the old glyph out");
@@ -751,7 +760,7 @@ fn climb_swing_and_ride_out(aspect: f32, font: ClockFont, residents: FixtureStar
     assert!(rode >= 3, "{context}: rode {rode} ticks");
     assert!(released >= rode, "{context}");
     assert!(
-        state.spider_state().unwrap().spider.position.y < face_bottom,
+        state.spider_fixture_state().unwrap().spider.position.y < face_bottom,
         "{context}"
     );
     // Unchanged slots keep their surfaces.
@@ -784,7 +793,7 @@ fn climb_swing_and_ride_out(aspect: f32, font: ClockFont, residents: FixtureStar
         "{context}: the balls never moved"
     );
     assert!(state.remove_spider());
-    assert_eq!(state.spider_state(), None);
+    assert_eq!(state.spider_fixture_state(), None);
     assert_eq!(state.spider_accounting().removed, 1);
     assert_eq!(state.arena_fixtures(), balls, "{context}");
     let claims = state.arena_state().claims;
@@ -1076,7 +1085,7 @@ fn a_glyph_replaced_under_the_spider_lets_it_fall_and_a_glyph_that_comes_between
     // Applied while paused, the change is published at once: the spider
     // still holds the proxy of a cell that is no longer there.
     sync(&mut state, &[ClockAction::configure(settings)]);
-    let fixture = state.spider_state().unwrap();
+    let fixture = state.spider_fixture_state().unwrap();
     assert_eq!(fixture.support, Some(Hold::Retired(held)));
     assert!(state.digit_surfaces().iter().all(|s| s.id != held));
     let fixture = drive(&mut state, grip());
@@ -1208,7 +1217,7 @@ fn the_colon_and_the_seconds_change_nothing_the_spider_stands_on() {
             &mut state,
             &[ClockAction::set_reading(reading(12, 39, 58 + second % 2))],
         );
-        let fixture = state.spider_state().unwrap();
+        let fixture = state.spider_fixture_state().unwrap();
         assert_eq!(held_surface(&fixture), Some(held), "second {second}");
         assert_eq!(
             state
@@ -1239,7 +1248,7 @@ fn a_resize_cancels_the_spider_and_keeps_the_residents_as_they_were() {
     let balls = state.arena_fixtures();
     let worlds = physics_activity().worlds;
     state.set_aspect_ratio(4.0 / 3.0);
-    assert_eq!(state.spider_state(), None);
+    assert_eq!(state.spider_fixture_state(), None);
     assert_eq!(state.spider_accounting().cancelled, 1);
     assert_eq!(physics_activity().worlds, worlds, "the same world");
     let world = state.arena.world().expect("the fixture keeps the world");
@@ -1503,7 +1512,7 @@ fn a_paused_clock_freezes_the_spider_and_the_run_ends_once_with_it() {
     assert!(state.set_spider_intent(crawl(1.0)));
     for _ in 0..10 {
         sync(&mut state, &[]);
-        let fixture = state.spider_state().unwrap();
+        let fixture = state.spider_fixture_state().unwrap();
         assert_eq!(fixture.spider.position, landed.spider.position);
         assert_eq!(fixture.ticks, landed.ticks);
     }
@@ -1514,7 +1523,7 @@ fn a_paused_clock_freezes_the_spider_and_the_run_ends_once_with_it() {
     );
     // The intent set while paused acts on the next moving tick.
     tick(&mut state, &[]);
-    let fixture = state.spider_state().unwrap();
+    let fixture = state.spider_fixture_state().unwrap();
     assert!(fixture.spider.position.x > landed.spider.position.x);
     assert_eq!(fixture.spider.intent, crawl(1.0));
     let before = physics_activity();

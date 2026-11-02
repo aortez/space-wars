@@ -37,7 +37,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap or grass.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap, grass, slot-machine or spider.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -57,11 +57,11 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
-        /// Admission ID; with --event crow, matches its stable visit ID.
+        /// Admission ID; with --event crow or spider, matches its stable visit ID.
         #[arg(long)]
         event_id: Option<u64>,
         #[arg(long, default_value_t = 0)]
@@ -108,7 +108,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={}, blocked by arena={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={}, blocked by spider={}, blocked by arena={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -119,6 +119,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.automatic_ready_at_tick,
                         event.blocked_by_duck,
                         event.blocked_by_crow,
+                        event.blocked_by_spider,
                         event
                             .blocked_by_arena
                             .map_or("none", ClockArenaUnavailable::as_str)
@@ -297,6 +298,31 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 crow.water_tolerance.label(),
                 crow.wetness_milli,
                 crow.wet_departures
+            );
+        }
+        if let Some(spider) = &state.spider {
+            println!(
+                "Spider #{} (seed {}): {}, age={} phase tick={} remaining={}, {} at {:?} going {:?} up {:?}, holds {:?}, tied to {:?}, shooting={} line={:?}, climbs={} swings={} falls={} recoveries={}, proxies={}, failed exit={}",
+                spider.visit_id,
+                spider.seed,
+                spider.phase.as_str(),
+                spider.age_ticks,
+                spider.phase_tick,
+                spider.remaining_ticks,
+                spider.mode.as_str(),
+                spider.position_milli,
+                spider.velocity_milli,
+                spider.up_milli,
+                spider.support,
+                spider.anchor,
+                spider.shooting,
+                spider.line_length_milli,
+                spider.climbs,
+                spider.swings,
+                spider.falls,
+                spider.recoveries,
+                spider.proxies,
+                spider.failed_exit
             );
         }
         let world_vector =

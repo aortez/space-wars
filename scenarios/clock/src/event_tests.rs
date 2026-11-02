@@ -20,6 +20,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 cell_swap: false,
                 grass: false,
                 slot_machine: false,
+                spider: false,
             },
             ..ClockConfig::default()
         },
@@ -253,11 +254,14 @@ fn arena_side_walls_keep_falling_cell_geometry_inside_the_view() {
 #[test]
 fn timed_events_obey_the_same_lifecycle_and_cleanup_contract() {
     // Resident visitors have independent admission/cooldown contracts, covered
-    // in autonomous_tests and crow_tests; neither occupies the timed-event slot.
-    for definition in EVENT_CATALOG
-        .into_iter()
-        .filter(|d| !matches!(d.kind, ClockEventKind::Duck | ClockEventKind::Crow))
-    {
+    // in autonomous_tests, crow_tests and spider::tests::visit; none occupies
+    // the timed-event slot.
+    for definition in EVENT_CATALOG.into_iter().filter(|d| {
+        !matches!(
+            d.kind,
+            ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::Spider
+        )
+    }) {
         let kind = definition.kind;
         let mut state = ready(ClockEventProfile::Off, 9);
         let trigger = ClockAction::trigger_event(kind);
@@ -414,6 +418,7 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         assert_eq!(a.meltdown_state(), b.meltdown_state());
         assert_eq!(a.duck_state(), b.duck_state());
         assert_eq!(a.crow_state(), b.crow_state());
+        assert_eq!(a.spider_state(), b.spider_state());
         assert_eq!(a.marquee_state(), b.marquee_state());
         assert_eq!(a.cell_swap_state(), b.cell_swap_state());
         if let Some(kind) = a.event_kind() {
@@ -421,6 +426,7 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         }
         seen[ClockEventKind::Duck as usize] |= a.duck_state().is_some();
         seen[ClockEventKind::Crow as usize] |= a.crow_state().is_some();
+        seen[ClockEventKind::Spider as usize] |= a.spider_state().is_some();
     }
     for definition in EVENT_CATALOG {
         assert_eq!(
@@ -829,6 +835,7 @@ fn slot_machine_reports_a_preview_only_when_a_person_asked_for_one() {
         cell_swap: false,
         grass: false,
         slot_machine: true,
+        spider: true,
     };
     let mut state = ready(ClockEventProfile::Demo, 7);
     let mut settings = state.settings();

@@ -650,6 +650,15 @@ fn clock_stays_live_while_raining_or_draining_and_pause_resize_replace_clean_up(
                 &[ClockAction::preview_event(kind)],
                 Duration::ZERO,
             );
+            if kind == ClockEventKind::Spider {
+                // The spider waits for the event before it rather than
+                // replacing it.
+                let before = ClockEventKind::ALL[kind as usize - 1];
+                assert_eq!(state.last_started_event, Some(before));
+                assert_eq!(state.event_kind(), Some(before));
+                assert!(state.spider_state().is_none());
+                continue;
+            }
             assert_eq!(state.last_started_event, Some(kind));
             if kind == ClockEventKind::Duck {
                 assert!(state.duck_state().is_some());
