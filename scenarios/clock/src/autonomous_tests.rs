@@ -137,6 +137,7 @@ fn ordinary_demo_schedule_can_rain_on_an_existing_automatic_duck() {
         cell_swap: false,
         grass: false,
         slot_machine: false,
+        spider: false,
     };
     state.configure(settings);
     for _ in 0..800 {

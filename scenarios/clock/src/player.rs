@@ -67,7 +67,7 @@ impl ClockState {
     }
 
     pub fn automatic_events_suspended(&self) -> bool {
-        (self.duck_visit.is_some() || self.crow_visit.is_some())
+        (self.duck_visit.is_some() || self.crow_visit.is_some() || self.spider_visit.is_some())
             && !ClockEventKind::ALL
                 .into_iter()
                 .any(|kind| self.config.events.enabled(kind) && !self.event_blocked(kind))
@@ -101,6 +101,7 @@ impl ClockState {
             cell_swap: enabled(ClockEventKind::CellSwap),
             grass: enabled(ClockEventKind::Grass),
             slot_machine: enabled(ClockEventKind::SlotMachine),
+            spider: enabled(ClockEventKind::Spider),
         };
         self.schedule
             .configure(self.config.event_profile, effective);

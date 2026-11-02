@@ -1074,6 +1074,9 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), Some((9, 1)));
     click(&window, 649.0, 334.0);
     assert_eq!(adjusted.get(), Some((10, 1)));
+    // Spider sits between Aquarium and the recipe in the Marquee row.
+    click(&window, 371.0, 334.0);
+    assert_eq!(adjusted.get(), Some((21, 1)));
     // The extra launcher row must not overlap Back/Start at 800×480.
     window.set_ingame_menu_visible(false);
     window.set_launcher_visible(true);
@@ -1082,7 +1085,13 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 480.0, 168.0);
     assert!(window.get_launcher_clock_show_date());
     assert_eq!(window.get_launcher_settings_focus_index(), 12);
+    // The Events row has four columns now, with Spider at its far end and
+    // Digit Slide beside it.
+    assert!(window.get_launcher_clock_spider_enabled());
     click(&window, 649.0, 220.0);
+    assert!(!window.get_launcher_clock_spider_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 20);
+    click(&window, 500.0, 220.0);
     assert!(!window.get_launcher_clock_digit_slide_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 3);
     key(&window, Key::DownArrow);

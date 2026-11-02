@@ -1238,6 +1238,19 @@ fn validate_clock_trigger(
             ControlFailureCode::ActionUnavailable,
             "A crow is already visiting; wait for departure",
         ))
+    } else if clock
+        .events
+        .iter()
+        .any(|event| event.kind == request.event && event.blocked_by_spider)
+    {
+        Some((
+            ControlFailureCode::ActionUnavailable,
+            if clock.spider.is_some() {
+                "A spider is visiting; wait for departure"
+            } else {
+                "The spider waits for the duck, crow or event to finish"
+            },
+        ))
     } else if let Some(unavailable) = clock
         .events
         .iter()
@@ -1628,6 +1641,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_cell_swap_enabled: window.get_launcher_clock_cell_swap_enabled(),
             clock_grass_enabled: window.get_launcher_clock_grass_enabled(),
             clock_slot_machine_enabled: window.get_launcher_clock_slot_machine_enabled(),
+            clock_spider_enabled: window.get_launcher_clock_spider_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
                 window.get_launcher_clock_rain_amount().to_string()
             } else {
@@ -1733,17 +1747,25 @@ mod tests {
         for event in ClockEventKind::ALL {
             let request = ClockTriggerRequest::new(&clock, event);
             let result = validate_clock_trigger(&request, &ui, &clock);
-            if clock
+            let entry = clock
                 .events
                 .iter()
                 .find(|entry| entry.kind == event)
-                .unwrap()
-                .blocked_by_duck
-            {
+                .unwrap();
+            if entry.blocked_by_duck {
                 let failure = result.unwrap_err();
                 assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
                 assert!(failure.message.contains("dismiss the duck"));
                 assert_eq!(failure.current_clock_state, Some(clock.clone()));
+            } else if entry.blocked_by_spider {
+                // The spider waits for the player's duck; none is visiting.
+                assert_eq!(event, ClockEventKind::Spider);
+                let failure = result.unwrap_err();
+                assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+                assert_eq!(
+                    failure.message,
+                    "The spider waits for the duck, crow or event to finish"
+                );
             } else {
                 result.unwrap();
             }

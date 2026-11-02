@@ -29,6 +29,7 @@ mod rain;
 mod slot_machine;
 #[cfg(test)]
 mod slot_machine_contract;
+mod spider;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
@@ -114,6 +115,9 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     );
     frame::render(&mut frame, state, layout);
     render_canopy(&mut frame, layout);
+    if state.spider.is_some() {
+        spider::render_hatch(&mut frame, layout);
+    }
     ceiling::render(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Aquarium(event)) = &state.active_event {
         aquarium::water(&mut frame, event);
@@ -564,6 +568,9 @@ fn filled_polygons(frame: RenderFrame, z: i32) -> Vec<Vec<Vec2>> {
 fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     if let Some(visit) = &state.crow_visit {
         crow::render(frame, visit, layout);
+    }
+    if let Some(fixture) = &state.spider {
+        spider::render(frame, &fixture.state(&state.arena, &state.published));
     }
     // Kept outside the marquee's face fade and early return. The duck/course
     // retain their own opacity and geometry while clock content transforms.

@@ -609,6 +609,7 @@ enabled = true
                 cell_swap: false,
                 grass: false,
                 slot_machine: false,
+                spider: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -738,6 +739,7 @@ enabled = true
                         | engine_common::ClockEventKind::CellSwap
                         | engine_common::ClockEventKind::Grass
                         | engine_common::ClockEventKind::SlotMachine
+                        | engine_common::ClockEventKind::Spider
                 )
             );
         }
@@ -765,6 +767,7 @@ enabled = true
                         | engine_common::ClockEventKind::CellSwap
                         | engine_common::ClockEventKind::Grass
                         | engine_common::ClockEventKind::SlotMachine
+                        | engine_common::ClockEventKind::Spider
                 )
             );
         }
