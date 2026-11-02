@@ -15,7 +15,8 @@ typical ratio of 0.99 to the native law; 22 of its legs run past 2,000
 ticks against 8, where the law crawls at the edge of its heat disk. The law
 passes 115 of 236 transfers with the sun in the way, and none of ten
 variants of its sun routing and braking passes more, so the networks are
-unchanged and the crawl is the next deficiency.
+unchanged and the crawl is the next deficiency, taken up by
+[LF-095](flight-sun-detour-v1.md).
 
 ## The withheld legs
 

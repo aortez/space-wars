@@ -1,4 +1,4 @@
-//! The gameplay driver must fly an archived LF-093 evaluation case exactly as
+//! The gameplay driver must fly an archived LF-095 evaluation case exactly as
 //! the training bridge flew it under the v2 contract: same commands, same
 //! actuator outputs, same physics, with the goal issued each tick where the
 //! environment's target is, as a host issues a goal that rides its planet.

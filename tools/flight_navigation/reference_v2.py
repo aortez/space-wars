@@ -46,11 +46,16 @@ SUN_RADIUS = 200.
 # its side; below it the ship is drifting, and a drift that crosses the
 # threshold must not take the route from one side to the other. A detour
 # waypoint outside the enclosing edge by the body margin rounds the other way.
+# sun_lead: the sun's detour waypoint lies at its circle's radius over the
+# cosine of the lead, so the chase settles on the circle and not inside the
+# heat disk, where every heading toward the waypoint is speed-limited (LF-095).
+# heat_brake: whether the momentum brake reads the heat disk from outside it;
+# off, a ship drifting toward the heat turns along it instead of stopping.
 LAW = dict(reference.LAW, contract=CONTRACT, max_speed=60., lookahead=120., brake_acceleration=20., sun_margin=30.,
            escape_time=(2., 4.), escape_speed=25., escape_gravity=(1., 2.), escape_goal_fade=(30., 60.), curve_seconds=.5,
            sun_escape_depth=20., sun_escape_speed=30., speed_margins=(24., 10., 12.), speed_ramp=(20., 45.),
            momentum_speed=20., momentum_brake_acceleration=20., motion_weight=.3, motion_ramp=(5., 20.),
-           global_range=240., body_margin=65., detour_margin=105., detour_turn=.5, detour_commit_speed=12., approach_gain=.8,
+           global_range=240., body_margin=65., detour_margin=105., detour_turn=.5, detour_commit_speed=12., sun_lead=True, heat_brake=False, approach_gain=.8,
            speed_deadband=.5)
 
 
@@ -97,19 +102,26 @@ def with_speed_margins(inputs, law):
                 margin=law['margin'] + weight * margin)
 
 
+class Disks(list):
+    """The body disks with the sun's index, which the routing cannot tell from a disk alone."""
+    sun = None
+
+
 def bodies(inputs, law=LAW):
     """Planet and sun disks in body units with their world velocities, each inflated by the mission's body margin, or empty without a sun to fix the scale."""
     sun_row = next((row for row in inputs['objects'] if row[0] > 0. and row[2] > 0. and row[12] > 1e-6), None)
     if sun_row is None:
-        return []
+        return Disks()
     scale = SUN_RADIUS / sun_row[12]
     g = inputs['self_goal']
-    disks = []
+    disks = Disks()
     for row in inputs['objects']:
         if row[0] <= 0. or not (row[1] > 0. or row[2] > 0.):
             continue
         radius = max(row[12], row[13]) * scale + (law['sun_margin'] if row[2] > 0. else law['body_margin'])
         velocity = (row[7] * VELOCITY_SCALE + g[6] * VELOCITY_SCALE, row[8] * VELOCITY_SCALE + g[7] * VELOCITY_SCALE)
+        if row[2] > 0.:
+            disks.sun = len(disks)
         disks.append(((row[5] * scale, row[6] * scale), radius, velocity))
     return disks
 
@@ -131,7 +143,11 @@ def route_aim(goal, disks, law=LAW, motion=(0., 0.), edge=None):
     the side to round is a toss-up that a ship moving around the body has
     settled, so it keeps rounding the way it already moves. `edge` is the
     enclosing edge's disk; a waypoint beyond it, less the body margin, is no
-    way around.
+    way around. A ship chasing a waypoint that keeps a fixed lead ahead on a
+    circle settles at the circle's radius times the cosine of the lead,
+    which for the sun lies inside the heat disk the speed limit keeps clear;
+    with sun_lead the sun's waypoint lies at the circle's radius over that
+    cosine, so the chase settles on the circle.
     """
     aim = goal
     visited = []
@@ -172,11 +188,13 @@ def route_aim(goal, disks, law=LAW, motion=(0., 0.), edge=None):
         if abs(angle) > math.pi / 2 and abs(tangential) > law['detour_commit_speed']:
             turn = math.copysign(law['detour_turn'], tangential)
         reach = radius - (law['body_margin'] if radius > law['sun_margin'] else 0.) + law['detour_margin']
+        lead = law.get('sun_lead', False) and index == getattr(disks, 'sun', None)
 
         def waypoint(turn):
             c, s_ = math.cos(turn), math.sin(turn)
             rotated = (radial[0] * c - radial[1] * s_, radial[0] * s_ + radial[1] * c)
-            return (center[0] + rotated[0] * reach, center[1] + rotated[1] * reach)
+            distance = reach / max(c, .5) if lead else reach
+            return (center[0] + rotated[0] * distance, center[1] + rotated[1] * distance)
 
         def inside_another(point):
             return (any(j != index and math.hypot(point[0] - c[0], point[1] - c[1]) < r for j, (c, r, _) in enumerate(disks))
@@ -325,10 +343,15 @@ def momentum_brake(inputs, bearings, sun, law):
     Speed limits on the commanded heading assume the ship already moves that
     way. Above the v1 envelope's speeds it may not, so the motion it has must
     also stop inside the clearance it has; when it cannot, the law commands
-    a stop, which the motor brakes toward at its full authority.
+    a stop, which the motor brakes toward at its full authority. Outside the
+    heat disk, without heat_brake, the brake reads the surfaces alone: a
+    ship drifting toward the heat turns along it rather than stopping before
+    it, and inside the disk the sun escape takes over.
     """
     world = world_velocity(inputs)
     against = geometry_relative_velocity(inputs)
+    if not law.get('heat_brake', True) and sun is not None and math.hypot(*sun[0]) > sun[1]:
+        sun = None
     surfaces, heat = world_clearances(inputs, bearings, sun, world[0], world[1], law)
     braking = dict(law, brake_acceleration=law['momentum_brake_acceleration'])
     return any(speed >= law['momentum_speed'] and speed > safe_speed(clearance, braking) + 2.
@@ -502,8 +525,12 @@ def finish_row(bridge, row, item, decisions, min_clearance, max_speed):
     steps = bridge.call('state')['traces'][0]['steps']
     spinning = sum(1 for s in steps if s['frame'] and abs(s['frame']['spin']) > 1.5)
     saturated = sum(1 for s in steps if s['action'] and abs(s['action']['steering']) > .95)
+    # The first tick within 50 units of the goal, the mission's reach of a
+    # handoff, since a long leg is judged by its approach as much as by its
+    # arrival.
+    within_50 = next((i + 1 for i, s in enumerate(steps) if s['frame'] and s['frame']['errors']['position'] <= 50.), None)
     return {'index': row['index'], 'family': row['family'], 'recipe': row['recipe'], 'outcome': item['progress']['outcome'],
-            'ticks': item['progress']['elapsed_ticks'], 'decisions': decisions,
+            'ticks': item['progress']['elapsed_ticks'], 'decisions': decisions, 'ticks_within_50': within_50,
             'final_distance': math.hypot(f['target_position']['x'] - f['center_of_mass']['x'], f['target_position']['y'] - f['center_of_mass']['y']),
             'final_relative_speed': math.hypot(f['velocity']['x'] - f['target_velocity']['x'], f['velocity']['y'] - f['target_velocity']['y']),
             'final_spin': abs(f['spin']), 'min_clearance': min_clearance, 'max_command_speed': max_speed,
