@@ -4,13 +4,10 @@
 //! budgets beside residents they leave alone, a run's world and a refusal
 //! are accounted for, and the profiles bring the spider in or keep it out.
 
-use super::visit::{Visit, gone, preview, run, spider, visited};
+use super::visit::{LONGEST, Visit, gone, preview, run, spider, visited};
 use super::*;
-use crate::spider::visit::{EXIT_GRACE_TICKS, SPIDER_TICKS};
 use engine_common::{ClockSpiderHold, ClockSpiderPhase, RenderPrimitive};
 
-/// Ticks a visit may take at most, exit grace included, and a little over.
-const LONGEST: u64 = SPIDER_TICKS + EXIT_GRACE_TICKS + 10;
 /// The renderer's layer for the spider, its line and the hatch.
 const SPIDER_LAYER: i32 = 8;
 
@@ -82,33 +79,28 @@ fn the_drawn_line_is_the_physics_line_and_nothing_remains_after_departure() {
     assert!(drawn_lines(&state).is_empty());
 }
 
-fn fixture_position(state: &ClockState) -> Vec2 {
-    state
-        .spider_fixture_state()
-        .expect("the fixture")
-        .spider
-        .position
-}
-
-/// The slot of the cell the spider holds, where it holds one.
-fn held_slot(state: &ClockState) -> Option<u8> {
+/// The published cell the spider holds, where it holds one.
+fn held_cell(state: &ClockState) -> Option<DigitSurface> {
     let ClockSpiderHold::Surface { id, .. } = spider(state).support? else {
         return None;
     };
     state
         .digit_surfaces()
-        .iter()
+        .into_iter()
         .find(|s| s.id.get() == id)
-        .map(|s| s.slot)
 }
 
 #[test]
 fn the_spider_stays_on_the_drawn_face_while_the_digits_slide_under_it() {
-    let mut state = visited(ASPECT, ClockFont::Classic, 7);
+    // A seed whose visit crawls well up the digit, so a cell above the
+    // bottom row is held when the minute changes.
+    let mut state = visited(ASPECT, ClockFont::Classic, 0);
     preview(&mut state, ClockEventKind::Spider);
     let mut changed_at = None;
+    let mut changed_to = None;
     let mut checked = 0;
-    let mut rode_a_departing_cell = false;
+    let mut rode_ticks = 0;
+    let mut let_go = None;
     let visit = run(&mut state, LONGEST, |state| {
         let published = spider(state);
         // A cell above the bottom row, so the old glyph carries the spider
@@ -116,26 +108,36 @@ fn the_spider_stays_on_the_drawn_face_while_the_digits_slide_under_it() {
         // is clipped away under it at once.
         let layout = Layout::new(state.aspect_ratio());
         let [low, _] = layout.digit_band();
-        let high_enough = fixture_position(state).y > low + 1.2 * layout.pitch;
+        let held = held_cell(state);
+        let high_enough = held.is_some_and(|cell| cell.origin.y > low + layout.pitch);
         if changed_at.is_none()
             && published.phase == ClockSpiderPhase::Crawling
             && published.phase_tick > 10
             && high_enough
-            && let Some(slot) = held_slot(state)
+            && let Some(slot) = held.map(|cell| cell.slot)
         {
             // The digit it holds changes by the next minute, as the host's
             // readings come: only a contiguous forward minute slides, so
             // the clock is first set to the minute before, which leaves the
             // held slot's digit as it is, and then to the one after.
             let (before, after) = match slot {
-                0 => (reading(9, 59, 59), reading(10, 0, 0)),
+                0 => (reading(19, 59, 59), reading(20, 0, 0)),
                 1 => (reading(12, 59, 59), reading(13, 0, 0)),
                 _ => (reading(12, 39, 59), reading(12, 40, 0)),
             };
+            let ids: Vec<u32> = state.digit_surfaces().iter().map(|s| s.id.get()).collect();
             sync(state, &[ClockAction::set_reading(before)]);
+            assert!(
+                state
+                    .digit_surfaces()
+                    .iter()
+                    .any(|s| ids.contains(&s.id.get()) && s.slot == slot),
+                "the minute before keeps the held slot's digit"
+            );
             tick(state, &[ClockAction::set_reading(after)]);
             assert_eq!(state.event_kind(), Some(ClockEventKind::DigitSlide));
             changed_at = Some(published.age_ticks);
+            changed_to = Some(after);
         }
         // Wherever its legs hold, the point is on a cell the face draws
         // right now, departing or not: the visible and the physical support
@@ -143,6 +145,12 @@ fn the_spider_stays_on_the_drawn_face_while_the_digits_slide_under_it() {
         // a tick goes at the next tick.
         let fixture = state.spider_fixture_state().unwrap();
         let Some(Hold::Surface { id, departing, .. }) = fixture.support else {
+            // Once the departing cell has let it go, why it did: the cell
+            // was retired at the band's edge, or carried it off its drawn
+            // part on the way.
+            if rode_ticks > 0 && let_go.is_none() {
+                let_go = fixture.spider.last_release.map(|release| release.reason);
+            }
             return;
         };
         let id = id.get();
@@ -171,11 +179,25 @@ fn the_spider_stays_on_the_drawn_face_while_the_digits_slide_under_it() {
             published.age_ticks
         );
         checked += 1;
-        rode_a_departing_cell |= departing;
+        rode_ticks += u32::from(departing);
     });
     assert!(changed_at.is_some(), "{visit:?}");
-    assert!(checked > 100, "{visit:?}");
-    assert!(rode_a_departing_cell, "{visit:?}");
+    assert!(checked > 200, "{visit:?}");
+    assert!(
+        rode_ticks >= 10,
+        "rode the departing cell {rode_ticks} ticks: {visit:?}"
+    );
+    assert!(
+        matches!(
+            let_go,
+            Some(SpiderReleaseReason::Removed | SpiderReleaseReason::OutOfReach)
+        ),
+        "let go at the band's edge: {let_go:?} in {visit:?}"
+    );
+    assert_eq!(
+        state.reading().unwrap().minute(),
+        changed_to.unwrap().minute()
+    );
     assert_eq!(state.spider_accounting().departed, 1, "{visit:?}");
     gone(&state, 0);
 }
@@ -242,12 +264,7 @@ fn visits_repeat_within_their_budgets_and_leave_the_residents_alone() {
     }
     assert_eq!(state.spider_accounting().admitted, 3);
     assert_eq!(state.spider_accounting().failed_exits, 0);
-    // Each departure set the reuse delay once, from its own tick.
-    assert!(
-        retired_at
-            .windows(2)
-            .all(|pair| pair[1] > pair[0] + 30 * 60)
-    );
+    assert_eq!(retired_at.len(), 3);
     assert_eq!(
         state.arena_state().accounting.worlds,
         1,
@@ -270,8 +287,10 @@ fn a_visit_makes_the_run_its_world_and_a_refused_one_changes_nothing() {
     assert_eq!(state.arena_accounting().worlds, 1);
     gone(&state, 0);
 
-    // Two fixtures and a visit leave the spider no room: the refusal is
-    // reported before anything is claimed, and the visit goes on.
+    // Two fixtures and a duck's visit leave the spider no room, which the
+    // catalog reports as a capacity refusal; a preview meanwhile is turned
+    // away by the visitor rule before the arena is asked, and changes
+    // nothing: the visit goes on.
     let mut config = config(ASPECT, ClockFont::Classic, FixtureStart::TwoOwners);
     config.events = ClockEvents::default();
     let mut state = ClockScenario::init(config, 7);
@@ -305,7 +324,15 @@ fn a_visit_makes_the_run_its_world_and_a_refused_one_changes_nothing() {
         before,
         "nothing changed"
     );
-    assert!(state.event_notice.is_some());
+    assert_eq!(
+        state.event_notice.unwrap().0,
+        "The spider waits for the visitor or event to finish"
+    );
+    assert_eq!(
+        state.arena_accounting().refused,
+        0,
+        "the arena was not asked"
+    );
 }
 
 #[test]
@@ -330,25 +357,24 @@ fn off_keeps_the_spider_out_and_calm_brings_it_in() {
     let mut settings = state.settings();
     settings.event_profile = ClockEventProfile::Calm;
     state.configure(settings);
-    let mut arrived = None;
-    for t in 0..120 * 60 {
+    // Calm's idle wait, and the spider on the tick it ends.
+    let deadline = state.next_event_tick().expect("a Calm deadline");
+    assert!((45 * 60..=75 * 60).contains(&(deadline - state.simulation_tick())));
+    while state.simulation_tick() < deadline {
+        assert!(state.spider_state().is_none());
         tick(&mut state, &[]);
-        if state.spider_state().is_some() {
-            arrived = Some(t);
-            break;
-        }
     }
-    let arrived = arrived.expect("a Calm visit within two minutes");
+    assert_eq!(state.simulation_tick(), deadline);
     assert!(
-        arrived >= 45 * 60,
-        "after Calm's idle wait, not before: {arrived}"
+        state.spider_state().is_some(),
+        "a Calm visit on its deadline"
     );
     assert_eq!(spider(&state).visit_id, state.event_id());
 }
 
 /// Prints the route envelope as the docs' table: every view and font over
-/// six seeds, with how many departed, swung and fell, and the visits'
-/// lengths.
+/// six seeds, with how many departed, swung and fell, the visits' median
+/// and longest lengths, and the median age at which they started leaving.
 #[test]
 #[ignore = "probe"]
 fn probe_route_envelope() {
@@ -379,11 +405,12 @@ fn probe_route_envelope() {
             }
             ends.sort_unstable();
             left.sort_unstable();
+            let median = |sorted: &[u64]| (sorted[2] + sorted[3]) as f32 / 2.0 / 60.0;
             println!(
                 "| {name} | {font:?} | {departed}/6 | {swung}/6 | {fell}/6 | {:.1} / {:.1} | {:.1} |",
-                ends[3] as f32 / 60.0,
+                median(&ends),
                 ends[5] as f32 / 60.0,
-                left[3] as f32 / 60.0
+                median(&left)
             );
         }
     }

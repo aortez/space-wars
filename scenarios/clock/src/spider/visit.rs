@@ -769,6 +769,17 @@ impl SpiderVisit {
             self.leave(state);
             return SpiderIntent { grip: true, ..idle };
         }
+        if matches!(state.support, Some(Hold::Floor | Hold::Frame(_))) {
+            // Set down on the floor or a rail by the swing, where the legs
+            // would hold it against the reel: the recovery's way up is
+            // quicker than this line's.
+            self.enter(ClockSpiderPhase::Recovering);
+            return SpiderIntent {
+                cut: true,
+                grip: true,
+                ..idle
+            };
+        }
         if self.phase_tick > STEP_LIMIT_TICKS {
             // Hanging under something it cannot catch: let the line go.
             self.enter(ClockSpiderPhase::Recovering);

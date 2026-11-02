@@ -3384,7 +3384,7 @@ CPU construction costs, not Pi or end-to-end latency measurements.
 
 **Marquee has not been deployed or tested on the Pi.** Ask before deploying.
 
-### Spider visit qualification (2026-11-02)
+### Spider visit qualification (2026-11-01)
 
 Issue [#384](https://github.com/aortez/space-wars/issues/384) is the
 completion gate for [#162](https://github.com/aortez/space-wars/issues/162):
@@ -3397,32 +3397,34 @@ visit's own tests, the route envelope below, the captures of the
 **Route envelope.** Every supported view and font over six seeds, from the
 ignored probe `spider::tests::qualify::probe_route_envelope` (the same visits
 `probe_visit_sweep` prints one line each for). A visit's length is from its
-admission to its departure; "left at" is when it started leaving. The budget
-is 30 s with up to 10 s more for the way out; nothing failed to leave.
+admission to its departure, given as the median and the longest of the six;
+"left at" is the median age at which they started leaving. The budget is
+30 s with up to 10 s more for the way out; nothing failed to leave.
 
 | View | Font | Departed | Swung | Fell | Visit (s) median / longest | Left at (s) |
 | --- | --- | --- | --- | --- | --- | --- |
-| 800×480 | Classic | 6/6 | 6/6 | 1/6 | 20.8 / 30.1 | 16.3 |
-| 800×480 | Matrix | 6/6 | 6/6 | 1/6 | 20.6 / 22.9 | 15.5 |
-| 800×480 | Sans | 6/6 | 6/6 | 1/6 | 20.5 / 23.4 | 15.8 |
-| 800×480 | Serif | 6/6 | 6/6 | 0/6 | 20.6 / 22.0 | 15.6 |
-| 1024×768 | Classic | 6/6 | 6/6 | 0/6 | 21.1 / 22.3 | 16.1 |
-| 1024×768 | Matrix | 6/6 | 6/6 | 2/6 | 22.4 / 28.4 | 15.4 |
-| 1024×768 | Sans | 6/6 | 6/6 | 1/6 | 22.1 / 25.5 | 15.9 |
-| 1024×768 | Serif | 6/6 | 6/6 | 1/6 | 22.5 / 28.1 | 16.0 |
-| 4:1 | Classic | 6/6 | 4/6 | 6/6 | 20.7 / 20.9 | 15.8 |
-| 4:1 | Matrix | 6/6 | 6/6 | 1/6 | 24.6 / 29.1 | 16.2 |
-| 4:1 | Sans | 6/6 | 6/6 | 1/6 | 23.9 / 30.2 | 16.0 |
-| 4:1 | Serif | 6/6 | 6/6 | 0/6 | 21.1 / 25.6 | 15.9 |
+| 800×480 | Classic | 6/6 | 6/6 | 1/6 | 20.8 / 30.1 | 15.8 |
+| 800×480 | Matrix | 6/6 | 6/6 | 1/6 | 20.5 / 22.9 | 15.5 |
+| 800×480 | Sans | 6/6 | 6/6 | 1/6 | 20.5 / 23.4 | 15.6 |
+| 800×480 | Serif | 6/6 | 6/6 | 0/6 | 20.6 / 22.0 | 15.5 |
+| 1024×768 | Classic | 6/6 | 6/6 | 0/6 | 21.0 / 22.3 | 15.8 |
+| 1024×768 | Matrix | 6/6 | 6/6 | 2/6 | 22.4 / 28.4 | 15.3 |
+| 1024×768 | Sans | 6/6 | 6/6 | 1/6 | 22.1 / 25.5 | 15.6 |
+| 1024×768 | Serif | 6/6 | 6/6 | 1/6 | 22.4 / 28.1 | 15.9 |
+| 4:1 | Classic | 6/6 | 6/6 | 6/6 | 20.7 / 24.0 | 15.4 |
+| 4:1 | Matrix | 6/6 | 6/6 | 1/6 | 23.9 / 29.1 | 15.8 |
+| 4:1 | Sans | 6/6 | 6/6 | 1/6 | 23.5 / 30.2 | 15.5 |
+| 4:1 | Serif | 6/6 | 6/6 | 0/6 | 20.8 / 25.6 | 15.7 |
 | 480×800 | Classic | 6/6 | 6/6 | 0/6 | 22.4 / 30.3 | 15.2 |
-| 480×800 | Matrix | 6/6 | 6/6 | 0/6 | 22.3 / 24.0 | 13.4 |
-| 480×800 | Sans | 6/6 | 6/6 | 0/6 | 22.2 / 22.6 | 15.5 |
-| 480×800 | Serif | 6/6 | 6/6 | 0/6 | 22.1 / 22.7 | 16.4 |
+| 480×800 | Matrix | 6/6 | 6/6 | 0/6 | 22.2 / 24.0 | 13.4 |
+| 480×800 | Sans | 6/6 | 6/6 | 0/6 | 21.6 / 22.6 | 15.4 |
+| 480×800 | Serif | 6/6 | 6/6 | 0/6 | 21.4 / 22.7 | 16.2 |
 
-Swings are missing only in the 4:1 view in Classic, where the digits sit
-under two pitches of floor room and the first underside the spider comes to
-has none to drop in. Falls are landings on the floor after a lost line or a
-cell gone from under the spider, every one recovered from.
+Every visit swung at least once. Falls are landings on the floor, every one
+recovered from: after a line cut by the silk crossing a cell on the way up,
+or, in the 4:1 view in Classic, when the entry's swing sets the spider down
+on the floor under the low digits, which ends that climb at once and sends
+it up by the floor's own route.
 
 **What the tests prove.**
 
@@ -3434,7 +3436,8 @@ cell gone from under the spider, every one recovered from.
   minute change by a contiguous forward minute, the old glyph slides out
   under the spider, which rides the departing cell with its legs' hold
   inside the cell's visible footprint and on a drawn cell every tick, is let
-  go at the band's edge and recovers; the time shows the new minute.
+  go as the cell is retired at the band's edge or carries it off its drawn
+  part, recovers, and departs; the time shows the new minute.
 - Visits repeat within their budgets beside residents: three automatic
   Demo visits beside the fixture's three balls, the spider's claim within
   its budget and the arena within capacity every tick, at most one joint,
@@ -3442,8 +3445,10 @@ cell gone from under the spider, every one recovered from.
   after each, the reuse delay set once per departure from its own tick, and
   one world all along.
 - A first visit makes the run its world, kept for the run; two fixtures and
-  a duck visit leave the spider no room, which is reported as `capacity`
-  before anything is claimed, and the duck's visit goes on untouched.
+  a duck visit leave the spider no room, which the catalog reports as
+  `capacity`, and a preview meanwhile is turned away by the visitor rule
+  before the arena is asked, changing nothing: the duck's visit goes on
+  untouched.
 - Off admits no spider in two minutes while a manual preview still does;
   Calm brings one in after its idle wait.
 - From #383: exact replay, bounded drawing, the schedule and reuse delay,

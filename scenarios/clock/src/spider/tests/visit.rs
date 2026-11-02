@@ -14,7 +14,7 @@ use engine_common::{ClockSpiderHold, ClockSpiderPhase, ClockSpiderState};
 /// one and a portrait one.
 const VIEWS: [f32; 4] = [ASPECT, 4.0 / 3.0, 4.0, 0.6];
 /// Ticks a visit may take at most, exit grace included, and a little over.
-const LONGEST: u64 = SPIDER_TICKS + EXIT_GRACE_TICKS + 10;
+pub(super) const LONGEST: u64 = SPIDER_TICKS + EXIT_GRACE_TICKS + 10;
 
 /// A clock with the spider enabled and previewable, in `font`.
 pub(super) fn visited(aspect: f32, font: ClockFont, seed: u64) -> ClockState {
