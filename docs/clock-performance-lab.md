@@ -493,7 +493,9 @@ the 16.7 ms frame budget, and the worst p95 row stays under 10 ms. At 2× the
 same work adds 1.6 ms to a frame that is already above the budget when idle,
 matching the earlier idle 2× observation. These are CPU-only headless samples,
 not displayed FPS; raw reports are retained under
-`target/clock-benchmarks/run.lSUiHORH/`.
+`target/clock-benchmarks/run.lSUiHORH/`. The same cases were re-measured on the
+final build on 2026-11-02, with live samples: see
+[Ceiling sunlight opening on the Picade](#ceiling-sunlight-opening-on-the-picade-2026-11-02).
 
 ## Idle arena residents (2026-10-31)
 
@@ -552,6 +554,167 @@ and so do the worst p95 rows. Leaving out the first three seconds changes no
 median by more than 1 µs. These are CPU-only headless samples, not displayed
 FPS; raw reports are retained under `target/clock-benchmarks/run.Oa2hOXuL/`.
 
+## Ceiling sunlight opening on the Picade (2026-11-02)
+
+The qualification half of #518, on the final build of the sunlight opening and
+the moss succession: the headless table re-measured, then the opening sampled
+live on the cabinet at raster scales 1 and 2 through opening, a mature patch, a
+Duck crossing, closing and the aftermath.
+
+**Build and device.** Source `2ffbc9ab` (`main` after #574; the tree is the one
+`8e7a9ed3` built), built by the Yocto recipe for `raspberrypi-spacewars`
+(release, aarch64, `pi-kiosk-gpu`; `engine-client` SHA-256
+`d49ae20519ab58df20781b284b6244ad7d9a7eecc3bf3beec3245d45d287075c`,
+compatibility `cbf51bf0…`), on `sw-picade`: Raspberry Pi 4 Model B Rev 1.4,
+Linux `6.6.63-v8`, ondemand governor, HDMI 1024×768 at 60 Hz, FemtoVG on V3D
+4.2.14.0 with Mesa 25.1.6, renderer preference `raster`. The fast updater
+refused the cabinet's installed runtime (`de3ca81f…`, an image from
+`e150c7a6`, before the OS manager's development installs), so nothing was
+installed: the bundle's client and CLI ran from tmpfs under the kiosk unit
+through a runtime drop-in with a copy of the cabinet's settings (24-hour,
+Classic, its twelve saved event switches on; Auto-start off and automatic
+events Off in the copy, and raster scale 2 for the second live run), and the
+kiosk was returned to its installed client afterwards with its settings file
+byte-for-byte unchanged.
+
+**Headless fixtures.** `benchmark-clock.sh --cases idle,duck,grass --seconds 60
+--repeats 3` from `/tmp`, with the trial kiosk parked at its launcher and no
+Auto-start: seed 7, two warm-up seconds, 60 measured seconds, three processes
+per combination, 67–74 °C at 1.0–1.5 GHz. Values are medians of per-run means;
+p95 is the worst row of any run:
+
+| Case | Scale | Step ms | Scene ms | Prepare ms | Total ms/frame | Worst row p95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| idle | 1 | 0.071 | 0.123 | 6.746 | 6.947 | 7.746 |
+| duck | 1 | 0.171 | 0.140 | 6.827 | 7.144 | 8.006 |
+| grass | 1 | 0.777 | 0.488 | 7.196 | 8.467 | 9.594 |
+| idle | 2 | 0.069 | 0.119 | 20.769 | 20.963 | 23.395 |
+| duck | 2 | 0.167 | 0.137 | 21.129 | 21.438 | 23.075 |
+| grass | 2 | 0.778 | 0.492 | 22.399 | 23.673 | 27.106 |
+
+Against the [2026-10-19 table](#ceiling-sunlight-opening-2026-10-19), idle and
+duck are 0.1–0.2 ms a frame cheaper at 1× and about 0.9 ms cheaper at 2×, but
+the opening's whole-window cost over idle at 1× has grown from 1.0 ms to
+1.5 ms: 0.71 ms of simulation, 0.37 ms of scene generation and 0.45 ms of
+raster preparation, about 9% of the 16.7 ms budget, with the worst p95 row
+under 10 ms. At 2× it adds 2.7 ms to a frame that is already 21 ms when idle.
+The growth is in the simulation and scene stages, and it follows the patch:
+per-second rows put the step at 0.06 ms before the delivery, 0.22 ms at six
+seconds, 0.54 ms at twenty, 0.90 ms at thirty and 1.13 ms from 45 s on with the
+full 64-tissue patch, while scene generation rises from 0.35 ms during the
+opening to 0.50 ms with the lawn. The fixture's floor now carries the inset
+layer of #559, 960 retained cells under the whole floor, and the arena of #568
+steps every tick, neither of which the October table had; this record does not
+attribute the growth further.
+
+**Live sequence at scale 1, the cabinet's production profile.** Clock was
+started from the launcher and settled for half a minute, then the CLI sampled
+`status` and `clock state --json` every 3.3 s from four idle windows before the
+request until 557 s after `clock trigger grass`, with `clock trigger duck` at
+201 s and a 240-loop `host render-trace` in each phase (167 windows of 120
+callbacks; the five windows that followed a screenshot are excluded). The event
+seed put one opening at the far left of the face, seven soil columns wide
+(about 24 of the 1024 pixels), and the patch grew to 28 tissues with 7 shoots
+by 31 s, all 7 mature by 121 s. Every window reported 60 FPS and 60 UPS with
+one update per callback, and every trace completed 240 flips in 240 loops at
+60.005 Hz with no refresh skipped: interval p95 16.667–16.668 ms and maximum
+16.671–16.694 ms, in the idle, opening, mature, Duck, closing, aftermath and
+late-aftermath traces alike. Medians per phase, with the worst window's p95 in
+parentheses (ms; CPU is the overlay's main-loop share):
+
+| Phase (windows) | Interval | Step | Scene | Prepare | Callback | Primitives | KMS loop CPU | CPU |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Idle before the request (4) | 16.66 (16.84) | 0.059 | 0.222 | 0.232 | 0.596 (0.795) | 454 | 4.54 (6.02) | 28% |
+| Opening, 0–3 s (2) | 16.67 (16.85) | 0.064 | 0.360 | 0.240 | 0.747 (1.195) | 472 | 4.85 (6.31) | 30% |
+| Open, patch growing, 12–177 s (53) | 16.66 (16.88) | 0.710 | 0.675 | 0.248 | 1.733 (3.064) | 470 | 5.74 (8.57) | 35% |
+| Open, mature patch, 180–195 s (4) | 16.67 (16.84) | 0.720 | 0.692 | 0.252 | 1.764 (2.406) | 474 | 5.81 (7.47) | 36% |
+| Duck crossing, 216–222 s (2) | 16.67 (16.82) | 0.869 | 0.762 | 0.278 | 2.024 (2.667) | 547 | 6.16 (7.71) | 38% |
+| Open after the Duck, 201–303 s (27) | 16.66 (16.87) | 0.731 | 0.695 | 0.252 | 1.777 (2.710) | 484 | 5.82 (7.73) | 36% |
+| Closing, 306–362 s (16) | 16.66 (16.87) | 0.724 | 0.667 | 0.243 | 1.750 (2.714) | 448 | 5.67 (7.87) | 35% |
+| Closed, first minute, 365–418 s (18) | 16.66 (16.85) | 0.724 | 0.259 | 0.249 | 1.332 (2.431) | 493 | 5.37 (7.42) | 33% |
+| Closed, patch declining, 421–557 s (40) | 16.66 (16.89) | 0.688 | 0.257 | 0.244 | 1.298 (2.005) | 490 | 5.35 (7.14) | 33% |
+
+With the patch under the beam the host callback costs 1.76 ms against 0.60 ms
+idle, 7% of the refresh period, and the presentation loop's CPU 5.8 ms against
+4.5 ms, another 8%; the overlay's main-loop share rises from 28% to 36%. By
+stage: simulation +0.66 ms, which is the retained layer and the biology and
+which stays at +0.63–0.67 ms after the ceiling closes; scene generation
++0.47 ms while the beam is up, the silhouettes, the light query and the beam
+envelope, falling to +0.04 ms once the ceiling is closed; raster preparation
++0.02 ms, because at 1× the kiosk draws direct geometry on the GPU
+(`gpu_scene_applied=true`, retained-culled) rather than rasterising on the CPU,
+which is why the headless table's 7 ms of preparation does not appear here; and
++1.3 ms in the presentation loop while open, of which about 0.4 ms goes with
+the beam and the rest stays with the layer and the blades. The largest callback
+in any window was 4.5 ms, and a single host interval of 33.5 ms occurred at
+269 s, the window in which three blades matured, with the flip cadence
+unaffected (119 flips in 1982 ms). No capacity was reached: `optical_refusals`
+stayed 0, the patch's seven shoots used 7 of the 64 receivers and the largest
+scene was the Duck's 556 primitives.
+
+The Duck, previewed at 201 s with the patch mature, opened its doors through
+the retained layer (96 of 960 cells exported), ran the course and exited at
+about 224 s with all three obstacles cleared, six to seven arena bodies in
+flight. The crossing cost 0.26 ms more per callback than the open hold and held
+60 Hz; its trace, started five seconds after the request, completed 240 of 240
+flips with a 16.678 ms maximum. It also cost the patch: the tissue count dipped
+from 28 to 23 and every mature blade lost its maturity, the patch regrew to 28
+within six seconds, and the blades began maturing again at 269 s and were all
+mature by 300 s. Closing began at 305 s; the first stressed tissue appeared at
+318 s, 11 were stressed when the ceiling closed at 365 s and 24 by 380 s, the
+first tissue was lost at about 480 s, and 4 living tissues with no shoots
+remained at 539 s.
+
+| Open with the mature patch at 195 s, the beam at the far left | The Duck crossing at 216 s |
+| --- | --- |
+| ![The 24-hour Classic face on the Picade at 60 FPS, with the seven blades of the lit patch at the foot of the far-left corridor](screenshots/clock/picade-ceiling-mature-device.png) | ![The Duck running the course across the opened floor under the face](screenshots/clock/picade-ceiling-duck-device.png) |
+
+**No mat formed.** `moss_tissues` stayed 0 from the closing boundary to the end
+of the run, 192 s later, where the reference sequence has 2 cells at 365 s and
+18 by 545 s. The cause is the admission rule, reproduced headlessly with the
+cabinet's launch seed at the 4:3 aspect: the boundary tries one placement per
+opening, in the first soil column of its lit span, and the runtime refused it
+for space because a living shoot stood in that column, as one did in all seven
+columns of this span. Nothing retries later. Twelve further probe seeds at 4:3
+ended the same way eight times, against once at the 5:3 reference aspect, whose
+spans run to sixteen columns where the Picade's run from three to twelve. The
+[sunlight doc](clock-ceiling.md#moss-succession-on-the-retained-floor) records
+the limitation; the fix belongs to its own change.
+
+**Live sequence at scale 2.** The same sequence, after restarting the trial
+kiosk with `raster_scale = 2.0`. At 2× the direct-geometry GPU scene is not
+applied, since it is a 1× path, so the client rasterises 2048×1536 on the CPU
+(clear 3.6 ms, drawing 14.1 ms, image 5.0 ms) and uploads 12.6 MB a frame. That
+is over budget before any event: idle windows reported 30.6 FPS at 60 UPS with
+two updates per callback, 22.8 ms of preparation and 100% main-loop CPU, and
+the idle trace ran at 29.3 Hz with 182 refreshes passed without a flip in 175
+loops. The opening took the kiosk from 30.6 to 27.3–28.9 FPS, UPS held at 60
+throughout, and every traced phase ran at 27.3–28.3 Hz with interval p95 at
+50 ms, every second or third refresh; 65–71 °C. Medians per phase, with the
+worst window's p95 in parentheses (ms; step is per callback, at 2.1 updates
+each):
+
+| Phase (windows) | FPS / UPS | Interval | Step | Scene | Prepare | Callback | KMS loop CPU |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Idle before the request (4) | 30.6 / 59.8 | 32.75 (36.22) | 0.064 | 0.162 | 22.780 | 23.081 (24.301) | 32.58 (36.11) |
+| Opening, 0–3 s (2) | 28.9 / 59.4 | 34.43 (36.34) | 0.074 | 0.252 | 24.288 | 24.692 (26.191) | 34.32 (36.34) |
+| Open, patch growing, 12–179 s (54) | 27.9 / 60.0 | 35.95 (40.42) | 0.937 | 0.526 | 24.897 | 26.342 (28.919) | 35.83 (40.22) |
+| Open, mature patch, 182–197 s (4) | 28.2 / 59.7 | 35.51 (38.25) | 0.935 | 0.497 | 24.389 | 25.907 (27.238) | 35.34 (37.64) |
+| Duck crossing, 215–221 s (3) | 27.7 / 60.1 | 36.08 (38.84) | 1.178 | 0.553 | 24.532 | 26.387 (27.854) | 35.80 (38.25) |
+| Open after the Duck, 201–303 s (27) | 27.3 / 60.0 | 36.70 (40.37) | 0.983 | 0.530 | 25.491 | 27.084 (28.912) | 36.53 (40.29) |
+| Closing, 307–363 s (17) | 27.3 / 60.3 | 36.59 (39.94) | 0.972 | 0.524 | 25.389 | 26.967 (28.760) | 36.45 (39.97) |
+| Closed, first minute, 366–419 s (18) | 28.4 / 60.0 | 35.31 (38.83) | 0.929 | 0.204 | 24.457 | 25.681 (27.651) | 35.13 (38.36) |
+| Closed, patch declining, 422–557 s (40) | 27.6 / 60.0 | 35.94 (40.31) | 0.918 | 0.211 | 25.001 | 26.227 (29.086) | 35.75 (39.37) |
+
+So the production profile, 1×, holds 60 Hz through the whole sequence, with
+about 15% of the refresh period spent on the opening with its mature patch and
+18% while the Duck crosses it, and no tuning limit is needed on this device for
+the beam, the silhouettes or the biology. The 2× shortfall is the CPU raster
+path's, present before the opening and 3–4 ms a frame worse with it; its
+mitigation is the cabinet's own setting, 1×, which the GPU scene path serves.
+Raw reports, samples, traces, captures, the sampling script and the headless
+probe are retained under `target/clock-benchmarks/picade-ceiling-20261102/`.
+
 ## Live CPU timings
 
 ```sh
@@ -586,7 +749,10 @@ comparisons. Time values are observations, never unit-test thresholds.
 Use the Pi 4 `picade.local`, not another checkout's Pi 5 target. Deploy a matching
 client with the usual updater, then return the kiosk to its launcher before
 running headless tests so an active scenario does not compete for CPU/memory
-bandwidth. With [Auto-start](auto-start.md) on, the root launcher starts its
+bandwidth. When the updater refuses the cabinet's installed runtime, the bundle
+can run from tmpfs under the kiosk unit for the measurement instead, as the
+[2026-11-02 record](#ceiling-sunlight-opening-on-the-picade-2026-11-02)
+describes. With [Auto-start](auto-start.md) on, the root launcher starts its
 activity again after the idle delay, so open App Settings from the launcher,
 which suspends it. Avoid screenshots during measured runs. Keep cooling, CPU
 governor, power supply, display mode and background load comparable; collect
