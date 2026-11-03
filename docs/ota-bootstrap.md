@@ -491,6 +491,11 @@ recovery state. Remove the old medium before the first boot. Both disks carry th
 same labels and, from current images, the same partition UUIDs, so the kernel
 could select either root and layout inspection refuses the duplicates.
 
+Flash a card only from an image built with `--no-fstab-update`. Earlier full
+disk images name `/dev/sda1` and `/dev/sda4` in the flashed root's `fstab`. A
+card has no `/dev/sda4`, so its first boot waited 90 seconds for that device
+and entered emergency mode, without network or a console login.
+
 No physical recovery case, including power loss, has run on an SD card yet.
 
 ## Read the existing device
