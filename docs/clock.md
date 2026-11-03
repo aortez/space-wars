@@ -655,7 +655,7 @@ spider is in the arena, on the shared code-native path of the raster and
 vector adapters. The time stays legible: the way out goes up through the
 canopy, not through the digits.
 
-[Spider visit qualification](#spider-visit-qualification-2026-11-02) under
+[Spider visit qualification](#spider-visit-qualification-2026-11-01) under
 Verification records the route envelope over every view and font, what the
 tests prove, the caps and the benchmarks; `./benchmark-clock.sh --cases
 spider` measures one visit per cycle in the headless client.
@@ -686,6 +686,13 @@ In the portrait view the same seed drops the spider three pitches under the
 wide one:
 
 ![The spider hangs three pitches under the 2 in the 480×800 view](screenshots/clock/spider-visit-portrait.png)
+
+On `sw-picade` (Pi 4, 1024×768, the cabinet's Classic 24-hour face), from
+the [qualification's](#spider-visit-qualification-2026-11-01) second visit:
+
+| Hanging on its line under the 9 | Crawling under the 9's bottom row |
+| --- | --- |
+| ![The spider hangs on a line from the 9's lowest cell on the Picade](screenshots/clock/picade-spider-hanging-device.png) | ![The spider crawls under the 9's bottom row on the Picade](screenshots/clock/picade-spider-crawling-device.png) |
 
 ### Managed floor and drain
 
@@ -3485,8 +3492,69 @@ each (CPU-only: no drawing, upload or vsync):
 
 The spider's physics, its frame and up to 233 proxies cost about 0.02–0.035
 ms a tick here, over the empty arena's step; the frame's cost is the raster
-preparation of the face in every case. Device numbers for the supported Pi
-targets go here once measured.
+preparation of the face in every case.
+
+**Picade (2026-11-02).** The same source (`8e7a9ed3`, the pull request's
+head), built by the Yocto recipe for `raspberrypi-spacewars` (release,
+aarch64, `pi-kiosk-gpu`; `engine-client` SHA-256
+`d49ae20519ab58df20781b284b6244ad7d9a7eecc3bf3beec3245d45d287075c`,
+compatibility `cbf51bf0…`), on `sw-picade`: Raspberry Pi 4 Model B Rev 1.4,
+Linux `6.6.63-v8`, HDMI 1024×768 at 60 Hz, FemtoVG on V3D 4.2.14.0 with Mesa
+25.1.6, renderer preference `raster` at scale 1, the cabinet's own settings
+(24-hour, Classic, Calm, twelve event switches; the spider defaulted to On).
+The fast updater refused the cabinet's installed runtime (`de3ca81f…`, an
+image from `e150c7a6`, before the OS manager's development installs), so
+nothing was installed: the bundle's client and CLI ran from tmpfs under the
+kiosk unit through a runtime drop-in with a copy of the settings, and the
+kiosk was returned to its installed client afterwards.
+
+Three previewed visits (`spacewars-cli clock trigger spider`), the third
+beside the floor's soil resident, each departed with `failed_exit=false`. The
+first, screenshot-free, made the run's world and left after 1257 arena steps
+(21.0 s). The second, with a screenshot at every phase change (the captures
+in the [Spider visitor](#spider-visitor) section), came down the beam line in
+2.4 s, climbed under the digit by the hatch, fell and recovered from the
+floor, climbed on two more digits, entered a swing under the 9 at 10.5 s,
+decided to leave at 11.0 s, shot a line to the ceiling's right at 14.0 s,
+crawled along the ceiling to the hatch as the clock turned 17:50 beneath it,
+and was gone at 23.4 s (1 climb, 1 fall, 2 recoveries, 50 proxies). The
+third, screenshot-free, climbed at 2.9 s, swung from 4.0 to 5.7 s, crawled
+over the digit including a crossing at 14.6 s, fell and recovered at 15.8 s,
+left from 16.9 s by a line to a digit and then to the beam, and was gone at
+22.5 s (3 climbs, 1 swing, 2 falls, 2 recoveries, 52 proxies). The CLI polled
+the published state twice a second throughout; the live `status` window
+spanning the third visit reported a step of 2.3 ms mean, 3.1 ms p95 and 6.8
+ms max, and frame intervals of 16.67 ms mean, 16.81 ms p95 and 18.2 ms max.
+
+Four basic KMS traces of 240 loops, without screenshots (`spacewars-cli host
+render-trace start`/`read`; intervals from consecutive `flip_kernel_us`,
+skipped refreshes from `flip_sequence`; loop CPU is the CPU-observed loop
+time, not GPU execution):
+
+| Trace | Completed flips | Mean Hz | Interval p95 / max (ms) | Skipped refreshes | Loop CPU mean / max (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| First visit, descent | 240 | 60.004 | 16.668 / 16.702 | 0 | 4.75 / 7.85 |
+| Third visit, descent | 240 | 60.004 | 16.668 / 16.675 | 0 | 7.26 / 10.78 |
+| Third visit, crawling (7–12 s) | 240 | 60.004 | 16.668 / 16.684 | 0 | 7.30 / 10.52 |
+| Third visit, leaving (17–22 s) | 240 | 60.007 | 16.668 / 16.681 | 0 | 7.29 / 12.59 |
+
+CPU-only benchmarks on the same cabinet with the kiosk paused in the
+background, the copied script and the tmpfs client: 1024×768, raster scale 1,
+seed 7, 69 simulated seconds after two of warm-up, three independent
+processes per case. The governor stayed `ondemand`; readings before and after
+each run ranged over 66–76 °C and 1.1–1.5 GHz, so throttling is not ruled
+out.
+
+| Case | step ms/frame | scene | prepare | total | worst row p95 |
+| --- | --- | --- | --- | --- | --- |
+| idle | 0.074–0.076 | 0.125–0.129 | 7.14–7.32 | 7.34–7.53 | 8.23–8.63 |
+| spider | 0.281–0.291 | 0.136–0.141 | 7.13–7.37 | 7.55–7.80 | 8.85–10.04 |
+| residents | 0.127–0.134 | 0.125–0.129 | 7.15–7.35 | 7.41–7.62 | 8.69–9.03 |
+
+The spider's physics, frame and proxies cost about 0.21 ms a tick on the Pi
+4 over idle's step, with at most 95 bodies and colliders in the fixture; the
+frame's cost is the raster preparation of the face in every case, about 7.2
+ms there, and the live display held every refresh in the traced windows.
 
 ## Device captures
 
