@@ -728,8 +728,9 @@ fn busctl(args: &[&str]) -> Result<String> {
 
 fn missing_root() -> Result<()> {
     // The image's BusyBox blkid has neither PARTUUID filtering nor meaningful
-    // no-match status. Require precisely the four independently inspected USB
-    // partitions instead; any other partitioned medium blocks the experiment.
+    // no-match status. Require precisely the boot medium's four independently
+    // inspected partitions instead; any other partitioned medium blocks the
+    // experiment.
     let layout = crate::recovery_linux::inspect_layout()?;
     let mut found = BTreeSet::new();
     for (index, entry) in fs::read_dir("/sys/class/block")?.enumerate() {

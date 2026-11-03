@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, wr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { assertBootCompatibility, deviceProfileText, readBootIdentity, setHardwareProfile, validateProfile } from '../scripts/hardware.mjs';
+import { assertBootCompatibility, bootMediumCommandLine, deviceProfileText, readBootIdentity, setBootMedium, setHardwareProfile, validateBootMedium, validateProfile } from '../scripts/hardware.mjs';
 import { defaultBuildDir, defaultImageDir, MACHINE, preferredImages, YOCTO_DIR } from '../scripts/paths.mjs';
 
 const hardwareFiles = join(YOCTO_DIR, 'meta-spacewars/recipes-spacewars/spacewars-hardware/files');
@@ -113,6 +113,71 @@ test('profile selection verifies the bytes read back after writing', () => {
   const fixture = privateBootMount({ corruptReadback: true });
   assert.throws(() => setHardwareProfile(flashUtils, '/dev/fixture', 'hyperpixel', 'a'.repeat(64), false, fixture), /readback/);
   assert.ok(fixture.result().unmounted && fixture.result().removed);
+});
+
+// The fresh default from the image's boot partition, including its double space.
+const FRESH_COMMAND_LINE = 'dwc_otg.lpm_enable=0 root=/dev/sda2 rootfstype=ext4 rootwait  net.ifnames=0 console=tty1 fbcon=map:01 roottimeout=30\n';
+const SD_COMMAND_LINE = FRESH_COMMAND_LINE.replace('root=/dev/sda2', 'root=/dev/mmcblk0p2');
+
+test('only explicit known boot media can be flashed', () => {
+  for (const name of ['usb', 'sd']) assert.equal(validateBootMedium(name), name);
+  for (const name of [null, '', 'mmc', 'SD', 'sd\n', 'toString']) {
+    assert.throws(() => validateBootMedium(name), /Select --boot-medium/);
+  }
+});
+
+test('SD flashing changes only the fresh default root', () => {
+  assert.equal(bootMediumCommandLine(FRESH_COMMAND_LINE, 'sd'), SD_COMMAND_LINE);
+  assert.equal(bootMediumCommandLine(FRESH_COMMAND_LINE, 'usb'), FRESH_COMMAND_LINE);
+  for (const text of [
+    FRESH_COMMAND_LINE.replace('root=/dev/sda2', 'root=PARTUUID=076c4a2a-02'),
+    FRESH_COMMAND_LINE.replace('root=/dev/sda2', 'root=/dev/sda3'),
+    SD_COMMAND_LINE,
+    FRESH_COMMAND_LINE.replace('rootwait', 'rootwait root=/dev/sda2'),
+    FRESH_COMMAND_LINE.trimEnd(),
+    FRESH_COMMAND_LINE + FRESH_COMMAND_LINE,
+  ]) {
+    assert.throws(() => bootMediumCommandLine(text, 'sd'), /fresh image default/);
+  }
+});
+
+function commandLineMount(initial, { corruptReadback = false } = {}) {
+  let mountPoint;
+  let written;
+  let unmounted = false;
+  const run = (program, args, options = {}) => {
+    assert.equal(program, 'sudo');
+    const [command, ...rest] = args;
+    if (command === 'mount') {
+      mountPoint = rest.at(-1);
+      writeFileSync(join(mountPoint, 'cmdline.txt'), initial);
+      return '';
+    }
+    if (command === 'umount') {
+      rmSync(join(mountPoint, 'cmdline.txt'));
+      unmounted = true;
+      return '';
+    }
+    if (command === 'tee') written = options.input;
+    if (corruptReadback && command === 'cat' && written !== undefined) return initial;
+    return execFileSync(command, rest, options);
+  };
+  return { run, result: () => ({ written, unmounted, removed: !mountPoint || !existsSync(mountPoint) }) };
+}
+
+test('SD root selection reads back its write and always unmounts the boot filesystem', () => {
+  const sd = commandLineMount(FRESH_COMMAND_LINE);
+  setBootMedium(flashUtils, '/dev/fixture', 'sd', false, sd);
+  assert.deepEqual(sd.result(), { written: SD_COMMAND_LINE, unmounted: true, removed: true });
+  const usb = commandLineMount(FRESH_COMMAND_LINE);
+  setBootMedium(flashUtils, '/dev/fixture', 'usb', false, usb);
+  assert.deepEqual(usb.result(), { written: undefined, unmounted: false, removed: true });
+  const provisioned = commandLineMount(FRESH_COMMAND_LINE.replace('root=/dev/sda2', 'root=PARTUUID=076c4a2a-02'));
+  assert.throws(() => setBootMedium(flashUtils, '/dev/fixture', 'sd', false, provisioned), /fresh image default/);
+  assert.deepEqual(provisioned.result(), { written: undefined, unmounted: true, removed: true });
+  const corrupt = commandLineMount(FRESH_COMMAND_LINE, { corruptReadback: true });
+  assert.throws(() => setBootMedium(flashUtils, '/dev/fixture', 'sd', false, corrupt), /readback/);
+  assert.ok(corrupt.result().unmounted && corrupt.result().removed);
 });
 
 test('HDMI selection uses the connected connector, not the first DRM card', t => {
@@ -235,4 +300,5 @@ test('flash help documents explicit hardware selection without accessing disks o
   const output = execFileSync(process.execPath, [join(YOCTO_DIR, 'scripts/flash.mjs'), '--help'], { encoding: 'utf8' });
   assert.match(output, /--profile/);
   assert.match(output, /picade/);
+  assert.match(output, /--boot-medium/);
 });

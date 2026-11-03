@@ -54,6 +54,10 @@ impl Fixture {
     }
 
     fn inspect(&self, running: Option<&str>) -> Result<BootstrapOrigin> {
+        self.inspect_on("sda3", running)
+    }
+
+    fn inspect_on(&self, active: &str, running: Option<&str>) -> Result<BootstrapOrigin> {
         let files = self
             .contents
             .iter()
@@ -71,7 +75,7 @@ impl Fixture {
         inspect(
             self.image.clone(),
             &files,
-            "sda3",
+            active,
             &"a".repeat(40),
             running.unwrap_or(default),
             &|path, limit| {
@@ -145,6 +149,21 @@ fn fresh_inventory_binds_the_image_kernel_and_complete_factory_boot_set() {
         }
         assert!(changed.inspect(None).is_err());
     }
+}
+
+#[test]
+fn an_sd_card_flash_names_the_card_partition_as_its_factory_root() {
+    let mut fixture = Fixture::new();
+    let default = std::str::from_utf8(&fixture.contents["cmdline.txt"])
+        .unwrap()
+        .replace("/dev/sda3", "/dev/mmcblk0p3");
+    fixture
+        .contents
+        .insert("cmdline.txt".into(), default.into_bytes());
+    assert!(fixture.inspect_on("mmcblk0p3", None).is_ok());
+    // Neither medium may run with the other's factory root.
+    assert!(fixture.inspect_on("sda3", None).is_err());
+    assert!(Fixture::new().inspect_on("mmcblk0p3", None).is_err());
 }
 
 #[test]

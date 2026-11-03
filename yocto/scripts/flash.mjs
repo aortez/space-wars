@@ -4,7 +4,7 @@ import { existsSync, statSync } from 'fs';
 import { basename, isAbsolute, join, resolve } from 'path';
 import { pathToFileURL } from 'url';
 import { defaultImageDir, preferredImages, YOCTO_DIR } from './paths.mjs';
-import { readBootIdentity, setHardwareProfile, validateProfile } from './hardware.mjs';
+import { BOOT_MEDIA, readBootIdentity, setBootMedium, setHardwareProfile, validateBootMedium, validateProfile } from './hardware.mjs';
 import { ADMIN_USER, backupData, restoreData, readPublicKey, provisionAccess, preserveLegacyHostKeys, requireGnuInstall } from './flash-storage.mjs';
 
 const DEFAULT_IMAGE_DIR = defaultImageDir();
@@ -27,6 +27,7 @@ Options:
   --device <dev>       Flash directly to device, still with confirmation
   --image <path>       Use a specific .wic.gz image
   --profile <name>     Required: hdmi, hyperpixel, or picade
+  --boot-medium <name> Pi root device: usb [default], or sd for its card slot
   --hostname <name>    Write /boot/hostname.txt after flashing [default: spacewars]
   --ssh-key <path>     Runtime public SSH key (also the default owner key)
   --admin-ssh-key <path> Separate owner key for swadmin, with passwordless sudo
@@ -269,6 +270,7 @@ async function main() {
     throw new Error('--access-only requires --device and --expected-serial.');
   }
   const profile = listOnly ? null : validateProfile(argValue(args, '--profile'));
+  const bootMedium = listOnly ? null : validateBootMedium(argValue(args, '--boot-medium') ?? 'usb');
 
   const utils = await loadPiBase();
 
@@ -299,6 +301,7 @@ async function main() {
   utils.log('');
   utils.info(`Image: ${image.name}`);
   utils.info(`Hardware profile: ${profile}`);
+  utils.info(`Boot medium: ${bootMedium} (root ${BOOT_MEDIA[bootMedium]})`);
   utils.info(`Boot assets: ${bootIdentity.substring(0, 16)}...`);
   utils.info(`Size: ${utils.formatBytes(image.stat.size)}`);
   utils.info(`Built: ${image.stat.mtime.toLocaleString()}`);
@@ -380,6 +383,7 @@ async function main() {
       skipConfirm: (!interactive && config.skip_confirmation) || false,
     });
 
+    setBootMedium(utils, targetDevice, bootMedium, dryRun);
     utils.growDataPartition(targetDevice, DATA_FREE_PERCENT, dryRun);
     await utils.setHostname(targetDevice, hostname, dryRun);
     setHardwareProfile(utils, targetDevice, profile, bootIdentity, dryRun);
