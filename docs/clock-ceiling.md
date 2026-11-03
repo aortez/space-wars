@@ -215,20 +215,25 @@ into. The two organisms therefore meet by ordinary occupancy: a mat cell refuses
 a shoot and a shoot cell refuses a mat, with no replacement and no recharge. A
 seed is still planted into the dirt below a mat, because that is a different
 cell; what the mat refuses is the shoot that seed would raise. Each mat is
-placed at the near edge of its opening's lit span rather than the centre where
-the seed batch lands, so the two organisms compete at their margins.
+placed in the nearest free soil column to its opening's lit span, the span's
+own columns from the near edge first and then outward through the corridor,
+rather than at the centre where the seed batch lands, so the two organisms
+compete at their margins.
 
-That placement is tried once, at the closing boundary, in the first soil
-column of the span, and the runtime refuses it when a living shoot already
-stands in that column's air row. A span the patch has filled to its near edge
-therefore keeps no mat, and nothing retries later. The Picade's 4:3 face makes
-that common: its corridors seat spans of three to twelve columns, against four
-to sixteen at the 5:3 reference aspect, and in a headless replay of the
-cabinet's own launch seed every one of the single opening's seven columns
-carried a shoot at the boundary, so the mat was refused for space. Eight of
-twelve further seeds ended the same way at 4:3, against one at 5:3. The
+That placement is tried once, at the closing boundary. A column whose air row
+already holds plant tissue is passed over, since the runtime would refuse the
+mat for space, and the runtime still refuses capacity and surface contact, so
+a span the patch has filled to its edge seats its mat beside the patch rather
+than keeping none. A corridor whose every soil column holds a shoot at the
+boundary still admits no mat; no probe seed at 4:3 or 5:3 did that, and a
+bounded retry on later biology ticks would be the follow-up if one does. The
+rule matters on narrow faces: the Picade's 4:3 corridors seat spans of three
+to twelve columns against four to sixteen at the 5:3 reference aspect, and the
+seed batch fills them to the edge. Before it, only the first column was ever
+tried, and the
 [2026-11-02 cabinet run](clock-performance-lab.md#ceiling-sunlight-opening-on-the-picade-2026-11-02)
-measured the same outcome live: no mat in the 192 seconds after closing.
+ended with no mat in the 192 seconds after closing, as did eight of twelve
+probe seeds at 4:3 and one at 5:3.
 
 A mat attaches to retained soil, not to the floor slab beneath it. Surface
 contact is a terrain-geometry test, and the floor is not part of the soil
@@ -241,7 +246,9 @@ Bounds are the mat's own. Eighteen cells cover every patch together, the way
 grass's trait bounds all of its seeds at once: the moss policy recognises its
 own tissue by policy and support, so each mat counts the others. Placement
 answers to that same total, so a later ceiling cannot seat a fresh mat once the
-retained ones fill it, and at most one mat is admitted per opening. Spread is
+retained ones fill it, and at most one mat is admitted per opening; a corridor
+whose floor already carries living moss keeps it rather than collecting another
+on every later ceiling. Spread is
 confined to the corridors the openings are cut through, captured when a ceiling
 first closes and held as two ranges however many ceilings come and go. That is
 deliberately not the grass window, which is rebuilt from the live apertures and

@@ -293,10 +293,12 @@ impl ClockState {
     /// moss where it leaves a grass shoot far below its threshold, so when the
     /// ceiling finishes closing each former opening keeps one bounded mat on
     /// the retained soil it exposed, and the corridor holds low cover as the
-    /// lit patch withers. A mat is admitted at its opening's near edge rather
-    /// than the centre where the next seed batch lands, so the two organisms
-    /// meet by ordinary occupancy in the row they share instead of displacing
-    /// each other. A cancelled ceiling never reaches this boundary.
+    /// lit patch withers. A mat is admitted in the nearest free soil column to
+    /// its opening's span, the span's own columns from the near edge first and
+    /// then outward through the corridor, rather than the centre where the
+    /// next seed batch lands, so the two organisms meet by ordinary occupancy
+    /// in the row they share instead of displacing each other. A cancelled
+    /// ceiling never reaches this boundary.
     pub(crate) fn introduce_moss(&mut self) {
         use crate::grass;
         use engine_core::plants::Role;
@@ -321,45 +323,82 @@ impl ClockState {
             .filter_map(|(left, right)| soil.columns_within(left, right))
             .collect();
         let surface_row = grass::SOIL_DEPTH_CELLS as i32 - 1;
-        let settled: Vec<i32> = self
-            .plants
-            .plants
-            .observe()
+        let observation = self.plants.plants.observe();
+        let settled: Vec<i32> = observation
             .tissues
             .iter()
             .filter(|t| t.role == Role::Moss && t.health > 0)
             .map(|t| t.cell[0])
             .collect();
-        let mut chosen: Vec<i32> = Vec::with_capacity(spans.len());
+        // Any tissue in the mat's row refuses the cell by occupancy, living or
+        // not, so those columns are passed over rather than tried.
+        let occupied: Vec<i32> = observation
+            .tissues
+            .iter()
+            .filter(|t| t.cell[1] == grass::MOSS_ROW)
+            .map(|t| t.cell[0])
+            .collect();
+        let mut orders: Vec<Vec<i32>> = Vec::with_capacity(spans.len());
         for (left, right) in spans {
             let Some((low, high)) = soil.columns_within(left, right) else {
                 continue;
             };
-            // One mat per opening: an opening whose floor already carries
+            let Some(&(start, end)) = corridors
+                .iter()
+                .find(|&&(start, end)| start <= low && high <= end)
+            else {
+                continue;
+            };
+            // One mat per opening, and a corridor whose floor already carries
             // living moss from an earlier ceiling keeps it, rather than
-            // collecting a second mat on every visit.
-            if settled.iter().any(|x| (low..=high).contains(x)) {
+            // collecting a second mat on every visit. The corridor is what is
+            // matched, because a mat may stand beside the span that seated it.
+            if settled.iter().any(|x| (start..=end).contains(x)) {
                 continue;
             }
-            if let Some(column) = (low..=high).find(|x| {
-                !chosen.contains(x)
-                    && soil
-                        .terrain()
-                        .cell(engine_terrain::CellCoord::new(*x, surface_row))
-                        .is_some_and(|c| c.material == grass::CLOCK_DIRT)
-            }) {
-                chosen.push(column);
+            let mut order: Vec<i32> = (low..=high).collect();
+            for distance in 1.. {
+                let below = low - distance;
+                let above = high + distance;
+                if below < start && above > end {
+                    break;
+                }
+                if below >= start {
+                    order.push(below);
+                }
+                if above <= end {
+                    order.push(above);
+                }
             }
+            orders.push(order);
         }
-        if chosen.is_empty() {
-            return;
-        }
-        self.plants.moss_columns = Some(corridors);
-        for column in chosen {
+        let mut chosen: Vec<i32> = Vec::with_capacity(orders.len());
+        let mut captured = false;
+        for order in orders {
             let soil = self.soil.as_ref().expect("synchronized soil habitat");
-            // Capacity, occupancy and surface contact are all the runtime's to
-            // refuse, and it validates every one before it admits a cell.
-            let _ = self.plants.plant_moss(soil, column);
+            for column in order {
+                if chosen.contains(&column) || occupied.contains(&column) {
+                    continue;
+                }
+                let dirt = soil
+                    .terrain()
+                    .cell(engine_terrain::CellCoord::new(column, surface_row))
+                    .is_some_and(|c| c.material == grass::CLOCK_DIRT);
+                if !dirt {
+                    continue;
+                }
+                // Capacity, occupancy and surface contact are all the runtime's
+                // to refuse, and it validates every one before it admits a
+                // cell; a refusal moves on to the next candidate.
+                if self.plants.plant_moss(soil, column).is_ok() {
+                    if !captured {
+                        self.plants.moss_columns = Some(corridors.clone());
+                        captured = true;
+                    }
+                    chosen.push(column);
+                    break;
+                }
+            }
         }
     }
 }
