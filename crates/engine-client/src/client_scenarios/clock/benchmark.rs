@@ -27,11 +27,16 @@ pub enum ClockBenchmarkCase {
     /// nothing else happens. They drop onto the floor as the run starts, and
     /// all five are asleep within three seconds.
     Residents,
+    /// One spider visit per cycle: the frame, up to 233 proxies and the
+    /// spider in the run's arena, stepped every tick through the descent,
+    /// the digits and the way out, with the digits' proxies reposed as the
+    /// seconds change.
+    Spider,
 }
 
 impl ClockBenchmarkCase {
     #[cfg(test)]
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Idle,
         Self::Falling,
         Self::ColorCycle,
@@ -43,6 +48,7 @@ impl ClockBenchmarkCase {
         Self::Aquarium,
         Self::Grass,
         Self::Residents,
+        Self::Spider,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -64,12 +70,19 @@ impl ClockBenchmarkCase {
             Self::Rain => ClockEventKind::Rain,
             Self::Aquarium => ClockEventKind::Aquarium,
             Self::Grass => ClockEventKind::Grass,
+            Self::Spider => ClockEventKind::Spider,
         })
     }
 
     pub fn cycle_ticks(self) -> u64 {
+        // A spider's visit may run its exit grace past its budget.
+        let grace = match self {
+            Self::Spider => scenario_clock::SPIDER_EXIT_GRACE_TICKS,
+            _ => 0,
+        };
         self.event().map_or(60, |event| {
             scenario_clock::EVENT_CATALOG[event as usize].duration_ticks
+                + grace
                 + scenario_clock::COOLDOWN_TICKS
                 + 60
         })
@@ -180,7 +193,9 @@ mod tests {
                     ClockScenario::render_frame(&b)
                 );
                 assert_eq!(a.duck_state(), b.duck_state());
-                active += u64::from(a.event_kind().is_some() || a.has_duck_visit());
+                active += u64::from(
+                    a.event_kind().is_some() || a.has_duck_visit() || a.spider_state().is_some(),
+                );
                 assert_eq!(a.reading().unwrap().hour(), 8);
                 assert_eq!(a.reading().unwrap().minute(), 8);
                 if (tick + 1) % case.cycle_ticks() == 0 {

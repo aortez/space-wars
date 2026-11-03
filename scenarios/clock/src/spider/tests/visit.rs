@@ -14,10 +14,10 @@ use engine_common::{ClockSpiderHold, ClockSpiderPhase, ClockSpiderState};
 /// one and a portrait one.
 const VIEWS: [f32; 4] = [ASPECT, 4.0 / 3.0, 4.0, 0.6];
 /// Ticks a visit may take at most, exit grace included, and a little over.
-const LONGEST: u64 = SPIDER_TICKS + EXIT_GRACE_TICKS + 10;
+pub(super) const LONGEST: u64 = SPIDER_TICKS + EXIT_GRACE_TICKS + 10;
 
 /// A clock with the spider enabled and previewable, in `font`.
-fn visited(aspect: f32, font: ClockFont, seed: u64) -> ClockState {
+pub(super) fn visited(aspect: f32, font: ClockFont, seed: u64) -> ClockState {
     let mut config = config(aspect, font, FixtureStart::None);
     config.events.spider = true;
     let mut state = ClockScenario::init(config, seed);
@@ -43,27 +43,31 @@ fn probed() -> ClockState {
     state
 }
 
-fn preview(state: &mut ClockState, kind: ClockEventKind) {
+pub(super) fn preview(state: &mut ClockState, kind: ClockEventKind) {
     sync(state, &[ClockAction::preview_event(kind)]);
 }
 
-fn spider(state: &ClockState) -> ClockSpiderState {
+pub(super) fn spider(state: &ClockState) -> ClockSpiderState {
     state.spider_state().expect("a visiting spider")
 }
 
 /// What a visit did, read back tick by tick.
 #[derive(Debug, Default)]
-struct Visit {
-    phases: BTreeSet<&'static str>,
-    ticks: u64,
+pub(super) struct Visit {
+    pub phases: BTreeSet<&'static str>,
+    pub ticks: u64,
     /// The visit's age when it started leaving.
-    left_at: Option<u64>,
-    last: Option<ClockSpiderState>,
+    pub left_at: Option<u64>,
+    pub last: Option<ClockSpiderState>,
 }
 
 /// Runs the visit to its end, or for `limit` ticks, checking what every
 /// tick publishes, and `each` tick on the way.
-fn run(state: &mut ClockState, limit: u64, mut each: impl FnMut(&mut ClockState)) -> Visit {
+pub(super) fn run(
+    state: &mut ClockState,
+    limit: u64,
+    mut each: impl FnMut(&mut ClockState),
+) -> Visit {
     let mut visit = Visit::default();
     while visit.ticks < limit {
         let Some(spider) = state.spider_state() else {
@@ -118,7 +122,7 @@ fn readable(state: &ClockState, spider: &ClockSpiderState) {
 }
 
 /// Nothing of the visit is left: no spider, no line, no proxies, no frame.
-fn gone(state: &ClockState, bodies_before: usize) {
+pub(super) fn gone(state: &ClockState, bodies_before: usize) {
     assert!(state.spider_state().is_none());
     assert!(state.spider_fixture_state().is_none());
     assert!(state.spider_visit.is_none());
