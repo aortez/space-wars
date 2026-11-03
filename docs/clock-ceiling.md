@@ -218,6 +218,18 @@ cell; what the mat refuses is the shoot that seed would raise. Each mat is
 placed at the near edge of its opening's lit span rather than the centre where
 the seed batch lands, so the two organisms compete at their margins.
 
+That placement is tried once, at the closing boundary, in the first soil
+column of the span, and the runtime refuses it when a living shoot already
+stands in that column's air row. A span the patch has filled to its near edge
+therefore keeps no mat, and nothing retries later. The Picade's 4:3 face makes
+that common: its corridors seat spans of three to twelve columns, against four
+to sixteen at the 5:3 reference aspect, and in a headless replay of the
+cabinet's own launch seed every one of the single opening's seven columns
+carried a shoot at the boundary, so the mat was refused for space. Eight of
+twelve further seeds ended the same way at 4:3, against one at 5:3. The
+[2026-11-02 cabinet run](clock-performance-lab.md#ceiling-sunlight-opening-on-the-picade-2026-11-02)
+measured the same outcome live: no mat in the 192 seconds after closing.
+
 A mat attaches to retained soil, not to the floor slab beneath it. Surface
 contact is a terrain-geometry test, and the floor is not part of the soil
 terrain, so a column needs actual dirt in its surface row to carry a mat. Since
@@ -279,8 +291,9 @@ silhouette, so unlike a shoot it is never an occluder and claims no surface
 identity: it owns no polygon that could block its own ray or shade a neighbour.
 A full mat therefore costs at most 18 further arena polygons per frame and 18
 further receivers per biological tick, and no further occluders at all. That is
-the bound the design carries, not a measurement: the opening's cost on the
-cabinet belongs to Picade qualification, which is still outstanding.
+the bound the design carries; the opening's measured cost on the cabinet, with
+its patch but without a mat, is in the
+[Clock performance lab](clock-performance-lab.md#ceiling-sunlight-opening-on-the-picade-2026-11-02).
 
 The grass state publishes `moss_tissues`, `moss_stressed` and `moss_dead`
 separately from the grass counts, and the inspection cutaway names the role and
