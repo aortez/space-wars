@@ -975,6 +975,9 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             page.selected_control.as_deref(),
             Some("pause.clock.aquarium")
         );
+        // Spider sits between Aquarium and the recipe in the Marquee row.
+        page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.spider"));
         page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
             page.selected_control.as_deref(),
