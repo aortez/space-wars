@@ -371,3 +371,143 @@ fn clock_moss_contract_cancelled_disabled_and_restarted_ceilings_leave_no_mat() 
     assert_eq!(fresh.plants().moss_columns, None);
     assert_eq!(fresh.grass_state().moss_tissues, 0);
 }
+
+/// A 4:3 Clock at the cabinet's own reading and launch seed. Grass is requested
+/// at tick 0 and the state returned at the second before the ceiling closes.
+fn picade_fixture(seed: u64) -> ClockState {
+    let mut s = ClockScenario::init(
+        ClockConfig {
+            event_profile: ClockEventProfile::Off,
+            aspect_ratio: 1024.0 / 768.0,
+            ..Default::default()
+        },
+        seed,
+    );
+    ClockScenario::step(
+        &mut s,
+        &[
+            ClockAction::set_reading(ClockReading::new(19, 42, 0).unwrap()),
+            ClockAction::trigger_event(ClockEventKind::Grass),
+        ],
+        Duration::ZERO,
+    );
+    seconds(&mut s, CLOSED_AT - 2);
+    assert_eq!(s.ceiling.phase, Phase::Closing);
+    s
+}
+/// Column ranges of the lit spans, and every column whose mat row is occupied.
+fn spans_and_occupied(s: &ClockState) -> (Vec<(i32, i32)>, Vec<i32>) {
+    let layout = Layout::new(s.aspect_ratio());
+    let soil = s.soil.as_ref().expect("soil");
+    let spans = s
+        .ceiling
+        .lit_spans(layout)
+        .iter()
+        .filter_map(|&(left, right)| soil.columns_within(left, right))
+        .collect();
+    let occupied = s
+        .plants()
+        .plants
+        .observe()
+        .tissues
+        .iter()
+        .filter(|t| t.cell[1] == MOSS_ROW)
+        .map(|t| t.cell[0])
+        .collect();
+    (spans, occupied)
+}
+
+/// The sequence measured on `sw-picade` on 2026-11-02: one opening seven
+/// columns wide, and the batch raises a shoot in every one of them, so the
+/// near edge is occupied when the ceiling closes. The mat is seated in the
+/// nearest free column beside the span instead of being refused outright.
+#[test]
+fn clock_moss_contract_a_filled_span_seats_its_mat_beside_the_patch() {
+    let mut s = picade_fixture(12616578969279246616);
+    let (spans, occupied) = spans_and_occupied(&s);
+    assert_eq!(spans.len(), 1, "{spans:?}");
+    let (low, high) = spans[0];
+    assert!(
+        (low..=high).all(|x| occupied.contains(&x)),
+        "{low}..={high} against {occupied:?}"
+    );
+    assert!(mat(&s).is_empty());
+
+    seconds(&mut s, 2);
+    assert_eq!(s.ceiling.phase, Phase::Closed);
+    let admitted = mat(&s);
+    assert_eq!(admitted.len(), 1, "{admitted:?}");
+    let (_, cell, health, shade) = admitted[0];
+    assert_eq!(cell[1], MOSS_ROW);
+    assert_eq!((health, shade), (100, 0));
+    assert!(
+        cell[0] == low - 1 || cell[0] == high + 1,
+        "{cell:?} is not beside {low}..={high}"
+    );
+    let windows = s.plants().moss_columns.clone().expect("retained corridors");
+    let corridor = windows
+        .iter()
+        .find(|&&(start, end)| start <= low && high <= end)
+        .copied()
+        .expect("the span's corridor");
+    assert!((corridor.0..=corridor.1).contains(&cell[0]));
+    assert_eq!(s.grass_state().moss_tissues, 1);
+    assert_eq!(s.grass_state().living_tissues, 28);
+
+    // From there the mat spreads along its corridor like any other, to every
+    // column of it: at 4:3 the corridor is narrower than the 18-cell bound.
+    seconds(&mut s, 600);
+    let grown = mat(&s);
+    let width = (corridor.1 - corridor.0 + 1) as usize;
+    assert!(width < MAX_MOSS_TISSUES, "{corridor:?}");
+    assert_eq!(grown.len(), width, "{grown:?}");
+    assert!(grown.iter().all(|&(_, cell, health, _)| {
+        cell[1] == MOSS_ROW && health == 100 && (corridor.0..=corridor.1).contains(&cell[0])
+    }));
+    assert_eq!(s.grass_state().moss_tissues, width);
+    assert_eq!(s.grass_state().living_tissues, 0);
+}
+
+/// Twelve seeds at 4:3, where the corridors seat spans of three to twelve
+/// columns and the batch fills most of them to the edge: every opening seats
+/// one mat, in a free column of its own corridor.
+#[test]
+fn clock_moss_contract_four_by_three_openings_each_seat_a_mat() {
+    let mut filled_edges = 0;
+    for seed in 1..=12 {
+        let mut s = picade_fixture(seed);
+        let (spans, occupied) = spans_and_occupied(&s);
+        filled_edges += spans
+            .iter()
+            .filter(|(low, _)| occupied.contains(low))
+            .count();
+        seconds(&mut s, 2);
+        assert_eq!(s.ceiling.phase, Phase::Closed);
+        let admitted = mat(&s);
+        let organisms: std::collections::BTreeSet<_> = admitted.iter().map(|m| m.0).collect();
+        assert_eq!(
+            organisms.len(),
+            spans.len(),
+            "seed {seed}: {spans:?} {admitted:?}"
+        );
+        let windows = s.plants().moss_columns.clone().expect("retained corridors");
+        for &(_, cell, health, shade) in &admitted {
+            assert_eq!(cell[1], MOSS_ROW);
+            assert_eq!((health, shade), (100, 0));
+            assert!(!occupied.contains(&cell[0]), "seed {seed}: {cell:?}");
+            assert!(
+                windows
+                    .iter()
+                    .any(|&(start, end)| (start..=end).contains(&cell[0]))
+            );
+        }
+        // A mat may already have paid for a first neighbour at the boundary.
+        assert!(
+            admitted.len() <= 2 * spans.len(),
+            "seed {seed}: {admitted:?}"
+        );
+        assert_eq!(s.grass_state().moss_tissues, admitted.len());
+    }
+    // The rule is exercised: before it, each of these spans kept no mat.
+    assert!(filled_edges >= 8, "{filled_edges} filled near edges");
+}

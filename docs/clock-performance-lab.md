@@ -678,8 +678,8 @@ for space because a living shoot stood in that column, as one did in all seven
 columns of this span. Nothing retries later. Twelve further probe seeds at 4:3
 ended the same way eight times, against once at the 5:3 reference aspect, whose
 spans run to sixteen columns where the Picade's run from three to twelve. The
-[sunlight doc](clock-ceiling.md#moss-succession-on-the-retained-floor) records
-the limitation; the fix belongs to its own change.
+[sunlight doc](clock-ceiling.md#moss-succession-on-the-retained-floor) describes
+the placement rule that replaced it: the nearest free column beside the span.
 
 **Live sequence at scale 2.** The same sequence, after restarting the trial
 kiosk with `raster_scale = 2.0`. At 2× the direct-geometry GPU scene is not
