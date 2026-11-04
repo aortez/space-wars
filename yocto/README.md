@@ -149,9 +149,10 @@ default, `usb`, keeps the image's `/dev/sda2`. Use `--boot-medium sd` for a card
 that will boot from the Pi's own slot; it selects `/dev/mmcblk0p2` and reads the
 file back. A card in a workstation USB reader still lists as `/dev/sdX`. The
 image mounts `/boot` and `/data` by label, and its flashed root keeps the stock
-`fstab`, so nothing else names the medium. Boot with only one Space-Wars disk
-attached: every flashed disk has the same partition labels, and current images
-also share their partition UUIDs.
+`fstab`, so nothing else names the medium. The device service may write the
+inactive root slot on either kind of disk, so updates install on both. Boot
+with only one Space-Wars disk attached: every flashed disk has the same
+partition labels, and current images also share their partition UUIDs.
 
 The flash script follows the DirtSim flow: it uses `bmaptool` when a
 `.wic.bmap` exists, otherwise falls back to `gzip | dd`, injects your SSH public
