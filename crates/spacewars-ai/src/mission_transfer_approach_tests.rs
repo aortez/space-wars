@@ -294,3 +294,33 @@ fn learned_leg_keeps_a_clear_pilot_entry_and_flies_a_blocked_one_when_none_is_cl
         })
     );
 }
+
+#[test]
+fn the_launch_band_yields_only_while_the_stack_flies_the_leg() {
+    let (mut bot, mut o) = fixture(false);
+    bot.configure_learned_transfer(true);
+    bot.intent(&o);
+    assert_eq!(bot.telemetry.goal, MissionGoal::Transfer);
+    let leg = bot.transfer_leg().expect("a leg above the band");
+    // The stack's route dips into the band while the stack flies: the leg
+    // goes on.
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick += 1;
+    p.ship.position = p.planet.motion.position + Vec2::Y * 75.0;
+    p.learned_control = true;
+    bot.intent(&o);
+    assert_eq!(bot.telemetry.goal, MissionGoal::Transfer);
+    assert_eq!(
+        bot.transfer_leg().map(|l| l.selected_tick),
+        Some(leg.selected_tick)
+    );
+    // Handed back low in the same selection, whether refused, touched down
+    // or returned from a solar escape (a recovery or a pursuit starts a new
+    // selection): the climb comes first and no leg is published.
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick += 1;
+    p.learned_control = false;
+    bot.intent(&o);
+    assert_eq!(bot.telemetry.goal, MissionGoal::Launch);
+    assert_eq!(bot.transfer_leg(), None);
+}

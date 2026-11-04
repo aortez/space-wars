@@ -300,9 +300,6 @@ pub struct MaterialMissionPilot {
     landing_reference: Option<crate::mission_evaluation::CostedLandingReference>,
     learned_transfer: bool,
     transfer_leg: Option<TransferLeg>,
-    /// The selection whose leg a learned host has been given: from then on
-    /// the stack owns the ship's altitude until the handoff.
-    learned_leg: Option<u64>,
     learned_bearing: Option<transfer_approach::LearnedBearing>,
 }
 
@@ -393,7 +390,6 @@ impl MaterialMissionPilot {
             landing_reference: None,
             learned_transfer: false,
             transfer_leg: None,
-            learned_leg: None,
             learned_bearing: None,
         }
     }
@@ -1191,11 +1187,13 @@ impl MaterialMissionPilot {
         let relative = p.ship.velocity - p.planet.motion.velocity;
         let falling = (-relative.dot(up)).max(0.0);
         let mut speed_brake = false;
-        // The launch climb clears the surface before a transfer; once a
-        // learned host flies the leg, the stack keeps its own clearances and
-        // the band must not take the ship back every time its route runs low.
-        let launching = altitude < 70.0 + falling * falling / 50.0
-            && self.learned_leg != Some(self.selected_tick);
+        // The launch climb clears the surface before a transfer. While the
+        // learned host flies the leg, which it does on exactly the ticks it
+        // leaves the seat in learned control, the stack keeps its own
+        // clearances and the band must not take the ship back every time its
+        // route runs low; a leg the host refuses or hands back low climbs
+        // first like any other.
+        let launching = altitude < 70.0 + falling * falling / 50.0 && !p.learned_control;
         let desired = if launching {
             self.goal(MissionGoal::Launch, p.tick);
             self.progress_tick = p.tick;
@@ -1225,7 +1223,6 @@ impl MaterialMissionPilot {
                     entry_velocity: target.velocity_at(entry),
                     distance: p.ship.position.distance_to(entry),
                 });
-                self.learned_leg = Some(self.selected_tick);
             }
             let waypoint = self.route_waypoint(o, entry, Some(target.index));
             let delta = waypoint - p.ship.position;
