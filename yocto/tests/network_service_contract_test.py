@@ -13,6 +13,8 @@ class NetworkServiceContractTest(unittest.TestCase):
         self.assertIn("CapabilityBoundingSet=CAP_SYS_TIME CAP_SYS_ADMIN", unit)
         self.assertIn("DevicePolicy=closed", unit)
         self.assertIn("DeviceAllow=block-sd rw", unit)
+        # An SD card's slots are MMC block devices, not SCSI disks (#577).
+        self.assertIn("DeviceAllow=block-mmc rw", unit)
         self.assertIn("DeviceAllow=/dev/rtc0 rw", unit)
         self.assertIn("SystemCallFilter=~@mount", unit)
         self.assertIn("RestrictNamespaces=yes", unit)

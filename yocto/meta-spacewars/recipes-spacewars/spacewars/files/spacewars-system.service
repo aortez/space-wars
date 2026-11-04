@@ -34,7 +34,10 @@ CapabilityBoundingSet=CAP_SYS_TIME CAP_SYS_ADMIN
 RestrictNamespaces=yes
 SystemCallFilter=~@mount
 DevicePolicy=closed
+# The inactive root slot is on a USB disk (block-sd) or on a card in the Pi's own
+# slot (block-mmc, major 179).
 DeviceAllow=block-sd rw
+DeviceAllow=block-mmc rw
 DeviceAllow=/dev/rtc0 rw
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictRealtime=yes
