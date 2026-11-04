@@ -6,10 +6,14 @@ simulation or an unbounded input vector. Use a shared, typed observation with
 coarse world context, bounded object records, and detailed nearby geometry.
 Whole brains and individual components choose declared views of those facts.
 
-The nine proposed [arrival guidance inputs](guidance-component-v1.md) are one
-small component view. They are not the whole pilot's senses. Review this broader
-representation before freezing that encoder or a whole-brain encoder. The
-block structure below is proposed; capacities and numerical layouts need the
+The original [arrival guidance inputs](guidance-component-v1.md) are one
+small component view. They are not the whole pilot's senses. The implemented
+[arrival perception design](guidance-perception.md) adds body records and a
+ring of clearance arcs. The [new flight plan](learned-flight-controller-v1.md)
+reconsiders that skill's observation and encoding; its capacities and model
+layout are not inherited from the arrival experiments. Review the broader
+representation below before freezing a new flight or whole-brain encoder.
+The block structure is proposed; capacities and numerical layouts need the
 specific checks at the end.
 
 ## Observation and encoding are separate contracts
@@ -95,6 +99,14 @@ must be named rather than silently becoming part of a supposedly independent
 learned brain's observation.
 
 ## Coarse world information and detailed nearby terrain
+
+For the new flight skill, the agreed prototype is global object records plus
+a multiband polar map with precise nearest-surface distances. Its
+[sensor inspection stage](learned-flight-controller-v1.md#surroundings-encoder-and-sensor-inspection)
+checks actual collision geometry, destruction and stand-ins for future built
+structures before heavy training. The directional samples and rectangular
+patches below remain broader design options, not additional required flight
+inputs.
 
 Planet records need enough information for strategic navigation, not the
 material field for every planet. A planet center and radius are useful broad

@@ -1,0 +1,5189 @@
+{
+  "experiment_id": "learned-flight-aligned-approach-v1-20261023",
+  "seeds": [
+    {
+      "seed": 17,
+      "status": "completed",
+      "initial": {
+        "outcomes": {
+          "deadline": 12,
+          "collision": 4
+        },
+        "strata": [
+          {
+            "deadline": 4
+          },
+          {
+            "collision": 1,
+            "deadline": 3
+          },
+          {
+            "collision": 1,
+            "deadline": 3
+          },
+          {
+            "collision": 2,
+            "deadline": 2
+          }
+        ],
+        "successes": 0,
+        "physical_failures": 4
+      },
+      "final": {
+        "outcomes": {
+          "deadline": 16
+        },
+        "strata": [
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          }
+        ],
+        "successes": 0,
+        "physical_failures": 0
+      },
+      "success_gain": 0,
+      "learning_evidence": false,
+      "basic_flight_gate": false,
+      "initial_evaluation": [
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 0,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.31583833694458,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.036569595336914,
+            "spin": 0.006715687457472086,
+            "velocity": 0.008172597736120224
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 4,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.048146724700928,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.048146724700928,
+            "spin": 0.005709946621209383,
+            "velocity": 0.006951780989766121
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 8,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 5.728227138519287,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 5.7281718254089355,
+            "spin": 0.0023535853251814842,
+            "velocity": 0.002869782969355583
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 12,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.916017055511475,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 81.00350189208984,
+            "spin": 0.008818667382001877,
+            "velocity": 0.010743613354861736
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 1,
+          "outcome": "collision",
+          "ticks": 590,
+          "initial_errors": {
+            "position": 6.3835248947143555,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 305.638427734375,
+            "spin": 1.2712308168411255,
+            "velocity": 23.627910614013672
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 5,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.650993347167969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.700394630432129,
+            "spin": 0.004679358098655939,
+            "velocity": 0.0057662841863930225
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 9,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.607094764709473,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.53675651550293,
+            "spin": 0.006992848124355078,
+            "velocity": 0.00854779314249754
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 13,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.463879108428955,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.463898181915283,
+            "spin": 0.0003372832725290209,
+            "velocity": 4.5786651980961324e-07
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 2,
+          "outcome": "collision",
+          "ticks": 579,
+          "initial_errors": {
+            "position": 9.201042175292969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 292.5268249511719,
+            "spin": 0.9439408183097839,
+            "velocity": 23.999177932739258
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 6,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.216156959533691,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.21617317199707,
+            "spin": 0.002286530565470457,
+            "velocity": 0.00279214046895504
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 10,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.938739776611328,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 286.21417236328125,
+            "spin": 0.001060393755324185,
+            "velocity": 0.0013077766634523869
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 14,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 8.5028076171875,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 8.502767562866211,
+            "spin": 0.001991353929042816,
+            "velocity": 0.002447125967592001
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 3,
+          "outcome": "collision",
+          "ticks": 1253,
+          "initial_errors": {
+            "position": 11.555130958557129,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 321.5727844238281,
+            "spin": 1.3684828281402588,
+            "velocity": 23.76120948791504
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 7,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.240020751953125,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.239990234375,
+            "spin": 0.00241056177765131,
+            "velocity": 0.0029441516380757093
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 11,
+          "outcome": "collision",
+          "ticks": 561,
+          "initial_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 274.36907958984375,
+            "spin": 0.08986853808164597,
+            "velocity": 24.337059020996094
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 15,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0026107048615813255,
+            "velocity": 0.003044768702238798
+          },
+          "damage": false,
+          "collision": false
+        }
+      ],
+      "final_evaluation": [
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 0,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.31583833694458,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 3.987318992614746,
+            "spin": 0.0016246101586148143,
+            "velocity": 8.534876542398706e-05
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 4,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.048146724700928,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.052734851837158,
+            "spin": 0.00788052473217249,
+            "velocity": 0.000254854530794546
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 8,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 5.728227138519287,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 5.665715217590332,
+            "spin": 0.0012145978398621082,
+            "velocity": 0.00012768563465215266
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 12,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.916017055511475,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.868300437927246,
+            "spin": 0.004379800520837307,
+            "velocity": 0.005102037452161312
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 1,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.3835248947143555,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.369197368621826,
+            "spin": 0.006149929016828537,
+            "velocity": 0.00010706433386076242
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 5,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.650993347167969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.580770015716553,
+            "spin": 0.0016918464098125696,
+            "velocity": 0.0018626328092068434
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 9,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.607094764709473,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.534063816070557,
+            "spin": 0.0018765213899314404,
+            "velocity": 0.0020584622398018837
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 13,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.463879108428955,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.406121253967285,
+            "spin": 0.003631965722888708,
+            "velocity": 0.0041516972705721855
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 2,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.201042175292969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.195221900939941,
+            "spin": 0.0028222331311553717,
+            "velocity": 0.0031780977733433247
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 6,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.216156959533691,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.12192153930664,
+            "spin": 0.005384273827075958,
+            "velocity": 0.006330882664769888
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 10,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.938739776611328,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.936264991760254,
+            "spin": 0.000922233855817467,
+            "velocity": 0.000960235483944416
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 14,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 8.5028076171875,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 8.480903625488281,
+            "spin": 0.00013800300075672567,
+            "velocity": 1.0270179700455628e-05
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 3,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.555130958557129,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.529997825622559,
+            "spin": 0.0017847513081505895,
+            "velocity": 0.001951222657226026
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 7,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.240020751953125,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.896977424621582,
+            "spin": 6.169416155898944e-05,
+            "velocity": 0.00015893786621745676
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 11,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.589020729064941,
+            "spin": 0.005497270729392767,
+            "velocity": 0.0003057900466956198
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 15,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.004682001657783985,
+            "velocity": 0.005466805305331945
+          },
+          "damage": false,
+          "collision": false
+        }
+      ],
+      "training_ticks": 131072,
+      "total_seconds": 517.9477684439989,
+      "training_seconds": 361.2304290989996,
+      "training_outcomes": {
+        "collision": 18,
+        "deadline": 61
+      },
+      "censored": 4,
+      "diagnostics": {
+        "attempts": 83,
+        "ticks": 131072,
+        "entered_goal_radius": 71,
+        "met_all_instantaneous_tolerances": 30,
+        "maximum_dwell_ticks": 29,
+        "thrust_fraction": 0.22345733642578125,
+        "brake_fraction": 0.7546539306640625,
+        "both_fraction": 0.1412200927734375,
+        "mean_thrust_on_ticks": 1.589806220485263,
+        "half_second_thrust_runs": 0,
+        "maximum_thrust_on_ticks": 19
+      },
+      "parity": {
+        "fixtures": 16,
+        "maximum_abs_output_error": 1.1920928955078125e-06,
+        "actions_match": true
+      },
+      "evaluation_trace_inspection": {
+        "initial": [
+          {
+            "task": "clear-0",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.036569595336914,
+            "final_errors": {
+              "position": 4.036569595336914,
+              "spin": 0.006715687457472086,
+              "velocity": 0.008172597736120224
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.005990910844541051,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-1",
+            "outcome": "collision",
+            "ticks": 590,
+            "minimum_position_error": 0.04972118139266968,
+            "final_errors": {
+              "position": 305.638427734375,
+              "spin": 1.2712308168411255,
+              "velocity": 23.627910614013672
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 1.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0019153467812614863,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-10",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 0.019865067675709724,
+            "final_errors": {
+              "position": 286.21417236328125,
+              "spin": 0.001060393755324185,
+              "velocity": 0.0013077766634523869
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.2961111111111111,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0009590761397460786,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-11",
+            "outcome": "collision",
+            "ticks": 561,
+            "minimum_position_error": 0.05886378139257431,
+            "final_errors": {
+              "position": 274.36907958984375,
+              "spin": 0.08986853808164597,
+              "velocity": 24.337059020996094
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 1.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0015125085229619362,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-12",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 0.04646074399352074,
+            "final_errors": {
+              "position": 81.00350189208984,
+              "spin": 0.008818667382001877,
+              "velocity": 0.010743613354861736
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.17833333333333334,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.003755716333527946,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-13",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.463879108428955,
+            "final_errors": {
+              "position": 7.463898181915283,
+              "spin": 0.0003372832725290209,
+              "velocity": 4.5786651980961324e-07
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0002692302471324284,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-14",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 8.502767562866211,
+            "final_errors": {
+              "position": 8.502767562866211,
+              "spin": 0.001991353929042816,
+              "velocity": 0.002447125967592001
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0018611431613357531,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-15",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.20372200012207,
+            "final_errors": {
+              "position": 10.20372200012207,
+              "spin": 0.0026107048615813255,
+              "velocity": 0.003044768702238798
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0006334674513426661,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-2",
+            "outcome": "collision",
+            "ticks": 579,
+            "minimum_position_error": 0.09521269053220749,
+            "final_errors": {
+              "position": 292.5268249511719,
+              "spin": 0.9439408183097839,
+              "velocity": 23.999177932739258
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 1.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0017114559593928145,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-3",
+            "outcome": "collision",
+            "ticks": 1253,
+            "minimum_position_error": 0.3279840350151062,
+            "final_errors": {
+              "position": 321.5727844238281,
+              "spin": 1.3684828281402588,
+              "velocity": 23.76120948791504
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.48842777334397447,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0016968257128343162,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-4",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.048146724700928,
+            "final_errors": {
+              "position": 4.048146724700928,
+              "spin": 0.005709946621209383,
+              "velocity": 0.006951780989766121
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0033338350150734185,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-5",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.650993347167969,
+            "final_errors": {
+              "position": 6.700394630432129,
+              "spin": 0.004679358098655939,
+              "velocity": 0.0057662841863930225
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.00371994405066491,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-6",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.216156959533691,
+            "final_errors": {
+              "position": 9.21617317199707,
+              "spin": 0.002286530565470457,
+              "velocity": 0.00279214046895504
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0011155083358042046,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-7",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.239990234375,
+            "final_errors": {
+              "position": 11.239990234375,
+              "spin": 0.00241056177765131,
+              "velocity": 0.0029441516380757093
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0011273462840795724,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-8",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 5.7281718254089355,
+            "final_errors": {
+              "position": 5.7281718254089355,
+              "spin": 0.0023535853251814842,
+              "velocity": 0.002869782969355583
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0012222735959221609,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-9",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.53675651550293,
+            "final_errors": {
+              "position": 7.53675651550293,
+              "spin": 0.006992848124355078,
+              "velocity": 0.00854779314249754
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.00426317366072908,
+            "collision": false,
+            "damage": false
+          }
+        ],
+        "final": [
+          {
+            "task": "clear-0",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 3.987318992614746,
+            "final_errors": {
+              "position": 3.987318992614746,
+              "spin": 0.0016246101586148143,
+              "velocity": 8.534876542398706e-05
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.01720740920605345,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-1",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.369197368621826,
+            "final_errors": {
+              "position": 6.369197368621826,
+              "spin": 0.006149929016828537,
+              "velocity": 0.00010706433386076242
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.005116609273956985,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-10",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.936264991760254,
+            "final_errors": {
+              "position": 9.936264991760254,
+              "spin": 0.000922233855817467,
+              "velocity": 0.000960235483944416
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.005070101093232451,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-11",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.589020729064941,
+            "final_errors": {
+              "position": 10.589020729064941,
+              "spin": 0.005497270729392767,
+              "velocity": 0.0003057900466956198
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.018722182502711397,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-12",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.868300437927246,
+            "final_errors": {
+              "position": 4.868300437927246,
+              "spin": 0.004379800520837307,
+              "velocity": 0.005102037452161312
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.00823442659460448,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-13",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.399465084075928,
+            "final_errors": {
+              "position": 7.406121253967285,
+              "spin": 0.003631965722888708,
+              "velocity": 0.0041516972705721855
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.007346361749498303,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-14",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 8.480903625488281,
+            "final_errors": {
+              "position": 8.480903625488281,
+              "spin": 0.00013800300075672567,
+              "velocity": 1.0270179700455628e-05
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0032928056039640474,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-15",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.20372200012207,
+            "final_errors": {
+              "position": 10.20372200012207,
+              "spin": 0.004682001657783985,
+              "velocity": 0.005466805305331945
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0013905154542751715,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-2",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.194076538085938,
+            "final_errors": {
+              "position": 9.195221900939941,
+              "spin": 0.0028222331311553717,
+              "velocity": 0.0031780977733433247
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0037432842768288944,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-3",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.529958724975586,
+            "final_errors": {
+              "position": 11.529997825622559,
+              "spin": 0.0017847513081505895,
+              "velocity": 0.001951222657226026
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.00407214026827003,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-4",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.048146724700928,
+            "final_errors": {
+              "position": 4.052734851837158,
+              "spin": 0.00788052473217249,
+              "velocity": 0.000254854530794546
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.003685536908661662,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-5",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.5676774978637695,
+            "final_errors": {
+              "position": 6.580770015716553,
+              "spin": 0.0016918464098125696,
+              "velocity": 0.0018626328092068434
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.008236354557997805,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-6",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.12192153930664,
+            "final_errors": {
+              "position": 9.12192153930664,
+              "spin": 0.005384273827075958,
+              "velocity": 0.006330882664769888
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.008036975097283074,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-7",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.896977424621582,
+            "final_errors": {
+              "position": 10.896977424621582,
+              "spin": 6.169416155898944e-05,
+              "velocity": 0.00015893786621745676
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.01593761381643061,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-8",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 5.665715217590332,
+            "final_errors": {
+              "position": 5.665715217590332,
+              "spin": 0.0012145978398621082,
+              "velocity": 0.00012768563465215266
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0069351884887469675,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-9",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.534063816070557,
+            "final_errors": {
+              "position": 7.534063816070557,
+              "spin": 0.0018765213899314404,
+              "velocity": 0.0020584622398018837
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.009081559728721105,
+            "collision": false,
+            "damage": false
+          }
+        ]
+      },
+      "development_behavior": {
+        "initial": [
+          {
+            "task": "clear-0",
+            "initial_distance": 4.31583833694458,
+            "minimum_distance": 4.036569595336914,
+            "best_distance_reduction": 0.279268741607666,
+            "final_distance_reduction": 0.279268741607666,
+            "closing_tick_fraction": 0.915,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-1",
+            "initial_distance": 6.3835248947143555,
+            "minimum_distance": 0.04972118139266968,
+            "best_distance_reduction": 6.333803713321686,
+            "final_distance_reduction": -299.25490283966064,
+            "closing_tick_fraction": 0.08135593220338982,
+            "thrust_while_closing_fraction": 0.08135593220338982,
+            "first_goal_entry_errors": {
+              "position": 2.8870222568511963,
+              "spin": 0.0025234997738152742,
+              "velocity": 9.92476749420166
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-10",
+            "initial_distance": 9.938739776611328,
+            "minimum_distance": 0.019865067675709724,
+            "best_distance_reduction": 9.918874708935618,
+            "final_distance_reduction": -276.2754325866699,
+            "closing_tick_fraction": 0.03611111111111111,
+            "thrust_while_closing_fraction": 0.03611111111111111,
+            "first_goal_entry_errors": {
+              "position": 2.8403217792510986,
+              "spin": 0.0008358110208064318,
+              "velocity": 11.596440315246582
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-11",
+            "initial_distance": 10.864906311035156,
+            "minimum_distance": 0.05886378139257431,
+            "best_distance_reduction": 10.806042529642582,
+            "final_distance_reduction": -263.5041732788086,
+            "closing_tick_fraction": 0.12477718360071301,
+            "thrust_while_closing_fraction": 0.12477718360071301,
+            "first_goal_entry_errors": {
+              "position": 2.980323076248169,
+              "spin": 0.006562228314578533,
+              "velocity": 11.929742813110352
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-12",
+            "initial_distance": 4.916017055511475,
+            "minimum_distance": 0.04646074399352074,
+            "best_distance_reduction": 4.869556311517954,
+            "final_distance_reduction": -76.08748483657837,
+            "closing_tick_fraction": 0.021666666666666667,
+            "thrust_while_closing_fraction": 0.021666666666666667,
+            "first_goal_entry_errors": {
+              "position": 2.9878430366516113,
+              "spin": 0.006107787135988474,
+              "velocity": 8.608049392700195
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-13",
+            "initial_distance": 7.463879108428955,
+            "minimum_distance": 7.463879108428955,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -1.9073486328125e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-14",
+            "initial_distance": 8.5028076171875,
+            "minimum_distance": 8.502767562866211,
+            "best_distance_reduction": 4.00543212890625e-05,
+            "final_distance_reduction": 4.00543212890625e-05,
+            "closing_tick_fraction": 0.0011111111111111111,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-15",
+            "initial_distance": 10.20372200012207,
+            "minimum_distance": 10.20372200012207,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-2",
+            "initial_distance": 9.201042175292969,
+            "minimum_distance": 0.09521269053220749,
+            "best_distance_reduction": 9.105829484760761,
+            "final_distance_reduction": -283.3257827758789,
+            "closing_tick_fraction": 0.1070811744386874,
+            "thrust_while_closing_fraction": 0.1070811744386874,
+            "first_goal_entry_errors": {
+              "position": 2.8669590950012207,
+              "spin": 0.008495555259287357,
+              "velocity": 11.26308536529541
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-3",
+            "initial_distance": 11.555130958557129,
+            "minimum_distance": 0.3279840350151062,
+            "best_distance_reduction": 11.227146923542023,
+            "final_distance_reduction": -310.017653465271,
+            "closing_tick_fraction": 0.05905826017557861,
+            "thrust_while_closing_fraction": 0.05826017557861133,
+            "first_goal_entry_errors": {
+              "position": 2.872511625289917,
+              "spin": 0.001416312879882753,
+              "velocity": 12.263113021850586
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-4",
+            "initial_distance": 4.048146724700928,
+            "minimum_distance": 4.048146724700928,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-5",
+            "initial_distance": 6.650993347167969,
+            "minimum_distance": 6.650993347167969,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -0.049401283264160156,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-6",
+            "initial_distance": 9.216156959533691,
+            "minimum_distance": 9.216156959533691,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -1.621246337890625e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-7",
+            "initial_distance": 11.240020751953125,
+            "minimum_distance": 11.239990234375,
+            "best_distance_reduction": 3.0517578125e-05,
+            "final_distance_reduction": 3.0517578125e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-8",
+            "initial_distance": 5.728227138519287,
+            "minimum_distance": 5.7281718254089355,
+            "best_distance_reduction": 5.53131103515625e-05,
+            "final_distance_reduction": 5.53131103515625e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-9",
+            "initial_distance": 7.607094764709473,
+            "minimum_distance": 7.53675651550293,
+            "best_distance_reduction": 0.07033824920654297,
+            "final_distance_reduction": 0.07033824920654297,
+            "closing_tick_fraction": 0.9866666666666667,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          }
+        ],
+        "final": [
+          {
+            "task": "clear-0",
+            "initial_distance": 4.31583833694458,
+            "minimum_distance": 3.987318992614746,
+            "best_distance_reduction": 0.328519344329834,
+            "final_distance_reduction": 0.328519344329834,
+            "closing_tick_fraction": 0.4061111111111111,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-1",
+            "initial_distance": 6.3835248947143555,
+            "minimum_distance": 6.369197368621826,
+            "best_distance_reduction": 0.014327526092529297,
+            "final_distance_reduction": 0.014327526092529297,
+            "closing_tick_fraction": 0.058333333333333334,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-10",
+            "initial_distance": 9.938739776611328,
+            "minimum_distance": 9.936264991760254,
+            "best_distance_reduction": 0.0024747848510742188,
+            "final_distance_reduction": 0.0024747848510742188,
+            "closing_tick_fraction": 0.07,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-11",
+            "initial_distance": 10.864906311035156,
+            "minimum_distance": 10.589020729064941,
+            "best_distance_reduction": 0.27588558197021484,
+            "final_distance_reduction": 0.27588558197021484,
+            "closing_tick_fraction": 0.2538888888888889,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-12",
+            "initial_distance": 4.916017055511475,
+            "minimum_distance": 4.868300437927246,
+            "best_distance_reduction": 0.047716617584228516,
+            "final_distance_reduction": 0.047716617584228516,
+            "closing_tick_fraction": 0.15222222222222223,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-13",
+            "initial_distance": 7.463879108428955,
+            "minimum_distance": 7.399465084075928,
+            "best_distance_reduction": 0.06441402435302734,
+            "final_distance_reduction": 0.05775785446166992,
+            "closing_tick_fraction": 0.16777777777777778,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-14",
+            "initial_distance": 8.5028076171875,
+            "minimum_distance": 8.480903625488281,
+            "best_distance_reduction": 0.02190399169921875,
+            "final_distance_reduction": 0.02190399169921875,
+            "closing_tick_fraction": 0.14888888888888888,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-15",
+            "initial_distance": 10.20372200012207,
+            "minimum_distance": 10.20372200012207,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-2",
+            "initial_distance": 9.201042175292969,
+            "minimum_distance": 9.194076538085938,
+            "best_distance_reduction": 0.00696563720703125,
+            "final_distance_reduction": 0.005820274353027344,
+            "closing_tick_fraction": 0.07388888888888889,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-3",
+            "initial_distance": 11.555130958557129,
+            "minimum_distance": 11.529958724975586,
+            "best_distance_reduction": 0.02517223358154297,
+            "final_distance_reduction": 0.025133132934570312,
+            "closing_tick_fraction": 0.058888888888888886,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-4",
+            "initial_distance": 4.048146724700928,
+            "minimum_distance": 4.048146724700928,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -0.004588127136230469,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-5",
+            "initial_distance": 6.650993347167969,
+            "minimum_distance": 6.5676774978637695,
+            "best_distance_reduction": 0.08331584930419922,
+            "final_distance_reduction": 0.07022333145141602,
+            "closing_tick_fraction": 0.19333333333333333,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-6",
+            "initial_distance": 9.216156959533691,
+            "minimum_distance": 9.12192153930664,
+            "best_distance_reduction": 0.09423542022705078,
+            "final_distance_reduction": 0.09423542022705078,
+            "closing_tick_fraction": 0.22777777777777777,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-7",
+            "initial_distance": 11.240020751953125,
+            "minimum_distance": 10.896977424621582,
+            "best_distance_reduction": 0.34304332733154297,
+            "final_distance_reduction": 0.34304332733154297,
+            "closing_tick_fraction": 0.35555555555555557,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-8",
+            "initial_distance": 5.728227138519287,
+            "minimum_distance": 5.665715217590332,
+            "best_distance_reduction": 0.06251192092895508,
+            "final_distance_reduction": 0.06251192092895508,
+            "closing_tick_fraction": 0.17888888888888888,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-9",
+            "initial_distance": 7.607094764709473,
+            "minimum_distance": 7.534063816070557,
+            "best_distance_reduction": 0.07303094863891602,
+            "final_distance_reduction": 0.07303094863891602,
+            "closing_tick_fraction": 0.3638888888888889,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          }
+        ]
+      },
+      "best": {
+        "policy": "policy-0128.json",
+        "sha256": "09695167ec56c8b268dad7888fb42bcf68cba7024044acdd36894da0ed6ba543",
+        "rule": "success count, then fewer physical failures, then lower mean final position error; ties keep initial",
+        "initial_score": [
+          0,
+          -4,
+          -102.25008633732796
+        ],
+        "final_score": [
+          0,
+          0,
+          -7.901140749454498
+        ],
+        "scope": "development comparison; qualification requires experiment gates"
+      },
+      "kl_early_stopped_updates": 0,
+      "optimization_summary": {
+        "value_loss": {
+          "first": 0.009608060179743916,
+          "last": 0.001353633269900456,
+          "mean": 0.044787990519495224,
+          "maximum": 0.8831674605607986
+        },
+        "policy_loss": {
+          "first": -0.0035798187600448728,
+          "last": -0.0053394619026221335,
+          "mean": -0.0024900313171656308,
+          "maximum": 0.0004026688984595239
+        },
+        "entropy": {
+          "first": 1.984025500714779,
+          "last": 1.0348831787705421,
+          "mean": 1.5218254390347283,
+          "maximum": 1.9917925000190735
+        },
+        "gradient_norm": {
+          "first": 0.4654385335743427,
+          "last": 1.0878818593919277,
+          "mean": 0.7285832126763125,
+          "maximum": 1.4110709205269814
+        },
+        "clip_fraction": {
+          "first": 0.01123046875,
+          "last": 0.125,
+          "mean": 0.02808380126953125,
+          "maximum": 0.125
+        },
+        "kl": {
+          "first": 0.0020455371704883873,
+          "last": 0.008800001567578875,
+          "mean": 0.0026633069827539657,
+          "maximum": 0.008800001567578875
+        }
+      },
+      "sampled_training_successes": [],
+      "final_control_summary": {
+        "thrust_fraction": 0.0,
+        "brake_fraction": 1.0,
+        "mean_abs_steering": 0.007881816538827278,
+        "entered_goal_radius": 0,
+        "maximum_dwell_ticks": 0,
+        "mean_final_distance_reduction": 0.0886247456073761
+      },
+      "final_distance_by_stratum": [
+        {
+          "stratum": 0,
+          "initial_mean": 4.752057313919067,
+          "final_mean": 4.643517374992371
+        },
+        {
+          "stratum": 1,
+          "initial_mean": 7.026373028755188,
+          "final_mean": 6.972538113594055
+        },
+        {
+          "stratum": 2,
+          "initial_mean": 9.214686632156372,
+          "final_mean": 9.18357801437378
+        },
+        {
+          "stratum": 3,
+          "initial_mean": 10.96594500541687,
+          "final_mean": 10.804929494857788
+        }
+      ],
+      "successful_approach_controls": []
+    },
+    {
+      "seed": 29,
+      "status": "completed",
+      "initial": {
+        "outcomes": {
+          "deadline": 16
+        },
+        "strata": [
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          }
+        ],
+        "successes": 0,
+        "physical_failures": 0
+      },
+      "final": {
+        "outcomes": {
+          "deadline": 16
+        },
+        "strata": [
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          }
+        ],
+        "successes": 0,
+        "physical_failures": 0
+      },
+      "success_gain": 0,
+      "learning_evidence": false,
+      "basic_flight_gate": false,
+      "initial_evaluation": [
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 0,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.31583833694458,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.31583833694458,
+            "spin": 0.00581231527030468,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 4,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.048146724700928,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.048146724700928,
+            "spin": 3.866189581458457e-05,
+            "velocity": 3.182786895195022e-05
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 8,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 5.728227138519287,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 5.728257179260254,
+            "spin": 0.0011668889783322811,
+            "velocity": 0.0014503132551908493
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 12,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.916017055511475,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.916017055511475,
+            "spin": 0.004744145553559065,
+            "velocity": 0.005801804829388857
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 1,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.3835248947143555,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.3834662437438965,
+            "spin": 0.005291444715112448,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 5,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.650993347167969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.651003837585449,
+            "spin": 0.0014470204478129745,
+            "velocity": 0.0020066534634679556
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 9,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.607094764709473,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.607094764709473,
+            "spin": 0.0013219310203567147,
+            "velocity": 0.0016435912111774087
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 13,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.463879108428955,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.463860034942627,
+            "spin": 0.004635847173631191,
+            "velocity": 0.0056670610792934895
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 2,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.201042175292969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.201042175292969,
+            "spin": 0.0009916007984429598,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 6,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.216156959533691,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.216140747070312,
+            "spin": 0.0027995347045361996,
+            "velocity": 0.0034332082141190767
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 10,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.938739776611328,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.938780784606934,
+            "spin": 0.005911657586693764,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 14,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 8.5028076171875,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 8.502849578857422,
+            "spin": 0.0008069504983723164,
+            "velocity": 0.0010169771267101169
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 3,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.555130958557129,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.555091857910156,
+            "spin": 5.2839582167507615e-06,
+            "velocity": 2.317175358257373e-06
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 7,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.240020751953125,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.239990234375,
+            "spin": 0.0007542752427980304,
+            "velocity": 0.0009371769847348332
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 11,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.004821417387574911,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 15,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0016409647651016712,
+            "velocity": 0.001999321859329939
+          },
+          "damage": false,
+          "collision": false
+        }
+      ],
+      "final_evaluation": [
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 0,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.31583833694458,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.162890434265137,
+            "spin": 0.007018730975687504,
+            "velocity": 0.00018392391211818904
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 4,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.048146724700928,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 3.952972412109375,
+            "spin": 0.00422416627407074,
+            "velocity": 0.00037367118056863546
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 8,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 5.728227138519287,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 5.7414093017578125,
+            "spin": 0.00019892057753168046,
+            "velocity": 0.00014293369895312935
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 12,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.916017055511475,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.758260250091553,
+            "spin": 0.007767469622194767,
+            "velocity": 0.0004352355608716607
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 1,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.3835248947143555,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.407441139221191,
+            "spin": 0.03570885956287384,
+            "velocity": 0.002217461122199893
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 5,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.650993347167969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.658781051635742,
+            "spin": 0.023483123630285263,
+            "velocity": 0.0014759679324924946
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 9,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.607094764709473,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.328237533569336,
+            "spin": 0.023309489712119102,
+            "velocity": 0.0006459290743805468
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 13,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.463879108428955,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.433474540710449,
+            "spin": 0.009343894198536873,
+            "velocity": 0.0010436342563480139
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 2,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.201042175292969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.199393272399902,
+            "spin": 0.004929645452648401,
+            "velocity": 0.00010704618034651503
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 6,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.216156959533691,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 8.911747932434082,
+            "spin": 0.0034095309674739838,
+            "velocity": 0.00025399436708539724
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 10,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.938739776611328,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.938878059387207,
+            "spin": 0.016393225640058517,
+            "velocity": 0.0026446860283613205
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 14,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 8.5028076171875,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 8.397917747497559,
+            "spin": 0.02510330080986023,
+            "velocity": 0.0009702796814963222
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 3,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.555130958557129,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.492852210998535,
+            "spin": 0.0008148097549565136,
+            "velocity": 0.00023722357582300901
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 7,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.240020751953125,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.217516899108887,
+            "spin": 0.0026841340586543083,
+            "velocity": 0.00015998937305994332
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 11,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.685434341430664,
+            "spin": 0.018440179526805878,
+            "velocity": 0.0006937431753613055
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 15,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.054787635803223,
+            "spin": 0.006090924609452486,
+            "velocity": 3.297355578979477e-05
+          },
+          "damage": false,
+          "collision": false
+        }
+      ],
+      "training_ticks": 131072,
+      "total_seconds": 527.5288730090033,
+      "training_seconds": 360.45147213700693,
+      "training_outcomes": {
+        "collision": 6,
+        "deadline": 67
+      },
+      "censored": 4,
+      "diagnostics": {
+        "attempts": 77,
+        "ticks": 131072,
+        "entered_goal_radius": 69,
+        "met_all_instantaneous_tolerances": 19,
+        "maximum_dwell_ticks": 14,
+        "thrust_fraction": 0.2379608154296875,
+        "brake_fraction": 0.7019729614257812,
+        "both_fraction": 0.1571044921875,
+        "mean_thrust_on_ticks": 1.4108653367711586,
+        "half_second_thrust_runs": 0,
+        "maximum_thrust_on_ticks": 12
+      },
+      "parity": {
+        "fixtures": 16,
+        "maximum_abs_output_error": 9.5367431640625e-07,
+        "actions_match": true
+      },
+      "evaluation_trace_inspection": {
+        "initial": [
+          {
+            "task": "clear-0",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.31583833694458,
+            "final_errors": {
+              "position": 4.31583833694458,
+              "spin": 0.00581231527030468,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.0031987727908158884,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-1",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.3834662437438965,
+            "final_errors": {
+              "position": 6.3834662437438965,
+              "spin": 0.005291444715112448,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.0025113754232491676,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-10",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.938739776611328,
+            "final_errors": {
+              "position": 9.938780784606934,
+              "spin": 0.005911657586693764,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.0029637899053179557,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-11",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.864906311035156,
+            "final_errors": {
+              "position": 10.864906311035156,
+              "spin": 0.004821417387574911,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.0015082275348120473,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-12",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.916017055511475,
+            "final_errors": {
+              "position": 4.916017055511475,
+              "spin": 0.004744145553559065,
+              "velocity": 0.005801804829388857
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0022715870497955217,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-13",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.463860034942627,
+            "final_errors": {
+              "position": 7.463860034942627,
+              "spin": 0.004635847173631191,
+              "velocity": 0.0056670610792934895
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.7733333333333333,
+            "mean_abs_steering": 0.002734645164649313,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-14",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 8.5028076171875,
+            "final_errors": {
+              "position": 8.502849578857422,
+              "spin": 0.0008069504983723164,
+              "velocity": 0.0010169771267101169
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0013984263478616615,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-15",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.20372200012207,
+            "final_errors": {
+              "position": 10.20372200012207,
+              "spin": 0.0016409647651016712,
+              "velocity": 0.001999321859329939
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.6533333333333333,
+            "mean_abs_steering": 0.001373460872079401,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-2",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.201042175292969,
+            "final_errors": {
+              "position": 9.201042175292969,
+              "spin": 0.0009916007984429598,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.00022187426955497358,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-3",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.555091857910156,
+            "final_errors": {
+              "position": 11.555091857910156,
+              "spin": 5.2839582167507615e-06,
+              "velocity": 2.317175358257373e-06
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.8616666666666667,
+            "mean_abs_steering": 0.00038616408160426847,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-4",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.048146724700928,
+            "final_errors": {
+              "position": 4.048146724700928,
+              "spin": 3.866189581458457e-05,
+              "velocity": 3.182786895195022e-05
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.5727777777777778,
+            "mean_abs_steering": 0.000622496821876363,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-5",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.650993347167969,
+            "final_errors": {
+              "position": 6.651003837585449,
+              "spin": 0.0014470204478129745,
+              "velocity": 0.0020066534634679556
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.8644444444444445,
+            "mean_abs_steering": 0.0003695609407885867,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-6",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.216140747070312,
+            "final_errors": {
+              "position": 9.216140747070312,
+              "spin": 0.0027995347045361996,
+              "velocity": 0.0034332082141190767
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0022991422693788384,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-7",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.239990234375,
+            "final_errors": {
+              "position": 11.239990234375,
+              "spin": 0.0007542752427980304,
+              "velocity": 0.0009371769847348332
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.00095251197297734,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-8",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 5.728227138519287,
+            "final_errors": {
+              "position": 5.728257179260254,
+              "spin": 0.0011668889783322811,
+              "velocity": 0.0014503132551908493
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.6666666666666666,
+            "mean_abs_steering": 0.00033593141062940253,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-9",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.607094764709473,
+            "final_errors": {
+              "position": 7.607094764709473,
+              "spin": 0.0013219310203567147,
+              "velocity": 0.0016435912111774087
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0019111796403497767,
+            "collision": false,
+            "damage": false
+          }
+        ],
+        "final": [
+          {
+            "task": "clear-0",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.162890434265137,
+            "final_errors": {
+              "position": 4.162890434265137,
+              "spin": 0.007018730975687504,
+              "velocity": 0.00018392391211818904
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.013609242122054437,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-1",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.3835248947143555,
+            "final_errors": {
+              "position": 6.407441139221191,
+              "spin": 0.03570885956287384,
+              "velocity": 0.002217461122199893
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.011174413198847712,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-10",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.9381685256958,
+            "final_errors": {
+              "position": 9.938878059387207,
+              "spin": 0.016393225640058517,
+              "velocity": 0.0026446860283613205
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.014874607326023073,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-11",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.685434341430664,
+            "final_errors": {
+              "position": 10.685434341430664,
+              "spin": 0.018440179526805878,
+              "velocity": 0.0006937431753613055
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.013517207978778364,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-12",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.758260250091553,
+            "final_errors": {
+              "position": 4.758260250091553,
+              "spin": 0.007767469622194767,
+              "velocity": 0.0004352355608716607
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.015872068163056006,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-13",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.433474540710449,
+            "final_errors": {
+              "position": 7.433474540710449,
+              "spin": 0.009343894198536873,
+              "velocity": 0.0010436342563480139
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.008656976118590036,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-14",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 8.397917747497559,
+            "final_errors": {
+              "position": 8.397917747497559,
+              "spin": 0.02510330080986023,
+              "velocity": 0.0009702796814963222
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.016088754032195236,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-15",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.054787635803223,
+            "final_errors": {
+              "position": 10.054787635803223,
+              "spin": 0.006090924609452486,
+              "velocity": 3.297355578979477e-05
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.014730589054185355,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-2",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.199393272399902,
+            "final_errors": {
+              "position": 9.199393272399902,
+              "spin": 0.004929645452648401,
+              "velocity": 0.00010704618034651503
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.006331029563314385,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-3",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.492852210998535,
+            "final_errors": {
+              "position": 11.492852210998535,
+              "spin": 0.0008148097549565136,
+              "velocity": 0.00023722357582300901
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.010021876916030629,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-4",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 3.952016592025757,
+            "final_errors": {
+              "position": 3.952972412109375,
+              "spin": 0.00422416627407074,
+              "velocity": 0.00037367118056863546
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.011082826426702216,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-5",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.650993347167969,
+            "final_errors": {
+              "position": 6.658781051635742,
+              "spin": 0.023483123630285263,
+              "velocity": 0.0014759679324924946
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.013102527682979901,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-6",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 8.911747932434082,
+            "final_errors": {
+              "position": 8.911747932434082,
+              "spin": 0.0034095309674739838,
+              "velocity": 0.00025399436708539724
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.015636712834271344,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-7",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.217516899108887,
+            "final_errors": {
+              "position": 11.217516899108887,
+              "spin": 0.0026841340586543083,
+              "velocity": 0.00015998937305994332
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.007453089342905312,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-8",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 5.728227138519287,
+            "final_errors": {
+              "position": 5.7414093017578125,
+              "spin": 0.00019892057753168046,
+              "velocity": 0.00014293369895312935
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.006019507746548495,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-9",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.328237533569336,
+            "final_errors": {
+              "position": 7.328237533569336,
+              "spin": 0.023309489712119102,
+              "velocity": 0.0006459290743805468
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.02130231639719568,
+            "collision": false,
+            "damage": false
+          }
+        ]
+      },
+      "development_behavior": {
+        "initial": [
+          {
+            "task": "clear-0",
+            "initial_distance": 4.31583833694458,
+            "minimum_distance": 4.31583833694458,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-1",
+            "initial_distance": 6.3835248947143555,
+            "minimum_distance": 6.3834662437438965,
+            "best_distance_reduction": 5.8650970458984375e-05,
+            "final_distance_reduction": 5.8650970458984375e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-10",
+            "initial_distance": 9.938739776611328,
+            "minimum_distance": 9.938739776611328,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -4.100799560546875e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-11",
+            "initial_distance": 10.864906311035156,
+            "minimum_distance": 10.864906311035156,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-12",
+            "initial_distance": 4.916017055511475,
+            "minimum_distance": 4.916017055511475,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-13",
+            "initial_distance": 7.463879108428955,
+            "minimum_distance": 7.463860034942627,
+            "best_distance_reduction": 1.9073486328125e-05,
+            "final_distance_reduction": 1.9073486328125e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-14",
+            "initial_distance": 8.5028076171875,
+            "minimum_distance": 8.5028076171875,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -4.1961669921875e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-15",
+            "initial_distance": 10.20372200012207,
+            "minimum_distance": 10.20372200012207,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-2",
+            "initial_distance": 9.201042175292969,
+            "minimum_distance": 9.201042175292969,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-3",
+            "initial_distance": 11.555130958557129,
+            "minimum_distance": 11.555091857910156,
+            "best_distance_reduction": 3.910064697265625e-05,
+            "final_distance_reduction": 3.910064697265625e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-4",
+            "initial_distance": 4.048146724700928,
+            "minimum_distance": 4.048146724700928,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-5",
+            "initial_distance": 6.650993347167969,
+            "minimum_distance": 6.650993347167969,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -1.049041748046875e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-6",
+            "initial_distance": 9.216156959533691,
+            "minimum_distance": 9.216140747070312,
+            "best_distance_reduction": 1.621246337890625e-05,
+            "final_distance_reduction": 1.621246337890625e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-7",
+            "initial_distance": 11.240020751953125,
+            "minimum_distance": 11.239990234375,
+            "best_distance_reduction": 3.0517578125e-05,
+            "final_distance_reduction": 3.0517578125e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-8",
+            "initial_distance": 5.728227138519287,
+            "minimum_distance": 5.728227138519287,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -3.0040740966796875e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-9",
+            "initial_distance": 7.607094764709473,
+            "minimum_distance": 7.607094764709473,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          }
+        ],
+        "final": [
+          {
+            "task": "clear-0",
+            "initial_distance": 4.31583833694458,
+            "minimum_distance": 4.162890434265137,
+            "best_distance_reduction": 0.15294790267944336,
+            "final_distance_reduction": 0.15294790267944336,
+            "closing_tick_fraction": 0.15833333333333333,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-1",
+            "initial_distance": 6.3835248947143555,
+            "minimum_distance": 6.3835248947143555,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -0.023916244506835938,
+            "closing_tick_fraction": 0.0077777777777777776,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-10",
+            "initial_distance": 9.938739776611328,
+            "minimum_distance": 9.9381685256958,
+            "best_distance_reduction": 0.0005712509155273438,
+            "final_distance_reduction": -0.00013828277587890625,
+            "closing_tick_fraction": 0.015,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-11",
+            "initial_distance": 10.864906311035156,
+            "minimum_distance": 10.685434341430664,
+            "best_distance_reduction": 0.1794719696044922,
+            "final_distance_reduction": 0.1794719696044922,
+            "closing_tick_fraction": 0.14222222222222222,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-12",
+            "initial_distance": 4.916017055511475,
+            "minimum_distance": 4.758260250091553,
+            "best_distance_reduction": 0.15775680541992188,
+            "final_distance_reduction": 0.15775680541992188,
+            "closing_tick_fraction": 0.14,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-13",
+            "initial_distance": 7.463879108428955,
+            "minimum_distance": 7.433474540710449,
+            "best_distance_reduction": 0.03040456771850586,
+            "final_distance_reduction": 0.03040456771850586,
+            "closing_tick_fraction": 0.09722222222222222,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-14",
+            "initial_distance": 8.5028076171875,
+            "minimum_distance": 8.397917747497559,
+            "best_distance_reduction": 0.1048898696899414,
+            "final_distance_reduction": 0.1048898696899414,
+            "closing_tick_fraction": 0.12555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-15",
+            "initial_distance": 10.20372200012207,
+            "minimum_distance": 10.054787635803223,
+            "best_distance_reduction": 0.14893436431884766,
+            "final_distance_reduction": 0.14893436431884766,
+            "closing_tick_fraction": 0.14722222222222223,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-2",
+            "initial_distance": 9.201042175292969,
+            "minimum_distance": 9.199393272399902,
+            "best_distance_reduction": 0.0016489028930664062,
+            "final_distance_reduction": 0.0016489028930664062,
+            "closing_tick_fraction": 0.021111111111111112,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-3",
+            "initial_distance": 11.555130958557129,
+            "minimum_distance": 11.492852210998535,
+            "best_distance_reduction": 0.06227874755859375,
+            "final_distance_reduction": 0.06227874755859375,
+            "closing_tick_fraction": 0.09,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-4",
+            "initial_distance": 4.048146724700928,
+            "minimum_distance": 3.952016592025757,
+            "best_distance_reduction": 0.0961301326751709,
+            "final_distance_reduction": 0.09517431259155273,
+            "closing_tick_fraction": 0.16,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-5",
+            "initial_distance": 6.650993347167969,
+            "minimum_distance": 6.650993347167969,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -0.0077877044677734375,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-6",
+            "initial_distance": 9.216156959533691,
+            "minimum_distance": 8.911747932434082,
+            "best_distance_reduction": 0.3044090270996094,
+            "final_distance_reduction": 0.3044090270996094,
+            "closing_tick_fraction": 0.19666666666666666,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-7",
+            "initial_distance": 11.240020751953125,
+            "minimum_distance": 11.217516899108887,
+            "best_distance_reduction": 0.02250385284423828,
+            "final_distance_reduction": 0.02250385284423828,
+            "closing_tick_fraction": 0.10166666666666667,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-8",
+            "initial_distance": 5.728227138519287,
+            "minimum_distance": 5.728227138519287,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -0.01318216323852539,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-9",
+            "initial_distance": 7.607094764709473,
+            "minimum_distance": 7.328237533569336,
+            "best_distance_reduction": 0.2788572311401367,
+            "final_distance_reduction": 0.2788572311401367,
+            "closing_tick_fraction": 0.22611111111111112,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          }
+        ]
+      },
+      "best": {
+        "policy": "policy-0128.json",
+        "sha256": "2397d8659acba3d747ef07fffb936b15e6f3ff1eb0c82901c4dffea0bc13a030",
+        "rule": "success count, then fewer physical failures, then lower mean final position error; ties keep initial",
+        "initial_score": [
+          0,
+          0,
+          -7.989762991666794
+        ],
+        "final_score": [
+          0,
+          0,
+          -7.896374672651291
+        ],
+        "scope": "development comparison; qualification requires experiment gates"
+      },
+      "kl_early_stopped_updates": 0,
+      "optimization_summary": {
+        "value_loss": {
+          "first": 0.006271796999499202,
+          "last": 0.0019560803630156443,
+          "mean": 0.03093506021406256,
+          "maximum": 1.2500383965671062
+        },
+        "policy_loss": {
+          "first": -0.0021536041822400875,
+          "last": -0.0020836357725784183,
+          "mean": -0.0024801220463928075,
+          "maximum": 0.0004036228056065738
+        },
+        "entropy": {
+          "first": 1.994732677936554,
+          "last": 1.38751320540905,
+          "mean": 1.6896027062321082,
+          "maximum": 2.000452645123005
+        },
+        "gradient_norm": {
+          "first": 0.48140417970716953,
+          "last": 0.5308580147102475,
+          "mean": 0.653827888876549,
+          "maximum": 2.0013816505670547
+        },
+        "clip_fraction": {
+          "first": 0.0029296875,
+          "last": 0.005126953125,
+          "mean": 0.0256195068359375,
+          "maximum": 0.149658203125
+        },
+        "kl": {
+          "first": 0.0009600007761036977,
+          "last": 0.0011012019531335682,
+          "mean": 0.0025226508450941765,
+          "maximum": 0.010391210977104492
+        }
+      },
+      "sampled_training_successes": [],
+      "final_control_summary": {
+        "thrust_fraction": 0.0,
+        "brake_fraction": 1.0,
+        "mean_abs_steering": 0.012467109056479886,
+        "entered_goal_radius": 0,
+        "maximum_dwell_ticks": 0,
+        "mean_final_distance_reduction": 0.0933908224105835
+      },
+      "final_distance_by_stratum": [
+        {
+          "stratum": 0,
+          "initial_mean": 4.752057313919067,
+          "final_mean": 4.653883099555969
+        },
+        {
+          "stratum": 1,
+          "initial_mean": 7.026373028755188,
+          "final_mean": 6.95698356628418
+        },
+        {
+          "stratum": 2,
+          "initial_mean": 9.214686632156372,
+          "final_mean": 9.111984252929688
+        },
+        {
+          "stratum": 3,
+          "initial_mean": 10.96594500541687,
+          "final_mean": 10.862647771835327
+        }
+      ],
+      "successful_approach_controls": []
+    },
+    {
+      "seed": 43,
+      "status": "completed",
+      "initial": {
+        "outcomes": {
+          "collision": 11,
+          "deadline": 5
+        },
+        "strata": [
+          {
+            "collision": 4
+          },
+          {
+            "deadline": 1,
+            "collision": 3
+          },
+          {
+            "deadline": 2,
+            "collision": 2
+          },
+          {
+            "deadline": 2,
+            "collision": 2
+          }
+        ],
+        "successes": 0,
+        "physical_failures": 11
+      },
+      "final": {
+        "outcomes": {
+          "deadline": 16
+        },
+        "strata": [
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          },
+          {
+            "deadline": 4
+          }
+        ],
+        "successes": 0,
+        "physical_failures": 0
+      },
+      "success_gain": 0,
+      "learning_evidence": false,
+      "basic_flight_gate": false,
+      "initial_evaluation": [
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 0,
+          "outcome": "collision",
+          "ticks": 366,
+          "initial_errors": {
+            "position": 4.31583833694458,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 151.21568298339844,
+            "spin": 0.46295541524887085,
+            "velocity": 6.720266819000244
+          },
+          "damage": true,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 4,
+          "outcome": "collision",
+          "ticks": 779,
+          "initial_errors": {
+            "position": 4.048146724700928,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 519.4940795898438,
+            "spin": 4.4817023277282715,
+            "velocity": 21.960744857788086
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 8,
+          "outcome": "collision",
+          "ticks": 839,
+          "initial_errors": {
+            "position": 5.728227138519287,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 623.510498046875,
+            "spin": 0.48868459463119507,
+            "velocity": 32.059200286865234
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 12,
+          "outcome": "collision",
+          "ticks": 740,
+          "initial_errors": {
+            "position": 4.916017055511475,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 552.7304077148438,
+            "spin": 0.5072948932647705,
+            "velocity": 28.856590270996094
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 1,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.3835248947143555,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.3835835456848145,
+            "spin": 0.009574098512530327,
+            "velocity": 0.011486725881695747
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 5,
+          "outcome": "collision",
+          "ticks": 867,
+          "initial_errors": {
+            "position": 6.650993347167969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 637.3309326171875,
+            "spin": 2.4206268787384033,
+            "velocity": 29.07773208618164
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 9,
+          "outcome": "collision",
+          "ticks": 786,
+          "initial_errors": {
+            "position": 7.607094764709473,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 487.73590087890625,
+            "spin": 1.5902321338653564,
+            "velocity": 27.68498420715332
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 13,
+          "outcome": "collision",
+          "ticks": 391,
+          "initial_errors": {
+            "position": 7.463879108428955,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 317.37237548828125,
+            "spin": 0.9232409000396729,
+            "velocity": 25.12510108947754
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 2,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.201042175292969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 146.89541625976562,
+            "spin": 0.006943312473595142,
+            "velocity": 0.008637955412268639
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 6,
+          "outcome": "collision",
+          "ticks": 733,
+          "initial_errors": {
+            "position": 9.216156959533691,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 473.42041015625,
+            "spin": 0.1518193483352661,
+            "velocity": 29.290721893310547
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 10,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.938739776611328,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.830991744995117,
+            "spin": 0.01144589576870203,
+            "velocity": 0.013956579379737377
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 14,
+          "outcome": "collision",
+          "ticks": 778,
+          "initial_errors": {
+            "position": 8.5028076171875,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 555.9555053710938,
+            "spin": 3.9385316371917725,
+            "velocity": 23.74120330810547
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 3,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.555130958557129,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.555177688598633,
+            "spin": 0.006426655687391758,
+            "velocity": 0.007845724932849407
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 7,
+          "outcome": "collision",
+          "ticks": 626,
+          "initial_errors": {
+            "position": 11.240020751953125,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 285.8946838378906,
+            "spin": 0.5345070362091064,
+            "velocity": 23.49746322631836
+          },
+          "damage": false,
+          "collision": true
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 11,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.010717974975705147,
+            "velocity": 0.013044670224189758
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 15,
+          "outcome": "collision",
+          "ticks": 440,
+          "initial_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 360.7960510253906,
+            "spin": 1.4441601037979126,
+            "velocity": 24.649354934692383
+          },
+          "damage": false,
+          "collision": true
+        }
+      ],
+      "final_evaluation": [
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 0,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.31583833694458,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.31583833694458,
+            "spin": 0.011644723825156689,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 4,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.048146724700928,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.048146724700928,
+            "spin": 0.008893807418644428,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 8,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 5.728227138519287,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 5.728252410888672,
+            "spin": 0.016010267660021782,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-0",
+          "index": 12,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 4.916017055511475,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 4.916017055511475,
+            "spin": 0.014538302086293697,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 1,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.3835248947143555,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.3835835456848145,
+            "spin": 0.0152868228033185,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 5,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 6.650993347167969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 6.650993347167969,
+            "spin": 0.026840565726161003,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 9,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.607094764709473,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.607100486755371,
+            "spin": 0.011858773417770863,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-1",
+          "index": 13,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 7.463879108428955,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 7.463898181915283,
+            "spin": 0.01928020641207695,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 2,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.201042175292969,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.201042175292969,
+            "spin": 0.002995181130245328,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 6,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.216156959533691,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.21617317199707,
+            "spin": 0.007302005309611559,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 10,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 9.938739776611328,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 9.938754081726074,
+            "spin": 0.012583544477820396,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-2",
+          "index": 14,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 8.5028076171875,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 8.50278091430664,
+            "spin": 0.009048709645867348,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 3,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.555130958557129,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.555126190185547,
+            "spin": 0.010244308039546013,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 7,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 11.240020751953125,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 11.239990234375,
+            "spin": 0.00875887181609869,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 11,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.864906311035156,
+            "spin": 0.010674421675503254,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        },
+        {
+          "family": "clear",
+          "recipe": "aligned-approach-v1/stratum-3",
+          "index": 15,
+          "outcome": "deadline",
+          "ticks": 1800,
+          "initial_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0,
+            "velocity": 0.0
+          },
+          "final_errors": {
+            "position": 10.20372200012207,
+            "spin": 0.0026335346046835184,
+            "velocity": 0.0
+          },
+          "damage": false,
+          "collision": false
+        }
+      ],
+      "training_ticks": 131072,
+      "total_seconds": 493.86568072999944,
+      "training_seconds": 367.5816231189965,
+      "training_outcomes": {
+        "collision": 9,
+        "deadline": 66,
+        "success": 2
+      },
+      "censored": 4,
+      "diagnostics": {
+        "attempts": 81,
+        "ticks": 131072,
+        "entered_goal_radius": 66,
+        "met_all_instantaneous_tolerances": 32,
+        "maximum_dwell_ticks": 30,
+        "thrust_fraction": 0.142425537109375,
+        "brake_fraction": 0.49927520751953125,
+        "both_fraction": 0.0773468017578125,
+        "mean_thrust_on_ticks": 1.4269989298272436,
+        "half_second_thrust_runs": 0,
+        "maximum_thrust_on_ticks": 12
+      },
+      "parity": {
+        "fixtures": 16,
+        "maximum_abs_output_error": 9.5367431640625e-07,
+        "actions_match": true
+      },
+      "evaluation_trace_inspection": {
+        "initial": [
+          {
+            "task": "clear-0",
+            "outcome": "collision",
+            "ticks": 366,
+            "minimum_position_error": 0.027862347662448883,
+            "final_errors": {
+              "position": 151.21568298339844,
+              "spin": 0.46295541524887085,
+              "velocity": 6.720266819000244
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 1.0,
+            "brake_fraction": 0.8497267759562842,
+            "mean_abs_steering": 0.0036088856070078503,
+            "collision": true,
+            "damage": true
+          },
+          {
+            "task": "clear-1",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.3835248947143555,
+            "final_errors": {
+              "position": 6.3835835456848145,
+              "spin": 0.009574098512530327,
+              "velocity": 0.011486725881695747
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.005327640229111744,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-10",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.830991744995117,
+            "final_errors": {
+              "position": 9.830991744995117,
+              "spin": 0.01144589576870203,
+              "velocity": 0.013956579379737377
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.008698885201010854,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-11",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.864906311035156,
+            "final_errors": {
+              "position": 10.864906311035156,
+              "spin": 0.010717974975705147,
+              "velocity": 0.013044670224189758
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.004329725450887862,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-12",
+            "outcome": "collision",
+            "ticks": 740,
+            "minimum_position_error": 0.04592850059270859,
+            "final_errors": {
+              "position": 552.7304077148438,
+              "spin": 0.5072948932647705,
+              "velocity": 28.856590270996094
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 1.0,
+            "brake_fraction": 0.6067567567567568,
+            "mean_abs_steering": 0.0040063809447511214,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-13",
+            "outcome": "collision",
+            "ticks": 391,
+            "minimum_position_error": 0.1263246238231659,
+            "final_errors": {
+              "position": 317.37237548828125,
+              "spin": 0.9232409000396729,
+              "velocity": 25.12510108947754
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 1.0,
+            "brake_fraction": 0.7570332480818415,
+            "mean_abs_steering": 0.004958554174003127,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-14",
+            "outcome": "collision",
+            "ticks": 778,
+            "minimum_position_error": 0.03156612440943718,
+            "final_errors": {
+              "position": 555.9555053710938,
+              "spin": 3.9385316371917725,
+              "velocity": 23.74120330810547
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.8367609254498715,
+            "brake_fraction": 0.6760925449871465,
+            "mean_abs_steering": 0.005207786274443029,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-15",
+            "outcome": "collision",
+            "ticks": 440,
+            "minimum_position_error": 0.05821051821112633,
+            "final_errors": {
+              "position": 360.7960510253906,
+              "spin": 1.4441601037979126,
+              "velocity": 24.649354934692383
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 1.0,
+            "brake_fraction": 0.5522727272727272,
+            "mean_abs_steering": 0.004119363066704616,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-2",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 0.09425081312656403,
+            "final_errors": {
+              "position": 146.89541625976562,
+              "spin": 0.006943312473595142,
+              "velocity": 0.008637955412268639
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.2544444444444444,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0036785302230338047,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-3",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.555130958557129,
+            "final_errors": {
+              "position": 11.555177688598633,
+              "spin": 0.006426655687391758,
+              "velocity": 0.007845724932849407
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 1.0,
+            "mean_abs_steering": 0.0030443927958711155,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-4",
+            "outcome": "collision",
+            "ticks": 779,
+            "minimum_position_error": 0.046673741191625595,
+            "final_errors": {
+              "position": 519.4940795898438,
+              "spin": 4.4817023277282715,
+              "velocity": 21.960744857788086
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.9332477535301669,
+            "brake_fraction": 0.72400513478819,
+            "mean_abs_steering": 0.002933387519842234,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-5",
+            "outcome": "collision",
+            "ticks": 867,
+            "minimum_position_error": 0.06361175328493118,
+            "final_errors": {
+              "position": 637.3309326171875,
+              "spin": 2.4206268787384033,
+              "velocity": 29.07773208618164
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.9907727797001153,
+            "brake_fraction": 0.6931949250288351,
+            "mean_abs_steering": 0.0034091881299990923,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-6",
+            "outcome": "collision",
+            "ticks": 733,
+            "minimum_position_error": 0.0994686558842659,
+            "final_errors": {
+              "position": 473.42041015625,
+              "spin": 0.1518193483352661,
+              "velocity": 29.290721893310547
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.9481582537517054,
+            "brake_fraction": 0.694406548431105,
+            "mean_abs_steering": 0.003924849420148399,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-7",
+            "outcome": "collision",
+            "ticks": 626,
+            "minimum_position_error": 0.025042718276381493,
+            "final_errors": {
+              "position": 285.8946838378906,
+              "spin": 0.5345070362091064,
+              "velocity": 23.49746322631836
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.9824281150159745,
+            "brake_fraction": 0.9952076677316294,
+            "mean_abs_steering": 0.002522921982257011,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-8",
+            "outcome": "collision",
+            "ticks": 839,
+            "minimum_position_error": 0.04726364091038704,
+            "final_errors": {
+              "position": 623.510498046875,
+              "spin": 0.48868459463119507,
+              "velocity": 32.059200286865234
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 1.0,
+            "brake_fraction": 0.6853396901072706,
+            "mean_abs_steering": 0.002824985929529444,
+            "collision": true,
+            "damage": false
+          },
+          {
+            "task": "clear-9",
+            "outcome": "collision",
+            "ticks": 786,
+            "minimum_position_error": 0.0815461203455925,
+            "final_errors": {
+              "position": 487.73590087890625,
+              "spin": 1.5902321338653564,
+              "velocity": 27.68498420715332
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.7760814249363868,
+            "brake_fraction": 0.6348600508905853,
+            "mean_abs_steering": 0.0057772070672434134,
+            "collision": true,
+            "damage": false
+          }
+        ],
+        "final": [
+          {
+            "task": "clear-0",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.31583833694458,
+            "final_errors": {
+              "position": 4.31583833694458,
+              "spin": 0.011644723825156689,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.011927036934810328,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-1",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.3835248947143555,
+            "final_errors": {
+              "position": 6.3835835456848145,
+              "spin": 0.0152868228033185,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.02769095381024979,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-10",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.938739776611328,
+            "final_errors": {
+              "position": 9.938754081726074,
+              "spin": 0.012583544477820396,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.02423301051888201,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-11",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.864906311035156,
+            "final_errors": {
+              "position": 10.864906311035156,
+              "spin": 0.010674421675503254,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.00932593890706711,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-12",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.916017055511475,
+            "final_errors": {
+              "position": 4.916017055511475,
+              "spin": 0.014538302086293697,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.02657100386287008,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-13",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.463879108428955,
+            "final_errors": {
+              "position": 7.463898181915283,
+              "spin": 0.01928020641207695,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.01149329944006038,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-14",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 8.50278091430664,
+            "final_errors": {
+              "position": 8.50278091430664,
+              "spin": 0.009048709645867348,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.01275100282432201,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-15",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 10.20372200012207,
+            "final_errors": {
+              "position": 10.20372200012207,
+              "spin": 0.0026335346046835184,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.010229072346911481,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-2",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.201042175292969,
+            "final_errors": {
+              "position": 9.201042175292969,
+              "spin": 0.002995181130245328,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.016260951433844942,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-3",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.555126190185547,
+            "final_errors": {
+              "position": 11.555126190185547,
+              "spin": 0.010244308039546013,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.02705915836948811,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-4",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 4.048146724700928,
+            "final_errors": {
+              "position": 4.048146724700928,
+              "spin": 0.008893807418644428,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.021883357095745546,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-5",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 6.650993347167969,
+            "final_errors": {
+              "position": 6.650993347167969,
+              "spin": 0.026840565726161003,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.009727787205225064,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-6",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 9.216156959533691,
+            "final_errors": {
+              "position": 9.21617317199707,
+              "spin": 0.007302005309611559,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.01837842380655477,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-7",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 11.239990234375,
+            "final_errors": {
+              "position": 11.239990234375,
+              "spin": 0.00875887181609869,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.0067429598658216286,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-8",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 5.728227138519287,
+            "final_errors": {
+              "position": 5.728252410888672,
+              "spin": 0.016010267660021782,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.011040903785485877,
+            "collision": false,
+            "damage": false
+          },
+          {
+            "task": "clear-9",
+            "outcome": "deadline",
+            "ticks": 1800,
+            "minimum_position_error": 7.607094764709473,
+            "final_errors": {
+              "position": 7.607100486755371,
+              "spin": 0.011858773417770863,
+              "velocity": 0.0
+            },
+            "maximum_dwell_ticks": 0,
+            "thrust_fraction": 0.0,
+            "brake_fraction": 0.0,
+            "mean_abs_steering": 0.018387170476748402,
+            "collision": false,
+            "damage": false
+          }
+        ]
+      },
+      "development_behavior": {
+        "initial": [
+          {
+            "task": "clear-0",
+            "initial_distance": 4.31583833694458,
+            "minimum_distance": 0.027862347662448883,
+            "best_distance_reduction": 4.287975989282131,
+            "final_distance_reduction": -146.89984464645386,
+            "closing_tick_fraction": 0.10109289617486339,
+            "thrust_while_closing_fraction": 0.10109289617486339,
+            "first_goal_entry_errors": {
+              "position": 2.941990613937378,
+              "spin": 0.009030690416693687,
+              "velocity": 7.768411636352539
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-1",
+            "initial_distance": 6.3835248947143555,
+            "minimum_distance": 6.3835248947143555,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -5.8650970458984375e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-10",
+            "initial_distance": 9.938739776611328,
+            "minimum_distance": 9.830991744995117,
+            "best_distance_reduction": 0.10774803161621094,
+            "final_distance_reduction": 0.10774803161621094,
+            "closing_tick_fraction": 0.7233333333333334,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-11",
+            "initial_distance": 10.864906311035156,
+            "minimum_distance": 10.864906311035156,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-12",
+            "initial_distance": 4.916017055511475,
+            "minimum_distance": 0.04592850059270859,
+            "best_distance_reduction": 4.870088554918766,
+            "final_distance_reduction": -547.8143906593323,
+            "closing_tick_fraction": 0.05405405405405406,
+            "thrust_while_closing_fraction": 0.05405405405405406,
+            "first_goal_entry_errors": {
+              "position": 2.9871978759765625,
+              "spin": 0.010012851096689701,
+              "velocity": 8.608050346374512
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-13",
+            "initial_distance": 7.463879108428955,
+            "minimum_distance": 0.1263246238231659,
+            "best_distance_reduction": 7.337554484605789,
+            "final_distance_reduction": -309.9084963798523,
+            "closing_tick_fraction": 0.09974424552429667,
+            "thrust_while_closing_fraction": 0.09974424552429667,
+            "first_goal_entry_errors": {
+              "position": 2.716118335723877,
+              "spin": 0.008113947696983814,
+              "velocity": 19.2032527923584
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-14",
+            "initial_distance": 8.5028076171875,
+            "minimum_distance": 0.03156612440943718,
+            "best_distance_reduction": 8.471241492778063,
+            "final_distance_reduction": -547.4526977539062,
+            "closing_tick_fraction": 0.07583547557840617,
+            "thrust_while_closing_fraction": 0.07583547557840617,
+            "first_goal_entry_errors": {
+              "position": 2.9119350910186768,
+              "spin": 0.011939776130020618,
+              "velocity": 10.929733276367188
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-15",
+            "initial_distance": 10.20372200012207,
+            "minimum_distance": 0.05821051821112633,
+            "best_distance_reduction": 10.145511481910944,
+            "final_distance_reduction": -350.59232902526855,
+            "closing_tick_fraction": 0.15227272727272728,
+            "thrust_while_closing_fraction": 0.15227272727272728,
+            "first_goal_entry_errors": {
+              "position": 2.910062074661255,
+              "spin": 0.011365935206413269,
+              "velocity": 11.679692268371582
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-2",
+            "initial_distance": 9.201042175292969,
+            "minimum_distance": 0.09425081312656403,
+            "best_distance_reduction": 9.106791362166405,
+            "final_distance_reduction": -137.69437408447266,
+            "closing_tick_fraction": 0.03388888888888889,
+            "thrust_while_closing_fraction": 0.03388888888888889,
+            "first_goal_entry_errors": {
+              "position": 2.8676974773406982,
+              "spin": 0.00599147891625762,
+              "velocity": 11.263108253479004
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-3",
+            "initial_distance": 11.555130958557129,
+            "minimum_distance": 11.555130958557129,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -4.673004150390625e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-4",
+            "initial_distance": 4.048146724700928,
+            "minimum_distance": 0.046673741191625595,
+            "best_distance_reduction": 4.001472983509302,
+            "final_distance_reduction": -515.4459328651428,
+            "closing_tick_fraction": 0.044929396662387676,
+            "thrust_while_closing_fraction": 0.044929396662387676,
+            "first_goal_entry_errors": {
+              "position": 2.927994966506958,
+              "spin": 0.006561843678355217,
+              "velocity": 7.25327730178833
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-5",
+            "initial_distance": 6.650993347167969,
+            "minimum_distance": 0.06361175328493118,
+            "best_distance_reduction": 6.587381593883038,
+            "final_distance_reduction": -630.6799392700195,
+            "closing_tick_fraction": 0.05767012687427912,
+            "thrust_while_closing_fraction": 0.05767012687427912,
+            "first_goal_entry_errors": {
+              "position": 2.9870574474334717,
+              "spin": 0.00741116888821125,
+              "velocity": 10.013113975524902
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-6",
+            "initial_distance": 9.216156959533691,
+            "minimum_distance": 0.0994686558842659,
+            "best_distance_reduction": 9.116688303649426,
+            "final_distance_reduction": -464.2042531967163,
+            "closing_tick_fraction": 0.08594815825375171,
+            "thrust_while_closing_fraction": 0.08594815825375171,
+            "first_goal_entry_errors": {
+              "position": 2.8834850788116455,
+              "spin": 0.0028385331388562918,
+              "velocity": 11.26311206817627
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-7",
+            "initial_distance": 11.240020751953125,
+            "minimum_distance": 0.025042718276381493,
+            "best_distance_reduction": 11.214978033676744,
+            "final_distance_reduction": -274.6546630859375,
+            "closing_tick_fraction": 0.11501597444089456,
+            "thrust_while_closing_fraction": 0.11501597444089456,
+            "first_goal_entry_errors": {
+              "position": 2.9538233280181885,
+              "spin": 0.004955143667757511,
+              "velocity": 12.096427917480469
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-8",
+            "initial_distance": 5.728227138519287,
+            "minimum_distance": 0.04726364091038704,
+            "best_distance_reduction": 5.6809634976089,
+            "final_distance_reduction": -617.7822709083557,
+            "closing_tick_fraction": 0.05363528009535161,
+            "thrust_while_closing_fraction": 0.05363528009535161,
+            "first_goal_entry_errors": {
+              "position": 2.883443593978882,
+              "spin": 0.005044890101999044,
+              "velocity": 9.503593444824219
+            },
+            "entered_then_left_goal_radius": true
+          },
+          {
+            "task": "clear-9",
+            "initial_distance": 7.607094764709473,
+            "minimum_distance": 0.0815461203455925,
+            "best_distance_reduction": 7.52554864436388,
+            "final_distance_reduction": -480.1288061141968,
+            "closing_tick_fraction": 0.06997455470737914,
+            "thrust_while_closing_fraction": 0.06997455470737914,
+            "first_goal_entry_errors": {
+              "position": 2.913013219833374,
+              "spin": 0.009109482169151306,
+              "velocity": 10.513097763061523
+            },
+            "entered_then_left_goal_radius": true
+          }
+        ],
+        "final": [
+          {
+            "task": "clear-0",
+            "initial_distance": 4.31583833694458,
+            "minimum_distance": 4.31583833694458,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-1",
+            "initial_distance": 6.3835248947143555,
+            "minimum_distance": 6.3835248947143555,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -5.8650970458984375e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-10",
+            "initial_distance": 9.938739776611328,
+            "minimum_distance": 9.938739776611328,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -1.430511474609375e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-11",
+            "initial_distance": 10.864906311035156,
+            "minimum_distance": 10.864906311035156,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-12",
+            "initial_distance": 4.916017055511475,
+            "minimum_distance": 4.916017055511475,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-13",
+            "initial_distance": 7.463879108428955,
+            "minimum_distance": 7.463879108428955,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -1.9073486328125e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-14",
+            "initial_distance": 8.5028076171875,
+            "minimum_distance": 8.50278091430664,
+            "best_distance_reduction": 2.6702880859375e-05,
+            "final_distance_reduction": 2.6702880859375e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-15",
+            "initial_distance": 10.20372200012207,
+            "minimum_distance": 10.20372200012207,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-2",
+            "initial_distance": 9.201042175292969,
+            "minimum_distance": 9.201042175292969,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-3",
+            "initial_distance": 11.555130958557129,
+            "minimum_distance": 11.555126190185547,
+            "best_distance_reduction": 4.76837158203125e-06,
+            "final_distance_reduction": 4.76837158203125e-06,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-4",
+            "initial_distance": 4.048146724700928,
+            "minimum_distance": 4.048146724700928,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-5",
+            "initial_distance": 6.650993347167969,
+            "minimum_distance": 6.650993347167969,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": 0.0,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-6",
+            "initial_distance": 9.216156959533691,
+            "minimum_distance": 9.216156959533691,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -1.621246337890625e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-7",
+            "initial_distance": 11.240020751953125,
+            "minimum_distance": 11.239990234375,
+            "best_distance_reduction": 3.0517578125e-05,
+            "final_distance_reduction": 3.0517578125e-05,
+            "closing_tick_fraction": 0.0005555555555555556,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-8",
+            "initial_distance": 5.728227138519287,
+            "minimum_distance": 5.728227138519287,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -2.5272369384765625e-05,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          },
+          {
+            "task": "clear-9",
+            "initial_distance": 7.607094764709473,
+            "minimum_distance": 7.607094764709473,
+            "best_distance_reduction": 0.0,
+            "final_distance_reduction": -5.7220458984375e-06,
+            "closing_tick_fraction": 0.0,
+            "thrust_while_closing_fraction": 0.0,
+            "first_goal_entry_errors": null,
+            "entered_then_left_goal_radius": false
+          }
+        ]
+      },
+      "best": {
+        "policy": "policy-0128.json",
+        "sha256": "c6d5ffe5f85ddc99fd0b632024aa0a91e13fd8d7d39081a804d269662168bd65",
+        "rule": "success count, then fewer physical failures, then lower mean final position error; ties keep initial",
+        "initial_score": [
+          0,
+          -11,
+          -321.9366627037525
+        ],
+        "final_score": [
+          0,
+          0,
+          -7.989770323038101
+        ],
+        "scope": "development comparison; qualification requires experiment gates"
+      },
+      "kl_early_stopped_updates": 0,
+      "optimization_summary": {
+        "value_loss": {
+          "first": 0.014280239556683227,
+          "last": 0.026370448584202677,
+          "mean": 0.0738158342700217,
+          "maximum": 1.7856523916125298
+        },
+        "policy_loss": {
+          "first": -0.00213358219480142,
+          "last": -0.004094841657206416,
+          "mean": -0.0022640335898813646,
+          "maximum": 0.002346047229366377
+        },
+        "entropy": {
+          "first": 1.9939768686890602,
+          "last": 1.3357915133237839,
+          "mean": 1.5749453682801686,
+          "maximum": 1.9939768686890602
+        },
+        "gradient_norm": {
+          "first": 0.524891896173358,
+          "last": 0.8102776566520333,
+          "mean": 0.7596110577323998,
+          "maximum": 1.7687964215874672
+        },
+        "clip_fraction": {
+          "first": 0.0,
+          "last": 0.08251953125,
+          "mean": 0.026849746704101562,
+          "maximum": 0.171142578125
+        },
+        "kl": {
+          "first": 0.0006698560173390433,
+          "last": 0.0060194520046934485,
+          "mean": 0.0026357169168704786,
+          "maximum": 0.011775495047913864
+        }
+      },
+      "sampled_training_successes": [
+        {
+          "episode_id": 60,
+          "candidate_index": 58,
+          "recipe": "aligned-approach-v1/stratum-2",
+          "initial_distance": 9.29089641571045,
+          "ticks": 612,
+          "thrust_ticks": 20,
+          "brake_ticks": 274,
+          "maximum_thrust_run_ticks": 1,
+          "final_errors": {
+            "position": 1.8888262510299683,
+            "spin": 0.036657363176345825,
+            "velocity": 0.6898127198219299
+          }
+        },
+        {
+          "episode_id": 72,
+          "candidate_index": 8,
+          "recipe": "aligned-approach-v1/stratum-0",
+          "initial_distance": 4.491353988647461,
+          "ticks": 408,
+          "thrust_ticks": 6,
+          "brake_ticks": 163,
+          "maximum_thrust_run_ticks": 1,
+          "final_errors": {
+            "position": 1.7434093952178955,
+            "spin": 0.08196559548377991,
+            "velocity": 0.08407444506883621
+          }
+        }
+      ],
+      "final_control_summary": {
+        "thrust_fraction": 0.0,
+        "brake_fraction": 0.0,
+        "mean_abs_steering": 0.01648137691775547,
+        "entered_goal_radius": 0,
+        "maximum_dwell_ticks": 0,
+        "mean_final_distance_reduction": -4.827976226806641e-06
+      },
+      "final_distance_by_stratum": [
+        {
+          "stratum": 0,
+          "initial_mean": 4.752057313919067,
+          "final_mean": 4.752063632011414
+        },
+        {
+          "stratum": 1,
+          "initial_mean": 7.026373028755188,
+          "final_mean": 7.026393890380859
+        },
+        {
+          "stratum": 2,
+          "initial_mean": 9.214686632156372,
+          "final_mean": 9.214687585830688
+        },
+        {
+          "stratum": 3,
+          "initial_mean": 10.96594500541687,
+          "final_mean": 10.965936183929443
+        }
+      ],
+      "successful_approach_controls": []
+    }
+  ],
+  "gates": {
+    "learning_evidence": false,
+    "basic_flight_gate": false
+  },
+  "total_training_ticks": 393216,
+  "total_development_ticks": 156128,
+  "totals": {
+    "training_outcomes": {
+      "collision": 33,
+      "deadline": 194,
+      "success": 2
+    },
+    "final_outcomes": {
+      "deadline": 48
+    },
+    "training_attempts": 241,
+    "training_entered_goal_radius": 206,
+    "training_met_all_instantaneous_tolerances": 81,
+    "maximum_training_dwell_ticks": 30,
+    "censored": 12
+  },
+  "confirmation_status": "unused: progression gate failed",
+  "confirmation": null,
+  "general_flight_claim": false,
+  "obstacle_navigation_claim": false,
+  "total_confirmation_ticks": 0
+}

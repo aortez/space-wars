@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "experiment": "recovery_guidance_match_learning_v1",
+  "parent_genome": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb",
+  "parent_file_sha256": "a1d127eb9eb96f190616d5d3ee377490d5a06ac2023302c9eaeb27a971945199",
+  "contract": "arrival_local_9_v1 / turn_tanh_thrust_brake_v1",
+  "architecture": "9-8-3; tanh hidden, linear outputs; 107 parameters",
+  "evolution": {
+    "seed": 1,
+    "population": 16,
+    "generations": 24,
+    "elites": 2,
+    "tournament_size": 3,
+    "mutation_probability": 0.05,
+    "mutation_scale": 0.15,
+    "initial_scale": 0.5,
+    "parameter_limit": 8.0
+  },
+  "initialization": "one unchanged parent followed by 15 independently randomized genomes; existing shared evolution operators",
+  "finalist": "last generation training winner; no reselection or budget extension using evaluation",
+  "retention": "all 12 material_arrival_mixed_train_v1 cases evaluated for every candidate",
+  "fitness_order": [
+    "retained_completed",
+    "approach_completed",
+    "approach_speed_points",
+    "approach_position_points",
+    "retained_position_points",
+    "retained_velocity_points",
+    "spare_ticks"
+  ],
+  "quality": "final speed and frozen-marker distance: floor(1000 * clamp(1 - value/scale, 0, 1)), scales 70 and 100; only arrived, timeout or host_preempted approaches earn progress; completed handoffs dominate progress, old training arrivals dominate all approach terms",
+  "training_selection": "first census free direct transfer within each of 65 and 35 units, per seed 42/10101 and seat, weak-angular only; identical source identities deduplicated",
+  "training_cases": [
+    {
+      "name": "train-42-p1-d65",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 883,
+      "planet": 1,
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711
+    },
+    {
+      "name": "train-42-p2-d65",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 784,
+      "planet": 1,
+      "source_entry_distance": 55.553462982177734,
+      "source_relative_speed": 44.16749572753906
+    },
+    {
+      "name": "train-42-p2-d35",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 821,
+      "planet": 1,
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273
+    },
+    {
+      "name": "train-10101-p1-d65",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 1008,
+      "planet": 1,
+      "source_entry_distance": 53.1820182800293,
+      "source_relative_speed": 41.5108642578125
+    },
+    {
+      "name": "train-10101-p1-d35",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 1040,
+      "planet": 1,
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961
+    },
+    {
+      "name": "train-10101-p2-d65",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 1242,
+      "planet": 1,
+      "source_entry_distance": 64.95734405517578,
+      "source_relative_speed": 50.2044792175293
+    },
+    {
+      "name": "train-10101-p2-d35",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 1290,
+      "planet": 1,
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367
+    }
+  ],
+  "development": "all eight frozen recovery_guidance_approach_probe_v1 cases; four overlap training and four are correlated dirt variants",
+  "validation_seeds": [
+    17,
+    113,
+    2027,
+    9001
+  ],
+  "validation_shapes": [
+    "weak-angular",
+    "weak-round"
+  ],
+  "validation_seats": [
+    0,
+    1
+  ],
+  "validation_entry_distance": 35.0,
+  "validation_prefix_ticks": 10800,
+  "validation_selection": "first source per seed/shape/seat with free direct transfer, entry distance <=35, finite unsaturated features, and the common neutral handoff retaining these conditions; discover initial states only before training; no candidate/reference continuation consulted",
+  "missing_validation": "retain as missing, never substitute another seed; acceptance requires all 16 starts",
+  "episode": "same 300-step physical gates, native capture handoff and held-mission component experiment as recovery_guidance_approach_probe_v1",
+  "gate": "all seven training approaches, all eight development approaches, all 16 validation approaches and every case in the original six mixed-arrival partitions must arrive; failures and missing cases remain failures",
+  "evaluation_controllers": [
+    "native_mission",
+    "arrival_reference",
+    "parent_genome",
+    "finalist"
+  ],
+  "evaluation_timing": "after the fixed training budget completes; no reserved continuation outcomes used in selection",
+  "scope": "one continuation run; correlated match cases; component development evidence, no reliability estimate, production adapter or default change"
+}

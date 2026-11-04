@@ -1,0 +1,1420 @@
+{
+  "debug_assertions": true,
+  "notes": [
+    "Prototype, not a trained policy or navigation qualification.",
+    "Overlap coverage is conservative subcell intersection, not occupied area. Dense reference uses 8×8 point samples per cell, not exhaustive truth.",
+    "Fixture probe is a radius-4 disk, not the production ship footprint. Circle outlines are tessellated for display; all sensor queries use native shapes.",
+    "Sensing timings exclude construction, replay, dense reference, outline export and rendering. Record the build profile with the run command."
+  ],
+  "repeats": 5,
+  "runtime_sha256": "078a4b8d22d4a91159a75011153c3479a4ff9fe1de26ce8c9add60efd7cedeb9",
+  "scenes": [
+    {
+      "name": "occluded-pair",
+      "physical_check": null,
+      "sequence": "occluded-pair",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.01315283203125,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.050836,
+            "median_ms": 0.045266,
+            "min_ms": 0.045114999999999995,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": 0.024120330810546875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00269384765625,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.045114999999999995,
+              0.045215,
+              0.045266,
+              0.045626,
+              0.050836
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0095537109375,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.095801,
+            "median_ms": 0.08962,
+            "min_ms": 0.08899900000000001,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": 0.0060253143310546875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0026279296875,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.08899900000000001,
+              0.089058,
+              0.08962,
+              0.093015,
+              0.095801
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0095537109375,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.196421,
+            "median_ms": 0.176855,
+            "min_ms": 0.176243,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 0,
+            "ray_nearest_error": 0.001506805419921875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00273779296875,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.176243,
+              0.176353,
+              0.176855,
+              0.17993,
+              0.196421
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "thin-wall-near",
+      "physical_check": null,
+      "sequence": "thin-wall-near",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.00028125,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.045066,
+            "median_ms": 0.041529,
+            "min_ms": 0.041308,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": null,
+            "ring_missed_all": true,
+            "sampled_occupancy_mae": 0.0,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.041308,
+              0.041358,
+              0.041529,
+              0.041689,
+              0.045066
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.000140625,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.089539,
+            "median_ms": 0.081564,
+            "min_ms": 0.08122399999999999,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": null,
+            "ring_missed_all": true,
+            "sampled_occupancy_mae": 0.0,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.08122399999999999,
+              0.081344,
+              0.081564,
+              0.08309699999999999,
+              0.089539
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.000140625,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.16904999999999998,
+            "median_ms": 0.160974,
+            "min_ms": 0.16076400000000002,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": null,
+            "ring_missed_all": true,
+            "sampled_occupancy_mae": 0.0,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.16076400000000002,
+              0.160824,
+              0.160974,
+              0.16192600000000001,
+              0.16904999999999998
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "thin-wall-far",
+      "physical_check": null,
+      "sequence": "thin-wall-far",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.015121527777777777,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.044384,
+            "median_ms": 0.041619,
+            "min_ms": 0.041238000000000004,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": null,
+            "ring_missed_all": true,
+            "sampled_occupancy_mae": 0.0,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.041238000000000004,
+              0.041368,
+              0.041619,
+              0.043492,
+              0.044384
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.007560763888888889,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.089128,
+            "median_ms": 0.081163,
+            "min_ms": 0.080743,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": null,
+            "ring_missed_all": true,
+            "sampled_occupancy_mae": 0.0,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.080743,
+              0.08111299999999999,
+              0.081163,
+              0.081545,
+              0.089128
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.007560763888888889,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.165904,
+            "median_ms": 0.161115,
+            "min_ms": 0.160433,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": null,
+            "ring_missed_all": true,
+            "sampled_occupancy_mae": 0.0,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.160433,
+              0.160584,
+              0.161115,
+              0.16277699999999998,
+              0.165904
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "gap-too-narrow",
+      "physical_check": {
+        "crossing": {
+          "x": 40.0,
+          "y": 0.0
+        },
+        "gap_width": 7.5,
+        "probe_diameter": 8.0,
+        "probe_fits": false
+      },
+      "sequence": "gap-too-narrow",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.006069780815972222,
+            "gap_center_cell_overlap": 0.5,
+            "max_ms": 0.049433,
+            "median_ms": 0.045896,
+            "min_ms": 0.045856,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 10,
+            "ray_nearest_error": 0.23120498657226562,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0008257052951388888,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.045856,
+              0.045856999999999995,
+              0.045896,
+              0.048681999999999996,
+              0.049433
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0053800618489583335,
+            "gap_center_cell_overlap": 0.25,
+            "max_ms": 0.095711,
+            "median_ms": 0.09000000000000001,
+            "min_ms": 0.089981,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 18,
+            "ray_nearest_error": 0.10335540771484375,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0008426812065972223,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.089981,
+              0.08999,
+              0.09000000000000001,
+              0.092845,
+              0.095711
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0053800618489583335,
+            "gap_center_cell_overlap": 0.125,
+            "max_ms": 0.18654300000000001,
+            "median_ms": 0.17887799999999998,
+            "min_ms": 0.17774600000000002,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 18,
+            "ray_nearest_error": 0.048366546630859375,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0007558756510416667,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.17774600000000002,
+              0.178217,
+              0.17887799999999998,
+              0.179018,
+              0.18654300000000001
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "gap-passable",
+      "physical_check": {
+        "crossing": {
+          "x": 40.0,
+          "y": 0.0
+        },
+        "gap_width": 9.0,
+        "probe_diameter": 8.0,
+        "probe_fits": true
+      },
+      "sequence": "gap-passable",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.006057530381944444,
+            "gap_center_cell_overlap": 0.25,
+            "max_ms": 0.050085,
+            "median_ms": 0.046658,
+            "min_ms": 0.045947,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 10,
+            "ray_nearest_error": 0.15027236938476562,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0008379557291666666,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.045947,
+              0.046127,
+              0.046658,
+              0.048411,
+              0.050085
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0043770616319444445,
+            "gap_center_cell_overlap": 0.0,
+            "max_ms": 0.133653,
+            "median_ms": 0.08996,
+            "min_ms": 0.08972000000000001,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 14,
+            "ray_nearest_error": 0.02242279052734375,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0008488064236111112,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.08972000000000001,
+              0.08986,
+              0.08996,
+              0.090531,
+              0.133653
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0043770616319444445,
+            "gap_center_cell_overlap": 0.0,
+            "max_ms": 0.20646,
+            "median_ms": 0.18473900000000001,
+            "min_ms": 0.177556,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 14,
+            "ray_nearest_error": 0.08335494995117188,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0007620008680555556,
+            "solid_witnesses": 2,
+            "timing_samples_ms": [
+              0.177556,
+              0.178047,
+              0.18473900000000001,
+              0.189818,
+              0.20646
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "sun-and-boundary",
+      "physical_check": null,
+      "sequence": "sun-and-boundary",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.2596921115451389,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.205639,
+            "median_ms": 0.18801500000000002,
+            "min_ms": 0.186453,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 38,
+            "ray_nearest_error": 0.2205352783203125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0012301974826388889,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.186453,
+              0.187965,
+              0.18801500000000002,
+              0.191512,
+              0.205639
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.25394700792100694,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.383085,
+            "median_ms": 0.359099,
+            "min_ms": 0.356795,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 74,
+            "ray_nearest_error": 0.05239105224609375,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0010725233289930556,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.356795,
+              0.358748,
+              0.359099,
+              0.363317,
+              0.383085
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.25394700792100694,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.72504,
+            "median_ms": 0.700214,
+            "min_ms": 0.6970970000000001,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 73,
+            "ray_nearest_error": 0.01194000244140625,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0012244330512152777,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.6970970000000001,
+              0.699802,
+              0.700214,
+              0.706736,
+              0.72504
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "rotation-0",
+      "physical_check": null,
+      "sequence": "observer-rotation",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.0008458604600694445,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.047238999999999996,
+            "median_ms": 0.04219,
+            "min_ms": 0.041338,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 1,
+            "ray_nearest_error": 0.002880096435546875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00016539171006944443,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.041338,
+              0.041599,
+              0.04219,
+              0.045005,
+              0.047238999999999996
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0006899197048611111,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.117552,
+            "median_ms": 0.082356,
+            "min_ms": 0.08172499999999999,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 1,
+            "ray_nearest_error": 0.0015869140625,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00020319552951388888,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.08172499999999999,
+              0.082055,
+              0.082356,
+              0.08327699999999999,
+              0.117552
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0006899197048611111,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.20397500000000002,
+            "median_ms": 0.162798,
+            "min_ms": 0.162667,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 1,
+            "ray_nearest_error": 0.0000476837158203125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00018429361979166667,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.162667,
+              0.16278700000000002,
+              0.162798,
+              0.164571,
+              0.20397500000000002
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "rotation-1",
+      "physical_check": null,
+      "sequence": "observer-rotation",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.0005387044270833333,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.047319,
+            "median_ms": 0.04202,
+            "min_ms": 0.041538,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 0,
+            "ray_nearest_error": 0.03497505187988281,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00023627387152777777,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.041538,
+              0.04186,
+              0.04202,
+              0.042841,
+              0.047319
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0005387044270833333,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.088958,
+            "median_ms": 0.082185,
+            "min_ms": 0.08169499999999999,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 0,
+            "ray_nearest_error": 0.00873565673828125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00016066623263888888,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.08169499999999999,
+              0.081995,
+              0.082185,
+              0.082927,
+              0.088958
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0005387044270833333,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.169831,
+            "median_ms": 0.162447,
+            "min_ms": 0.162156,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 0,
+            "ray_nearest_error": 0.002185821533203125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00019847005208333332,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.162156,
+              0.16230699999999998,
+              0.162447,
+              0.163259,
+              0.169831
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "rotation-2",
+      "physical_check": null,
+      "sequence": "observer-rotation",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.0008458604600694445,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.044795,
+            "median_ms": 0.041619,
+            "min_ms": 0.041338,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 1,
+            "ray_nearest_error": 0.002880096435546875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00016539171006944443,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.041338,
+              0.041378000000000005,
+              0.041619,
+              0.042029,
+              0.044795
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0006899197048611111,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.09177400000000001,
+            "median_ms": 0.082155,
+            "min_ms": 0.081995,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 1,
+            "ray_nearest_error": 0.0015869140625,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00020319552951388888,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.081995,
+              0.082045,
+              0.082155,
+              0.08304700000000001,
+              0.09177400000000001
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0006899197048611111,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.16939099999999999,
+            "median_ms": 0.16311799999999999,
+            "min_ms": 0.16275799999999999,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 1,
+            "ray_nearest_error": 0.0000476837158203125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00018429361979166667,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.16275799999999999,
+              0.163008,
+              0.16311799999999999,
+              0.166054,
+              0.16939099999999999
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "moving-0",
+      "physical_check": null,
+      "sequence": "moving-structure",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.0015950520833333333,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.045897,
+            "median_ms": 0.04253,
+            "min_ms": 0.04236,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 1,
+            "ray_nearest_error": 0.4186210632324219,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00022786458333333334,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.04236,
+              0.042411,
+              0.04253,
+              0.043052,
+              0.045897
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.001589626736111111,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.091624,
+            "median_ms": 0.083608,
+            "min_ms": 0.083457,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 4,
+            "ray_nearest_error": 0.032047271728515625,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0003634982638888889,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.083457,
+              0.083498,
+              0.083608,
+              0.084019,
+              0.091624
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.001589626736111111,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.17082299999999997,
+            "median_ms": 0.164791,
+            "min_ms": 0.16470100000000001,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 3,
+            "ray_nearest_error": 0.07830047607421875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.000341796875,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.16470100000000001,
+              0.164741,
+              0.164791,
+              0.166034,
+              0.17082299999999997
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "moving-1",
+      "physical_check": null,
+      "sequence": "moving-structure",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.0038736979166666668,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.048281,
+            "median_ms": 0.044474,
+            "min_ms": 0.043843,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 3,
+            "ray_nearest_error": 0.4013023376464844,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00029296875,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.043843,
+              0.044103,
+              0.044474,
+              0.045376,
+              0.048281
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.003179253472222222,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.098626,
+            "median_ms": 0.085802,
+            "min_ms": 0.085431,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 3,
+            "ray_nearest_error": 0.22763442993164062,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0003255208333333333,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.085431,
+              0.085793,
+              0.085802,
+              0.088157,
+              0.098626
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.003179253472222222,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.18840600000000002,
+            "median_ms": 0.171084,
+            "min_ms": 0.1695,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 3,
+            "ray_nearest_error": 0.02530670166015625,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00023871527777777777,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.1695,
+              0.169841,
+              0.171084,
+              0.171855,
+              0.18840600000000002
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "moving-2",
+      "physical_check": null,
+      "sequence": "moving-structure",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.006239149305555556,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.046408,
+            "median_ms": 0.042851,
+            "min_ms": 0.042620000000000005,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 6,
+            "ray_nearest_error": 1.0439262390136719,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0005316840277777777,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.042620000000000005,
+              0.042751,
+              0.042851,
+              0.043493,
+              0.046408
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.004774305555555556,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.091523,
+            "median_ms": 0.083879,
+            "min_ms": 0.083768,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 9,
+            "ray_nearest_error": 0.116973876953125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0005208333333333333,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.083768,
+              0.083858,
+              0.083879,
+              0.08436999999999999,
+              0.091523
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.004774305555555556,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.171043,
+            "median_ms": 0.167176,
+            "min_ms": 0.16586399999999998,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 8,
+            "ray_nearest_error": 0.18126296997070312,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.00042317708333333335,
+            "solid_witnesses": 1,
+            "timing_samples_ms": [
+              0.16586399999999998,
+              0.166434,
+              0.167176,
+              0.17047199999999998,
+              0.171043
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "terrain-before",
+      "physical_check": {
+        "terrain_hash": 12096345168586781380,
+        "terrain_revision": 0
+      },
+      "sequence": "terrain-edit",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.006912641059027778,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.150595,
+            "median_ms": 0.13191,
+            "min_ms": 0.130256,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 2,
+            "ray_nearest_error": 0.031352996826171875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0011404405381944445,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.130256,
+              0.130917,
+              0.13191,
+              0.136518,
+              0.150595
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0069077311197916665,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.293285,
+            "median_ms": 0.271203,
+            "min_ms": 0.269469,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 8,
+            "ray_nearest_error": 0.010835647583007812,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0009185709635416667,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.269469,
+              0.270742,
+              0.271203,
+              0.27784499999999995,
+              0.293285
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.0069077311197916665,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.543006,
+            "median_ms": 0.5206339999999999,
+            "min_ms": 0.516616,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 6,
+            "ray_nearest_error": 0.00421142578125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0007996799045138889,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.516616,
+              0.517819,
+              0.5206339999999999,
+              0.525924,
+              0.543006
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "terrain-crater",
+      "physical_check": {
+        "terrain_hash": 12287596490391436508,
+        "terrain_revision": 1
+      },
+      "sequence": "terrain-edit",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.007144867621527778,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.147098,
+            "median_ms": 0.132461,
+            "min_ms": 0.129495,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 0,
+            "ray_nearest_error": 1.1725444793701172,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0013176323784722223,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.129495,
+              0.13163899999999998,
+              0.132461,
+              0.135856,
+              0.147098
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.007133365885416667,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.28654100000000005,
+            "median_ms": 0.265833,
+            "min_ms": 0.264009,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 8,
+            "ray_nearest_error": 0.22496795654296875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0011285481770833333,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.264009,
+              0.26551199999999997,
+              0.265833,
+              0.27439800000000003,
+              0.28654100000000005
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.007133365885416667,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.53417,
+            "median_ms": 0.511467,
+            "min_ms": 0.506077,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 6,
+            "ray_nearest_error": 0.07162857055664062,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0010140516493055555,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.506077,
+              0.5097940000000001,
+              0.511467,
+              0.5199630000000001,
+              0.53417
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "terrain-added-wall",
+      "physical_check": {
+        "terrain_hash": 12287596490391436508,
+        "terrain_revision": 1
+      },
+      "sequence": "terrain-edit",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.007880110677083333,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.14831,
+            "median_ms": 0.13521599999999998,
+            "min_ms": 0.13222,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 4,
+            "ray_nearest_error": 0.01447296142578125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0014191948784722222,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.13222,
+              0.13262,
+              0.13521599999999998,
+              0.138532,
+              0.14831
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.007776378038194445,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.28455800000000003,
+            "median_ms": 0.263318,
+            "min_ms": 0.261544,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 16,
+            "ray_nearest_error": 0.0036144256591796875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0012501302083333333,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.261544,
+              0.263158,
+              0.263318,
+              0.268698,
+              0.28455800000000003
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.007776378038194445,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.5274770000000001,
+            "median_ms": 0.503803,
+            "min_ms": 0.500696,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 12,
+            "ray_nearest_error": 0.000904083251953125,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0011200086805555555,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.500696,
+              0.501628,
+              0.503803,
+              0.512579,
+              0.5274770000000001
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "terrain-wall-removed",
+      "physical_check": {
+        "terrain_hash": 12287596490391436508,
+        "terrain_revision": 1
+      },
+      "sequence": "terrain-edit",
+      "variants": [
+        {
+          "label": "32 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 352,
+            "empty_reference_area_in_flagged_cells": 0.007144867621527778,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.155003,
+            "median_ms": 0.137941,
+            "min_ms": 0.136278,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 2881,
+            "overlap_cells_with_zero_center_samples": 0,
+            "ray_nearest_error": 1.1725444793701172,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0013176323784722223,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.136278,
+              0.136408,
+              0.137941,
+              0.143762,
+              0.155003
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 2×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.007133365885416667,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.289717,
+            "median_ms": 0.26979000000000003,
+            "min_ms": 0.265051,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 5761,
+            "overlap_cells_with_zero_center_samples": 8,
+            "ray_nearest_error": 0.22496795654296875,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0011285481770833333,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.265051,
+              0.265843,
+              0.26979000000000003,
+              0.27494999999999997,
+              0.289717
+            ]
+          }
+        },
+        {
+          "label": "64 sectors / 4×2 samples",
+          "metrics": {
+            "cells": 704,
+            "empty_reference_area_in_flagged_cells": 0.007133365885416667,
+            "gap_center_cell_overlap": null,
+            "max_ms": 0.5386390000000001,
+            "median_ms": 0.5123989999999999,
+            "min_ms": 0.5083909999999999,
+            "missed_occupied_reference_fraction": 0.0,
+            "missed_witnesses": 0,
+            "native_queries": 11521,
+            "overlap_cells_with_zero_center_samples": 6,
+            "ray_nearest_error": 0.07162857055664062,
+            "ring_missed_all": false,
+            "sampled_occupancy_mae": 0.0010140516493055555,
+            "solid_witnesses": 0,
+            "timing_samples_ms": [
+              0.5083909999999999,
+              0.5108050000000001,
+              0.5123989999999999,
+              0.5222570000000001,
+              0.5386390000000001
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "seed": 42,
+  "sources": [
+    {
+      "path": "crates/engine-rapier/src/world/polar.rs",
+      "sha256": "feab4a7bbc07c14fad0bcf5c2c5ec04c222e7ed047b41bbaf2536ce9313ba238"
+    },
+    {
+      "path": "scenarios/spacewars/src/surface_sortie/flight_sensing.rs",
+      "sha256": "078065be915832748bf15cc5b5530ce5e21d869ecad3fd73493607390272c4c2"
+    },
+    {
+      "path": "scenarios/spacewars/examples/flight_sensor_probe.rs",
+      "sha256": "f01087ec068afd3537033ca7dc7b744cb34e304a2758495874ba92e13e6d798e"
+    },
+    {
+      "path": "scenarios/spacewars/examples/flight_sensor_probe/viewer.html",
+      "sha256": "1183635a429110b55841e8e8007e78ee7bfdfbd8d02d8099efd4224d714f48ba"
+    }
+  ]
+}

@@ -1,0 +1,4473 @@
+{
+  "experiment": "recovery-guidance-fresh-check-v1",
+  "runtime": "diagnostic_v1/linux/x86_64/e6998f2eae08ab91584dba81aca68c4eedb30c88df8c08cfc7fd8982b5d19af7",
+  "gate": {
+    "coverage_passed": true,
+    "match_completion_passed": false,
+    "precision_completion_passed": true,
+    "known_retention_passed": true,
+    "passed": false
+  },
+  "coverage": {
+    "worlds": 64,
+    "possible": 256,
+    "available": 238,
+    "complete_worlds": 53,
+    "strata": {
+      "weak-angular/p1": 62,
+      "weak-angular/p2": 57,
+      "weak-round/p1": 61,
+      "weak-round/p2": 58
+    },
+    "missing": [
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000003,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000003,
+        "shape": "weak-round"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 0,
+        "seed": 94000006,
+        "shape": "weak-round"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000012,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 8971,
+        "round_finished": true,
+        "seat": 1,
+        "seed": 94000012,
+        "shape": "weak-round"
+      },
+      {
+        "end_tick": 7848,
+        "round_finished": true,
+        "seat": 1,
+        "seed": 94000014,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000026,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000026,
+        "shape": "weak-round"
+      },
+      {
+        "end_tick": 10288,
+        "round_finished": true,
+        "seat": 1,
+        "seed": 94000034,
+        "shape": "weak-round"
+      },
+      {
+        "end_tick": 7470,
+        "round_finished": true,
+        "seat": 1,
+        "seed": 94000040,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000041,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000041,
+        "shape": "weak-round"
+      },
+      {
+        "end_tick": 6025,
+        "round_finished": true,
+        "seat": 0,
+        "seed": 94000052,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 6025,
+        "round_finished": true,
+        "seat": 0,
+        "seed": 94000052,
+        "shape": "weak-round"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000055,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 10800,
+        "round_finished": false,
+        "seat": 1,
+        "seed": 94000055,
+        "shape": "weak-round"
+      },
+      {
+        "end_tick": 8984,
+        "round_finished": true,
+        "seat": 0,
+        "seed": 94000064,
+        "shape": "weak-angular"
+      },
+      {
+        "end_tick": 9404,
+        "round_finished": true,
+        "seat": 0,
+        "seed": 94000064,
+        "shape": "weak-round"
+      }
+    ]
+  },
+  "matches": {
+    "candidate": {
+      "cases": 238,
+      "arrived": 222,
+      "outcomes": {
+        "arrived": 222,
+        "host_preempted:sun": 12,
+        "host_preempted:launch": 4
+      },
+      "strata": {
+        "weak-angular/p1": {
+          "cases": 62,
+          "arrived": 58,
+          "outcomes": {
+            "arrived": 58,
+            "host_preempted:sun": 2,
+            "host_preempted:launch": 2
+          }
+        },
+        "weak-angular/p2": {
+          "cases": 57,
+          "arrived": 53,
+          "outcomes": {
+            "arrived": 53,
+            "host_preempted:sun": 4
+          }
+        },
+        "weak-round/p1": {
+          "cases": 61,
+          "arrived": 57,
+          "outcomes": {
+            "arrived": 57,
+            "host_preempted:sun": 2,
+            "host_preempted:launch": 2
+          }
+        },
+        "weak-round/p2": {
+          "cases": 58,
+          "arrived": 54,
+          "outcomes": {
+            "arrived": 54,
+            "host_preempted:sun": 4
+          }
+        }
+      },
+      "failures": [
+        {
+          "case": "validation-94000002-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 4,
+          "brake_ticks": 4
+        },
+        {
+          "case": "validation-94000002-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 4,
+          "brake_ticks": 4
+        },
+        {
+          "case": "validation-94000019-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 6,
+          "brake_ticks": 6
+        },
+        {
+          "case": "validation-94000019-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 6,
+          "brake_ticks": 6
+        },
+        {
+          "case": "validation-94000025-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 1,
+          "brake_ticks": 0
+        },
+        {
+          "case": "validation-94000025-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 1,
+          "brake_ticks": 0
+        },
+        {
+          "case": "validation-94000034-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 6,
+          "brake_ticks": 0
+        },
+        {
+          "case": "validation-94000034-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 6,
+          "brake_ticks": 0
+        },
+        {
+          "case": "validation-94000041-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 18,
+          "brake_ticks": 18
+        },
+        {
+          "case": "validation-94000041-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 18,
+          "brake_ticks": 18
+        },
+        {
+          "case": "validation-94000044-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 51,
+          "brake_ticks": 40
+        },
+        {
+          "case": "validation-94000044-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 51,
+          "brake_ticks": 40
+        },
+        {
+          "case": "validation-94000047-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 34,
+          "brake_ticks": 34
+        },
+        {
+          "case": "validation-94000047-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 34,
+          "brake_ticks": 34
+        },
+        {
+          "case": "validation-94000058-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 28,
+          "brake_ticks": 28
+        },
+        {
+          "case": "validation-94000058-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 28,
+          "brake_ticks": 28
+        }
+      ]
+    },
+    "learned-reference": {
+      "cases": 238,
+      "arrived": 220,
+      "outcomes": {
+        "arrived": 220,
+        "host_preempted:sun": 12,
+        "host_preempted:launch": 6
+      },
+      "strata": {
+        "weak-angular/p1": {
+          "cases": 62,
+          "arrived": 57,
+          "outcomes": {
+            "arrived": 57,
+            "host_preempted:sun": 2,
+            "host_preempted:launch": 3
+          }
+        },
+        "weak-angular/p2": {
+          "cases": 57,
+          "arrived": 53,
+          "outcomes": {
+            "arrived": 53,
+            "host_preempted:sun": 4
+          }
+        },
+        "weak-round/p1": {
+          "cases": 61,
+          "arrived": 56,
+          "outcomes": {
+            "arrived": 56,
+            "host_preempted:sun": 2,
+            "host_preempted:launch": 3
+          }
+        },
+        "weak-round/p2": {
+          "cases": 58,
+          "arrived": 54,
+          "outcomes": {
+            "arrived": 54,
+            "host_preempted:sun": 4
+          }
+        }
+      },
+      "failures": [
+        {
+          "case": "validation-94000002-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 4,
+          "brake_ticks": 4
+        },
+        {
+          "case": "validation-94000002-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 4,
+          "brake_ticks": 4
+        },
+        {
+          "case": "validation-94000012-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 67,
+          "brake_ticks": 36
+        },
+        {
+          "case": "validation-94000012-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 67,
+          "brake_ticks": 36
+        },
+        {
+          "case": "validation-94000019-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 6,
+          "brake_ticks": 6
+        },
+        {
+          "case": "validation-94000019-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 6,
+          "brake_ticks": 6
+        },
+        {
+          "case": "validation-94000025-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 1,
+          "brake_ticks": 0
+        },
+        {
+          "case": "validation-94000025-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 1,
+          "brake_ticks": 0
+        },
+        {
+          "case": "validation-94000034-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 6,
+          "brake_ticks": 0
+        },
+        {
+          "case": "validation-94000034-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 6,
+          "brake_ticks": 0
+        },
+        {
+          "case": "validation-94000041-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 19,
+          "brake_ticks": 19
+        },
+        {
+          "case": "validation-94000041-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 19,
+          "brake_ticks": 19
+        },
+        {
+          "case": "validation-94000044-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 47,
+          "brake_ticks": 45
+        },
+        {
+          "case": "validation-94000044-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 47,
+          "brake_ticks": 45
+        },
+        {
+          "case": "validation-94000047-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 35,
+          "brake_ticks": 35
+        },
+        {
+          "case": "validation-94000047-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 35,
+          "brake_ticks": 35
+        },
+        {
+          "case": "validation-94000058-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 28,
+          "brake_ticks": 28
+        },
+        {
+          "case": "validation-94000058-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 28,
+          "brake_ticks": 28
+        }
+      ]
+    },
+    "native-mission": {
+      "cases": 238,
+      "arrived": 218,
+      "outcomes": {
+        "arrived": 218,
+        "host_preempted:sun": 6,
+        "host_preempted:launch": 14
+      },
+      "strata": {
+        "weak-angular/p1": {
+          "cases": 62,
+          "arrived": 58,
+          "outcomes": {
+            "arrived": 58,
+            "host_preempted:sun": 1,
+            "host_preempted:launch": 3
+          }
+        },
+        "weak-angular/p2": {
+          "cases": 57,
+          "arrived": 51,
+          "outcomes": {
+            "arrived": 51,
+            "host_preempted:launch": 4,
+            "host_preempted:sun": 2
+          }
+        },
+        "weak-round/p1": {
+          "cases": 61,
+          "arrived": 57,
+          "outcomes": {
+            "arrived": 57,
+            "host_preempted:sun": 1,
+            "host_preempted:launch": 3
+          }
+        },
+        "weak-round/p2": {
+          "cases": 58,
+          "arrived": 52,
+          "outcomes": {
+            "arrived": 52,
+            "host_preempted:launch": 4,
+            "host_preempted:sun": 2
+          }
+        }
+      },
+      "failures": [
+        {
+          "case": "validation-94000002-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 5,
+          "brake_ticks": 4
+        },
+        {
+          "case": "validation-94000002-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 5,
+          "brake_ticks": 4
+        },
+        {
+          "case": "validation-94000003-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 75,
+          "brake_ticks": 7
+        },
+        {
+          "case": "validation-94000003-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 75,
+          "brake_ticks": 7
+        },
+        {
+          "case": "validation-94000012-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 40,
+          "brake_ticks": 20
+        },
+        {
+          "case": "validation-94000012-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 40,
+          "brake_ticks": 20
+        },
+        {
+          "case": "validation-94000014-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 72,
+          "brake_ticks": 6
+        },
+        {
+          "case": "validation-94000017-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 78,
+          "brake_ticks": 5
+        },
+        {
+          "case": "validation-94000017-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 78,
+          "brake_ticks": 5
+        },
+        {
+          "case": "validation-94000018-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 71,
+          "brake_ticks": 1
+        },
+        {
+          "case": "validation-94000018-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 71,
+          "brake_ticks": 1
+        },
+        {
+          "case": "validation-94000019-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 8,
+          "brake_ticks": 5
+        },
+        {
+          "case": "validation-94000019-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 8,
+          "brake_ticks": 5
+        },
+        {
+          "case": "validation-94000022-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 98,
+          "brake_ticks": 36
+        },
+        {
+          "case": "validation-94000022-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 98,
+          "brake_ticks": 36
+        },
+        {
+          "case": "validation-94000034-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 35,
+          "brake_ticks": 20
+        },
+        {
+          "case": "validation-94000034-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 102,
+          "brake_ticks": 7
+        },
+        {
+          "case": "validation-94000034-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:launch",
+          "ticks": 35,
+          "brake_ticks": 20
+        },
+        {
+          "case": "validation-94000058-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 30,
+          "brake_ticks": 21
+        },
+        {
+          "case": "validation-94000058-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 30,
+          "brake_ticks": 21
+        }
+      ]
+    },
+    "handwritten-guidance": {
+      "cases": 238,
+      "arrived": 210,
+      "outcomes": {
+        "arrived": 210,
+        "host_preempted:sun": 24,
+        "frame_changed": 2,
+        "host_preempted:{'planet': 1}": 2
+      },
+      "strata": {
+        "weak-angular/p1": {
+          "cases": 62,
+          "arrived": 57,
+          "outcomes": {
+            "arrived": 57,
+            "host_preempted:sun": 4,
+            "host_preempted:{'planet': 1}": 1
+          }
+        },
+        "weak-angular/p2": {
+          "cases": 57,
+          "arrived": 48,
+          "outcomes": {
+            "arrived": 48,
+            "host_preempted:sun": 8,
+            "frame_changed": 1
+          }
+        },
+        "weak-round/p1": {
+          "cases": 61,
+          "arrived": 56,
+          "outcomes": {
+            "arrived": 56,
+            "host_preempted:sun": 4,
+            "host_preempted:{'planet': 1}": 1
+          }
+        },
+        "weak-round/p2": {
+          "cases": 58,
+          "arrived": 49,
+          "outcomes": {
+            "arrived": 49,
+            "host_preempted:sun": 8,
+            "frame_changed": 1
+          }
+        }
+      },
+      "failures": [
+        {
+          "case": "validation-94000002-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 5,
+          "brake_ticks": 5
+        },
+        {
+          "case": "validation-94000002-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 5,
+          "brake_ticks": 5
+        },
+        {
+          "case": "validation-94000019-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 8,
+          "brake_ticks": 8
+        },
+        {
+          "case": "validation-94000019-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 8,
+          "brake_ticks": 8
+        },
+        {
+          "case": "validation-94000025-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 100,
+          "brake_ticks": 100
+        },
+        {
+          "case": "validation-94000025-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 100,
+          "brake_ticks": 100
+        },
+        {
+          "case": "validation-94000027-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 39,
+          "brake_ticks": 39
+        },
+        {
+          "case": "validation-94000027-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 39,
+          "brake_ticks": 39
+        },
+        {
+          "case": "validation-94000029-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 119,
+          "brake_ticks": 119
+        },
+        {
+          "case": "validation-94000029-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 119,
+          "brake_ticks": 119
+        },
+        {
+          "case": "validation-94000032-WeakAngular-p2",
+          "outcome": "frame_changed",
+          "category": "frame_changed",
+          "ticks": 110,
+          "brake_ticks": 110
+        },
+        {
+          "case": "validation-94000032-WeakRound-p2",
+          "outcome": "frame_changed",
+          "category": "frame_changed",
+          "ticks": 110,
+          "brake_ticks": 110
+        },
+        {
+          "case": "validation-94000039-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:{'planet': 1}",
+          "ticks": 38,
+          "brake_ticks": 38
+        },
+        {
+          "case": "validation-94000039-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:{'planet': 1}",
+          "ticks": 38,
+          "brake_ticks": 38
+        },
+        {
+          "case": "validation-94000041-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 35,
+          "brake_ticks": 35
+        },
+        {
+          "case": "validation-94000041-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 36,
+          "brake_ticks": 36
+        },
+        {
+          "case": "validation-94000045-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 47,
+          "brake_ticks": 47
+        },
+        {
+          "case": "validation-94000045-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 47,
+          "brake_ticks": 47
+        },
+        {
+          "case": "validation-94000047-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 57,
+          "brake_ticks": 57
+        },
+        {
+          "case": "validation-94000047-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 57,
+          "brake_ticks": 57
+        },
+        {
+          "case": "validation-94000056-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 184,
+          "brake_ticks": 184
+        },
+        {
+          "case": "validation-94000056-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 184,
+          "brake_ticks": 184
+        },
+        {
+          "case": "validation-94000057-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 75,
+          "brake_ticks": 75
+        },
+        {
+          "case": "validation-94000057-WeakRound-p1",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 75,
+          "brake_ticks": 75
+        },
+        {
+          "case": "validation-94000058-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 29,
+          "brake_ticks": 29
+        },
+        {
+          "case": "validation-94000058-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 29,
+          "brake_ticks": 29
+        },
+        {
+          "case": "validation-94000060-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 40,
+          "brake_ticks": 40
+        },
+        {
+          "case": "validation-94000060-WeakRound-p2",
+          "outcome": "host_preempted",
+          "category": "host_preempted:sun",
+          "ticks": 40,
+          "brake_ticks": 40
+        }
+      ]
+    }
+  },
+  "precision": {
+    "candidate": {
+      "cases": 96,
+      "arrived": 96,
+      "outcomes": {
+        "arrived": 96
+      },
+      "groups": {
+        "stationary": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "moving": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "inward": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "settling-neighborhood": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        }
+      },
+      "failures": []
+    },
+    "learned-reference": {
+      "cases": 96,
+      "arrived": 92,
+      "outcomes": {
+        "arrived": 92,
+        "timeout": 4
+      },
+      "groups": {
+        "stationary": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "moving": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "inward": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "settling-neighborhood": {
+          "cases": 24,
+          "arrived": 20,
+          "outcomes": {
+            "timeout": 4,
+            "arrived": 20
+          }
+        }
+      },
+      "failures": [
+        {
+          "case": "fresh_settling_b0_a0_o0_v0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "measure": {
+            "distance": 1.5826822519302368,
+            "dwell": 0,
+            "relative_speed": 1.46489417552948
+          }
+        },
+        {
+          "case": "fresh_settling_b0_a0_o0_v2",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "measure": {
+            "distance": 1.5846160650253296,
+            "dwell": 0,
+            "relative_speed": 1.4637418985366821
+          }
+        },
+        {
+          "case": "fresh_settling_b0_a0_o1_v2",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "measure": {
+            "distance": 1.5961689949035645,
+            "dwell": 0,
+            "relative_speed": 1.4413007497787476
+          }
+        },
+        {
+          "case": "fresh_settling_b0_a1_o1_v0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "measure": {
+            "distance": 1.523698329925537,
+            "dwell": 0,
+            "relative_speed": 1.4751259088516235
+          }
+        }
+      ]
+    },
+    "handwritten-guidance": {
+      "cases": 96,
+      "arrived": 96,
+      "outcomes": {
+        "arrived": 96
+      },
+      "groups": {
+        "stationary": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "moving": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "inward": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        },
+        "settling-neighborhood": {
+          "cases": 24,
+          "arrived": 24,
+          "outcomes": {
+            "arrived": 24
+          }
+        }
+      },
+      "failures": []
+    }
+  },
+  "paired_matches": {
+    "learned-reference": {
+      "counts": {
+        "both": 220,
+        "candidate_only": 2,
+        "baseline_only": 0,
+        "neither": 16
+      },
+      "cases": {
+        "both": [
+          "validation-94000001-WeakAngular-p2",
+          "validation-94000001-WeakAngular-p1",
+          "validation-94000001-WeakRound-p2",
+          "validation-94000001-WeakRound-p1",
+          "validation-94000002-WeakAngular-p2",
+          "validation-94000002-WeakRound-p2",
+          "validation-94000003-WeakAngular-p1",
+          "validation-94000003-WeakRound-p1",
+          "validation-94000004-WeakAngular-p1",
+          "validation-94000004-WeakAngular-p2",
+          "validation-94000004-WeakRound-p1",
+          "validation-94000004-WeakRound-p2",
+          "validation-94000005-WeakAngular-p1",
+          "validation-94000005-WeakAngular-p2",
+          "validation-94000005-WeakRound-p1",
+          "validation-94000005-WeakRound-p2",
+          "validation-94000006-WeakAngular-p2",
+          "validation-94000006-WeakAngular-p1",
+          "validation-94000006-WeakRound-p2",
+          "validation-94000007-WeakAngular-p1",
+          "validation-94000007-WeakAngular-p2",
+          "validation-94000007-WeakRound-p1",
+          "validation-94000007-WeakRound-p2",
+          "validation-94000008-WeakAngular-p1",
+          "validation-94000008-WeakAngular-p2",
+          "validation-94000008-WeakRound-p1",
+          "validation-94000008-WeakRound-p2",
+          "validation-94000009-WeakAngular-p2",
+          "validation-94000009-WeakAngular-p1",
+          "validation-94000009-WeakRound-p2",
+          "validation-94000009-WeakRound-p1",
+          "validation-94000010-WeakAngular-p1",
+          "validation-94000010-WeakAngular-p2",
+          "validation-94000010-WeakRound-p1",
+          "validation-94000010-WeakRound-p2",
+          "validation-94000011-WeakAngular-p2",
+          "validation-94000011-WeakAngular-p1",
+          "validation-94000011-WeakRound-p2",
+          "validation-94000011-WeakRound-p1",
+          "validation-94000013-WeakAngular-p1",
+          "validation-94000013-WeakAngular-p2",
+          "validation-94000013-WeakRound-p1",
+          "validation-94000013-WeakRound-p2",
+          "validation-94000014-WeakAngular-p1",
+          "validation-94000014-WeakRound-p1",
+          "validation-94000014-WeakRound-p2",
+          "validation-94000015-WeakAngular-p1",
+          "validation-94000015-WeakAngular-p2",
+          "validation-94000015-WeakRound-p1",
+          "validation-94000015-WeakRound-p2",
+          "validation-94000016-WeakAngular-p1",
+          "validation-94000016-WeakAngular-p2",
+          "validation-94000016-WeakRound-p1",
+          "validation-94000016-WeakRound-p2",
+          "validation-94000017-WeakAngular-p2",
+          "validation-94000017-WeakAngular-p1",
+          "validation-94000017-WeakRound-p2",
+          "validation-94000017-WeakRound-p1",
+          "validation-94000018-WeakAngular-p1",
+          "validation-94000018-WeakAngular-p2",
+          "validation-94000018-WeakRound-p1",
+          "validation-94000018-WeakRound-p2",
+          "validation-94000019-WeakAngular-p1",
+          "validation-94000019-WeakRound-p1",
+          "validation-94000020-WeakAngular-p1",
+          "validation-94000020-WeakAngular-p2",
+          "validation-94000020-WeakRound-p1",
+          "validation-94000020-WeakRound-p2",
+          "validation-94000021-WeakAngular-p1",
+          "validation-94000021-WeakAngular-p2",
+          "validation-94000021-WeakRound-p1",
+          "validation-94000021-WeakRound-p2",
+          "validation-94000022-WeakAngular-p1",
+          "validation-94000022-WeakAngular-p2",
+          "validation-94000022-WeakRound-p1",
+          "validation-94000022-WeakRound-p2",
+          "validation-94000023-WeakAngular-p2",
+          "validation-94000023-WeakAngular-p1",
+          "validation-94000023-WeakRound-p2",
+          "validation-94000023-WeakRound-p1",
+          "validation-94000024-WeakAngular-p1",
+          "validation-94000024-WeakAngular-p2",
+          "validation-94000024-WeakRound-p1",
+          "validation-94000024-WeakRound-p2",
+          "validation-94000025-WeakAngular-p2",
+          "validation-94000025-WeakRound-p2",
+          "validation-94000026-WeakAngular-p1",
+          "validation-94000026-WeakRound-p1",
+          "validation-94000027-WeakAngular-p1",
+          "validation-94000027-WeakAngular-p2",
+          "validation-94000027-WeakRound-p1",
+          "validation-94000027-WeakRound-p2",
+          "validation-94000028-WeakAngular-p1",
+          "validation-94000028-WeakAngular-p2",
+          "validation-94000028-WeakRound-p1",
+          "validation-94000028-WeakRound-p2",
+          "validation-94000029-WeakAngular-p1",
+          "validation-94000029-WeakAngular-p2",
+          "validation-94000029-WeakRound-p1",
+          "validation-94000029-WeakRound-p2",
+          "validation-94000030-WeakAngular-p1",
+          "validation-94000030-WeakAngular-p2",
+          "validation-94000030-WeakRound-p1",
+          "validation-94000030-WeakRound-p2",
+          "validation-94000031-WeakAngular-p1",
+          "validation-94000031-WeakAngular-p2",
+          "validation-94000031-WeakRound-p1",
+          "validation-94000031-WeakRound-p2",
+          "validation-94000032-WeakAngular-p1",
+          "validation-94000032-WeakAngular-p2",
+          "validation-94000032-WeakRound-p1",
+          "validation-94000032-WeakRound-p2",
+          "validation-94000033-WeakAngular-p1",
+          "validation-94000033-WeakAngular-p2",
+          "validation-94000033-WeakRound-p1",
+          "validation-94000033-WeakRound-p2",
+          "validation-94000034-WeakAngular-p2",
+          "validation-94000035-WeakAngular-p1",
+          "validation-94000035-WeakAngular-p2",
+          "validation-94000035-WeakRound-p1",
+          "validation-94000035-WeakRound-p2",
+          "validation-94000036-WeakAngular-p1",
+          "validation-94000036-WeakAngular-p2",
+          "validation-94000036-WeakRound-p1",
+          "validation-94000036-WeakRound-p2",
+          "validation-94000037-WeakAngular-p2",
+          "validation-94000037-WeakAngular-p1",
+          "validation-94000037-WeakRound-p2",
+          "validation-94000037-WeakRound-p1",
+          "validation-94000038-WeakAngular-p2",
+          "validation-94000038-WeakAngular-p1",
+          "validation-94000038-WeakRound-p2",
+          "validation-94000038-WeakRound-p1",
+          "validation-94000039-WeakAngular-p2",
+          "validation-94000039-WeakAngular-p1",
+          "validation-94000039-WeakRound-p2",
+          "validation-94000039-WeakRound-p1",
+          "validation-94000040-WeakAngular-p1",
+          "validation-94000040-WeakRound-p1",
+          "validation-94000040-WeakRound-p2",
+          "validation-94000042-WeakAngular-p1",
+          "validation-94000042-WeakAngular-p2",
+          "validation-94000042-WeakRound-p1",
+          "validation-94000042-WeakRound-p2",
+          "validation-94000043-WeakAngular-p1",
+          "validation-94000043-WeakAngular-p2",
+          "validation-94000043-WeakRound-p1",
+          "validation-94000043-WeakRound-p2",
+          "validation-94000044-WeakAngular-p1",
+          "validation-94000044-WeakRound-p1",
+          "validation-94000045-WeakAngular-p2",
+          "validation-94000045-WeakAngular-p1",
+          "validation-94000045-WeakRound-p2",
+          "validation-94000045-WeakRound-p1",
+          "validation-94000046-WeakAngular-p1",
+          "validation-94000046-WeakAngular-p2",
+          "validation-94000046-WeakRound-p1",
+          "validation-94000046-WeakRound-p2",
+          "validation-94000047-WeakAngular-p1",
+          "validation-94000047-WeakRound-p1",
+          "validation-94000048-WeakAngular-p1",
+          "validation-94000048-WeakAngular-p2",
+          "validation-94000048-WeakRound-p1",
+          "validation-94000048-WeakRound-p2",
+          "validation-94000049-WeakAngular-p1",
+          "validation-94000049-WeakAngular-p2",
+          "validation-94000049-WeakRound-p1",
+          "validation-94000049-WeakRound-p2",
+          "validation-94000050-WeakAngular-p2",
+          "validation-94000050-WeakAngular-p1",
+          "validation-94000050-WeakRound-p2",
+          "validation-94000050-WeakRound-p1",
+          "validation-94000051-WeakAngular-p1",
+          "validation-94000051-WeakAngular-p2",
+          "validation-94000051-WeakRound-p1",
+          "validation-94000051-WeakRound-p2",
+          "validation-94000052-WeakAngular-p2",
+          "validation-94000052-WeakRound-p2",
+          "validation-94000053-WeakAngular-p2",
+          "validation-94000053-WeakAngular-p1",
+          "validation-94000053-WeakRound-p2",
+          "validation-94000053-WeakRound-p1",
+          "validation-94000054-WeakAngular-p2",
+          "validation-94000054-WeakAngular-p1",
+          "validation-94000054-WeakRound-p2",
+          "validation-94000054-WeakRound-p1",
+          "validation-94000055-WeakAngular-p1",
+          "validation-94000055-WeakRound-p1",
+          "validation-94000056-WeakAngular-p1",
+          "validation-94000056-WeakAngular-p2",
+          "validation-94000056-WeakRound-p1",
+          "validation-94000056-WeakRound-p2",
+          "validation-94000057-WeakAngular-p2",
+          "validation-94000057-WeakAngular-p1",
+          "validation-94000057-WeakRound-p2",
+          "validation-94000057-WeakRound-p1",
+          "validation-94000058-WeakAngular-p1",
+          "validation-94000058-WeakRound-p1",
+          "validation-94000059-WeakAngular-p2",
+          "validation-94000059-WeakAngular-p1",
+          "validation-94000059-WeakRound-p2",
+          "validation-94000059-WeakRound-p1",
+          "validation-94000060-WeakAngular-p1",
+          "validation-94000060-WeakAngular-p2",
+          "validation-94000060-WeakRound-p1",
+          "validation-94000060-WeakRound-p2",
+          "validation-94000061-WeakAngular-p1",
+          "validation-94000061-WeakAngular-p2",
+          "validation-94000061-WeakRound-p1",
+          "validation-94000061-WeakRound-p2",
+          "validation-94000062-WeakAngular-p1",
+          "validation-94000062-WeakAngular-p2",
+          "validation-94000062-WeakRound-p1",
+          "validation-94000062-WeakRound-p2",
+          "validation-94000063-WeakAngular-p2",
+          "validation-94000063-WeakAngular-p1",
+          "validation-94000063-WeakRound-p2",
+          "validation-94000063-WeakRound-p1",
+          "validation-94000064-WeakAngular-p2",
+          "validation-94000064-WeakRound-p2"
+        ],
+        "candidate_only": [
+          "validation-94000012-WeakAngular-p1",
+          "validation-94000012-WeakRound-p1"
+        ],
+        "baseline_only": [],
+        "neither": [
+          "validation-94000002-WeakAngular-p1",
+          "validation-94000002-WeakRound-p1",
+          "validation-94000019-WeakAngular-p2",
+          "validation-94000019-WeakRound-p2",
+          "validation-94000025-WeakAngular-p1",
+          "validation-94000025-WeakRound-p1",
+          "validation-94000034-WeakAngular-p1",
+          "validation-94000034-WeakRound-p1",
+          "validation-94000041-WeakAngular-p1",
+          "validation-94000041-WeakRound-p1",
+          "validation-94000044-WeakAngular-p2",
+          "validation-94000044-WeakRound-p2",
+          "validation-94000047-WeakAngular-p2",
+          "validation-94000047-WeakRound-p2",
+          "validation-94000058-WeakAngular-p2",
+          "validation-94000058-WeakRound-p2"
+        ]
+      }
+    },
+    "native-mission": {
+      "counts": {
+        "both": 210,
+        "candidate_only": 12,
+        "baseline_only": 8,
+        "neither": 8
+      },
+      "cases": {
+        "both": [
+          "validation-94000001-WeakAngular-p2",
+          "validation-94000001-WeakAngular-p1",
+          "validation-94000001-WeakRound-p2",
+          "validation-94000001-WeakRound-p1",
+          "validation-94000002-WeakAngular-p2",
+          "validation-94000002-WeakRound-p2",
+          "validation-94000004-WeakAngular-p1",
+          "validation-94000004-WeakAngular-p2",
+          "validation-94000004-WeakRound-p1",
+          "validation-94000004-WeakRound-p2",
+          "validation-94000005-WeakAngular-p1",
+          "validation-94000005-WeakAngular-p2",
+          "validation-94000005-WeakRound-p1",
+          "validation-94000005-WeakRound-p2",
+          "validation-94000006-WeakAngular-p2",
+          "validation-94000006-WeakAngular-p1",
+          "validation-94000006-WeakRound-p2",
+          "validation-94000007-WeakAngular-p1",
+          "validation-94000007-WeakAngular-p2",
+          "validation-94000007-WeakRound-p1",
+          "validation-94000007-WeakRound-p2",
+          "validation-94000008-WeakAngular-p1",
+          "validation-94000008-WeakAngular-p2",
+          "validation-94000008-WeakRound-p1",
+          "validation-94000008-WeakRound-p2",
+          "validation-94000009-WeakAngular-p2",
+          "validation-94000009-WeakAngular-p1",
+          "validation-94000009-WeakRound-p2",
+          "validation-94000009-WeakRound-p1",
+          "validation-94000010-WeakAngular-p1",
+          "validation-94000010-WeakAngular-p2",
+          "validation-94000010-WeakRound-p1",
+          "validation-94000010-WeakRound-p2",
+          "validation-94000011-WeakAngular-p2",
+          "validation-94000011-WeakAngular-p1",
+          "validation-94000011-WeakRound-p2",
+          "validation-94000011-WeakRound-p1",
+          "validation-94000013-WeakAngular-p1",
+          "validation-94000013-WeakAngular-p2",
+          "validation-94000013-WeakRound-p1",
+          "validation-94000013-WeakRound-p2",
+          "validation-94000014-WeakAngular-p1",
+          "validation-94000014-WeakRound-p1",
+          "validation-94000015-WeakAngular-p1",
+          "validation-94000015-WeakAngular-p2",
+          "validation-94000015-WeakRound-p1",
+          "validation-94000015-WeakRound-p2",
+          "validation-94000016-WeakAngular-p1",
+          "validation-94000016-WeakAngular-p2",
+          "validation-94000016-WeakRound-p1",
+          "validation-94000016-WeakRound-p2",
+          "validation-94000017-WeakAngular-p1",
+          "validation-94000017-WeakRound-p1",
+          "validation-94000018-WeakAngular-p1",
+          "validation-94000018-WeakRound-p1",
+          "validation-94000019-WeakAngular-p1",
+          "validation-94000019-WeakRound-p1",
+          "validation-94000020-WeakAngular-p1",
+          "validation-94000020-WeakAngular-p2",
+          "validation-94000020-WeakRound-p1",
+          "validation-94000020-WeakRound-p2",
+          "validation-94000021-WeakAngular-p1",
+          "validation-94000021-WeakAngular-p2",
+          "validation-94000021-WeakRound-p1",
+          "validation-94000021-WeakRound-p2",
+          "validation-94000022-WeakAngular-p1",
+          "validation-94000022-WeakRound-p1",
+          "validation-94000023-WeakAngular-p2",
+          "validation-94000023-WeakAngular-p1",
+          "validation-94000023-WeakRound-p2",
+          "validation-94000023-WeakRound-p1",
+          "validation-94000024-WeakAngular-p1",
+          "validation-94000024-WeakAngular-p2",
+          "validation-94000024-WeakRound-p1",
+          "validation-94000024-WeakRound-p2",
+          "validation-94000025-WeakAngular-p2",
+          "validation-94000025-WeakRound-p2",
+          "validation-94000026-WeakAngular-p1",
+          "validation-94000026-WeakRound-p1",
+          "validation-94000027-WeakAngular-p1",
+          "validation-94000027-WeakAngular-p2",
+          "validation-94000027-WeakRound-p1",
+          "validation-94000027-WeakRound-p2",
+          "validation-94000028-WeakAngular-p1",
+          "validation-94000028-WeakAngular-p2",
+          "validation-94000028-WeakRound-p1",
+          "validation-94000028-WeakRound-p2",
+          "validation-94000029-WeakAngular-p1",
+          "validation-94000029-WeakAngular-p2",
+          "validation-94000029-WeakRound-p1",
+          "validation-94000029-WeakRound-p2",
+          "validation-94000030-WeakAngular-p1",
+          "validation-94000030-WeakAngular-p2",
+          "validation-94000030-WeakRound-p1",
+          "validation-94000030-WeakRound-p2",
+          "validation-94000031-WeakAngular-p1",
+          "validation-94000031-WeakAngular-p2",
+          "validation-94000031-WeakRound-p1",
+          "validation-94000031-WeakRound-p2",
+          "validation-94000032-WeakAngular-p1",
+          "validation-94000032-WeakAngular-p2",
+          "validation-94000032-WeakRound-p1",
+          "validation-94000032-WeakRound-p2",
+          "validation-94000033-WeakAngular-p1",
+          "validation-94000033-WeakAngular-p2",
+          "validation-94000033-WeakRound-p1",
+          "validation-94000033-WeakRound-p2",
+          "validation-94000035-WeakAngular-p1",
+          "validation-94000035-WeakAngular-p2",
+          "validation-94000035-WeakRound-p1",
+          "validation-94000035-WeakRound-p2",
+          "validation-94000036-WeakAngular-p1",
+          "validation-94000036-WeakAngular-p2",
+          "validation-94000036-WeakRound-p1",
+          "validation-94000036-WeakRound-p2",
+          "validation-94000037-WeakAngular-p2",
+          "validation-94000037-WeakAngular-p1",
+          "validation-94000037-WeakRound-p2",
+          "validation-94000037-WeakRound-p1",
+          "validation-94000038-WeakAngular-p2",
+          "validation-94000038-WeakAngular-p1",
+          "validation-94000038-WeakRound-p2",
+          "validation-94000038-WeakRound-p1",
+          "validation-94000039-WeakAngular-p2",
+          "validation-94000039-WeakAngular-p1",
+          "validation-94000039-WeakRound-p2",
+          "validation-94000039-WeakRound-p1",
+          "validation-94000040-WeakAngular-p1",
+          "validation-94000040-WeakRound-p1",
+          "validation-94000040-WeakRound-p2",
+          "validation-94000042-WeakAngular-p1",
+          "validation-94000042-WeakAngular-p2",
+          "validation-94000042-WeakRound-p1",
+          "validation-94000042-WeakRound-p2",
+          "validation-94000043-WeakAngular-p1",
+          "validation-94000043-WeakAngular-p2",
+          "validation-94000043-WeakRound-p1",
+          "validation-94000043-WeakRound-p2",
+          "validation-94000044-WeakAngular-p1",
+          "validation-94000044-WeakRound-p1",
+          "validation-94000045-WeakAngular-p2",
+          "validation-94000045-WeakAngular-p1",
+          "validation-94000045-WeakRound-p2",
+          "validation-94000045-WeakRound-p1",
+          "validation-94000046-WeakAngular-p1",
+          "validation-94000046-WeakAngular-p2",
+          "validation-94000046-WeakRound-p1",
+          "validation-94000046-WeakRound-p2",
+          "validation-94000047-WeakAngular-p1",
+          "validation-94000047-WeakRound-p1",
+          "validation-94000048-WeakAngular-p1",
+          "validation-94000048-WeakAngular-p2",
+          "validation-94000048-WeakRound-p1",
+          "validation-94000048-WeakRound-p2",
+          "validation-94000049-WeakAngular-p1",
+          "validation-94000049-WeakAngular-p2",
+          "validation-94000049-WeakRound-p1",
+          "validation-94000049-WeakRound-p2",
+          "validation-94000050-WeakAngular-p2",
+          "validation-94000050-WeakAngular-p1",
+          "validation-94000050-WeakRound-p2",
+          "validation-94000050-WeakRound-p1",
+          "validation-94000051-WeakAngular-p1",
+          "validation-94000051-WeakAngular-p2",
+          "validation-94000051-WeakRound-p1",
+          "validation-94000051-WeakRound-p2",
+          "validation-94000052-WeakAngular-p2",
+          "validation-94000052-WeakRound-p2",
+          "validation-94000053-WeakAngular-p2",
+          "validation-94000053-WeakAngular-p1",
+          "validation-94000053-WeakRound-p2",
+          "validation-94000053-WeakRound-p1",
+          "validation-94000054-WeakAngular-p2",
+          "validation-94000054-WeakAngular-p1",
+          "validation-94000054-WeakRound-p2",
+          "validation-94000054-WeakRound-p1",
+          "validation-94000055-WeakAngular-p1",
+          "validation-94000055-WeakRound-p1",
+          "validation-94000056-WeakAngular-p1",
+          "validation-94000056-WeakAngular-p2",
+          "validation-94000056-WeakRound-p1",
+          "validation-94000056-WeakRound-p2",
+          "validation-94000057-WeakAngular-p2",
+          "validation-94000057-WeakAngular-p1",
+          "validation-94000057-WeakRound-p2",
+          "validation-94000057-WeakRound-p1",
+          "validation-94000058-WeakAngular-p1",
+          "validation-94000058-WeakRound-p1",
+          "validation-94000059-WeakAngular-p2",
+          "validation-94000059-WeakAngular-p1",
+          "validation-94000059-WeakRound-p2",
+          "validation-94000059-WeakRound-p1",
+          "validation-94000060-WeakAngular-p1",
+          "validation-94000060-WeakAngular-p2",
+          "validation-94000060-WeakRound-p1",
+          "validation-94000060-WeakRound-p2",
+          "validation-94000061-WeakAngular-p1",
+          "validation-94000061-WeakAngular-p2",
+          "validation-94000061-WeakRound-p1",
+          "validation-94000061-WeakRound-p2",
+          "validation-94000062-WeakAngular-p1",
+          "validation-94000062-WeakAngular-p2",
+          "validation-94000062-WeakRound-p1",
+          "validation-94000062-WeakRound-p2",
+          "validation-94000063-WeakAngular-p2",
+          "validation-94000063-WeakAngular-p1",
+          "validation-94000063-WeakRound-p2",
+          "validation-94000063-WeakRound-p1",
+          "validation-94000064-WeakAngular-p2",
+          "validation-94000064-WeakRound-p2"
+        ],
+        "candidate_only": [
+          "validation-94000003-WeakAngular-p1",
+          "validation-94000003-WeakRound-p1",
+          "validation-94000012-WeakAngular-p1",
+          "validation-94000012-WeakRound-p1",
+          "validation-94000014-WeakRound-p2",
+          "validation-94000017-WeakAngular-p2",
+          "validation-94000017-WeakRound-p2",
+          "validation-94000018-WeakAngular-p2",
+          "validation-94000018-WeakRound-p2",
+          "validation-94000022-WeakAngular-p2",
+          "validation-94000022-WeakRound-p2",
+          "validation-94000034-WeakAngular-p2"
+        ],
+        "baseline_only": [
+          "validation-94000025-WeakAngular-p1",
+          "validation-94000025-WeakRound-p1",
+          "validation-94000041-WeakAngular-p1",
+          "validation-94000041-WeakRound-p1",
+          "validation-94000044-WeakAngular-p2",
+          "validation-94000044-WeakRound-p2",
+          "validation-94000047-WeakAngular-p2",
+          "validation-94000047-WeakRound-p2"
+        ],
+        "neither": [
+          "validation-94000002-WeakAngular-p1",
+          "validation-94000002-WeakRound-p1",
+          "validation-94000019-WeakAngular-p2",
+          "validation-94000019-WeakRound-p2",
+          "validation-94000034-WeakAngular-p1",
+          "validation-94000034-WeakRound-p1",
+          "validation-94000058-WeakAngular-p2",
+          "validation-94000058-WeakRound-p2"
+        ]
+      }
+    },
+    "handwritten-guidance": {
+      "counts": {
+        "both": 204,
+        "candidate_only": 18,
+        "baseline_only": 6,
+        "neither": 10
+      },
+      "cases": {
+        "both": [
+          "validation-94000001-WeakAngular-p2",
+          "validation-94000001-WeakAngular-p1",
+          "validation-94000001-WeakRound-p2",
+          "validation-94000001-WeakRound-p1",
+          "validation-94000002-WeakAngular-p2",
+          "validation-94000002-WeakRound-p2",
+          "validation-94000003-WeakAngular-p1",
+          "validation-94000003-WeakRound-p1",
+          "validation-94000004-WeakAngular-p1",
+          "validation-94000004-WeakAngular-p2",
+          "validation-94000004-WeakRound-p1",
+          "validation-94000004-WeakRound-p2",
+          "validation-94000005-WeakAngular-p1",
+          "validation-94000005-WeakAngular-p2",
+          "validation-94000005-WeakRound-p1",
+          "validation-94000005-WeakRound-p2",
+          "validation-94000006-WeakAngular-p2",
+          "validation-94000006-WeakAngular-p1",
+          "validation-94000006-WeakRound-p2",
+          "validation-94000007-WeakAngular-p1",
+          "validation-94000007-WeakAngular-p2",
+          "validation-94000007-WeakRound-p1",
+          "validation-94000007-WeakRound-p2",
+          "validation-94000008-WeakAngular-p1",
+          "validation-94000008-WeakAngular-p2",
+          "validation-94000008-WeakRound-p1",
+          "validation-94000008-WeakRound-p2",
+          "validation-94000009-WeakAngular-p2",
+          "validation-94000009-WeakAngular-p1",
+          "validation-94000009-WeakRound-p2",
+          "validation-94000009-WeakRound-p1",
+          "validation-94000010-WeakAngular-p1",
+          "validation-94000010-WeakAngular-p2",
+          "validation-94000010-WeakRound-p1",
+          "validation-94000010-WeakRound-p2",
+          "validation-94000011-WeakAngular-p2",
+          "validation-94000011-WeakAngular-p1",
+          "validation-94000011-WeakRound-p2",
+          "validation-94000011-WeakRound-p1",
+          "validation-94000012-WeakAngular-p1",
+          "validation-94000012-WeakRound-p1",
+          "validation-94000013-WeakAngular-p1",
+          "validation-94000013-WeakAngular-p2",
+          "validation-94000013-WeakRound-p1",
+          "validation-94000013-WeakRound-p2",
+          "validation-94000014-WeakAngular-p1",
+          "validation-94000014-WeakRound-p1",
+          "validation-94000014-WeakRound-p2",
+          "validation-94000015-WeakAngular-p1",
+          "validation-94000015-WeakAngular-p2",
+          "validation-94000015-WeakRound-p1",
+          "validation-94000015-WeakRound-p2",
+          "validation-94000016-WeakAngular-p1",
+          "validation-94000016-WeakAngular-p2",
+          "validation-94000016-WeakRound-p1",
+          "validation-94000016-WeakRound-p2",
+          "validation-94000017-WeakAngular-p2",
+          "validation-94000017-WeakAngular-p1",
+          "validation-94000017-WeakRound-p2",
+          "validation-94000017-WeakRound-p1",
+          "validation-94000018-WeakAngular-p1",
+          "validation-94000018-WeakAngular-p2",
+          "validation-94000018-WeakRound-p1",
+          "validation-94000018-WeakRound-p2",
+          "validation-94000019-WeakAngular-p1",
+          "validation-94000019-WeakRound-p1",
+          "validation-94000020-WeakAngular-p1",
+          "validation-94000020-WeakAngular-p2",
+          "validation-94000020-WeakRound-p1",
+          "validation-94000020-WeakRound-p2",
+          "validation-94000021-WeakAngular-p1",
+          "validation-94000021-WeakAngular-p2",
+          "validation-94000021-WeakRound-p1",
+          "validation-94000021-WeakRound-p2",
+          "validation-94000022-WeakAngular-p1",
+          "validation-94000022-WeakAngular-p2",
+          "validation-94000022-WeakRound-p1",
+          "validation-94000022-WeakRound-p2",
+          "validation-94000023-WeakAngular-p2",
+          "validation-94000023-WeakAngular-p1",
+          "validation-94000023-WeakRound-p2",
+          "validation-94000023-WeakRound-p1",
+          "validation-94000024-WeakAngular-p1",
+          "validation-94000024-WeakAngular-p2",
+          "validation-94000024-WeakRound-p1",
+          "validation-94000024-WeakRound-p2",
+          "validation-94000026-WeakAngular-p1",
+          "validation-94000026-WeakRound-p1",
+          "validation-94000027-WeakAngular-p1",
+          "validation-94000027-WeakRound-p1",
+          "validation-94000028-WeakAngular-p1",
+          "validation-94000028-WeakAngular-p2",
+          "validation-94000028-WeakRound-p1",
+          "validation-94000028-WeakRound-p2",
+          "validation-94000029-WeakAngular-p1",
+          "validation-94000029-WeakRound-p1",
+          "validation-94000030-WeakAngular-p1",
+          "validation-94000030-WeakAngular-p2",
+          "validation-94000030-WeakRound-p1",
+          "validation-94000030-WeakRound-p2",
+          "validation-94000031-WeakAngular-p1",
+          "validation-94000031-WeakAngular-p2",
+          "validation-94000031-WeakRound-p1",
+          "validation-94000031-WeakRound-p2",
+          "validation-94000032-WeakAngular-p1",
+          "validation-94000032-WeakRound-p1",
+          "validation-94000033-WeakAngular-p1",
+          "validation-94000033-WeakAngular-p2",
+          "validation-94000033-WeakRound-p1",
+          "validation-94000033-WeakRound-p2",
+          "validation-94000034-WeakAngular-p2",
+          "validation-94000035-WeakAngular-p1",
+          "validation-94000035-WeakAngular-p2",
+          "validation-94000035-WeakRound-p1",
+          "validation-94000035-WeakRound-p2",
+          "validation-94000036-WeakAngular-p1",
+          "validation-94000036-WeakAngular-p2",
+          "validation-94000036-WeakRound-p1",
+          "validation-94000036-WeakRound-p2",
+          "validation-94000037-WeakAngular-p2",
+          "validation-94000037-WeakAngular-p1",
+          "validation-94000037-WeakRound-p2",
+          "validation-94000037-WeakRound-p1",
+          "validation-94000038-WeakAngular-p2",
+          "validation-94000038-WeakAngular-p1",
+          "validation-94000038-WeakRound-p2",
+          "validation-94000038-WeakRound-p1",
+          "validation-94000039-WeakAngular-p2",
+          "validation-94000039-WeakRound-p2",
+          "validation-94000040-WeakAngular-p1",
+          "validation-94000040-WeakRound-p1",
+          "validation-94000040-WeakRound-p2",
+          "validation-94000042-WeakAngular-p1",
+          "validation-94000042-WeakAngular-p2",
+          "validation-94000042-WeakRound-p1",
+          "validation-94000042-WeakRound-p2",
+          "validation-94000043-WeakAngular-p1",
+          "validation-94000043-WeakAngular-p2",
+          "validation-94000043-WeakRound-p1",
+          "validation-94000043-WeakRound-p2",
+          "validation-94000044-WeakAngular-p1",
+          "validation-94000044-WeakRound-p1",
+          "validation-94000045-WeakAngular-p2",
+          "validation-94000045-WeakRound-p2",
+          "validation-94000046-WeakAngular-p1",
+          "validation-94000046-WeakAngular-p2",
+          "validation-94000046-WeakRound-p1",
+          "validation-94000046-WeakRound-p2",
+          "validation-94000047-WeakAngular-p1",
+          "validation-94000047-WeakRound-p1",
+          "validation-94000048-WeakAngular-p1",
+          "validation-94000048-WeakAngular-p2",
+          "validation-94000048-WeakRound-p1",
+          "validation-94000048-WeakRound-p2",
+          "validation-94000049-WeakAngular-p1",
+          "validation-94000049-WeakAngular-p2",
+          "validation-94000049-WeakRound-p1",
+          "validation-94000049-WeakRound-p2",
+          "validation-94000050-WeakAngular-p2",
+          "validation-94000050-WeakAngular-p1",
+          "validation-94000050-WeakRound-p2",
+          "validation-94000050-WeakRound-p1",
+          "validation-94000051-WeakAngular-p1",
+          "validation-94000051-WeakAngular-p2",
+          "validation-94000051-WeakRound-p1",
+          "validation-94000051-WeakRound-p2",
+          "validation-94000052-WeakAngular-p2",
+          "validation-94000052-WeakRound-p2",
+          "validation-94000053-WeakAngular-p2",
+          "validation-94000053-WeakAngular-p1",
+          "validation-94000053-WeakRound-p2",
+          "validation-94000053-WeakRound-p1",
+          "validation-94000054-WeakAngular-p2",
+          "validation-94000054-WeakAngular-p1",
+          "validation-94000054-WeakRound-p2",
+          "validation-94000054-WeakRound-p1",
+          "validation-94000055-WeakAngular-p1",
+          "validation-94000055-WeakRound-p1",
+          "validation-94000056-WeakAngular-p1",
+          "validation-94000056-WeakRound-p1",
+          "validation-94000057-WeakAngular-p2",
+          "validation-94000057-WeakRound-p2",
+          "validation-94000058-WeakAngular-p1",
+          "validation-94000058-WeakRound-p1",
+          "validation-94000059-WeakAngular-p2",
+          "validation-94000059-WeakAngular-p1",
+          "validation-94000059-WeakRound-p2",
+          "validation-94000059-WeakRound-p1",
+          "validation-94000060-WeakAngular-p1",
+          "validation-94000060-WeakRound-p1",
+          "validation-94000061-WeakAngular-p1",
+          "validation-94000061-WeakAngular-p2",
+          "validation-94000061-WeakRound-p1",
+          "validation-94000061-WeakRound-p2",
+          "validation-94000062-WeakAngular-p1",
+          "validation-94000062-WeakAngular-p2",
+          "validation-94000062-WeakRound-p1",
+          "validation-94000062-WeakRound-p2",
+          "validation-94000063-WeakAngular-p2",
+          "validation-94000063-WeakAngular-p1",
+          "validation-94000063-WeakRound-p2",
+          "validation-94000063-WeakRound-p1",
+          "validation-94000064-WeakAngular-p2",
+          "validation-94000064-WeakRound-p2"
+        ],
+        "candidate_only": [
+          "validation-94000025-WeakAngular-p2",
+          "validation-94000025-WeakRound-p2",
+          "validation-94000027-WeakAngular-p2",
+          "validation-94000027-WeakRound-p2",
+          "validation-94000029-WeakAngular-p2",
+          "validation-94000029-WeakRound-p2",
+          "validation-94000032-WeakAngular-p2",
+          "validation-94000032-WeakRound-p2",
+          "validation-94000039-WeakAngular-p1",
+          "validation-94000039-WeakRound-p1",
+          "validation-94000045-WeakAngular-p1",
+          "validation-94000045-WeakRound-p1",
+          "validation-94000056-WeakAngular-p2",
+          "validation-94000056-WeakRound-p2",
+          "validation-94000057-WeakAngular-p1",
+          "validation-94000057-WeakRound-p1",
+          "validation-94000060-WeakAngular-p2",
+          "validation-94000060-WeakRound-p2"
+        ],
+        "baseline_only": [
+          "validation-94000025-WeakAngular-p1",
+          "validation-94000025-WeakRound-p1",
+          "validation-94000034-WeakAngular-p1",
+          "validation-94000034-WeakRound-p1",
+          "validation-94000044-WeakAngular-p2",
+          "validation-94000044-WeakRound-p2"
+        ],
+        "neither": [
+          "validation-94000002-WeakAngular-p1",
+          "validation-94000002-WeakRound-p1",
+          "validation-94000019-WeakAngular-p2",
+          "validation-94000019-WeakRound-p2",
+          "validation-94000041-WeakAngular-p1",
+          "validation-94000041-WeakRound-p1",
+          "validation-94000047-WeakAngular-p2",
+          "validation-94000047-WeakRound-p2",
+          "validation-94000058-WeakAngular-p2",
+          "validation-94000058-WeakRound-p2"
+        ]
+      }
+    }
+  },
+  "paired_precision": {
+    "learned-reference": {
+      "counts": {
+        "both": 92,
+        "candidate_only": 4,
+        "baseline_only": 0,
+        "neither": 0
+      },
+      "cases": {
+        "both": [
+          "fresh_stationary_b0_p0",
+          "fresh_stationary_b0_p1",
+          "fresh_stationary_b0_p2",
+          "fresh_stationary_b0_p3",
+          "fresh_stationary_b0_p4",
+          "fresh_stationary_b0_p5",
+          "fresh_stationary_b1_p0",
+          "fresh_stationary_b1_p1",
+          "fresh_stationary_b1_p2",
+          "fresh_stationary_b1_p3",
+          "fresh_stationary_b1_p4",
+          "fresh_stationary_b1_p5",
+          "fresh_stationary_b2_p0",
+          "fresh_stationary_b2_p1",
+          "fresh_stationary_b2_p2",
+          "fresh_stationary_b2_p3",
+          "fresh_stationary_b2_p4",
+          "fresh_stationary_b2_p5",
+          "fresh_stationary_b3_p0",
+          "fresh_stationary_b3_p1",
+          "fresh_stationary_b3_p2",
+          "fresh_stationary_b3_p3",
+          "fresh_stationary_b3_p4",
+          "fresh_stationary_b3_p5",
+          "fresh_moving_b0_p0",
+          "fresh_moving_b0_p1",
+          "fresh_moving_b0_p2",
+          "fresh_moving_b0_p3",
+          "fresh_moving_b0_p4",
+          "fresh_moving_b0_p5",
+          "fresh_moving_b1_p0",
+          "fresh_moving_b1_p1",
+          "fresh_moving_b1_p2",
+          "fresh_moving_b1_p3",
+          "fresh_moving_b1_p4",
+          "fresh_moving_b1_p5",
+          "fresh_moving_b2_p0",
+          "fresh_moving_b2_p1",
+          "fresh_moving_b2_p2",
+          "fresh_moving_b2_p3",
+          "fresh_moving_b2_p4",
+          "fresh_moving_b2_p5",
+          "fresh_moving_b3_p0",
+          "fresh_moving_b3_p1",
+          "fresh_moving_b3_p2",
+          "fresh_moving_b3_p3",
+          "fresh_moving_b3_p4",
+          "fresh_moving_b3_p5",
+          "fresh_inward_b0_p0",
+          "fresh_inward_b0_p1",
+          "fresh_inward_b0_p2",
+          "fresh_inward_b0_p3",
+          "fresh_inward_b0_p4",
+          "fresh_inward_b0_p5",
+          "fresh_inward_b1_p0",
+          "fresh_inward_b1_p1",
+          "fresh_inward_b1_p2",
+          "fresh_inward_b1_p3",
+          "fresh_inward_b1_p4",
+          "fresh_inward_b1_p5",
+          "fresh_inward_b2_p0",
+          "fresh_inward_b2_p1",
+          "fresh_inward_b2_p2",
+          "fresh_inward_b2_p3",
+          "fresh_inward_b2_p4",
+          "fresh_inward_b2_p5",
+          "fresh_inward_b3_p0",
+          "fresh_inward_b3_p1",
+          "fresh_inward_b3_p2",
+          "fresh_inward_b3_p3",
+          "fresh_inward_b3_p4",
+          "fresh_inward_b3_p5",
+          "fresh_settling_b0_a0_o0_v1",
+          "fresh_settling_b0_a0_o1_v0",
+          "fresh_settling_b0_a0_o1_v1",
+          "fresh_settling_b0_a1_o0_v0",
+          "fresh_settling_b0_a1_o0_v1",
+          "fresh_settling_b0_a1_o0_v2",
+          "fresh_settling_b0_a1_o1_v1",
+          "fresh_settling_b0_a1_o1_v2",
+          "fresh_settling_b1_a0_o0_v0",
+          "fresh_settling_b1_a0_o0_v1",
+          "fresh_settling_b1_a0_o0_v2",
+          "fresh_settling_b1_a0_o1_v0",
+          "fresh_settling_b1_a0_o1_v1",
+          "fresh_settling_b1_a0_o1_v2",
+          "fresh_settling_b1_a1_o0_v0",
+          "fresh_settling_b1_a1_o0_v1",
+          "fresh_settling_b1_a1_o0_v2",
+          "fresh_settling_b1_a1_o1_v0",
+          "fresh_settling_b1_a1_o1_v1",
+          "fresh_settling_b1_a1_o1_v2"
+        ],
+        "candidate_only": [
+          "fresh_settling_b0_a0_o0_v0",
+          "fresh_settling_b0_a0_o0_v2",
+          "fresh_settling_b0_a0_o1_v2",
+          "fresh_settling_b0_a1_o1_v0"
+        ],
+        "baseline_only": [],
+        "neither": []
+      }
+    },
+    "handwritten-guidance": {
+      "counts": {
+        "both": 96,
+        "candidate_only": 0,
+        "baseline_only": 0,
+        "neither": 0
+      },
+      "cases": {
+        "both": [
+          "fresh_stationary_b0_p0",
+          "fresh_stationary_b0_p1",
+          "fresh_stationary_b0_p2",
+          "fresh_stationary_b0_p3",
+          "fresh_stationary_b0_p4",
+          "fresh_stationary_b0_p5",
+          "fresh_stationary_b1_p0",
+          "fresh_stationary_b1_p1",
+          "fresh_stationary_b1_p2",
+          "fresh_stationary_b1_p3",
+          "fresh_stationary_b1_p4",
+          "fresh_stationary_b1_p5",
+          "fresh_stationary_b2_p0",
+          "fresh_stationary_b2_p1",
+          "fresh_stationary_b2_p2",
+          "fresh_stationary_b2_p3",
+          "fresh_stationary_b2_p4",
+          "fresh_stationary_b2_p5",
+          "fresh_stationary_b3_p0",
+          "fresh_stationary_b3_p1",
+          "fresh_stationary_b3_p2",
+          "fresh_stationary_b3_p3",
+          "fresh_stationary_b3_p4",
+          "fresh_stationary_b3_p5",
+          "fresh_moving_b0_p0",
+          "fresh_moving_b0_p1",
+          "fresh_moving_b0_p2",
+          "fresh_moving_b0_p3",
+          "fresh_moving_b0_p4",
+          "fresh_moving_b0_p5",
+          "fresh_moving_b1_p0",
+          "fresh_moving_b1_p1",
+          "fresh_moving_b1_p2",
+          "fresh_moving_b1_p3",
+          "fresh_moving_b1_p4",
+          "fresh_moving_b1_p5",
+          "fresh_moving_b2_p0",
+          "fresh_moving_b2_p1",
+          "fresh_moving_b2_p2",
+          "fresh_moving_b2_p3",
+          "fresh_moving_b2_p4",
+          "fresh_moving_b2_p5",
+          "fresh_moving_b3_p0",
+          "fresh_moving_b3_p1",
+          "fresh_moving_b3_p2",
+          "fresh_moving_b3_p3",
+          "fresh_moving_b3_p4",
+          "fresh_moving_b3_p5",
+          "fresh_inward_b0_p0",
+          "fresh_inward_b0_p1",
+          "fresh_inward_b0_p2",
+          "fresh_inward_b0_p3",
+          "fresh_inward_b0_p4",
+          "fresh_inward_b0_p5",
+          "fresh_inward_b1_p0",
+          "fresh_inward_b1_p1",
+          "fresh_inward_b1_p2",
+          "fresh_inward_b1_p3",
+          "fresh_inward_b1_p4",
+          "fresh_inward_b1_p5",
+          "fresh_inward_b2_p0",
+          "fresh_inward_b2_p1",
+          "fresh_inward_b2_p2",
+          "fresh_inward_b2_p3",
+          "fresh_inward_b2_p4",
+          "fresh_inward_b2_p5",
+          "fresh_inward_b3_p0",
+          "fresh_inward_b3_p1",
+          "fresh_inward_b3_p2",
+          "fresh_inward_b3_p3",
+          "fresh_inward_b3_p4",
+          "fresh_inward_b3_p5",
+          "fresh_settling_b0_a0_o0_v0",
+          "fresh_settling_b0_a0_o0_v1",
+          "fresh_settling_b0_a0_o0_v2",
+          "fresh_settling_b0_a0_o1_v0",
+          "fresh_settling_b0_a0_o1_v1",
+          "fresh_settling_b0_a0_o1_v2",
+          "fresh_settling_b0_a1_o0_v0",
+          "fresh_settling_b0_a1_o0_v1",
+          "fresh_settling_b0_a1_o0_v2",
+          "fresh_settling_b0_a1_o1_v0",
+          "fresh_settling_b0_a1_o1_v1",
+          "fresh_settling_b0_a1_o1_v2",
+          "fresh_settling_b1_a0_o0_v0",
+          "fresh_settling_b1_a0_o0_v1",
+          "fresh_settling_b1_a0_o0_v2",
+          "fresh_settling_b1_a0_o1_v0",
+          "fresh_settling_b1_a0_o1_v1",
+          "fresh_settling_b1_a0_o1_v2",
+          "fresh_settling_b1_a1_o0_v0",
+          "fresh_settling_b1_a1_o0_v1",
+          "fresh_settling_b1_a1_o0_v2",
+          "fresh_settling_b1_a1_o1_v0",
+          "fresh_settling_b1_a1_o1_v1",
+          "fresh_settling_b1_a1_o1_v2"
+        ],
+        "candidate_only": [],
+        "baseline_only": [],
+        "neither": []
+      }
+    }
+  },
+  "replay_cases": {
+    "matches": [
+      "validation-94000002-WeakAngular-p1",
+      "validation-94000019-WeakAngular-p2",
+      "validation-94000002-WeakRound-p1",
+      "validation-94000019-WeakRound-p2",
+      "validation-94000025-WeakAngular-p1"
+    ],
+    "precision": [
+      "fresh_stationary_b0_p0",
+      "fresh_moving_b0_p0",
+      "fresh_inward_b0_p0",
+      "fresh_settling_b0_a0_o0_v0"
+    ]
+  },
+  "trajectories": {
+    "candidate": {
+      "validation-94000002-WeakAngular-p1": {
+        "outcome": "host_preempted",
+        "ticks": 4,
+        "brake_ticks": 4,
+        "thrust_ticks": 4,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 4,
+          "altitude": 117.17593059627904,
+          "relative_speed": 28.38389094134951,
+          "target_distance": 32.17680878427366,
+          "speed_points": 594.515843695007,
+          "position_points": 678.2319121572634,
+          "turn": -0.9845027327537537,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 4,
+          "altitude": 117.17593059627904,
+          "relative_speed": 28.38389094134951,
+          "target_distance": 32.17680878427366,
+          "speed_points": 594.515843695007,
+          "position_points": 678.2319121572634,
+          "turn": -0.9845027327537537,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.08663879494725,
+            "relative_speed": 30.00729095150609,
+            "target_distance": 34.086635987428004,
+            "speed_points": 571.3244149784844,
+            "position_points": 659.1336401257199,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 118.60168733746795,
+            "relative_speed": 29.549196654910748,
+            "target_distance": 33.60177237028531,
+            "speed_points": 577.8686192155608,
+            "position_points": 663.9822762971469,
+            "turn": -0.9832585453987122,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.12182274665159,
+            "relative_speed": 29.12867366629658,
+            "target_distance": 33.122123500931025,
+            "speed_points": 583.8760904814775,
+            "position_points": 668.7787649906898,
+            "turn": -0.983657717704773,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 117.64624044887881,
+            "relative_speed": 28.747452487936343,
+            "target_distance": 32.64682440437322,
+            "speed_points": 589.3221073151951,
+            "position_points": 673.5317559562678,
+            "turn": -0.9840714335441589,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.17593059627904,
+            "relative_speed": 28.38389094134951,
+            "target_distance": 32.17680878427366,
+            "speed_points": 594.515843695007,
+            "position_points": 678.2319121572634,
+            "turn": -0.9845027327537537,
+            "thrust": 1.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000002-WeakRound-p1": {
+        "outcome": "host_preempted",
+        "ticks": 4,
+        "brake_ticks": 4,
+        "thrust_ticks": 4,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 4,
+          "altitude": 117.17593059627904,
+          "relative_speed": 28.38389094134951,
+          "target_distance": 32.17680878427366,
+          "speed_points": 594.515843695007,
+          "position_points": 678.2319121572634,
+          "turn": -0.9845027327537537,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 4,
+          "altitude": 117.17593059627904,
+          "relative_speed": 28.38389094134951,
+          "target_distance": 32.17680878427366,
+          "speed_points": 594.515843695007,
+          "position_points": 678.2319121572634,
+          "turn": -0.9845027327537537,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.08663879494725,
+            "relative_speed": 30.00729095150609,
+            "target_distance": 34.086635987428004,
+            "speed_points": 571.3244149784844,
+            "position_points": 659.1336401257199,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 118.60168733746795,
+            "relative_speed": 29.549196654910748,
+            "target_distance": 33.60177237028531,
+            "speed_points": 577.8686192155608,
+            "position_points": 663.9822762971469,
+            "turn": -0.9832585453987122,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.12182274665159,
+            "relative_speed": 29.12867366629658,
+            "target_distance": 33.122123500931025,
+            "speed_points": 583.8760904814775,
+            "position_points": 668.7787649906898,
+            "turn": -0.983657717704773,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 117.64624044887881,
+            "relative_speed": 28.747452487936343,
+            "target_distance": 32.64682440437322,
+            "speed_points": 589.3221073151951,
+            "position_points": 673.5317559562678,
+            "turn": -0.9840714335441589,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.17593059627904,
+            "relative_speed": 28.38389094134951,
+            "target_distance": 32.17680878427366,
+            "speed_points": 594.515843695007,
+            "position_points": 678.2319121572634,
+            "turn": -0.9845027327537537,
+            "thrust": 1.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000019-WeakAngular-p2": {
+        "outcome": "host_preempted",
+        "ticks": 6,
+        "brake_ticks": 6,
+        "thrust_ticks": 6,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 6,
+          "altitude": 116.78466396336921,
+          "relative_speed": 25.60685451272141,
+          "target_distance": 31.785690442822304,
+          "speed_points": 634.1877926754084,
+          "position_points": 682.1430955717768,
+          "turn": -0.9709267616271973,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 6,
+          "altitude": 116.78466396336921,
+          "relative_speed": 25.60685451272141,
+          "target_distance": 31.785690442822304,
+          "speed_points": 634.1877926754084,
+          "position_points": 682.1430955717768,
+          "turn": -0.9709267616271973,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.48268552188745,
+            "relative_speed": 29.62884933066032,
+            "target_distance": 34.48268270125511,
+            "speed_points": 576.7307238477098,
+            "position_points": 655.1731729874489,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 119.00962130274402,
+            "relative_speed": 28.880145841080456,
+            "target_distance": 34.0097087856408,
+            "speed_points": 587.426487984565,
+            "position_points": 659.902912143592,
+            "turn": -0.965252697467804,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.54621160882542,
+            "relative_speed": 28.161643097069604,
+            "target_distance": 33.546510284431484,
+            "speed_points": 597.6908128990057,
+            "position_points": 664.5348971556851,
+            "turn": -0.9663618803024292,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 118.09169419718586,
+            "relative_speed": 27.471932272379664,
+            "target_distance": 33.09224573382193,
+            "speed_points": 607.5438246802904,
+            "position_points": 669.0775426617806,
+            "turn": -0.9674944281578064,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.64696955075686,
+            "relative_speed": 26.8160781522061,
+            "target_distance": 32.647755767435605,
+            "speed_points": 616.9131692541986,
+            "position_points": 673.522442325644,
+            "turn": -0.9686388969421387,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 117.21107037335321,
+            "relative_speed": 26.193394275205144,
+            "target_distance": 32.21202366384032,
+            "speed_points": 625.8086532113551,
+            "position_points": 677.8797633615967,
+            "turn": -0.9697858691215515,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 116.78466396336921,
+            "relative_speed": 25.60685451272141,
+            "target_distance": 31.785690442822304,
+            "speed_points": 634.1877926754084,
+            "position_points": 682.1430955717768,
+            "turn": -0.9709267616271973,
+            "thrust": 1.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000019-WeakRound-p2": {
+        "outcome": "host_preempted",
+        "ticks": 6,
+        "brake_ticks": 6,
+        "thrust_ticks": 6,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 6,
+          "altitude": 116.78466396336921,
+          "relative_speed": 25.60685451272141,
+          "target_distance": 31.785690442822304,
+          "speed_points": 634.1877926754084,
+          "position_points": 682.1430955717768,
+          "turn": -0.9709267616271973,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 6,
+          "altitude": 116.78466396336921,
+          "relative_speed": 25.60685451272141,
+          "target_distance": 31.785690442822304,
+          "speed_points": 634.1877926754084,
+          "position_points": 682.1430955717768,
+          "turn": -0.9709267616271973,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.48268552188745,
+            "relative_speed": 29.62884933066032,
+            "target_distance": 34.48268270125511,
+            "speed_points": 576.7307238477098,
+            "position_points": 655.1731729874489,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 119.00962130274402,
+            "relative_speed": 28.880145841080456,
+            "target_distance": 34.0097087856408,
+            "speed_points": 587.426487984565,
+            "position_points": 659.902912143592,
+            "turn": -0.965252697467804,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.54621160882542,
+            "relative_speed": 28.161643097069604,
+            "target_distance": 33.546510284431484,
+            "speed_points": 597.6908128990057,
+            "position_points": 664.5348971556851,
+            "turn": -0.9663618803024292,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 118.09169419718586,
+            "relative_speed": 27.471932272379664,
+            "target_distance": 33.09224573382193,
+            "speed_points": 607.5438246802904,
+            "position_points": 669.0775426617806,
+            "turn": -0.9674944281578064,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.64696955075686,
+            "relative_speed": 26.8160781522061,
+            "target_distance": 32.647755767435605,
+            "speed_points": 616.9131692541986,
+            "position_points": 673.522442325644,
+            "turn": -0.9686388969421387,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 117.21107037335321,
+            "relative_speed": 26.193394275205144,
+            "target_distance": 32.21202366384032,
+            "speed_points": 625.8086532113551,
+            "position_points": 677.8797633615967,
+            "turn": -0.9697858691215515,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 116.78466396336921,
+            "relative_speed": 25.60685451272141,
+            "target_distance": 31.785690442822304,
+            "speed_points": 634.1877926754084,
+            "position_points": 682.1430955717768,
+            "turn": -0.9709267616271973,
+            "thrust": 1.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000025-WeakAngular-p1": {
+        "outcome": "host_preempted",
+        "ticks": 1,
+        "brake_ticks": 0,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": 0,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 0,
+          "altitude": 91.99516309888233,
+          "relative_speed": 34.61232198233884,
+          "target_distance": 6.995170066232059,
+          "speed_points": 505.53825739515946,
+          "position_points": 930.0482993376794,
+          "turn": 0.0,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "minimum_altitude": {
+          "tick": 1,
+          "altitude": 91.44948498711827,
+          "relative_speed": 34.717005070618654,
+          "target_distance": 6.452185889569972,
+          "speed_points": 504.04278470544784,
+          "position_points": 935.4781411043002,
+          "turn": -0.9157344102859497,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 91.99516309888233,
+            "relative_speed": 34.61232198233884,
+            "target_distance": 6.995170066232059,
+            "speed_points": 505.53825739515946,
+            "position_points": 930.0482993376794,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 91.44948498711827,
+            "relative_speed": 34.717005070618654,
+            "target_distance": 6.452185889569972,
+            "speed_points": 504.04278470544784,
+            "position_points": 935.4781411043002,
+            "turn": -0.9157344102859497,
+            "thrust": 0.0,
+            "brake": 0.0
+          }
+        ]
+      }
+    },
+    "learned-reference": {
+      "validation-94000002-WeakAngular-p1": {
+        "outcome": "host_preempted",
+        "ticks": 4,
+        "brake_ticks": 4,
+        "thrust_ticks": 4,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 4,
+          "altitude": 117.17593059627904,
+          "relative_speed": 28.38389094134951,
+          "target_distance": 32.17680878427366,
+          "speed_points": 594.515843695007,
+          "position_points": 678.2319121572634,
+          "turn": -0.983887791633606,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 4,
+          "altitude": 117.17593059627904,
+          "relative_speed": 28.38389094134951,
+          "target_distance": 32.17680878427366,
+          "speed_points": 594.515843695007,
+          "position_points": 678.2319121572634,
+          "turn": -0.983887791633606,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.08663879494725,
+            "relative_speed": 30.00729095150609,
+            "target_distance": 34.086635987428004,
+            "speed_points": 571.3244149784844,
+            "position_points": 659.1336401257199,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 118.60168733746795,
+            "relative_speed": 29.549196654910748,
+            "target_distance": 33.60177237028531,
+            "speed_points": 577.8686192155608,
+            "position_points": 663.9822762971469,
+            "turn": -0.9825832843780518,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.12182274665159,
+            "relative_speed": 29.12867366629658,
+            "target_distance": 33.122123500931025,
+            "speed_points": 583.8760904814775,
+            "position_points": 668.7787649906898,
+            "turn": -0.9830061793327332,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 117.64624044887881,
+            "relative_speed": 28.747452487936343,
+            "target_distance": 32.64682440437322,
+            "speed_points": 589.3221073151951,
+            "position_points": 673.5317559562678,
+            "turn": -0.9834409356117249,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.17593059627904,
+            "relative_speed": 28.38389094134951,
+            "target_distance": 32.17680878427366,
+            "speed_points": 594.515843695007,
+            "position_points": 678.2319121572634,
+            "turn": -0.983887791633606,
+            "thrust": 1.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000002-WeakRound-p1": {
+        "outcome": "host_preempted",
+        "ticks": 4,
+        "brake_ticks": 4,
+        "thrust_ticks": 4,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 4,
+          "altitude": 117.17593059627904,
+          "relative_speed": 28.38389094134951,
+          "target_distance": 32.17680878427366,
+          "speed_points": 594.515843695007,
+          "position_points": 678.2319121572634,
+          "turn": -0.983887791633606,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 4,
+          "altitude": 117.17593059627904,
+          "relative_speed": 28.38389094134951,
+          "target_distance": 32.17680878427366,
+          "speed_points": 594.515843695007,
+          "position_points": 678.2319121572634,
+          "turn": -0.983887791633606,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.08663879494725,
+            "relative_speed": 30.00729095150609,
+            "target_distance": 34.086635987428004,
+            "speed_points": 571.3244149784844,
+            "position_points": 659.1336401257199,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 118.60168733746795,
+            "relative_speed": 29.549196654910748,
+            "target_distance": 33.60177237028531,
+            "speed_points": 577.8686192155608,
+            "position_points": 663.9822762971469,
+            "turn": -0.9825832843780518,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.12182274665159,
+            "relative_speed": 29.12867366629658,
+            "target_distance": 33.122123500931025,
+            "speed_points": 583.8760904814775,
+            "position_points": 668.7787649906898,
+            "turn": -0.9830061793327332,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 117.64624044887881,
+            "relative_speed": 28.747452487936343,
+            "target_distance": 32.64682440437322,
+            "speed_points": 589.3221073151951,
+            "position_points": 673.5317559562678,
+            "turn": -0.9834409356117249,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.17593059627904,
+            "relative_speed": 28.38389094134951,
+            "target_distance": 32.17680878427366,
+            "speed_points": 594.515843695007,
+            "position_points": 678.2319121572634,
+            "turn": -0.983887791633606,
+            "thrust": 1.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000019-WeakAngular-p2": {
+        "outcome": "host_preempted",
+        "ticks": 6,
+        "brake_ticks": 6,
+        "thrust_ticks": 6,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 6,
+          "altitude": 116.78466396336921,
+          "relative_speed": 25.60685451272141,
+          "target_distance": 31.785690442822304,
+          "speed_points": 634.1877926754084,
+          "position_points": 682.1430955717768,
+          "turn": -0.9670051336288452,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 6,
+          "altitude": 116.78466396336921,
+          "relative_speed": 25.60685451272141,
+          "target_distance": 31.785690442822304,
+          "speed_points": 634.1877926754084,
+          "position_points": 682.1430955717768,
+          "turn": -0.9670051336288452,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.48268552188745,
+            "relative_speed": 29.62884933066032,
+            "target_distance": 34.48268270125511,
+            "speed_points": 576.7307238477098,
+            "position_points": 655.1731729874489,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 119.00962130274402,
+            "relative_speed": 28.880145841080456,
+            "target_distance": 34.0097087856408,
+            "speed_points": 587.426487984565,
+            "position_points": 659.902912143592,
+            "turn": -0.9602831602096558,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.54621160882542,
+            "relative_speed": 28.161643097069604,
+            "target_distance": 33.546510284431484,
+            "speed_points": 597.6908128990057,
+            "position_points": 664.5348971556851,
+            "turn": -0.9616089463233948,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 118.09169419718586,
+            "relative_speed": 27.471932272379664,
+            "target_distance": 33.09224573382193,
+            "speed_points": 607.5438246802904,
+            "position_points": 669.0775426617806,
+            "turn": -0.9629565477371216,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.64696955075686,
+            "relative_speed": 26.8160781522061,
+            "target_distance": 32.647755767435605,
+            "speed_points": 616.9131692541986,
+            "position_points": 673.522442325644,
+            "turn": -0.9643144607543945,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 117.21107037335321,
+            "relative_speed": 26.193394275205144,
+            "target_distance": 32.21202366384032,
+            "speed_points": 625.8086532113551,
+            "position_points": 677.8797633615967,
+            "turn": -0.9656665921211243,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 116.78466396336921,
+            "relative_speed": 25.60685451272141,
+            "target_distance": 31.785690442822304,
+            "speed_points": 634.1877926754084,
+            "position_points": 682.1430955717768,
+            "turn": -0.9670051336288452,
+            "thrust": 1.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000019-WeakRound-p2": {
+        "outcome": "host_preempted",
+        "ticks": 6,
+        "brake_ticks": 6,
+        "thrust_ticks": 6,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 6,
+          "altitude": 116.78466396336921,
+          "relative_speed": 25.60685451272141,
+          "target_distance": 31.785690442822304,
+          "speed_points": 634.1877926754084,
+          "position_points": 682.1430955717768,
+          "turn": -0.9670051336288452,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 6,
+          "altitude": 116.78466396336921,
+          "relative_speed": 25.60685451272141,
+          "target_distance": 31.785690442822304,
+          "speed_points": 634.1877926754084,
+          "position_points": 682.1430955717768,
+          "turn": -0.9670051336288452,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.48268552188745,
+            "relative_speed": 29.62884933066032,
+            "target_distance": 34.48268270125511,
+            "speed_points": 576.7307238477098,
+            "position_points": 655.1731729874489,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 119.00962130274402,
+            "relative_speed": 28.880145841080456,
+            "target_distance": 34.0097087856408,
+            "speed_points": 587.426487984565,
+            "position_points": 659.902912143592,
+            "turn": -0.9602831602096558,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.54621160882542,
+            "relative_speed": 28.161643097069604,
+            "target_distance": 33.546510284431484,
+            "speed_points": 597.6908128990057,
+            "position_points": 664.5348971556851,
+            "turn": -0.9616089463233948,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 118.09169419718586,
+            "relative_speed": 27.471932272379664,
+            "target_distance": 33.09224573382193,
+            "speed_points": 607.5438246802904,
+            "position_points": 669.0775426617806,
+            "turn": -0.9629565477371216,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.64696955075686,
+            "relative_speed": 26.8160781522061,
+            "target_distance": 32.647755767435605,
+            "speed_points": 616.9131692541986,
+            "position_points": 673.522442325644,
+            "turn": -0.9643144607543945,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 117.21107037335321,
+            "relative_speed": 26.193394275205144,
+            "target_distance": 32.21202366384032,
+            "speed_points": 625.8086532113551,
+            "position_points": 677.8797633615967,
+            "turn": -0.9656665921211243,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 116.78466396336921,
+            "relative_speed": 25.60685451272141,
+            "target_distance": 31.785690442822304,
+            "speed_points": 634.1877926754084,
+            "position_points": 682.1430955717768,
+            "turn": -0.9670051336288452,
+            "thrust": 1.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000025-WeakAngular-p1": {
+        "outcome": "host_preempted",
+        "ticks": 1,
+        "brake_ticks": 0,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": 0,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 0,
+          "altitude": 91.99516309888233,
+          "relative_speed": 34.61232198233884,
+          "target_distance": 6.995170066232059,
+          "speed_points": 505.53825739515946,
+          "position_points": 930.0482993376794,
+          "turn": 0.0,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "minimum_altitude": {
+          "tick": 1,
+          "altitude": 91.44948498711827,
+          "relative_speed": 34.717005070618654,
+          "target_distance": 6.452185889569972,
+          "speed_points": 504.04278470544784,
+          "position_points": 935.4781411043002,
+          "turn": -0.8698141574859619,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 91.99516309888233,
+            "relative_speed": 34.61232198233884,
+            "target_distance": 6.995170066232059,
+            "speed_points": 505.53825739515946,
+            "position_points": 930.0482993376794,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 91.44948498711827,
+            "relative_speed": 34.717005070618654,
+            "target_distance": 6.452185889569972,
+            "speed_points": 504.04278470544784,
+            "position_points": 935.4781411043002,
+            "turn": -0.8698141574859619,
+            "thrust": 0.0,
+            "brake": 0.0
+          }
+        ]
+      }
+    },
+    "native-mission": {
+      "validation-94000002-WeakAngular-p1": {
+        "outcome": "host_preempted",
+        "ticks": 5,
+        "brake_ticks": 4,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 5,
+          "altitude": 116.75484776790108,
+          "relative_speed": 27.73067991553931,
+          "target_distance": 31.75771846992659,
+          "speed_points": 603.8474297780099,
+          "position_points": 682.4228153007341,
+          "turn": -1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 5,
+          "altitude": 116.75484776790108,
+          "relative_speed": 27.73067991553931,
+          "target_distance": 31.75771846992659,
+          "speed_points": 603.8474297780099,
+          "position_points": 682.4228153007341,
+          "turn": -1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.08663879494725,
+            "relative_speed": 30.00729095150609,
+            "target_distance": 34.086635987428004,
+            "speed_points": 571.3244149784844,
+            "position_points": 659.1336401257199,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 118.605541923859,
+            "relative_speed": 29.461898033269648,
+            "target_distance": 33.60565323881134,
+            "speed_points": 579.1157423818622,
+            "position_points": 663.9434676118865,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.13298329298215,
+            "relative_speed": 28.922251535013793,
+            "target_distance": 33.13343725867544,
+            "speed_points": 586.8249780712316,
+            "position_points": 668.6656274132456,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 117.66933755738336,
+            "relative_speed": 28.3906920453432,
+            "target_distance": 32.67036064018454,
+            "speed_points": 594.4186850665257,
+            "position_points": 673.2963935981546,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.2075910026496,
+            "relative_speed": 28.27053427509417,
+            "target_distance": 32.209423461573756,
+            "speed_points": 596.135224641512,
+            "position_points": 677.9057653842624,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 5,
+            "altitude": 116.75484776790108,
+            "relative_speed": 27.73067991553931,
+            "target_distance": 31.75771846992659,
+            "speed_points": 603.8474297780099,
+            "position_points": 682.4228153007341,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000002-WeakRound-p1": {
+        "outcome": "host_preempted",
+        "ticks": 5,
+        "brake_ticks": 4,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 5,
+          "altitude": 116.75484776790108,
+          "relative_speed": 27.73067991553931,
+          "target_distance": 31.75771846992659,
+          "speed_points": 603.8474297780099,
+          "position_points": 682.4228153007341,
+          "turn": -1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 5,
+          "altitude": 116.75484776790108,
+          "relative_speed": 27.73067991553931,
+          "target_distance": 31.75771846992659,
+          "speed_points": 603.8474297780099,
+          "position_points": 682.4228153007341,
+          "turn": -1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.08663879494725,
+            "relative_speed": 30.00729095150609,
+            "target_distance": 34.086635987428004,
+            "speed_points": 571.3244149784844,
+            "position_points": 659.1336401257199,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 118.605541923859,
+            "relative_speed": 29.461898033269648,
+            "target_distance": 33.60565323881134,
+            "speed_points": 579.1157423818622,
+            "position_points": 663.9434676118865,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.13298329298215,
+            "relative_speed": 28.922251535013793,
+            "target_distance": 33.13343725867544,
+            "speed_points": 586.8249780712316,
+            "position_points": 668.6656274132456,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 117.66933755738336,
+            "relative_speed": 28.3906920453432,
+            "target_distance": 32.67036064018454,
+            "speed_points": 594.4186850665257,
+            "position_points": 673.2963935981546,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.2075910026496,
+            "relative_speed": 28.27053427509417,
+            "target_distance": 32.209423461573756,
+            "speed_points": 596.135224641512,
+            "position_points": 677.9057653842624,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 5,
+            "altitude": 116.75484776790108,
+            "relative_speed": 27.73067991553931,
+            "target_distance": 31.75771846992659,
+            "speed_points": 603.8474297780099,
+            "position_points": 682.4228153007341,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000019-WeakAngular-p2": {
+        "outcome": "host_preempted",
+        "ticks": 8,
+        "brake_ticks": 5,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 8,
+          "altitude": 115.84516453821936,
+          "relative_speed": 26.783287137956734,
+          "target_distance": 30.85202565835131,
+          "speed_points": 617.3816123149038,
+          "position_points": 691.4797434164869,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "minimum_altitude": {
+          "tick": 8,
+          "altitude": 115.84516453821936,
+          "relative_speed": 26.783287137956734,
+          "target_distance": 30.85202565835131,
+          "speed_points": 617.3816123149038,
+          "position_points": 691.4797434164869,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.48268552188745,
+            "relative_speed": 29.62884933066032,
+            "target_distance": 34.48268270125511,
+            "speed_points": 576.7307238477098,
+            "position_points": 655.1731729874489,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 119.00829632936328,
+            "relative_speed": 29.111368764974355,
+            "target_distance": 34.00841085703238,
+            "speed_points": 584.1233033575093,
+            "position_points": 659.9158914296762,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.54202260271589,
+            "relative_speed": 28.597157600083072,
+            "target_distance": 33.54247656163863,
+            "speed_points": 591.4691771416705,
+            "position_points": 664.5752343836137,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 118.07690439495252,
+            "relative_speed": 28.505630811100236,
+            "target_distance": 33.07793202118181,
+            "speed_points": 592.7767026985681,
+            "position_points": 669.2206797881819,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.61955430606343,
+            "relative_speed": 27.992443571263724,
+            "target_distance": 32.621356098218044,
+            "speed_points": 600.1079489819467,
+            "position_points": 673.7864390178196,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 117.17028388770066,
+            "relative_speed": 27.478585203811964,
+            "target_distance": 32.173044752704484,
+            "speed_points": 607.4487828026862,
+            "position_points": 678.2695524729552,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 116.72302119829783,
+            "relative_speed": 27.38661201842218,
+            "target_distance": 31.726966567826477,
+            "speed_points": 608.7626854511117,
+            "position_points": 682.7303343217352,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 7,
+            "altitude": 116.28343037759976,
+            "relative_speed": 26.87225026853546,
+            "target_distance": 31.288720369124157,
+            "speed_points": 616.1107104494934,
+            "position_points": 687.1127963087584,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 8,
+            "altitude": 115.84516453821936,
+            "relative_speed": 26.783287137956734,
+            "target_distance": 30.85202565835131,
+            "speed_points": 617.3816123149038,
+            "position_points": 691.4797434164869,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          }
+        ]
+      },
+      "validation-94000019-WeakRound-p2": {
+        "outcome": "host_preempted",
+        "ticks": 8,
+        "brake_ticks": 5,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 8,
+          "altitude": 115.84516453821936,
+          "relative_speed": 26.783287137956734,
+          "target_distance": 30.85202565835131,
+          "speed_points": 617.3816123149038,
+          "position_points": 691.4797434164869,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "minimum_altitude": {
+          "tick": 8,
+          "altitude": 115.84516453821936,
+          "relative_speed": 26.783287137956734,
+          "target_distance": 30.85202565835131,
+          "speed_points": 617.3816123149038,
+          "position_points": 691.4797434164869,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.48268552188745,
+            "relative_speed": 29.62884933066032,
+            "target_distance": 34.48268270125511,
+            "speed_points": 576.7307238477098,
+            "position_points": 655.1731729874489,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 119.00829632936328,
+            "relative_speed": 29.111368764974355,
+            "target_distance": 34.00841085703238,
+            "speed_points": 584.1233033575093,
+            "position_points": 659.9158914296762,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.54202260271589,
+            "relative_speed": 28.597157600083072,
+            "target_distance": 33.54247656163863,
+            "speed_points": 591.4691771416705,
+            "position_points": 664.5752343836137,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 118.07690439495252,
+            "relative_speed": 28.505630811100236,
+            "target_distance": 33.07793202118181,
+            "speed_points": 592.7767026985681,
+            "position_points": 669.2206797881819,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.61955430606343,
+            "relative_speed": 27.992443571263724,
+            "target_distance": 32.621356098218044,
+            "speed_points": 600.1079489819467,
+            "position_points": 673.7864390178196,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 117.17028388770066,
+            "relative_speed": 27.478585203811964,
+            "target_distance": 32.173044752704484,
+            "speed_points": 607.4487828026862,
+            "position_points": 678.2695524729552,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 116.72302119829783,
+            "relative_speed": 27.38661201842218,
+            "target_distance": 31.726966567826477,
+            "speed_points": 608.7626854511117,
+            "position_points": 682.7303343217352,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 7,
+            "altitude": 116.28343037759976,
+            "relative_speed": 26.87225026853546,
+            "target_distance": 31.288720369124157,
+            "speed_points": 616.1107104494934,
+            "position_points": 687.1127963087584,
+            "turn": -1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 8,
+            "altitude": 115.84516453821936,
+            "relative_speed": 26.783287137956734,
+            "target_distance": 30.85202565835131,
+            "speed_points": 617.3816123149038,
+            "position_points": 691.4797434164869,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          }
+        ]
+      },
+      "validation-94000025-WeakAngular-p1": {
+        "outcome": "arrived",
+        "ticks": 26,
+        "brake_ticks": 7,
+        "thrust_ticks": 22,
+        "first_speed_below_18": 25,
+        "first_altitude_below_105": 0,
+        "first_both_numeric_gates": 25,
+        "minimum_speed": {
+          "tick": 25,
+          "altitude": 82.08517207659773,
+          "relative_speed": 17.6508166843248,
+          "target_distance": 4.150437487844305,
+          "speed_points": 747.8454759382172,
+          "position_points": 958.4956251215569,
+          "turn": -0.3022507429122925,
+          "thrust": 1.0,
+          "brake": 0.0
+        },
+        "minimum_altitude": {
+          "tick": 26,
+          "altitude": 81.79732831772864,
+          "relative_speed": 17.79628199541654,
+          "target_distance": 4.402373221676118,
+          "speed_points": 745.767400065478,
+          "position_points": 955.9762677832389,
+          "turn": 0.0,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 91.99516309888233,
+            "relative_speed": 34.61232198233884,
+            "target_distance": 6.995170066232059,
+            "speed_points": 505.53825739515946,
+            "position_points": 930.0482993376794,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 91.46790805874278,
+            "relative_speed": 33.41361621487332,
+            "target_distance": 6.470244341591213,
+            "speed_points": 522.6626255018097,
+            "position_points": 935.2975565840878,
+            "turn": 0.24793195724487305,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 90.94869856752965,
+            "relative_speed": 32.92602317388395,
+            "target_distance": 5.958733813609113,
+            "speed_points": 529.6282403730866,
+            "position_points": 940.4126618639089,
+            "turn": 0.28556910157203674,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 90.4475654447372,
+            "relative_speed": 31.727112919728963,
+            "target_distance": 5.4712556213069075,
+            "speed_points": 546.7555297181576,
+            "position_points": 945.287443786931,
+            "turn": 0.28906768560409546,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 89.96455128292115,
+            "relative_speed": 30.520961691659657,
+            "target_distance": 5.008589553542628,
+            "speed_points": 563.9862615477191,
+            "position_points": 949.9141044645737,
+            "turn": 0.32838693261146545,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 89.48973103755623,
+            "relative_speed": 30.022943281495714,
+            "target_distance": 4.563161610945411,
+            "speed_points": 571.1008102643469,
+            "position_points": 954.3683838905459,
+            "turn": 0.37457242608070374,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 89.03315263764213,
+            "relative_speed": 28.822411333690713,
+            "target_distance": 4.145633510375113,
+            "speed_points": 588.2512666615612,
+            "position_points": 958.5436648962489,
+            "turn": 0.3749462366104126,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 7,
+            "altitude": 88.58466571609966,
+            "relative_speed": 28.332423192144137,
+            "target_distance": 3.750094575113504,
+            "speed_points": 595.2510972550838,
+            "position_points": 962.4990542488649,
+            "turn": 0.4267687499523163,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 8,
+            "altitude": 88.14580103597177,
+            "relative_speed": 27.71148832465409,
+            "target_distance": 3.38144619781124,
+            "speed_points": 604.1215953620845,
+            "position_points": 966.1855380218875,
+            "turn": -0.4380827844142914,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 9,
+            "altitude": 87.71643366716924,
+            "relative_speed": 27.09947212795877,
+            "target_distance": 3.044684563109136,
+            "speed_points": 612.8646838863032,
+            "position_points": 969.5531543689086,
+            "turn": -0.43320250511169434,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 10,
+            "altitude": 87.29682422018965,
+            "relative_speed": 26.473562551684097,
+            "target_distance": 2.7467840698557393,
+            "speed_points": 621.8062492616558,
+            "position_points": 972.5321593014427,
+            "turn": -0.4240597188472748,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 11,
+            "altitude": 86.88673034056245,
+            "relative_speed": 25.863892597385448,
+            "target_distance": 2.4960172578824174,
+            "speed_points": 630.5158200373507,
+            "position_points": 975.0398274211758,
+            "turn": -0.4118378758430481,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 12,
+            "altitude": 86.48632702205387,
+            "relative_speed": 25.248400712240116,
+            "target_distance": 2.3023736352099857,
+            "speed_points": 639.3085612537126,
+            "position_points": 976.9762636479002,
+            "turn": -0.39569661021232605,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 13,
+            "altitude": 86.09557664340943,
+            "relative_speed": 24.634105896956168,
+            "target_distance": 2.175052660377806,
+            "speed_points": 648.0842014720547,
+            "position_points": 978.2494733962219,
+            "turn": -0.3758419454097748,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 14,
+            "altitude": 85.71386504350397,
+            "relative_speed": 24.039389888416093,
+            "target_distance": 2.1190420116859494,
+            "speed_points": 656.5801444511987,
+            "position_points": 978.8095798831406,
+            "turn": -0.3532719314098358,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 15,
+            "altitude": 85.34045866045662,
+            "relative_speed": 23.46754635123626,
+            "target_distance": 2.1334382255459112,
+            "speed_points": 664.749337839482,
+            "position_points": 978.6656177445409,
+            "turn": -0.33837687969207764,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 16,
+            "altitude": 84.97559513656532,
+            "relative_speed": 22.893060671216677,
+            "target_distance": 2.212294045080206,
+            "speed_points": 672.956276125476,
+            "position_points": 977.877059549198,
+            "turn": -0.3383983373641968,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 17,
+            "altitude": 84.61935321070638,
+            "relative_speed": 22.305931625256637,
+            "target_distance": 2.344306102387331,
+            "speed_points": 681.3438339249052,
+            "position_points": 976.5569389761267,
+            "turn": -0.3339516222476959,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 18,
+            "altitude": 84.2717900475275,
+            "relative_speed": 21.732266984946705,
+            "target_distance": 2.517068307086192,
+            "speed_points": 689.5390430721899,
+            "position_points": 974.8293169291381,
+            "turn": -0.32994142174720764,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 19,
+            "altitude": 83.932781524657,
+            "relative_speed": 21.150401196888897,
+            "target_distance": 2.71906156371815,
+            "speed_points": 697.8514114730158,
+            "position_points": 972.8093843628185,
+            "turn": -0.3258277475833893,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 20,
+            "altitude": 83.60273920597385,
+            "relative_speed": 20.567544528863717,
+            "target_distance": 2.9407875528376883,
+            "speed_points": 706.1779353019468,
+            "position_points": 970.5921244716232,
+            "turn": -0.3222580552101135,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 21,
+            "altitude": 83.28142201706262,
+            "relative_speed": 19.984092297543246,
+            "target_distance": 3.175112385099479,
+            "speed_points": 714.5129671779537,
+            "position_points": 968.2488761490052,
+            "turn": -0.3184390068054199,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 22,
+            "altitude": 82.96892144718831,
+            "relative_speed": 19.406965220556675,
+            "target_distance": 3.4168728476183095,
+            "speed_points": 722.7576397063332,
+            "position_points": 965.8312715238169,
+            "turn": -0.3147057890892029,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 23,
+            "altitude": 82.66537148809454,
+            "relative_speed": 18.815434996697853,
+            "target_distance": 3.6616497748319823,
+            "speed_points": 731.208071475745,
+            "position_points": 963.3835022516802,
+            "turn": -0.3097638785839081,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 24,
+            "altitude": 82.37069353209037,
+            "relative_speed": 18.23644733520746,
+            "target_distance": 3.907054236951179,
+            "speed_points": 739.4793237827506,
+            "position_points": 960.9294576304882,
+            "turn": -0.3070369362831116,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 25,
+            "altitude": 82.08517207659773,
+            "relative_speed": 17.6508166843248,
+            "target_distance": 4.150437487844305,
+            "speed_points": 747.8454759382172,
+            "position_points": 958.4956251215569,
+            "turn": -0.3022507429122925,
+            "thrust": 1.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 26,
+            "altitude": 81.79732831772864,
+            "relative_speed": 17.79628199541654,
+            "target_distance": 4.402373221676118,
+            "speed_points": 745.767400065478,
+            "position_points": 955.9762677832389,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          }
+        ]
+      }
+    },
+    "handwritten-guidance": {
+      "validation-94000002-WeakAngular-p1": {
+        "outcome": "host_preempted",
+        "ticks": 5,
+        "brake_ticks": 5,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 5,
+          "altitude": 116.82557161201962,
+          "relative_speed": 26.113465545312778,
+          "target_distance": 31.828132348085802,
+          "speed_points": 626.9504922098174,
+          "position_points": 681.7186765191419,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 5,
+          "altitude": 116.82557161201962,
+          "relative_speed": 26.113465545312778,
+          "target_distance": 31.828132348085802,
+          "speed_points": 626.9504922098174,
+          "position_points": 681.7186765191419,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.08663879494725,
+            "relative_speed": 30.00729095150609,
+            "target_distance": 34.086635987428004,
+            "speed_points": 571.3244149784844,
+            "position_points": 659.1336401257199,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 118.6093957432368,
+            "relative_speed": 29.21981429863146,
+            "target_distance": 33.609504102034045,
+            "speed_points": 582.574081448122,
+            "position_points": 663.9049589796595,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.14448179945731,
+            "relative_speed": 28.43990882809247,
+            "target_distance": 33.14491661418297,
+            "speed_points": 593.7155881701075,
+            "position_points": 668.5508338581702,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 117.69226913091657,
+            "relative_speed": 27.670119704992967,
+            "target_distance": 32.69323243779785,
+            "speed_points": 604.7125756429576,
+            "position_points": 673.0676756220215,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.2527411537493,
+            "relative_speed": 26.888211283050637,
+            "target_distance": 32.254413886724,
+            "speed_points": 615.8826959564194,
+            "position_points": 677.4558611327599,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 116.82557161201962,
+            "relative_speed": 26.113465545312778,
+            "target_distance": 31.828132348085802,
+            "speed_points": 626.9504922098174,
+            "position_points": 681.7186765191419,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000002-WeakRound-p1": {
+        "outcome": "host_preempted",
+        "ticks": 5,
+        "brake_ticks": 5,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 5,
+          "altitude": 116.82557161201962,
+          "relative_speed": 26.113465545312778,
+          "target_distance": 31.828132348085802,
+          "speed_points": 626.9504922098174,
+          "position_points": 681.7186765191419,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 5,
+          "altitude": 116.82557161201962,
+          "relative_speed": 26.113465545312778,
+          "target_distance": 31.828132348085802,
+          "speed_points": 626.9504922098174,
+          "position_points": 681.7186765191419,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.08663879494725,
+            "relative_speed": 30.00729095150609,
+            "target_distance": 34.086635987428004,
+            "speed_points": 571.3244149784844,
+            "position_points": 659.1336401257199,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 118.6093957432368,
+            "relative_speed": 29.21981429863146,
+            "target_distance": 33.609504102034045,
+            "speed_points": 582.574081448122,
+            "position_points": 663.9049589796595,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.14448179945731,
+            "relative_speed": 28.43990882809247,
+            "target_distance": 33.14491661418297,
+            "speed_points": 593.7155881701075,
+            "position_points": 668.5508338581702,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 117.69226913091657,
+            "relative_speed": 27.670119704992967,
+            "target_distance": 32.69323243779785,
+            "speed_points": 604.7125756429576,
+            "position_points": 673.0676756220215,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.2527411537493,
+            "relative_speed": 26.888211283050637,
+            "target_distance": 32.254413886724,
+            "speed_points": 615.8826959564194,
+            "position_points": 677.4558611327599,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 116.82557161201962,
+            "relative_speed": 26.113465545312778,
+            "target_distance": 31.828132348085802,
+            "speed_points": 626.9504922098174,
+            "position_points": 681.7186765191419,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000019-WeakAngular-p2": {
+        "outcome": "host_preempted",
+        "ticks": 8,
+        "brake_ticks": 8,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 8,
+          "altitude": 116.05325091620313,
+          "relative_speed": 23.661360854195905,
+          "target_distance": 31.059490595378534,
+          "speed_points": 661.9805592257728,
+          "position_points": 689.4050940462147,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 8,
+          "altitude": 116.05325091620313,
+          "relative_speed": 23.661360854195905,
+          "target_distance": 31.059490595378534,
+          "speed_points": 661.9805592257728,
+          "position_points": 689.4050940462147,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.48268552188745,
+            "relative_speed": 29.62884933066032,
+            "target_distance": 34.48268270125511,
+            "speed_points": 576.7307238477098,
+            "position_points": 655.1731729874489,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 119.0124249768916,
+            "relative_speed": 28.879528343802527,
+            "target_distance": 34.01254052246373,
+            "speed_points": 587.4353093742498,
+            "position_points": 659.8745947753627,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.55416593676463,
+            "relative_speed": 28.132559247393985,
+            "target_distance": 33.55462579104289,
+            "speed_points": 598.1062964658001,
+            "position_points": 664.453742089571,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 118.10777979051062,
+            "relative_speed": 27.384046287635698,
+            "target_distance": 33.1087931369503,
+            "speed_points": 608.7993387480615,
+            "position_points": 668.9120686304971,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.67291302770022,
+            "relative_speed": 26.63831146555307,
+            "target_distance": 32.67466917059812,
+            "speed_points": 619.4526933492419,
+            "position_points": 673.2533082940189,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 117.24993300222948,
+            "relative_speed": 25.89150592780903,
+            "target_distance": 32.25260037560128,
+            "speed_points": 630.1213438884424,
+            "position_points": 677.4739962439871,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 116.83904011463122,
+            "relative_speed": 25.14592844851208,
+            "target_distance": 31.842773157531642,
+            "speed_points": 640.7724507355417,
+            "position_points": 681.5722684246837,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 7,
+            "altitude": 116.44018567387619,
+            "relative_speed": 24.400200446211745,
+            "target_distance": 31.445116917541704,
+            "speed_points": 651.4257079112608,
+            "position_points": 685.548830824583,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 8,
+            "altitude": 116.05325091620313,
+            "relative_speed": 23.661360854195905,
+            "target_distance": 31.059490595378534,
+            "speed_points": 661.9805592257728,
+            "position_points": 689.4050940462147,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000019-WeakRound-p2": {
+        "outcome": "host_preempted",
+        "ticks": 8,
+        "brake_ticks": 8,
+        "thrust_ticks": 0,
+        "first_speed_below_18": null,
+        "first_altitude_below_105": null,
+        "first_both_numeric_gates": null,
+        "minimum_speed": {
+          "tick": 8,
+          "altitude": 116.05325091620313,
+          "relative_speed": 23.661360854195905,
+          "target_distance": 31.059490595378534,
+          "speed_points": 661.9805592257728,
+          "position_points": 689.4050940462147,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 8,
+          "altitude": 116.05325091620313,
+          "relative_speed": 23.661360854195905,
+          "target_distance": 31.059490595378534,
+          "speed_points": 661.9805592257728,
+          "position_points": 689.4050940462147,
+          "turn": 1.0,
+          "thrust": 0.0,
+          "brake": 1.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 119.48268552188745,
+            "relative_speed": 29.62884933066032,
+            "target_distance": 34.48268270125511,
+            "speed_points": 576.7307238477098,
+            "position_points": 655.1731729874489,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 119.0124249768916,
+            "relative_speed": 28.879528343802527,
+            "target_distance": 34.01254052246373,
+            "speed_points": 587.4353093742498,
+            "position_points": 659.8745947753627,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 118.55416593676463,
+            "relative_speed": 28.132559247393985,
+            "target_distance": 33.55462579104289,
+            "speed_points": 598.1062964658001,
+            "position_points": 664.453742089571,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 118.10777979051062,
+            "relative_speed": 27.384046287635698,
+            "target_distance": 33.1087931369503,
+            "speed_points": 608.7993387480615,
+            "position_points": 668.9120686304971,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 117.67291302770022,
+            "relative_speed": 26.63831146555307,
+            "target_distance": 32.67466917059812,
+            "speed_points": 619.4526933492419,
+            "position_points": 673.2533082940189,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 117.24993300222948,
+            "relative_speed": 25.89150592780903,
+            "target_distance": 32.25260037560128,
+            "speed_points": 630.1213438884424,
+            "position_points": 677.4739962439871,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 116.83904011463122,
+            "relative_speed": 25.14592844851208,
+            "target_distance": 31.842773157531642,
+            "speed_points": 640.7724507355417,
+            "position_points": 681.5722684246837,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 7,
+            "altitude": 116.44018567387619,
+            "relative_speed": 24.400200446211745,
+            "target_distance": 31.445116917541704,
+            "speed_points": 651.4257079112608,
+            "position_points": 685.548830824583,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 8,
+            "altitude": 116.05325091620313,
+            "relative_speed": 23.661360854195905,
+            "target_distance": 31.059490595378534,
+            "speed_points": 661.9805592257728,
+            "position_points": 689.4050940462147,
+            "turn": 1.0,
+            "thrust": 0.0,
+            "brake": 1.0
+          }
+        ]
+      },
+      "validation-94000025-WeakAngular-p1": {
+        "outcome": "arrived",
+        "ticks": 15,
+        "brake_ticks": 14,
+        "thrust_ticks": 14,
+        "first_speed_below_18": 14,
+        "first_altitude_below_105": 0,
+        "first_both_numeric_gates": 14,
+        "minimum_speed": {
+          "tick": 14,
+          "altitude": 86.27750780327437,
+          "relative_speed": 17.841513787831026,
+          "target_distance": 2.1002832291739555,
+          "speed_points": 745.1212316024138,
+          "position_points": 978.9971677082603,
+          "turn": 0.23853257298469543,
+          "thrust": 1.0,
+          "brake": 1.0
+        },
+        "minimum_altitude": {
+          "tick": 15,
+          "altitude": 85.98842116519026,
+          "relative_speed": 17.962865263510132,
+          "target_distance": 2.0012284353566,
+          "speed_points": 743.3876390927123,
+          "position_points": 979.987715646434,
+          "turn": 0.0,
+          "thrust": 0.0,
+          "brake": 0.0
+        },
+        "series": [
+          {
+            "tick": 0,
+            "altitude": 91.99516309888233,
+            "relative_speed": 34.61232198233884,
+            "target_distance": 6.995170066232059,
+            "speed_points": 505.53825739515946,
+            "position_points": 930.0482993376794,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          },
+          {
+            "tick": 1,
+            "altitude": 91.46790805874278,
+            "relative_speed": 33.41361621487332,
+            "target_distance": 6.470244341591213,
+            "speed_points": 522.6626255018097,
+            "position_points": 935.2975565840878,
+            "turn": 0.210898756980896,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 2,
+            "altitude": 90.95876973435543,
+            "relative_speed": 32.21256341837077,
+            "target_distance": 5.968375041070858,
+            "speed_points": 539.8205225947032,
+            "position_points": 940.3162495892914,
+            "turn": 0.22253811359405518,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 3,
+            "altitude": 90.46769751976387,
+            "relative_speed": 31.016114076532386,
+            "target_distance": 5.489982450264491,
+            "speed_points": 556.9126560495373,
+            "position_points": 945.1001754973552,
+            "turn": 0.23217704892158508,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 4,
+            "altitude": 89.9947659427497,
+            "relative_speed": 29.812406379088813,
+            "target_distance": 5.035747894319646,
+            "speed_points": 574.1084802987313,
+            "position_points": 949.6425210568036,
+            "turn": 0.23868605494499207,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 5,
+            "altitude": 89.54025620228447,
+            "relative_speed": 28.601601517666907,
+            "target_distance": 4.606694994431462,
+            "speed_points": 591.4056926047584,
+            "position_points": 953.9330500556854,
+            "turn": 0.24373675882816315,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 6,
+            "altitude": 89.10391628733458,
+            "relative_speed": 27.406444961833248,
+            "target_distance": 4.203468830399196,
+            "speed_points": 608.4793576880965,
+            "position_points": 957.965311696008,
+            "turn": 0.246699720621109,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 7,
+            "altitude": 88.68606114281025,
+            "relative_speed": 26.20671695140087,
+            "target_distance": 3.8275165747059168,
+            "speed_points": 625.6183292657018,
+            "position_points": 961.7248342529408,
+            "turn": 0.24679367244243622,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 8,
+            "altitude": 88.28644117236948,
+            "relative_speed": 25.010255914717135,
+            "target_distance": 3.479919988521678,
+            "speed_points": 642.7106297897552,
+            "position_points": 965.2008001147833,
+            "turn": 0.24523033201694489,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 9,
+            "altitude": 87.90507510738061,
+            "relative_speed": 23.826424435808793,
+            "target_distance": 3.162275430139741,
+            "speed_points": 659.6225080598743,
+            "position_points": 968.3772456986026,
+            "turn": 0.2407887578010559,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 10,
+            "altitude": 87.54201424832829,
+            "relative_speed": 22.633997638478046,
+            "target_distance": 2.8764859637324833,
+            "speed_points": 676.6571765931708,
+            "position_points": 971.2351403626752,
+            "turn": 0.23486003279685974,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 11,
+            "altitude": 87.1969889023232,
+            "relative_speed": 21.463218326971038,
+            "target_distance": 2.624474552337721,
+            "speed_points": 693.3825953289852,
+            "position_points": 973.7552544766228,
+            "turn": 0.22692397236824036,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 12,
+            "altitude": 86.8714701367357,
+            "relative_speed": 20.239537875960576,
+            "target_distance": 2.4104753757149986,
+            "speed_points": 710.8637446291345,
+            "position_points": 975.89524624285,
+            "turn": 0.2173616737127304,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 13,
+            "altitude": 86.56487612733144,
+            "relative_speed": 19.040732142761712,
+            "target_distance": 2.235279867043155,
+            "speed_points": 727.9895408176899,
+            "position_points": 977.6472013295685,
+            "turn": 0.23180556297302246,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 14,
+            "altitude": 86.27750780327437,
+            "relative_speed": 17.841513787831026,
+            "target_distance": 2.1002832291739555,
+            "speed_points": 745.1212316024138,
+            "position_points": 978.9971677082603,
+            "turn": 0.23853257298469543,
+            "thrust": 1.0,
+            "brake": 1.0
+          },
+          {
+            "tick": 15,
+            "altitude": 85.98842116519026,
+            "relative_speed": 17.962865263510132,
+            "target_distance": 2.0012284353566,
+            "speed_points": 743.3876390927123,
+            "position_points": 979.987715646434,
+            "turn": 0.0,
+            "thrust": 0.0,
+            "brake": 0.0
+          }
+        ]
+      }
+    }
+  },
+  "verification": {
+    "preflight_match_traces": 964,
+    "preflight_precision_traces": 12,
+    "fresh_match_traces": 952,
+    "fresh_precision_traces": 288,
+    "repeat_match_trace_parity": 64
+  },
+  "fresh_generalization_test": true,
+  "training_performed": false,
+  "production_controls_changed": false
+}

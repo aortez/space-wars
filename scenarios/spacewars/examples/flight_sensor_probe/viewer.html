@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flight sensor lab</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;color:#e4eaf4;background:#0b111b;font-size:14px}
+*{box-sizing:border-box}body{margin:0;padding:26px;max-width:1700px;margin-inline:auto}
+header{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:22px}
+.eyebrow{color:#7dd3c6;text-transform:uppercase;letter-spacing:.16em;font-size:11px;font-weight:700}
+h1{font-size:30px;letter-spacing:-.04em;margin:5px 0}p{color:#9eacc0;line-height:1.6;margin:5px 0}
+.badge{border:1px solid #3a4659;border-radius:30px;padding:7px 12px;color:#b6c4d8;font-size:12px}
+.toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:end;padding:16px;background:#141e2c;border:1px solid #263448;border-radius:12px}
+label{display:block;color:#aebbd0;font-size:12px}select,button{background:#1a293c;border:1px solid #3a4b64;color:#e4eaf4;border-radius:6px;padding:9px 12px;font:inherit}
+select{margin-top:6px;max-width:min(380px,100%)}button{cursor:pointer}button:hover{border-color:#7dd3c6}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #7dd3c6;outline-offset:3px}
+.controls{display:flex;gap:6px;align-items:center}.spacer{flex:1}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+.card{background:#141e2c;border:1px solid #263448;padding:14px 18px;border-radius:10px}.value{font-size:23px;font-variant-numeric:tabular-nums;margin-top:4px}.unit{font-size:12px;color:#9eacc0}
+.layout{display:grid;grid-template-columns:minmax(450px,1.5fr) minmax(350px,1fr);gap:16px}
+.panel{background:#101a28;border:1px solid #263448;border-radius:12px;overflow:hidden}
+.panel-head{padding:14px 16px;border-bottom:1px solid #263448;display:flex;justify-content:space-between;align-items:center;gap:8px}
+h2{font-size:14px;margin:0;font-weight:600}.muted{color:#94a3ba;font-size:12px}
+#world{display:block;width:100%;height:520px;background:#0e1724}#map{display:block;width:100%;height:340px;background:#0e1724}
+.caption{padding:12px 16px;color:#9eacc0;font-size:12px;line-height:1.5;border-top:1px solid #263448;min-height:52px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;padding:12px 16px;color:#b2bed1;font-size:12px}
+.swatch{display:inline-block;width:10px;height:10px;margin-right:5px;border-radius:2px}
+.row{display:flex;align-items:center;gap:12px}.row label{display:flex;align-items:center;gap:6px}input[type=range]{accent-color:#7dd3c6;width:110px}input[type=checkbox]{accent-color:#7dd3c6}
+#scene-description{margin:16px 2px;min-height:42px;max-width:1000px}
+#cell{padding:13px 16px;line-height:1.8;min-height:78px;font-variant-numeric:tabular-nums}
+details{margin-top:15px;background:#141e2c;border:1px solid #263448;padding:13px 16px;border-radius:10px}summary{cursor:pointer;color:#cad5e5}
+pre{white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto;font-size:12px;color:#aebbd0}
+.navigation{margin:12px 0;padding:14px;background:#142638;border:1px solid #35516c;border-radius:10px}.navigation[hidden]{display:none}.navigation .row{flex-wrap:wrap}.navigation input[type=range]{width:min(300px,100%)}#path-caption{margin-top:10px}table{border-collapse:collapse;width:100%;font-size:12px;margin-top:10px}td,th{text-align:left;padding:8px;border-bottom:1px solid #2b3c52}.table-wrap{overflow:auto}.notes{margin-top:18px;font-size:12px;color:#94a3ba;line-height:1.7}a{color:#7dd3c6}#frame-label{min-width:50px;font-variant-numeric:tabular-nums}
+@media(max-width:950px){.toolbar>label{max-width:100%}.panel-head{flex-wrap:wrap}body{padding:14px}.layout{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}.spacer{display:none}#world{height:440px}}
+</style>
+<header><div><div class="eyebrow">Space Wars · perception research</div><h1>Flight sensor lab</h1><p>Inspect what survives the encoding before teaching the ship to fly.</p></div><span class="badge">Prototype · no trained policy</span></header>
+<section class="toolbar" aria-label="Inspection controls">
+<label>Scene<select id="scene"></select></label>
+<label>Sensor resolution<select id="variant"></select></label>
+<label>Map channel<select id="channel"><option value="overlap">Conservative overlap</option><option value="sampled">Sampled occupancy</option><option value="reference">Dense reference samples</option></select></label>
+<div class="spacer"></div><div class="controls"><button id="previous" aria-label="Previous scene">←</button><button id="play">Play sequence</button><button id="next" aria-label="Next scene">→</button><span id="frame-label" class="muted"></span></div>
+</section>
+<p id="scene-description"></p>
+<section id="navigation" class="navigation" hidden><div class="row"><strong>Actual hull inspection</strong><label><input id="route" type="checkbox" checked>Show inspection path</label><label>Move ghost hull<input id="path-step" type="range" min="0" value="0" step="1"></label></div><p id="path-caption"></p><span class="muted">The sensor stays at the original observation pose. The ghost hull tests geometry along a prescribed path at fixed heading; this is not a flight replay or a policy input.</span></section>
+<div class="cards" id="metrics"></div>
+<div class="layout">
+<section class="panel"><div class="panel-head"><h2>Physical world + polar map</h2><div class="row"><label><input id="overlay" type="checkbox" checked>Map</label><label><input id="rays" type="checkbox">Rays</label><label>Zoom<input id="zoom" type="range" min="1" max="6" step="0.1" value="3"></label></div></div><canvas id="world" aria-label="Collision geometry and encoded polar cells"></canvas><div class="legend"><span><i class="swatch" style="background:#738397"></i>Actual collision geometry</span><span><i class="swatch" style="background:#4db6a3"></i>Occupied samples</span><span><i class="swatch" style="background:#e6a34e"></i>Overlap without center hits</span><span><i class="swatch" style="background:#e9d77e"></i>Nearest point</span></div><div id="world-caption" class="caption"></div></section>
+<section class="panel"><div class="panel-head"><h2>Unwrapped polar map</h2><span class="muted">angle → · distance ↑</span></div><canvas id="map" aria-label="Angle by radial-band sensor array"></canvas><div id="cell" class="muted" aria-live="polite">Hover over a cell in either view to inspect its values.</div><div class="caption">Rows represent unequal physical distance bands. A colored overlap cell may contain mostly empty space. Dense reference is also sampled, not exhaustive ground truth.</div></section>
+</div>
+<details id="pair-panel"><summary>Paired scenes — what changes in the encoding?</summary><p id="pair-note"></p><div class="table-wrap"><table><thead><tr><th>Configuration</th><th>Overlap cells</th><th>Occupancy cells</th><th>Ray distances</th><th>Distance Δ</th><th>Nearest-point separation</th></tr></thead><tbody id="pair-rows"></tbody></table></div><p class="muted">Counts of changed feature values. Identical cell arrays do not imply identical complete observations: rays and precise nearest-point readings may still differ. These counts do not measure learnability.</p></details>
+<details><summary>Physical checks and object records</summary><pre id="records"></pre></details>
+<details><summary>Reproducibility and measured errors</summary><pre id="measurements"></pre><button id="download">Download full report</button></details>
+<details><summary>Live match adapter check</summary><p>Read-only sensing was also exercised on an ordinary match state. This is separate from the controlled geometry fixtures.</p><pre id="live"></pre></details>
+<div class="notes" id="notes"></div>
+<script>
+'use strict';
+const report=/*REPORT_DATA*/null;
+const $=id=>document.getElementById(id), scenes=report.scenes;
+let selected=scenes.findIndex(s=>s.name==='dead-end-open'), vi=1, hovered=-1, timer=null, worldTransform=null, mapTransform=null;
+if(selected<0)selected=0;
+const options=(select,rows)=>rows.forEach((text,i)=>{const o=document.createElement('option');o.value=i;o.textContent=text;select.append(o)});
+options($('scene'),scenes.map(s=>s.name));options($('variant'),scenes[0].variants.map(v=>v.label));$('variant').value=vi;
+const frame=()=>scenes[selected], variant=()=>frame().variants[vi], observation=()=>variant().observation;
+const percent=n=>n===null?'—':(n*100).toFixed(2)+'%';
+function drawHull(x,point,p,angle,fill){x.strokeStyle='#a8d7ff';x.fillStyle=fill;x.lineWidth=1.5;for(const shape of report.ship_outlines){x.beginPath();shape.points.forEach((v,i)=>{const q=point({x:p.x+v.x*Math.cos(angle)-v.y*Math.sin(angle),y:p.y+v.x*Math.sin(angle)+v.y*Math.cos(angle)});i?x.lineTo(...q):x.moveTo(...q)});if(shape.closed){x.closePath();x.fill()}x.stroke()}}
+function canvas(id){const c=$(id),r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;c.width=Math.round(r.width*d);c.height=Math.round(r.height*d);const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,r.width,r.height);return [x,r.width,r.height]}
+function cellValue(i){const v=variant(),c=v.observation.cells[i];return $('channel').value==='reference'?v.reference_occupancy[i]:$('channel').value==='sampled'?c.sampled_occupancy:c.overlap_coverage}
+function color(i,alpha=1){const c=observation().cells[i],v=cellValue(i);if(v===0)return 'rgba(35,50,71,'+alpha*.5+')';const rgb=$('channel').value==='overlap'&&c.sampled_occupancy===0?'230,163,78':'77,182,163';return `rgba(${rgb},${alpha*(.2+.8*v)})`}
+function polarPath(ctx,cx,cy,k,r0,r1,a0,a1){ctx.beginPath();ctx.arc(cx,cy,r1*k,-a1,-a0);if(r0>0)ctx.arc(cx,cy,r0*k,-a0,-a1,true);else ctx.lineTo(cx,cy);ctx.closePath()}
+function drawWorld(){
+ const [x,w,h]=canvas('world'),o=observation(),s=frame(),range=o.config.radial_edges.at(-1),view=range/Number($('zoom').value),k=Math.min(w,h)*.46/view,cx=w/2,cy=h/2;
+ worldTransform={cx,cy,k,w,h};
+ const point=p=>[cx+(p.x-o.origin.x)*k,cy-(p.y-o.origin.y)*k];
+ x.strokeStyle='#1b2a3d';x.lineWidth=1;const spacing=20;for(let a=-Math.ceil(view/spacing);a<=Math.ceil(view/spacing);a++){x.beginPath();x.moveTo(cx+a*spacing*k,0);x.lineTo(cx+a*spacing*k,h);x.stroke();x.beginPath();x.moveTo(0,cy+a*spacing*k);x.lineTo(w,cy+a*spacing*k);x.stroke()}
+ for(const shape of s.outlines){x.beginPath();shape.points.forEach((p,i)=>{const [a,b]=point(p);if(i===0)x.moveTo(a,b);else x.lineTo(a,b)});if(shape.closed){x.closePath();x.fillStyle='#526176';x.fill()}x.strokeStyle='#8190a4';x.lineWidth=.7;x.stroke()}
+ const edges=o.config.radial_edges,N=o.config.sectors,da=2*Math.PI/N;
+ if($('overlay').checked){for(let b=0;b<edges.length-1;b++)for(let a=0;a<N;a++){const i=b*N+a;if(cellValue(i)<=0&&i!==hovered)continue;polarPath(x,cx,cy,k,edges[b],edges[b+1],a*da+o.angle,(a+1)*da+o.angle);x.fillStyle=color(i,.45);x.fill();if(i===hovered){x.strokeStyle='#a3d7ff';x.lineWidth=2;x.stroke()}}}
+ x.strokeStyle='rgba(143,173,209,.17)';x.lineWidth=.6;
+ for(const r of edges.slice(1)){x.beginPath();x.arc(cx,cy,r*k,0,Math.PI*2);x.stroke()}
+ for(let a=0;a<N;a++){const t=o.angle+a*da;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+range*k*Math.cos(t),cy-range*k*Math.sin(t));x.stroke()}
+ if($('rays').checked){x.strokeStyle='rgba(244,222,132,.45)';for(const r of o.rays){const a=o.angle+r.bearing,d=r.distance??range;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+k*d*Math.cos(a),cy-k*d*Math.sin(a));x.stroke()}}
+ if(o.nearest_point){const p=point(o.nearest_point);x.strokeStyle='#e9d77e';x.setLineDash([4,4]);x.beginPath();x.moveTo(cx,cy);x.lineTo(...p);x.stroke();x.setLineDash([]);x.fillStyle='#e9d77e';x.beginPath();x.arc(...p,4,0,Math.PI*2);x.fill()}
+ const gp=point(s.goal);x.strokeStyle='#ce9af5';x.lineWidth=2;x.beginPath();x.arc(...gp,7,0,Math.PI*2);x.moveTo(gp[0]-11,gp[1]);x.lineTo(gp[0]+11,gp[1]);x.moveTo(gp[0],gp[1]-11);x.lineTo(gp[0],gp[1]+11);x.stroke();x.fillStyle='#ce9af5';x.fillText('goal',gp[0]+12,gp[1]-8);
+ if(s.ship_probe){drawHull(x,point,s.origin,s.angle,'#89c6ff88');if($('route').checked){x.beginPath();s.route.forEach((p,i)=>{const q=point(p);i?x.lineTo(...q):x.moveTo(...q)});x.strokeStyle='#ce9af5';x.setLineDash([5,4]);x.stroke();x.setLineDash([]);for(const p of s.physical_check.route_samples){x.fillStyle=p.hull_fits?'#7dd3c6':'#ff7373';x.beginPath();x.arc(...point(p.position),1.5,0,Math.PI*2);x.fill()}const sample=s.physical_check.route_samples[Number($('path-step').value)];drawHull(x,point,sample.position,s.angle,sample.hull_fits?'#7dd3c655':'#ff737355')}}else{x.fillStyle='#89c6ff';x.strokeStyle='#b8dcff';x.beginPath();x.arc(cx,cy,s.probe_radius*k,0,Math.PI*2);x.fill();x.stroke()}const a=o.angle+Math.PI/2;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+11*k*Math.cos(a),cy-11*k*Math.sin(a));x.stroke();
+ x.font='12px system-ui';x.fillStyle='#9eacc0';x.fillText('world units · ship-local +y is forward',14,22);x.fillText('20 units',14,h-13);x.strokeStyle='#9eacc0';x.beginPath();x.moveTo(85,h-17);x.lineTo(85+20*k,h-17);x.stroke();
+ $('world-caption').textContent=`${s.ship_probe?'Production hull + rear feet':'Radius-'+s.probe_radius+' inspection disk'} · completed fixture step ${s.tick} · map range ${range} units · nearest solid ${o.nearest_distance===null?'outside range':o.nearest_distance.toFixed(3)+' units'}.`;
+}
+function drawMap(){const [x,w,h]=canvas('map'),o=observation(),N=o.config.sectors,B=o.config.radial_edges.length-1,left=48,top=18,cw=(w-left-16)/N,ch=(h-top-34)/B;mapTransform={left,top,cw,ch,B,N};x.font='11px system-ui';
+ for(let b=0;b<B;b++){const y=top+(B-b-1)*ch;for(let a=0;a<N;a++){const i=b*N+a;x.fillStyle=color(i);x.fillRect(left+a*cw,y,cw-.4,ch-.6);if(i===hovered){x.strokeStyle='#c8e6ff';x.lineWidth=2;x.strokeRect(left+a*cw,y,cw,ch)}}x.fillStyle='#9eacc0';x.textAlign='right';x.fillText(o.config.radial_edges[b+1],left-7,y+12)}
+ x.textAlign='center';for(let d=0;d<=360;d+=90){x.fillStyle='#9eacc0';x.fillText(d+'°',left+(w-left-16)*d/360,h-12)}x.textAlign='left';}
+function showCell(){const o=observation();if(hovered<0){$('cell').textContent='Hover over either view to inspect a cell. Orange highlights overlap that center samples missed.';return}const b=Math.floor(hovered/o.config.sectors),a=hovered%o.config.sectors,c=o.cells[hovered],r=o.config.radial_edges;
+ $('cell').textContent=`Sector ${a} · ${r[b]}–${r[b+1]} units | Overlap ${percent(c.overlap_coverage)} | Centers ${percent(c.sampled_occupancy)} | Dense centers ${percent(variant().reference_occupancy[hovered])}`;}
+function draw(){drawWorld();drawMap();showCell();if(frame().ship_probe){const p=frame().physical_check,s=p.route_samples[Number($('path-step').value)];$('path-caption').textContent=`Direct translation: ${p.direct_translation_clear?'clear':'blocked'} · Inspection path: ${p.route_translation_clear?'clear':'blocked'} · Ghost pose: ${s.hull_fits?'fits':'intersects'} · Clear path-center samples in touched cells: ${percent(variant().metrics.clear_route_centers_in_touched_cells_fraction)}.`}}
+function refresh(){const s=frame(),v=variant(),o=v.observation,m=v.metrics;hovered=-1;$('scene').value=selected;$('scene-description').textContent=s.description;$('navigation').hidden=!s.ship_probe;$('path-step').value=0;if(s.ship_probe)$('path-step').max=s.physical_check.route_samples.length-1;
+ const pair=report.comparisons.find(p=>p.a===s.name||p.b===s.name);$('pair-panel').hidden=!pair;$('pair-rows').replaceChildren();if(pair){$('pair-note').textContent=`${pair.a} (${pair.route_clear_a?'clear path':'blocked path'}) versus ${pair.b} (${pair.route_clear_b?'clear path':'blocked path'}).`;for(const v of pair.variants){const tr=document.createElement('tr');for(const value of [v.label,v.changed_overlap_cells,v.changed_occupancy_cells,v.changed_ray_distances,v.nearest_distance_delta.toFixed(6),v.nearest_point_separation.toFixed(6)]){const td=document.createElement('td');td.textContent=value;tr.append(td)}$('pair-rows').append(tr)}}
+ $('metrics').innerHTML=[['Sensor time',m.median_ms.toFixed(2),'ms median'],['Native queries',m.native_queries.toLocaleString(),'per observation'],['Missed occupied samples',percent(m.missed_occupied_reference_fraction),'dense reference'],['Empty area flagged',percent(m.empty_reference_area_in_flagged_cells),'of full mapped area']].map(([l,n,u])=>`<div class="card"><label>${l}</label><div class="value">${n}</div><span class="unit">${u}</span></div>`).join('');
+ $('records').textContent=JSON.stringify({physical_check:s.physical_check,objects:s.objects},null,2);$('measurements').textContent=JSON.stringify({metrics:m,max_arc_overreach:o.max_arc_overreach,snapshot:s.snapshot,snapshot_sha256:s.snapshot_sha256},null,2);
+ const seq=scenes.filter(t=>t.sequence===s.sequence);$('frame-label').textContent=`${seq.indexOf(s)+1}/${seq.length}`;$('play').disabled=seq.length<2;draw();}
+function stop(){if(timer)clearInterval(timer);timer=null;$('play').textContent='Play sequence'}
+$('scene').onchange=()=>{stop();selected=Number($('scene').value);refresh()};$('variant').onchange=()=>{vi=Number($('variant').value);refresh()};$('channel').onchange=draw;$('overlay').onchange=draw;$('rays').onchange=draw;$('zoom').oninput=draw;$('route').onchange=draw;$('path-step').oninput=draw;
+$('previous').onclick=()=>{stop();selected=(selected+scenes.length-1)%scenes.length;refresh()};$('next').onclick=()=>{stop();selected=(selected+1)%scenes.length;refresh()};
+$('play').onclick=()=>{if(timer){stop();return}const seq=scenes.map((s,i)=>s.sequence===frame().sequence?i:-1).filter(i=>i>=0);if(seq.length<2)return;$('play').textContent='Pause';timer=setInterval(()=>{selected=seq[(seq.indexOf(selected)+1)%seq.length];refresh()},850)};
+$('map').onmousemove=e=>{const r=$('map').getBoundingClientRect(),t=mapTransform,a=Math.floor((e.clientX-r.left-t.left)/t.cw),b=t.B-1-Math.floor((e.clientY-r.top-t.top)/t.ch);hovered=a>=0&&a<t.N&&b>=0&&b<t.B?b*t.N+a:-1;draw()};
+$('world').onmousemove=e=>{const r=$('world').getBoundingClientRect(),t=worldTransform,o=observation(),dx=(e.clientX-r.left-t.cx)/t.k,dy=-(e.clientY-r.top-t.cy)/t.k,d=Math.hypot(dx,dy),a=((Math.atan2(dy,dx)-o.angle)%(2*Math.PI)+2*Math.PI)%(2*Math.PI),edges=o.config.radial_edges,b=edges.findIndex((v,i)=>i<edges.length-1&&d>=v&&d<edges[i+1]);hovered=b<0?-1:b*o.config.sectors+Math.min(o.config.sectors-1,Math.floor(a/(2*Math.PI)*o.config.sectors));draw()};
+for(const id of ['world','map'])$(id).onmouseleave=()=>{hovered=-1;draw()};
+$('download').onclick=()=>{const blob=new Blob([JSON.stringify(report)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='flight-sensor-report.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+$('live').textContent=JSON.stringify({tick:report.live_match.observation.tick,bodies:report.live_match.observation.bodies,nearest_distance:report.live_match.observation.geometry.nearest_distance,collider_outlines:report.live_match.outlines.length},null,2);
+for(const note of report.notes){const p=document.createElement('p');p.textContent=note;$('notes').append(p)}
+window.addEventListener('resize',draw);refresh();
+</script>
+</html>

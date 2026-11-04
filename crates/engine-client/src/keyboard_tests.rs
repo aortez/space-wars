@@ -246,6 +246,12 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     }
     assert_eq!(window.get_training_population(), 8);
     assert_eq!(window.get_training_generations(), 8);
+    assert_eq!(window.get_training_worker_label(), "Auto 75%");
+    window.set_training_focus(9);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_training_worker_label(), "Auto 90%");
+    key(&window, Key::Return);
+    assert_eq!(window.get_training_worker_label(), "Fixed 1");
     assert!(ui_activation::activate(&window, "training.start"));
     pump_worker_until(&window, || window.get_training_can_pause());
     assert!(window.get_training_active());
@@ -257,6 +263,12 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     assert!(!window.get_training_active());
     let before: serde_json::Value = serde_json::from_str(&window.get_training_snapshot()).unwrap();
     assert_eq!(before["evaluated_candidates"], before["saved_candidates"]);
+    assert_eq!(before["workers"]["config"]["mode"], "fixed");
+    assert!(ui_activation::activate(
+        &window,
+        "training.workers.previous"
+    ));
+    assert_eq!(window.get_training_worker_label(), "Auto 90%");
     assert!(ui_activation::activate(&window, "training.resume"));
     key(&window, Key::Escape);
     assert!(!window.get_training_visible());

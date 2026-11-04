@@ -2,9 +2,10 @@
 
 The normal `spacewars` launcher entry uses the generated three-planet material
 match. Each player independently selects **human**, **legacy bot**, **planner
-bot**, **mission v12**, **value v13**, or **recovery v1** in Settings: two humans,
-either human/bot arrangement, or two bots watching the same round.
-The default is two humans. Choices persist through restart and relaunch.
+bot**, **mission v12**, **value v13**, **recovery v1**, or **learned flight
+v1** in Settings: two humans, either human/bot arrangement, or two bots
+watching the same round. The default is two humans. Choices persist through
+restart and relaunch.
 
 **Recovery bot v1** is the live candidate: Value bot v13's mission decisions
 with bounded terrain recovery, precise rebuild approach and supported hatch
@@ -13,6 +14,16 @@ for either or both players; **value v13** retains its existing recovery behavior
 The HUD and scoreboard identify the candidate as **Recovery bot v1**. Runtime
 diagnostics report its mission policy and exact recovery profile independently.
 See the [qualification results](terrain-recovery-p1-followup-results.md).
+
+**Learned flight bot v1** is Recovery bot v1 with its transfer legs flown by
+the learned flight stack: from the moment the mission would fly toward the
+entry point above its destination until the mission's own handoff, a
+navigation network chooses a heading and speed every six ticks and a motor
+network flies the actuators, while the mission's other priorities (recovery,
+pursuit, solar escape, capture) keep their native controls and take the ship
+back the tick they claim it. The HUD shows the stack's distance and leg time
+beside the mission label while it flies; runtime diagnostics report the leg
+counts. See the [mission binding results](flight-mission-binding-v1.md).
 
 Generated planets use interpolated round surfaces shared by drawing, collisions
 and mining. Material quantities remain cell based. The

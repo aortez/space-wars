@@ -144,6 +144,9 @@ The local launcher includes the following scenarios and presets:
   **spacewars-terrain-combat** adds a human-versus-bot dogfight with the shared
   laser/cannon and physical ship recovery. **spacewars-terrain-duel** lets both
   bots run the same loop. See [Material combat](docs/material-combat-ai.md).
+  **spacewars-terrain-learned-flight** flies P2 with the composed learned flight
+  stack between stops around a gravity-free practice planet; see
+  [Learned flight stack integration](docs/flight-stack-integration-v1.md).
 - **Surface comparison** — `spacewars-surface-blocks` and
   `spacewars-surface-contour` compare steps and slopes on the same destructible
   planet, with collision outlines and the real landing, mining and recovery loop.
@@ -509,6 +512,121 @@ screenshot starts inside the benchmark window without a fixed delay. Its
 successful response includes the new scenario revision.
 
 ## Run headless AI episodes
+
+New learned-flight work follows the
+[flight-controller plan](docs/design/learned-flight-controller-v1.md): a
+goal-conditioned skill trained with PPO and evaluated on physical outcomes,
+with no native takeover. The [PPO integration smoke](docs/flight-ppo-smoke-v1.md)
+now verifies training, Rust inference and exact checkpoint continuation; flight
+competence is not yet demonstrated. The first [bounded clear-space learning test](docs/flight-clear-control-v1.md)
+completed three seeds with failed arrival gates. A subsequent
+[matched persistence comparison](docs/flight-persistent-exploration-v1.md) produced
+longer thrust bursts but no successful final arrivals in either arm.
+A [velocity-shaping comparison](docs/flight-velocity-shaping-v1.md) then increased
+sampled thrust by removing the speed term, but both arms again had zero final arrivals.
+A [credit-assignment comparison](docs/flight-credit-assignment-v1.md) increased
+GAE lambda to 1.0 within unchanged rollouts; sampled thrust rose but final arrivals
+remained zero in both arms.
+The [learning-signal audit](docs/flight-learning-signal-audit-v1.md) then verified
+that surviving timeouts from the same state receive equal complete reward despite
+different partial progress. It reconstructed training signals without updating models.
+A [graded-deadline comparison](docs/flight-graded-deadline-v1.md) then added lasting
+value for finishing closer. It broke that reward tie, but both arms still had zero
+final arrivals; graded policies braked near their starting positions without thrust.
+An [aligned-approach diagnostic](docs/flight-aligned-approach-v1.md) simplified starts
+to stationary ships facing nearby goals. Sampled training often reached the radius,
+but all final deterministic policies still suppressed thrust and had zero arrivals.
+A [frozen action-execution comparison](docs/flight-action-execution-v1.md) then
+produced 20/192 arrivals by sampling those same models, versus 0/48 deterministic
+arrivals. Low-probability thrust survives sampling; settling is still unreliable.
+A [steering-noise ablation](docs/flight-steering-ablation-v1.md) then kept steering
+at the network mean while sampling buttons. With unchanged weights and paired random
+draws, arrivals rose to 137/192; broader qualification remains pending.
+A [learning-gain comparison](docs/flight-learning-gain-v1.md) then tested the original
+untrained checkpoints under the same mixed decoder: 0/192 arrivals versus 137/192
+trained arrivals, confirming a scoped contribution from training. The decoder now has
+an explicit [candidate execution contract](docs/design/learned-flight-execution-v1.md).
+It is available through the routine evaluator and training configuration; see
+[usage and output records](docs/design/learned-flight-execution-v1.md#routine-evaluation-use)
+and the [integration verification](docs/flight-evaluation-integration-v1.md).
+Evaluation sampling preserves training's random state. A subsequent
+[256-update duration experiment](docs/flight-mixed-duration-v1.md) used frozen repeated
+trial criteria and regressed from 137/192 to 84/192 arrivals. The subsequent
+[saved-policy execution comparison](docs/flight-duration-execution-v1.md) found
+fully sampled arrivals nearly unchanged overall (20/192 to 21/192), with two models
+declining under both modes. An [exact PPO-update audit](docs/flight-update-attribution-v1.md)
+found that seed 43's selected thrust declines persisted without immediate value loss.
+The subsequent [continuous-control change](docs/flight-continuous-controls-v2.md)
+adds real fractional throttle/braking to the game API and learner, preserving full-power
+keyboard inputs. New v2 policies use continuous action densities; old binary exports
+and traces remain in their archives. The [first continuous training experiment](docs/flight-continuous-approach-v1.md)
+produced 0/48 mean and 0/192 sampled arrivals: most trials reached the goal area but
+never slowed enough, despite eliminating final-evaluation collisions. Progression
+remains unqualified. A [frozen response probe](docs/flight-goal-response-v1.md) found
+almost no goal-distance/speed conditioning in all three policies. The
+[paired input-scaling experiment](docs/flight-input-scaling-v1.md) has now completed
+six fresh runs. Input scaling increased response magnitudes but produced 0/48 arrivals, matching the control.
+The [stationary hold diagnostic](docs/flight-hold-position-v1.md) then tested learning
+from already-settled starts. The stationary hold diagnostic produced 0/48 final holds or later arrivals; both learning gates failed.
+An [exact hold-update audit](docs/flight-hold-update-audit-v1.md) found small immediate
+entropy effects and very sparse coverage of states still within holding tolerances.
+The [paired early-hold experiment](docs/flight-early-hold-v1.md) tested terminating
+failed holds immediately during training. Early failure concentrates training on holding and lowers throttle, but both arms still produce 0/48 final holds or later arrivals at 32 updates.
+The [128-update hold comparison](docs/flight-extended-hold-v1.md) kept settings fixed.
+At 128 updates, early-failure training achieves 48/48 immediate holds across all three seeds; the matched long-episode controls remain at 0/48.
+The [hold robustness audit](docs/flight-hold-robustness-v1.md) then checked longer
+holds and systematic disturbances without training. The original 48/48 short holds reproduce, but sustained holding and general small-error recovery remain unqualified.
+The [settle/recover comparison](docs/flight-settle-recover-v1.md) tests fixed correction
+families and a granular state cost from the short-hold policies. The near-goal comparison fails sustained recovery and short-hold retention; the added state cost does not improve this bounded run.
+The [short-recovery entry stage](docs/flight-short-recovery-v1.md) tests a shorter request
+with explicit sampled-experience and retention gates. The short-recovery pilot produces sparse sampled successes but fails its entry gate; conditional longer training is not run.
+The [frozen-policy noise probe](docs/flight-noise-probe-v1.md) isolates exploration
+amplitude with paired random streams. Quarter exploration noise improves sampled holding and recovery, but backward and lateral position correction remain absent.
+The [paired noise-training pilot](docs/flight-noise-training-v1.md) tests whether lower
+- [Full/quarter-noise update-attribution audit](docs/flight-noise-update-audit-v1.md): exact replay, loss effects and optimizer-step limits.
+- [Quarter-noise learning-rate pilot](docs/flight-rate-training-v1.md): smaller steps retain 44/48 holds, while position correction remains unlearned.
+- [Learning-rate continuation through update 32](docs/flight-rate-continuation-v1.md): exact continuation with separate original and boundary baselines.
+- [Value-gradient isolation pilot](docs/flight-value-isolation-v1.md): shared versus head-only critic training with unchanged inference.
+- [Value-gradient continuation through update 32](docs/flight-value-continuation-v1.md): retention and recovery trends after isolating the value gradient.
+- [Goal response of retained recovery policies](docs/flight-recovery-response-v1.md): fixed-state destination sensitivity and recorded position failures.
+- [Function-preserving goal scaling](docs/flight-goal-scaling-v1.md): paired position-recovery and holding test with identical initial behavior.
+- [Goal-path and policy-gradient audit](docs/flight-goal-flow-v1.md): layer attenuation, task-family gradients and recorded position experience.
+- [Learned goal-residual branch](docs/flight-goal-residual-v1.md): versioned direct goal path, paired recovery/holding results and exact restart checks.
+- [Task-family advantage centering](docs/flight-family-centering-v1.md): shared-scale centering comparison with retained advantages and physical recovery results.
+- [Frozen continuous-policy persistence probe](docs/flight-persistent-probe-v1.md): paired temporal-noise audit with movement, action coverage and holding outcomes.
+- [Frozen propulsion-exploration probe](docs/flight-propulsion-probe-v1.md): fixed steering with wider throttle/brake noise, exact baseline reproduction and physical retention results.
+- [Arrival-corridor bearing curriculum](docs/flight-bearing-curriculum-v1.md): fixed five-stage recipe and paired first-stage learning, holding and settling evidence.
+- [Fresh versus holding-warm initialization](docs/flight-fresh-initialization-v1.md): matched first-stage learning, independent starting baselines and physical qualification.
+- [Small motor turn-and-settle pilot](docs/flight-motor-turn-v1.md): heading/speed control boundary, compact learned motor network and first scoped turning results.
+- [Motor heading retention and steering response](docs/flight-motor-retention-v1.md): frozen-policy fifteen-second trials and matched-state inspection of the failed seed.
+- [Motor braking and velocity tracking](docs/flight-motor-velocity-v1.md): inherited braking succeeds, but the fixed velocity-training stage fails and exposes limited propulsion exploration.
+- [Motor throttle/brake exploration](docs/flight-motor-exploration-v1.md): persistent exploration reaches useful speeds in two models, with measured braking and overspeed tradeoffs.
+- [Paired motor training with persistent exploration](docs/flight-motor-persistent-v1.md): movement action coverage improves, but neither training arm learns sustained speed tracking.
+- [Saved motor learning-credit audit](docs/flight-motor-credit-v1.md): useful acceleration receives credit, but rare useful samples compete with conservative aggregate updates and deadline effects.
+- [Aligned motor speed-control comparison](docs/flight-motor-aligned-v1.md): one joint seed retains eight low-speed cases; removing stopping updates adds none and fails retention.
+- [Protected sustained speed-control attempt](docs/flight-motor-sustained-v1.md): original stopping outputs are preserved; a seed-17 collision stops preflight before the main comparison.
+- [Completed protected speed-control comparison](docs/flight-motor-sustained-v2.md): original stopping trajectories are preserved; sustained training adds eight low-speed cases in one seed, but neither arm qualifies.
+- [Saved motor velocity-feedback audit](docs/flight-motor-feedback-v1.md): the original actor dominates partial corrective learning in seed 43; native brake saturation exposes high-speed overshoot.
+- [Protected movement-actor comparison](docs/flight-motor-movement-v1.md): matched initial functions and exact stopping preservation; the new movement actor adds no tracking success and retains the overspeed feedback failure.
+- [Matched motor action/return probe](docs/flight-motor-action-return-v1.md): corrective braking earns useful local credit; intermediate critic terms reverse some beneficial underspeed action rankings.
+- [Protected GAE-lambda comparison](docs/flight-motor-gae-v1.md): lambda 1 learns corrective high-speed feedback in seed 43 and preserves seed 29's low-speed cases; original stopping remains exact, but strict speed tracking still fails.
+- [Saved motor force-balance/update audit](docs/flight-motor-balance-v1.md): corrective feedback remains weak at high speeds; incorrect balance and competing command updates limit tracking.
+- [Protected command-balanced comparison](docs/flight-motor-command-balance-v1.md): all commands are represented in each balanced rollout, but tracking gains remain zero and original stopping remains exact.
+- [Saved per-command gradient audit](docs/flight-motor-gradient-v1.md): exact update replay exposes conflicting speed signals, broad force shifts and critic clipping while preserving stopping.
+- [Protected single-speed diagnostic](docs/flight-motor-single-speed-v1.md): speed-16 feedback gains the correct local direction, but slow correction and biased balance still yield no retained cases.
+- [Single-speed error-region audit](docs/flight-motor-error-gradient-v1.md): exact replays reveal noncorrective overspeed credit, competing state-group updates and incoming momentum.
+- [Matched single-speed action returns](docs/flight-motor-error-return-v1.md): corrective actions usually improve measured returns at saved learning states; current endpoint credit preserves their mean rankings.
+- [Repeated-rollout gradient diagnostic](docs/flight-motor-rollout-gradient-v1.md): identical saved starts yield frequent gradient direction flips; averaged and combined signals remain distinct.
+- [Larger effective-batch comparison](docs/flight-motor-effective-batch-v1.md): matched physics and larger optimizer means still yield 0/24 retained speed cases in every seed; original stopping stays exact.
+exploration noise improves learning and retention. Quarter-noise training produces more successful samples but worsens deterministic recovery and retention; the pilot stops without a longer run.
+The tools and arrival results below describe
+the existing evolutionary training and rule-bot workflows.
+The [flight sensor prototype](docs/flight-sensor-prototype.md) provides a
+self-contained gallery for inspecting polar geometry, thin obstacles and live
+terrain edits before fixing the new model's observation contract.
+The [actual-hull comparison](docs/flight-sensor-navigation-v1.md) extends that
+gallery to narrow gaps, curved corridors and detours, with physical hull checks
+and paired sensor comparisons.
 
 The Training view, genome browser design, and evolutionary experiments
 are described in the [evolutionary training plan](docs/design/evolutionary-training.md).

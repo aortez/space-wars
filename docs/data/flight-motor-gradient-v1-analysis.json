@@ -1,0 +1,1986 @@
+{
+  "by_arm": {
+    "cyclic": {
+      "updates": 15,
+      "minibatch_pairs": {
+        "actor": {
+          "count": 72,
+          "min": -0.9652528478663313,
+          "max": 0.9721593441656592,
+          "mean": -0.02686499837810234,
+          "median": 0.05770887787646366,
+          "missing": 1008,
+          "negative": 34,
+          "below_minus_half": 22
+        },
+        "mean_action": {
+          "count": 72,
+          "min": -0.9779846925427002,
+          "max": 0.9797512910999129,
+          "mean": -0.021194981278910573,
+          "median": 0.08612297771750402,
+          "missing": 1008,
+          "negative": 33,
+          "below_minus_half": 22
+        }
+      },
+      "normalization_pairs": {
+        "raw": {
+          "count": 3,
+          "min": -0.3899648479905454,
+          "max": 0.9577024718695993,
+          "mean": 0.46058103000153156,
+          "median": 0.8140054661255408,
+          "missing": 42,
+          "negative": 1,
+          "below_minus_half": 0
+        },
+        "raw_common_scale": {
+          "count": 3,
+          "min": -0.389964914222442,
+          "max": 0.9577024942671876,
+          "mean": 0.46058101547470237,
+          "median": 0.8140054663793616,
+          "missing": 42,
+          "negative": 1,
+          "below_minus_half": 0
+        },
+        "pooled": {
+          "count": 3,
+          "min": -0.6438370036994326,
+          "max": 0.9804669269667543,
+          "mean": 0.4234273871135205,
+          "median": 0.9336522380732398,
+          "missing": 42,
+          "negative": 1,
+          "below_minus_half": 1
+        },
+        "own_center_common_scale": {
+          "count": 3,
+          "min": 0.6150277041643405,
+          "max": 0.9683837687577171,
+          "mean": 0.8084785181921936,
+          "median": 0.8420240816545234,
+          "missing": 42,
+          "negative": 0,
+          "below_minus_half": 0
+        }
+      },
+      "clipping": {
+        "actual": {
+          "count": 360,
+          "min": 0.23774360120296478,
+          "max": 1.0,
+          "mean": 0.9247455712821748,
+          "median": 1.0
+        },
+        "actor_only": {
+          "count": 360,
+          "min": 0.4582422971725464,
+          "max": 1.0,
+          "mean": 0.964067834450139,
+          "median": 1.0
+        },
+        "critic_reduces_scale": 109,
+        "actual_over_actor_ratio": {
+          "count": 360,
+          "min": 0.23774360120296478,
+          "max": 1.0,
+          "mean": 0.958820818107431,
+          "median": 1.0
+        }
+      },
+      "normalization_by_command": [
+        {
+          "command": 4,
+          "rows": 6144,
+          "sign_flips": 3125,
+          "pooled_positive": 2444,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 1
+        },
+        {
+          "command": 10,
+          "rows": 5376,
+          "sign_flips": 1332,
+          "pooled_positive": 2978,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 16,
+          "rows": 0,
+          "sign_flips": 0,
+          "pooled_positive": 0,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        }
+      ],
+      "effects": {
+        "anchors_mean": {
+          "groups": 90,
+          "actual_corrective": 46,
+          "linear_corrective": 46,
+          "linear_actual_same_sign": 90,
+          "linear_absolute_error": {
+            "count": 90,
+            "min": 6.434809563004434e-05,
+            "max": 0.04380285836058756,
+            "mean": 0.011608315902385495,
+            "median": 0.008831043924955262
+          },
+          "own_gradient_corrective": {
+            "raw": 19,
+            "pooled": 19,
+            "own_center_common_scale": 18
+          },
+          "allocation_corrective": {
+            "4": 27,
+            "10": 26,
+            "16": 0,
+            "stop": 0,
+            "entropy": 54,
+            "value": 0,
+            "carry": 34,
+            "rounding": 51
+          },
+          "pooled_own_corrective_actual_wrong": 1,
+          "allocation_abs": {
+            "4": 9.947364493543642,
+            "10": 11.886959997016179,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.06706698478453389,
+            "value": 0.0,
+            "carry": 5.275339693410994,
+            "rounding": 0.00012464948343427737
+          },
+          "same_direction_under_over": 44,
+          "restores_both_sides": 1,
+          "worsens_both_sides": 0,
+          "pairs": 45,
+          "slope_strengthened": 24
+        },
+        "anchor_51": {
+          "groups": 90,
+          "actual_corrective": 46,
+          "linear_corrective": 46,
+          "linear_actual_same_sign": 90,
+          "linear_absolute_error": {
+            "count": 90,
+            "min": 1.2469230499301265e-05,
+            "max": 0.04360569630431632,
+            "mean": 0.011665721573510611,
+            "median": 0.008842445020928291
+          },
+          "own_gradient_corrective": {
+            "raw": 19,
+            "pooled": 19,
+            "own_center_common_scale": 18
+          },
+          "allocation_corrective": {
+            "4": 27,
+            "10": 26,
+            "16": 0,
+            "stop": 0,
+            "entropy": 53,
+            "value": 0,
+            "carry": 34,
+            "rounding": 51
+          },
+          "pooled_own_corrective_actual_wrong": 1,
+          "allocation_abs": {
+            "4": 10.120624185764365,
+            "10": 12.118694946550544,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.06897092026660688,
+            "value": 0.0,
+            "carry": 5.361607186575835,
+            "rounding": 0.0001265765665843882
+          },
+          "same_direction_under_over": 44,
+          "restores_both_sides": 1,
+          "worsens_both_sides": 0,
+          "pairs": 45,
+          "slope_strengthened": 23
+        },
+        "saved_ready_near": {
+          "groups": 18,
+          "actual_corrective": 11,
+          "linear_corrective": 11,
+          "linear_actual_same_sign": 18,
+          "linear_absolute_error": {
+            "count": 18,
+            "min": 3.032650309408788e-05,
+            "max": 0.029739496914058416,
+            "mean": 0.009418149590928637,
+            "median": 0.009061365065826027
+          },
+          "own_gradient_corrective": {
+            "raw": 11,
+            "pooled": 12,
+            "own_center_common_scale": 12
+          },
+          "allocation_corrective": {
+            "4": 6,
+            "10": 8,
+            "16": 0,
+            "stop": 0,
+            "entropy": 11,
+            "value": 0,
+            "carry": 8,
+            "rounding": 9
+          },
+          "pooled_own_corrective_actual_wrong": 2,
+          "allocation_abs": {
+            "4": 1.6007640572750874,
+            "10": 2.2878970780764822,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.01593380929660726,
+            "value": 0.0,
+            "carry": 0.9327360953318516,
+            "rounding": 1.9792849842714955e-05
+          }
+        }
+      }
+    },
+    "balanced": {
+      "updates": 15,
+      "minibatch_pairs": {
+        "actor": {
+          "count": 1080,
+          "min": -0.9883910522762444,
+          "max": 0.9904253762977031,
+          "mean": 0.013321654782988634,
+          "median": 0.015731021192273563,
+          "missing": 0,
+          "negative": 530,
+          "below_minus_half": 308
+        },
+        "mean_action": {
+          "count": 1080,
+          "min": -0.9915147270700815,
+          "max": 0.9916844928758067,
+          "mean": 0.019059856285858878,
+          "median": 0.03271072811068045,
+          "missing": 0,
+          "negative": 529,
+          "below_minus_half": 344
+        }
+      },
+      "normalization_pairs": {
+        "raw": {
+          "count": 45,
+          "min": -0.9724934250819675,
+          "max": 0.9798013324121029,
+          "mean": 0.11681754220855094,
+          "median": 0.24729531955093642,
+          "missing": 0,
+          "negative": 21,
+          "below_minus_half": 10
+        },
+        "raw_common_scale": {
+          "count": 45,
+          "min": -0.9724934306533932,
+          "max": 0.9798013186507751,
+          "mean": 0.11681751515452707,
+          "median": 0.24729530751036827,
+          "missing": 0,
+          "negative": 21,
+          "below_minus_half": 10
+        },
+        "pooled": {
+          "count": 45,
+          "min": -0.94746170527806,
+          "max": 0.9827930046587248,
+          "mean": 0.22238598371326737,
+          "median": 0.5146158710267241,
+          "missing": 0,
+          "negative": 17,
+          "below_minus_half": 8
+        },
+        "own_center_common_scale": {
+          "count": 45,
+          "min": -0.9800845435217659,
+          "max": 0.9797419425884745,
+          "mean": 0.05445322091551789,
+          "median": 0.005700848677332333,
+          "missing": 0,
+          "negative": 22,
+          "below_minus_half": 13
+        }
+      },
+      "clipping": {
+        "actual": {
+          "count": 360,
+          "min": 0.07675687968730927,
+          "max": 1.0,
+          "mean": 0.5955980320978496,
+          "median": 0.5758805572986603
+        },
+        "actor_only": {
+          "count": 360,
+          "min": 0.38308143615722656,
+          "max": 1.0,
+          "mean": 0.9534974791109562,
+          "median": 1.0
+        },
+        "critic_reduces_scale": 284,
+        "actual_over_actor_ratio": {
+          "count": 360,
+          "min": 0.07675687968730927,
+          "max": 1.0,
+          "mean": 0.6231747328082666,
+          "median": 0.609754890203476
+        }
+      },
+      "normalization_by_command": [
+        {
+          "command": 4,
+          "rows": 3840,
+          "sign_flips": 1999,
+          "pooled_positive": 2272,
+          "all_positive_groups": 7,
+          "all_nonpositive_groups": 4
+        },
+        {
+          "command": 10,
+          "rows": 3840,
+          "sign_flips": 1648,
+          "pooled_positive": 3063,
+          "all_positive_groups": 4,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 16,
+          "rows": 3840,
+          "sign_flips": 476,
+          "pooled_positive": 1077,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 1
+        }
+      ],
+      "effects": {
+        "anchors_mean": {
+          "groups": 90,
+          "actual_corrective": 44,
+          "linear_corrective": 44,
+          "linear_actual_same_sign": 90,
+          "linear_absolute_error": {
+            "count": 90,
+            "min": 9.91646644263322e-06,
+            "max": 0.01360349190527621,
+            "mean": 0.0037447738580013343,
+            "median": 0.00217747402567549
+          },
+          "own_gradient_corrective": {
+            "raw": 47,
+            "pooled": 42,
+            "own_center_common_scale": 45
+          },
+          "allocation_corrective": {
+            "4": 41,
+            "10": 43,
+            "16": 44,
+            "stop": 0,
+            "entropy": 60,
+            "value": 0,
+            "carry": 36,
+            "rounding": 46
+          },
+          "pooled_own_corrective_actual_wrong": 10,
+          "allocation_abs": {
+            "4": 5.236255626359399,
+            "10": 5.102991363594766,
+            "16": 12.130505963466991,
+            "stop": 0.0,
+            "entropy": 0.06435985669942106,
+            "value": 0.0,
+            "carry": 5.440503336465215,
+            "rounding": 0.00013394359244151325
+          },
+          "same_direction_under_over": 38,
+          "restores_both_sides": 3,
+          "worsens_both_sides": 4,
+          "pairs": 45,
+          "slope_strengthened": 17
+        },
+        "anchor_51": {
+          "groups": 90,
+          "actual_corrective": 44,
+          "linear_corrective": 44,
+          "linear_actual_same_sign": 90,
+          "linear_absolute_error": {
+            "count": 90,
+            "min": 3.771245883837319e-05,
+            "max": 0.01375979992248999,
+            "mean": 0.0037802512532489566,
+            "median": 0.002154277674371971
+          },
+          "own_gradient_corrective": {
+            "raw": 47,
+            "pooled": 42,
+            "own_center_common_scale": 45
+          },
+          "allocation_corrective": {
+            "4": 41,
+            "10": 43,
+            "16": 44,
+            "stop": 0,
+            "entropy": 59,
+            "value": 0,
+            "carry": 36,
+            "rounding": 46
+          },
+          "pooled_own_corrective_actual_wrong": 10,
+          "allocation_abs": {
+            "4": 5.262372791456104,
+            "10": 5.139128752654142,
+            "16": 12.181900541171375,
+            "stop": 0.0,
+            "entropy": 0.06440744451647801,
+            "value": 0.0,
+            "carry": 5.488577328236489,
+            "rounding": 0.00013587594216493538
+          },
+          "same_direction_under_over": 38,
+          "restores_both_sides": 3,
+          "worsens_both_sides": 4,
+          "pairs": 45,
+          "slope_strengthened": 17
+        },
+        "saved_ready_near": {
+          "groups": 29,
+          "actual_corrective": 17,
+          "linear_corrective": 17,
+          "linear_actual_same_sign": 29,
+          "linear_absolute_error": {
+            "count": 29,
+            "min": 0.00012864637506434205,
+            "max": 0.013335063618822196,
+            "mean": 0.004303649007480045,
+            "median": 0.003485030213079554
+          },
+          "own_gradient_corrective": {
+            "raw": 18,
+            "pooled": 17,
+            "own_center_common_scale": 17
+          },
+          "allocation_corrective": {
+            "4": 14,
+            "10": 17,
+            "16": 14,
+            "stop": 0,
+            "entropy": 18,
+            "value": 0,
+            "carry": 10,
+            "rounding": 10
+          },
+          "pooled_own_corrective_actual_wrong": 5,
+          "allocation_abs": {
+            "4": 1.0902336315243017,
+            "10": 1.642035294856224,
+            "16": 3.472249262337573,
+            "stop": 0.0,
+            "entropy": 0.02546137538702507,
+            "value": 0.0,
+            "carry": 1.651371664276317,
+            "rounding": 4.3391147468753604e-05
+          }
+        }
+      }
+    }
+  },
+  "by_run": [
+    {
+      "arm": "cyclic",
+      "seed": 17,
+      "updates": 5,
+      "minibatch_pairs": {
+        "actor": {
+          "count": 24,
+          "min": -0.9652528478663313,
+          "max": 0.49650088147703586,
+          "mean": -0.16541593553272393,
+          "median": -0.059256741101080784,
+          "missing": 336,
+          "negative": 13,
+          "below_minus_half": 8
+        },
+        "mean_action": {
+          "count": 24,
+          "min": -0.9767772359625201,
+          "max": 0.620071260248311,
+          "mean": -0.17294925243448964,
+          "median": -0.10253839160432618,
+          "missing": 336,
+          "negative": 12,
+          "below_minus_half": 8
+        }
+      },
+      "normalization_pairs": {
+        "raw": {
+          "count": 1,
+          "min": -0.3899648479905454,
+          "max": -0.3899648479905454,
+          "mean": -0.3899648479905454,
+          "median": -0.3899648479905454,
+          "missing": 14,
+          "negative": 1,
+          "below_minus_half": 0
+        },
+        "raw_common_scale": {
+          "count": 1,
+          "min": -0.389964914222442,
+          "max": -0.389964914222442,
+          "mean": -0.389964914222442,
+          "median": -0.389964914222442,
+          "missing": 14,
+          "negative": 1,
+          "below_minus_half": 0
+        },
+        "pooled": {
+          "count": 1,
+          "min": 0.9336522380732398,
+          "max": 0.9336522380732398,
+          "mean": 0.9336522380732398,
+          "median": 0.9336522380732398,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        },
+        "own_center_common_scale": {
+          "count": 1,
+          "min": 0.9683837687577171,
+          "max": 0.9683837687577171,
+          "mean": 0.9683837687577171,
+          "median": 0.9683837687577171,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        }
+      },
+      "clipping": {
+        "actual": {
+          "count": 120,
+          "min": 0.23774360120296478,
+          "max": 1.0,
+          "mean": 0.9167129213611285,
+          "median": 1.0
+        },
+        "actor_only": {
+          "count": 120,
+          "min": 0.6585257649421692,
+          "max": 1.0,
+          "mean": 0.9768737907210986,
+          "median": 1.0
+        },
+        "critic_reduces_scale": 31,
+        "actual_over_actor_ratio": {
+          "count": 120,
+          "min": 0.23774360120296478,
+          "max": 1.0,
+          "mean": 0.9383689996256648,
+          "median": 1.0
+        }
+      },
+      "normalization_by_command": [
+        {
+          "command": 4,
+          "rows": 2048,
+          "sign_flips": 846,
+          "pooled_positive": 946,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 10,
+          "rows": 1792,
+          "sign_flips": 762,
+          "pooled_positive": 788,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 16,
+          "rows": 0,
+          "sign_flips": 0,
+          "pooled_positive": 0,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        }
+      ],
+      "effects": {
+        "anchors_mean": {
+          "groups": 30,
+          "actual_corrective": 15,
+          "linear_corrective": 15,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 6.434809563004434e-05,
+            "max": 0.04380285836058756,
+            "mean": 0.009128075185357897,
+            "median": 0.0023953909587923067
+          },
+          "own_gradient_corrective": {
+            "raw": 7,
+            "pooled": 6,
+            "own_center_common_scale": 6
+          },
+          "allocation_corrective": {
+            "4": 9,
+            "10": 9,
+            "16": 0,
+            "stop": 0,
+            "entropy": 18,
+            "value": 0,
+            "carry": 12,
+            "rounding": 16
+          },
+          "pooled_own_corrective_actual_wrong": 0,
+          "allocation_abs": {
+            "4": 3.171800169031052,
+            "10": 4.04589388231441,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.011877200019248526,
+            "value": 0.0,
+            "carry": 1.4704460091921827,
+            "rounding": 2.9565899387520424e-05
+          },
+          "same_direction_under_over": 15,
+          "restores_both_sides": 0,
+          "worsens_both_sides": 0,
+          "pairs": 15,
+          "slope_strengthened": 11
+        },
+        "anchor_51": {
+          "groups": 30,
+          "actual_corrective": 15,
+          "linear_corrective": 15,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 6.74835213124586e-05,
+            "max": 0.04360569630431632,
+            "mean": 0.009074430573484213,
+            "median": 0.002392882839706789
+          },
+          "own_gradient_corrective": {
+            "raw": 7,
+            "pooled": 6,
+            "own_center_common_scale": 6
+          },
+          "allocation_corrective": {
+            "4": 9,
+            "10": 9,
+            "16": 0,
+            "stop": 0,
+            "entropy": 18,
+            "value": 0,
+            "carry": 12,
+            "rounding": 16
+          },
+          "pooled_own_corrective_actual_wrong": 0,
+          "allocation_abs": {
+            "4": 3.213478331082351,
+            "10": 4.066421999745209,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.012165498713867627,
+            "value": 0.0,
+            "carry": 1.4724169239779186,
+            "rounding": 2.9876358283506823e-05
+          },
+          "same_direction_under_over": 15,
+          "restores_both_sides": 0,
+          "worsens_both_sides": 0,
+          "pairs": 15,
+          "slope_strengthened": 11
+        },
+        "saved_ready_near": {
+          "groups": 1,
+          "actual_corrective": 0,
+          "linear_corrective": 0,
+          "linear_actual_same_sign": 1,
+          "linear_absolute_error": {
+            "count": 1,
+            "min": 0.0206759039055181,
+            "max": 0.0206759039055181,
+            "mean": 0.0206759039055181,
+            "median": 0.0206759039055181
+          },
+          "own_gradient_corrective": {
+            "raw": 0,
+            "pooled": 0,
+            "own_center_common_scale": 0
+          },
+          "allocation_corrective": {
+            "4": 0,
+            "10": 0,
+            "16": 0,
+            "stop": 0,
+            "entropy": 1,
+            "value": 0,
+            "carry": 0,
+            "rounding": 0
+          },
+          "pooled_own_corrective_actual_wrong": 0,
+          "allocation_abs": {
+            "4": 0.2539145886581582,
+            "10": 0.0,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.0009636252919761105,
+            "value": 0.0,
+            "carry": 0.0,
+            "rounding": 1.129169234967563e-06
+          }
+        }
+      }
+    },
+    {
+      "arm": "cyclic",
+      "seed": 29,
+      "updates": 5,
+      "minibatch_pairs": {
+        "actor": {
+          "count": 24,
+          "min": -0.9223469212715347,
+          "max": 0.8878904879202859,
+          "mean": 0.13699959441652101,
+          "median": 0.2421766450730113,
+          "missing": 336,
+          "negative": 9,
+          "below_minus_half": 5
+        },
+        "mean_action": {
+          "count": 24,
+          "min": -0.9779846925427002,
+          "max": 0.9460962067367715,
+          "mean": 0.14450738243082425,
+          "median": 0.2637476480790705,
+          "missing": 336,
+          "negative": 9,
+          "below_minus_half": 5
+        }
+      },
+      "normalization_pairs": {
+        "raw": {
+          "count": 1,
+          "min": 0.8140054661255408,
+          "max": 0.8140054661255408,
+          "mean": 0.8140054661255408,
+          "median": 0.8140054661255408,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        },
+        "raw_common_scale": {
+          "count": 1,
+          "min": 0.8140054663793616,
+          "max": 0.8140054663793616,
+          "mean": 0.8140054663793616,
+          "median": 0.8140054663793616,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        },
+        "pooled": {
+          "count": 1,
+          "min": -0.6438370036994326,
+          "max": -0.6438370036994326,
+          "mean": -0.6438370036994326,
+          "median": -0.6438370036994326,
+          "missing": 14,
+          "negative": 1,
+          "below_minus_half": 1
+        },
+        "own_center_common_scale": {
+          "count": 1,
+          "min": 0.8420240816545234,
+          "max": 0.8420240816545234,
+          "mean": 0.8420240816545234,
+          "median": 0.8420240816545234,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        }
+      },
+      "clipping": {
+        "actual": {
+          "count": 120,
+          "min": 0.4571966230869293,
+          "max": 1.0,
+          "mean": 0.9327717033525308,
+          "median": 1.0
+        },
+        "actor_only": {
+          "count": 120,
+          "min": 0.4582422971725464,
+          "max": 1.0,
+          "mean": 0.9508711352944375,
+          "median": 1.0
+        },
+        "critic_reduces_scale": 36,
+        "actual_over_actor_ratio": {
+          "count": 120,
+          "min": 0.7084279656410217,
+          "max": 1.0,
+          "mean": 0.9811040788461582,
+          "median": 1.0
+        }
+      },
+      "normalization_by_command": [
+        {
+          "command": 4,
+          "rows": 2048,
+          "sign_flips": 989,
+          "pooled_positive": 628,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 10,
+          "rows": 1792,
+          "sign_flips": 464,
+          "pooled_positive": 1082,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 16,
+          "rows": 0,
+          "sign_flips": 0,
+          "pooled_positive": 0,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        }
+      ],
+      "effects": {
+        "anchors_mean": {
+          "groups": 30,
+          "actual_corrective": 16,
+          "linear_corrective": 16,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 0.00017304513655058695,
+            "max": 0.03252645230361162,
+            "mean": 0.011346098268091721,
+            "median": 0.009700359349429546
+          },
+          "own_gradient_corrective": {
+            "raw": 6,
+            "pooled": 8,
+            "own_center_common_scale": 7
+          },
+          "allocation_corrective": {
+            "4": 10,
+            "10": 8,
+            "16": 0,
+            "stop": 0,
+            "entropy": 16,
+            "value": 0,
+            "carry": 12,
+            "rounding": 17
+          },
+          "pooled_own_corrective_actual_wrong": 1,
+          "allocation_abs": {
+            "4": 2.853923079849016,
+            "10": 4.283130836491481,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.038009328568137914,
+            "value": 0.0,
+            "carry": 2.5825865435184903,
+            "rounding": 4.129062860532552e-05
+          },
+          "same_direction_under_over": 14,
+          "restores_both_sides": 1,
+          "worsens_both_sides": 0,
+          "pairs": 15,
+          "slope_strengthened": 8
+        },
+        "anchor_51": {
+          "groups": 30,
+          "actual_corrective": 16,
+          "linear_corrective": 16,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 1.2469230499301265e-05,
+            "max": 0.03329304703681568,
+            "mean": 0.011470043892159762,
+            "median": 0.009699614413657541
+          },
+          "own_gradient_corrective": {
+            "raw": 6,
+            "pooled": 8,
+            "own_center_common_scale": 7
+          },
+          "allocation_corrective": {
+            "4": 10,
+            "10": 8,
+            "16": 0,
+            "stop": 0,
+            "entropy": 16,
+            "value": 0,
+            "carry": 12,
+            "rounding": 17
+          },
+          "pooled_own_corrective_actual_wrong": 1,
+          "allocation_abs": {
+            "4": 2.9172154695355483,
+            "10": 4.454856129880269,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.038479297778105895,
+            "value": 0.0,
+            "carry": 2.650511413381599,
+            "rounding": 4.2043502019429015e-05
+          },
+          "same_direction_under_over": 14,
+          "restores_both_sides": 1,
+          "worsens_both_sides": 0,
+          "pairs": 15,
+          "slope_strengthened": 7
+        },
+        "saved_ready_near": {
+          "groups": 9,
+          "actual_corrective": 6,
+          "linear_corrective": 6,
+          "linear_actual_same_sign": 9,
+          "linear_absolute_error": {
+            "count": 9,
+            "min": 3.032650309408788e-05,
+            "max": 0.029739496914058416,
+            "mean": 0.006081013317283971,
+            "median": 0.002335811492427897
+          },
+          "own_gradient_corrective": {
+            "raw": 6,
+            "pooled": 7,
+            "own_center_common_scale": 7
+          },
+          "allocation_corrective": {
+            "4": 3,
+            "10": 4,
+            "16": 0,
+            "stop": 0,
+            "entropy": 5,
+            "value": 0,
+            "carry": 5,
+            "rounding": 5
+          },
+          "pooled_own_corrective_actual_wrong": 2,
+          "allocation_abs": {
+            "4": 0.3473551244613054,
+            "10": 1.3438808422901296,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.010964401291677457,
+            "value": 0.0,
+            "carry": 0.6662299045754565,
+            "rounding": 1.0474157065906696e-05
+          }
+        }
+      }
+    },
+    {
+      "arm": "cyclic",
+      "seed": 43,
+      "updates": 5,
+      "minibatch_pairs": {
+        "actor": {
+          "count": 24,
+          "min": -0.8885863276201799,
+          "max": 0.9721593441656592,
+          "mean": -0.05217865401810409,
+          "median": -0.025759644591687628,
+          "missing": 336,
+          "negative": 12,
+          "below_minus_half": 9
+        },
+        "mean_action": {
+          "count": 24,
+          "min": -0.9120534339376644,
+          "max": 0.9797512910999129,
+          "mean": -0.03514307383306634,
+          "median": -0.007779772556178996,
+          "missing": 336,
+          "negative": 12,
+          "below_minus_half": 9
+        }
+      },
+      "normalization_pairs": {
+        "raw": {
+          "count": 1,
+          "min": 0.9577024718695993,
+          "max": 0.9577024718695993,
+          "mean": 0.9577024718695993,
+          "median": 0.9577024718695993,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        },
+        "raw_common_scale": {
+          "count": 1,
+          "min": 0.9577024942671876,
+          "max": 0.9577024942671876,
+          "mean": 0.9577024942671876,
+          "median": 0.9577024942671876,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        },
+        "pooled": {
+          "count": 1,
+          "min": 0.9804669269667543,
+          "max": 0.9804669269667543,
+          "mean": 0.9804669269667543,
+          "median": 0.9804669269667543,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        },
+        "own_center_common_scale": {
+          "count": 1,
+          "min": 0.6150277041643405,
+          "max": 0.6150277041643405,
+          "mean": 0.6150277041643405,
+          "median": 0.6150277041643405,
+          "missing": 14,
+          "negative": 0,
+          "below_minus_half": 0
+        }
+      },
+      "clipping": {
+        "actual": {
+          "count": 120,
+          "min": 0.42603549361228943,
+          "max": 1.0,
+          "mean": 0.9247520891328652,
+          "median": 1.0
+        },
+        "actor_only": {
+          "count": 120,
+          "min": 0.5297368168830872,
+          "max": 1.0,
+          "mean": 0.9644585773348808,
+          "median": 1.0
+        },
+        "critic_reduces_scale": 42,
+        "actual_over_actor_ratio": {
+          "count": 120,
+          "min": 0.553869903087616,
+          "max": 1.0,
+          "mean": 0.9569893758504703,
+          "median": 1.0
+        }
+      },
+      "normalization_by_command": [
+        {
+          "command": 4,
+          "rows": 2048,
+          "sign_flips": 1290,
+          "pooled_positive": 870,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 1
+        },
+        {
+          "command": 10,
+          "rows": 1792,
+          "sign_flips": 106,
+          "pooled_positive": 1108,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 16,
+          "rows": 0,
+          "sign_flips": 0,
+          "pooled_positive": 0,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        }
+      ],
+      "effects": {
+        "anchors_mean": {
+          "groups": 30,
+          "actual_corrective": 15,
+          "linear_corrective": 15,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 0.000767513847115861,
+            "max": 0.03634137292489764,
+            "mean": 0.014350774253706868,
+            "median": 0.013158615513632094
+          },
+          "own_gradient_corrective": {
+            "raw": 6,
+            "pooled": 5,
+            "own_center_common_scale": 5
+          },
+          "allocation_corrective": {
+            "4": 8,
+            "10": 9,
+            "16": 0,
+            "stop": 0,
+            "entropy": 20,
+            "value": 0,
+            "carry": 10,
+            "rounding": 18
+          },
+          "pooled_own_corrective_actual_wrong": 0,
+          "allocation_abs": {
+            "4": 3.9216412446635744,
+            "10": 3.5579352782102864,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.017180456197147448,
+            "value": 0.0,
+            "carry": 1.2223071407003212,
+            "rounding": 5.379295544143144e-05
+          },
+          "same_direction_under_over": 15,
+          "restores_both_sides": 0,
+          "worsens_both_sides": 0,
+          "pairs": 15,
+          "slope_strengthened": 5
+        },
+        "anchor_51": {
+          "groups": 30,
+          "actual_corrective": 15,
+          "linear_corrective": 15,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 0.0007327078969931282,
+            "max": 0.036915574319711486,
+            "mean": 0.014452690254887856,
+            "median": 0.013364624006958592
+          },
+          "own_gradient_corrective": {
+            "raw": 6,
+            "pooled": 5,
+            "own_center_common_scale": 5
+          },
+          "allocation_corrective": {
+            "4": 8,
+            "10": 9,
+            "16": 0,
+            "stop": 0,
+            "entropy": 19,
+            "value": 0,
+            "carry": 10,
+            "rounding": 18
+          },
+          "pooled_own_corrective_actual_wrong": 0,
+          "allocation_abs": {
+            "4": 3.989930385146465,
+            "10": 3.597416816925065,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.018326123774633368,
+            "value": 0.0,
+            "carry": 1.2386788492163179,
+            "rounding": 5.465670628145235e-05
+          },
+          "same_direction_under_over": 15,
+          "restores_both_sides": 0,
+          "worsens_both_sides": 0,
+          "pairs": 15,
+          "slope_strengthened": 5
+        },
+        "saved_ready_near": {
+          "groups": 8,
+          "actual_corrective": 5,
+          "linear_corrective": 5,
+          "linear_actual_same_sign": 8,
+          "linear_absolute_error": {
+            "count": 8,
+            "min": 0.0008906626328681888,
+            "max": 0.020622332386522058,
+            "mean": 0.0117652086094552,
+            "median": 0.012122874911405762
+          },
+          "own_gradient_corrective": {
+            "raw": 5,
+            "pooled": 5,
+            "own_center_common_scale": 5
+          },
+          "allocation_corrective": {
+            "4": 3,
+            "10": 4,
+            "16": 0,
+            "stop": 0,
+            "entropy": 5,
+            "value": 0,
+            "carry": 3,
+            "rounding": 4
+          },
+          "pooled_own_corrective_actual_wrong": 0,
+          "allocation_abs": {
+            "4": 0.9994943441556238,
+            "10": 0.9440162357863527,
+            "16": 0.0,
+            "stop": 0.0,
+            "entropy": 0.004005782712953691,
+            "value": 0.0,
+            "carry": 0.26650619075639514,
+            "rounding": 8.189523541840694e-06
+          }
+        }
+      }
+    },
+    {
+      "arm": "balanced",
+      "seed": 17,
+      "updates": 5,
+      "minibatch_pairs": {
+        "actor": {
+          "count": 360,
+          "min": -0.9883910522762444,
+          "max": 0.9749679496774025,
+          "mean": 0.024597165300801256,
+          "median": 0.07006610210399208,
+          "missing": 0,
+          "negative": 173,
+          "below_minus_half": 105
+        },
+        "mean_action": {
+          "count": 360,
+          "min": -0.9894946214769496,
+          "max": 0.9882322673085632,
+          "mean": 0.03572702672440643,
+          "median": 0.09068164517979146,
+          "missing": 0,
+          "negative": 173,
+          "below_minus_half": 119
+        }
+      },
+      "normalization_pairs": {
+        "raw": {
+          "count": 15,
+          "min": -0.3976642549281223,
+          "max": 0.9798013324121029,
+          "mean": 0.523634189841607,
+          "median": 0.6851293186120407,
+          "missing": 0,
+          "negative": 4,
+          "below_minus_half": 0
+        },
+        "raw_common_scale": {
+          "count": 15,
+          "min": -0.3976642697544191,
+          "max": 0.9798013186507751,
+          "mean": 0.5236342156027178,
+          "median": 0.6851293435598487,
+          "missing": 0,
+          "negative": 4,
+          "below_minus_half": 0
+        },
+        "pooled": {
+          "count": 15,
+          "min": -0.9378471760165907,
+          "max": 0.9314437239855465,
+          "mean": 0.3292589950912174,
+          "median": 0.6194364950708962,
+          "missing": 0,
+          "negative": 4,
+          "below_minus_half": 2
+        },
+        "own_center_common_scale": {
+          "count": 15,
+          "min": -0.9781350373127682,
+          "max": 0.9518738199993039,
+          "mean": 0.09067938198379197,
+          "median": 0.11192012998242333,
+          "missing": 0,
+          "negative": 6,
+          "below_minus_half": 2
+        }
+      },
+      "clipping": {
+        "actual": {
+          "count": 120,
+          "min": 0.2414846569299698,
+          "max": 1.0,
+          "mean": 0.7218110381315151,
+          "median": 0.7577788829803467
+        },
+        "actor_only": {
+          "count": 120,
+          "min": 0.5922366976737976,
+          "max": 1.0,
+          "mean": 0.9835831478238106,
+          "median": 1.0
+        },
+        "critic_reduces_scale": 84,
+        "actual_over_actor_ratio": {
+          "count": 120,
+          "min": 0.2414846569299698,
+          "max": 1.0,
+          "mean": 0.7336415177557482,
+          "median": 0.7824681019702258
+        }
+      },
+      "normalization_by_command": [
+        {
+          "command": 4,
+          "rows": 1280,
+          "sign_flips": 407,
+          "pooled_positive": 1011,
+          "all_positive_groups": 3,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 10,
+          "rows": 1280,
+          "sign_flips": 248,
+          "pooled_positive": 1243,
+          "all_positive_groups": 3,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 16,
+          "rows": 1280,
+          "sign_flips": 103,
+          "pooled_positive": 105,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 1
+        }
+      ],
+      "effects": {
+        "anchors_mean": {
+          "groups": 30,
+          "actual_corrective": 15,
+          "linear_corrective": 15,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 9.91646644263322e-06,
+            "max": 0.005633775833586346,
+            "mean": 0.002190914779098305,
+            "median": 0.0019961575569363427
+          },
+          "own_gradient_corrective": {
+            "raw": 15,
+            "pooled": 13,
+            "own_center_common_scale": 15
+          },
+          "allocation_corrective": {
+            "4": 13,
+            "10": 15,
+            "16": 14,
+            "stop": 0,
+            "entropy": 23,
+            "value": 0,
+            "carry": 12,
+            "rounding": 17
+          },
+          "pooled_own_corrective_actual_wrong": 3,
+          "allocation_abs": {
+            "4": 1.3792342451005626,
+            "10": 1.6040063749642721,
+            "16": 3.99954838152551,
+            "stop": 0.0,
+            "entropy": 0.01663005941647257,
+            "value": 0.0,
+            "carry": 2.1369218765407973,
+            "rounding": 2.9190187552384037e-05
+          },
+          "same_direction_under_over": 13,
+          "restores_both_sides": 1,
+          "worsens_both_sides": 1,
+          "pairs": 15,
+          "slope_strengthened": 8
+        },
+        "anchor_51": {
+          "groups": 30,
+          "actual_corrective": 15,
+          "linear_corrective": 15,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 9.906290962248543e-05,
+            "max": 0.005818879676075445,
+            "mean": 0.002267701215414099,
+            "median": 0.002025871504091118
+          },
+          "own_gradient_corrective": {
+            "raw": 15,
+            "pooled": 13,
+            "own_center_common_scale": 15
+          },
+          "allocation_corrective": {
+            "4": 13,
+            "10": 15,
+            "16": 14,
+            "stop": 0,
+            "entropy": 22,
+            "value": 0,
+            "carry": 12,
+            "rounding": 17
+          },
+          "pooled_own_corrective_actual_wrong": 3,
+          "allocation_abs": {
+            "4": 1.3729411108676535,
+            "10": 1.589602595807952,
+            "16": 3.948083865888899,
+            "stop": 0.0,
+            "entropy": 0.016499886113767376,
+            "value": 0.0,
+            "carry": 2.104054816245138,
+            "rounding": 2.9572527892763957e-05
+          },
+          "same_direction_under_over": 13,
+          "restores_both_sides": 1,
+          "worsens_both_sides": 1,
+          "pairs": 15,
+          "slope_strengthened": 8
+        },
+        "saved_ready_near": {
+          "groups": 2,
+          "actual_corrective": 2,
+          "linear_corrective": 2,
+          "linear_actual_same_sign": 2,
+          "linear_absolute_error": {
+            "count": 2,
+            "min": 0.000492401209184562,
+            "max": 0.004797350535495307,
+            "mean": 0.0026448758723399343,
+            "median": 0.0026448758723399343
+          },
+          "own_gradient_corrective": {
+            "raw": 1,
+            "pooled": 1,
+            "own_center_common_scale": 1
+          },
+          "allocation_corrective": {
+            "4": 1,
+            "10": 2,
+            "16": 1,
+            "stop": 0,
+            "entropy": 1,
+            "value": 0,
+            "carry": 1,
+            "rounding": 0
+          },
+          "pooled_own_corrective_actual_wrong": 0,
+          "allocation_abs": {
+            "4": 0.0636351191406101,
+            "10": 0.18479859587814707,
+            "16": 0.06622824043601847,
+            "stop": 0.0,
+            "entropy": 0.0012256765535042017,
+            "value": 0.0,
+            "carry": 0.0902119964817944,
+            "rounding": 1.0317725120448127e-06
+          }
+        }
+      }
+    },
+    {
+      "arm": "balanced",
+      "seed": 29,
+      "updates": 5,
+      "minibatch_pairs": {
+        "actor": {
+          "count": 360,
+          "min": -0.9658197315445798,
+          "max": 0.9695549987851643,
+          "mean": 0.021699159480230573,
+          "median": 0.030705811094876488,
+          "missing": 0,
+          "negative": 174,
+          "below_minus_half": 91
+        },
+        "mean_action": {
+          "count": 360,
+          "min": -0.9866948400989759,
+          "max": 0.9854933085214652,
+          "mean": 0.024215295214174638,
+          "median": 0.03271072811068045,
+          "missing": 0,
+          "negative": 173,
+          "below_minus_half": 100
+        }
+      },
+      "normalization_pairs": {
+        "raw": {
+          "count": 15,
+          "min": -0.9539657220996343,
+          "max": 0.9159295373531824,
+          "mean": -0.040881143531696404,
+          "median": -0.16305644400708733,
+          "missing": 0,
+          "negative": 9,
+          "below_minus_half": 5
+        },
+        "raw_common_scale": {
+          "count": 15,
+          "min": -0.9539656863698797,
+          "max": 0.9159295372502388,
+          "mean": -0.040881166924144945,
+          "median": -0.16305655756784243,
+          "missing": 0,
+          "negative": 9,
+          "below_minus_half": 5
+        },
+        "pooled": {
+          "count": 15,
+          "min": -0.94746170527806,
+          "max": 0.9531168639188311,
+          "mean": 0.022393289992332897,
+          "median": -0.11170141453216653,
+          "missing": 0,
+          "negative": 8,
+          "below_minus_half": 3
+        },
+        "own_center_common_scale": {
+          "count": 15,
+          "min": -0.9800845435217659,
+          "max": 0.9593660152565159,
+          "mean": -0.020496597222427502,
+          "median": -0.08659243922521642,
+          "missing": 0,
+          "negative": 9,
+          "below_minus_half": 6
+        }
+      },
+      "clipping": {
+        "actual": {
+          "count": 120,
+          "min": 0.23032139241695404,
+          "max": 1.0,
+          "mean": 0.7567119284222523,
+          "median": 0.7847411632537842
+        },
+        "actor_only": {
+          "count": 120,
+          "min": 0.5108531713485718,
+          "max": 1.0,
+          "mean": 0.9433899362881978,
+          "median": 1.0
+        },
+        "critic_reduces_scale": 81,
+        "actual_over_actor_ratio": {
+          "count": 120,
+          "min": 0.3095227081340318,
+          "max": 1.0,
+          "mean": 0.8044124736672217,
+          "median": 0.9015330856910769
+        }
+      },
+      "normalization_by_command": [
+        {
+          "command": 4,
+          "rows": 1280,
+          "sign_flips": 520,
+          "pooled_positive": 493,
+          "all_positive_groups": 1,
+          "all_nonpositive_groups": 2
+        },
+        {
+          "command": 10,
+          "rows": 1280,
+          "sign_flips": 509,
+          "pooled_positive": 1012,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 16,
+          "rows": 1280,
+          "sign_flips": 143,
+          "pooled_positive": 624,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        }
+      ],
+      "effects": {
+        "anchors_mean": {
+          "groups": 30,
+          "actual_corrective": 16,
+          "linear_corrective": 16,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 2.7496001230697953e-05,
+            "max": 0.01360349190527621,
+            "mean": 0.005357445381640318,
+            "median": 0.003545979461272211
+          },
+          "own_gradient_corrective": {
+            "raw": 16,
+            "pooled": 15,
+            "own_center_common_scale": 16
+          },
+          "allocation_corrective": {
+            "4": 15,
+            "10": 14,
+            "16": 16,
+            "stop": 0,
+            "entropy": 15,
+            "value": 0,
+            "carry": 12,
+            "rounding": 14
+          },
+          "pooled_own_corrective_actual_wrong": 4,
+          "allocation_abs": {
+            "4": 2.1366614708617258,
+            "10": 2.2671005914630618,
+            "16": 5.012358053907299,
+            "stop": 0.0,
+            "entropy": 0.039411262792271945,
+            "value": 0.0,
+            "carry": 1.694070190133042,
+            "rounding": 6.172828486861276e-05
+          },
+          "same_direction_under_over": 12,
+          "restores_both_sides": 2,
+          "worsens_both_sides": 1,
+          "pairs": 15,
+          "slope_strengthened": 5
+        },
+        "anchor_51": {
+          "groups": 30,
+          "actual_corrective": 16,
+          "linear_corrective": 16,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 9.680136749828927e-05,
+            "max": 0.01375979992248999,
+            "mean": 0.005369633893999979,
+            "median": 0.003500951789656764
+          },
+          "own_gradient_corrective": {
+            "raw": 16,
+            "pooled": 15,
+            "own_center_common_scale": 16
+          },
+          "allocation_corrective": {
+            "4": 15,
+            "10": 14,
+            "16": 16,
+            "stop": 0,
+            "entropy": 15,
+            "value": 0,
+            "carry": 12,
+            "rounding": 14
+          },
+          "pooled_own_corrective_actual_wrong": 4,
+          "allocation_abs": {
+            "4": 2.1430386233536454,
+            "10": 2.3093361164032196,
+            "16": 5.079606849275039,
+            "stop": 0.0,
+            "entropy": 0.039734990435100793,
+            "value": 0.0,
+            "carry": 1.7575053679870811,
+            "rounding": 6.30051235683448e-05
+          },
+          "same_direction_under_over": 12,
+          "restores_both_sides": 2,
+          "worsens_both_sides": 1,
+          "pairs": 15,
+          "slope_strengthened": 5
+        },
+        "saved_ready_near": {
+          "groups": 17,
+          "actual_corrective": 9,
+          "linear_corrective": 9,
+          "linear_actual_same_sign": 17,
+          "linear_absolute_error": {
+            "count": 17,
+            "min": 0.00044766027451417084,
+            "max": 0.013335063618822196,
+            "mean": 0.005615429051494148,
+            "median": 0.0036122737342718647
+          },
+          "own_gradient_corrective": {
+            "raw": 11,
+            "pooled": 10,
+            "own_center_common_scale": 10
+          },
+          "allocation_corrective": {
+            "4": 7,
+            "10": 9,
+            "16": 7,
+            "stop": 0,
+            "entropy": 9,
+            "value": 0,
+            "carry": 6,
+            "rounding": 6
+          },
+          "pooled_own_corrective_actual_wrong": 4,
+          "allocation_abs": {
+            "4": 0.9015537688644679,
+            "10": 1.1895559199508243,
+            "16": 2.433873009823026,
+            "stop": 0.0,
+            "entropy": 0.021630085555112432,
+            "value": 0.0,
+            "carry": 1.316185530401523,
+            "rounding": 3.214439725529356e-05
+          }
+        }
+      }
+    },
+    {
+      "arm": "balanced",
+      "seed": 43,
+      "updates": 5,
+      "minibatch_pairs": {
+        "actor": {
+          "count": 360,
+          "min": -0.9777071519531999,
+          "max": 0.9904253762977031,
+          "mean": -0.006331360432065928,
+          "median": -0.009431204014172563,
+          "missing": 0,
+          "negative": 183,
+          "below_minus_half": 112
+        },
+        "mean_action": {
+          "count": 360,
+          "min": -0.9915147270700815,
+          "max": 0.9916844928758067,
+          "mean": -0.0027627530810044325,
+          "median": -0.0189574332425565,
+          "missing": 0,
+          "negative": 183,
+          "below_minus_half": 125
+        }
+      },
+      "normalization_pairs": {
+        "raw": {
+          "count": 15,
+          "min": -0.9724934250819675,
+          "max": 0.9566510416635576,
+          "mean": -0.13230041968425788,
+          "median": -0.23558719171896916,
+          "missing": 0,
+          "negative": 8,
+          "below_minus_half": 5
+        },
+        "raw_common_scale": {
+          "count": 15,
+          "min": -0.9724934306533932,
+          "max": 0.956651042961228,
+          "mean": -0.13230050321499168,
+          "median": -0.2355872844967067,
+          "missing": 0,
+          "negative": 8,
+          "below_minus_half": 5
+        },
+        "pooled": {
+          "count": 15,
+          "min": -0.9441317391633693,
+          "max": 0.9827930046587248,
+          "mean": 0.3155056660562518,
+          "median": 0.6985102574287436,
+          "missing": 0,
+          "negative": 5,
+          "below_minus_half": 3
+        },
+        "own_center_common_scale": {
+          "count": 15,
+          "min": -0.9721579569058073,
+          "max": 0.9797419425884745,
+          "mean": 0.09317687798518919,
+          "median": 0.28012683942253574,
+          "missing": 0,
+          "negative": 7,
+          "below_minus_half": 5
+        }
+      },
+      "clipping": {
+        "actual": {
+          "count": 120,
+          "min": 0.07675687968730927,
+          "max": 1.0,
+          "mean": 0.3082711297397812,
+          "median": 0.25701138377189636
+        },
+        "actor_only": {
+          "count": 120,
+          "min": 0.38308143615722656,
+          "max": 1.0,
+          "mean": 0.9335193532208602,
+          "median": 1.0
+        },
+        "critic_reduces_scale": 119,
+        "actual_over_actor_ratio": {
+          "count": 120,
+          "min": 0.07675687968730927,
+          "max": 1.0,
+          "mean": 0.33147020700183,
+          "median": 0.26909802854061127
+        }
+      },
+      "normalization_by_command": [
+        {
+          "command": 4,
+          "rows": 1280,
+          "sign_flips": 1072,
+          "pooled_positive": 768,
+          "all_positive_groups": 3,
+          "all_nonpositive_groups": 2
+        },
+        {
+          "command": 10,
+          "rows": 1280,
+          "sign_flips": 891,
+          "pooled_positive": 808,
+          "all_positive_groups": 1,
+          "all_nonpositive_groups": 0
+        },
+        {
+          "command": 16,
+          "rows": 1280,
+          "sign_flips": 230,
+          "pooled_positive": 348,
+          "all_positive_groups": 0,
+          "all_nonpositive_groups": 0
+        }
+      ],
+      "effects": {
+        "anchors_mean": {
+          "groups": 30,
+          "actual_corrective": 13,
+          "linear_corrective": 13,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 2.9844355355773677e-05,
+            "max": 0.013507230035838147,
+            "mean": 0.00368596141326538,
+            "median": 0.00217747402567549
+          },
+          "own_gradient_corrective": {
+            "raw": 16,
+            "pooled": 14,
+            "own_center_common_scale": 14
+          },
+          "allocation_corrective": {
+            "4": 13,
+            "10": 14,
+            "16": 14,
+            "stop": 0,
+            "entropy": 22,
+            "value": 0,
+            "carry": 12,
+            "rounding": 15
+          },
+          "pooled_own_corrective_actual_wrong": 3,
+          "allocation_abs": {
+            "4": 1.7203599103971103,
+            "10": 1.2318843971674327,
+            "16": 3.1185995280341823,
+            "stop": 0.0,
+            "entropy": 0.008318534490676545,
+            "value": 0.0,
+            "carry": 1.6095112697913756,
+            "rounding": 4.3025120020516436e-05
+          },
+          "same_direction_under_over": 13,
+          "restores_both_sides": 0,
+          "worsens_both_sides": 2,
+          "pairs": 15,
+          "slope_strengthened": 4
+        },
+        "anchor_51": {
+          "groups": 30,
+          "actual_corrective": 13,
+          "linear_corrective": 13,
+          "linear_actual_same_sign": 30,
+          "linear_absolute_error": {
+            "count": 30,
+            "min": 3.771245883837319e-05,
+            "max": 0.013719669886873898,
+            "mean": 0.003703418650332793,
+            "median": 0.0021644348546860787
+          },
+          "own_gradient_corrective": {
+            "raw": 16,
+            "pooled": 14,
+            "own_center_common_scale": 14
+          },
+          "allocation_corrective": {
+            "4": 13,
+            "10": 14,
+            "16": 14,
+            "stop": 0,
+            "entropy": 22,
+            "value": 0,
+            "carry": 12,
+            "rounding": 15
+          },
+          "pooled_own_corrective_actual_wrong": 3,
+          "allocation_abs": {
+            "4": 1.7463930572348054,
+            "10": 1.2401900404429707,
+            "16": 3.154209826007436,
+            "stop": 0.0,
+            "entropy": 0.008172567967609831,
+            "value": 0.0,
+            "carry": 1.6270171440042702,
+            "rounding": 4.329829070382662e-05
+          },
+          "same_direction_under_over": 13,
+          "restores_both_sides": 0,
+          "worsens_both_sides": 2,
+          "pairs": 15,
+          "slope_strengthened": 4
+        },
+        "saved_ready_near": {
+          "groups": 10,
+          "actual_corrective": 6,
+          "linear_corrective": 6,
+          "linear_actual_same_sign": 10,
+          "linear_absolute_error": {
+            "count": 10,
+            "min": 0.00012864637506434205,
+            "max": 0.004801811922864996,
+            "mean": 0.0024053775596840914,
+            "median": 0.0022118494953689283
+          },
+          "own_gradient_corrective": {
+            "raw": 6,
+            "pooled": 6,
+            "own_center_common_scale": 6
+          },
+          "allocation_corrective": {
+            "4": 6,
+            "10": 6,
+            "16": 6,
+            "stop": 0,
+            "entropy": 8,
+            "value": 0,
+            "carry": 3,
+            "rounding": 4
+          },
+          "pooled_own_corrective_actual_wrong": 1,
+          "allocation_abs": {
+            "4": 0.12504474351922382,
+            "10": 0.2676807790272527,
+            "16": 0.9721480120785286,
+            "stop": 0.0,
+            "entropy": 0.0026056132784084366,
+            "value": 0.0,
+            "carry": 0.24497413739299942,
+            "rounding": 1.0214977701415229e-05
+          }
+        }
+      }
+    }
+  ]
+}

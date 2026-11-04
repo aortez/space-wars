@@ -1,0 +1,156 @@
+{
+  "runtime": "diagnostic_v1/linux/x86_64/17128fa5e851bf3d66cc8884eae1d0d91a5a8ec7d263153a628cb1432ec1000e",
+  "original_runtime": "diagnostic_v1/linux/x86_64/cb77fce2782528640f054d019df231008564988e5e66f945ea0e1ff1d79dfc8b",
+  "source_sha256": "f086a03c5dca52f672b94a661911af205ab221476c591536909bbb67c1a7365c",
+  "simulated_tick_seconds": 0.016666666666666666,
+  "rendered_frames": 0,
+  "throughput_basis": "scored physics ticks divided by complete evaluation wall time, including setup and host probes; aggregate across practice workers",
+  "throughput": [
+    {
+      "workers": 1,
+      "samples": 2,
+      "precision_seconds": {
+        "median": 1.4416015144999998,
+        "min": 1.432560691,
+        "max": 1.450642338
+      },
+      "match_seconds": {
+        "median": 6.706400513,
+        "min": 6.683873709,
+        "max": 6.728927317
+      },
+      "precision_scored_ticks_per_second": {
+        "median": 57154.65733664566,
+        "min": 56796.21905534099,
+        "max": 57513.095617950334
+      },
+      "match_scored_ticks_per_second": {
+        "median": 129.87739485822655,
+        "min": 129.44113659832536,
+        "max": 130.31365311812775
+      },
+      "combined_scored_ticks_per_second": {
+        "median": 10218.729427335802,
+        "min": 10201.816129409915,
+        "max": 10235.642725261687
+      }
+    },
+    {
+      "workers": 4,
+      "samples": 4,
+      "precision_seconds": {
+        "median": 0.4270030395,
+        "min": 0.382826522,
+        "max": 0.486630256
+      },
+      "match_seconds": {
+        "median": 6.859720989,
+        "min": 6.606320118,
+        "max": 9.828991844
+      },
+      "precision_scored_ticks_per_second": {
+        "median": 193093.83494490816,
+        "min": 169309.24245696716,
+        "max": 215217.586204751
+      },
+      "match_scored_ticks_per_second": {
+        "median": 127.05809540219799,
+        "min": 88.61539553842364,
+        "max": 131.84344452622238
+      },
+      "combined_scored_ticks_per_second": {
+        "median": 11398.665411242602,
+        "min": 8109.2165649149365,
+        "max": 11913.042362493627
+      }
+    },
+    {
+      "workers": 8,
+      "samples": 2,
+      "precision_seconds": {
+        "median": 0.2993552275,
+        "min": 0.298859031,
+        "max": 0.299851424
+      },
+      "match_seconds": {
+        "median": 6.6690613894999995,
+        "min": 6.655619748,
+        "max": 6.6825030309999995
+      },
+      "precision_scored_ticks_per_second": {
+        "median": 275228.95476348116,
+        "min": 274772.7487864123,
+        "max": 275685.16074054997
+      },
+      "match_scored_ticks_per_second": {
+        "median": 130.60361682605412,
+        "min": 130.34038233270502,
+        "max": 130.86685131940322
+      },
+      "combined_scored_ticks_per_second": {
+        "median": 11948.52972685804,
+        "min": 11924.630944562956,
+        "max": 11972.428509153122
+      }
+    }
+  ],
+  "source_setup_seconds": 2.499047569,
+  "source_prefix_ticks": 15531,
+  "checkpoint_save_ms": 16.615348375,
+  "counts": {
+    "component.active_bodies": 4315,
+    "component.candidate_pairs": 517462,
+    "component.ccd_substeps": 863,
+    "component.contacts": 0,
+    "component.sleeping_bodies": 0,
+    "component.steps": 863,
+    "host.active_bodies": 4390,
+    "host.candidate_pairs": 526402,
+    "host.ccd_substeps": 878,
+    "host.contacts": 0,
+    "host.sleeping_bodies": 0,
+    "host.steps": 878
+  },
+  "all_parity_checks_passed": true,
+  "precision_replayed_ticks": 82391,
+  "historical_full_run_ticks_available": false,
+  "environment": "Ryzen 7 9800X3D, 8 cores / 16 threads; other builds active; Rust 1.89 ci profile",
+  "match_profile": {
+    "total_ms": 8301.299201000002,
+    "parts": [
+      {
+        "name": "match_clone",
+        "ms": 7078.077046999999,
+        "percent": 85.26469020833932
+      },
+      {
+        "name": "host_step",
+        "ms": 262.01965500000006,
+        "percent": 3.156369246014363
+      },
+      {
+        "name": "component_step",
+        "ms": 150.81006099999976,
+        "percent": 1.8167043175823936
+      },
+      {
+        "name": "match_network_decision",
+        "ms": 1.7519650000000013,
+        "percent": 0.021104708523082192
+      },
+      {
+        "name": "other_loop_work",
+        "ms": 808.6404730000031,
+        "percent": 9.741131519540842
+      }
+    ],
+    "clone_calls": 893,
+    "clone_ms_per_call": 7.926178104143336,
+    "rapier_ms_nested_in_steps": 197.375163
+  },
+  "historical_candidate_repeats": {
+    "evaluations": 384,
+    "unique_genomes": 338,
+    "repeated_evaluations": 46
+  }
+}

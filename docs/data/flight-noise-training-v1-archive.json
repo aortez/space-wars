@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-noise-training-v1-20261024",
+  "completed_at_utc": "2026-10-24T23:45:12.754693+00:00",
+  "kind": "paired full-quarter exploration short-recovery training",
+  "source_file_count": 1558,
+  "source_archive_sha256": "57ff08763c9d3ef990bfc38385b914f96939ff0041b62d3232f23fc0cac2737b",
+  "runtime_sha256": "73b06a97af78b64ff3b93dda0df79f703bbbf61bc26360236a2029f284648374",
+  "checkpoint_count": 108,
+  "policy_export_count": 24,
+  "pilot_gates": {
+    "full": {
+      "checks": {
+        "signed_exposure": true,
+        "sampled_success_each_seed": false,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": true
+      },
+      "passed": false
+    },
+    "quarter": {
+      "checks": {
+        "signed_exposure": false,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": false
+      },
+      "passed": false
+    }
+  },
+  "main_executed": false,
+  "training_ticks": 104448,
+  "optimizer_steps": 1146,
+  "evaluation_ticks": 144375,
+  "evaluation_episodes": 384,
+  "parity_comparisons": 192,
+  "progression_qualified": false,
+  "quarter_learning_benefit": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "validation": {
+    "sources_and_archive_verified": 1558,
+    "previous_manifests_unchanged": 33,
+    "copied_inputs_unchanged": 122,
+    "native_runtime_unchanged": true,
+    "native_baseline_passed": 421,
+    "native_baseline_ignored": 2,
+    "python_tests": 16,
+    "full_parent_states_exact_except_equivalent_descriptor_and_declared_sources": true,
+    "all_six_exact_resumes": true,
+    "matched_initial_tensors_optimizer_rng_collector": true,
+    "initial_parent_traces_exact": true,
+    "full_parent_final_score_records_exact": true,
+    "native_python_parity_comparisons": 192,
+    "physical_dwell_reward_reconstructed": true,
+    "all_process_exits_zero": true,
+    "budgets_passed": true,
+    "quarter_gate_honored": true,
+    "new_checkpoint_count": 108,
+    "new_export_count": 24
+  },
+  "retained_file_count": 1024,
+  "retained_bytes_excluding_manifest": 571197011,
+  "archive_path": "data/training-experiments/learned-flight-noise-training-v1-20261024",
+  "manifest_sha256": "9654c6c9ec74d0c813adccbcfa3d642f9a9e7d43e6beb2898ab20ad28da4c27e",
+  "report_sha256": "f5c2f93a7fe51d1138c9087c7434aa2ef6d78dfe9fcd261c6e4d02f3a5842cb4",
+  "results_sha256": "da28752948d7e40c151d1e3ddb321bbfe7bb7a8cc603e65f22420624329ba4de"
+}

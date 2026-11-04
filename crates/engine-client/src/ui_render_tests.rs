@@ -136,6 +136,16 @@ fn training_setup_progress_and_errors_render_with_working_back_controls() {
         evaluated_episodes: 4608,
         evaluation_millis: 75_000,
         can_resume: true,
+        workers: Some(engine_agent::training_workers::WorkerSnapshot {
+            config: engine_agent::training_workers::WorkerConfig::default(),
+            capacity: 16,
+            allowed: 4,
+            active: 0,
+            queued: 0,
+            machine_cpu_percent: Some(68.0),
+            completed_episodes: 4608,
+            episodes_per_second: 345.0,
+        }),
         best_id: Some("693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb".into()),
         history: (1..=12)
             .map(|generation| GenerationProgress {
@@ -172,6 +182,7 @@ fn training_setup_progress_and_errors_render_with_working_back_controls() {
                 snapshot.best_id = None;
                 snapshot.history.clear();
                 snapshot.can_resume = false;
+                snapshot.workers.as_mut().unwrap().active = 4;
             }
             if name == "error" {
                 snapshot.state = JobState::Failed;
@@ -238,6 +249,20 @@ fn training_setup_progress_and_errors_render_with_working_back_controls() {
                     "{name} {width}x{height} {id}"
                 );
             }
+            let position = slint::LogicalPosition::new(
+                (width as f32 - page_width) / 2.0 + page_width - 184.0,
+                (height as f32 - page_height) / 2.0 + 32.0,
+            );
+            clicked.borrow_mut().clear();
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position,
+                button: PointerEventButton::Left,
+            });
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position,
+                button: PointerEventButton::Left,
+            });
+            assert_eq!(*clicked.borrow(), "training.workers.next");
         }
     }
 }

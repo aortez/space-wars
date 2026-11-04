@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-bearing-curriculum-v1-20261025",
+  "completed_at_utc": "2026-10-25T08:23:42.787538+00:00",
+  "kind": "paired arrival-corridor bearing curriculum stage-0 pilot",
+  "source_file_count": 1583,
+  "source_archive_sha256": "d32a546cb9f10cf31b7abf63673f7ee526f6fe6a4a996254313e3d4d47421ac6",
+  "runtime_sha256": "e238892a83630fba630065277038c1d6360c160bd5b840e85a3f57d286f2011b",
+  "new_checkpoint_count": 396,
+  "new_training_export_count": 24,
+  "preflight_export_count": 6,
+  "paired_benefit": {
+    "per_seed": [
+      {
+        "seed": 17,
+        "stage_competence": false,
+        "paired_learning_gain": false,
+        "holding_retained": true,
+        "broad_recovery_retained": true,
+        "physical_safety": true,
+        "full_position_exposure": true,
+        "joint_stage_advance": false
+      },
+      {
+        "seed": 29,
+        "stage_competence": false,
+        "paired_learning_gain": false,
+        "holding_retained": true,
+        "broad_recovery_retained": true,
+        "physical_safety": true,
+        "full_position_exposure": true,
+        "joint_stage_advance": false
+      },
+      {
+        "seed": 43,
+        "stage_competence": false,
+        "paired_learning_gain": false,
+        "holding_retained": true,
+        "broad_recovery_retained": false,
+        "physical_safety": true,
+        "full_position_exposure": true,
+        "joint_stage_advance": false
+      }
+    ],
+    "passed": false
+  },
+  "training_ticks": 399360,
+  "restore_ticks": 8766,
+  "optimizer_steps": 6225,
+  "evaluation_ticks": 241890,
+  "evaluation_episodes": 576,
+  "parity_comparisons": 576,
+  "total_native_python_comparisons": 600,
+  "later_stages_executed": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "validation": {
+    "sources_and_archive_verified": 1583,
+    "previous_manifests_unchanged": 46,
+    "copied_inputs_unchanged": 119,
+    "declared_production_changes": [
+      "tools/flight_ppo/curriculum.py",
+      "tools/flight_ppo/run.py"
+    ],
+    "native_runtime_unchanged": true,
+    "native_retained_baseline_passed": 421,
+    "native_retained_baseline_ignored": 2,
+    "python_tests": 69,
+    "all_six_exact_63_to_64_resumes": true,
+    "initial_weights_exports_rng_and_original_traces_exact": true,
+    "stage_initial_traces_matched_between_arms": true,
+    "broad_control_parent_0_1_16_exact_except_two_python_sources": true,
+    "native_python_comparisons": 600,
+    "physical_dwell_reward_reconstructed": true,
+    "all_process_exits_zero": true,
+    "budgets_passed": true,
+    "later_stages_executed": false,
+    "new_checkpoint_count": 396,
+    "new_training_export_count": 24,
+    "preflight_export_count": 6,
+    "advantage_records_verified": 390,
+    "update_delta_records": 384,
+    "all_five_stage_matrices_admitted": true,
+    "all_position_training_cases_completed_each_pilot": true
+  },
+  "retained_file_count": 3679,
+  "retained_bytes_excluding_manifest": 1492966560,
+  "archive_path": "data/training-experiments/learned-flight-bearing-curriculum-v1-20261025",
+  "manifest_sha256": "92aa7ccd888eb48dd302b36e8e19f295058d9c2733414d418332f92750a40432",
+  "report_sha256": "d04fa069b2d15a3824daa8fef5dfdf280a1742c06961969e700e88fec6d24e40",
+  "results_sha256": "cf5f3da4cd72ba1e88f8a4958972ddbe38fecbdcef3b6948515c3ceba57fa757"
+}

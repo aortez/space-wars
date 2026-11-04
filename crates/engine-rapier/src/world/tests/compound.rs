@@ -162,6 +162,7 @@ fn ccd_thickness_shape_edits_and_handle_reuse_keep_snapshot_continuation() {
             world.set_velocity(ball_ids(2).1, Vec2::new(100.0, 0.0), 0.0, true);
             let mut restored =
                 PhysicsWorld::from_snapshot_bytes(&world.snapshot_bytes().unwrap()).unwrap();
+            let mut cloned = world.clone();
             #[cfg(feature = "ccd-diagnostics")]
             rapier2d::counters::ccd_probe::begin();
             world.step(1.0 / 60.0);
@@ -179,6 +180,8 @@ fn ccd_thickness_shape_edits_and_handle_reuse_keep_snapshot_continuation() {
                 assert_eq!(counts.compound_children, children);
             }
             restored.step(1.0 / 60.0);
+            cloned.step(1.0 / 60.0);
+            super::cloning::assert_same(&cloned, &restored);
             assert_eq!(world.contact_events(), restored.contact_events());
             assert_eq!(
                 world.snapshot_bytes().unwrap(),

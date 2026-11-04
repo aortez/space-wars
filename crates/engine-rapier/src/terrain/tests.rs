@@ -134,6 +134,80 @@ fn fixture_surface(
 }
 
 #[test]
+fn cloned_terrain_assembly_keeps_edits_and_queries_in_its_own_world() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        let (world, terrain, geometry, assembly) = fixture_surface(surface);
+        let original = world.snapshot_bytes().unwrap();
+        let mut fork_world = world.clone();
+        let mut fork_terrain = terrain.clone();
+        let mut fork_geometry = geometry.clone();
+        let mut fork_assembly = assembly.clone();
+        assert!(Arc::ptr_eq(&assembly.shapes, &fork_assembly.shapes));
+        assert_eq!(
+            fork_assembly.synchronize(&mut fork_world, &fork_terrain, &fork_geometry),
+            Some(0)
+        );
+        assert!(Arc::ptr_eq(&assembly.shapes, &fork_assembly.shapes));
+
+        // Durability-only edits advance revisions without changing colliders.
+        fork_terrain
+            .apply(TerrainEdit {
+                brush: Brush::Circle {
+                    center: CellCoord::new(16, 16),
+                    radius: 1,
+                },
+                mode: EditMode::Damage(1),
+            })
+            .unwrap();
+        assert!(!fork_geometry.refresh(&fork_terrain).is_empty());
+        assert_eq!(
+            fork_assembly.synchronize(&mut fork_world, &fork_terrain, &fork_geometry),
+            Some(0)
+        );
+        assert!(Arc::ptr_eq(&assembly.shapes, &fork_assembly.shapes));
+
+        fork_terrain
+            .apply(TerrainEdit {
+                brush: Brush::Capsule {
+                    start: CellCoord::new(-5, 32),
+                    end: CellCoord::new(100, 32),
+                    radius: 4,
+                },
+                mode: EditMode::Remove,
+            })
+            .unwrap();
+        assert!(!fork_geometry.refresh(&fork_terrain).is_empty());
+        assert!(
+            fork_assembly
+                .synchronize(&mut fork_world, &fork_terrain, &fork_geometry)
+                .unwrap()
+                > 0
+        );
+        assert!(!Arc::ptr_eq(&assembly.shapes, &fork_assembly.shapes));
+        assert_eq!(world.snapshot_bytes().unwrap(), original);
+        fork_world.step(1.0 / 60.0);
+        let options = RayCastOptions {
+            max_distance: 80.0,
+            ..RayCastOptions::default()
+        };
+        assert!(
+            world
+                .cast_ray(Vec2::new(-40.0, 0.0), Vec2::X, options)
+                .is_some()
+        );
+        assert!(
+            fork_world
+                .cast_ray(Vec2::new(-40.0, 0.0), Vec2::X, options)
+                .is_none()
+        );
+    }
+}
+
+#[test]
 fn tunnel_crosses_chunks_and_ray_queries_follow_rotating_translating_field() {
     let (mut world, mut terrain, mut geometry, mut assembly) = fixture();
     let options = RayCastOptions {

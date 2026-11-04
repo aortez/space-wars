@@ -1,0 +1,2077 @@
+{
+  "verification_passed": true,
+  "counts": {
+    "matched_initial_states": 3240,
+    "restore_ticks": 1009498,
+    "neutral_setups": 3509,
+    "probe_ticks": 781748,
+    "native_python_comparisons": 15552,
+    "baseline_replays": 40,
+    "baseline_replay_ticks": 20292,
+    "source_replays": 40,
+    "source_replay_ticks": 16286,
+    "protected_stopping_rows": 11520
+  },
+  "sampled_corrective_summaries": [
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "under",
+      "horizon": 1,
+      "cells": 104,
+      "observed_positive": 104,
+      "observed_negative": 0,
+      "all_draws_observed_positive": 104,
+      "bootstrap_target_positive": 16,
+      "helpful_but_bootstrapped_negative": 88,
+      "helpful_but_td_negative": 88
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "under",
+      "horizon": 30,
+      "cells": 104,
+      "observed_positive": 104,
+      "observed_negative": 0,
+      "all_draws_observed_positive": 104,
+      "bootstrap_target_positive": 99,
+      "helpful_but_bootstrapped_negative": 5,
+      "helpful_but_td_negative": 88
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "under",
+      "horizon": 120,
+      "cells": 104,
+      "observed_positive": 102,
+      "observed_negative": 2,
+      "all_draws_observed_positive": 102,
+      "bootstrap_target_positive": 102,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 86
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "under",
+      "horizon": 256,
+      "cells": 104,
+      "observed_positive": 100,
+      "observed_negative": 4,
+      "all_draws_observed_positive": 100,
+      "bootstrap_target_positive": 100,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 84
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "under",
+      "horizon": "cutoff",
+      "cells": 104,
+      "observed_positive": 102,
+      "observed_negative": 2,
+      "all_draws_observed_positive": 100,
+      "bootstrap_target_positive": 102,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 86
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "over",
+      "horizon": 1,
+      "cells": 56,
+      "observed_positive": 56,
+      "observed_negative": 0,
+      "all_draws_observed_positive": 56,
+      "bootstrap_target_positive": 56,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 0
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "over",
+      "horizon": 30,
+      "cells": 56,
+      "observed_positive": 56,
+      "observed_negative": 0,
+      "all_draws_observed_positive": 56,
+      "bootstrap_target_positive": 56,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 0
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "over",
+      "horizon": 120,
+      "cells": 56,
+      "observed_positive": 54,
+      "observed_negative": 2,
+      "all_draws_observed_positive": 54,
+      "bootstrap_target_positive": 55,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 0
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "over",
+      "horizon": 256,
+      "cells": 56,
+      "observed_positive": 52,
+      "observed_negative": 4,
+      "all_draws_observed_positive": 51,
+      "bootstrap_target_positive": 52,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 0
+    },
+    {
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "mode": "sampled",
+      "band": "over",
+      "horizon": "cutoff",
+      "cells": 56,
+      "observed_positive": 54,
+      "observed_negative": 2,
+      "all_draws_observed_positive": 52,
+      "bootstrap_target_positive": 54,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 0
+    }
+  ],
+  "per_seed_sampled_cutoff": [
+    {
+      "seeds": [
+        17
+      ],
+      "mode": "sampled",
+      "band": "under",
+      "horizon": "cutoff",
+      "cells": 24,
+      "observed_positive": 24,
+      "observed_negative": 0,
+      "all_draws_observed_positive": 24,
+      "bootstrap_target_positive": 24,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 20
+    },
+    {
+      "seeds": [
+        17
+      ],
+      "mode": "sampled",
+      "band": "over",
+      "horizon": "cutoff",
+      "cells": 8,
+      "observed_positive": 8,
+      "observed_negative": 0,
+      "all_draws_observed_positive": 8,
+      "bootstrap_target_positive": 8,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 0
+    },
+    {
+      "seeds": [
+        29
+      ],
+      "mode": "sampled",
+      "band": "under",
+      "horizon": "cutoff",
+      "cells": 40,
+      "observed_positive": 38,
+      "observed_negative": 2,
+      "all_draws_observed_positive": 36,
+      "bootstrap_target_positive": 38,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 30
+    },
+    {
+      "seeds": [
+        29
+      ],
+      "mode": "sampled",
+      "band": "over",
+      "horizon": "cutoff",
+      "cells": 24,
+      "observed_positive": 24,
+      "observed_negative": 0,
+      "all_draws_observed_positive": 24,
+      "bootstrap_target_positive": 24,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 0
+    },
+    {
+      "seeds": [
+        43
+      ],
+      "mode": "sampled",
+      "band": "under",
+      "horizon": "cutoff",
+      "cells": 40,
+      "observed_positive": 40,
+      "observed_negative": 0,
+      "all_draws_observed_positive": 40,
+      "bootstrap_target_positive": 40,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 36
+    },
+    {
+      "seeds": [
+        43
+      ],
+      "mode": "sampled",
+      "band": "over",
+      "horizon": "cutoff",
+      "cells": 24,
+      "observed_positive": 22,
+      "observed_negative": 2,
+      "all_draws_observed_positive": 20,
+      "bootstrap_target_positive": 22,
+      "helpful_but_bootstrapped_negative": 0,
+      "helpful_but_td_negative": 0
+    }
+  ],
+  "all_variant_ranking_agreement": [
+    {
+      "mode": "mean",
+      "horizon": 256,
+      "cells": 320,
+      "observed_bootstrap_sign_agreement": 319
+    },
+    {
+      "mode": "mean",
+      "horizon": "cutoff",
+      "cells": 320,
+      "observed_bootstrap_sign_agreement": 320
+    },
+    {
+      "mode": "sampled",
+      "horizon": 256,
+      "cells": 320,
+      "observed_bootstrap_sign_agreement": 319
+    },
+    {
+      "mode": "sampled",
+      "horizon": "cutoff",
+      "cells": 320,
+      "observed_bootstrap_sign_agreement": 320
+    }
+  ],
+  "direct_corrective_contrasts": [
+    {
+      "horizon": 256,
+      "cells": 160,
+      "corrective_direction_wins": 152
+    },
+    {
+      "horizon": "cutoff",
+      "cells": 160,
+      "corrective_direction_wins": 158
+    }
+  ],
+  "baseline_noise_to_paired_effect": [
+    {
+      "band": "under",
+      "cells": 52,
+      "median": 7.7357415829365435,
+      "min": 2.0701068732535846,
+      "max": 80.4468661705715,
+      "definition": "Eight-draw baseline observed-return std divided by absolute mean paired one-tick corrective return change, at original rollout cutoff."
+    },
+    {
+      "band": "over",
+      "cells": 28,
+      "median": 8.155969161391416,
+      "min": 3.1585796270322994,
+      "max": 28.34787869485567,
+      "definition": "Eight-draw baseline observed-return std divided by absolute mean paired one-tick corrective return change, at original rollout cutoff."
+    }
+  ],
+  "policy_times_and_terminals": [
+    {
+      "seed": 17,
+      "seconds": 24.17559363300097,
+      "terminal_counts": {
+        "None": 648
+      }
+    },
+    {
+      "seed": 29,
+      "seconds": 72.72766668500117,
+      "terminal_counts": {
+        "None": 1134,
+        "deadline": 162
+      }
+    },
+    {
+      "seed": 43,
+      "seconds": 82.58366603300237,
+      "terminal_counts": {
+        "None": 1134,
+        "deadline": 81,
+        "collision": 81
+      }
+    }
+  ],
+  "physical_failures": [
+    {
+      "seed": 43,
+      "anchor": 39,
+      "outcome": "collision",
+      "branches": 81
+    }
+  ],
+  "seed29_update16_example": {
+    "anchor": {
+      "index": 12,
+      "seed": 29,
+      "update": 16,
+      "region": "ready_over",
+      "band": "over",
+      "row": 512,
+      "rollout_t": 85,
+      "slot": 2,
+      "rollout_remaining": 171,
+      "tick": 325,
+      "episode_id": 183,
+      "candidate": 40,
+      "command": 16,
+      "forward_error": 6.763252258300781,
+      "original_advantage": 1.209272027015686,
+      "original_pooled_advantage": 1.556901454925537,
+      "original_latents": [
+        -1.5036309957504272,
+        -2.261723279953003
+      ]
+    },
+    "cells": [
+      {
+        "anchor": 12,
+        "seed": 29,
+        "update": 16,
+        "band": "over",
+        "mode": "sampled",
+        "variant": "throttle--1-1",
+        "channel": 1,
+        "offset": -0.5,
+        "duration": 1,
+        "corrective": true,
+        "horizon": 256,
+        "original_cutoff": false,
+        "rollout_remaining": 171,
+        "tick": 325,
+        "forward_error": 6.763252258300781,
+        "replicates": 8,
+        "metrics": {
+          "observed_return_delta": {
+            "mean": 0.033326843811929824,
+            "min": 0.011180830549082588,
+            "max": 0.06258290243224796,
+            "std": 0.018712378518369006,
+            "positive": 8,
+            "negative": 0
+          },
+          "bootstrap_delta": {
+            "mean": 4.639929493302497e-05,
+            "min": 1.606610555399124e-05,
+            "max": 7.692807959486236e-05,
+            "std": 2.0994534968813554e-05,
+            "positive": 8,
+            "negative": 0
+          },
+          "bootstrapped_return_delta": {
+            "mean": 0.03337324310686274,
+            "min": 0.011196896654636301,
+            "max": 0.06265983051184287,
+            "std": 0.018730134009965326,
+            "positive": 8,
+            "negative": 0
+          },
+          "gae_first_delta": {
+            "mean": 0.03337344527244568,
+            "min": 0.01119697093963623,
+            "max": 0.06265914440155029,
+            "std": 0.018729875099774973,
+            "positive": 8,
+            "negative": 0
+          },
+          "td_first_delta": {
+            "mean": 0.037694517274703854,
+            "min": 0.015597879827148997,
+            "max": 0.05984249679681275,
+            "std": 0.01376916773905912,
+            "positive": 8,
+            "negative": 0
+          },
+          "velocity_error_delta": {
+            "mean": -0.04722397029399872,
+            "min": -0.08378171920776367,
+            "max": -0.01622450351715088,
+            "std": 0.023293353455389035,
+            "positive": 0,
+            "negative": 8
+          },
+          "forward_error_delta": {
+            "mean": -0.049294894218208096,
+            "min": -0.08709616935898667,
+            "max": -0.01713022476569792,
+            "std": 0.023737235778861422,
+            "positive": 0,
+            "negative": 8
+          },
+          "baseline_observed_return": {
+            "mean": -1.9912753430392565,
+            "min": -2.5191307519627157,
+            "max": -1.67464745890503,
+            "std": 0.3110990010158432,
+            "positive": 0,
+            "negative": 8
+          },
+          "baseline_velocity_error": {
+            "mean": 2.3819525837898254,
+            "min": 1.4830191135406494,
+            "max": 3.401137351989746,
+            "std": 0.706214755081111,
+            "positive": 8,
+            "negative": 0
+          },
+          "variant_velocity_error": {
+            "mean": 2.3347286134958267,
+            "min": 1.4441229104995728,
+            "max": 3.3203542232513428,
+            "std": 0.6986929739471314,
+            "positive": 8,
+            "negative": 0
+          },
+          "baseline_ticks": {
+            "mean": 256,
+            "min": 256,
+            "max": 256,
+            "std": 0.0,
+            "positive": 8,
+            "negative": 0
+          },
+          "variant_ticks": {
+            "mean": 256,
+            "min": 256,
+            "max": 256,
+            "std": 0.0,
+            "positive": 8,
+            "negative": 0
+          },
+          "initial_thrust_delta": {
+            "mean": -0.06308821542188525,
+            "min": -0.1114966869354248,
+            "max": -0.021957550197839737,
+            "std": 0.030449071145047638,
+            "positive": 0,
+            "negative": 8
+          },
+          "initial_brake_delta": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "positive": 0,
+            "negative": 0
+          }
+        },
+        "own_adam_force_change": 0.06078514176327575,
+        "actual_force_change": 0.32982248067855835,
+        "own_pooled_gradient_force_change": 1.6126204242154647
+      },
+      {
+        "anchor": 12,
+        "seed": 29,
+        "update": 16,
+        "band": "over",
+        "mode": "sampled",
+        "variant": "brake-+1-1",
+        "channel": 2,
+        "offset": 0.5,
+        "duration": 1,
+        "corrective": true,
+        "horizon": 256,
+        "original_cutoff": false,
+        "rollout_remaining": 171,
+        "tick": 325,
+        "forward_error": 6.763252258300781,
+        "replicates": 8,
+        "metrics": {
+          "observed_return_delta": {
+            "mean": 0.04547880793927289,
+            "min": 0.03974271771631366,
+            "max": 0.05524419589099816,
+            "std": 0.005419029492800323,
+            "positive": 8,
+            "negative": 0
+          },
+          "bootstrap_delta": {
+            "mean": 6.658427324440774e-05,
+            "min": 4.090215774105177e-05,
+            "max": 8.875477111253138e-05,
+            "std": 1.6878088461717582e-05,
+            "positive": 8,
+            "negative": 0
+          },
+          "bootstrapped_return_delta": {
+            "mean": 0.045545392212517244,
+            "min": 0.03982572289585762,
+            "max": 0.05531175359192897,
+            "std": 0.005422612848079822,
+            "positive": 8,
+            "negative": 0
+          },
+          "gae_first_delta": {
+            "mean": 0.04554617404937744,
+            "min": 0.03982710838317871,
+            "max": 0.05531120300292969,
+            "std": 0.005422420750225175,
+            "positive": 8,
+            "negative": 0
+          },
+          "td_first_delta": {
+            "mean": 0.09549992532844453,
+            "min": 0.061442476099076604,
+            "max": 0.11235179724246303,
+            "std": 0.016890093968943694,
+            "positive": 8,
+            "negative": 0
+          },
+          "velocity_error_delta": {
+            "mean": -0.06606684625148773,
+            "min": -0.07500553131103516,
+            "max": -0.05180525779724121,
+            "std": 0.007541497312127281,
+            "positive": 0,
+            "negative": 8
+          },
+          "forward_error_delta": {
+            "mean": -0.06938655810549477,
+            "min": -0.076932230136042,
+            "max": -0.05250190937146959,
+            "std": 0.008560018273224444,
+            "positive": 0,
+            "negative": 8
+          },
+          "baseline_observed_return": {
+            "mean": -1.9912753430392565,
+            "min": -2.5191307519627157,
+            "max": -1.67464745890503,
+            "std": 0.3110990010158432,
+            "positive": 0,
+            "negative": 8
+          },
+          "baseline_velocity_error": {
+            "mean": 2.3819525837898254,
+            "min": 1.4830191135406494,
+            "max": 3.401137351989746,
+            "std": 0.706214755081111,
+            "positive": 8,
+            "negative": 0
+          },
+          "variant_velocity_error": {
+            "mean": 2.3158857375383377,
+            "min": 1.4143387079238892,
+            "max": 3.349332094192505,
+            "std": 0.7092066932134071,
+            "positive": 8,
+            "negative": 0
+          },
+          "baseline_ticks": {
+            "mean": 256,
+            "min": 256,
+            "max": 256,
+            "std": 0.0,
+            "positive": 8,
+            "negative": 0
+          },
+          "variant_ticks": {
+            "mean": 256,
+            "min": 256,
+            "max": 256,
+            "std": 0.0,
+            "positive": 8,
+            "negative": 0
+          },
+          "initial_thrust_delta": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "positive": 0,
+            "negative": 0
+          },
+          "initial_brake_delta": {
+            "mean": 0.10042698308825493,
+            "min": 0.07614384591579437,
+            "max": 0.11144152283668518,
+            "std": 0.012359151028250316,
+            "positive": 8,
+            "negative": 0
+          }
+        },
+        "own_adam_force_change": 0.06078514176327575,
+        "actual_force_change": 0.32982248067855835,
+        "own_pooled_gradient_force_change": 1.6126204242154647
+      },
+      {
+        "anchor": 12,
+        "seed": 29,
+        "update": 16,
+        "band": "over",
+        "mode": "sampled",
+        "variant": "throttle--1-30",
+        "channel": 1,
+        "offset": -0.5,
+        "duration": 30,
+        "corrective": true,
+        "horizon": 256,
+        "original_cutoff": false,
+        "rollout_remaining": 171,
+        "tick": 325,
+        "forward_error": 6.763252258300781,
+        "replicates": 8,
+        "metrics": {
+          "observed_return_delta": {
+            "mean": 0.6470724026212213,
+            "min": 0.5461188622841184,
+            "max": 0.8164916600815773,
+            "std": 0.10318063070988712,
+            "positive": 8,
+            "negative": 0
+          },
+          "bootstrap_delta": {
+            "mean": 0.0014101828554731743,
+            "min": 0.0009552327764263402,
+            "max": 0.001870091047502409,
+            "std": 0.0002906690121582482,
+            "positive": 8,
+            "negative": 0
+          },
+          "bootstrapped_return_delta": {
+            "mean": 0.6484825854766945,
+            "min": 0.5473349736805142,
+            "max": 0.8177576437263574,
+            "std": 0.10312313329602452,
+            "positive": 8,
+            "negative": 0
+          },
+          "gae_first_delta": {
+            "mean": 0.6484828442335129,
+            "min": 0.5473370552062988,
+            "max": 0.8177576065063477,
+            "std": 0.10312288374078209,
+            "positive": 8,
+            "negative": 0
+          },
+          "td_first_delta": {
+            "mean": 0.037694517274703854,
+            "min": 0.015597879827148997,
+            "max": 0.05984249679681275,
+            "std": 0.01376916773905912,
+            "positive": 8,
+            "negative": 0
+          },
+          "velocity_error_delta": {
+            "mean": -1.1344179436564445,
+            "min": -1.3856680393218994,
+            "max": -0.8254256248474121,
+            "std": 0.1852394767673695,
+            "positive": 0,
+            "negative": 8
+          },
+          "forward_error_delta": {
+            "mean": -1.3284680618064117,
+            "min": -1.4571785658674696,
+            "max": -1.1964276601234136,
+            "std": 0.09740309489975484,
+            "positive": 0,
+            "negative": 8
+          },
+          "baseline_observed_return": {
+            "mean": -1.9912753430392565,
+            "min": -2.5191307519627157,
+            "max": -1.67464745890503,
+            "std": 0.3110990010158432,
+            "positive": 0,
+            "negative": 8
+          },
+          "baseline_velocity_error": {
+            "mean": 2.3819525837898254,
+            "min": 1.4830191135406494,
+            "max": 3.401137351989746,
+            "std": 0.706214755081111,
+            "positive": 8,
+            "negative": 0
+          },
+          "variant_velocity_error": {
+            "mean": 1.247534640133381,
+            "min": 0.6378154754638672,
+            "max": 2.0154693126678467,
+            "std": 0.5587210797304729,
+            "positive": 8,
+            "negative": 0
+          },
+          "baseline_ticks": {
+            "mean": 256,
+            "min": 256,
+            "max": 256,
+            "std": 0.0,
+            "positive": 8,
+            "negative": 0
+          },
+          "variant_ticks": {
+            "mean": 256,
+            "min": 256,
+            "max": 256,
+            "std": 0.0,
+            "positive": 8,
+            "negative": 0
+          },
+          "initial_thrust_delta": {
+            "mean": -0.06308821542188525,
+            "min": -0.1114966869354248,
+            "max": -0.021957550197839737,
+            "std": 0.030449071145047638,
+            "positive": 0,
+            "negative": 8
+          },
+          "initial_brake_delta": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "positive": 0,
+            "negative": 0
+          }
+        },
+        "own_adam_force_change": 0.06078514176327575,
+        "actual_force_change": 0.32982248067855835,
+        "own_pooled_gradient_force_change": 1.6126204242154647
+      },
+      {
+        "anchor": 12,
+        "seed": 29,
+        "update": 16,
+        "band": "over",
+        "mode": "sampled",
+        "variant": "brake-+1-30",
+        "channel": 2,
+        "offset": 0.5,
+        "duration": 30,
+        "corrective": true,
+        "horizon": 256,
+        "original_cutoff": false,
+        "rollout_remaining": 171,
+        "tick": 325,
+        "forward_error": 6.763252258300781,
+        "replicates": 8,
+        "metrics": {
+          "observed_return_delta": {
+            "mean": 0.8656710819622863,
+            "min": 0.7349390244456854,
+            "max": 1.0428921596736196,
+            "std": 0.09935403663159471,
+            "positive": 8,
+            "negative": 0
+          },
+          "bootstrap_delta": {
+            "mean": 0.0020944820497762195,
+            "min": 0.0014366700957452183,
+            "max": 0.002635914810545925,
+            "std": 0.00037763649067693034,
+            "positive": 8,
+            "negative": 0
+          },
+          "bootstrapped_return_delta": {
+            "mean": 0.8677655640120624,
+            "min": 0.7375749392562314,
+            "max": 1.0446601954707795,
+            "std": 0.0990918885375323,
+            "positive": 8,
+            "negative": 0
+          },
+          "gae_first_delta": {
+            "mean": 0.8677662312984467,
+            "min": 0.7375748157501221,
+            "max": 1.0446619987487793,
+            "std": 0.09909244498673589,
+            "positive": 8,
+            "negative": 0
+          },
+          "td_first_delta": {
+            "mean": 0.09549992532844453,
+            "min": 0.061442476099076604,
+            "max": 0.11235179724246303,
+            "std": 0.016890093968943694,
+            "positive": 8,
+            "negative": 0
+          },
+          "velocity_error_delta": {
+            "mean": -1.412980817258358,
+            "min": -1.8391344547271729,
+            "max": -0.6416851282119751,
+            "std": 0.4692226922012998,
+            "positive": 0,
+            "negative": 8
+          },
+          "forward_error_delta": {
+            "mean": -1.8945947030045591,
+            "min": -2.010355784562221,
+            "max": -1.7999938227908396,
+            "std": 0.06183110081871905,
+            "positive": 0,
+            "negative": 8
+          },
+          "baseline_observed_return": {
+            "mean": -1.9912753430392565,
+            "min": -2.5191307519627157,
+            "max": -1.67464745890503,
+            "std": 0.3110990010158432,
+            "positive": 0,
+            "negative": 8
+          },
+          "baseline_velocity_error": {
+            "mean": 2.3819525837898254,
+            "min": 1.4830191135406494,
+            "max": 3.401137351989746,
+            "std": 0.706214755081111,
+            "positive": 8,
+            "negative": 0
+          },
+          "variant_velocity_error": {
+            "mean": 0.9689717665314674,
+            "min": 0.6653856635093689,
+            "max": 1.5620028972625732,
+            "std": 0.34969063650138676,
+            "positive": 8,
+            "negative": 0
+          },
+          "baseline_ticks": {
+            "mean": 256,
+            "min": 256,
+            "max": 256,
+            "std": 0.0,
+            "positive": 8,
+            "negative": 0
+          },
+          "variant_ticks": {
+            "mean": 256,
+            "min": 256,
+            "max": 256,
+            "std": 0.0,
+            "positive": 8,
+            "negative": 0
+          },
+          "initial_thrust_delta": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "positive": 0,
+            "negative": 0
+          },
+          "initial_brake_delta": {
+            "mean": 0.10042698308825493,
+            "min": 0.07614384591579437,
+            "max": 0.11144152283668518,
+            "std": 0.012359151028250316,
+            "positive": 8,
+            "negative": 0
+          }
+        },
+        "own_adam_force_change": 0.06078514176327575,
+        "actual_force_change": 0.32982248067855835,
+        "own_pooled_gradient_force_change": 1.6126204242154647
+      }
+    ]
+  },
+  "near_target_exceptions": [
+    {
+      "anchor": {
+        "index": 14,
+        "seed": 29,
+        "update": 43,
+        "region": "ready_under",
+        "band": "under",
+        "row": 412,
+        "rollout_t": 68,
+        "slot": 4,
+        "rollout_remaining": 188,
+        "tick": 564,
+        "episode_id": 508,
+        "candidate": 36,
+        "command": 16,
+        "forward_error": -1.7005605697631836,
+        "original_advantage": 1.4552899599075317,
+        "original_pooled_advantage": 0.7101080417633057,
+        "original_latents": [
+          -0.9105615019798279,
+          -2.247908353805542
+        ]
+      },
+      "baseline_final_forward_error_mean": 2.980829042167506,
+      "cells": [
+        {
+          "anchor": 14,
+          "seed": 29,
+          "update": 43,
+          "band": "under",
+          "mode": "sampled",
+          "variant": "throttle-+1-1",
+          "channel": 1,
+          "offset": 0.5,
+          "duration": 1,
+          "corrective": true,
+          "horizon": 256,
+          "original_cutoff": false,
+          "rollout_remaining": 188,
+          "tick": 564,
+          "forward_error": -1.7005605697631836,
+          "replicates": 8,
+          "metrics": {
+            "observed_return_delta": {
+              "mean": -0.0005462377962964227,
+              "min": -0.004475397663881636,
+              "max": 0.005889855949374717,
+              "std": 0.0033680377600891435,
+              "positive": 2,
+              "negative": 6
+            },
+            "bootstrap_delta": {
+              "mean": -0.00014775176687562355,
+              "min": -0.00020747655903979867,
+              "max": -0.0001041385675405182,
+              "std": 2.9759942854274118e-05,
+              "positive": 0,
+              "negative": 8
+            },
+            "bootstrapped_return_delta": {
+              "mean": -0.0006939895631720427,
+              "min": -0.004613697174998155,
+              "max": 0.005743832698951679,
+              "std": 0.0033713076428340725,
+              "positive": 2,
+              "negative": 6
+            },
+            "gae_first_delta": {
+              "mean": -0.0006936788558959961,
+              "min": -0.00461268424987793,
+              "max": 0.005744576454162598,
+              "std": 0.003371300991703384,
+              "positive": 2,
+              "negative": 6
+            },
+            "td_first_delta": {
+              "mean": -0.07271317686901785,
+              "min": -0.08734780417673704,
+              "max": -0.053149646793516414,
+              "std": 0.010428621963292403,
+              "positive": 0,
+              "negative": 8
+            },
+            "velocity_error_delta": {
+              "mean": 0.06294088065624237,
+              "min": 0.04464602470397949,
+              "max": 0.08347010612487793,
+              "std": 0.011352481371844322,
+              "positive": 8,
+              "negative": 0
+            },
+            "forward_error_delta": {
+              "mean": 0.06667200164767656,
+              "min": 0.04546421528405897,
+              "max": 0.08441738817552391,
+              "std": 0.012337435731639241,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_observed_return": {
+              "mean": -0.12684520857338685,
+              "min": -0.2175131491468975,
+              "max": -0.07367404182041963,
+              "std": 0.049088678649804506,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_velocity_error": {
+              "mean": 3.0955980643630028,
+              "min": 0.7929536700248718,
+              "max": 5.533474922180176,
+              "std": 1.4113964712373017,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_velocity_error": {
+              "mean": 3.158538945019245,
+              "min": 0.8496354222297668,
+              "max": 5.5925469398498535,
+              "std": 1.4139650271001698,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_thrust_delta": {
+              "mean": 0.08926984574645758,
+              "min": 0.0609729066491127,
+              "max": 0.1124829351902008,
+              "std": 0.016226885428792356,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_brake_delta": {
+              "mean": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "std": 0.0,
+              "positive": 0,
+              "negative": 0
+            }
+          },
+          "own_adam_force_change": 0.25827114196132334,
+          "actual_force_change": 0.3523254990577698,
+          "own_pooled_gradient_force_change": 3.6136029145979256
+        },
+        {
+          "anchor": 14,
+          "seed": 29,
+          "update": 43,
+          "band": "under",
+          "mode": "sampled",
+          "variant": "brake--1-1",
+          "channel": 2,
+          "offset": -0.5,
+          "duration": 1,
+          "corrective": true,
+          "horizon": 256,
+          "original_cutoff": false,
+          "rollout_remaining": 188,
+          "tick": 564,
+          "forward_error": -1.7005605697631836,
+          "replicates": 8,
+          "metrics": {
+            "observed_return_delta": {
+              "mean": -0.0003298707817452843,
+              "min": -0.002797354887455805,
+              "max": 0.0016951031541955208,
+              "std": 0.0015570767368947437,
+              "positive": 2,
+              "negative": 6
+            },
+            "bootstrap_delta": {
+              "mean": -8.919372331693542e-05,
+              "min": -0.00012292481214354334,
+              "max": -3.002160154483291e-05,
+              "std": 3.65983563720631e-05,
+              "positive": 0,
+              "negative": 8
+            },
+            "bootstrapped_return_delta": {
+              "mean": -0.0004190645050622249,
+              "min": -0.0028857457603678194,
+              "max": 0.0015721783420519775,
+              "std": 0.001560600074222795,
+              "positive": 2,
+              "negative": 6
+            },
+            "gae_first_delta": {
+              "mean": -0.0004191845655441284,
+              "min": -0.002885580062866211,
+              "max": 0.0015726089477539062,
+              "std": 0.0015605823912690586,
+              "positive": 2,
+              "negative": 6
+            },
+            "td_first_delta": {
+              "mean": -0.06894566255707182,
+              "min": -0.09949046191138056,
+              "max": -0.02213366416894802,
+              "std": 0.02842361676697063,
+              "positive": 0,
+              "negative": 8
+            },
+            "velocity_error_delta": {
+              "mean": 0.03844144940376282,
+              "min": 0.0130462646484375,
+              "max": 0.05469250679016113,
+              "std": 0.016619118092836886,
+              "positive": 8,
+              "negative": 0
+            },
+            "forward_error_delta": {
+              "mean": 0.0398568775273897,
+              "min": 0.013138683359958936,
+              "max": 0.05654922856239031,
+              "std": 0.015917501408045823,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_observed_return": {
+              "mean": -0.12684520857338685,
+              "min": -0.2175131491468975,
+              "max": -0.07367404182041963,
+              "std": 0.049088678649804506,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_velocity_error": {
+              "mean": 3.0955980643630028,
+              "min": 0.7929536700248718,
+              "max": 5.533474922180176,
+              "std": 1.4113964712373017,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_velocity_error": {
+              "mean": 3.1340395137667656,
+              "min": 0.8066536784172058,
+              "max": 5.5712127685546875,
+              "std": 1.4132382992660093,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_thrust_delta": {
+              "mean": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "std": 0.0,
+              "positive": 0,
+              "negative": 0
+            },
+            "initial_brake_delta": {
+              "mean": -0.06068302085623145,
+              "min": -0.08591650426387787,
+              "max": -0.020090661942958832,
+              "std": 0.024218357216883132,
+              "positive": 0,
+              "negative": 8
+            }
+          },
+          "own_adam_force_change": 0.25827114196132334,
+          "actual_force_change": 0.3523254990577698,
+          "own_pooled_gradient_force_change": 3.6136029145979256
+        },
+        {
+          "anchor": 14,
+          "seed": 29,
+          "update": 43,
+          "band": "under",
+          "mode": "sampled",
+          "variant": "throttle-+1-30",
+          "channel": 1,
+          "offset": 0.5,
+          "duration": 30,
+          "corrective": true,
+          "horizon": 256,
+          "original_cutoff": false,
+          "rollout_remaining": 188,
+          "tick": 564,
+          "forward_error": -1.7005605697631836,
+          "replicates": 8,
+          "metrics": {
+            "observed_return_delta": {
+              "mean": -0.24214833827063884,
+              "min": -0.36462644999206956,
+              "max": -0.07219810535414964,
+              "std": 0.09466594751791065,
+              "positive": 0,
+              "negative": 8
+            },
+            "bootstrap_delta": {
+              "mean": -0.004379761612006747,
+              "min": -0.004925171097799275,
+              "max": -0.00358333287311563,
+              "std": 0.00038124124326948484,
+              "positive": 0,
+              "negative": 8
+            },
+            "bootstrapped_return_delta": {
+              "mean": -0.24652809988264557,
+              "min": -0.36916331441752404,
+              "max": -0.0757814382272653,
+              "std": 0.09495066111537412,
+              "positive": 0,
+              "negative": 8
+            },
+            "gae_first_delta": {
+              "mean": -0.24652886390686035,
+              "min": -0.36916446685791016,
+              "max": -0.07578170299530029,
+              "std": 0.09495077971438808,
+              "positive": 0,
+              "negative": 8
+            },
+            "td_first_delta": {
+              "mean": -0.07271317686901785,
+              "min": -0.08734780417673704,
+              "max": -0.053149646793516414,
+              "std": 0.010428621963292403,
+              "positive": 0,
+              "negative": 8
+            },
+            "velocity_error_delta": {
+              "mean": 1.8530654087662697,
+              "min": 1.6597886681556702,
+              "max": 1.9232563972473145,
+              "std": 0.08814345264033994,
+              "positive": 8,
+              "negative": 0
+            },
+            "forward_error_delta": {
+              "mean": 1.8865698974539191,
+              "min": 1.8294783486685318,
+              "max": 1.9559456321109803,
+              "std": 0.04641280266649852,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_observed_return": {
+              "mean": -0.12684520857338685,
+              "min": -0.2175131491468975,
+              "max": -0.07367404182041963,
+              "std": 0.049088678649804506,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_velocity_error": {
+              "mean": 3.0955980643630028,
+              "min": 0.7929536700248718,
+              "max": 5.533474922180176,
+              "std": 1.4113964712373017,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_velocity_error": {
+              "mean": 4.9486634731292725,
+              "min": 2.452742338180542,
+              "max": 7.4187235832214355,
+              "std": 1.4690639046342744,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_thrust_delta": {
+              "mean": 0.08926984574645758,
+              "min": 0.0609729066491127,
+              "max": 0.1124829351902008,
+              "std": 0.016226885428792356,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_brake_delta": {
+              "mean": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "std": 0.0,
+              "positive": 0,
+              "negative": 0
+            }
+          },
+          "own_adam_force_change": 0.25827114196132334,
+          "actual_force_change": 0.3523254990577698,
+          "own_pooled_gradient_force_change": 3.6136029145979256
+        },
+        {
+          "anchor": 14,
+          "seed": 29,
+          "update": 43,
+          "band": "under",
+          "mode": "sampled",
+          "variant": "brake--1-30",
+          "channel": 2,
+          "offset": -0.5,
+          "duration": 30,
+          "corrective": true,
+          "horizon": 256,
+          "original_cutoff": false,
+          "rollout_remaining": 188,
+          "tick": 564,
+          "forward_error": -1.7005605697631836,
+          "replicates": 8,
+          "metrics": {
+            "observed_return_delta": {
+              "mean": -0.10359299567513003,
+              "min": -0.16889631994707804,
+              "max": -0.0008487255655564574,
+              "std": 0.057211113097874855,
+              "positive": 0,
+              "negative": 8
+            },
+            "bootstrap_delta": {
+              "mean": -0.0026297876745943055,
+              "min": -0.0029585833449677634,
+              "max": -0.0020663322496004555,
+              "std": 0.0002914761275847539,
+              "positive": 0,
+              "negative": 8
+            },
+            "bootstrapped_return_delta": {
+              "mean": -0.10622278334972433,
+              "min": -0.1715305244360814,
+              "max": -0.002915057815156913,
+              "std": 0.05741990252304971,
+              "positive": 0,
+              "negative": 8
+            },
+            "gae_first_delta": {
+              "mean": -0.10622306168079376,
+              "min": -0.17152976989746094,
+              "max": -0.0029146671295166016,
+              "std": 0.057419869048973504,
+              "positive": 0,
+              "negative": 8
+            },
+            "td_first_delta": {
+              "mean": -0.06894566255707182,
+              "min": -0.09949046191138056,
+              "max": -0.02213366416894802,
+              "std": 0.02842361676697063,
+              "positive": 0,
+              "negative": 8
+            },
+            "velocity_error_delta": {
+              "mean": 1.1209730878472328,
+              "min": 0.9380117058753967,
+              "max": 1.2085590362548828,
+              "std": 0.08598422198369848,
+              "positive": 8,
+              "negative": 0
+            },
+            "forward_error_delta": {
+              "mean": 1.1493850598569226,
+              "min": 1.0881921958507523,
+              "max": 1.2182415025573068,
+              "std": 0.04893909461627165,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_observed_return": {
+              "mean": -0.12684520857338685,
+              "min": -0.2175131491468975,
+              "max": -0.07367404182041963,
+              "std": 0.049088678649804506,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_velocity_error": {
+              "mean": 3.0955980643630028,
+              "min": 0.7929536700248718,
+              "max": 5.533474922180176,
+              "std": 1.4113964712373017,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_velocity_error": {
+              "mean": 4.216571152210236,
+              "min": 1.7309653759002686,
+              "max": 6.638895034790039,
+              "std": 1.4624314571365995,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_thrust_delta": {
+              "mean": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "std": 0.0,
+              "positive": 0,
+              "negative": 0
+            },
+            "initial_brake_delta": {
+              "mean": -0.06068302085623145,
+              "min": -0.08591650426387787,
+              "max": -0.020090661942958832,
+              "std": 0.024218357216883132,
+              "positive": 0,
+              "negative": 8
+            }
+          },
+          "own_adam_force_change": 0.25827114196132334,
+          "actual_force_change": 0.3523254990577698,
+          "own_pooled_gradient_force_change": 3.6136029145979256
+        }
+      ]
+    },
+    {
+      "anchor": {
+        "index": 29,
+        "seed": 43,
+        "update": 16,
+        "region": "ready_over",
+        "band": "over",
+        "row": 560,
+        "rollout_t": 93,
+        "slot": 2,
+        "rollout_remaining": 163,
+        "tick": 333,
+        "episode_id": 180,
+        "candidate": 40,
+        "command": 16,
+        "forward_error": 1.7465572357177734,
+        "original_advantage": 3.6073691844940186,
+        "original_pooled_advantage": 1.7122658491134644,
+        "original_latents": [
+          -2.2059051990509033,
+          -1.693729043006897
+        ]
+      },
+      "baseline_final_forward_error_mean": -4.904327991986694,
+      "cells": [
+        {
+          "anchor": 29,
+          "seed": 43,
+          "update": 16,
+          "band": "over",
+          "mode": "sampled",
+          "variant": "throttle--1-1",
+          "channel": 1,
+          "offset": -0.5,
+          "duration": 1,
+          "corrective": true,
+          "horizon": 256,
+          "original_cutoff": false,
+          "rollout_remaining": 163,
+          "tick": 333,
+          "forward_error": 1.7465572357177734,
+          "replicates": 8,
+          "metrics": {
+            "observed_return_delta": {
+              "mean": -0.001283487844339442,
+              "min": -0.006844989164968784,
+              "max": 0.0015794172170249254,
+              "std": 0.0025007146959957994,
+              "positive": 2,
+              "negative": 6
+            },
+            "bootstrap_delta": {
+              "mean": 0.00012572227956022392,
+              "min": 6.440998149620514e-05,
+              "max": 0.00020996926171351626,
+              "std": 4.246739636704007e-05,
+              "positive": 8,
+              "negative": 0
+            },
+            "bootstrapped_return_delta": {
+              "mean": -0.0011577655647792215,
+              "min": -0.006635019903255213,
+              "max": 0.0016806173065960217,
+              "std": 0.0024660418226587913,
+              "positive": 2,
+              "negative": 6
+            },
+            "gae_first_delta": {
+              "mean": -0.001157224178314209,
+              "min": -0.006634712219238281,
+              "max": 0.0016808509826660156,
+              "std": 0.0024657206497164983,
+              "positive": 2,
+              "negative": 6
+            },
+            "td_first_delta": {
+              "mean": 0.023619612135881818,
+              "min": 0.014261302162460687,
+              "max": 0.03763952521253344,
+              "std": 0.007584043614176468,
+              "positive": 8,
+              "negative": 0
+            },
+            "velocity_error_delta": {
+              "mean": 0.037624627351760864,
+              "min": 0.021766185760498047,
+              "max": 0.05574750900268555,
+              "std": 0.01094589648765315,
+              "positive": 8,
+              "negative": 0
+            },
+            "forward_error_delta": {
+              "mean": -0.03778594124639911,
+              "min": -0.055831092946392324,
+              "max": -0.02188496416160035,
+              "std": 0.010990857346759919,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_observed_return": {
+              "mean": -0.18964341836967233,
+              "min": -0.2943952409977804,
+              "max": -0.1225987837759668,
+              "std": 0.05939400792273437,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_velocity_error": {
+              "mean": 4.910077452659607,
+              "min": 3.421959638595581,
+              "max": 6.751434326171875,
+              "std": 1.2276377134279004,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_velocity_error": {
+              "mean": 4.947702080011368,
+              "min": 3.4719271659851074,
+              "max": 6.8071818351745605,
+              "std": 1.2297703005020257,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_thrust_delta": {
+              "mean": -0.037175492849200964,
+              "min": -0.06569549441337585,
+              "max": -0.02057141810655594,
+              "std": 0.0138493736246007,
+              "positive": 0,
+              "negative": 8
+            },
+            "initial_brake_delta": {
+              "mean": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "std": 0.0,
+              "positive": 0,
+              "negative": 0
+            }
+          },
+          "own_adam_force_change": 0.18384563033910004,
+          "actual_force_change": 0.2967722713947296,
+          "own_pooled_gradient_force_change": 0.6735829233258512
+        },
+        {
+          "anchor": 29,
+          "seed": 43,
+          "update": 16,
+          "band": "over",
+          "mode": "sampled",
+          "variant": "brake-+1-1",
+          "channel": 2,
+          "offset": 0.5,
+          "duration": 1,
+          "corrective": true,
+          "horizon": 256,
+          "original_cutoff": false,
+          "rollout_remaining": 163,
+          "tick": 333,
+          "forward_error": 1.7465572357177734,
+          "replicates": 8,
+          "metrics": {
+            "observed_return_delta": {
+              "mean": -0.0015217784195228987,
+              "min": -0.005529940007224565,
+              "max": 0.003603055278775885,
+              "std": 0.0027315221463204173,
+              "positive": 1,
+              "negative": 7
+            },
+            "bootstrap_delta": {
+              "mean": 0.00022656301965830877,
+              "min": 0.00014945299096313924,
+              "max": 0.00028354947786340956,
+              "std": 4.687337353118337e-05,
+              "positive": 8,
+              "negative": 0
+            },
+            "bootstrapped_return_delta": {
+              "mean": -0.001295215399864602,
+              "min": -0.005360654564331879,
+              "max": 0.003847704039001254,
+              "std": 0.0027482635648701627,
+              "positive": 2,
+              "negative": 6
+            },
+            "gae_first_delta": {
+              "mean": -0.001295715570449829,
+              "min": -0.00536036491394043,
+              "max": 0.0038509368896484375,
+              "std": 0.0027490821565600465,
+              "positive": 2,
+              "negative": 6
+            },
+            "td_first_delta": {
+              "mean": 0.07111881216361449,
+              "min": 0.02914466851366715,
+              "max": 0.10349080376698883,
+              "std": 0.02690745057735886,
+              "positive": 8,
+              "negative": 0
+            },
+            "velocity_error_delta": {
+              "mean": 0.07129174470901489,
+              "min": 0.03479433059692383,
+              "max": 0.09818649291992188,
+              "std": 0.023703078833011867,
+              "positive": 8,
+              "negative": 0
+            },
+            "forward_error_delta": {
+              "mean": -0.0716279533599199,
+              "min": -0.09892821261807239,
+              "max": -0.034871472207820275,
+              "std": 0.023946190638083446,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_observed_return": {
+              "mean": -0.18964341836967233,
+              "min": -0.2943952409977804,
+              "max": -0.1225987837759668,
+              "std": 0.05939400792273437,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_velocity_error": {
+              "mean": 4.910077452659607,
+              "min": 3.421959638595581,
+              "max": 6.751434326171875,
+              "std": 1.2276377134279004,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_velocity_error": {
+              "mean": 4.981369197368622,
+              "min": 3.520146131515503,
+              "max": 6.796546459197998,
+              "std": 1.2060643780023175,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_thrust_delta": {
+              "mean": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "std": 0.0,
+              "positive": 0,
+              "negative": 0
+            },
+            "initial_brake_delta": {
+              "mean": 0.07622352708131075,
+              "min": 0.03674905002117157,
+              "max": 0.10288335382938385,
+              "std": 0.023083999524617906,
+              "positive": 8,
+              "negative": 0
+            }
+          },
+          "own_adam_force_change": 0.18384563033910004,
+          "actual_force_change": 0.2967722713947296,
+          "own_pooled_gradient_force_change": 0.6735829233258512
+        },
+        {
+          "anchor": 29,
+          "seed": 43,
+          "update": 16,
+          "band": "over",
+          "mode": "sampled",
+          "variant": "throttle--1-30",
+          "channel": 1,
+          "offset": -0.5,
+          "duration": 30,
+          "corrective": true,
+          "horizon": 256,
+          "original_cutoff": false,
+          "rollout_remaining": 163,
+          "tick": 333,
+          "forward_error": 1.7465572357177734,
+          "replicates": 8,
+          "metrics": {
+            "observed_return_delta": {
+              "mean": -0.1055384275279949,
+              "min": -0.16931034196378547,
+              "max": -0.028190180992038266,
+              "std": 0.04425926802573822,
+              "positive": 0,
+              "negative": 8
+            },
+            "bootstrap_delta": {
+              "mean": 0.00414514620747955,
+              "min": 0.0032248294633953067,
+              "max": 0.0049640445230723085,
+              "std": 0.0005193780976068479,
+              "positive": 8,
+              "negative": 0
+            },
+            "bootstrapped_return_delta": {
+              "mean": -0.10139328132051534,
+              "min": -0.16608551250039016,
+              "max": -0.024078640783378846,
+              "std": 0.044276510482145606,
+              "positive": 0,
+              "negative": 8
+            },
+            "gae_first_delta": {
+              "mean": -0.10139331221580505,
+              "min": -0.16608786582946777,
+              "max": -0.024074554443359375,
+              "std": 0.04427782921070129,
+              "positive": 0,
+              "negative": 8
+            },
+            "td_first_delta": {
+              "mean": 0.023619612135881818,
+              "min": 0.014261302162460687,
+              "max": 0.03763952521253344,
+              "std": 0.007584043614176468,
+              "positive": 8,
+              "negative": 0
+            },
+            "velocity_error_delta": {
+              "mean": 1.1811562180519104,
+              "min": 0.8238329887390137,
+              "max": 1.3632020950317383,
+              "std": 0.1793887314129972,
+              "positive": 8,
+              "negative": 0
+            },
+            "forward_error_delta": {
+              "mean": -1.184755664389208,
+              "min": -1.3685786418174324,
+              "max": -0.8248114043804637,
+              "std": 0.1811607244371131,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_observed_return": {
+              "mean": -0.18964341836967233,
+              "min": -0.2943952409977804,
+              "max": -0.1225987837759668,
+              "std": 0.05939400792273437,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_velocity_error": {
+              "mean": 4.910077452659607,
+              "min": 3.421959638595581,
+              "max": 6.751434326171875,
+              "std": 1.2276377134279004,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_velocity_error": {
+              "mean": 6.091233670711517,
+              "min": 4.66947603225708,
+              "max": 7.575267314910889,
+              "std": 1.071673682271671,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_thrust_delta": {
+              "mean": -0.037175492849200964,
+              "min": -0.06569549441337585,
+              "max": -0.02057141810655594,
+              "std": 0.0138493736246007,
+              "positive": 0,
+              "negative": 8
+            },
+            "initial_brake_delta": {
+              "mean": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "std": 0.0,
+              "positive": 0,
+              "negative": 0
+            }
+          },
+          "own_adam_force_change": 0.18384563033910004,
+          "actual_force_change": 0.2967722713947296,
+          "own_pooled_gradient_force_change": 0.6735829233258512
+        },
+        {
+          "anchor": 29,
+          "seed": 43,
+          "update": 16,
+          "band": "over",
+          "mode": "sampled",
+          "variant": "brake-+1-30",
+          "channel": 2,
+          "offset": 0.5,
+          "duration": 30,
+          "corrective": true,
+          "horizon": 256,
+          "original_cutoff": false,
+          "rollout_remaining": 163,
+          "tick": 333,
+          "forward_error": 1.7465572357177734,
+          "replicates": 8,
+          "metrics": {
+            "observed_return_delta": {
+              "mean": -0.24124596270845863,
+              "min": -0.39275273072010125,
+              "max": -0.08928936817450547,
+              "std": 0.09032899754593914,
+              "positive": 0,
+              "negative": 8
+            },
+            "bootstrap_delta": {
+              "mean": 0.006884649189537677,
+              "min": 0.005541259848774183,
+              "max": 0.008470713142788466,
+              "std": 0.0008720384401907444,
+              "positive": 8,
+              "negative": 0
+            },
+            "bootstrapped_return_delta": {
+              "mean": -0.23436131351892095,
+              "min": -0.387211470871327,
+              "max": -0.08281026988329088,
+              "std": 0.09037692974582685,
+              "positive": 0,
+              "negative": 8
+            },
+            "gae_first_delta": {
+              "mean": -0.23436129093170166,
+              "min": -0.38721346855163574,
+              "max": -0.0828084945678711,
+              "std": 0.09037760454375778,
+              "positive": 0,
+              "negative": 8
+            },
+            "td_first_delta": {
+              "mean": 0.07111881216361449,
+              "min": 0.02914466851366715,
+              "max": 0.10349080376698883,
+              "std": 0.02690745057735886,
+              "positive": 8,
+              "negative": 0
+            },
+            "velocity_error_delta": {
+              "mean": 1.8928369283676147,
+              "min": 1.3774347305297852,
+              "max": 2.219741106033325,
+              "std": 0.31932533679939085,
+              "positive": 8,
+              "negative": 0
+            },
+            "forward_error_delta": {
+              "mean": -1.8974807035174557,
+              "min": -2.2283085192135044,
+              "max": -1.3788150487035242,
+              "std": 0.32186236894436615,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_observed_return": {
+              "mean": -0.18964341836967233,
+              "min": -0.2943952409977804,
+              "max": -0.1225987837759668,
+              "std": 0.05939400792273437,
+              "positive": 0,
+              "negative": 8
+            },
+            "baseline_velocity_error": {
+              "mean": 4.910077452659607,
+              "min": 3.421959638595581,
+              "max": 6.751434326171875,
+              "std": 1.2276377134279004,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_velocity_error": {
+              "mean": 6.802914381027222,
+              "min": 5.641700744628906,
+              "max": 8.12886905670166,
+              "std": 0.9164158408723622,
+              "positive": 8,
+              "negative": 0
+            },
+            "baseline_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "variant_ticks": {
+              "mean": 256,
+              "min": 256,
+              "max": 256,
+              "std": 0.0,
+              "positive": 8,
+              "negative": 0
+            },
+            "initial_thrust_delta": {
+              "mean": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "std": 0.0,
+              "positive": 0,
+              "negative": 0
+            },
+            "initial_brake_delta": {
+              "mean": 0.07622352708131075,
+              "min": 0.03674905002117157,
+              "max": 0.10288335382938385,
+              "std": 0.023083999524617906,
+              "positive": 8,
+              "negative": 0
+            }
+          },
+          "own_adam_force_change": 0.18384563033910004,
+          "actual_force_change": 0.2967722713947296,
+          "own_pooled_gradient_force_change": 0.6735829233258512
+        }
+      ]
+    }
+  ],
+  "evidence_counts": {
+    "paired_rows": 14400,
+    "cell_count": 3200,
+    "direct_pair_rows": 7200,
+    "direct_cell_count": 1600
+  }
+}

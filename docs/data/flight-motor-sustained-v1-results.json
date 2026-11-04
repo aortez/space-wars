@@ -1,0 +1,893 @@
+{
+  "experiment_id": "learned-flight-motor-sustained-v1-20261025",
+  "status": "stopped_at_preflight",
+  "passed": false,
+  "original_preflight_gate_passed": false,
+  "correctness_verification_passed": true,
+  "all_preflights_reviewed": true,
+  "preflight_passes": 5,
+  "records": [
+    {
+      "arm": "acquire",
+      "seed": 17,
+      "training_coverage": {
+        "0": 2,
+        "1": 2,
+        "33": 2,
+        "40": 2
+      },
+      "training_outcomes": {
+        "track": {
+          "deadline": 4
+        },
+        "brake": {
+          "deadline": 4
+        }
+      },
+      "training_stats": {
+        "movement_ticks": 2048,
+        "movement_heading_spin_good": 12,
+        "helpful_strict_push": 0,
+        "helpful_gentle_push": 1,
+        "movement_ticks_after_360": 0,
+        "stopping_ticks": 2048
+      },
+      "training_peak_speeds": {
+        "track": 25.922276277948654,
+        "brake": 13.694176118098621
+      },
+      "action_counts": {
+        "movement_thrust_above_point05": 1976,
+        "movement_brake_below_point4": 2036
+      },
+      "likelihood_comparisons": 4096,
+      "max_log_probability_error": 9.5367431640625e-07,
+      "protected_stopping_rows": 2048,
+      "restore_ticks": 192,
+      "neutral_setups": 16,
+      "optimizer_steps": 64,
+      "repeated_optimizer_steps": 16,
+      "kl_stops": 0,
+      "main_seconds": 1.0648629139996046,
+      "frozen_parent_checkpoints": 5,
+      "preflight_checks": {
+        "physical_safety": true,
+        "throttle_coverage": true,
+        "brake_coverage": true,
+        "continuation_exposure": true
+      },
+      "preflight_passed": true
+    },
+    {
+      "arm": "acquire",
+      "seed": 29,
+      "training_coverage": {
+        "0": 11,
+        "1": 34,
+        "33": 9,
+        "40": 5
+      },
+      "training_outcomes": {
+        "track": {
+          "success": 16
+        },
+        "brake": {
+          "success": 43
+        }
+      },
+      "training_stats": {
+        "stopping_ticks": 2048,
+        "movement_ticks": 2048,
+        "movement_heading_spin_good": 2048,
+        "helpful_strict_push": 0,
+        "helpful_gentle_push": 74,
+        "movement_ticks_after_360": 0
+      },
+      "training_peak_speeds": {
+        "track": 23.99193446521187,
+        "brake": 13.6856197400172
+      },
+      "action_counts": {
+        "movement_thrust_above_point05": 1978,
+        "movement_brake_below_point4": 1880
+      },
+      "likelihood_comparisons": 4096,
+      "max_log_probability_error": 9.5367431640625e-07,
+      "protected_stopping_rows": 2048,
+      "restore_ticks": 289,
+      "neutral_setups": 83,
+      "optimizer_steps": 64,
+      "repeated_optimizer_steps": 16,
+      "kl_stops": 0,
+      "main_seconds": 1.8283671240005788,
+      "frozen_parent_checkpoints": 5,
+      "preflight_checks": {
+        "physical_safety": true,
+        "throttle_coverage": true,
+        "brake_coverage": true,
+        "continuation_exposure": true
+      },
+      "preflight_passed": true
+    },
+    {
+      "arm": "acquire",
+      "seed": 43,
+      "training_coverage": {
+        "0": 4,
+        "1": 34,
+        "33": 10,
+        "40": 4
+      },
+      "training_outcomes": {
+        "track": {
+          "success": 7,
+          "deadline": 1
+        },
+        "brake": {
+          "success": 44
+        }
+      },
+      "training_stats": {
+        "stopping_ticks": 2048,
+        "movement_ticks": 2048,
+        "movement_heading_spin_good": 2048,
+        "helpful_strict_push": 0,
+        "helpful_gentle_push": 76,
+        "movement_ticks_after_360": 0
+      },
+      "training_peak_speeds": {
+        "track": 24.047313748222198,
+        "brake": 13.671943755679772
+      },
+      "action_counts": {
+        "movement_thrust_above_point05": 1601,
+        "movement_brake_below_point4": 1991
+      },
+      "likelihood_comparisons": 4096,
+      "max_log_probability_error": 9.5367431640625e-07,
+      "protected_stopping_rows": 2048,
+      "restore_ticks": 560,
+      "neutral_setups": 75,
+      "optimizer_steps": 64,
+      "repeated_optimizer_steps": 16,
+      "kl_stops": 0,
+      "main_seconds": 1.8649947289995907,
+      "frozen_parent_checkpoints": 5,
+      "preflight_checks": {
+        "physical_safety": true,
+        "throttle_coverage": true,
+        "brake_coverage": true,
+        "continuation_exposure": true
+      },
+      "preflight_passed": true
+    },
+    {
+      "arm": "sustain",
+      "seed": 17,
+      "training_coverage": {
+        "0": 1,
+        "1": 2,
+        "33": 2,
+        "40": 1
+      },
+      "training_outcomes": {
+        "track": {
+          "collision": 1,
+          "deadline": 1
+        },
+        "brake": {
+          "deadline": 4
+        }
+      },
+      "training_stats": {
+        "stopping_ticks": 2048,
+        "movement_ticks": 2048,
+        "movement_heading_spin_good": 8,
+        "helpful_strict_push": 0,
+        "helpful_gentle_push": 1,
+        "movement_ticks_after_360": 871
+      },
+      "training_peak_speeds": {
+        "track": 25.922276277948654,
+        "brake": 13.694176118098621
+      },
+      "action_counts": {
+        "movement_thrust_above_point05": 1979,
+        "movement_brake_below_point4": 2036
+      },
+      "likelihood_comparisons": 4096,
+      "max_log_probability_error": 4.76837158203125e-07,
+      "protected_stopping_rows": 2048,
+      "restore_ticks": 941,
+      "neutral_setups": 15,
+      "optimizer_steps": 64,
+      "repeated_optimizer_steps": 16,
+      "kl_stops": 0,
+      "main_seconds": 1.2914671349990385,
+      "frozen_parent_checkpoints": 5,
+      "preflight_checks": {
+        "physical_safety": false,
+        "throttle_coverage": true,
+        "brake_coverage": true,
+        "continuation_exposure": false
+      },
+      "preflight_passed": false
+    },
+    {
+      "arm": "sustain",
+      "seed": 29,
+      "training_coverage": {
+        "0": 1,
+        "1": 34,
+        "33": 9,
+        "40": 1
+      },
+      "training_outcomes": {
+        "track": {
+          "deadline": 2
+        },
+        "brake": {
+          "success": 43
+        }
+      },
+      "training_stats": {
+        "stopping_ticks": 2048,
+        "movement_ticks": 2048,
+        "movement_heading_spin_good": 2048,
+        "helpful_strict_push": 0,
+        "helpful_gentle_push": 208,
+        "movement_ticks_after_360": 1080,
+        "movement_episodes_acquired": 3,
+        "post_acquisition_movement_ticks": 1541,
+        "movement_episodes_breached": 2
+      },
+      "training_peak_speeds": {
+        "track": 23.876136738788876,
+        "brake": 13.6856197400172
+      },
+      "action_counts": {
+        "movement_thrust_above_point05": 1983,
+        "movement_brake_below_point4": 1877
+      },
+      "likelihood_comparisons": 4096,
+      "max_log_probability_error": 9.5367431640625e-07,
+      "protected_stopping_rows": 2048,
+      "restore_ticks": 1583,
+      "neutral_setups": 66,
+      "optimizer_steps": 64,
+      "repeated_optimizer_steps": 16,
+      "kl_stops": 0,
+      "main_seconds": 2.4510406160006823,
+      "frozen_parent_checkpoints": 5,
+      "preflight_checks": {
+        "physical_safety": true,
+        "throttle_coverage": true,
+        "brake_coverage": true,
+        "continuation_exposure": true
+      },
+      "preflight_passed": true
+    },
+    {
+      "arm": "sustain",
+      "seed": 43,
+      "training_coverage": {
+        "0": 1,
+        "1": 34,
+        "33": 10,
+        "40": 1
+      },
+      "training_outcomes": {
+        "track": {
+          "deadline": 2
+        },
+        "brake": {
+          "success": 44
+        }
+      },
+      "training_stats": {
+        "stopping_ticks": 2048,
+        "movement_ticks": 2048,
+        "movement_heading_spin_good": 2048,
+        "helpful_strict_push": 0,
+        "helpful_gentle_push": 176,
+        "movement_ticks_after_360": 1080,
+        "movement_episodes_acquired": 2,
+        "post_acquisition_movement_ticks": 1470,
+        "movement_episodes_breached": 2
+      },
+      "training_peak_speeds": {
+        "track": 23.87156354973836,
+        "brake": 13.671943755679772
+      },
+      "action_counts": {
+        "movement_thrust_above_point05": 1655,
+        "movement_brake_below_point4": 1992
+      },
+      "likelihood_comparisons": 4096,
+      "max_log_probability_error": 9.5367431640625e-07,
+      "protected_stopping_rows": 2048,
+      "restore_ticks": 1606,
+      "neutral_setups": 68,
+      "optimizer_steps": 64,
+      "repeated_optimizer_steps": 16,
+      "kl_stops": 0,
+      "main_seconds": 2.413275369000985,
+      "frozen_parent_checkpoints": 5,
+      "preflight_checks": {
+        "physical_safety": true,
+        "throttle_coverage": true,
+        "brake_coverage": true,
+        "continuation_exposure": true
+      },
+      "preflight_passed": true
+    }
+  ],
+  "physical_failures": [
+    {
+      "arm": "sustain",
+      "seed": 17,
+      "episode": 3,
+      "case": 40,
+      "command": {
+        "heading": 0.4880967438220978,
+        "speed": 16.0
+      },
+      "outcome": "collision",
+      "ticks": 691,
+      "first_success_tick": null,
+      "samples": [
+        {
+          "tick": 0,
+          "errors": {
+            "heading": 0.0,
+            "spin": 0.0,
+            "velocity": 7.999999046325684
+          },
+          "frame": {
+            "angle": 0.4880967438220978,
+            "center_of_mass": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "errors": {
+              "position": 0.0,
+              "spin": 0.0,
+              "velocity": 23.999998092651367
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": false,
+            "origin": {
+              "x": 363.79931640625,
+              "y": 667.4436645507812
+            },
+            "potential_landing_assist": 0.0,
+            "spin": 0.0,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": -11.2546968460083,
+              "y": 21.197446823120117
+            },
+            "world_tick": 1
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": false,
+            "contact_pairs": 0,
+            "damage": false,
+            "maximum_impulse": 0.0,
+            "minimum_separation": null,
+            "ship_lost": false
+          },
+          "action": null
+        },
+        {
+          "tick": 30,
+          "errors": {
+            "heading": 0.18527904152870178,
+            "spin": 0.34711840748786926,
+            "velocity": 8.091504096984863
+          },
+          "frame": {
+            "angle": 0.6733757853507996,
+            "center_of_mass": {
+              "x": 358.7093811035156,
+              "y": 676.9666748046875
+            },
+            "errors": {
+              "position": 12.019619941711426,
+              "spin": 0.34711840748786926,
+              "velocity": 24.089746475219727
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": false,
+            "origin": {
+              "x": 357.947509765625,
+              "y": 677.9216918945312
+            },
+            "potential_landing_assist": 0.0,
+            "spin": 0.34711840748786926,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": -11.479119300842285,
+              "y": 21.178897857666016
+            },
+            "world_tick": 31
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": false,
+            "contact_pairs": 0,
+            "damage": false,
+            "maximum_impulse": 0.0,
+            "minimum_separation": null,
+            "ship_lost": false
+          },
+          "action": {
+            "brake": 0.13257446885108948,
+            "steering": -0.19284357130527496,
+            "thrust": 0.15694662928581238
+          }
+        },
+        {
+          "tick": 120,
+          "errors": {
+            "heading": 0.5224215984344482,
+            "spin": 0.12689131498336792,
+            "velocity": 8.593717575073242
+          },
+          "frame": {
+            "angle": 1.0105183124542236,
+            "center_of_mass": {
+              "x": 339.83782958984375,
+              "y": 707.7327880859375
+            },
+            "errors": {
+              "position": 48.096378326416016,
+              "spin": 0.12689131498336792,
+              "velocity": 24.23662757873535
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": false,
+            "origin": {
+              "x": 338.8029479980469,
+              "y": 708.3820190429688
+            },
+            "potential_landing_assist": 0.0,
+            "spin": 0.12689131498336792,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": -13.937342643737793,
+              "y": 19.828378677368164
+            },
+            "world_tick": 121
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": false,
+            "contact_pairs": 0,
+            "damage": false,
+            "maximum_impulse": 0.0,
+            "minimum_separation": null,
+            "ship_lost": false
+          },
+          "action": {
+            "brake": 0.05059148371219635,
+            "steering": -0.07049518078565598,
+            "thrust": 0.2576506733894348
+          }
+        },
+        {
+          "tick": 256,
+          "errors": {
+            "heading": 0.6582045555114746,
+            "spin": 0.024148831143975258,
+            "velocity": 11.805975914001465
+          },
+          "frame": {
+            "angle": 1.14630126953125,
+            "center_of_mass": {
+              "x": 301.96234130859375,
+              "y": 749.9710693359375
+            },
+            "errors": {
+              "position": 104.33135223388672,
+              "spin": 0.024148831143975258,
+              "velocity": 25.5849609375
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": false,
+            "origin": {
+              "x": 300.8490905761719,
+              "y": 750.4742431640625
+            },
+            "potential_landing_assist": 0.0,
+            "spin": 0.024148831143975258,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": -18.88753318786621,
+              "y": 17.25836753845215
+            },
+            "world_tick": 257
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": false,
+            "contact_pairs": 0,
+            "damage": false,
+            "maximum_impulse": 0.0,
+            "minimum_separation": null,
+            "ship_lost": false
+          },
+          "action": {
+            "brake": 0.1489841341972351,
+            "steering": -0.013416017405688763,
+            "thrust": 0.17144668102264404
+          }
+        },
+        {
+          "tick": 360,
+          "errors": {
+            "heading": 0.6420788764953613,
+            "spin": 0.030230306088924408,
+            "velocity": 12.724783897399902
+          },
+          "frame": {
+            "angle": 1.1301755905151367,
+            "center_of_mass": {
+              "x": 267.90032958984375,
+              "y": 777.5701904296875
+            },
+            "errors": {
+              "position": 147.21923828125,
+              "spin": 0.030230306088924408,
+              "velocity": 25.038455963134766
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": false,
+            "origin": {
+              "x": 266.7953186035156,
+              "y": 778.0912475585938
+            },
+            "potential_landing_assist": 0.0,
+            "spin": -0.030230306088924408,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": -20.2114315032959,
+              "y": 14.779117584228516
+            },
+            "world_tick": 361
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": false,
+            "contact_pairs": 0,
+            "damage": false,
+            "maximum_impulse": 0.0,
+            "minimum_separation": null,
+            "ship_lost": false
+          },
+          "action": {
+            "brake": 0.14562536776065826,
+            "steering": 0.016794614493846893,
+            "thrust": 0.14750933647155762
+          }
+        },
+        {
+          "tick": 512,
+          "errors": {
+            "heading": 0.5770052671432495,
+            "spin": 0.01943102665245533,
+            "velocity": 13.640095710754395
+          },
+          "frame": {
+            "angle": 1.065101981163025,
+            "center_of_mass": {
+              "x": 214.56622314453125,
+              "y": 813.2572021484375
+            },
+            "errors": {
+              "position": 209.8076934814453,
+              "spin": 0.01943102665245533,
+              "velocity": 24.947559356689453
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": false,
+            "origin": {
+              "x": 213.49745178222656,
+              "y": 813.8489990234375
+            },
+            "potential_landing_assist": 0.0,
+            "spin": -0.01943102665245533,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": -21.116851806640625,
+              "y": 13.283798217773438
+            },
+            "world_tick": 513
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": false,
+            "contact_pairs": 0,
+            "damage": false,
+            "maximum_impulse": 0.0,
+            "minimum_separation": null,
+            "ship_lost": false
+          },
+          "action": {
+            "brake": 0.14076077938079834,
+            "steering": 0.010795014910399914,
+            "thrust": 0.05577947944402695
+          }
+        },
+        {
+          "tick": 600,
+          "errors": {
+            "heading": 0.5414142608642578,
+            "spin": 0.020798252895474434,
+            "velocity": 13.60351848602295
+          },
+          "frame": {
+            "angle": 1.0295109748840332,
+            "center_of_mass": {
+              "x": 183.50982666015625,
+              "y": 832.4886474609375
+            },
+            "errors": {
+              "position": 245.5776824951172,
+              "spin": 0.020798252895474434,
+              "velocity": 24.697237014770508
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": false,
+            "origin": {
+              "x": 182.46278381347656,
+              "y": 833.1181030273438
+            },
+            "potential_landing_assist": 0.0,
+            "spin": -0.020798252895474434,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": -21.052026748657227,
+              "y": 12.913779258728027
+            },
+            "world_tick": 601
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": false,
+            "contact_pairs": 0,
+            "damage": false,
+            "maximum_impulse": 0.0,
+            "minimum_separation": null,
+            "ship_lost": false
+          },
+          "action": {
+            "brake": 0.07140840590000153,
+            "steering": 0.011554584838449955,
+            "thrust": 0.0695221871137619
+          }
+        },
+        {
+          "tick": 690,
+          "errors": {
+            "heading": 0.5196636915206909,
+            "spin": 0.013399483636021614,
+            "velocity": 14.300284385681152
+          },
+          "frame": {
+            "angle": 1.0077604055404663,
+            "center_of_mass": {
+              "x": 151.47601318359375,
+              "y": 852.1395263671875
+            },
+            "errors": {
+              "position": 282.55462646484375,
+              "spin": 0.013399483636021614,
+              "velocity": 25.577621459960938
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": false,
+            "origin": {
+              "x": 150.4429168701172,
+              "y": 852.7916259765625
+            },
+            "potential_landing_assist": 0.0,
+            "spin": -0.013399483636021614,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": -21.784832000732422,
+              "y": 13.402827262878418
+            },
+            "world_tick": 691
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": false,
+            "contact_pairs": 0,
+            "damage": false,
+            "maximum_impulse": 0.0,
+            "minimum_separation": null,
+            "ship_lost": false
+          },
+          "action": {
+            "brake": 0.029515499249100685,
+            "steering": 0.0074441577307879925,
+            "thrust": 0.08985081315040588
+          }
+        },
+        {
+          "tick": 691,
+          "errors": {
+            "heading": 0.5253380537033081,
+            "spin": 0.36477670073509216,
+            "velocity": 26.282859802246094
+          },
+          "frame": {
+            "angle": 1.0134347677230835,
+            "center_of_mass": {
+              "x": 151.61203002929688,
+              "y": 852.0360107421875
+            },
+            "errors": {
+              "position": 282.3840637207031,
+              "spin": 0.36477670073509216,
+              "velocity": 10.890366554260254
+            },
+            "gravity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "health": 100.0,
+            "near_contact": true,
+            "origin": {
+              "x": 150.5752410888672,
+              "y": 852.6821899414062
+            },
+            "potential_landing_assist": 0.0,
+            "spin": 0.36477670073509216,
+            "target_position": {
+              "x": 364.3722229003906,
+              "y": 666.3646240234375
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "velocity": {
+              "x": 8.677974700927734,
+              "y": -6.579730033874512
+            },
+            "world_tick": 692
+          },
+          "evidence": {
+            "boundary_escape": false,
+            "collision": true,
+            "contact_pairs": 1,
+            "damage": false,
+            "maximum_impulse": 1109.480712890625,
+            "minimum_separation": -0.07411277294158936,
+            "ship_lost": false
+          },
+          "action": {
+            "brake": 0.169987291097641,
+            "steering": 0.006313382647931576,
+            "thrust": 0.09463324397802353
+          }
+        }
+      ]
+    }
+  ],
+  "main_started": false,
+  "development_evaluated": false,
+  "training_ticks": 30720,
+  "primary_preflight_training_ticks": 24576,
+  "repeated_training_ticks": 6144,
+  "optimizer_steps": 480,
+  "restore_ticks": 5171,
+  "neutral_setup_ticks": 323,
+  "evaluation_ticks": 0,
+  "evaluation_episodes": 0,
+  "native_python_comparisons": 0,
+  "likelihood_comparisons": 24576,
+  "protected_stopping_rows": 12288,
+  "frozen_parent_checkpoints": 36,
+  "exact_resumes": 6,
+  "declared_parent_initializations": 6,
+  "retained_checkpoints": 36,
+  "retained_rollouts": 30,
+  "retained_policy_exports": 24,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "navigation_qualified": false,
+  "seconds": 14.469503407000957,
+  "review_scope": "supplemental read-only audit after frozen verifier stopped on physical failure; no retries or extra training"
+}

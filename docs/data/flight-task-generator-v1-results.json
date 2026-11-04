@@ -1,0 +1,289 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-tasks-v1-20261022",
+  "kind": "task-generator-correctness-inspection",
+  "training": false,
+  "partition": "development inspection only",
+  "seeds": [
+    20261022,
+    20261023,
+    20261024
+  ],
+  "per_family_per_seed": 16,
+  "max_rounds": 128,
+  "attempts": 240,
+  "accepted": 192,
+  "rejected": 48,
+  "families": {
+    "altered": {
+      "candidates": 49,
+      "admitted": 48,
+      "rejected": {
+        "unsupported_independent_body_motion": 1
+      }
+    },
+    "clear": {
+      "candidates": 52,
+      "admitted": 48,
+      "rejected": {
+        "unsafe_goal_trajectory": 4
+      }
+    },
+    "moving": {
+      "candidates": 91,
+      "admitted": 48,
+      "rejected": {
+        "unsafe_goal_trajectory": 43
+      }
+    },
+    "obstructed": {
+      "candidates": 48,
+      "admitted": 48,
+      "rejected": {}
+    }
+  },
+  "accepted_coverage": {
+    "start_speed": {
+      "min": 0.15636830031871796,
+      "max": 69.9220199584961
+    },
+    "start_spin": {
+      "min": -1.761497139930725,
+      "max": 1.7854249477386475
+    },
+    "heading": {
+      "min": -3.1007187366485596,
+      "max": 3.1010844707489014
+    },
+    "goal_distance": {
+      "min": 33.934410095214844,
+      "max": 199.76119995117188
+    },
+    "target_speed": {
+      "min": 0.0,
+      "max": 19.294410705566406
+    },
+    "reference_seconds": {
+      "min": 8.502851486206055,
+      "max": 25.562299728393555
+    },
+    "route_length": {
+      "min": 33.93441390991211,
+      "max": 217.0531005859375
+    },
+    "gravity_sample_max": {
+      "min": 0.0,
+      "max": 18.17805290222168
+    },
+    "hull_com_bound": {
+      "min": 5.9819183349609375,
+      "max": 5.981985092163086
+    },
+    "object_count": {
+      "min": 2,
+      "max": 14
+    },
+    "gravity_enabled_counts": {
+      "true": 102,
+      "false": 90
+    },
+    "planet_spin_counts": {
+      "-0.015": 65,
+      "0.015": 60,
+      "0.000": 67
+    },
+    "accepted_recipes": {
+      "clear": 48,
+      "constant_velocity": 48,
+      "wall": 18,
+      "carved_passage": 24,
+      "open_u": 15,
+      "built_protrusion": 24,
+      "curved_corridor": 15
+    }
+  },
+  "validation": {
+    "scenario_tests": {
+      "passed": 650,
+      "ignored": 2,
+      "failed": 0
+    },
+    "physics_tests": {
+      "passed": 175,
+      "ignored": 1,
+      "failed": 0
+    },
+    "new_generator_tests": 8,
+    "accepted_task_json_reset_parity": 192,
+    "accepted_alterations_change_direct_clearance": 48,
+    "retreat_first_u_witnesses": 15,
+    "budget_exhaustion_cli": "passed; four attempts retained, nonzero exit",
+    "browser_desktop_mobile": "passed; no JavaScript errors or horizontal overflow",
+    "clippy": "18 existing warnings; none in new generator/probe",
+    "format_and_whitespace": "passed"
+  },
+  "recipe_manifest": {
+    "altered_schedule": "(index / 4) modulo 2: carved passage, built protrusion",
+    "altered_speed": [
+      0,
+      12
+    ],
+    "batch_sampling": "choose equal accepted quotas per family; skip filled families, retain every attempted rejection; stop at explicit max_rounds and report incomplete quota",
+    "carved_altitude": [
+      15,
+      25
+    ],
+    "clear_moving_speed": [
+      0,
+      70
+    ],
+    "deadline": "reference screen: (5 seconds + 1.9 seconds per route segment + length / 35) / (1 - target speed / 35) + dwell; engineering estimate, not dynamic feasibility proof",
+    "deadline_ticks": 1800,
+    "decision_hz": 60,
+    "distance": [
+      30,
+      200
+    ],
+    "exclusions": [
+      "generated match worlds and sun",
+      "moving body origins or debris",
+      "planet-attached targets",
+      "mid-episode geometry changes as a navigation task",
+      "orientation-dependent narrow passages",
+      "dynamic feasibility guarantee"
+    ],
+    "family_schedule": "index modulo 4: clear, moving, obstructed, altered; round-robin candidate schedule",
+    "generator_version": 1,
+    "goal_clearance": 12.0,
+    "goal_motion": "full deadline segment; static native shapes plus full rotation envelopes; inward world-edge clearance",
+    "gravity": "seeded equal zero/production practice gravity; one stationary-center practice planet; no mass or radius variants",
+    "gravity_measurement": "production spherical gravity solver at route/goal-path samples spaced at most 8 units; not flown trajectories or global extrema",
+    "grid_spacing": 8.0,
+    "heading": [
+      -3.1415927410125732,
+      3.1415927410125732
+    ],
+    "obstructed_schedule": "(index / 4) modulo 3: wall, open U, curved corridor",
+    "obstructed_speed": [
+      0,
+      15
+    ],
+    "ordinary_altitude": [
+      100,
+      150
+    ],
+    "planet_spin": "seeded choice -0.015, 0, +0.015; carved passage stationary only",
+    "rng": "SplitMix64; candidate keyed by seed and index; top 24 bits for uniform f32",
+    "rotation": "full-rotation shape bound around stationary planet origin; excludes potential routes through rotating envelopes",
+    "route": "orientation-independent COM enclosing disk, continuous native capsule queries; A* then visible shortcuts; grid failure means no conservative witness, not proven disconnection",
+    "route_margin": 0.25,
+    "spin": [
+      -1.8,
+      1.8
+    ],
+    "target_speed": [
+      5,
+      20
+    ],
+    "training": false
+  },
+  "runs": [
+    {
+      "seed": 20261022,
+      "attempts": 83,
+      "families": {
+        "altered": {
+          "admitted": 16,
+          "candidates": 17,
+          "rejected": {
+            "unsupported_independent_body_motion": 1
+          }
+        },
+        "clear": {
+          "admitted": 16,
+          "candidates": 16,
+          "rejected": {}
+        },
+        "moving": {
+          "admitted": 16,
+          "candidates": 34,
+          "rejected": {
+            "unsafe_goal_trajectory": 18
+          }
+        },
+        "obstructed": {
+          "admitted": 16,
+          "candidates": 16,
+          "rejected": {}
+        }
+      }
+    },
+    {
+      "seed": 20261023,
+      "attempts": 79,
+      "families": {
+        "altered": {
+          "admitted": 16,
+          "candidates": 16,
+          "rejected": {}
+        },
+        "clear": {
+          "admitted": 16,
+          "candidates": 17,
+          "rejected": {
+            "unsafe_goal_trajectory": 1
+          }
+        },
+        "moving": {
+          "admitted": 16,
+          "candidates": 30,
+          "rejected": {
+            "unsafe_goal_trajectory": 14
+          }
+        },
+        "obstructed": {
+          "admitted": 16,
+          "candidates": 16,
+          "rejected": {}
+        }
+      }
+    },
+    {
+      "seed": 20261024,
+      "attempts": 78,
+      "families": {
+        "altered": {
+          "admitted": 16,
+          "candidates": 16,
+          "rejected": {}
+        },
+        "clear": {
+          "admitted": 16,
+          "candidates": 19,
+          "rejected": {
+            "unsafe_goal_trajectory": 3
+          }
+        },
+        "moving": {
+          "admitted": 16,
+          "candidates": 27,
+          "rejected": {
+            "unsafe_goal_trajectory": 11
+          }
+        },
+        "obstructed": {
+          "admitted": 16,
+          "candidates": 16,
+          "rejected": {}
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Conservative geometric witnesses and a reference time screen, not dynamically flown maneuvers or feasibility proofs.",
+    "One practice planet, fixed-center rotation and fixed added solids; no generated-match gravity or sun.",
+    "No PPO, model weights, training distribution freeze or learned capability.",
+    "Source excludes Cargo registry dependencies and toolchain binaries.",
+    "Local retained evidence, not an off-machine backup."
+  ]
+}

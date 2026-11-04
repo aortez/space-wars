@@ -140,6 +140,27 @@ pub struct MissionBoundary {
     pub radius: f32,
 }
 
+/// A lab variant of the match arena for training and evaluation worlds. The
+/// standard layout is the match arena itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArenaLayout {
+    /// Without a sun nothing moves the planets, so they spin in place.
+    pub sun: bool,
+    /// The generator's first planets, at least two. Seats start on the first
+    /// and third, or the first and second when there are two.
+    pub planets: usize,
+    /// From the outermost planet's farthest reach to the world edge.
+    pub edge_margin: u32,
+}
+
+impl ArenaLayout {
+    pub const STANDARD: Self = Self {
+        sun: true,
+        planets: 3,
+        edge_margin: profiles::FLIGHT_MARGIN,
+    };
+}
+
 impl SurfaceSortieScenario {
     pub fn init_material_arena(seed: u64) -> SurfaceSortieState {
         Self::init_material_arena_trial(seed, false, 0.0)
@@ -181,21 +202,60 @@ impl SurfaceSortieScenario {
         surface: engine_terrain::TerrainSurface,
         colliders: engine_rapier::terrain::TerrainColliders,
     ) -> SurfaceSortieState {
-        assert!(bearing.is_finite());
-        let mut world = SpacewarsScenario::init(
-            SpacewarsConfig {
-                // Even three maximum-size generated planets fit in this bound.
-                universe_radius: 1600,
-                use_starfield: false,
-                asteroid_probability_per_sec: 0.0,
-                ..SpacewarsConfig::default()
-            },
+        Self::init_material_arena_layout_trial(
             seed,
-        );
-        assert!(world.planets.len() >= 3);
+            ArenaLayout::STANDARD,
+            mirror,
+            bearing,
+            surface,
+            colliders,
+        )
+    }
+
+    /// Lab worlds for training and evaluation. Matches and the launcher keep
+    /// the standard layout.
+    pub fn init_material_arena_layout(seed: u64, layout: ArenaLayout) -> SurfaceSortieState {
+        Self::init_material_arena_layout_trial(
+            seed,
+            layout,
+            false,
+            0.0,
+            engine_terrain::TerrainSurface::Interpolated,
+            engine_rapier::terrain::TerrainColliders::default(),
+        )
+    }
+
+    fn init_material_arena_layout_trial(
+        seed: u64,
+        layout: ArenaLayout,
+        mirror: bool,
+        bearing: f32,
+        surface: engine_terrain::TerrainSurface,
+        colliders: engine_rapier::terrain::TerrainColliders,
+    ) -> SurfaceSortieState {
+        assert!(bearing.is_finite());
+        assert!((2..=transfer_environment::MAX_TRANSFER_PLANETS).contains(&layout.planets));
+        // Even three maximum-size generated planets fit in this bound. Widen
+        // it only when a seed places fewer planets than the layout asks for.
+        let mut bound = 1600;
+        let mut world = loop {
+            let world = SpacewarsScenario::init(
+                SpacewarsConfig {
+                    universe_radius: bound,
+                    use_starfield: false,
+                    asteroid_probability_per_sec: 0.0,
+                    ..SpacewarsConfig::default()
+                },
+                seed,
+            );
+            if world.planets.len() >= layout.planets {
+                break world;
+            }
+            bound *= 2;
+        };
         world.terrain.colliders = colliders;
-        world.planets.truncate(3);
-        world.rover_builds.truncate(3);
+        world.planets.truncate(layout.planets);
+        world.rover_builds.truncate(layout.planets);
         let radius = world
             .planets
             .iter()
@@ -209,6 +269,16 @@ impl SurfaceSortieScenario {
             planet.position += offset;
         }
         GeneratedSurfaceProfile::SurfaceV1.apply(&mut world);
+        if layout.edge_margin != profiles::FLIGHT_MARGIN {
+            // Keep the layout at the center of the moved edge.
+            world.config.universe_radius =
+                world.config.universe_radius - profiles::FLIGHT_MARGIN + layout.edge_margin;
+            let shift = Vec2::splat(layout.edge_margin as f32 - profiles::FLIGHT_MARGIN as f32);
+            world.sun.as_mut().unwrap().position += shift;
+            for planet in &mut world.planets {
+                planet.position += shift;
+            }
+        }
         let sun = world.sun.unwrap();
         if mirror {
             for planet in &mut world.planets {
@@ -224,13 +294,18 @@ impl SurfaceSortieScenario {
                 .rotate_radians(if mirror { -bearing } else { bearing })
         };
         let first_up = up(&world.planets[0]);
-        let mut state = Self::on_surface(
-            world,
-            SurfaceMotionPreset::GeneratedSurfaceV1,
-            0,
-            first_up,
-            None,
-        );
+        let preset = if layout.sun {
+            SurfaceMotionPreset::GeneratedSurfaceV1
+        } else {
+            // Seats still start on the side away from the world's center,
+            // where the sun would be.
+            world.sun = None;
+            for planet in &mut world.planets {
+                planet.orbit_omega = 0.0;
+            }
+            SurfaceMotionPreset::Stationary
+        };
+        let mut state = Self::on_surface(world, preset, 0, first_up, None);
         state.world.terrain.legacy_services = false;
         state.world.terrain.surface = surface;
         for index in 0..state.world.planets.len() {
@@ -239,7 +314,8 @@ impl SurfaceSortieScenario {
                 .enable_planet_terrain(index)
                 .expect("generated material planet");
         }
-        let planet = state.world.planets[2];
+        let second = if layout.planets == 2 { 1 } else { 2 };
+        let planet = state.world.planets[second];
         let up = up(&planet);
         let center = planet.position + up * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + 5.5);
         let ship = &mut state.world.ships[1];
@@ -252,7 +328,7 @@ impl SurfaceSortieScenario {
         ship.omega = planet.wrapper_omega;
         state
             .pilots
-            .push(SurfacePilot::new(PlayerId::PLAYER_2, 2, true));
+            .push(SurfacePilot::new(PlayerId::PLAYER_2, second, true));
         for pilot in &mut state.pilots {
             pilot.travel_enabled = true;
             pilot.flight_enabled = true;
@@ -1056,6 +1132,85 @@ mod tests {
                 assert!(state.world.planet_terrain(i).is_some());
                 assert!(planet.owner_id.is_none());
             }
+        }
+    }
+
+    #[test]
+    fn layouts_vary_the_sun_planets_and_edge_of_the_generated_arena() {
+        let dt = Duration::from_nanos(16_666_667);
+        let seed = 42;
+        let mut standard = SurfaceSortieScenario::init_material_match(seed);
+        let mut same =
+            SurfaceSortieScenario::init_material_match_layout(seed, ArenaLayout::STANDARD);
+        for _ in 0..10 {
+            assert_eq!(
+                SurfaceSortieScenario::observe(&same).payload,
+                SurfaceSortieScenario::observe(&standard).payload
+            );
+            SurfaceSortieScenario::step(&mut standard, &[], dt);
+            SurfaceSortieScenario::step(&mut same, &[], dt);
+        }
+        // Wide enough for the first eight planets of this seed.
+        let original = SpacewarsScenario::init(
+            SpacewarsConfig {
+                universe_radius: 3200,
+                ..Default::default()
+            },
+            seed,
+        );
+        let layouts = [true, false]
+            .into_iter()
+            .flat_map(|sun| {
+                [2, 3, 5, 8].map(|planets| ArenaLayout {
+                    sun,
+                    planets,
+                    edge_margin: 200,
+                })
+            })
+            .chain([120, 320].map(|edge_margin| ArenaLayout {
+                edge_margin,
+                ..ArenaLayout::STANDARD
+            }));
+        for layout in layouts {
+            let mut state = SurfaceSortieScenario::init_material_match_layout(seed, layout);
+            assert_eq!(state.world.sun.is_some(), layout.sun);
+            assert_eq!(state.world.planets.len(), layout.planets);
+            assert_eq!(state.world.terrain.planets.len(), layout.planets);
+            assert_eq!(state.claims.len(), layout.planets);
+            assert_eq!(
+                state.pilots.iter().map(|p| p.planet).collect::<Vec<_>>(),
+                vec![0, if layout.planets == 2 { 1 } else { 2 }]
+            );
+            let center = Vec2::splat(state.world.config.universe_radius as f32);
+            for (i, planet) in state.world.planets.iter().enumerate() {
+                assert_eq!(planet.radius, original.planets[i].radius);
+                assert_eq!(planet.orbit_radius, original.planets[i].orbit_radius);
+                assert!(
+                    (planet.position.distance_to(center) - planet.orbit_radius).abs() < 0.01,
+                    "{layout:?}"
+                );
+            }
+            // The generated reach is rounded up to a whole unit.
+            let reach = state
+                .world
+                .planets
+                .iter()
+                .map(|p| p.orbit_radius + p.radius)
+                .fold(0.0_f32, f32::max);
+            let margin = state.world.config.universe_radius as f32 - reach;
+            let expected = layout.edge_margin as f32;
+            assert!(
+                (expected..expected + 1.0).contains(&margin),
+                "{layout:?}: {margin}"
+            );
+            let before: Vec<_> = state.world.planets.iter().map(|p| p.position).collect();
+            for _ in 0..30 {
+                SurfaceSortieScenario::step(&mut state, &[], dt);
+            }
+            for (planet, start) in state.world.planets.iter().zip(before) {
+                assert_eq!(planet.position != start, layout.sun, "{layout:?}");
+            }
+            assert!(state.pilots.iter().all(|p| p.vitals.unwrap().alive()));
         }
     }
 }

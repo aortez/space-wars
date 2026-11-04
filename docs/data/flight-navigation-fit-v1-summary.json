@@ -1,0 +1,209 @@
+{
+  "kind": "navigation-teacher-fit-v1",
+  "input_scaling": "task-local-v1",
+  "rounds": [
+    {
+      "rows": 58161,
+      "episodes": 360,
+      "law_outcomes": {
+        "success": 348,
+        "deadline": 10,
+        "collision": 2
+      },
+      "errors": {
+        "rows": 58161,
+        "heading_degrees": 4.2479746825869,
+        "speed": 0.13899938762187958,
+        "near_goal": {
+          "rows": 20897,
+          "heading_degrees": 3.478372232241724,
+          "speed": 0.20467177033424377
+        },
+        "by_family": {
+          "clear": {
+            "rows": 17387,
+            "heading_degrees": 2.9713843656246026,
+            "speed": 0.16117271780967712
+          },
+          "obstructed": {
+            "rows": 21520,
+            "heading_degrees": 5.334758097939363,
+            "speed": 0.1294580101966858
+          },
+          "altered": {
+            "rows": 19254,
+            "heading_degrees": 4.186089326725177,
+            "speed": 0.12964043021202087
+          }
+        }
+      }
+    },
+    {
+      "rows": 84238,
+      "episodes": 180,
+      "network_outcomes": {
+        "success": 173,
+        "collision": 5,
+        "deadline": 2
+      },
+      "errors": {
+        "rows": 84238,
+        "heading_degrees": 4.387862506317462,
+        "speed": 0.12826985120773315,
+        "near_goal": {
+          "rows": 30827,
+          "heading_degrees": 3.3773108322915113,
+          "speed": 0.1938830465078354
+        },
+        "by_family": {
+          "clear": {
+            "rows": 25562,
+            "heading_degrees": 2.8921343210151793,
+            "speed": 0.14636357128620148
+          },
+          "obstructed": {
+            "rows": 31067,
+            "heading_degrees": 5.809555709885038,
+            "speed": 0.12205222249031067
+          },
+          "altered": {
+            "rows": 27609,
+            "heading_degrees": 4.1729326748364395,
+            "speed": 0.11851402372121811
+          }
+        }
+      }
+    },
+    {
+      "rows": 108209,
+      "episodes": 180,
+      "network_outcomes": {
+        "success": 177,
+        "deadline": 3
+      },
+      "errors": {
+        "rows": 108209,
+        "heading_degrees": 4.211112151636342,
+        "speed": 0.11044681817293167,
+        "near_goal": {
+          "rows": 38870,
+          "heading_degrees": 3.1099727458655693,
+          "speed": 0.16908986866474152
+        },
+        "by_family": {
+          "clear": {
+            "rows": 32689,
+            "heading_degrees": 2.686299313300852,
+            "speed": 0.12614867091178894
+          },
+          "obstructed": {
+            "rows": 40028,
+            "heading_degrees": 5.679865358585305,
+            "speed": 0.10542361438274384
+          },
+          "altered": {
+            "rows": 35492,
+            "heading_degrees": 3.9590354825805583,
+            "speed": 0.10165023058652878
+          }
+        }
+      }
+    }
+  ],
+  "development": {
+    "cases": 72,
+    "passed": 72,
+    "families": {
+      "clear": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 668.1666666666666
+      },
+      "obstructed": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 863.875
+      },
+      "altered": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 735.4166666666666
+      }
+    },
+    "max_parity": 6.67572021484375e-06
+  },
+  "held_out": {
+    "cases": 72,
+    "passed": 71,
+    "families": {
+      "clear": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 773.9583333333334
+      },
+      "obstructed": {
+        "cases": 24,
+        "passed": 23,
+        "outcomes": {
+          "success": 23,
+          "collision": 1
+        },
+        "mean_success_ticks": 857.304347826087
+      },
+      "altered": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 717.8333333333334
+      }
+    },
+    "max_parity": 4.76837158203125e-06
+  },
+  "law_held_out": {
+    "cases": 72,
+    "passed": 71,
+    "families": {
+      "clear": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 750.75
+      },
+      "obstructed": {
+        "cases": 24,
+        "passed": 23,
+        "outcomes": {
+          "success": 23,
+          "deadline": 1
+        },
+        "mean_success_ticks": 840.8260869565217
+      },
+      "altered": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 723.7083333333334
+      }
+    }
+  },
+  "seconds": 492.42967503199907,
+  "policy_sha256": "eac796afb0f636b9872dfd937c00a8090a2d4b2d16018d224762b2b2ea02f824"
+}

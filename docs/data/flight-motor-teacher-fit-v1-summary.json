@@ -1,0 +1,733 @@
+{
+  "kind": "motor-teacher-fit-v1",
+  "rounds": [
+    {
+      "rows": 480000,
+      "teacher_outcomes": {
+        "deadline": 297,
+        "success": 3
+      },
+      "mean_absolute_error": [
+        0.006974238436669111,
+        0.009598078206181526,
+        0.015457183122634888
+      ]
+    },
+    {
+      "rows": 600000,
+      "network_outcomes": {
+        "deadline": 195,
+        "success": 5
+      },
+      "mean_absolute_error": [
+        0.005225254222750664,
+        0.007175487466156483,
+        0.012770016677677631
+      ]
+    },
+    {
+      "rows": 720000,
+      "network_outcomes": {
+        "deadline": 196,
+        "success": 4
+      },
+      "mean_absolute_error": [
+        0.00410778122022748,
+        0.005838434677571058,
+        0.011257866397500038
+      ]
+    }
+  ],
+  "fixed_state_probe": {
+    "rows": [
+      {
+        "speed": 0,
+        "thrust": 0.9998132586479187,
+        "brake": 0.6368436813354492,
+        "net_acceleration": 44.99159663915634
+      },
+      {
+        "speed": 8,
+        "thrust": 0.8454200625419617,
+        "brake": 0.0001851572305895388,
+        "net_acceleration": 38.03797778300941
+      },
+      {
+        "speed": 12,
+        "thrust": 0.3888269364833832,
+        "brake": 5.2679995860671625e-05,
+        "net_acceleration": 17.495104941917816
+      },
+      {
+        "speed": 15,
+        "thrust": 0.10007628798484802,
+        "brake": 0.00011735898442566395,
+        "net_acceleration": 4.4987385999411345
+      },
+      {
+        "speed": 16,
+        "thrust": 0.003646061522886157,
+        "brake": 0.004565990064293146,
+        "net_acceleration": -0.01856683404184878
+      },
+      {
+        "speed": 17,
+        "thrust": 1.3325347936188336e-05,
+        "brake": 0.09912505000829697,
+        "net_acceleration": -3.96440235967475
+      },
+      {
+        "speed": 20,
+        "thrust": 1.2063173571164043e-08,
+        "brake": 0.39544761180877686,
+        "net_acceleration": -15.817903929508264
+      },
+      {
+        "speed": 24,
+        "thrust": 3.164627726537361e-10,
+        "brake": 0.8238587975502014,
+        "net_acceleration": -32.95435188776723
+      }
+    ],
+    "slope_at_16": -4.231570479807942,
+    "bias_at_16": -0.01856683404184878
+  },
+  "development_speed16": {
+    "cases": 104,
+    "passed": 104,
+    "groups": {
+      "brake/forward/0": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.00040653656469658017,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "brake/forward/18": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.8315595388412476,
+        "acquisition_ticks": [
+          174,
+          175
+        ]
+      },
+      "brake/forward/30": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.8232141137123108,
+        "acquisition_ticks": [
+          194,
+          194
+        ]
+      },
+      "brake/forward/8": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.834102988243103,
+        "acquisition_ticks": [
+          151,
+          159
+        ]
+      },
+      "brake/left/0": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.000406560895498842,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "brake/left/18": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.9019325375556946,
+        "acquisition_ticks": [
+          162,
+          330
+        ]
+      },
+      "brake/left/30": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.8955391049385071,
+        "acquisition_ticks": [
+          228,
+          307
+        ]
+      },
+      "brake/left/8": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.902961015701294,
+        "acquisition_ticks": [
+          140,
+          313
+        ]
+      },
+      "brake/reverse/0": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.00040678848745301366,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "brake/reverse/18": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.8022080659866333,
+        "acquisition_ticks": [
+          163,
+          184
+        ]
+      },
+      "brake/reverse/30": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.7976047396659851,
+        "acquisition_ticks": [
+          189,
+          193
+        ]
+      },
+      "brake/reverse/8": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.8018444776535034,
+        "acquisition_ticks": [
+          148,
+          174
+        ]
+      },
+      "brake/right/0": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.00040647241985425353,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "brake/right/18": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.901921272277832,
+        "acquisition_ticks": [
+          157,
+          327
+        ]
+      },
+      "brake/right/30": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.8927265405654907,
+        "acquisition_ticks": [
+          214,
+          306
+        ]
+      },
+      "brake/right/8": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.901046872138977,
+        "acquisition_ticks": [
+          129,
+          311
+        ]
+      },
+      "hold/None/None": {
+        "cases": 8,
+        "passed": 8,
+        "outcomes": {
+          "success": 8
+        },
+        "max_post_acquisition_velocity_error": 0.00040702513069845736,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "track/fast/16": {
+        "cases": 6,
+        "passed": 6,
+        "outcomes": {
+          "success": 6
+        },
+        "max_post_acquisition_velocity_error": 0.23950591683387756,
+        "acquisition_ticks": [
+          61,
+          61
+        ]
+      },
+      "track/rest/16": {
+        "cases": 6,
+        "passed": 6,
+        "outcomes": {
+          "success": 6
+        },
+        "max_post_acquisition_velocity_error": 0.23689895868301392,
+        "acquisition_ticks": [
+          67,
+          67
+        ]
+      },
+      "track/reverse/16": {
+        "cases": 6,
+        "passed": 6,
+        "outcomes": {
+          "success": 6
+        },
+        "max_post_acquisition_velocity_error": 0.24076877534389496,
+        "acquisition_ticks": [
+          80,
+          80
+        ]
+      },
+      "track/slow/16": {
+        "cases": 6,
+        "passed": 6,
+        "outcomes": {
+          "success": 6
+        },
+        "max_post_acquisition_velocity_error": 0.23575177788734436,
+        "acquisition_ticks": [
+          56,
+          56
+        ]
+      },
+      "turn/None/None": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "max_post_acquisition_velocity_error": 0.4658032953739166,
+        "acquisition_ticks": [
+          84,
+          179
+        ]
+      }
+    }
+  },
+  "development_aligned": {
+    "cases": 104,
+    "passed": 104,
+    "groups": {
+      "brake/forward/0": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.00040653656469658017,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "brake/forward/18": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.8315595388412476,
+        "acquisition_ticks": [
+          174,
+          175
+        ]
+      },
+      "brake/forward/30": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.8232141137123108,
+        "acquisition_ticks": [
+          194,
+          194
+        ]
+      },
+      "brake/forward/8": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.834102988243103,
+        "acquisition_ticks": [
+          151,
+          159
+        ]
+      },
+      "brake/left/0": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.000406560895498842,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "brake/left/18": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.9019325375556946,
+        "acquisition_ticks": [
+          162,
+          330
+        ]
+      },
+      "brake/left/30": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.8955391049385071,
+        "acquisition_ticks": [
+          228,
+          307
+        ]
+      },
+      "brake/left/8": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.902961015701294,
+        "acquisition_ticks": [
+          140,
+          313
+        ]
+      },
+      "brake/reverse/0": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.00040678848745301366,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "brake/reverse/18": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.8022080659866333,
+        "acquisition_ticks": [
+          163,
+          184
+        ]
+      },
+      "brake/reverse/30": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.7976047396659851,
+        "acquisition_ticks": [
+          189,
+          193
+        ]
+      },
+      "brake/reverse/8": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.8018444776535034,
+        "acquisition_ticks": [
+          148,
+          174
+        ]
+      },
+      "brake/right/0": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.00040647241985425353,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "brake/right/18": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.901921272277832,
+        "acquisition_ticks": [
+          157,
+          327
+        ]
+      },
+      "brake/right/30": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.8927265405654907,
+        "acquisition_ticks": [
+          214,
+          306
+        ]
+      },
+      "brake/right/8": {
+        "cases": 4,
+        "passed": 4,
+        "outcomes": {
+          "success": 4
+        },
+        "max_post_acquisition_velocity_error": 0.901046872138977,
+        "acquisition_ticks": [
+          129,
+          311
+        ]
+      },
+      "hold/None/None": {
+        "cases": 8,
+        "passed": 8,
+        "outcomes": {
+          "success": 8
+        },
+        "max_post_acquisition_velocity_error": 0.00040702513069845736,
+        "acquisition_ticks": [
+          30,
+          30
+        ]
+      },
+      "track/fast/12": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.2403155416250229,
+        "acquisition_ticks": [
+          56,
+          56
+        ]
+      },
+      "track/fast/18": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.22065305709838867,
+        "acquisition_ticks": [
+          63,
+          63
+        ]
+      },
+      "track/fast/6": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.31561094522476196,
+        "acquisition_ticks": [
+          52,
+          52
+        ]
+      },
+      "track/rest/12": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.2207377552986145,
+        "acquisition_ticks": [
+          61,
+          61
+        ]
+      },
+      "track/rest/18": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.24191255867481232,
+        "acquisition_ticks": [
+          70,
+          70
+        ]
+      },
+      "track/rest/6": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.2688601613044739,
+        "acquisition_ticks": [
+          52,
+          52
+        ]
+      },
+      "track/reverse/12": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.21772192418575287,
+        "acquisition_ticks": [
+          72,
+          72
+        ]
+      },
+      "track/reverse/18": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.24094635248184204,
+        "acquisition_ticks": [
+          85,
+          85
+        ]
+      },
+      "track/reverse/6": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.2686538100242615,
+        "acquisition_ticks": [
+          59,
+          59
+        ]
+      },
+      "track/slow/12": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.2190352976322174,
+        "acquisition_ticks": [
+          52,
+          52
+        ]
+      },
+      "track/slow/18": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.24113759398460388,
+        "acquisition_ticks": [
+          58,
+          58
+        ]
+      },
+      "track/slow/6": {
+        "cases": 2,
+        "passed": 2,
+        "outcomes": {
+          "success": 2
+        },
+        "max_post_acquisition_velocity_error": 0.262983113527298,
+        "acquisition_ticks": [
+          44,
+          44
+        ]
+      },
+      "turn/None/None": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "max_post_acquisition_velocity_error": 0.4658032953739166,
+        "acquisition_ticks": [
+          84,
+          179
+        ]
+      }
+    }
+  },
+  "seconds": 65.19042986400018,
+  "policy_sha256": "e30208c5b857bc92372c1633302e3cd4e6eccb9a6a2bef170daac8ecb27982e1"
+}

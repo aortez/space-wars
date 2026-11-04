@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-value-isolation-v1-20261024",
+  "completed_at_utc": "2026-10-25T00:26:26.795203+00:00",
+  "kind": "paired shared versus head-only value-gradient pilot",
+  "source_file_count": 1566,
+  "source_archive_sha256": "7785878e13c36d6c90165145b39738229a4ff82a89a62619ef9ca859bb1e5d3b",
+  "runtime_sha256": "73b06a97af78b64ff3b93dda0df79f703bbbf61bc26360236a2029f284648374",
+  "checkpoint_count": 108,
+  "policy_export_count": 24,
+  "pilot_gates": {
+    "shared": {
+      "checks": {
+        "signed_exposure": true,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": true
+      },
+      "passed": true
+    },
+    "head_only": {
+      "checks": {
+        "signed_exposure": true,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": true
+      },
+      "passed": true
+    }
+  },
+  "legacy_pilot_gates": {
+    "shared": {
+      "checks": {
+        "signed_exposure": false,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": true
+      },
+      "passed": false
+    },
+    "head_only": {
+      "checks": {
+        "signed_exposure": true,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": true
+      },
+      "passed": true
+    }
+  },
+  "main_executed": false,
+  "training_ticks": 104448,
+  "resume_restore_ticks": 7700,
+  "optimizer_steps": 1463,
+  "evaluation_ticks": 79591,
+  "evaluation_episodes": 384,
+  "parity_comparisons": 192,
+  "progression_qualified": false,
+  "head_only_learning_benefit": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "validation": {
+    "sources_and_archive_verified": 1566,
+    "previous_manifests_unchanged": 37,
+    "copied_inputs_unchanged": 128,
+    "production_source_changes": [
+      "model.py",
+      "ppo.py",
+      "run.py"
+    ],
+    "native_runtime_unchanged": true,
+    "native_baseline_passed": 421,
+    "native_baseline_ignored": 2,
+    "python_tests": 20,
+    "shared_states_0_1_16_exact_except_declared_mode_and_sources": true,
+    "all_six_exact_resumes": true,
+    "matched_initial_tensors_rng_collector_optimizer": true,
+    "initial_parent_traces_exact": true,
+    "shared_parent_final_score_records_exact": true,
+    "same_first_rollout_successor_collectors": true,
+    "native_python_parity_comparisons": 192,
+    "physical_dwell_reward_reconstructed": true,
+    "all_process_exits_zero": true,
+    "budgets_passed": true,
+    "no_longer_run": true,
+    "new_checkpoint_count": 108,
+    "new_export_count": 24
+  },
+  "retained_file_count": 1223,
+  "retained_bytes_excluding_manifest": 597490829,
+  "archive_path": "data/training-experiments/learned-flight-value-isolation-v1-20261024",
+  "manifest_sha256": "ae9d62aa09750738f4476fae66c6f0d4c3323f5b2d29b3314f4eb03f6bef0d1d",
+  "report_sha256": "4741761165961c78eba58b3256ddd9a8a3d153c9fc10ed0cac0631100610096c",
+  "results_sha256": "c0ef9c8b82dd158bced7da1f05c373400fbede90f1a31d3e695f3d5eb3f06ae2"
+}

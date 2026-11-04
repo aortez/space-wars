@@ -1573,6 +1573,7 @@ dependencies = [
  "clap",
  "engine-common",
  "engine-core",
+ "rayon",
  "scenario-line-mover",
  "scenario-spacewars",
  "serde",
@@ -5939,6 +5940,7 @@ version = "0.1.0"
 dependencies = [
  "engine-common",
  "engine-core",
+ "engine-rapier",
  "scenario-spacewars",
  "serde",
  "serde_json",

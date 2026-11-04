@@ -4,9 +4,66 @@ use super::*;
 use pilot::{LandingSiteId, LandingSiteQuery, PilotObservationV1};
 
 const WING_ACTION: u32 = 0x5355_0003;
+const ANALOG_ACTION: u32 = 0x5355_0006;
+
+/// Optional analog throttle/brake override for an aboard pilot. Digital controls
+/// still provide steering, interaction and walking. A new digital action clears
+/// the override; an analog action in the same tick then takes precedence.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct SurfaceFlightAction {
+    pub thrust: f32,
+    pub brake: f32,
+}
+
+impl SurfaceFlightAction {
+    pub fn encode(self, player: PlayerId) -> Action {
+        let mut payload = self.thrust.to_le_bytes().to_vec();
+        payload.extend(self.brake.to_le_bytes());
+        payload.push(player.index() as u8);
+        Action::scenario(ANALOG_ACTION, payload)
+    }
+
+    pub fn decode(action: &Action) -> Option<(PlayerId, Self)> {
+        let Action::Scenario {
+            kind: ANALOG_ACTION,
+            payload,
+        } = action
+        else {
+            return None;
+        };
+        if payload.len() != 9 {
+            return None;
+        }
+        let thrust = f32::from_le_bytes(payload[..4].try_into().ok()?);
+        let brake = f32::from_le_bytes(payload[4..8].try_into().ok()?);
+        let player = PlayerId::from_index(payload[8] as usize)?;
+        (thrust.is_finite()
+            && brake.is_finite()
+            && (0.0..=1.0).contains(&thrust)
+            && (0.0..=1.0).contains(&brake))
+        .then_some((player, Self { thrust, brake }))
+    }
+}
+
 pub const WING_TRANSITION_SECONDS: f32 = 0.45;
 pub const OPEN_CRUISE_SPEED: f32 = 70.0;
 pub const SWEPT_CRUISE_SPEED: f32 = 140.0;
+
+/// Actuator mode shared by headless flight and future runtime inference.
+/// Ordinary controls remain intact; learned flight omits terrain assistance.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FlightControlMode {
+    #[default]
+    Standard,
+    Learned,
+}
+
+impl SurfacePilot {
+    pub(crate) fn flight_control_mode(&self) -> FlightControlMode {
+        self.flight_control_mode
+    }
+}
 
 /// Local center of mass relative to the full ship's body/render origin.
 /// Uses the actual uniform-density hull; the landing feet have zero mass.
@@ -133,6 +190,20 @@ pub(super) fn sweep(ship: &ShipState) -> f32 {
 }
 
 impl SurfaceSortieState {
+    pub fn set_flight_control_mode(&mut self, player: usize, mode: FlightControlMode) -> bool {
+        let Some(pilot) = self.pilots.get_mut(player) else {
+            return false;
+        };
+        pilot.flight_control_mode = mode;
+        true
+    }
+
+    pub fn flight_control_mode(&self, player: usize) -> Option<FlightControlMode> {
+        self.pilots
+            .get(player)
+            .map(|pilot| pilot.flight_control_mode)
+    }
+
     pub fn flight_observation(&self, player: usize) -> SurfaceFlightObservation {
         let pilot = &self.pilots[player];
         let ship = &self.world.ships[pilot.vehicle.0];

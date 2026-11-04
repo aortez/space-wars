@@ -1,0 +1,1497 @@
+{
+  "evolution": {
+    "seed": 1,
+    "population": 16,
+    "generations": 24,
+    "elites": 2,
+    "tournament_size": 3,
+    "mutation_probability": 0.05,
+    "mutation_scale": 0.15,
+    "initial_scale": 0.5,
+    "parameter_limit": 8.0
+  },
+  "retention_partitions": [
+    "training",
+    "original",
+    "development",
+    "fresh_stationary",
+    "fresh_moving",
+    "fresh_inward"
+  ],
+  "retention_deduplicate": true,
+  "validation_shapes": [
+    "weak-angular",
+    "weak-round"
+  ],
+  "validation_seats": [
+    0,
+    1
+  ],
+  "validation_entry_distance": 35.0,
+  "validation_prefix_ticks": 10800,
+  "precision_traces": [
+    "qualification_target_motion_b0_p0",
+    "qualification_target_motion_b1_p0",
+    "qualification_target_motion_b2_p0",
+    "qualification_target_motion_b3_p0",
+    "qualification_combined_a0_b0_p0",
+    "qualification_combined_a0_b1_p0",
+    "qualification_combined_a1_b0_p0",
+    "qualification_combined_a1_b1_p0"
+  ],
+  "fitness_order": [
+    "precision_completed",
+    "protected_completed",
+    "additional_completed",
+    "approach_speed_points",
+    "approach_position_points",
+    "precision_position_points",
+    "precision_velocity_points",
+    "spare_ticks"
+  ],
+  "version": 1,
+  "experiment": "recovery_guidance_focused_progress_v1",
+  "prior_plan_sha256": "177fc909c382e121dc8202bfcb995695cba1353298d8671483303d0b7591d0c8",
+  "prior_preflight_sha256": "87133d3b7bc6ceb3d7d90a00a1f6c65d224a94b5cd845e24496a8c086f699f4f",
+  "prior_results_sha256": "8728116eaccdd12dfb20e9187db4c44a91fc2dda28d1081dda3ed5b8247c5d0d",
+  "baseline_genome": "f68d4d800b7bc06aa35883916286dfe6ddc7572edab83e5d43cdb403ba619e82",
+  "baseline_file_sha256": "cf8ab7915d6f4e4e58ca3cf4f8e4fb6ef3d921d96ba3da9cd6dc176fd422e90c",
+  "training_cases": [
+    {
+      "name": "train-42-p1-d65",
+      "planet": 1,
+      "seat": 0,
+      "seed": 42,
+      "shape": "weak-angular",
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711,
+      "source_tick": 883
+    },
+    {
+      "name": "train-42-p2-d65",
+      "planet": 1,
+      "seat": 1,
+      "seed": 42,
+      "shape": "weak-angular",
+      "source_entry_distance": 55.553462982177734,
+      "source_relative_speed": 44.16749572753906,
+      "source_tick": 784
+    },
+    {
+      "name": "train-42-p2-d35",
+      "planet": 1,
+      "seat": 1,
+      "seed": 42,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273,
+      "source_tick": 821
+    },
+    {
+      "name": "train-10101-p1-d65",
+      "planet": 1,
+      "seat": 0,
+      "seed": 10101,
+      "shape": "weak-angular",
+      "source_entry_distance": 53.1820182800293,
+      "source_relative_speed": 41.5108642578125,
+      "source_tick": 1008
+    },
+    {
+      "name": "train-10101-p1-d35",
+      "planet": 1,
+      "seat": 0,
+      "seed": 10101,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961,
+      "source_tick": 1040
+    },
+    {
+      "name": "train-10101-p2-d65",
+      "planet": 1,
+      "seat": 1,
+      "seed": 10101,
+      "shape": "weak-angular",
+      "source_entry_distance": 64.95734405517578,
+      "source_relative_speed": 50.2044792175293,
+      "source_tick": 1242
+    },
+    {
+      "name": "train-10101-p2-d35",
+      "planet": 1,
+      "seat": 1,
+      "seed": 10101,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367,
+      "source_tick": 1290
+    },
+    {
+      "name": "train-inspected-17-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 17,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.8948860168457,
+      "source_relative_speed": 37.15235900878906,
+      "source_tick": 455
+    },
+    {
+      "name": "train-inspected-17-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 17,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.760799407958984,
+      "source_relative_speed": 29.299516677856445,
+      "source_tick": 1126
+    },
+    {
+      "name": "train-inspected-113-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 113,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.88804626464844,
+      "source_relative_speed": 30.90194320678711,
+      "source_tick": 605
+    },
+    {
+      "name": "train-inspected-113-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 113,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.57772445678711,
+      "source_relative_speed": 28.19192123413086,
+      "source_tick": 1102
+    },
+    {
+      "name": "train-inspected-2027-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2027,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.63172912597656,
+      "source_relative_speed": 27.205408096313477,
+      "source_tick": 599
+    },
+    {
+      "name": "train-inspected-2027-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 2027,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.72901916503906,
+      "source_relative_speed": 28.07271957397461,
+      "source_tick": 1419
+    },
+    {
+      "name": "train-inspected-9001-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 9001,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.85470199584961,
+      "source_relative_speed": 26.82145881652832,
+      "source_tick": 1554
+    },
+    {
+      "name": "train-inspected-9001-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 9001,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.912410736083984,
+      "source_relative_speed": 22.630029678344727,
+      "source_tick": 1603
+    },
+    {
+      "name": "seed-42-weak-round-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 42,
+      "shape": "weak-round",
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711,
+      "source_tick": 883
+    },
+    {
+      "name": "seed-42-weak-round-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 42,
+      "shape": "weak-round",
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273,
+      "source_tick": 821
+    },
+    {
+      "name": "seed-10101-weak-round-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 10101,
+      "shape": "weak-round",
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961,
+      "source_tick": 1040
+    },
+    {
+      "name": "seed-10101-weak-round-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 10101,
+      "shape": "weak-round",
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367,
+      "source_tick": 1290
+    },
+    {
+      "name": "development-inspected-17-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 17,
+      "shape": "weak-round",
+      "source_entry_distance": 34.8948860168457,
+      "source_relative_speed": 37.15235900878906,
+      "source_tick": 455
+    },
+    {
+      "name": "development-inspected-17-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 17,
+      "shape": "weak-round",
+      "source_entry_distance": 34.760799407958984,
+      "source_relative_speed": 29.299516677856445,
+      "source_tick": 1126
+    },
+    {
+      "name": "development-inspected-113-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 113,
+      "shape": "weak-round",
+      "source_entry_distance": 34.88804626464844,
+      "source_relative_speed": 30.90194320678711,
+      "source_tick": 605
+    },
+    {
+      "name": "development-inspected-113-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 113,
+      "shape": "weak-round",
+      "source_entry_distance": 34.57772445678711,
+      "source_relative_speed": 28.19192123413086,
+      "source_tick": 1102
+    },
+    {
+      "name": "development-inspected-2027-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2027,
+      "shape": "weak-round",
+      "source_entry_distance": 34.63172912597656,
+      "source_relative_speed": 27.205408096313477,
+      "source_tick": 599
+    },
+    {
+      "name": "development-inspected-2027-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 2027,
+      "shape": "weak-round",
+      "source_entry_distance": 34.72901916503906,
+      "source_relative_speed": 28.07271957397461,
+      "source_tick": 1419
+    },
+    {
+      "name": "development-inspected-9001-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 9001,
+      "shape": "weak-round",
+      "source_entry_distance": 34.85470199584961,
+      "source_relative_speed": 26.82145881652832,
+      "source_tick": 1554
+    },
+    {
+      "name": "development-inspected-9001-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 9001,
+      "shape": "weak-round",
+      "source_entry_distance": 34.912410736083984,
+      "source_relative_speed": 22.630029678344727,
+      "source_tick": 1603
+    },
+    {
+      "name": "validation-73-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 73,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.70812225341797,
+      "source_relative_speed": 29.259910583496094,
+      "source_tick": 780
+    },
+    {
+      "name": "validation-73-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 73,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.65625762939453,
+      "source_relative_speed": 28.35440444946289,
+      "source_tick": 889
+    },
+    {
+      "name": "validation-73-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 73,
+      "shape": "weak-round",
+      "source_entry_distance": 34.70812225341797,
+      "source_relative_speed": 29.259910583496094,
+      "source_tick": 780
+    },
+    {
+      "name": "validation-73-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 73,
+      "shape": "weak-round",
+      "source_entry_distance": 34.65625762939453,
+      "source_relative_speed": 28.35440444946289,
+      "source_tick": 889
+    },
+    {
+      "name": "validation-509-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 509,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.76520919799805,
+      "source_relative_speed": 35.475364685058594,
+      "source_tick": 431
+    },
+    {
+      "name": "validation-509-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 509,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.755958557128906,
+      "source_relative_speed": 28.789894104003906,
+      "source_tick": 953
+    },
+    {
+      "name": "validation-509-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 509,
+      "shape": "weak-round",
+      "source_entry_distance": 34.76520919799805,
+      "source_relative_speed": 35.475364685058594,
+      "source_tick": 431
+    },
+    {
+      "name": "validation-509-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 509,
+      "shape": "weak-round",
+      "source_entry_distance": 34.755958557128906,
+      "source_relative_speed": 28.789894104003906,
+      "source_tick": 953
+    },
+    {
+      "name": "validation-4093-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 4093,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.98323059082031,
+      "source_relative_speed": 28.6729736328125,
+      "source_tick": 981
+    },
+    {
+      "name": "validation-4093-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 4093,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.76390838623047,
+      "source_relative_speed": 26.471450805664062,
+      "source_tick": 1197
+    },
+    {
+      "name": "validation-4093-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 4093,
+      "shape": "weak-round",
+      "source_entry_distance": 34.98323059082031,
+      "source_relative_speed": 28.6729736328125,
+      "source_tick": 981
+    },
+    {
+      "name": "validation-4093-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 4093,
+      "shape": "weak-round",
+      "source_entry_distance": 34.76390838623047,
+      "source_relative_speed": 26.471450805664062,
+      "source_tick": 1197
+    },
+    {
+      "name": "validation-65537-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 65537,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.71917724609375,
+      "source_relative_speed": 29.432384490966797,
+      "source_tick": 1387
+    },
+    {
+      "name": "validation-65537-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 65537,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.623558044433594,
+      "source_relative_speed": 29.772905349731445,
+      "source_tick": 1571
+    },
+    {
+      "name": "validation-65537-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 65537,
+      "shape": "weak-round",
+      "source_entry_distance": 34.71917724609375,
+      "source_relative_speed": 29.432384490966797,
+      "source_tick": 1387
+    },
+    {
+      "name": "validation-65537-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 65537,
+      "shape": "weak-round",
+      "source_entry_distance": 34.623558044433594,
+      "source_relative_speed": 29.772905349731445,
+      "source_tick": 1571
+    },
+    {
+      "name": "validation-211-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 211,
+      "shape": "weak-angular",
+      "source_entry_distance": 22.559139251708984,
+      "source_relative_speed": 20.037641525268555,
+      "source_tick": 705
+    },
+    {
+      "name": "validation-211-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 211,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.59903335571289,
+      "source_relative_speed": 28.94040298461914,
+      "source_tick": 4641
+    },
+    {
+      "name": "validation-211-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 211,
+      "shape": "weak-round",
+      "source_entry_distance": 22.559139251708984,
+      "source_relative_speed": 20.037641525268555,
+      "source_tick": 705
+    },
+    {
+      "name": "validation-211-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 211,
+      "shape": "weak-round",
+      "source_entry_distance": 34.59903335571289,
+      "source_relative_speed": 28.94040298461914,
+      "source_tick": 4641
+    },
+    {
+      "name": "validation-1021-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1021,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.74074172973633,
+      "source_relative_speed": 34.62619400024414,
+      "source_tick": 775
+    },
+    {
+      "name": "validation-1021-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1021,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.87705993652344,
+      "source_relative_speed": 31.925981521606445,
+      "source_tick": 1042
+    },
+    {
+      "name": "validation-1021-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1021,
+      "shape": "weak-round",
+      "source_entry_distance": 34.74074172973633,
+      "source_relative_speed": 34.62619400024414,
+      "source_tick": 775
+    },
+    {
+      "name": "validation-1021-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1021,
+      "shape": "weak-round",
+      "source_entry_distance": 34.87705993652344,
+      "source_relative_speed": 31.925981521606445,
+      "source_tick": 1042
+    },
+    {
+      "name": "validation-8191-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 8191,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.698265075683594,
+      "source_relative_speed": 33.15288162231445,
+      "source_tick": 1894
+    },
+    {
+      "name": "validation-8191-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 8191,
+      "shape": "weak-round",
+      "source_entry_distance": 34.698265075683594,
+      "source_relative_speed": 33.15288162231445,
+      "source_tick": 1894
+    },
+    {
+      "name": "validation-131071-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 131071,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.8666877746582,
+      "source_relative_speed": 28.943628311157227,
+      "source_tick": 788
+    },
+    {
+      "name": "validation-131071-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 131071,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.780574798583984,
+      "source_relative_speed": 25.917301177978516,
+      "source_tick": 995
+    },
+    {
+      "name": "validation-131071-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 131071,
+      "shape": "weak-round",
+      "source_entry_distance": 34.8666877746582,
+      "source_relative_speed": 28.943628311157227,
+      "source_tick": 788
+    },
+    {
+      "name": "validation-131071-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 131071,
+      "shape": "weak-round",
+      "source_entry_distance": 34.780574798583984,
+      "source_relative_speed": 25.917301177978516,
+      "source_tick": 995
+    },
+    {
+      "name": "validation-307-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 307,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.753665924072266,
+      "source_relative_speed": 26.794004440307617,
+      "source_tick": 1592
+    },
+    {
+      "name": "validation-307-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 307,
+      "shape": "weak-angular",
+      "source_entry_distance": 10.749626159667969,
+      "source_relative_speed": 19.38563346862793,
+      "source_tick": 2489
+    },
+    {
+      "name": "validation-307-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 307,
+      "shape": "weak-round",
+      "source_entry_distance": 34.753665924072266,
+      "source_relative_speed": 26.794004440307617,
+      "source_tick": 1592
+    },
+    {
+      "name": "validation-307-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 307,
+      "shape": "weak-round",
+      "source_entry_distance": 10.749626159667969,
+      "source_relative_speed": 19.38563346862793,
+      "source_tick": 2489
+    },
+    {
+      "name": "validation-1543-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1543,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.594146728515625,
+      "source_relative_speed": 28.75322723388672,
+      "source_tick": 724
+    },
+    {
+      "name": "validation-1543-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1543,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.58313751220703,
+      "source_relative_speed": 28.19756507873535,
+      "source_tick": 1128
+    },
+    {
+      "name": "validation-1543-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1543,
+      "shape": "weak-round",
+      "source_entry_distance": 34.594146728515625,
+      "source_relative_speed": 28.75322723388672,
+      "source_tick": 724
+    },
+    {
+      "name": "validation-1543-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1543,
+      "shape": "weak-round",
+      "source_entry_distance": 34.58313751220703,
+      "source_relative_speed": 28.19756507873535,
+      "source_tick": 1128
+    },
+    {
+      "name": "validation-12289-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 12289,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.656105041503906,
+      "source_relative_speed": 31.239988327026367,
+      "source_tick": 1380
+    },
+    {
+      "name": "validation-12289-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 12289,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.75042724609375,
+      "source_relative_speed": 27.864171981811523,
+      "source_tick": 1534
+    },
+    {
+      "name": "validation-12289-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 12289,
+      "shape": "weak-round",
+      "source_entry_distance": 34.656105041503906,
+      "source_relative_speed": 31.239988327026367,
+      "source_tick": 1380
+    },
+    {
+      "name": "validation-12289-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 12289,
+      "shape": "weak-round",
+      "source_entry_distance": 34.75042724609375,
+      "source_relative_speed": 27.864171981811523,
+      "source_tick": 1534
+    },
+    {
+      "name": "validation-262147-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 262147,
+      "shape": "weak-angular",
+      "source_entry_distance": 22.400888442993164,
+      "source_relative_speed": 22.778034210205078,
+      "source_tick": 2135
+    },
+    {
+      "name": "validation-262147-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 262147,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.878196716308594,
+      "source_relative_speed": 27.17969512939453,
+      "source_tick": 5198
+    },
+    {
+      "name": "validation-262147-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 262147,
+      "shape": "weak-round",
+      "source_entry_distance": 22.400888442993164,
+      "source_relative_speed": 22.778034210205078,
+      "source_tick": 2135
+    },
+    {
+      "name": "validation-262147-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 262147,
+      "shape": "weak-round",
+      "source_entry_distance": 34.913055419921875,
+      "source_relative_speed": 27.15361976623535,
+      "source_tick": 5203
+    },
+    {
+      "name": "validation-2017-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2017,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.55866241455078,
+      "source_relative_speed": 28.40538787841797,
+      "source_tick": 1980
+    },
+    {
+      "name": "validation-2017-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 2017,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.858917236328125,
+      "source_relative_speed": 30.046405792236328,
+      "source_tick": 7825
+    },
+    {
+      "name": "validation-2017-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2017,
+      "shape": "weak-round",
+      "source_entry_distance": 34.55866241455078,
+      "source_relative_speed": 28.40538787841797,
+      "source_tick": 1980
+    },
+    {
+      "name": "validation-32771-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 32771,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.965972900390625,
+      "source_relative_speed": 28.420122146606445,
+      "source_tick": 672
+    },
+    {
+      "name": "validation-32771-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 32771,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.553443908691406,
+      "source_relative_speed": 29.787187576293945,
+      "source_tick": 955
+    },
+    {
+      "name": "validation-32771-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 32771,
+      "shape": "weak-round",
+      "source_entry_distance": 34.965972900390625,
+      "source_relative_speed": 28.420122146606445,
+      "source_tick": 672
+    },
+    {
+      "name": "validation-32771-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 32771,
+      "shape": "weak-round",
+      "source_entry_distance": 34.553443908691406,
+      "source_relative_speed": 29.787187576293945,
+      "source_tick": 955
+    },
+    {
+      "name": "validation-524309-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 524309,
+      "shape": "weak-angular",
+      "source_entry_distance": 9.009989738464355,
+      "source_relative_speed": 19.375574111938477,
+      "source_tick": 609
+    },
+    {
+      "name": "validation-524309-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 524309,
+      "shape": "weak-round",
+      "source_entry_distance": 9.009989738464355,
+      "source_relative_speed": 19.375574111938477,
+      "source_tick": 609
+    }
+  ],
+  "protected_cases": [
+    "train-42-p2-d35",
+    "train-10101-p1-d65",
+    "train-10101-p1-d35",
+    "train-10101-p2-d35",
+    "train-inspected-17-WeakAngular-p1",
+    "train-inspected-17-WeakAngular-p2",
+    "train-inspected-113-WeakAngular-p1",
+    "train-inspected-113-WeakAngular-p2",
+    "train-inspected-2027-WeakAngular-p2",
+    "train-inspected-9001-WeakAngular-p2",
+    "train-inspected-9001-WeakAngular-p1",
+    "seed-42-weak-round-p2",
+    "seed-10101-weak-round-p1",
+    "seed-10101-weak-round-p2",
+    "development-inspected-17-WeakRound-p1",
+    "development-inspected-17-WeakRound-p2",
+    "development-inspected-113-WeakRound-p1",
+    "development-inspected-113-WeakRound-p2",
+    "development-inspected-2027-WeakRound-p2",
+    "development-inspected-9001-WeakRound-p2",
+    "development-inspected-9001-WeakRound-p1",
+    "validation-73-WeakAngular-p1",
+    "validation-73-WeakAngular-p2",
+    "validation-73-WeakRound-p1",
+    "validation-73-WeakRound-p2",
+    "validation-509-WeakAngular-p1",
+    "validation-509-WeakAngular-p2",
+    "validation-509-WeakRound-p1",
+    "validation-509-WeakRound-p2",
+    "validation-4093-WeakAngular-p2",
+    "validation-4093-WeakAngular-p1",
+    "validation-4093-WeakRound-p2",
+    "validation-4093-WeakRound-p1",
+    "validation-65537-WeakAngular-p2",
+    "validation-65537-WeakAngular-p1",
+    "validation-65537-WeakRound-p2",
+    "validation-65537-WeakRound-p1",
+    "validation-211-WeakAngular-p2",
+    "validation-211-WeakAngular-p1",
+    "validation-211-WeakRound-p2",
+    "validation-211-WeakRound-p1",
+    "validation-1021-WeakAngular-p1",
+    "validation-1021-WeakRound-p1",
+    "validation-8191-WeakAngular-p2",
+    "validation-8191-WeakRound-p2",
+    "validation-131071-WeakAngular-p1",
+    "validation-131071-WeakAngular-p2",
+    "validation-131071-WeakRound-p1",
+    "validation-131071-WeakRound-p2",
+    "validation-307-WeakAngular-p2",
+    "validation-307-WeakAngular-p1",
+    "validation-307-WeakRound-p2",
+    "validation-307-WeakRound-p1",
+    "validation-1543-WeakAngular-p1",
+    "validation-1543-WeakAngular-p2",
+    "validation-1543-WeakRound-p1",
+    "validation-1543-WeakRound-p2",
+    "validation-12289-WeakAngular-p2",
+    "validation-12289-WeakAngular-p1",
+    "validation-12289-WeakRound-p2",
+    "validation-12289-WeakRound-p1",
+    "validation-262147-WeakAngular-p2",
+    "validation-262147-WeakAngular-p1",
+    "validation-262147-WeakRound-p2",
+    "validation-262147-WeakRound-p1",
+    "validation-2017-WeakAngular-p1",
+    "validation-2017-WeakAngular-p2",
+    "validation-2017-WeakRound-p1",
+    "validation-32771-WeakAngular-p1",
+    "validation-32771-WeakAngular-p2",
+    "validation-32771-WeakRound-p1",
+    "validation-32771-WeakRound-p2",
+    "validation-524309-WeakAngular-p2",
+    "validation-524309-WeakRound-p2"
+  ],
+  "additional_cases": [
+    "train-42-p1-d65",
+    "train-42-p2-d65",
+    "train-10101-p2-d65",
+    "train-inspected-2027-WeakAngular-p1",
+    "seed-42-weak-round-p1",
+    "development-inspected-2027-WeakRound-p1",
+    "validation-1021-WeakAngular-p2",
+    "validation-1021-WeakRound-p2"
+  ],
+  "prior_case_aliases": {
+    "train-42-p1-d65": [
+      {
+        "partition": "training",
+        "name": "train-42-p1-d65"
+      },
+      {
+        "partition": "development",
+        "name": "seed-42-weak-angular-p1"
+      }
+    ],
+    "train-42-p2-d65": [
+      {
+        "partition": "training",
+        "name": "train-42-p2-d65"
+      }
+    ],
+    "train-42-p2-d35": [
+      {
+        "partition": "training",
+        "name": "train-42-p2-d35"
+      },
+      {
+        "partition": "development",
+        "name": "seed-42-weak-angular-p2"
+      }
+    ],
+    "train-10101-p1-d65": [
+      {
+        "partition": "training",
+        "name": "train-10101-p1-d65"
+      }
+    ],
+    "train-10101-p1-d35": [
+      {
+        "partition": "training",
+        "name": "train-10101-p1-d35"
+      },
+      {
+        "partition": "development",
+        "name": "seed-10101-weak-angular-p1"
+      }
+    ],
+    "train-10101-p2-d65": [
+      {
+        "partition": "training",
+        "name": "train-10101-p2-d65"
+      }
+    ],
+    "train-10101-p2-d35": [
+      {
+        "partition": "training",
+        "name": "train-10101-p2-d35"
+      },
+      {
+        "partition": "development",
+        "name": "seed-10101-weak-angular-p2"
+      }
+    ],
+    "train-inspected-17-WeakAngular-p1": [
+      {
+        "partition": "training",
+        "name": "train-inspected-17-WeakAngular-p1"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-17-WeakAngular-p1"
+      }
+    ],
+    "train-inspected-17-WeakAngular-p2": [
+      {
+        "partition": "training",
+        "name": "train-inspected-17-WeakAngular-p2"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-17-WeakAngular-p2"
+      }
+    ],
+    "train-inspected-113-WeakAngular-p1": [
+      {
+        "partition": "training",
+        "name": "train-inspected-113-WeakAngular-p1"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-113-WeakAngular-p1"
+      }
+    ],
+    "train-inspected-113-WeakAngular-p2": [
+      {
+        "partition": "training",
+        "name": "train-inspected-113-WeakAngular-p2"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-113-WeakAngular-p2"
+      }
+    ],
+    "train-inspected-2027-WeakAngular-p1": [
+      {
+        "partition": "training",
+        "name": "train-inspected-2027-WeakAngular-p1"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-2027-WeakAngular-p1"
+      }
+    ],
+    "train-inspected-2027-WeakAngular-p2": [
+      {
+        "partition": "training",
+        "name": "train-inspected-2027-WeakAngular-p2"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-2027-WeakAngular-p2"
+      }
+    ],
+    "train-inspected-9001-WeakAngular-p2": [
+      {
+        "partition": "training",
+        "name": "train-inspected-9001-WeakAngular-p2"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-9001-WeakAngular-p2"
+      }
+    ],
+    "train-inspected-9001-WeakAngular-p1": [
+      {
+        "partition": "training",
+        "name": "train-inspected-9001-WeakAngular-p1"
+      },
+      {
+        "partition": "development",
+        "name": "development-inspected-9001-WeakAngular-p1"
+      }
+    ],
+    "seed-42-weak-round-p1": [
+      {
+        "partition": "development",
+        "name": "seed-42-weak-round-p1"
+      }
+    ],
+    "seed-42-weak-round-p2": [
+      {
+        "partition": "development",
+        "name": "seed-42-weak-round-p2"
+      }
+    ],
+    "seed-10101-weak-round-p1": [
+      {
+        "partition": "development",
+        "name": "seed-10101-weak-round-p1"
+      }
+    ],
+    "seed-10101-weak-round-p2": [
+      {
+        "partition": "development",
+        "name": "seed-10101-weak-round-p2"
+      }
+    ],
+    "development-inspected-17-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "development-inspected-17-WeakRound-p1"
+      }
+    ],
+    "development-inspected-17-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "development-inspected-17-WeakRound-p2"
+      }
+    ],
+    "development-inspected-113-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "development-inspected-113-WeakRound-p1"
+      }
+    ],
+    "development-inspected-113-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "development-inspected-113-WeakRound-p2"
+      }
+    ],
+    "development-inspected-2027-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "development-inspected-2027-WeakRound-p1"
+      }
+    ],
+    "development-inspected-2027-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "development-inspected-2027-WeakRound-p2"
+      }
+    ],
+    "development-inspected-9001-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "development-inspected-9001-WeakRound-p2"
+      }
+    ],
+    "development-inspected-9001-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "development-inspected-9001-WeakRound-p1"
+      }
+    ],
+    "validation-73-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-73-WeakAngular-p1"
+      }
+    ],
+    "validation-73-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-73-WeakAngular-p2"
+      }
+    ],
+    "validation-73-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-73-WeakRound-p1"
+      }
+    ],
+    "validation-73-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-73-WeakRound-p2"
+      }
+    ],
+    "validation-509-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-509-WeakAngular-p1"
+      }
+    ],
+    "validation-509-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-509-WeakAngular-p2"
+      }
+    ],
+    "validation-509-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-509-WeakRound-p1"
+      }
+    ],
+    "validation-509-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-509-WeakRound-p2"
+      }
+    ],
+    "validation-4093-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-4093-WeakAngular-p2"
+      }
+    ],
+    "validation-4093-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-4093-WeakAngular-p1"
+      }
+    ],
+    "validation-4093-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-4093-WeakRound-p2"
+      }
+    ],
+    "validation-4093-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-4093-WeakRound-p1"
+      }
+    ],
+    "validation-65537-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-65537-WeakAngular-p2"
+      }
+    ],
+    "validation-65537-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-65537-WeakAngular-p1"
+      }
+    ],
+    "validation-65537-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-65537-WeakRound-p2"
+      }
+    ],
+    "validation-65537-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-65537-WeakRound-p1"
+      }
+    ],
+    "validation-211-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-211-WeakAngular-p2"
+      }
+    ],
+    "validation-211-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-211-WeakAngular-p1"
+      }
+    ],
+    "validation-211-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-211-WeakRound-p2"
+      }
+    ],
+    "validation-211-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-211-WeakRound-p1"
+      }
+    ],
+    "validation-1021-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-1021-WeakAngular-p1"
+      }
+    ],
+    "validation-1021-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-1021-WeakAngular-p2"
+      }
+    ],
+    "validation-1021-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-1021-WeakRound-p1"
+      }
+    ],
+    "validation-1021-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-1021-WeakRound-p2"
+      }
+    ],
+    "validation-8191-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-8191-WeakAngular-p2"
+      }
+    ],
+    "validation-8191-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-8191-WeakRound-p2"
+      }
+    ],
+    "validation-131071-WeakAngular-p1": [
+      {
+        "partition": "development",
+        "name": "validation-131071-WeakAngular-p1"
+      }
+    ],
+    "validation-131071-WeakAngular-p2": [
+      {
+        "partition": "development",
+        "name": "validation-131071-WeakAngular-p2"
+      }
+    ],
+    "validation-131071-WeakRound-p1": [
+      {
+        "partition": "development",
+        "name": "validation-131071-WeakRound-p1"
+      }
+    ],
+    "validation-131071-WeakRound-p2": [
+      {
+        "partition": "development",
+        "name": "validation-131071-WeakRound-p2"
+      }
+    ],
+    "validation-307-WeakAngular-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-307-WeakAngular-p2"
+      }
+    ],
+    "validation-307-WeakAngular-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-307-WeakAngular-p1"
+      }
+    ],
+    "validation-307-WeakRound-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-307-WeakRound-p2"
+      }
+    ],
+    "validation-307-WeakRound-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-307-WeakRound-p1"
+      }
+    ],
+    "validation-1543-WeakAngular-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-1543-WeakAngular-p1"
+      }
+    ],
+    "validation-1543-WeakAngular-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-1543-WeakAngular-p2"
+      }
+    ],
+    "validation-1543-WeakRound-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-1543-WeakRound-p1"
+      }
+    ],
+    "validation-1543-WeakRound-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-1543-WeakRound-p2"
+      }
+    ],
+    "validation-12289-WeakAngular-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-12289-WeakAngular-p2"
+      }
+    ],
+    "validation-12289-WeakAngular-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-12289-WeakAngular-p1"
+      }
+    ],
+    "validation-12289-WeakRound-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-12289-WeakRound-p2"
+      }
+    ],
+    "validation-12289-WeakRound-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-12289-WeakRound-p1"
+      }
+    ],
+    "validation-262147-WeakAngular-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-262147-WeakAngular-p2"
+      }
+    ],
+    "validation-262147-WeakAngular-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-262147-WeakAngular-p1"
+      }
+    ],
+    "validation-262147-WeakRound-p2": [
+      {
+        "partition": "validation",
+        "name": "validation-262147-WeakRound-p2"
+      }
+    ],
+    "validation-262147-WeakRound-p1": [
+      {
+        "partition": "validation",
+        "name": "validation-262147-WeakRound-p1"
+      }
+    ]
+  },
+  "curriculum": "All 73 previously inspected starts plus the 9 available fresh starts from the protected-match run. All 82 are now training data. Protect every one of the retained finalist's 74 successes before rewarding the 8 remaining starts.",
+  "arms": [
+    "all",
+    "remaining"
+  ],
+  "treatment": "Only the two progress fields change scope: all uses final speed and marker distance over all 82 match cases; remaining uses only the fixed 8 unprotected starts. Precision/protected/additional counts, precision quality, spare ticks and every physical episode remain identical for the same genome.",
+  "quality": "Same floor(1000 * clamp(1 - value/scale, 0, 1)), speed scale 70 and marker-distance scale 100, eligible outcomes arrived/timeout/host_preempted. Fixed membership throughout training, including after a previously unsolved case succeeds. Spare ticks still include all completed match and precision cases.",
+  "initialization": "Both arms start from the same retained finalist plus the same 15 independent random networks. Identical RNG configuration and mutation operator; no crossover. The last-generation winner is retained in each arm.",
+  "diagnostic": "Before training, replay baseline and constant-brake intervention on all 82 inspected match starts and all 157 precision starts. Change only the brake output row to weights 0 and bias +1. This intervention is not an evolution seed or a candidate; diagnostic outcomes do not change the frozen recipe.",
+  "validation_seeds": [
+    619,
+    2381,
+    4919,
+    10037,
+    16411,
+    32803,
+    65539,
+    131101,
+    262151,
+    524341,
+    1048583,
+    2097169
+  ],
+  "validation_worlds": 4,
+  "validation_selection": "Native-only preflight scans seeds in declared order. Accept the first 4 worlds having one eligible start for both seats in both dirt shapes (4 starts/world). Stop after the fourth complete world; record every scanned partial world and its missing starts. Component outcomes play no role. Freeze the selected 16 starts before training; never backfill based on evaluation. If the list yields fewer than 4 complete worlds, report missing coverage and fail qualification.",
+  "validation_population": "Conditional on all four native eligible approaches existing in a world; not an unconditional match-success sample.",
+  "budget": {
+    "arms": 2,
+    "candidate_evaluations_per_arm": 384,
+    "episodes_per_candidate": 239,
+    "training_episodes_per_arm": 91776,
+    "training_episodes_total": 183552
+  },
+  "selection": "Freeze both final-generation winners before any reserved component continuation. Evaluate/report both; no validation-based winner selection or training extension.",
+  "acceptance": {
+    "precision": 157,
+    "protected": 74,
+    "additional": 8,
+    "reserved": 16,
+    "required": "Every declared match start and original precision start must pass unchanged host and safety checks; all 4 reserved worlds must be available. Both arms are reported independently."
+  },
+  "scope": "Test-only comparison of progress selection scope. Observations, full 107-parameter network, decoder, physics, host priority, mutation configuration, success and failure thresholds, and production defaults are unchanged."
+}

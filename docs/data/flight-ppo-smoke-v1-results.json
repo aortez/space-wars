@@ -1,0 +1,650 @@
+{
+  "experiment_id": "learned-flight-ppo-smoke-v1-20261022",
+  "checkpoint": "C3",
+  "kind": "bounded integration smoke; no capability claim",
+  "config": {
+    "learner_seed": 17,
+    "train_task_seed": 3110001,
+    "development_task_seed": 3110002,
+    "train_tasks_per_family": 4,
+    "eval_tasks_per_family": 2,
+    "updates": 8,
+    "rollout_ticks": 256,
+    "epochs": 4,
+    "minibatch": 256,
+    "learning_rate": 0.0003,
+    "gamma": 0.9995,
+    "lambda": 0.98,
+    "clip": 0.2,
+    "value_weight": 0.5,
+    "entropy_weight": 0.01,
+    "grad_clip": 0.5,
+    "target_kl": 0.03,
+    "wall_seconds": 600
+  },
+  "parameter_count": 39445,
+  "completed_updates": 8,
+  "training_ticks": 8192,
+  "training_seconds_including_checkpoints": 18.67908083599832,
+  "training_steps_per_second": 438.56547717339384,
+  "total_seconds": 78.78843586399671,
+  "training_outcomes": {
+    "collision": 7
+  },
+  "budget_censored_training_episodes": 4,
+  "started_episodes": 11,
+  "initial_evaluation": [
+    {
+      "family": "clear",
+      "index": 0,
+      "outcome": "deadline",
+      "ticks": 1800,
+      "initial_errors": {
+        "position": 107.44822692871094,
+        "spin": 1.5662927627563477,
+        "velocity": 68.5696792602539
+      },
+      "final_errors": {
+        "position": 143.01922607421875,
+        "spin": 0.005727514158934355,
+        "velocity": 0.007001878228038549
+      },
+      "damage": false,
+      "collision": false
+    },
+    {
+      "family": "clear",
+      "index": 8,
+      "outcome": "deadline",
+      "ticks": 1800,
+      "initial_errors": {
+        "position": 171.3679656982422,
+        "spin": 1.1811777353286743,
+        "velocity": 45.02400588989258
+      },
+      "final_errors": {
+        "position": 126.57597351074219,
+        "spin": 0.0009311479516327381,
+        "velocity": 8.233756670961156e-05
+      },
+      "damage": false,
+      "collision": false
+    },
+    {
+      "family": "moving",
+      "index": 13,
+      "outcome": "deadline",
+      "ticks": 1800,
+      "initial_errors": {
+        "position": 147.40199279785156,
+        "spin": 0.4370010793209076,
+        "velocity": 38.830867767333984
+      },
+      "final_errors": {
+        "position": 596.9097290039062,
+        "spin": 0.009105762466788292,
+        "velocity": 16.071584701538086
+      },
+      "damage": false,
+      "collision": false
+    },
+    {
+      "family": "moving",
+      "index": 17,
+      "outcome": "deadline",
+      "ticks": 1800,
+      "initial_errors": {
+        "position": 191.31155395507812,
+        "spin": 1.5843092203140259,
+        "velocity": 67.67562103271484
+      },
+      "final_errors": {
+        "position": 317.2743835449219,
+        "spin": 0.0026566050946712494,
+        "velocity": 8.014421463012695
+      },
+      "damage": false,
+      "collision": false
+    },
+    {
+      "family": "obstructed",
+      "index": 2,
+      "outcome": "collision",
+      "ticks": 222,
+      "initial_errors": {
+        "position": 134.9762725830078,
+        "spin": 1.3711308240890503,
+        "velocity": 11.41922664642334
+      },
+      "final_errors": {
+        "position": 86.00746154785156,
+        "spin": 1.4835715293884277,
+        "velocity": 6.777247428894043
+      },
+      "damage": false,
+      "collision": true
+    },
+    {
+      "family": "obstructed",
+      "index": 6,
+      "outcome": "collision",
+      "ticks": 152,
+      "initial_errors": {
+        "position": 78.91073608398438,
+        "spin": 0.7917159199714661,
+        "velocity": 11.366450309753418
+      },
+      "final_errors": {
+        "position": 53.93098449707031,
+        "spin": 0.7690824866294861,
+        "velocity": 5.973575115203857
+      },
+      "damage": false,
+      "collision": true
+    },
+    {
+      "family": "altered",
+      "index": 3,
+      "outcome": "collision",
+      "ticks": 484,
+      "initial_errors": {
+        "position": 122.21037292480469,
+        "spin": 0.09350702166557312,
+        "velocity": 1.850290060043335
+      },
+      "final_errors": {
+        "position": 108.96466064453125,
+        "spin": 0.2195141315460205,
+        "velocity": 1.1664456129074097
+      },
+      "damage": false,
+      "collision": true
+    },
+    {
+      "family": "altered",
+      "index": 7,
+      "outcome": "collision",
+      "ticks": 118,
+      "initial_errors": {
+        "position": 72.2781753540039,
+        "spin": 1.1590741872787476,
+        "velocity": 2.834981679916382
+      },
+      "final_errors": {
+        "position": 45.30238342285156,
+        "spin": 0.18247078359127045,
+        "velocity": 0.8338953852653503
+      },
+      "damage": false,
+      "collision": true
+    }
+  ],
+  "final_evaluation": [
+    {
+      "family": "clear",
+      "index": 0,
+      "outcome": "deadline",
+      "ticks": 1800,
+      "initial_errors": {
+        "position": 107.44822692871094,
+        "spin": 1.5662927627563477,
+        "velocity": 68.5696792602539
+      },
+      "final_errors": {
+        "position": 143.36941528320312,
+        "spin": 0.2959252893924713,
+        "velocity": 0.33641359210014343
+      },
+      "damage": false,
+      "collision": false
+    },
+    {
+      "family": "clear",
+      "index": 8,
+      "outcome": "deadline",
+      "ticks": 1800,
+      "initial_errors": {
+        "position": 171.3679656982422,
+        "spin": 1.1811777353286743,
+        "velocity": 45.02400588989258
+      },
+      "final_errors": {
+        "position": 187.2985076904297,
+        "spin": 0.15978200733661652,
+        "velocity": 0.21012939512729645
+      },
+      "damage": false,
+      "collision": false
+    },
+    {
+      "family": "moving",
+      "index": 13,
+      "outcome": "deadline",
+      "ticks": 1800,
+      "initial_errors": {
+        "position": 147.40199279785156,
+        "spin": 0.4370010793209076,
+        "velocity": 38.830867767333984
+      },
+      "final_errors": {
+        "position": 581.8824462890625,
+        "spin": 0.25157687067985535,
+        "velocity": 16.175167083740234
+      },
+      "damage": false,
+      "collision": false
+    },
+    {
+      "family": "moving",
+      "index": 17,
+      "outcome": "deadline",
+      "ticks": 1800,
+      "initial_errors": {
+        "position": 191.31155395507812,
+        "spin": 1.5843092203140259,
+        "velocity": 67.67562103271484
+      },
+      "final_errors": {
+        "position": 317.29034423828125,
+        "spin": 0.27764543890953064,
+        "velocity": 8.305453300476074
+      },
+      "damage": false,
+      "collision": false
+    },
+    {
+      "family": "obstructed",
+      "index": 2,
+      "outcome": "collision",
+      "ticks": 1432,
+      "initial_errors": {
+        "position": 134.9762725830078,
+        "spin": 1.3711308240890503,
+        "velocity": 11.41922664642334
+      },
+      "final_errors": {
+        "position": 74.16588592529297,
+        "spin": 0.20532649755477905,
+        "velocity": 0.767634391784668
+      },
+      "damage": false,
+      "collision": true
+    },
+    {
+      "family": "obstructed",
+      "index": 6,
+      "outcome": "collision",
+      "ticks": 907,
+      "initial_errors": {
+        "position": 78.91073608398438,
+        "spin": 0.7917159199714661,
+        "velocity": 11.366450309753418
+      },
+      "final_errors": {
+        "position": 45.67555618286133,
+        "spin": 0.2396850883960724,
+        "velocity": 1.593774676322937
+      },
+      "damage": false,
+      "collision": true
+    },
+    {
+      "family": "altered",
+      "index": 3,
+      "outcome": "collision",
+      "ticks": 494,
+      "initial_errors": {
+        "position": 122.21037292480469,
+        "spin": 0.09350702166557312,
+        "velocity": 1.850290060043335
+      },
+      "final_errors": {
+        "position": 109.97441101074219,
+        "spin": 0.06154488027095795,
+        "velocity": 0.3268599212169647
+      },
+      "damage": false,
+      "collision": true
+    },
+    {
+      "family": "altered",
+      "index": 7,
+      "outcome": "collision",
+      "ticks": 537,
+      "initial_errors": {
+        "position": 72.2781753540039,
+        "spin": 1.1590741872787476,
+        "velocity": 2.834981679916382
+      },
+      "final_errors": {
+        "position": 45.43378829956055,
+        "spin": 0.2135322093963623,
+        "velocity": 1.1104274988174438
+      },
+      "damage": false,
+      "collision": true
+    }
+  ],
+  "initial_outcomes": {
+    "deadline": 4,
+    "collision": 4
+  },
+  "final_outcomes": {
+    "deadline": 4,
+    "collision": 4
+  },
+  "best": {
+    "policy": "policy-0000.json",
+    "sha256": "d6766811fb58a4570aaef8ac7e90e4b3b4ae025c50caaf10cba650dd5d445f10",
+    "rule": "success count, then fewer physical failures, then lower mean final position error; ties keep initial",
+    "initial_score": [
+      0,
+      -4,
+      -184.74810028076172
+    ],
+    "final_score": [
+      0,
+      -4,
+      -188.1362943649292
+    ],
+    "scope": "tiny development smoke; not qualified"
+  },
+  "admission": {
+    "training": {
+      "attempted": 20,
+      "accepted": 16,
+      "rejections": {
+        "unsafe_goal_trajectory": 4
+      }
+    },
+    "development": {
+      "attempted": 12,
+      "accepted": 8,
+      "rejections": {
+        "unsafe_goal_trajectory": 4
+      }
+    }
+  },
+  "verification": {
+    "checkpoint_full_state_bitwise_equal": true,
+    "parity_fixture_count": 48,
+    "max_abs_output_error": 1.430511474609375e-06,
+    "button_decisions_equal": true,
+    "parameter_max_abs_changes": {
+      "log_std": 0.0017499923706054688,
+      "conv1.weight": 0.026307199150323868,
+      "conv1.bias": 0.01657964661717415,
+      "conv2.weight": 0.026783958077430725,
+      "conv2.bias": 0.015442664735019207,
+      "map_fc.weight": 0.027277857065200806,
+      "map_fc.bias": 0.017007315531373024,
+      "rays_fc.weight": 0.02601052075624466,
+      "rays_fc.bias": 0.016988404095172882,
+      "object_fc1.weight": 0.026071742177009583,
+      "object_fc1.bias": 0.013595497235655785,
+      "object_fc2.weight": 0.025755248963832855,
+      "object_fc2.bias": 0.016626326367259026,
+      "query.weight": 0.024055087938904762,
+      "query.bias": 0.015146763063967228,
+      "fusion1.weight": 0.03168191760778427,
+      "fusion1.bias": 0.016282545402646065,
+      "fusion2.weight": 0.030296310782432556,
+      "fusion2.bias": 0.02145576663315296,
+      "actor.weight": 0.023770708590745926,
+      "actor.bias": 0.018273260444402695,
+      "critic.weight": 0.02212371677160263,
+      "critic.bias": 0.012661365792155266
+    },
+    "single_observation_mean_ms": {
+      "pytorch_cpu": 0.11506397000630386,
+      "rust_with_json_ipc": 0.694519329990726
+    },
+    "timing_scope": "100 warm calls, CPU one thread; Rust includes Python JSON/IPC; not gameplay profiling"
+  },
+  "trace_inspection": [
+    {
+      "phase": "initial",
+      "task": "altered-3",
+      "outcome": "collision",
+      "ticks": 484,
+      "min_position_error": 108.96466064453125,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.0021926104239032274,
+      "collision_ticks": [
+        484
+      ],
+      "damage_ticks": []
+    },
+    {
+      "phase": "initial",
+      "task": "altered-7",
+      "outcome": "collision",
+      "ticks": 118,
+      "min_position_error": 45.28044891357422,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 1.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 1.0,
+      "mean_abs_steering": 0.0026732274820491417,
+      "collision_ticks": [
+        118
+      ],
+      "damage_ticks": []
+    },
+    {
+      "phase": "initial",
+      "task": "clear-0",
+      "outcome": "deadline",
+      "ticks": 1800,
+      "min_position_error": 107.44822692871094,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.0043566503087317365,
+      "collision_ticks": [],
+      "damage_ticks": []
+    },
+    {
+      "phase": "initial",
+      "task": "clear-8",
+      "outcome": "deadline",
+      "ticks": 1800,
+      "min_position_error": 88.68102264404297,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.2822222222222222,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.2822222222222222,
+      "mean_abs_steering": 0.0005720181995032665,
+      "collision_ticks": [],
+      "damage_ticks": []
+    },
+    {
+      "phase": "initial",
+      "task": "moving-13",
+      "outcome": "deadline",
+      "ticks": 1800,
+      "min_position_error": 137.1524200439453,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.024444444444444446,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.024444444444444446,
+      "mean_abs_steering": 0.005183669780510374,
+      "collision_ticks": [],
+      "damage_ticks": []
+    },
+    {
+      "phase": "initial",
+      "task": "moving-17",
+      "outcome": "deadline",
+      "ticks": 1800,
+      "min_position_error": 139.3082733154297,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.0016650670008837348,
+      "collision_ticks": [],
+      "damage_ticks": []
+    },
+    {
+      "phase": "initial",
+      "task": "obstructed-2",
+      "outcome": "collision",
+      "ticks": 222,
+      "min_position_error": 86.00746154785156,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 1.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 1.0,
+      "mean_abs_steering": 0.0011051381468303032,
+      "collision_ticks": [
+        222
+      ],
+      "damage_ticks": []
+    },
+    {
+      "phase": "initial",
+      "task": "obstructed-6",
+      "outcome": "collision",
+      "ticks": 152,
+      "min_position_error": 53.93098449707031,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 1.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 1.0,
+      "mean_abs_steering": 0.003923333533365573,
+      "collision_ticks": [
+        152
+      ],
+      "damage_ticks": []
+    },
+    {
+      "phase": "final",
+      "task": "altered-3",
+      "outcome": "collision",
+      "ticks": 494,
+      "min_position_error": 109.97441101074219,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.08968790768370455,
+      "collision_ticks": [
+        494
+      ],
+      "damage_ticks": []
+    },
+    {
+      "phase": "final",
+      "task": "altered-7",
+      "outcome": "collision",
+      "ticks": 537,
+      "min_position_error": 45.43378829956055,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.166137711989591,
+      "collision_ticks": [
+        537
+      ],
+      "damage_ticks": []
+    },
+    {
+      "phase": "final",
+      "task": "clear-0",
+      "outcome": "deadline",
+      "ticks": 1800,
+      "min_position_error": 107.44822692871094,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.12798585918214586,
+      "collision_ticks": [],
+      "damage_ticks": []
+    },
+    {
+      "phase": "final",
+      "task": "clear-8",
+      "outcome": "deadline",
+      "ticks": 1800,
+      "min_position_error": 171.3679656982422,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.1193870439587368,
+      "collision_ticks": [],
+      "damage_ticks": []
+    },
+    {
+      "phase": "final",
+      "task": "moving-13",
+      "outcome": "deadline",
+      "ticks": 1800,
+      "min_position_error": 132.9250946044922,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.11930754450460275,
+      "collision_ticks": [],
+      "damage_ticks": []
+    },
+    {
+      "phase": "final",
+      "task": "moving-17",
+      "outcome": "deadline",
+      "ticks": 1800,
+      "min_position_error": 139.35336303710938,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.12020463230295314,
+      "collision_ticks": [],
+      "damage_ticks": []
+    },
+    {
+      "phase": "final",
+      "task": "obstructed-2",
+      "outcome": "collision",
+      "ticks": 1432,
+      "min_position_error": 74.16588592529297,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.14700687978957785,
+      "collision_ticks": [
+        1432
+      ],
+      "damage_ticks": []
+    },
+    {
+      "phase": "final",
+      "task": "obstructed-6",
+      "outcome": "collision",
+      "ticks": 907,
+      "min_position_error": 45.67555618286133,
+      "max_dwell_ticks": 0,
+      "thrust_fraction": 0.0,
+      "brake_fraction": 1.0,
+      "both_fraction": 0.0,
+      "mean_abs_steering": 0.18279756774844513,
+      "collision_ticks": [
+        907
+      ],
+      "damage_ticks": []
+    }
+  ],
+  "evaluation_ticks": 18746,
+  "all_training_ticks_accounted": true,
+  "all_update_metrics_finite": true,
+  "optimizer_minibatches": 128
+}

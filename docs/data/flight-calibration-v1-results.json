@@ -1,0 +1,4600 @@
+{
+  "footprint": {
+    "feet": [
+      {
+        "center": {
+          "x": -3.0,
+          "y": -5.0
+        },
+        "radius": 0.44999998807907104
+      },
+      {
+        "center": {
+          "x": 3.0,
+          "y": -5.0
+        },
+        "radius": 0.44999998807907104
+      }
+    ],
+    "hull": [
+      {
+        "x": -5.5,
+        "y": -1.5
+      },
+      {
+        "x": -2.5,
+        "y": -4.5
+      },
+      {
+        "x": 2.5,
+        "y": -4.5
+      },
+      {
+        "x": 5.5,
+        "y": -1.5
+      },
+      {
+        "x": 0.0,
+        "y": 3.5
+      }
+    ],
+    "local_center_of_mass": {
+      "x": 0.0,
+      "y": -1.2216796875
+    },
+    "mass": 31.250001907348633,
+    "origin_radius": 6.280951499938965,
+    "rotated_bounds": [
+      {
+        "angle_degrees": 0,
+        "height": 8.949999809265137,
+        "max": {
+          "x": 5.5,
+          "y": 3.5
+        },
+        "min": {
+          "x": -5.5,
+          "y": -5.449999809265137
+        },
+        "width": 11.0
+      },
+      {
+        "angle_degrees": 15,
+        "height": 9.436826705932617,
+        "max": {
+          "x": 5.700820446014404,
+          "y": 3.3807404041290283
+        },
+        "min": {
+          "x": -4.924363613128662,
+          "y": -6.05608606338501
+        },
+        "width": 10.625184059143066
+      },
+      {
+        "angle_degrees": 30,
+        "height": 9.3112154006958,
+        "max": {
+          "x": 5.5480756759643555,
+          "y": 3.0310888290405273
+        },
+        "min": {
+          "x": -4.013139724731445,
+          "y": -6.280126571655273
+        },
+        "width": 9.5612154006958
+      },
+      {
+        "angle_degrees": 45,
+        "height": 8.935280799865723,
+        "max": {
+          "x": 6.10685396194458,
+          "y": 2.8284270763397217
+        },
+        "min": {
+          "x": -2.8284270763397217,
+          "y": -6.10685396194458
+        },
+        "width": 8.935280799865723
+      },
+      {
+        "angle_degrees": 60,
+        "height": 9.5612154006958,
+        "max": {
+          "x": 6.280127048492432,
+          "y": 4.013139724731445
+        },
+        "min": {
+          "x": -3.0310890674591064,
+          "y": -5.5480756759643555
+        },
+        "width": 9.311216354370117
+      },
+      {
+        "angle_degrees": 75,
+        "height": 10.625185012817383,
+        "max": {
+          "x": 6.05608606338501,
+          "y": 4.92436408996582
+        },
+        "min": {
+          "x": -3.3807406425476074,
+          "y": -5.7008209228515625
+        },
+        "width": 9.436826705932617
+      },
+      {
+        "angle_degrees": 90,
+        "height": 11.0,
+        "max": {
+          "x": 5.449999809265137,
+          "y": 5.5
+        },
+        "min": {
+          "x": -3.5,
+          "y": -5.5
+        },
+        "width": 8.949999809265137
+      },
+      {
+        "angle_degrees": 105,
+        "height": 10.625184059143066,
+        "max": {
+          "x": 6.05608606338501,
+          "y": 5.7008209228515625
+        },
+        "min": {
+          "x": -3.3807404041290283,
+          "y": -4.924363136291504
+        },
+        "width": 9.436826705932617
+      },
+      {
+        "angle_degrees": 120,
+        "height": 9.561216354370117,
+        "max": {
+          "x": 6.280126571655273,
+          "y": 5.548076152801514
+        },
+        "min": {
+          "x": -3.0310888290405273,
+          "y": -4.013139724731445
+        },
+        "width": 9.3112154006958
+      },
+      {
+        "angle_degrees": 135,
+        "height": 8.935280799865723,
+        "max": {
+          "x": 6.10685396194458,
+          "y": 6.10685396194458
+        },
+        "min": {
+          "x": -2.8284270763397217,
+          "y": -2.8284270763397217
+        },
+        "width": 8.935280799865723
+      },
+      {
+        "angle_degrees": 150,
+        "height": 9.311216354370117,
+        "max": {
+          "x": 5.5480756759643555,
+          "y": 6.280127048492432
+        },
+        "min": {
+          "x": -4.013140678405762,
+          "y": -3.0310893058776855
+        },
+        "width": 9.561216354370117
+      },
+      {
+        "angle_degrees": 165,
+        "height": 9.436826705932617,
+        "max": {
+          "x": 5.7008209228515625,
+          "y": 6.05608606338501
+        },
+        "min": {
+          "x": -4.92436408996582,
+          "y": -3.3807406425476074
+        },
+        "width": 10.625185012817383
+      },
+      {
+        "angle_degrees": 180,
+        "height": 8.950000762939453,
+        "max": {
+          "x": 5.5,
+          "y": 5.450000286102295
+        },
+        "min": {
+          "x": -5.5,
+          "y": -3.5
+        },
+        "width": 11.0
+      }
+    ],
+    "static_gap_checks": [
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": false,
+        "fits_origin_centered": false,
+        "gap": 8.0
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": false,
+        "fits_origin_centered": false,
+        "gap": 9.0
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": false,
+        "fits_origin_centered": false,
+        "gap": 10.0
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": false,
+        "fits_origin_centered": false,
+        "gap": 10.800000190734863
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": false,
+        "fits_origin_centered": false,
+        "gap": 10.949999809265137
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 11.050000190734863
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 11.199999809265137
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 12.0
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 14.0
+      },
+      {
+        "angle_degrees": 0.0,
+        "bounds_centering_offset_x": -0.0,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 16.0
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": false,
+        "fits_origin_centered": false,
+        "gap": 8.0
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": false,
+        "gap": 9.0
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": false,
+        "gap": 10.0
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": false,
+        "gap": 10.800000190734863
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 10.949999809265137
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 11.050000190734863
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 11.199999809265137
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 12.0
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 14.0
+      },
+      {
+        "angle_degrees": 90.0,
+        "bounds_centering_offset_x": -0.9749999046325684,
+        "fits_bounds_centered": true,
+        "fits_origin_centered": true,
+        "gap": 16.0
+      }
+    ]
+  },
+  "plan": {
+    "cases": [
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-5-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-5-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-5-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-10-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-10-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-10-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-30-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-30-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-30-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-50-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-50-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-50-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-70-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-70-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-70-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-100-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-100-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-100-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-140-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-140-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-zero-g-140-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-5-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-5-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-5-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-10-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-10-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-10-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-30-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-30-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-30-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-50-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-50-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-50-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-100-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-100-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-100-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-140-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-140-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-140-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-inward",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": -1.5707963705062866
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-outward",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 1.5707963705062866
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-rotating-frame",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.014999999664723873,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "turn-held",
+        "name": "turn-held-0",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 180
+      },
+      {
+        "maneuver": "turn-release-coast",
+        "name": "turn-release-coast-0",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      {
+        "maneuver": "turn-release-brake",
+        "name": "turn-release-brake-0",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      {
+        "maneuver": "turn-held",
+        "name": "turn-held-30",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 180
+      },
+      {
+        "maneuver": "turn-release-coast",
+        "name": "turn-release-coast-30",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      {
+        "maneuver": "turn-release-brake",
+        "name": "turn-release-brake-30",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      {
+        "maneuver": "turn-held",
+        "name": "turn-held-70",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 180
+      },
+      {
+        "maneuver": "turn-release-coast",
+        "name": "turn-release-coast-70",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      {
+        "maneuver": "turn-release-brake",
+        "name": "turn-release-brake-70",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      {
+        "maneuver": "turn-held",
+        "name": "turn-held-left-0",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": -1.0,
+        "turn_ticks": 180
+      },
+      {
+        "maneuver": "coast",
+        "name": "coast-zero-g",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "thrust",
+        "name": "thrust-zero-g",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "coast",
+        "name": "coast-gravity",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      {
+        "maneuver": "thrust",
+        "name": "thrust-gravity",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 0.0,
+        "turn_ticks": 0
+      }
+    ],
+    "dt_nanoseconds": 16666667,
+    "dwell_ticks": 15,
+    "kind": "mechanics-calibration-not-policy-evaluation",
+    "notes": [
+      "Thresholds are measurement probes, not accepted task-success tolerances.",
+      "Zero gravity and nonrotating planet isolate mechanics. Gravity-on uses the stationary practice planet, not the generated-match gravity envelope.",
+      "All maneuvers use prescribed controls, not a native pilot. Every tick is compared to an independently reset replay."
+    ],
+    "seed": 42,
+    "speed_measurement_thresholds": [
+      0.5,
+      1.0,
+      2.0
+    ],
+    "stop_on": "first contact, damage, lost vehicle, landing assist or wing sweep",
+    "version": 1
+  },
+  "runs": [
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-5-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 1.165771484375,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 5.12864684054648e-9,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 1.165771484375,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 1.12451171875,
+            "dwell_completed_seconds": 0.8000000715255737,
+            "first_entry_seconds": 0.5666666626930237,
+            "origin_displacement": 1.12451171875,
+            "origin_path": 1.12451171875,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 1.08251953125,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 1.08251953125,
+            "origin_path": 1.08251953125,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 0.998046875,
+            "dwell_completed_seconds": 0.46666669845581055,
+            "first_entry_seconds": 0.23333333432674408,
+            "origin_displacement": 0.998046875,
+            "origin_path": 0.998046875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-5-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 1.165771484375,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 5.12864684054648e-9,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 1.165771484375,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 1.12451171875,
+            "dwell_completed_seconds": 0.8000000715255737,
+            "first_entry_seconds": 0.5666666626930237,
+            "origin_displacement": 1.12451171875,
+            "origin_path": 1.12451171875,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 1.08251953125,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 1.08251953125,
+            "origin_path": 1.08251953125,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 0.998046875,
+            "dwell_completed_seconds": 0.46666669845581055,
+            "first_entry_seconds": 0.23333333432674408,
+            "origin_displacement": 0.998046875,
+            "origin_path": 0.998046875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-5-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 1.165771484375,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 5.12864684054648e-9,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 1.165771484375,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 1.12451171875,
+            "dwell_completed_seconds": 0.8000000715255737,
+            "first_entry_seconds": 0.5666666626930237,
+            "origin_displacement": 1.12451171875,
+            "origin_path": 1.12451171875,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 1.08251953125,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 1.08251953125,
+            "origin_path": 1.08251953125,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 0.998046875,
+            "dwell_completed_seconds": 0.46666669845581055,
+            "first_entry_seconds": 0.23333333432674408,
+            "origin_displacement": 0.998046875,
+            "origin_path": 0.998046875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-10-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 2.331298828125,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 1.025729368109296e-8,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 2.331298828125,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 2.2900390625,
+            "dwell_completed_seconds": 0.9666666984558105,
+            "first_entry_seconds": 0.7333333492279053,
+            "origin_displacement": 2.2900390625,
+            "origin_path": 2.2900390625,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 2.248046875,
+            "dwell_completed_seconds": 0.8000000715255737,
+            "first_entry_seconds": 0.5666666626930237,
+            "origin_displacement": 2.248046875,
+            "origin_path": 2.248046875,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 2.163330078125,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 2.163330078125,
+            "origin_path": 2.163330078125,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-10-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 2.331298828125,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 1.025729368109296e-8,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 2.331298828125,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 2.2900390625,
+            "dwell_completed_seconds": 0.9666666984558105,
+            "first_entry_seconds": 0.7333333492279053,
+            "origin_displacement": 2.2900390625,
+            "origin_path": 2.2900390625,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 2.248046875,
+            "dwell_completed_seconds": 0.8000000715255737,
+            "first_entry_seconds": 0.5666666626930237,
+            "origin_displacement": 2.248046875,
+            "origin_path": 2.248046875,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 2.163330078125,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 2.163330078125,
+            "origin_path": 2.163330078125,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-10-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 2.331298828125,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 1.025729368109296e-8,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 2.331298828125,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 2.2900390625,
+            "dwell_completed_seconds": 0.9666666984558105,
+            "first_entry_seconds": 0.7333333492279053,
+            "origin_displacement": 2.2900390625,
+            "origin_path": 2.2900390625,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 2.248046875,
+            "dwell_completed_seconds": 0.8000000715255737,
+            "first_entry_seconds": 0.5666666626930237,
+            "origin_displacement": 2.248046875,
+            "origin_path": 2.248046875,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 2.163330078125,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 2.163330078125,
+            "origin_path": 2.163330078125,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-30-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 12.16259765625,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 8.12698601748707e-8,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 12.16259765625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 12.12255859375,
+            "dwell_completed_seconds": 1.4666666984558105,
+            "first_entry_seconds": 1.2333333492279053,
+            "origin_displacement": 12.12255859375,
+            "origin_path": 12.12255859375,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 12.080078125,
+            "dwell_completed_seconds": 1.3000000715255737,
+            "first_entry_seconds": 1.0666667222976685,
+            "origin_displacement": 12.080078125,
+            "origin_path": 12.080078125,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 11.99609375,
+            "dwell_completed_seconds": 1.133333444595337,
+            "first_entry_seconds": 0.8999999761581421,
+            "origin_displacement": 11.99609375,
+            "origin_path": 11.99609375,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-30-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 12.1640625,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 8.12698601748707e-8,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 12.1640625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 12.122802734375,
+            "dwell_completed_seconds": 1.4666666984558105,
+            "first_entry_seconds": 1.2333333492279053,
+            "origin_displacement": 12.122802734375,
+            "origin_path": 12.122802734375,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 12.080810546875,
+            "dwell_completed_seconds": 1.3000000715255737,
+            "first_entry_seconds": 1.0666667222976685,
+            "origin_displacement": 12.080810546875,
+            "origin_path": 12.080810546875,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 11.99609375,
+            "dwell_completed_seconds": 1.133333444595337,
+            "first_entry_seconds": 0.8999999761581421,
+            "origin_displacement": 11.99609375,
+            "origin_path": 11.99609375,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-30-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 12.16259765625,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 8.12698601748707e-8,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 12.16259765625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 12.12255859375,
+            "dwell_completed_seconds": 1.4666666984558105,
+            "first_entry_seconds": 1.2333333492279053,
+            "origin_displacement": 12.12255859375,
+            "origin_path": 12.12255859375,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 12.080078125,
+            "dwell_completed_seconds": 1.3000000715255737,
+            "first_entry_seconds": 1.0666667222976685,
+            "origin_displacement": 12.080078125,
+            "origin_path": 12.080078125,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 11.99609375,
+            "dwell_completed_seconds": 1.133333444595337,
+            "first_entry_seconds": 0.8999999761581421,
+            "origin_displacement": 11.99609375,
+            "origin_path": 11.99609375,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-50-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 31.998046875,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 6.439096296162461e-7,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 31.998046875,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 31.9580078125,
+            "dwell_completed_seconds": 1.9666668176651,
+            "first_entry_seconds": 1.7333333492279053,
+            "origin_displacement": 31.9580078125,
+            "origin_path": 31.9580078125,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 31.91552734375,
+            "dwell_completed_seconds": 1.8000000715255737,
+            "first_entry_seconds": 1.5666667222976685,
+            "origin_displacement": 31.91552734375,
+            "origin_path": 31.91552734375,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 31.83154296875,
+            "dwell_completed_seconds": 1.633333444595337,
+            "first_entry_seconds": 1.399999976158142,
+            "origin_displacement": 31.83154296875,
+            "origin_path": 31.83154296875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-50-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 31.99810791015625,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 6.439096296162461e-7,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 31.99810791015625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 31.95806884765625,
+            "dwell_completed_seconds": 1.9666668176651,
+            "first_entry_seconds": 1.7333333492279053,
+            "origin_displacement": 31.95806884765625,
+            "origin_path": 31.95806884765625,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 31.91558837890625,
+            "dwell_completed_seconds": 1.8000000715255737,
+            "first_entry_seconds": 1.5666667222976685,
+            "origin_displacement": 31.91558837890625,
+            "origin_path": 31.91558837890625,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 31.83160400390625,
+            "dwell_completed_seconds": 1.633333444595337,
+            "first_entry_seconds": 1.399999976158142,
+            "origin_displacement": 31.83160400390625,
+            "origin_path": 31.83160400390625,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-50-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 31.998046875,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 6.439096296162461e-7,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 31.998046875,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 31.9580078125,
+            "dwell_completed_seconds": 1.9666668176651,
+            "first_entry_seconds": 1.7333333492279053,
+            "origin_displacement": 31.9580078125,
+            "origin_path": 31.9580078125,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 31.91552734375,
+            "dwell_completed_seconds": 1.8000000715255737,
+            "first_entry_seconds": 1.5666667222976685,
+            "origin_displacement": 31.91552734375,
+            "origin_path": 31.91552734375,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 31.83154296875,
+            "dwell_completed_seconds": 1.633333444595337,
+            "first_entry_seconds": 1.399999976158142,
+            "origin_displacement": 31.83154296875,
+            "origin_path": 31.83154296875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-70-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 61.831298828125,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 5.101776878291275e-6,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 61.831298828125,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 61.791259765625,
+            "dwell_completed_seconds": 2.4666666984558105,
+            "first_entry_seconds": 2.2333333492279053,
+            "origin_displacement": 61.791259765625,
+            "origin_path": 61.791259765625,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 61.748779296875,
+            "dwell_completed_seconds": 2.3000001907348633,
+            "first_entry_seconds": 2.066666603088379,
+            "origin_displacement": 61.748779296875,
+            "origin_path": 61.748779296875,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 61.664794921875,
+            "dwell_completed_seconds": 2.133333444595337,
+            "first_entry_seconds": 1.899999976158142,
+            "origin_displacement": 61.664794921875,
+            "origin_path": 61.664794921875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-70-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 61.83154296875,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 5.101776878291275e-6,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 61.83154296875,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 61.79150390625,
+            "dwell_completed_seconds": 2.4666666984558105,
+            "first_entry_seconds": 2.2333333492279053,
+            "origin_displacement": 61.79150390625,
+            "origin_path": 61.79150390625,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 61.7490234375,
+            "dwell_completed_seconds": 2.3000001907348633,
+            "first_entry_seconds": 2.066666603088379,
+            "origin_displacement": 61.7490234375,
+            "origin_path": 61.7490234375,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 61.6650390625,
+            "dwell_completed_seconds": 2.133333444595337,
+            "first_entry_seconds": 1.899999976158142,
+            "origin_displacement": 61.6650390625,
+            "origin_path": 61.6650390625,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-70-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 61.831298828125,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 5.101776878291275e-6,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 61.831298828125,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 61.791259765625,
+            "dwell_completed_seconds": 2.4666666984558105,
+            "first_entry_seconds": 2.2333333492279053,
+            "origin_displacement": 61.791259765625,
+            "origin_path": 61.791259765625,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 61.748779296875,
+            "dwell_completed_seconds": 2.3000001907348633,
+            "first_entry_seconds": 2.066666603088379,
+            "origin_displacement": 61.748779296875,
+            "origin_path": 61.748779296875,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 61.664794921875,
+            "dwell_completed_seconds": 2.133333444595337,
+            "first_entry_seconds": 1.899999976158142,
+            "origin_displacement": 61.664794921875,
+            "origin_path": 61.664794921875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-100-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 125.3314208984375,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.00011378154158592224,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 125.3314208984375,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 125.2913818359375,
+            "dwell_completed_seconds": 3.2166669368743896,
+            "first_entry_seconds": 2.9833333492279053,
+            "origin_displacement": 125.2913818359375,
+            "origin_path": 125.2913818359375,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 125.2489013671875,
+            "dwell_completed_seconds": 3.0500001907348633,
+            "first_entry_seconds": 2.816666603088379,
+            "origin_displacement": 125.2489013671875,
+            "origin_path": 125.2489013671875,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 125.1649169921875,
+            "dwell_completed_seconds": 2.883333444595337,
+            "first_entry_seconds": 2.6500000953674316,
+            "origin_displacement": 125.1649169921875,
+            "origin_path": 125.1649169921875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-100-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 125.33148193359375,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.00011378154158592224,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 125.33148193359375,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 125.29144287109375,
+            "dwell_completed_seconds": 3.2166669368743896,
+            "first_entry_seconds": 2.9833333492279053,
+            "origin_displacement": 125.29144287109375,
+            "origin_path": 125.29144287109375,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 125.24896240234375,
+            "dwell_completed_seconds": 3.0500001907348633,
+            "first_entry_seconds": 2.816666603088379,
+            "origin_displacement": 125.24896240234375,
+            "origin_path": 125.24896240234375,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 125.16497802734375,
+            "dwell_completed_seconds": 2.883333444595337,
+            "first_entry_seconds": 2.6500000953674316,
+            "origin_displacement": 125.16497802734375,
+            "origin_path": 125.16497802734375,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-100-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 125.3314208984375,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.00011378154158592224,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 125.3314208984375,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 125.2913818359375,
+            "dwell_completed_seconds": 3.2166669368743896,
+            "first_entry_seconds": 2.9833333492279053,
+            "origin_displacement": 125.2913818359375,
+            "origin_path": 125.2913818359375,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 125.2489013671875,
+            "dwell_completed_seconds": 3.0500001907348633,
+            "first_entry_seconds": 2.816666603088379,
+            "origin_displacement": 125.2489013671875,
+            "origin_path": 125.2489013671875,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 125.1649169921875,
+            "dwell_completed_seconds": 2.883333444595337,
+            "first_entry_seconds": 2.6500000953674316,
+            "origin_displacement": 125.1649169921875,
+            "origin_path": 125.1649169921875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-140-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 244.998046875,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.007142768241465092,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 244.998046875,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 244.9580078125,
+            "dwell_completed_seconds": 4.2166666984558105,
+            "first_entry_seconds": 3.9833333492279053,
+            "origin_displacement": 244.9580078125,
+            "origin_path": 244.9580078125,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 244.91552734375,
+            "dwell_completed_seconds": 4.050000190734863,
+            "first_entry_seconds": 3.816666603088379,
+            "origin_displacement": 244.91552734375,
+            "origin_path": 244.91552734375,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 244.83154296875,
+            "dwell_completed_seconds": 3.883333444595337,
+            "first_entry_seconds": 3.6500000953674316,
+            "origin_displacement": 244.83154296875,
+            "origin_path": 244.83154296875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-140-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 244.998046875,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.007142768241465092,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 244.998046875,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 244.9580078125,
+            "dwell_completed_seconds": 4.2166666984558105,
+            "first_entry_seconds": 3.9833333492279053,
+            "origin_displacement": 244.9580078125,
+            "origin_path": 244.9580078125,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 244.91552734375,
+            "dwell_completed_seconds": 4.050000190734863,
+            "first_entry_seconds": 3.816666603088379,
+            "origin_displacement": 244.91552734375,
+            "origin_path": 244.91552734375,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 244.83154296875,
+            "dwell_completed_seconds": 3.883333444595337,
+            "first_entry_seconds": 3.6500000953674316,
+            "origin_displacement": 244.83154296875,
+            "origin_path": 244.83154296875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-zero-g-140-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 244.998046875,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.007142768241465092,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 244.998046875,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 244.9580078125,
+            "dwell_completed_seconds": 4.2166666984558105,
+            "first_entry_seconds": 3.9833333492279053,
+            "origin_displacement": 244.9580078125,
+            "origin_path": 244.9580078125,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 244.91552734375,
+            "dwell_completed_seconds": 4.050000190734863,
+            "first_entry_seconds": 3.816666603088379,
+            "origin_displacement": 244.91552734375,
+            "origin_path": 244.91552734375,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 244.83154296875,
+            "dwell_completed_seconds": 3.883333444595337,
+            "first_entry_seconds": 3.6500000953674316,
+            "origin_displacement": 244.83154296875,
+            "origin_path": 244.83154296875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-5-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 2.649243116378784,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.34504932165145874,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 2.649243116378784,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 1.198989748954773,
+            "dwell_completed_seconds": 0.8666667342185974,
+            "first_entry_seconds": 0.6333333253860474,
+            "origin_displacement": 1.1566369533538818,
+            "origin_path": 1.198989748954773,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 1.1062726974487305,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 1.0924046039581299,
+            "origin_path": 1.1062726974487305,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 1.0069833993911743,
+            "dwell_completed_seconds": 0.46666669845581055,
+            "first_entry_seconds": 0.23333333432674408,
+            "origin_displacement": 1.0026127099990845,
+            "origin_path": 1.0069833993911743,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-5-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 2.649243116378784,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.34504932165145874,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 2.649243116378784,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 1.198989748954773,
+            "dwell_completed_seconds": 0.8666667342185974,
+            "first_entry_seconds": 0.6333333253860474,
+            "origin_displacement": 1.1566369533538818,
+            "origin_path": 1.198989748954773,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 1.1062726974487305,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 1.0924046039581299,
+            "origin_path": 1.1062726974487305,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 1.0069833993911743,
+            "dwell_completed_seconds": 0.46666669845581055,
+            "first_entry_seconds": 0.23333333432674408,
+            "origin_displacement": 1.0026127099990845,
+            "origin_path": 1.0069833993911743,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-5-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 5.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 2.649243116378784,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.34504932165145874,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 2.649243116378784,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 1.198989748954773,
+            "dwell_completed_seconds": 0.8666667342185974,
+            "first_entry_seconds": 0.6333333253860474,
+            "origin_displacement": 1.1566369533538818,
+            "origin_path": 1.198989748954773,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 1.1062726974487305,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 1.0924046039581299,
+            "origin_path": 1.1062726974487305,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 1.0069833993911743,
+            "dwell_completed_seconds": 0.46666669845581055,
+            "first_entry_seconds": 0.23333333432674408,
+            "origin_displacement": 1.0026127099990845,
+            "origin_path": 1.0069833993911743,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-10-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 3.765916109085083,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.3450630009174347,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 3.765916109085083,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 2.369725227355957,
+            "dwell_completed_seconds": 1.033333420753479,
+            "first_entry_seconds": 0.800000011920929,
+            "origin_displacement": 2.3175415992736816,
+            "origin_path": 2.369725227355957,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 2.2849247455596924,
+            "dwell_completed_seconds": 0.8166667222976685,
+            "first_entry_seconds": 0.5833333134651184,
+            "origin_displacement": 2.2635090351104736,
+            "origin_path": 2.2849247455596924,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 2.1764719486236572,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 2.1689019203186035,
+            "origin_path": 2.1764719486236572,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-10-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 3.765916109085083,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.3450630009174347,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 3.765916109085083,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 2.369725227355957,
+            "dwell_completed_seconds": 1.033333420753479,
+            "first_entry_seconds": 0.800000011920929,
+            "origin_displacement": 2.3175415992736816,
+            "origin_path": 2.369725227355957,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 2.2849247455596924,
+            "dwell_completed_seconds": 0.8166667222976685,
+            "first_entry_seconds": 0.5833333134651184,
+            "origin_displacement": 2.2635090351104736,
+            "origin_path": 2.2849247455596924,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 2.1764719486236572,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 2.1689019203186035,
+            "origin_path": 2.1764719486236572,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-10-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 10.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 3.765916109085083,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.3450630009174347,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 3.765916109085083,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 2.369725227355957,
+            "dwell_completed_seconds": 1.033333420753479,
+            "first_entry_seconds": 0.800000011920929,
+            "origin_displacement": 2.3175415992736816,
+            "origin_path": 2.369725227355957,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 2.2849247455596924,
+            "dwell_completed_seconds": 0.8166667222976685,
+            "first_entry_seconds": 0.5833333134651184,
+            "origin_displacement": 2.2635090351104736,
+            "origin_path": 2.2849247455596924,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 2.1764719486236572,
+            "dwell_completed_seconds": 0.6333333849906921,
+            "first_entry_seconds": 0.4000000059604645,
+            "origin_displacement": 2.1689019203186035,
+            "origin_path": 2.1764719486236572,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-30-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 13.431353569030762,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.34453076124191284,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 13.431353569030762,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 12.207839012145996,
+            "dwell_completed_seconds": 1.533333420753479,
+            "first_entry_seconds": 1.2999999523162842,
+            "origin_displacement": 12.130669593811035,
+            "origin_path": 12.207839012145996,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 12.119288444519043,
+            "dwell_completed_seconds": 1.3166667222976685,
+            "first_entry_seconds": 1.0833333730697632,
+            "origin_displacement": 12.083850860595703,
+            "origin_path": 12.119288444519043,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 12.009892463684082,
+            "dwell_completed_seconds": 1.133333444595337,
+            "first_entry_seconds": 0.8999999761581421,
+            "origin_displacement": 11.994154930114746,
+            "origin_path": 12.009892463684082,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-30-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 13.429155349731445,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.34452760219573975,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 13.429155349731445,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 12.207627296447754,
+            "dwell_completed_seconds": 1.533333420753479,
+            "first_entry_seconds": 1.2999999523162842,
+            "origin_displacement": 12.130182266235352,
+            "origin_path": 12.207627296447754,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 12.119283676147461,
+            "dwell_completed_seconds": 1.3166667222976685,
+            "first_entry_seconds": 1.0833333730697632,
+            "origin_displacement": 12.083850860595703,
+            "origin_path": 12.119283676147461,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 12.009892463684082,
+            "dwell_completed_seconds": 1.133333444595337,
+            "first_entry_seconds": 0.8999999761581421,
+            "origin_displacement": 11.994154930114746,
+            "origin_path": 12.009892463684082,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-30-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 13.431353569030762,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.34453076124191284,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 13.431353569030762,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 12.207839012145996,
+            "dwell_completed_seconds": 1.533333420753479,
+            "first_entry_seconds": 1.2999999523162842,
+            "origin_displacement": 12.130669593811035,
+            "origin_path": 12.207839012145996,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 12.119288444519043,
+            "dwell_completed_seconds": 1.3166667222976685,
+            "first_entry_seconds": 1.0833333730697632,
+            "origin_displacement": 12.083850860595703,
+            "origin_path": 12.119288444519043,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 12.009892463684082,
+            "dwell_completed_seconds": 1.133333444595337,
+            "first_entry_seconds": 0.8999999761581421,
+            "origin_displacement": 11.994154930114746,
+            "origin_path": 12.009892463684082,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-50-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 32.94550323486328,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.33904749155044556,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 32.94550323486328,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 31.971580505371094,
+            "dwell_completed_seconds": 2.016666889190674,
+            "first_entry_seconds": 1.7833333015441895,
+            "origin_displacement": 31.888103485107422,
+            "origin_path": 31.971580505371094,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 31.885902404785156,
+            "dwell_completed_seconds": 1.8000000715255737,
+            "first_entry_seconds": 1.5666667222976685,
+            "origin_displacement": 31.845653533935547,
+            "origin_path": 31.885902404785156,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 31.788549423217773,
+            "dwell_completed_seconds": 1.633333444595337,
+            "first_entry_seconds": 1.399999976158142,
+            "origin_displacement": 31.767127990722656,
+            "origin_path": 31.788549423217773,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-50-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 32.94532012939453,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.3390476405620575,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 32.94532012939453,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 31.971397399902344,
+            "dwell_completed_seconds": 2.016666889190674,
+            "first_entry_seconds": 1.7833333015441895,
+            "origin_displacement": 31.887922286987305,
+            "origin_path": 31.971397399902344,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 31.885719299316406,
+            "dwell_completed_seconds": 1.8000000715255737,
+            "first_entry_seconds": 1.5666667222976685,
+            "origin_displacement": 31.845470428466797,
+            "origin_path": 31.885719299316406,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 31.788366317749023,
+            "dwell_completed_seconds": 1.633333444595337,
+            "first_entry_seconds": 1.399999976158142,
+            "origin_displacement": 31.766944885253906,
+            "origin_path": 31.788366317749023,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-50-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 50.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 32.94550323486328,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.33904749155044556,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 32.94550323486328,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 31.971580505371094,
+            "dwell_completed_seconds": 2.016666889190674,
+            "first_entry_seconds": 1.7833333015441895,
+            "origin_displacement": 31.888103485107422,
+            "origin_path": 31.971580505371094,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 31.885902404785156,
+            "dwell_completed_seconds": 1.8000000715255737,
+            "first_entry_seconds": 1.5666667222976685,
+            "origin_displacement": 31.845653533935547,
+            "origin_path": 31.885902404785156,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 31.788549423217773,
+            "dwell_completed_seconds": 1.633333444595337,
+            "first_entry_seconds": 1.399999976158142,
+            "origin_displacement": 31.767127990722656,
+            "origin_path": 31.788549423217773,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 62.41127014160156,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.3214850127696991,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 62.41127014160156,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 61.57596206665039,
+            "dwell_completed_seconds": 2.4833333492279053,
+            "first_entry_seconds": 2.25,
+            "origin_displacement": 61.49562072753906,
+            "origin_path": 61.57596206665039,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 61.50277328491211,
+            "dwell_completed_seconds": 2.2833335399627686,
+            "first_entry_seconds": 2.049999952316284,
+            "origin_displacement": 61.461036682128906,
+            "origin_path": 61.50277328491211,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 61.41096878051758,
+            "dwell_completed_seconds": 2.116666793823242,
+            "first_entry_seconds": 1.8833333253860474,
+            "origin_displacement": 61.3862190246582,
+            "origin_path": 61.41096878051758,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 62.41127014160156,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.3214850127696991,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 62.41127014160156,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 61.57596206665039,
+            "dwell_completed_seconds": 2.4833333492279053,
+            "first_entry_seconds": 2.25,
+            "origin_displacement": 61.49562072753906,
+            "origin_path": 61.57596206665039,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 61.50277328491211,
+            "dwell_completed_seconds": 2.2833335399627686,
+            "first_entry_seconds": 2.049999952316284,
+            "origin_displacement": 61.461036682128906,
+            "origin_path": 61.50277328491211,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 61.41096878051758,
+            "dwell_completed_seconds": 2.116666793823242,
+            "first_entry_seconds": 1.8833333253860474,
+            "origin_displacement": 61.3862190246582,
+            "origin_path": 61.41096878051758,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 62.41127014160156,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.3214850127696991,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 62.41127014160156,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 61.57596206665039,
+            "dwell_completed_seconds": 2.4833333492279053,
+            "first_entry_seconds": 2.25,
+            "origin_displacement": 61.49562072753906,
+            "origin_path": 61.57596206665039,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 61.50277328491211,
+            "dwell_completed_seconds": 2.2833335399627686,
+            "first_entry_seconds": 2.049999952316284,
+            "origin_displacement": 61.461036682128906,
+            "origin_path": 61.50277328491211,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 61.41096878051758,
+            "dwell_completed_seconds": 2.116666793823242,
+            "first_entry_seconds": 1.8833333253860474,
+            "origin_displacement": 61.3862190246582,
+            "origin_path": 61.41096878051758,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-100-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 124.75752258300781,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.26042768359184265,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 124.75752258300781,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 124.28662872314453,
+            "dwell_completed_seconds": 3.1666667461395264,
+            "first_entry_seconds": 2.933333396911621,
+            "origin_displacement": 124.23406982421875,
+            "origin_path": 124.28662872314453,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 124.24446868896484,
+            "dwell_completed_seconds": 3.016666889190674,
+            "first_entry_seconds": 2.7833333015441895,
+            "origin_displacement": 124.21100616455078,
+            "origin_path": 124.24446868896484,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 124.16421508789062,
+            "dwell_completed_seconds": 2.8500001430511475,
+            "first_entry_seconds": 2.616666555404663,
+            "origin_displacement": 124.1414794921875,
+            "origin_path": 124.16421508789062,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-100-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 124.75758361816406,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.2604276239871979,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 124.75758361816406,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 124.28668975830078,
+            "dwell_completed_seconds": 3.1666667461395264,
+            "first_entry_seconds": 2.933333396911621,
+            "origin_displacement": 124.234130859375,
+            "origin_path": 124.28668975830078,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 124.2445297241211,
+            "dwell_completed_seconds": 3.016666889190674,
+            "first_entry_seconds": 2.7833333015441895,
+            "origin_displacement": 124.21106719970703,
+            "origin_path": 124.2445297241211,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 124.16427612304688,
+            "dwell_completed_seconds": 2.8500001430511475,
+            "first_entry_seconds": 2.616666555404663,
+            "origin_displacement": 124.14153289794922,
+            "origin_path": 124.16427612304688,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-100-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 100.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 124.75752258300781,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.26042768359184265,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 124.75752258300781,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 124.28662872314453,
+            "dwell_completed_seconds": 3.1666667461395264,
+            "first_entry_seconds": 2.933333396911621,
+            "origin_displacement": 124.23406982421875,
+            "origin_path": 124.28662872314453,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 124.24446868896484,
+            "dwell_completed_seconds": 3.016666889190674,
+            "first_entry_seconds": 2.7833333015441895,
+            "origin_displacement": 124.21100616455078,
+            "origin_path": 124.24446868896484,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 124.16421508789062,
+            "dwell_completed_seconds": 2.8500001430511475,
+            "first_entry_seconds": 2.616666555404663,
+            "origin_displacement": 124.1414794921875,
+            "origin_path": 124.16421508789062,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-140-up",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 242.44049072265625,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.1465579867362976,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 242.44049072265625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 242.33450317382812,
+            "dwell_completed_seconds": 4.133333683013916,
+            "first_entry_seconds": 3.9000000953674316,
+            "origin_displacement": 242.31549072265625,
+            "origin_path": 242.33450317382812,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 242.30088806152344,
+            "dwell_completed_seconds": 3.9833335876464844,
+            "first_entry_seconds": 3.75,
+            "origin_displacement": 242.28695678710938,
+            "origin_path": 242.30088806152344,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 242.2320556640625,
+            "dwell_completed_seconds": 3.8333334922790527,
+            "first_entry_seconds": 3.5999999046325684,
+            "origin_displacement": 242.2203369140625,
+            "origin_path": 242.2320556640625,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-140-right",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": -1.5707963705062866,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 242.44049072265625,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.1465579867362976,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 242.44049072265625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 242.33450317382812,
+            "dwell_completed_seconds": 4.133333683013916,
+            "first_entry_seconds": 3.9000000953674316,
+            "origin_displacement": 242.31549072265625,
+            "origin_path": 242.33450317382812,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 242.30088806152344,
+            "dwell_completed_seconds": 3.9833335876464844,
+            "first_entry_seconds": 3.75,
+            "origin_displacement": 242.28695678710938,
+            "origin_path": 242.30088806152344,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 242.2320556640625,
+            "dwell_completed_seconds": 3.8333334922790527,
+            "first_entry_seconds": 3.5999999046325684,
+            "origin_displacement": 242.2203369140625,
+            "origin_path": 242.2320556640625,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-140-down",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 3.1415927410125732,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 140.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 242.44049072265625,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.1465579867362976,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 242.44049072265625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 242.33450317382812,
+            "dwell_completed_seconds": 4.133333683013916,
+            "first_entry_seconds": 3.9000000953674316,
+            "origin_displacement": 242.31549072265625,
+            "origin_path": 242.33450317382812,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 242.30088806152344,
+            "dwell_completed_seconds": 3.9833335876464844,
+            "first_entry_seconds": 3.75,
+            "origin_displacement": 242.28695678710938,
+            "origin_path": 242.30088806152344,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 242.2320556640625,
+            "dwell_completed_seconds": 3.8333334922790527,
+            "first_entry_seconds": 3.5999999046325684,
+            "origin_displacement": 242.2203369140625,
+            "origin_path": 242.2320556640625,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-inward",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": -1.5707963705062866
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 67.384765625,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.7286896109580994,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 67.384765625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          {
+            "com_path": 65.6640625,
+            "dwell_completed_seconds": 2.6666667461395264,
+            "first_entry_seconds": 2.433333396911621,
+            "origin_displacement": 65.66407012939453,
+            "origin_path": 65.6640625,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 65.31396484375,
+            "dwell_completed_seconds": 2.3000001907348633,
+            "first_entry_seconds": 2.066666603088379,
+            "origin_displacement": 65.31397247314453,
+            "origin_path": 65.31396484375,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-outward",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 1.5707963705062866
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 60.4521484375,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.20719096064567566,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 60.4521484375,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 59.96337890625,
+            "dwell_completed_seconds": 2.3500001430511475,
+            "first_entry_seconds": 2.116666555404663,
+            "origin_displacement": 59.96337890625,
+            "origin_path": 59.96337890625,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 59.94677734375,
+            "dwell_completed_seconds": 2.2166666984558105,
+            "first_entry_seconds": 1.9833333492279053,
+            "origin_displacement": 59.94677734375,
+            "origin_path": 59.94677734375,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 59.888671875,
+            "dwell_completed_seconds": 2.066666841506958,
+            "first_entry_seconds": 1.8333333730697632,
+            "origin_displacement": 59.888671875,
+            "origin_path": 59.888671875,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "brake",
+        "name": "brake-gravity-70-rotating-frame",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.014999999664723873,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 300,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 65.20938110351562,
+        "duration_seconds": 5.000000476837158,
+        "final_relative_speed": 0.3116183578968048,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 65.20938110351562,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 56.84892272949219,
+            "dwell_completed_seconds": 2.4833333492279053,
+            "first_entry_seconds": 2.25,
+            "origin_displacement": 53.501976013183594,
+            "origin_path": 56.84892272949219,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 56.23097610473633,
+            "dwell_completed_seconds": 2.2833335399627686,
+            "first_entry_seconds": 2.049999952316284,
+            "origin_displacement": 54.11244583129883,
+            "origin_path": 56.23097610473633,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 55.76280975341797,
+            "dwell_completed_seconds": 2.116666793823242,
+            "first_entry_seconds": 1.8833333253860474,
+            "origin_displacement": 54.5744743347168,
+            "origin_path": 55.76280975341797,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-held",
+        "name": "turn-held-0",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 180
+      },
+      "metrics": {
+        "com_path": 0.00006103515625,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 2.1990463733673096,
+        "final_spin": -1.7999999523162842,
+        "first_invalid": null,
+        "half_turn_seconds": 1.9000000953674316,
+        "origin_path": 6.285263538360596,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          {
+            "com_path": 0.0,
+            "dwell_completed_seconds": 0.25,
+            "first_entry_seconds": 0.01666666753590107,
+            "origin_displacement": 0.24392502009868622,
+            "origin_path": 0.24432849884033203,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": -294.78521728515625,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-release-coast",
+        "name": "turn-release-coast-0",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      "metrics": {
+        "com_path": 0.0,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 0.0,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 3.1885013580322266,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": -61.01985168457031,
+        "release_spin_stop_seconds": 1.2000000476837158,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 0.0,
+            "dwell_completed_seconds": 2.1666667461395264,
+            "first_entry_seconds": 1.9333332777023315,
+            "origin_displacement": 2.357449531555176,
+            "origin_path": 3.188009262084961,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 0.0,
+            "dwell_completed_seconds": 1.9000000953674316,
+            "first_entry_seconds": 1.6666666269302368,
+            "origin_displacement": 2.3358867168426514,
+            "origin_path": 3.1106042861938477,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 0.0,
+            "dwell_completed_seconds": 0.25,
+            "first_entry_seconds": 0.01666666753590107,
+            "origin_displacement": 0.24392502009868622,
+            "origin_path": 0.24432849884033203,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": -149.5414581298828,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-release-brake",
+        "name": "turn-release-brake-0",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      "metrics": {
+        "com_path": 0.34510335326194763,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 0.0005850865854881704,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 2.2536723613739014,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": -14.610396385192871,
+        "release_spin_stop_seconds": 0.30000007152557373,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 0.305274099111557,
+            "dwell_completed_seconds": 1.6166667938232422,
+            "first_entry_seconds": 1.3833333253860474,
+            "origin_displacement": 1.7070988416671753,
+            "origin_path": 2.2138426303863525,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 0.21181441843509674,
+            "dwell_completed_seconds": 1.3333333730697632,
+            "first_entry_seconds": 1.100000023841858,
+            "origin_displacement": 1.765610933303833,
+            "origin_path": 2.120382785797119,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 0.0,
+            "dwell_completed_seconds": 0.25,
+            "first_entry_seconds": 0.01666666753590107,
+            "origin_displacement": 0.24392502009868622,
+            "origin_path": 0.24432849884033203,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": -103.13200378417969,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-held",
+        "name": "turn-held-30",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 180
+      },
+      "metrics": {
+        "com_path": 90.0,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 30.98624610900879,
+        "final_spin": -1.7999999523162842,
+        "first_invalid": null,
+        "half_turn_seconds": 1.9000000953674316,
+        "origin_path": 89.01538848876953,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": -294.78521728515625,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-release-coast",
+        "name": "turn-release-coast-30",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      "metrics": {
+        "com_path": 90.0,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 30.0,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 90.67779541015625,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": -61.01985168457031,
+        "release_spin_stop_seconds": 1.2000000476837158,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": -149.5414581298828,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-release-brake",
+        "name": "turn-release-brake-30",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 30.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      "metrics": {
+        "com_path": 42.172786712646484,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 0.02013702690601349,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 43.400718688964844,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": -14.610396385192871,
+        "release_spin_stop_seconds": 0.30000007152557373,
+        "speed_thresholds_with_15_tick_dwell": [
+          {
+            "com_path": 42.134700775146484,
+            "dwell_completed_seconds": 2.4666666984558105,
+            "first_entry_seconds": 2.2333333492279053,
+            "origin_displacement": 43.34214782714844,
+            "origin_path": 43.362632751464844,
+            "threshold": 0.5
+          },
+          {
+            "com_path": 42.092220306396484,
+            "dwell_completed_seconds": 2.3000001907348633,
+            "first_entry_seconds": 2.066666603088379,
+            "origin_displacement": 43.299686431884766,
+            "origin_path": 43.320152282714844,
+            "threshold": 1.0
+          },
+          {
+            "com_path": 42.008235931396484,
+            "dwell_completed_seconds": 2.133333444595337,
+            "first_entry_seconds": 1.899999976158142,
+            "origin_displacement": 43.21574020385742,
+            "origin_path": 43.236167907714844,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": -103.13200378417969,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-held",
+        "name": "turn-held-70",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 180
+      },
+      "metrics": {
+        "com_path": 209.97320556640625,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 70.949951171875,
+        "final_spin": -1.7999999523162842,
+        "first_invalid": null,
+        "half_turn_seconds": 1.9000000953674316,
+        "origin_path": 208.9172821044922,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": -294.78521728515625,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-release-coast",
+        "name": "turn-release-coast-70",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      "metrics": {
+        "com_path": 209.97320556640625,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 70.0,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 210.61770629882812,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": -61.01985168457031,
+        "release_spin_stop_seconds": 1.2000000476837158,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": -149.5414581298828,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-release-brake",
+        "name": "turn-release-brake-70",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 1.0,
+        "turn_ticks": 60
+      },
+      "metrics": {
+        "com_path": 131.53543090820312,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 1.262434959411621,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 132.74237060546875,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": -14.610396385192871,
+        "release_spin_stop_seconds": 0.30000007152557373,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": -103.13200378417969,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "turn-held",
+        "name": "turn-held-left-0",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": -1.0,
+        "turn_ticks": 180
+      },
+      "metrics": {
+        "com_path": 0.00006103515625,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 2.1990463733673096,
+        "final_spin": 1.7999999523162842,
+        "first_invalid": null,
+        "half_turn_seconds": 1.9000000953674316,
+        "origin_path": 6.285263538360596,
+        "peak_spin": 1.7999999523162842,
+        "quarter_turn_seconds": 1.0166667699813843,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          {
+            "com_path": 0.0,
+            "dwell_completed_seconds": 0.25,
+            "first_entry_seconds": 0.01666666753590107,
+            "origin_displacement": 0.24392502009868622,
+            "origin_path": 0.24432849884033203,
+            "threshold": 2.0
+          }
+        ],
+        "turn_degrees": 294.78521728515625,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "coast",
+        "name": "coast-zero-g",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 209.97320556640625,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 70.0,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 209.97320556640625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "thrust",
+        "name": "thrust-zero-g",
+        "start": {
+          "altitude": 150.0,
+          "gravity": false,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 155.11083984375,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 69.99588775634766,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 155.11083984375,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "coast",
+        "name": "coast-gravity",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 70.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 208.56900024414062,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 68.78941345214844,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 208.56900024414062,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    },
+    {
+      "case": {
+        "maneuver": "thrust",
+        "name": "thrust-gravity",
+        "start": {
+          "altitude": 150.0,
+          "gravity": true,
+          "heading": 0.0,
+          "planet_spin": 0.0,
+          "seed": 42,
+          "speed": 0.0,
+          "velocity_bearing": 0.0
+        },
+        "ticks": 180,
+        "turn": 0.0,
+        "turn_ticks": 0
+      },
+      "metrics": {
+        "com_path": 153.24462890625,
+        "duration_seconds": 3.000000238418579,
+        "final_relative_speed": 69.88446044921875,
+        "final_spin": 0.0,
+        "first_invalid": null,
+        "half_turn_seconds": null,
+        "origin_path": 153.24462890625,
+        "peak_spin": 0.0,
+        "quarter_turn_seconds": null,
+        "release_extra_degrees": null,
+        "release_spin_stop_seconds": null,
+        "speed_thresholds_with_15_tick_dwell": [
+          null,
+          null,
+          null
+        ],
+        "turn_degrees": 0.0,
+        "valid_free_flight": true
+      }
+    }
+  ],
+  "runtime_sha256": "531dbde37156cc62a8f4595154586e08166ca1d8de374e298369d0abbfd05146",
+  "sources": [
+    {
+      "path": "scenarios/spacewars/src/surface_sortie/flight_calibration.rs",
+      "sha256": "34246dfd20156f802bc3fd12a55fc1eba667b44a7a0af81a4968d15ba9a48cc5"
+    },
+    {
+      "path": "scenarios/spacewars/examples/flight_calibration_probe.rs",
+      "sha256": "1fa72c640365a3545c3fb582baef3c9735af138762758c077327dad2b1cc934c"
+    },
+    {
+      "path": "scenarios/spacewars/examples/flight_calibration_probe/viewer.html",
+      "sha256": "dc5a4713fc3b8334f4a644c4b76cc60de1f212250ba6a823f660232da9f089d8"
+    }
+  ],
+  "version": 1
+}

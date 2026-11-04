@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-learning-gain-v1-20261023",
+  "kind": "initial versus trained under candidate mixed execution",
+  "completed_at_utc": "2026-10-24T04:09:51.753266+00:00",
+  "source_file_count": 1522,
+  "source_archive_sha256": "c39b6ac34416e3b52312987208f158b86378932f1700c176557e03afef5dfffe",
+  "runtime_sha256": "e39a1c0b7e06c044ba764729e890f871872b70d248a07eae5fe025e80b724e2a",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "repeats": 4,
+  "new_episodes": 192,
+  "physics_ticks": 184513,
+  "trained_reused_physics_ticks": 177917,
+  "preflight_physics_ticks": 128,
+  "optimizer_steps": 0,
+  "model_weights_unchanged": true,
+  "outcomes": {
+    "initial": {
+      "collision": 191,
+      "deadline": 1
+    },
+    "trained": {
+      "success": 137,
+      "deadline": 55
+    }
+  },
+  "material_learning_gain": true,
+  "execution_contract": "mean-steering-sampled-buttons-v1",
+  "qualification_gate_changed": false,
+  "confirmation_used": false,
+  "general_flight_claim": false,
+  "validation": {
+    "diagnostic_tests": 4,
+    "matched_innovation_ticks": 124327,
+    "maximum_abs_standardized_innovation_error": 4.76837158203125e-07,
+    "production_source_runtime_contract": "unchanged",
+    "referenced_parent_inputs": 405,
+    "prior_manifests_unchanged": 16,
+    "compile_whitespace": "passed"
+  },
+  "retained_file_count": 823,
+  "retained_bytes_excluding_manifest": 137130898,
+  "limitations": [
+    "Same sixteen development tasks per model with repeated trials, not additional independent trained models.",
+    "Aligned stationary starts only; no broader flight or obstacle qualification.",
+    "Button randomness is paired, but state-dependent button choices may diverge downstream.",
+    "Initial and final checkpoints under a candidate execution contract; no new training or production promotion.",
+    "Local retention is not off-machine backup; external dependency/toolchain binaries excluded."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-learning-gain-v1-20261023",
+  "manifest_sha256": "ae2785224469df5f75d00bfe9771f204372bb4528ad9e5c9053913a2df83ac79",
+  "compact_results_sha256": "c51246515634f16faba372da4276e786fba914d3a706533c5dd02ee33cd64775",
+  "report_sha256": "c01e456cc5f64155ec863e130f0f1b764b63c3a9bf89479e151323cfa173a2d4"
+}

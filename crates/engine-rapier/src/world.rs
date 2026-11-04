@@ -35,6 +35,9 @@ pub use connectivity::{CapsuleConnectivity, ConnectivityGrid};
 mod forecast_body;
 pub mod loading;
 use loading::response::gravity::Invalidation as GravityInvalidation;
+mod point_projection;
+pub use point_projection::{PointProjectionHit, PointProjectionOptions};
+pub mod polar;
 mod quarter_turn;
 pub use quarter_turn::QuarterTurn;
 mod query_snapshot;
@@ -508,6 +511,10 @@ pub struct ContactEvent {
     pub impulse: Vec2,
     pub impulse_magnitude: f32,
     pub solver_contacts: usize,
+    /// Minimum signed solver separation across occurrences in this step.
+    /// Positive contacts are speculative; an applied impulse is still a
+    /// physical response even if the solver kept the surfaces separated.
+    pub minimum_separation: Option<f32>,
 }
 
 #[derive(Default)]
@@ -709,11 +716,49 @@ pub struct PhysicsWorld {
 
 impl Clone for PhysicsWorld {
     fn clone(&self) -> Self {
-        let snapshot = self
-            .snapshot_bytes()
-            .expect("an in-memory physics world must serialize");
-        let mut clone =
-            Self::from_snapshot_bytes(&snapshot).expect("a same-build physics snapshot must load");
+        // Copy simulation state directly. Rapier's shared shapes keep immutable
+        // terrain geometry cheap to copy; edits use copy-on-write. The pipeline
+        // and event collector are workspaces, not shared simulation state. A
+        // world with a loading capture goes through its snapshot instead: the
+        // capture's state is restored from the snapshot's tails and has no
+        // copy of its own.
+        let mut clone = if self.loading.is_some() {
+            let snapshot = self
+                .snapshot_bytes()
+                .expect("an in-memory physics world must serialize");
+            Self::from_snapshot_bytes(&snapshot).expect("a same-build physics snapshot must load")
+        } else {
+            Self {
+                raw: RapierWorld {
+                    gravity: self.raw.gravity,
+                    integration_parameters: self.raw.integration_parameters,
+                    physics_pipeline: PhysicsPipeline::new(),
+                    islands: self.raw.islands.clone(),
+                    broad_phase: self.raw.broad_phase.clone(),
+                    narrow_phase: self.raw.narrow_phase.clone(),
+                    bodies: self.raw.bodies.clone(),
+                    colliders: self.raw.colliders.clone(),
+                    impulse_joints: self.raw.impulse_joints.clone(),
+                    multibody_joints: self.raw.multibody_joints.clone(),
+                    ccd_solver: self.raw.ccd_solver.clone(),
+                },
+                bodies: self.bodies.clone(),
+                body_indices: self.body_indices.clone(),
+                colliders: self.colliders.clone(),
+                collider_indices: self.collider_indices.clone(),
+                joints: self.joints.clone(),
+                joint_indices: self.joint_indices.clone(),
+                entities: self.entities.clone(),
+                contact_events: Vec::new(),
+                contact_event_collector: ContactEventCollector::default(),
+                sensor_intersections: Vec::new(),
+                collect_events: self.collect_events,
+                loading: None,
+                carried_weights: self.carried_weights.clone(),
+            }
+        };
+        // Match snapshot restoration: report current contacts, without replaying
+        // transient force callbacks from the source world's previous step.
         if clone.collect_events {
             if self.loading.as_ref().is_some_and(|s| s.gravity.is_some()) {
                 // Gravity phases distinguish physical events from auxiliary
@@ -1305,6 +1350,31 @@ impl PhysicsWorld {
                     Vec2::new(max.x.max(next_max.x), max.y.max(next_max.y)),
                 )
             })
+    }
+
+    /// Conservative radius about the body's origin, from current enabled solid
+    /// shapes in body-local coordinates. Independent of the body's world angle.
+    /// None means missing body or no solid shapes; sensors do not enlarge it.
+    pub fn body_solid_radius(&self, id: BodyId) -> Option<f32> {
+        self.body_solid_radius_about(id, Vec2::ZERO)
+    }
+
+    /// Conservative current solid bound about an explicit body-local point.
+    pub fn body_solid_radius_about(&self, id: BodyId, local_center: Vec2) -> Option<f32> {
+        if !finite_vec2(local_center) {
+            return None;
+        }
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        body.colliders()
+            .iter()
+            .filter_map(|handle| self.raw.colliders.get(*handle))
+            .filter(|collider| collider.is_enabled() && !collider.is_sensor())
+            .map(|collider| {
+                let pose = collider.position_wrt_parent().copied().unwrap_or_default();
+                let sphere = collider.shape().compute_bounding_sphere(&pose);
+                (sphere.center - to_rapier(local_center)).length() + sphere.radius
+            })
+            .reduce(f32::max)
     }
 
     /// A point fixed to a body, where it is now, by the body's own pose and
@@ -3267,13 +3337,26 @@ impl PhysicsWorld {
                 ))
                 .then_with(|| right.impulse_magnitude.total_cmp(&left.impulse_magnitude))
         });
-        self.contact_events.dedup_by_key(|event| {
-            (
-                event.collider_a,
-                event.subshape_a,
-                event.collider_b,
-                event.subshape_b,
-            )
+        self.contact_events.dedup_by(|removed, retained| {
+            let same = (
+                removed.collider_a,
+                removed.subshape_a,
+                removed.collider_b,
+                removed.subshape_b,
+            ) == (
+                retained.collider_a,
+                retained.subshape_a,
+                retained.collider_b,
+                retained.subshape_b,
+            );
+            if same {
+                retained.minimum_separation = retained
+                    .minimum_separation
+                    .into_iter()
+                    .chain(removed.minimum_separation)
+                    .reduce(f32::min);
+            }
+            same
         });
 
         for (_, collider_a, _, collider_b, intersecting) in self.raw.intersection_pairs() {
@@ -3510,6 +3593,10 @@ fn contact_event_from_manifolds<'a>(
         .clone()
         .map(|manifold| manifold.data.solver_contacts.len())
         .sum();
+    let minimum_separation = manifolds
+        .flat_map(|manifold| &manifold.data.solver_contacts)
+        .map(|contact| contact.dist)
+        .reduce(f32::min);
     Some(ContactEvent {
         collider_a: id_a,
         collider_b: id_b,
@@ -3522,6 +3609,7 @@ fn contact_event_from_manifolds<'a>(
         impulse,
         impulse_magnitude: magnitude,
         solver_contacts,
+        minimum_separation,
     })
 }
 
@@ -3665,6 +3753,7 @@ pub(crate) fn from_rapier(value: Vector) -> Vec2 {
 mod tests {
     use super::*;
     mod carry;
+    mod cloning;
     mod compound;
     mod contact_impulses;
     mod proximity;
@@ -4077,6 +4166,11 @@ mod tests {
         assert!(event.collider_a < event.collider_b);
         assert_eq!(event.collider_a.entity, PhysicsId::new(2));
         assert_eq!(event.collider_b.entity, PhysicsId::new(9));
+        assert!(
+            event
+                .minimum_separation
+                .is_some_and(|distance| distance <= 0.0)
+        );
     }
 
     #[test]
@@ -4131,7 +4225,13 @@ mod tests {
         assert_eq!(event.collider_a, moving_collider_id);
         assert_eq!(event.collider_b, fixed_collider_id);
         assert!(event.impulse_magnitude > 0.0);
+        assert!(event.minimum_separation.is_some_and(f32::is_finite));
         assert!(world.motion(moving_body).unwrap().linear_velocity.x < 0.0);
+
+        let cloned = world.clone();
+        cloning::assert_same(&cloned, &cloning::snapshot_clone(&world));
+        assert!(cloned.contact_events().is_empty());
+        assert_eq!(world.contact_events(), &[event]);
     }
 
     #[test]

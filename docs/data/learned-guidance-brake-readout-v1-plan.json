@@ -1,0 +1,777 @@
+{
+  "evolution": {
+    "seed": 1,
+    "population": 16,
+    "generations": 24,
+    "elites": 2,
+    "tournament_size": 3,
+    "mutation_probability": 0.05,
+    "mutation_scale": 0.15,
+    "initial_scale": 0.5,
+    "parameter_limit": 8.0
+  },
+  "fitness_order": [
+    "retained_completed",
+    "approach_completed",
+    "approach_speed_points",
+    "approach_position_points",
+    "retained_position_points",
+    "retained_velocity_points",
+    "spare_ticks"
+  ],
+  "quality": "final speed and frozen-marker distance: floor(1000 * clamp(1 - value/scale, 0, 1)), scales 70 and 100; only arrived, timeout or host_preempted approaches earn progress; completed handoffs dominate progress, old training arrivals dominate all approach terms",
+  "training_cases": [
+    {
+      "name": "train-42-p1-d65",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 883,
+      "planet": 1,
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711
+    },
+    {
+      "name": "train-42-p2-d65",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 784,
+      "planet": 1,
+      "source_entry_distance": 55.553462982177734,
+      "source_relative_speed": 44.16749572753906
+    },
+    {
+      "name": "train-42-p2-d35",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 821,
+      "planet": 1,
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273
+    },
+    {
+      "name": "train-10101-p1-d65",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 1008,
+      "planet": 1,
+      "source_entry_distance": 53.1820182800293,
+      "source_relative_speed": 41.5108642578125
+    },
+    {
+      "name": "train-10101-p1-d35",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 1040,
+      "planet": 1,
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961
+    },
+    {
+      "name": "train-10101-p2-d65",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 1242,
+      "planet": 1,
+      "source_entry_distance": 64.95734405517578,
+      "source_relative_speed": 50.2044792175293
+    },
+    {
+      "name": "train-10101-p2-d35",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 1290,
+      "planet": 1,
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367
+    },
+    {
+      "name": "train-inspected-17-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 17,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.8948860168457,
+      "source_relative_speed": 37.15235900878906,
+      "source_tick": 455
+    },
+    {
+      "name": "train-inspected-17-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 17,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.760799407958984,
+      "source_relative_speed": 29.299516677856445,
+      "source_tick": 1126
+    },
+    {
+      "name": "train-inspected-113-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 113,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.88804626464844,
+      "source_relative_speed": 30.90194320678711,
+      "source_tick": 605
+    },
+    {
+      "name": "train-inspected-113-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 113,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.57772445678711,
+      "source_relative_speed": 28.19192123413086,
+      "source_tick": 1102
+    },
+    {
+      "name": "train-inspected-2027-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2027,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.63172912597656,
+      "source_relative_speed": 27.205408096313477,
+      "source_tick": 599
+    },
+    {
+      "name": "train-inspected-2027-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 2027,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.72901916503906,
+      "source_relative_speed": 28.07271957397461,
+      "source_tick": 1419
+    },
+    {
+      "name": "train-inspected-9001-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 9001,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.85470199584961,
+      "source_relative_speed": 26.82145881652832,
+      "source_tick": 1554
+    },
+    {
+      "name": "train-inspected-9001-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 9001,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.912410736083984,
+      "source_relative_speed": 22.630029678344727,
+      "source_tick": 1603
+    }
+  ],
+  "retention_partitions": [
+    "training",
+    "original",
+    "development",
+    "fresh_stationary",
+    "fresh_moving",
+    "fresh_inward"
+  ],
+  "retention_deduplicate": true,
+  "validation_shapes": [
+    "weak-angular",
+    "weak-round"
+  ],
+  "validation_seats": [
+    0,
+    1
+  ],
+  "validation_entry_distance": 35.0,
+  "validation_prefix_ticks": 10800,
+  "validation_selection": "first source per seed/shape/seat with free direct transfer, entry distance <=35, finite unsaturated features, and the common neutral handoff retaining these conditions; discover initial states only before training; no candidate/reference continuation consulted",
+  "precision_traces": [
+    "qualification_target_motion_b0_p0",
+    "qualification_target_motion_b1_p0",
+    "qualification_target_motion_b2_p0",
+    "qualification_target_motion_b3_p0",
+    "qualification_combined_a0_b0_p0",
+    "qualification_combined_a0_b1_p0",
+    "qualification_combined_a1_b0_p0",
+    "qualification_combined_a1_b1_p0"
+  ],
+  "version": 1,
+  "experiment": "recovery_guidance_brake_readout_v1",
+  "baseline_genome": "1cea67c1a3a7ef8f45b8358821115624217c135b1440194ecbc459aa36df28f7",
+  "baseline_file_sha256": "45790a33d6ebfcea1620b74e32c00d29ae27439f38c2c9b54ab5416256f7d04f",
+  "prior_plan_sha256": "3476822c8624a0f9425720c2a3950a87acc0800bd8d2b7f441730b032f9e13ad",
+  "arms": [
+    "all",
+    "brake"
+  ],
+  "treatment": "all evolves 107 parameters; brake evolves only the eight final-layer brake weights and its bias, grafted onto the unchanged baseline network",
+  "initialization": "one baseline seed per arm plus 15 random genomes in that arm parameter space; per-parameter mutation settings identical, expected number of changed parameters differs",
+  "finalist": "last-generation training winner in each arm; export and freeze both full genomes before reserved evaluation; no selection between arms based on reserved results",
+  "training_selection": "same 157 unique precision starts and 15 match starts as v3; no development or new-validation continuation enters fitness",
+  "development_cases": [
+    {
+      "name": "seed-42-weak-angular-p1",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 883,
+      "planet": 1,
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711
+    },
+    {
+      "name": "seed-42-weak-angular-p2",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 821,
+      "planet": 1,
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273
+    },
+    {
+      "name": "seed-42-weak-round-p1",
+      "seed": 42,
+      "shape": "weak-round",
+      "seat": 0,
+      "source_tick": 883,
+      "planet": 1,
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711
+    },
+    {
+      "name": "seed-42-weak-round-p2",
+      "seed": 42,
+      "shape": "weak-round",
+      "seat": 1,
+      "source_tick": 821,
+      "planet": 1,
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273
+    },
+    {
+      "name": "seed-10101-weak-angular-p1",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 1040,
+      "planet": 1,
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961
+    },
+    {
+      "name": "seed-10101-weak-angular-p2",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 1290,
+      "planet": 1,
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367
+    },
+    {
+      "name": "seed-10101-weak-round-p1",
+      "seed": 10101,
+      "shape": "weak-round",
+      "seat": 0,
+      "source_tick": 1040,
+      "planet": 1,
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961
+    },
+    {
+      "name": "seed-10101-weak-round-p2",
+      "seed": 10101,
+      "shape": "weak-round",
+      "seat": 1,
+      "source_tick": 1290,
+      "planet": 1,
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367
+    },
+    {
+      "name": "development-inspected-17-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 17,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.8948860168457,
+      "source_relative_speed": 37.15235900878906,
+      "source_tick": 455
+    },
+    {
+      "name": "development-inspected-17-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 17,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.760799407958984,
+      "source_relative_speed": 29.299516677856445,
+      "source_tick": 1126
+    },
+    {
+      "name": "development-inspected-17-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 17,
+      "shape": "weak-round",
+      "source_entry_distance": 34.8948860168457,
+      "source_relative_speed": 37.15235900878906,
+      "source_tick": 455
+    },
+    {
+      "name": "development-inspected-17-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 17,
+      "shape": "weak-round",
+      "source_entry_distance": 34.760799407958984,
+      "source_relative_speed": 29.299516677856445,
+      "source_tick": 1126
+    },
+    {
+      "name": "development-inspected-113-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 113,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.88804626464844,
+      "source_relative_speed": 30.90194320678711,
+      "source_tick": 605
+    },
+    {
+      "name": "development-inspected-113-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 113,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.57772445678711,
+      "source_relative_speed": 28.19192123413086,
+      "source_tick": 1102
+    },
+    {
+      "name": "development-inspected-113-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 113,
+      "shape": "weak-round",
+      "source_entry_distance": 34.88804626464844,
+      "source_relative_speed": 30.90194320678711,
+      "source_tick": 605
+    },
+    {
+      "name": "development-inspected-113-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 113,
+      "shape": "weak-round",
+      "source_entry_distance": 34.57772445678711,
+      "source_relative_speed": 28.19192123413086,
+      "source_tick": 1102
+    },
+    {
+      "name": "development-inspected-2027-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2027,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.63172912597656,
+      "source_relative_speed": 27.205408096313477,
+      "source_tick": 599
+    },
+    {
+      "name": "development-inspected-2027-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 2027,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.72901916503906,
+      "source_relative_speed": 28.07271957397461,
+      "source_tick": 1419
+    },
+    {
+      "name": "development-inspected-2027-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 2027,
+      "shape": "weak-round",
+      "source_entry_distance": 34.63172912597656,
+      "source_relative_speed": 27.205408096313477,
+      "source_tick": 599
+    },
+    {
+      "name": "development-inspected-2027-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 2027,
+      "shape": "weak-round",
+      "source_entry_distance": 34.72901916503906,
+      "source_relative_speed": 28.07271957397461,
+      "source_tick": 1419
+    },
+    {
+      "name": "development-inspected-9001-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 9001,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.85470199584961,
+      "source_relative_speed": 26.82145881652832,
+      "source_tick": 1554
+    },
+    {
+      "name": "development-inspected-9001-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 9001,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.912410736083984,
+      "source_relative_speed": 22.630029678344727,
+      "source_tick": 1603
+    },
+    {
+      "name": "development-inspected-9001-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 9001,
+      "shape": "weak-round",
+      "source_entry_distance": 34.85470199584961,
+      "source_relative_speed": 26.82145881652832,
+      "source_tick": 1554
+    },
+    {
+      "name": "development-inspected-9001-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 9001,
+      "shape": "weak-round",
+      "source_entry_distance": 34.912410736083984,
+      "source_relative_speed": 22.630029678344727,
+      "source_tick": 1603
+    },
+    {
+      "name": "validation-73-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 73,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.70812225341797,
+      "source_relative_speed": 29.259910583496094,
+      "source_tick": 780
+    },
+    {
+      "name": "validation-73-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 73,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.65625762939453,
+      "source_relative_speed": 28.35440444946289,
+      "source_tick": 889
+    },
+    {
+      "name": "validation-73-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 73,
+      "shape": "weak-round",
+      "source_entry_distance": 34.70812225341797,
+      "source_relative_speed": 29.259910583496094,
+      "source_tick": 780
+    },
+    {
+      "name": "validation-73-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 73,
+      "shape": "weak-round",
+      "source_entry_distance": 34.65625762939453,
+      "source_relative_speed": 28.35440444946289,
+      "source_tick": 889
+    },
+    {
+      "name": "validation-509-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 509,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.76520919799805,
+      "source_relative_speed": 35.475364685058594,
+      "source_tick": 431
+    },
+    {
+      "name": "validation-509-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 509,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.755958557128906,
+      "source_relative_speed": 28.789894104003906,
+      "source_tick": 953
+    },
+    {
+      "name": "validation-509-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 509,
+      "shape": "weak-round",
+      "source_entry_distance": 34.76520919799805,
+      "source_relative_speed": 35.475364685058594,
+      "source_tick": 431
+    },
+    {
+      "name": "validation-509-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 509,
+      "shape": "weak-round",
+      "source_entry_distance": 34.755958557128906,
+      "source_relative_speed": 28.789894104003906,
+      "source_tick": 953
+    },
+    {
+      "name": "validation-4093-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 4093,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.98323059082031,
+      "source_relative_speed": 28.6729736328125,
+      "source_tick": 981
+    },
+    {
+      "name": "validation-4093-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 4093,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.76390838623047,
+      "source_relative_speed": 26.471450805664062,
+      "source_tick": 1197
+    },
+    {
+      "name": "validation-4093-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 4093,
+      "shape": "weak-round",
+      "source_entry_distance": 34.98323059082031,
+      "source_relative_speed": 28.6729736328125,
+      "source_tick": 981
+    },
+    {
+      "name": "validation-4093-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 4093,
+      "shape": "weak-round",
+      "source_entry_distance": 34.76390838623047,
+      "source_relative_speed": 26.471450805664062,
+      "source_tick": 1197
+    },
+    {
+      "name": "validation-65537-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 65537,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.71917724609375,
+      "source_relative_speed": 29.432384490966797,
+      "source_tick": 1387
+    },
+    {
+      "name": "validation-65537-WeakAngular-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 65537,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.623558044433594,
+      "source_relative_speed": 29.772905349731445,
+      "source_tick": 1571
+    },
+    {
+      "name": "validation-65537-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 65537,
+      "shape": "weak-round",
+      "source_entry_distance": 34.71917724609375,
+      "source_relative_speed": 29.432384490966797,
+      "source_tick": 1387
+    },
+    {
+      "name": "validation-65537-WeakRound-p1",
+      "planet": 1,
+      "seat": 0,
+      "seed": 65537,
+      "shape": "weak-round",
+      "source_entry_distance": 34.623558044433594,
+      "source_relative_speed": 29.772905349731445,
+      "source_tick": 1571
+    },
+    {
+      "name": "validation-211-WeakAngular-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 211,
+      "shape": "weak-angular",
+      "source_entry_distance": 22.559139251708984,
+      "source_relative_speed": 20.037641525268555,
+      "source_tick": 705
+    },
+    {
+      "name": "validation-211-WeakAngular-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 211,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.59903335571289,
+      "source_relative_speed": 28.94040298461914,
+      "source_tick": 4641
+    },
+    {
+      "name": "validation-211-WeakRound-p2",
+      "planet": 1,
+      "seat": 1,
+      "seed": 211,
+      "shape": "weak-round",
+      "source_entry_distance": 22.559139251708984,
+      "source_relative_speed": 20.037641525268555,
+      "source_tick": 705
+    },
+    {
+      "name": "validation-211-WeakRound-p1",
+      "planet": 0,
+      "seat": 0,
+      "seed": 211,
+      "shape": "weak-round",
+      "source_entry_distance": 34.59903335571289,
+      "source_relative_speed": 28.94040298461914,
+      "source_tick": 4641
+    },
+    {
+      "name": "validation-1021-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1021,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.74074172973633,
+      "source_relative_speed": 34.62619400024414,
+      "source_tick": 775
+    },
+    {
+      "name": "validation-1021-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1021,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.87705993652344,
+      "source_relative_speed": 31.925981521606445,
+      "source_tick": 1042
+    },
+    {
+      "name": "validation-1021-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 1021,
+      "shape": "weak-round",
+      "source_entry_distance": 34.74074172973633,
+      "source_relative_speed": 34.62619400024414,
+      "source_tick": 775
+    },
+    {
+      "name": "validation-1021-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 1021,
+      "shape": "weak-round",
+      "source_entry_distance": 34.87705993652344,
+      "source_relative_speed": 31.925981521606445,
+      "source_tick": 1042
+    },
+    {
+      "name": "validation-8191-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 8191,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.698265075683594,
+      "source_relative_speed": 33.15288162231445,
+      "source_tick": 1894
+    },
+    {
+      "name": "validation-8191-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 8191,
+      "shape": "weak-round",
+      "source_entry_distance": 34.698265075683594,
+      "source_relative_speed": 33.15288162231445,
+      "source_tick": 1894
+    },
+    {
+      "name": "validation-131071-WeakAngular-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 131071,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.8666877746582,
+      "source_relative_speed": 28.943628311157227,
+      "source_tick": 788
+    },
+    {
+      "name": "validation-131071-WeakAngular-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 131071,
+      "shape": "weak-angular",
+      "source_entry_distance": 34.780574798583984,
+      "source_relative_speed": 25.917301177978516,
+      "source_tick": 995
+    },
+    {
+      "name": "validation-131071-WeakRound-p1",
+      "planet": 2,
+      "seat": 0,
+      "seed": 131071,
+      "shape": "weak-round",
+      "source_entry_distance": 34.8666877746582,
+      "source_relative_speed": 28.943628311157227,
+      "source_tick": 788
+    },
+    {
+      "name": "validation-131071-WeakRound-p2",
+      "planet": 0,
+      "seat": 1,
+      "seed": 131071,
+      "shape": "weak-round",
+      "source_entry_distance": 34.780574798583984,
+      "source_relative_speed": 25.917301177978516,
+      "source_tick": 995
+    }
+  ],
+  "validation_seeds": [
+    307,
+    1543,
+    12289,
+    262147
+  ],
+  "budget": {
+    "generations_per_arm": 24,
+    "population": 16,
+    "candidate_evaluations_per_arm": 384,
+    "episodes_per_candidate": 172,
+    "training_episodes_per_arm": 66048,
+    "total_training_episodes": 132096
+  },
+  "acceptance": "all 157 precision starts, all 15 training approaches, all 54 development approaches, all 16 requested reserved approaches, no damage; missing starts remain missing",
+  "comparison": "same starting full genome, physical cases, fitness order, worker policy, evolution operators and per-parameter mutation settings; search dimension and resulting initial/random/mutation distributions differ",
+  "scope": "test-only component learning experiment; no match selector, fallback policy or bot default changes"
+}

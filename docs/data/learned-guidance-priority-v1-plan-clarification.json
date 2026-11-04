@@ -1,0 +1,13 @@
+{
+  "recorded_utc": "2026-10-18T02:16:35.925095+00:00",
+  "field": "brake_progress.formula",
+  "inherited_sentence": "Control uses zero.",
+  "clarification": "That sentence describes an older unshaped control and does not apply to either arm here. Both arms use the same graded brake reward on the same eight retained probes. These eight were additional cases in the original graded recipe and are now protected known cases; they are not the 32 expansion cases. Only the priority of the brake term relative to physical speed and position changes.",
+  "evidence": [
+    "The frozen comparison and arms fields declare a reward-order comparison.",
+    "The frozen OrderedTask wrappers both contain Guided with Arm::Graded.",
+    "All 16 initial raw fitness vectors match; the parent brake term is 6733 in both arms."
+  ],
+  "original_plan_preserved": true,
+  "training_or_selection_changes": false
+}

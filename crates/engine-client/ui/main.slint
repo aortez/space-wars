@@ -518,6 +518,8 @@ export component MainWindow inherits Window {
     in property <string> training-status;
     in property <string> training-status-code;
     in property <string> training-snapshot;
+    in property <string> training-worker-label: "Auto 75%";
+    in property <string> training-worker-status;
     in property <string> training-error;
     in property <string> training-launcher-label: "Training";
     in property <bool> training-has-job: false;
@@ -2886,10 +2888,16 @@ export component MainWindow inherits Window {
         x: 0px; y: 0px; width: parent.width; height: parent.height; background: #050514;
         MenuPage {
             available-width: parent.width; available-height: parent.height;
-            heading: root.training-setup ? "Training · New run" : "Training";
+            heading: root.training-setup && parent.width >= 600px ? "Training · New run" : "Training";
             subtitle: root.training-setup ? root.training-budget : root.training-run-label;
             hint: root.training-setup ? "D-pad selects · Left / Right adjusts · A confirms" : "Back leaves this view · Job controls change the run";
 
+            MenuButton {
+                x: parent.width - 238px; y: 16px; width: 108px; height: 32px;
+                text: root.training-worker-label; text-size: 14px;
+                selected: root.training-focus == (root.training-setup ? 9 : 10);
+                activated => { root.training-command("training.workers.next"); }
+            }
             MenuButton {
                 x: parent.width - 124px; y: 16px; width: 100px; height: 32px;
                 text: "History"; text-size: 14px;
@@ -2959,12 +2967,12 @@ export component MainWindow inherits Window {
                     }
                 }
                 if root.training-error != "": Text {
-                    x: 0px; y: 106px; width: parent.width; height: parent.height - 132px;
+                    x: 0px; y: 106px; width: parent.width; height: parent.height - 150px;
                     text: root.training-error; color: #ffb0a0;
                     font-size: 15px; wrap: word-wrap; overflow: elide;
                 }
                 if root.training-error == "" && root.training-preview-mode == 0: Rectangle {
-                    x: 0px; y: 106px; width: parent.width; height: parent.height - 132px;
+                    x: 0px; y: 106px; width: parent.width; height: parent.height - 150px;
                     Text {
                         x: 0px; y: 0px; width: parent.width; height: 20px;
                         text: root.training-best; color: #ffffff; font-size: 14px; overflow: elide;
@@ -2996,7 +3004,7 @@ export component MainWindow inherits Window {
                     }
                 }
                 if root.training-error == "" && root.training-preview-mode != 0: Rectangle {
-                    x: 0px; y: 106px; width: parent.width; height: parent.height - 132px;
+                    x: 0px; y: 106px; width: parent.width; height: parent.height - 150px;
                     Text {
                         x: 0px; y: 0px; width: parent.width; height: 32px;
                         text: root.training-preview-label; color: #c7d0dc; font-size: 12px; wrap: word-wrap; overflow: elide;
@@ -3009,6 +3017,10 @@ export component MainWindow inherits Window {
                         x: 0px; y: parent.height - 34px; width: parent.width; height: 32px;
                         text: root.training-preview-detail; color: #c7d0dc; font-size: 12px; wrap: word-wrap; overflow: elide;
                     }
+                }
+                Text {
+                    x: 0px; y: parent.height - 38px; width: parent.width; height: 18px;
+                    text: root.training-worker-status; color: #80d8ff; font-size: 11px; overflow: elide;
                 }
                 Text {
                     x: 0px; y: parent.height - 20px; width: parent.width; height: 18px;

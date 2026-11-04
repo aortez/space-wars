@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-rate-training-v1-20261024",
+  "completed_at_utc": "2026-10-25T00:09:25.652448+00:00",
+  "kind": "paired quarter-noise learning-rate pilot",
+  "source_file_count": 1562,
+  "source_archive_sha256": "4dc34ea55a63fc7de5defde5b9fca69547a2f159199a1b621dc51e0f07865531",
+  "runtime_sha256": "73b06a97af78b64ff3b93dda0df79f703bbbf61bc26360236a2029f284648374",
+  "checkpoint_count": 108,
+  "policy_export_count": 24,
+  "pilot_gates": {
+    "control": {
+      "checks": {
+        "signed_exposure": true,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": false
+      },
+      "passed": false
+    },
+    "smaller": {
+      "checks": {
+        "signed_exposure": true,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": true
+      },
+      "passed": true
+    }
+  },
+  "legacy_pilot_gates": {
+    "control": {
+      "checks": {
+        "signed_exposure": false,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": false
+      },
+      "passed": false
+    },
+    "smaller": {
+      "checks": {
+        "signed_exposure": false,
+        "sampled_success_each_seed": true,
+        "position_eligible_30_rows_two_seeds": true,
+        "short_hold_retention_two_seeds": true
+      },
+      "passed": false
+    }
+  },
+  "main_executed": false,
+  "training_ticks": 104448,
+  "resume_restore_ticks": 7416,
+  "optimizer_steps": 1021,
+  "evaluation_ticks": 137122,
+  "evaluation_episodes": 384,
+  "parity_comparisons": 192,
+  "progression_qualified": false,
+  "smaller_rate_learning_benefit": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "validation": {
+    "sources_and_archive_verified": 1562,
+    "previous_manifests_unchanged": 35,
+    "copied_inputs_unchanged": 128,
+    "production_sources_unchanged": true,
+    "native_runtime_unchanged": true,
+    "native_baseline_passed": 421,
+    "native_baseline_ignored": 2,
+    "python_tests": 10,
+    "control_states_0_1_16_exact": true,
+    "all_six_exact_resumes": true,
+    "matched_initial_tensors_rng_collector_optimizer_except_rate": true,
+    "initial_parent_traces_exact": true,
+    "control_parent_final_score_records_exact": true,
+    "same_first_rollout_successor_collectors": true,
+    "native_python_parity_comparisons": 192,
+    "physical_dwell_reward_reconstructed": true,
+    "all_process_exits_zero": true,
+    "budgets_passed": true,
+    "no_longer_run": true,
+    "new_checkpoint_count": 108,
+    "new_export_count": 24
+  },
+  "retained_file_count": 1105,
+  "retained_bytes_excluding_manifest": 658572416,
+  "archive_path": "data/training-experiments/learned-flight-rate-training-v1-20261024",
+  "manifest_sha256": "bb1930a987e8f38dbe0e825200162a2cde1db092d6514957ed22c8a37db8c817",
+  "report_sha256": "c563b327efc6a45393a48372d8234aed709a56137e349201967d5cf4baf59fb8",
+  "results_sha256": "29b48fdfde6616b87ffefb4b2694dfd7130ca430bf5d99deaee021a25104af04"
+}

@@ -61,6 +61,11 @@ pub(super) struct Profile {
     samples: VecDeque<Sample>,
 }
 impl Profile {
+    #[cfg(test)]
+    pub(super) fn latest_sample(&self) -> Option<Sample> {
+        self.samples.back().copied()
+    }
+
     pub fn record(&mut self, sample: Sample) {
         if self.samples.back().is_some_and(|s| s.tick >= sample.tick) {
             self.samples.clear();

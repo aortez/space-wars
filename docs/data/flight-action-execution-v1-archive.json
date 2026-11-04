@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-action-execution-v1-20261023",
+  "kind": "frozen sampled versus deterministic joint action execution",
+  "completed_at_utc": "2026-10-24T03:37:07.993930+00:00",
+  "source_file_count": 1515,
+  "source_archive_sha256": "272ab716a3f096312d30a438d969f7b07c04b4402fa50f689946d33830827fbf",
+  "runtime_sha256": "e39a1c0b7e06c044ba764729e890f871872b70d248a07eae5fe025e80b724e2a",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "sampled_repeats": 4,
+  "episodes": 240,
+  "physics_ticks": 410538,
+  "preflight_physics_ticks": 128,
+  "optimizer_steps": 0,
+  "model_weights_unchanged": true,
+  "outcomes": {
+    "deterministic": {
+      "deadline": 48
+    },
+    "sampled": {
+      "success": 20,
+      "deadline": 172
+    }
+  },
+  "material_arrival_improvement": false,
+  "qualification_gate_changed": false,
+  "confirmation_used": false,
+  "general_flight_claim": false,
+  "validation": {
+    "diagnostic_tests": 4,
+    "exact_deterministic_replays": 48,
+    "production_source_runtime_contract": "unchanged",
+    "referenced_parent_inputs": 60,
+    "prior_manifests_unchanged": 14,
+    "compile_whitespace": "passed"
+  },
+  "retained_file_count": 571,
+  "retained_bytes_excluding_manifest": 216438269,
+  "limitations": [
+    "Same 16 development tasks per model, with repeated trials, not additional independent trained models.",
+    "Joint sampling changes steering and both buttons; it does not isolate thrust thresholding.",
+    "Frozen final models only; no inference about alternative checkpoints or training objectives.",
+    "Local retention is not off-machine backup; external dependency/toolchain binaries excluded."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-action-execution-v1-20261023",
+  "manifest_sha256": "e0a44d2381696ab2f9e108b83aded588e838ca96dd815017bd14b6d4a096a81d",
+  "compact_results_sha256": "584cffa3445cc37fdda780140724ffb2f32b9d241f93bcc8a1595a60dbce28c0",
+  "report_sha256": "0453e95c0e79782201afaca78aac37507e53ab352df2729389edfc7e296a2283"
+}

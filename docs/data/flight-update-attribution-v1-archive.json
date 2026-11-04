@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-update-attribution-v1-20261024",
+  "kind": "retrospective exact PPO-update replay and coefficient probes",
+  "completed_at_utc": "2026-10-24T17:40:13.310722+00:00",
+  "source_file_count": 1532,
+  "source_archive_sha256": "ac36ae1a7073583e63812ce7d3f52b13b2f8d4937796fce4687a3c1b6457061b",
+  "runtime_sha256": "e39a1c0b7e06c044ba764729e890f871872b70d248a07eae5fe025e80b724e2a",
+  "learner_seed": 43,
+  "checkpoint_range": [
+    128,
+    256
+  ],
+  "selected_updates": [
+    197,
+    199,
+    256
+  ],
+  "replay_physics_ticks": 11579,
+  "diagnostic_optimizer_steps": 192,
+  "preflight_physics_ticks": 3708,
+  "preflight_optimizer_steps": 64,
+  "exact_archive_replay": true,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "general_flight_claim": false,
+  "validation": {
+    "preflight_tests": 4,
+    "copied_parent_inputs_unchanged": 132,
+    "prior_manifests_unchanged": 20,
+    "compile_whitespace": "passed"
+  },
+  "retained_file_count": 204,
+  "retained_bytes_excluding_manifest": 563567763,
+  "limitations": [
+    "One retrospectively selected model and three diagnostic updates, not independent confirmation.",
+    "Branches inherit Adam history and original critic-derived advantages; effects are nonlinear and immediate.",
+    "No extended training, flight qualification or native gameplay change.",
+    "Local retention is not off-machine backup; external dependency/toolchain binaries excluded."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-update-attribution-v1-20261024",
+  "manifest_sha256": "78a304b556d37d58a8b9e639750748c0071016f115a3243f4490dc08a55338c3",
+  "compact_results_sha256": "3ff35167f87093100f558c71ed7bcd291795245df651ba2df29f68beb2c3a502",
+  "report_sha256": "b9d71dcb873d272d1f367629006ef91e63b84a94f592db01d71b31cdde65cef3"
+}

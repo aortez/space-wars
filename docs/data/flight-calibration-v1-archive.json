@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-calibration-v1-20261022",
+  "kind": "exploratory-mechanics-calibration",
+  "checkpoint": "C1-partial",
+  "completed_at_utc": "2026-10-23T01:41:44.867808+00:00",
+  "source_capture": "before final build/run; enumerated workspace files including uncommitted and untracked source",
+  "source_file_count": 1462,
+  "runtime_sha256": "531dbde37156cc62a8f4595154586e08166ca1d8de374e298369d0abbfd05146",
+  "validation": {
+    "flight_tests": {
+      "command": "cargo test -p scenario-spacewars --profile ci --lib flight --locked --offline",
+      "passed": 21,
+      "failed": 0
+    },
+    "probe": {
+      "independently_replayed_cases": 59,
+      "total_maneuver_ticks_including_replay": 32040,
+      "valid_free_flight_cases": 59,
+      "static_gap_configurations": 20
+    },
+    "browser": {
+      "interactions": [
+        "case selection",
+        "scrub",
+        "playback",
+        "range overlay",
+        "table navigation"
+      ],
+      "desktop_width": 1440,
+      "mobile_width": 430,
+      "mobile_content_width": 415,
+      "javascript_errors": 0
+    },
+    "format_and_whitespace": "passed",
+    "clippy": "completed; existing unrelated warnings; none in new files",
+    "source_archive_and_current_source_hashes": "passed",
+    "embedded_source_runtime_and_snapshot_hashes": "passed"
+  },
+  "limitations": [
+    "Controlled practice fixture only; not a generated-world gravity survey or policy evaluation.",
+    "No network inputs, arrival tolerances or task envelope were frozen.",
+    "External dependencies and libraries not bundled. Local archive is not an off-machine backup."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-calibration-v1-20261022",
+  "viewer_path": "data/training-experiments/learned-flight-calibration-v1-20261022/run/index.html",
+  "manifest_sha256": "2e77d127dcf39a6a38f105bcba3e21ed130169df375fce6f8fdbc41dd1dbb221",
+  "source_archive_sha256": "6394b306f21696ebc07aa863ccc85cb5b8424742787aa986f9edffa73aca6e33",
+  "report_sha256": "594eee6e00b215bc67ba33dcfa59bab4246c47db4763c55523e15f7ef5ee206a"
+}

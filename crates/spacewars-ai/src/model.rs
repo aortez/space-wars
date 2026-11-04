@@ -1,11 +1,14 @@
 //! Versioned, bounded dense models, independent of any particular organism.
 //!
 //! V1 stores row-major weights followed by per-output biases in each layer.
+//! V2, in `shared`, puts shared set encoders in front of such layers.
 //! Inference is feed-forward; episode state and fitness do not belong here.
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
+
+pub mod shared;
 
 pub const MODEL_VERSION: u32 = 1;
 pub const MAX_MODEL_BYTES: usize = 2 * 1024 * 1024;
@@ -179,16 +182,7 @@ fn validate(genome: &DenseGenome) -> Result<(), ModelError> {
     if genome.version != MODEL_VERSION {
         return Err(ModelError("unsupported model version".into()));
     }
-    for name in [&c.organism, &c.role, &c.observation, &c.action] {
-        if name.is_empty()
-            || name.len() > 128
-            || !name
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"_.-/".contains(&b))
-        {
-            return Err(ModelError("invalid contract identifier".into()));
-        }
-    }
+    validate_identifiers(c)?;
     if !(1..=MAX_WIDTH).contains(&c.inputs)
         || !(1..=MAX_WIDTH).contains(&c.outputs)
         || c.cadence_ticks == 0
@@ -217,6 +211,20 @@ fn validate(genome: &DenseGenome) -> Result<(), ModelError> {
         return Err(ModelError(
             "invalid output dimension or non-finite parameter".into(),
         ));
+    }
+    Ok(())
+}
+
+fn validate_identifiers(c: &ModelContract) -> Result<(), ModelError> {
+    for name in [&c.organism, &c.role, &c.observation, &c.action] {
+        if name.is_empty()
+            || name.len() > 128
+            || !name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"_.-/".contains(&b))
+        {
+            return Err(ModelError("invalid contract identifier".into()));
+        }
     }
     Ok(())
 }

@@ -1989,6 +1989,8 @@ pub enum SpacewarsController {
     DestinationBot,
     ValueBot,
     RecoveryBot,
+    /// The recovery bot with its transfer legs flown by the learned flight stack.
+    LearnedFlightBot,
 }
 impl SpacewarsController {
     /// Automatic matches fill human seats but retain an explicitly chosen bot.
