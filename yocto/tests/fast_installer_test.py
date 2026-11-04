@@ -43,9 +43,10 @@ class FastInstallerTest(unittest.TestCase):
             (self.root / name).mkdir()
         self.stage = self.root / "tmp" / Path(STAGE).name
         self.stage.mkdir()
+        self.stage.chmod(0o700)
         self.bin = self.root / "bin"
         self.control = self.root / "control"
-        for name in ("bash", "cat", "chmod", "cp", "flock", "id", "install", "mktemp", "od", "rm", "rmdir", "sha256sum", "tr"):
+        for name in ("bash", "cat", "chmod", "cp", "env", "flock", "id", "install", "mktemp", "od", "rm", "rmdir", "sha256sum", "stat", "timeout", "tr"):
             (self.bin / name).symlink_to(f"/host/usr/bin/{name}")
         (self.root / "share/fast-update-compat").write_text(COMPAT + "\n")
         self.hashes = []
@@ -55,12 +56,15 @@ class FastInstallerTest(unittest.TestCase):
             binary[18:20] = bytes.fromhex("b700")
             self.hashes.append(hashlib.sha256(binary).hexdigest())
             (self.stage / name).write_bytes(binary)
+            (self.stage / name).chmod(0o644)
             (self.bin / name).write_bytes(b"old-" + name.encode())
             (self.bin / name).chmod(0o755)
         self.command("uname", "echo aarch64")
         self.command("sync", ":")
         self.command("sleep", ":")
         self.command("systemctl", '''
+[[ $1 == --no-pager ]] || exit 93
+shift
 echo "$1" >> /test/calls
 case "$1" in
     is-active) [[ $(< /test/state) == active ]] ;;
@@ -129,7 +133,7 @@ exec /host/usr/bin/mv "$@"
     def test_probe_is_read_only(self):
         result = self.run_helper("--check")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), f"spacewars-fast-update-v1 {COMPAT}")
+        self.assertEqual(result.stdout.strip(), f"spacewars-fast-update-v2 {COMPAT}")
         self.assertFalse((self.control / "calls").exists())
         self.assert_old_pair()
 
@@ -150,6 +154,21 @@ exec /host/usr/bin/mv "$@"
         result = self.install()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("checksum mismatch", result.stderr)
+        self.assertNotIn("stop", (self.control / "calls").read_text())
+        self.assert_old_pair()
+
+    def test_public_or_linked_operator_stage_is_rejected_before_stopping(self):
+        self.stage.chmod(0o755)
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private root-owned", result.stderr)
+        self.stage.chmod(0o700)
+        binary = self.stage / "engine-client"
+        binary.unlink()
+        binary.symlink_to(self.stage / "spacewars-cli")
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("regular staging file", result.stderr)
         self.assertNotIn("stop", (self.control / "calls").read_text())
         self.assert_old_pair()
 

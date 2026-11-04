@@ -13,9 +13,12 @@ use crate::render::{FrameLayout, Viewport};
 
 mod clock;
 mod falling;
+mod garden_lab;
+mod material_lab;
 mod nes;
 mod null;
 mod pizza;
+mod pizza_worker;
 mod planetary_tanks;
 mod rover_lab;
 mod scorched_earth;
@@ -29,6 +32,8 @@ pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig};
 
 #[cfg(test)]
 pub(crate) use pizza::PizzaClientScenario;
+#[cfg(test)]
+pub(crate) use pizza_worker::PizzaWorkerClientScenario;
 #[cfg(test)]
 pub(crate) use spacewars::SpacewarsClientScenario;
 
@@ -65,6 +70,8 @@ pub enum ScenarioAsset {
     #[default]
     None,
     NesRom(crate::nes_roms::NesRomAsset),
+    PizzaLab(crate::pizza_lab::Config),
+    MaterialLab(std::path::PathBuf),
 }
 
 impl ScenarioStartMode {
@@ -189,9 +196,18 @@ pub struct PlayerPanelState {
     pub color: Color,
 }
 
+/// Launcher presentation only; every registration remains directly launchable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LauncherCategory {
+    Hidden,
+    /// Position in the main picker. Extras retain their registry order.
+    Main(u8),
+    Extra,
+}
+
 pub struct ScenarioRegistration {
     pub id: &'static str,
-    pub launcher_visible: bool,
+    pub launcher_category: LauncherCategory,
     pub capabilities: ScenarioCapabilities,
     pub controls_help: &'static str,
     create: ScenarioFactory,
@@ -277,6 +293,10 @@ pub trait ClientScenario {
     }
     fn frame_layout(&self) -> FrameLayout;
 
+    fn pizza_status(&self) -> Option<crate::host::PizzaStatus> {
+        None
+    }
+
     fn clock_state(&self) -> Option<spacewars_control::ClockState> {
         None
     }
@@ -297,8 +317,26 @@ pub trait ClientScenario {
     }
 
     /// Publishes one complete latest-state action snapshot. Realtime adapters
-    /// sample it at their next authoritative frame boundary.
+    /// sample it at their next authoritative frame boundary. Adapters with a
+    /// simulation worker instead queue every action for their next update.
     fn publish_realtime_actions(&self, _actions: &[Action], _observed_at: Instant) {}
+
+    /// True when a dedicated worker advances this adapter's fixed updates. The
+    /// host then forwards input instead of stepping and keeps presenting
+    /// `render_frames`.
+    fn has_simulation_worker(&self) -> bool {
+        false
+    }
+
+    /// Updates that worker has completed since it started.
+    fn simulation_worker_updates(&self) -> Option<u64> {
+        None
+    }
+
+    /// Changes whenever that worker publishes a new frame.
+    fn simulation_worker_frame(&self) -> Option<u64> {
+        None
+    }
 
     fn set_realtime_paused(&self, _paused: bool) {}
 
@@ -433,6 +471,8 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     null::REGISTRATION,
     clock::REGISTRATION,
     falling::REGISTRATION,
+    garden_lab::REGISTRATION,
+    material_lab::REGISTRATION,
     nes::REGISTRATION,
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
@@ -480,7 +520,7 @@ pub fn registration(name: &str) -> Option<&'static ScenarioRegistration> {
 pub fn launcher_registrations() -> impl Iterator<Item = &'static ScenarioRegistration> {
     SCENARIOS
         .iter()
-        .filter(|registration| registration.launcher_visible)
+        .filter(|registration| registration.launcher_category != LauncherCategory::Hidden)
 }
 
 #[cfg(test)]
@@ -517,7 +557,7 @@ mod tests {
 
     static MISSING_ASSET_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         id: "missing-test",
-        launcher_visible: false,
+        launcher_category: LauncherCategory::Hidden,
         capabilities: ScenarioCapabilities {
             benchmark: false,
             headless_benchmark: false,
@@ -542,6 +582,8 @@ mod tests {
             vec![
                 "clock",
                 "falling",
+                "garden-lab",
+                "material-lab",
                 "nes",
                 "pizza",
                 "rover-lab",
@@ -566,6 +608,7 @@ mod tests {
                 "spacewars-surface-round",
                 "spacewars-terrain-ai",
                 "spacewars-terrain-recovery",
+                "spacewars-terrain-learned-flight",
                 "spacewars-terrain-jetpack",
                 "spacewars-terrain-combat",
                 "spacewars-terrain-duel",

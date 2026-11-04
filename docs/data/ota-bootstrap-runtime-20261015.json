@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T03:58:13.868402+00:00",
+  "implementation_commit": "6b5a098d33593fb665d4f71cd680eb442f8b395f",
+  "scope": "First-image runtime uses a separate bootstrap journal, continuous health, staged-default selection, authorized watchdog completion and a separate normal-boot health window. Initial staging/activation and production baseline provisioning remain unimplemented.",
+  "host_validation": {
+    "ota_tests_passed": 219,
+    "manager_tests_passed": 38,
+    "ordinary_suite_ignored": 8,
+    "yocto_tests_passed": 71,
+    "yocto_sandbox_required": true,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "format": "passed",
+    "aarch64_ota_and_manager_test_build": "passed",
+    "journal_and_selector_tests_on_workspace_ext4": 7,
+    "commands": [
+      "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+      "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+      "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+      "cargo fmt --all -- --check",
+      "SPACEWARS_REQUIRE_UPDATE_SANDBOX=1 python3 -m unittest discover -s yocto/tests -p '*_test.py'",
+      "cargo test --locked -p engine-ota -p engine-os-manager --target aarch64-unknown-linux-gnu --no-run --message-format=json",
+      "TMPDIR=/home/data/workspace/space-wars-ota/target/ota-bootstrap-runtime-tmp target/debug/deps/engine_ota-d94cb44ff75a39c4 bootstrap::trial_store bootstrap::trial_files --test-threads=1"
+    ]
+  },
+  "pi5_validation": {
+    "remote_directory": "/tmp/spacewars-bootstrap-runtime.lzYJ4X",
+    "artifact": {
+      "path": "/home/data/workspace/space-wars-ota/target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f7c7f1697874a6b9",
+      "bytes": 79952752,
+      "sha256": "c96220c111a231d0fb335916a37ef4f6dfcdd9359ec9d01f85642d2c0ae94ad4",
+      "target": "aarch64-unknown-linux-gnu"
+    },
+    "artifact_build_state": "Built from the source working tree subsequently committed as implementation_commit; this is a test executable, not a clean Yocto runtime image.",
+    "remote_sha256": "c96220c111a231d0fb335916a37ef4f6dfcdd9359ec9d01f85642d2c0ae94ad4",
+    "uid": 1000,
+    "boot_id_before_and_after": "de606400-dc75-446e-b26b-385592b0f562",
+    "tests_passed": 17,
+    "ignored": 0,
+    "elapsed_test_seconds": 11.62,
+    "filters": [
+      "bootstrap::trial",
+      "watchdog_linux::tests::bootstrap_requires",
+      "recovery_linux::tests::service_writable",
+      "bootstrap::tests::linux::bootstrap_requires"
+    ],
+    "scope": "Temporary ordinary-user journal/boot-file fixtures, pure loaded-boot evidence checks, synthetic health/coordinator and fake watchdog, plus actual small ext4 artifact inspection. No fixed-path root adapter, live selector or actual watchdog access."
+  },
+  "package_contract": {
+    "schema": 3,
+    "bootstrap_protocol": 1,
+    "runtime_marker": "/etc/spacewars/bootstrap-runtime.json",
+    "runtime_marker_contents": {
+      "schema": 1,
+      "protocol": 1
+    },
+    "legacy_assets": 20,
+    "manager_additional_asset": 1,
+    "older_package_schemas_rejected": [
+      1,
+      2
+    ],
+    "new_runtime_image_or_kits_built": false,
+    "existing_runtime_commit": "c14c53f53012722e653c303834499906393fe2cb"
+  },
+  "covered_cases": [
+    "Trial health must persist before selector promotion and watchdog completion; the normal boot requires a different health proof and boot ID.",
+    "Service restart does not extend the boot-relative deadline; partial continuity is discarded and failed attempts cannot automatically retry.",
+    "Journal publication faults poison the handle and reopening trusts only a complete published checksummed record. Missing, corrupt, conflicting, linked, changed or pending-only state fails closed.",
+    "Selector failures preserve a complete old or new file, retain other assets and recheck authority after preparation. Changed assets and expired authorization prevent selection.",
+    "Loaded image, kernel, profile, board/medium, layout, selected root, firmware flag and trial token must match the recorded plan.",
+    "Bootstrap watchdog completion requires durable promoted health and uses the existing exact driver, timeout, early-evidence and idempotent completion checks.",
+    "Mount-source validation rejects wrong subtree roots, mount paths, devices, filesystems and duplicate IDs using synthetic mountinfo.",
+    "The real small ext4 fixture requires a supported runtime marker during packaging and root-install image checks; schema 1/2 and incomplete replacement inventories are rejected."
+  ],
+  "limits": [
+    "No production tool creates the initial boot-trial record or stages/activates the first trial yet. Runtime open never initializes a missing attempt.",
+    "No clean Yocto runtime image or schema-3 kits have been built. Existing c14c53f/schema-2 kits do not contain this implementation and must not be relabeled.",
+    "No installed Pi root, boot file, service, persistent data store, radio configuration, watchdog or reboot was changed. Only temporary files were used on Pi 5; Pi 4 was not exercised in this step.",
+    "The full fixed-path privileged bootstrap adapter and systemd writable-subtree namespace have not been exercised on a prepared device. The new bind-source test uses synthetic mountinfo.",
+    "Fault injection and ext4 file tests do not qualify physical FAT power-loss behavior, real watchdog handoff, kernel failure or reboot recovery.",
+    "Root connection details, supervised preservation/access checks, live root installation, staging, trial activation, canonical migration, explicit production baseline and both-board physical qualification remain outstanding.",
+    "End-to-end feed, service, scheduling, radio/maintenance and UI integration are still required before automatic update rollout."
+  ],
+  "logs": {
+    "host": {
+      "path": "target/ota-bootstrap-runtime-tests.log",
+      "sha256": "471cbad9d716fd6ce1f0370f2d1a728e17583040584ad204769ce352ec03dafa",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.01s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.56s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 197 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 93.58s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-bootstrap-runtime-clippy.log",
+      "sha256": "f1ab1a8975646e7a792b932863879a6695dd3ac94f8ad94a8e5a7f24a4f59d5e"
+    },
+    "msrv": {
+      "path": "target/ota-bootstrap-runtime-msrv.log",
+      "sha256": "5792ac7d8c4bc8636cc4ba33b03c65802500b83b0cf8125a997f456843ab34ea"
+    },
+    "format": {
+      "path": "target/ota-bootstrap-runtime-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "yocto": {
+      "path": "target/ota-bootstrap-runtime-yocto.log",
+      "sha256": "f5678a7a3e43327f0330f122baadd12293122fb9d2c6f227880bbbf5afab31a7",
+      "test_results": [
+        "Ran 71 tests in 28.657s"
+      ]
+    },
+    "aarch64": {
+      "path": "target/ota-bootstrap-runtime-aarch64.log",
+      "sha256": "631cef4097ee98bc2d75ab0c75595a39cdd66072c36537b379fe455a5442a319"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-bootstrap-runtime-aarch64.jsonl",
+      "sha256": "94e321b177e66371babd64eb83abb4d024d641bb02808b0c6e7d9bfc3a9dce01"
+    },
+    "host_ext4": {
+      "path": "target/ota-bootstrap-runtime-ext4.log",
+      "sha256": "9a70348722efeef8a76751b5ed1204c7d428da0e4577254bedde563ebbeae8d4",
+      "test_results": [
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 198 filtered out; finished in 1.13s"
+      ]
+    },
+    "pi5": {
+      "path": "target/ota-bootstrap-runtime-pi5.log",
+      "sha256": "732d30c91cad30591662a6a94a9c22e18aa5c2dc2f9919e29ac3145bb8c5e5f7",
+      "test_results": [
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 188 filtered out; finished in 11.62s"
+      ]
+    }
+  }
+}

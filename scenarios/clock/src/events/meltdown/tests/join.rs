@@ -38,9 +38,12 @@ fn promotion_preserves_every_solid_pose_velocity_release_time_and_water_sample()
             assert_eq!(after.water.stats(), stats);
             let duck = state.duck_visit.as_ref().unwrap();
             assert_eq!(duck.arena_opacity(), opacity);
-            assert_eq!(duck.responsive_floor().unwrap().opening, floor.opening);
-            assert_eq!(duck.responsive_floor().unwrap().load, floor.load);
-            let world = duck.arena_world();
+            assert_eq!(
+                duck.terrain.responsive_floor().unwrap().opening,
+                floor.opening
+            );
+            assert_eq!(duck.terrain.responsive_floor().unwrap().load, floor.load);
+            let world = state.arena.world().unwrap();
             let mut released = 0;
             for (index, cell) in cells.iter().enumerate() {
                 let id = BodyId::new(PhysicsId::new(4001 + index as u64), BodyRole::PRIMARY);
@@ -101,7 +104,7 @@ fn promoted_meltdown_replays_and_conserves_through_deadline_and_cleanup() {
                 tick(&mut b);
             }
             assert!(a.active_event.is_none());
-            assert!(a.body_count() <= 4);
+            assert!(a.body_count() <= 4 + a.flap_body_count());
             a.set_aspect_ratio(2.0);
             assert_eq!((a.body_count(), a.collider_count()), (0, 0));
             assert!(a.duck_visit.is_none());

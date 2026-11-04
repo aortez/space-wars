@@ -1,14 +1,14 @@
 # Functional UI tests
 
-Normal PR CI runs 49 of these full-application workflows using nextest's `ui-pr`
+Normal PR CI runs these full-application workflows using nextest's `ui-pr`
 profile. Only four long-running workflows (the two-match Spacewars case, automatic
 Clock demo, rain, and duck traversal) are deferred. The separate **UI functional tests**
-workflow runs all 53 nightly/on demand using the `ui` profile. Normal CI also
+workflow runs the full suite nightly/on demand using the `ui` profile. Normal CI also
 compiles every test and runs the display-free unit, simulation, rendering and
 control-protocol tests. See the [selection rationale and guard](ci-performance.md#deferred-ui-scenarios)
 and [manual dispatch instructions](ci-performance.md#running-the-full-ui-suite-on-github).
 
-The inventory including the first attached-device workflows is:
+The initial inventory, including the first attached-device workflows, was:
 
 | Area | Workflows | Main coverage |
 |---|---:|---|
@@ -21,7 +21,7 @@ The inventory including the first attached-device workflows is:
 | Attached-device workflows | 2 | Shared live-session checks, automatic/paused sessions and failed-check cleanup |
 
 Several workflows apply the same lifecycle to different scenario presets. These
-53 display-dependent tests share their test binary with three display-free HUD
+display-dependent tests share their test binary with three display-free HUD
 region tests, which run in the ordinary workspace suite. The CI selection guard
 reports the discovered counts and ensures new workflows join the PR set unless
 explicitly deferred; the documentation's inventory is a checkpoint, not a filter.
@@ -440,3 +440,12 @@ Keep functional tests black-box:
 Restart and return-to-launcher are exercised by activating their visible pause
 menu controls through the public semantic-control API. The test gates every
 asynchronous host transition on observable state and scenario revisions.
+
+### Launcher catalog
+
+`launcher_catalog` covers the six-item default and wraparound, the Show all
+control, fallback from extras, settings/Play targets, extra scenario return,
+process restart, saved-extra expansion, direct extra and hidden launches, and
+shared save-error/retry handling. `ui_render_tests` also checks real keyboard and
+pointer activation and partial/full repaints at 800×480, 1024×768 and 480×800.
+Physical cabinet touchscreen and gamepad checks still require a device smoke test.

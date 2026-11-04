@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-15T23:01:23.350824+00:00",
+  "implementation_commit": "3108cea8541f619d3052aef13e1114627628a59e",
+  "scope": "Supervised raw backup and independent export verification, exercised with regular-file fixtures. No installed Pi backup or privileged preparation was performed.",
+  "host_validation": {
+    "ota_tests_passed": 134,
+    "manager_tests_passed": 38,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "aarch64_tests_and_examples": "built",
+    "additional_optional_actual_artifact_test": "passed"
+  },
+  "artifact_validation": {
+    "image_source_commit": "514264c9723d13db493b9fd2e6503f8c5859a4e3",
+    "audit_directory": "target/ota-boot-audit-cfcq39hw",
+    "elapsed_seconds": 44.05,
+    "result": {
+      "boot": {
+        "bytes": 157286400,
+        "sha256": "225b2d78dabfd17513ca81e74130e41a781dfb26b944f63b3804cc1f8c4ce442"
+      },
+      "export_check": {
+        "boot_bytes": 157286400,
+        "copies_sha256": "86b41c0258a43c34eb5838da6d8e0f68c431ac059ffced10f20bd6b226ae97d5",
+        "device_id": "263a4dbe41488fb87214b0032339dbb9f0c8da14c16dfcf13084bf3c2552eca5",
+        "inactive_root_bytes": 520093696,
+        "layout_id": "1dc5ae5b68174891b6aa9850aa05ee0d9ae8a20468d9517259951a2dd9e9c0f0",
+        "package_sha256": "bc4a71180870f7945155fbb02f4b0a2e3faa2a62d6d31b7039013055ed19869a",
+        "schema": 1,
+        "scope": "verified raw recovery export; data/config copies, live-device state and physical restore qualification are separate"
+      },
+      "inactive_root": {
+        "bytes": 520093696,
+        "sha256": "7d63e950f48a66100d8db7bed122990a39c88b2bd797a114320ae7d672036081"
+      },
+      "scope": "actual build artifacts with a synthetic device binding and temporary regular-file targets; no live device access"
+    },
+    "binding_is_synthetic": true,
+    "all_targets_temporary_regular_files": true,
+    "image_source": {
+      "commit": "514264c9723d13db493b9fd2e6503f8c5859a4e3",
+      "dirty": false,
+      "revision": "514264c9723d",
+      "schema": 1
+    },
+    "image_build_id": "rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3"
+  },
+  "pi5_validation": {
+    "user": "spacewars",
+    "uid": 1000,
+    "bootstrap_fixture_tests_passed": 29,
+    "optional_artifact_tests_ignored": 2,
+    "elapsed_seconds": 38.53,
+    "backup_command_rejected_without_root": true,
+    "boot_id_unchanged": "de606400-dc75-446e-b26b-385592b0f562",
+    "boot_inventory_unchanged_files": 101,
+    "boot_inventory_sha256": "bc69b08539de96dd260d33dc78246a8a5c3e8b1762ffca1388b9bc1fd1fadc71",
+    "layout_physical_kernel_and_profile_unchanged": true
+  },
+  "device_mutations": {
+    "boot_remount": false,
+    "root_preparation": false,
+    "raw_partition_write": false,
+    "raw_backup_execution": false,
+    "watchdog_open": false,
+    "reboot": false
+  },
+  "logs": {
+    "host": {
+      "path": "target/ota-bootstrap-backup-host.log",
+      "sha256": "a18407b138031ad92b243311017b04943b7738eb0a0b546373ecc73f628a7b1e",
+      "results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.85s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.50s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 112 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 17.31s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "final-ota": {
+      "path": "target/ota-bootstrap-backup-final-ota.log",
+      "sha256": "34546b2df71c9cd2562b81a3d4dc471d966e38e82147331289db670c2e70e0f0",
+      "results": [
+        "test result: ok. 112 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 17.27s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-bootstrap-backup-clippy.log",
+      "sha256": "328feaf9ba97a7605975ddf2b7c989349b284a619f85f2c1f482118a0d2bbb10"
+    },
+    "msrv": {
+      "path": "target/ota-bootstrap-backup-msrv.log",
+      "sha256": "4d997e8c36050fd02759614a16c7ed512f15c0a64c9802fa9ea0fbf7085ea8c1"
+    },
+    "aarch64": {
+      "path": "target/ota-bootstrap-backup-aarch64.log",
+      "sha256": "9b04b8e2e5c221959dfaf39957daf65ecc96b7823dfa53f57b265051ba02bd9b"
+    },
+    "examples": {
+      "path": "target/ota-bootstrap-backup-examples.log",
+      "sha256": "59639588a6f1826f129cbcd121edc07279dab94786f5fa5bde6b3439b2e845cc"
+    },
+    "artifacts": {
+      "path": "target/ota-bootstrap-backup-artifacts.log",
+      "sha256": "770ae171df4dbf6853fc54e057349013ae4b26bf6ee867119536ecb0147fe0fc",
+      "results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 115 filtered out; finished in 44.05s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+      ]
+    },
+    "pi5-tests": {
+      "path": "target/ota-bootstrap-backup-pi5-tests.log",
+      "sha256": "9cd0887c4a690aae3dc468efb8e44d29f8dbb21efa8219ded359d068c2e317fe",
+      "results": [
+        "test result: ok. 29 passed; 0 failed; 2 ignored; 0 measured; 85 filtered out; finished in 38.53s"
+      ]
+    },
+    "pi5-denial": {
+      "path": "target/ota-bootstrap-backup-pi5-denial.log",
+      "sha256": "a2fe1c8b5f69df030c1d6dd5858052d8d438e27556269cf87252ee0fcbd79517"
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "cargo test --locked -p engine-ota --target aarch64-unknown-linux-gnu --no-run",
+    "cargo build --locked -p engine-ota --example bootstrap_backup --example bootstrap_probe --example bootstrap_check --example bootstrap_prepare --example bootstrap_verify_backup --target aarch64-unknown-linux-gnu",
+    "SPACEWARS_BOOTSTRAP_TEST_ARTIFACT_DIR=/absolute/path/to/artifact-audit cargo test --locked -p engine-ota bootstrap::backup::tests::actual_build_artifacts_roundtrip_into_private_raw_recovery_copies -- --ignored --nocapture --test-threads=1",
+    "On Pi 5 as UID 1000: /tmp/ota-bootstrap-backup-tests-aarch64 bootstrap --test-threads=1"
+  ],
+  "remaining": [
+    "authenticated root access and supervised read-only boot window",
+    "live backups on both Pis and independent verification of their exports",
+    "data and running-root configuration preservation",
+    "closure of installed legacy unsigned update and reboot paths",
+    "durable inactive-root write and staged boot operations",
+    "supervised trial, normal and canonical boot verification",
+    "explicit recovery baseline and physical failure/restore qualification",
+    "end-to-end feed, updater, policy and UI integration"
+  ],
+  "root_access_recheck": {
+    "root-access": {
+      "path": "target/ota-bootstrap-backup-root-access.log",
+      "sha256": "41655827d03b11187394d73ca9d3d587af5a1334bec70b6121210ea86c0cdc05",
+      "result": "root@spacewars.local: Permission denied (publickey,password)."
+    },
+    "picade-access": {
+      "path": "target/ota-bootstrap-backup-picade-access.log",
+      "sha256": "7b449f722bf2e78290a1cdd56239b205dbddad1bdced0484cccef30b1e5dd4c9",
+      "result": "ssh: Could not resolve hostname sw-picade.local: Temporary failure in name resolution"
+    }
+  }
+}

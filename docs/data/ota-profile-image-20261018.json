@@ -1,0 +1,721 @@
+{
+  "automatic_installation_enabled": false,
+  "automatic_publication_enabled": false,
+  "ci": {
+    "linux_workspace": {
+      "passed": 4028,
+      "seconds": 460.39,
+      "skipped": 112
+    },
+    "result": "success",
+    "run": 39164347298,
+    "source": "0a32db244ea2d692da9588b133ae4c5f92092804",
+    "url": "https://github.com/aortez/space-wars/actions/runs/39164347298"
+  },
+  "files": {
+    "build.json": {
+      "bytes": 3400,
+      "sha256": "a87b3af8cc8a3b2c159ac4cc34b7dec88e42c49c5284a5c18606f9287355a243"
+    },
+    "ci-workspace.log": {
+      "bytes": 1253937,
+      "sha256": "ac849aaee2f90daee2fadc8953dae35beb36905a3dfc612ce80bc9048c587868"
+    },
+    "idle-cycle/analysis.json": {
+      "bytes": 2525,
+      "sha256": "19c984f07bedcbed599433637758dad37eef0b0c50d05e6f9dd79c9b7bb3e802"
+    },
+    "idle-cycle/analyze.py": {
+      "bytes": 4928,
+      "sha256": "546261be6ee0d8bd712896402c2e5981ae2c94a7fbbbc6101117caf6a4e75dc7"
+    },
+    "idle-cycle/cycle.sh": {
+      "bytes": 7450,
+      "sha256": "26f93fe2c9684a287ad45011cfcb62f005b53682e5603365c9e604152dc95238"
+    },
+    "idle-cycle/profiles.sh": {
+      "bytes": 1243,
+      "sha256": "b743bd80d11ad2d474274ae7821a4007b3f7f652e8105ea21014edb39602a0fe"
+    },
+    "idle-cycle/restore-controls.json": {
+      "bytes": 340,
+      "sha256": "a3dc33efa26d1717b675625d8b401a5c2b2d73e47bb31a7915ab559cbdbff545"
+    },
+    "idle-cycle/restore.sh": {
+      "bytes": 3817,
+      "sha256": "492aaa3373625e658ea83b3b434d04385e32e4d64020dedef76bcac854e64dcc"
+    },
+    "idle-cycle/run.py": {
+      "bytes": 9128,
+      "sha256": "3ff43af9baebd310510c87335ce4b54c9aa008d98dac3051f9594ee01aec56aa"
+    },
+    "idle-cycle/run/device-evidence.tar.gz": {
+      "bytes": 53379,
+      "sha256": "3f81f2697b60961ca0a82067a458a7bb20f5ee4c8006411dfb5079646905a7e8"
+    },
+    "idle-cycle/run/intent.json": {
+      "bytes": 1029,
+      "sha256": "559e798a13e07066c891cd6474750382711916fe4c0751a6888143f419af8f92"
+    },
+    "idle-cycle/run/result.json": {
+      "bytes": 433,
+      "sha256": "2ec8183e5b395e872adf32048e81bef7a9fc6be3c28f4b2eca69325da1c9fe1b"
+    },
+    "idle-cycle/test-restore.py": {
+      "bytes": 3778,
+      "sha256": "ad1c250b9f48e205a299b2c13ec85f1ad1a0c4b0140a92121d68c41cb2ed7daf"
+    },
+    "image-verification.json": {
+      "bytes": 5137,
+      "sha256": "b5c2f2459828b07d13e68969253d3fb33dc48eab4e3514d2df6bf96d8bd5abae"
+    },
+    "install/normal-boot/result.json": {
+      "bytes": 637,
+      "sha256": "6f3835c4f80bc325f185c7e7ce715668cd0f36c9aed568c756e531d4315b20df"
+    },
+    "install/normal-boot/startup-journal.log": {
+      "bytes": 246,
+      "sha256": "1f88df77c718b4fabe4961079fd800707f5d9dae2e438b7d844cf7d4454879f0"
+    },
+    "install/result.json": {
+      "bytes": 726,
+      "sha256": "8ce00ac496f73661ae786145df4609c2b6f5eba5713ffc57614ac5f0d5cca87b"
+    },
+    "native-helper/result.json": {
+      "bytes": 1860,
+      "sha256": "06425e13620470c8a070f62e6ed2b42b43809272868d624cc5f7e9508dafe70c"
+    },
+    "native-provider/baseline/tests.log": {
+      "bytes": 612,
+      "sha256": "f4a1a1aa402d75d2297df8d175333ae6fcc39855df9720ecd908ce06c567a2cb"
+    },
+    "native-provider/candidate/tests.log": {
+      "bytes": 500,
+      "sha256": "e9362be5dc2a7f930bc22b5c9b2ae40ad86f13f939f248df034e500e55af3f26"
+    },
+    "native-provider/inputs.json": {
+      "bytes": 655,
+      "sha256": "97398b04ac251ea1e811385c2a722c06e717b7659c6e252307ac52235e9dd764"
+    },
+    "native-provider/preservation.json": {
+      "bytes": 292,
+      "sha256": "cb05b84b08a8f457298bfa3ba5f08de9d0af231f77fd0fac81074c88227145e8"
+    },
+    "native-provider/result.json": {
+      "bytes": 301,
+      "sha256": "88b7c4078f3b5b52cd38531b41620c14587f348dfcb6ae496f7d32d09e444819"
+    },
+    "pi4-readiness/sw-picade-helper/isolated-state.tar.gz": {
+      "bytes": 920,
+      "sha256": "d5ca70a3e31823c9213a61a1626a5ed9cb59328dae78725b23371a20989fb4a9"
+    },
+    "pi4-readiness/sw-picade-helper/result.json": {
+      "bytes": 2132,
+      "sha256": "c9f8956ab15f930ae1278b4abf27994111d4590c30f5e6835a3f3a1f290d4a03"
+    },
+    "pi4-readiness/sw-picade-helper/run.log": {
+      "bytes": 896,
+      "sha256": "e67c0ad1e5e54914a5579e591c85f27e610689d134d3e8bbd9a66efe69eea940"
+    },
+    "pi4-readiness/sw-picade-native/baseline/tests.log": {
+      "bytes": 612,
+      "sha256": "3e78972514db0348991e8185bdeb19fd037bea6768e0e28fba4f13d7ee551e63"
+    },
+    "pi4-readiness/sw-picade-native/candidate/tests.log": {
+      "bytes": 500,
+      "sha256": "88273be5e069dfe439bf163cacb92b92ac2bd41e36afdb151822bd33c3e484b8"
+    },
+    "pi4-readiness/sw-picade-native/inputs.json": {
+      "bytes": 655,
+      "sha256": "97398b04ac251ea1e811385c2a722c06e717b7659c6e252307ac52235e9dd764"
+    },
+    "pi4-readiness/sw-picade-native/preservation.json": {
+      "bytes": 292,
+      "sha256": "cb05b84b08a8f457298bfa3ba5f08de9d0af231f77fd0fac81074c88227145e8"
+    },
+    "pi4-readiness/sw-picade-native/result.json": {
+      "bytes": 375,
+      "sha256": "cd5a8d88b72de2a2d57c3d1d806406b2ee80e7224ee9c62da589006c6ad39362"
+    },
+    "pi4-readiness/sw-picade-preflight.json": {
+      "bytes": 800,
+      "sha256": "5048432a50f4e0c73211647eae9a720b88d013f8cad56624cd564a66b6c4bdad"
+    },
+    "profile-diagnostic/analysis.json": {
+      "bytes": 3011,
+      "sha256": "10cde564a343983bd166c25d8621d7aebc1ba4f7db856626c986aaaad85bbe74"
+    },
+    "profile-diagnostic/run/device-evidence.tar.gz": {
+      "bytes": 27971,
+      "sha256": "923127c606ec64762f05cd0e767d95ae447421281bb095a2357f41047ab65c21"
+    },
+    "profile-diagnostic/run/device/nm-journal.jsonl": {
+      "bytes": 119651,
+      "sha256": "d159006d01fff4bc324c5ee11f9eced504287ee092bb3c48020fb09247f24206"
+    },
+    "profile-diagnostic/run/device/radio-signals.log": {
+      "bytes": 12764,
+      "sha256": "e9f7f44b88bf5dd57dd1a9e2ce1de1b66a0c3f622543965e4cf232f43a5a3292"
+    },
+    "profile-diagnostic/run/intent.json": {
+      "bytes": 1027,
+      "sha256": "130ce2329522358f9de85014be121c222623d0edfb9ef1027a270d3045f9695b"
+    },
+    "profile-diagnostic/run/logging-after.json": {
+      "bytes": 276,
+      "sha256": "58c463ac82dd6b06e3ddddb1ecc7d4c5144650082b7beae86b2fea087c3f1f57"
+    },
+    "profile-diagnostic/run/result.json": {
+      "bytes": 434,
+      "sha256": "ba8f09dfb26da34814090f1b34214e443d0142c06602c988582fd2c6272a5a84"
+    },
+    "publication-result.json": {
+      "bytes": 1002,
+      "sha256": "a7f458b70f8cb8594ba290e80722dd30e10e18c8dd6f5bc3bec8fd59e0462015"
+    },
+    "qualify-image-helper-pi4.py": {
+      "bytes": 7531,
+      "sha256": "8c96b80b3e08a57d3fd9bfa451155e27e36ce90267c528c286b54bf4ff49f9be"
+    },
+    "qualify-provider-pi4.py": {
+      "bytes": 7650,
+      "sha256": "c5b0b58451e53e19ea500cafd484ed288ddfb12766e3e202875a8dd74a00f760"
+    },
+    "review.json": {
+      "bytes": 6326,
+      "sha256": "846a3b7136757809cea41968bc67430a17366d31f30c6c0678a78ebce91ca231"
+    }
+  },
+  "host": "spacewars.local",
+  "idle_cycle": {
+    "accepted_sync_age_before_request_seconds": 305,
+    "attempts": {
+      "time_check": {
+        "deadline_ms": 940376,
+        "first_observed_seconds": 235,
+        "id": 2,
+        "last_observed_seconds": 241,
+        "started_ms": 820376,
+        "trigger": "manual"
+      },
+      "update": {
+        "deadline_ms": 2620617,
+        "first_observed_seconds": 235,
+        "id": 35,
+        "last_observed_seconds": 241,
+        "started_ms": 820617,
+        "trigger": "automatic"
+      }
+    },
+    "boot_id": "97f79329-9146-476f-a569-fa0ee260c363",
+    "due_offline_from_seconds": 121,
+    "due_offline_samples": 107,
+    "due_offline_until_seconds": 235,
+    "emergency_radio_enable": false,
+    "files": {
+      "before-wake.json": {
+        "bytes": 1747,
+        "sha256": "85133da3a362d127516afc6e4f76d3f7b47d16a0760e16c25313878cdd92a4e2"
+      },
+      "handoff-complete.json": {
+        "bytes": 1741,
+        "sha256": "9e34b42a230d90df10a923f65b63a9678bac61bdfb0fd71494591f7119c94583"
+      },
+      "journal.jsonl": {
+        "bytes": 286792,
+        "sha256": "9333ee3c5f59f25e4d5689e6163ed83efbf2ff25b80b098c2663191186003bec"
+      },
+      "observations.jsonl": {
+        "bytes": 578302,
+        "sha256": "3e0f706c707080133ab92851d0850aefbf61a53bf6678f77417e16d45efce89e"
+      },
+      "radio-signals.log": {
+        "bytes": 25156,
+        "sha256": "8e627bc7291fa33f4b2a0b75f70418f799ca3e20b6e099819a8414bbd9e99197"
+      },
+      "restore.log": {
+        "bytes": 1077,
+        "sha256": "05abb8fe974acf3d9b0e9325e5ee2f055e3c3170d2aac84ab6b275c7ab6554a5"
+      },
+      "sync-now.json": {
+        "bytes": 52,
+        "sha256": "3e58a9c8aebea9f739e7fc57729f50b52d129612ad4f0a531766f8dbbff758b3"
+      }
+    },
+    "first_off_seconds": 120,
+    "fresh_ssh_passed": true,
+    "limits": [
+      "Manual time-sync request exercised the actual time worker; the daily timer was not advanced.",
+      "No update was installed during this cycle; the installed generation is already current.",
+      "Does not qualify Pi 4 or unattended rollout."
+    ],
+    "next_update_ms_after_handoff": 87220617,
+    "observed_hold_kinds": [
+      "download",
+      "time-check"
+    ],
+    "original_logging_restored": true,
+    "owner_resumes": 0,
+    "partial_offline_enabled": false,
+    "passed": true,
+    "restored_release": true,
+    "same_boot_image_kiosk": true,
+    "schema": 1,
+    "selected_durable_stores_unchanged": true,
+    "settled_seconds": 259,
+    "source": "0a32db244ea2d692da9588b133ae4c5f92092804",
+    "success_generation_after": 85,
+    "success_generation_before": 84,
+    "time_completion": "synchronized",
+    "update_completion": "ineligible"
+  },
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 26567800,
+        "sha256": "9b71d0cddf9d3e00fac6eefd528b05a2242b265196aece4790d624ad17af3267"
+      },
+      "os_manager": {
+        "bytes": 11266304,
+        "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-0ede218f3fff168475b06e0cda46ee94fac04de41e02a6497206669c72072126",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "0ede218f3fff168475b06e0cda46ee94fac04de41e02a6497206669c72072126",
+    "schema": 1,
+    "source": {
+      "commit": "0a32db244ea2d692da9588b133ae4c5f92092804",
+      "dirty": false,
+      "revision": "0a32db244ea2",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "local_artifacts": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/profile-image-0a32db2",
+  "native_helper": {
+    "cases": 4,
+    "executable": {
+      "bytes": 11266304,
+      "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+    },
+    "image": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 26567800,
+          "sha256": "9b71d0cddf9d3e00fac6eefd528b05a2242b265196aece4790d624ad17af3267"
+        },
+        "os_manager": {
+          "bytes": 11266304,
+          "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+        }
+      },
+      "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+      "build_id": "rootfs-0ede218f3fff168475b06e0cda46ee94fac04de41e02a6497206669c72072126",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 2,
+      "rootfs_tree": "0ede218f3fff168475b06e0cda46ee94fac04de41e02a6497206669c72072126",
+      "schema": 1,
+      "source": {
+        "commit": "0a32db244ea2d692da9588b133ae4c5f92092804",
+        "dirty": false,
+        "revision": "0a32db244ea2",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "limitations": "These isolated SSH controls do not qualify native radio behavior. The packaged NetworkManager is separately exercised in the new private-bus comparison.",
+    "passed": true,
+    "prior_boot_id": "da44b467-4432-4de5-bb05-aa65143848d0",
+    "prior_host": "swadmin@spacewars.local",
+    "prior_native_cases": 4,
+    "prior_result": {
+      "path": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/readiness-image-1d5c671/native-helper/result.json",
+      "sha256": "32cc660cd10c37a3ed879e1185de753d8242db9fcc7ed1b227f2d8426e743d9f"
+    },
+    "qualification_method": "Reused prior native controls for the byte-identical extracted executable; no new helper execution claimed"
+  },
+  "native_provider": {
+    "cases": {
+      "baseline": {
+        "returncode": 101,
+        "seconds": 0.357
+      },
+      "candidate": {
+        "returncode": 0,
+        "seconds": 0.394
+      }
+    },
+    "network_and_mount_namespaces_private": true,
+    "passed": true,
+    "production_replaced": false,
+    "synthetic_credentials_only": true
+  },
+  "normal_boot": {
+    "automatic_completion": "no-candidate",
+    "boot_id": "97f79329-9146-476f-a569-fa0ee260c363",
+    "elapsed_seconds": 49.973,
+    "host": "spacewars.local",
+    "maintenance_resume_logged": false,
+    "maintenance_wait_logged": false,
+    "passed": true,
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 1
+    }
+  },
+  "pi4_isolated_provider": {
+    "cases": {
+      "baseline": {
+        "returncode": 101,
+        "seconds": 0.557
+      },
+      "candidate": {
+        "returncode": 0,
+        "seconds": 0.715
+      }
+    },
+    "host": "sw-picade.local",
+    "model": "Raspberry Pi 4 Model B Rev 1.4",
+    "network_and_mount_namespaces_private": true,
+    "passed": true,
+    "preservation": {
+      "boot_unchanged": true,
+      "image_unchanged": true,
+      "kiosk_unchanged": true,
+      "passed": true,
+      "production_nm_unchanged": true,
+      "radio_clean": true,
+      "stores": {
+        "all_bytes_unchanged": true,
+        "durable_stores_unchanged": true,
+        "regenerated_local_gatt_databases": []
+      }
+    },
+    "production_replaced": false,
+    "synthetic_credentials_only": true
+  },
+  "pi4_isolated_ssh_helper": {
+    "boot_id": "dbf0104d-004b-4f19-b323-fc38ef558b0c",
+    "cases": 4,
+    "elapsed_seconds": 90.3,
+    "files": {
+      "engine-os-manager": {
+        "bytes": 11266304,
+        "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+      },
+      "retained-state.json": {
+        "bytes": 735,
+        "sha256": "ad1fec4ae2529e40890a1e7be598646d09ad0327b71feda1feb195b79bce0b4f"
+      },
+      "tests": {
+        "bytes": 1839952,
+        "sha256": "23bcfc28a19d4115a7c34c694ab25f3fad59fd06864d742abbda7d1385896a40"
+      }
+    },
+    "fresh_login_passed": true,
+    "helper_from_qualified_image": true,
+    "host": "swadmin@sw-picade.local",
+    "image": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 26567800,
+          "sha256": "9b71d0cddf9d3e00fac6eefd528b05a2242b265196aece4790d624ad17af3267"
+        },
+        "os_manager": {
+          "bytes": 11266304,
+          "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+        }
+      },
+      "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+      "build_id": "rootfs-0ede218f3fff168475b06e0cda46ee94fac04de41e02a6497206669c72072126",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 2,
+      "rootfs_tree": "0ede218f3fff168475b06e0cda46ee94fac04de41e02a6497206669c72072126",
+      "schema": 1,
+      "source": {
+        "commit": "0a32db244ea2d692da9588b133ae4c5f92092804",
+        "dirty": false,
+        "revision": "0a32db244ea2",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "kiosk_instance_unchanged": true,
+    "live_radio_writes": false,
+    "namespace_isolation": [
+      "mount",
+      "network"
+    ],
+    "passed": true,
+    "production_fix_deployed": false,
+    "production_image_unchanged": true,
+    "production_nm_unchanged": true,
+    "production_radio_clean": true,
+    "production_services_unchanged": true,
+    "production_stores_unchanged": true,
+    "real_device_reboot": false,
+    "remote_artifacts": "/data/spacewars-ssh-qualification-20261018-0a32db2-image"
+  },
+  "pi4_preflight": {
+    "boot_identity_matches": true,
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "good_generation": 2,
+    "helper_sha256": {
+      "boot_probe": "24819e6da2c1aed9665419ff88d37727a90b63a615f17d62a48ffef2541707b7",
+      "install_signed_trial": "8de94c6d49fea85e3c04955cbc192264787ea6d2f3de0f6ea06507c3046fca5e",
+      "stage_update": "b0537270daea20aa22159ad1355864f222bf5eadb2d3182f10e651f75be06407"
+    },
+    "helpers_present": {
+      "boot_probe": true,
+      "install_signed_trial": true,
+      "stage_update": true
+    },
+    "helpers_root_owned_private_single_link": true,
+    "highest_attempted_generation": 2,
+    "host": "sw-picade.local",
+    "recovery_phase": "committed",
+    "source": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+    "trust_and_data_identity_present": true
+  },
+  "profile_diagnostic": {
+    "diagnostic_calls_get_secrets": false,
+    "journal_events": [
+      {
+        "marker": "manager: startup complete",
+        "monotonic_us": 10819198
+      },
+      {
+        "marker": "secrets request completed",
+        "monotonic_us": 206534114
+      },
+      {
+        "marker": "new agent secrets processed",
+        "monotonic_us": 206534812
+      }
+    ],
+    "original_logging_restored": true,
+    "owner_resumes": 0,
+    "raw_settings_published": false,
+    "schema": 1,
+    "snapshots": [
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "2",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "3",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-baseline-3IJvxu",
+        "uptime": 79.17
+      },
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [
+              "connection.timestamp"
+            ],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "2",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "3",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-offline-0lntwt",
+        "uptime": 202.96
+      },
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [
+              "connection.timestamp"
+            ],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "2",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "3",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-restored-DVJxvh",
+        "uptime": 207.7
+      }
+    ],
+    "wireless_notifications": [
+      {
+        "seconds_since_first": "0.000000",
+        "serial": 2688,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "3.707945",
+        "serial": 2811,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "3.708005",
+        "serial": 2813,
+        "wireless_enabled": true
+      }
+    ]
+  },
+  "provider": {
+    "bytes": 3546496,
+    "sha256": "1fe0567c304db390f2665a179fadb5d5b6fc3f484cfd899ed64037428303ca44"
+  },
+  "publication": {
+    "automatic_installation_enabled": false,
+    "channel": "nightly",
+    "current": {
+      "manifest_sha256": "9cfe0d1693b7bc1b3e58c94678c729c2381766862d35228a2dcb17bb61f3bcca",
+      "timestamp": {
+        "bytes": 469,
+        "sha256": "34013f7b3bc67d76633bfcdc51f3a6a303d36335c5b8c28da08edf05d44e806b"
+      },
+      "version": 7
+    },
+    "generation": 6,
+    "intent_sha256": "7188c3ee83467dd13370a401089420593b65a2e8fb4a7a8afabe62e35245d839",
+    "main_ci_admission_claimed": false,
+    "payload": {
+      "bytes": 132987741,
+      "sha256": "c689c0e3b6d1ddfd1c5f9a9ab9d26623f7ee8ebbefabc645910e80cb685a517f"
+    },
+    "publication_scope": "Owner-supervised branch candidate",
+    "publisher": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+    "release_id": 416212208,
+    "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+    "result": "published",
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "source": "0a32db244ea2d692da9588b133ae4c5f92092804"
+  },
+  "radio_diagnostic": {
+    "boot_id": "97f79329-9146-476f-a569-fa0ee260c363",
+    "diagnostic_completed": true,
+    "emergency_radio_enable": false,
+    "fresh_ssh_passed": true,
+    "image_unchanged": true,
+    "kiosk_unchanged": true,
+    "off_at_seconds": 121,
+    "radio_cycle_passed": true,
+    "restored": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 0
+    },
+    "suspensions": []
+  },
+  "remaining": [
+    "Qualify the corrected image and native idle cycle on Pi 4",
+    "Qualify unattended rollout after the reviewed code reaches main"
+  ],
+  "schema": 1,
+  "scope": "Supervised signed Pi 5 image, normal startup, radio off/reconnect and native off/time-wake/automatic OTA/off qualification; Pi 4 and unattended rollout remain outstanding",
+  "signed_trial": {
+    "automatic_installation_enabled": false,
+    "elapsed_seconds": 96.989,
+    "generation": 6,
+    "host": "spacewars.local",
+    "original_boot": "bef62885-8ebd-4f2c-bcfa-484388e7e52e",
+    "passed": true,
+    "payload": "c689c0e3b6d1ddfd1c5f9a9ab9d26623f7ee8ebbefabc645910e80cb685a517f",
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 1
+    },
+    "trial_boot": "ecfde447-e758-4426-ad44-80970e9cd926"
+  },
+  "source": "0a32db244ea2d692da9588b133ae4c5f92092804"
+}

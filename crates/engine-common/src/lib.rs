@@ -11,11 +11,22 @@ use serde::{
 };
 
 mod activity_settings;
+mod clock_arena;
+mod clock_digit_surfaces;
 mod clock_font;
 mod clock_message;
 mod controller;
 mod dirt_settings;
 pub use activity_settings::{AutostartSettings, MatchSettings};
+pub use clock_arena::{
+    ClockArenaAccounting, ClockArenaClaim, ClockArenaLimits, ClockArenaOwner, ClockArenaPopulation,
+    ClockArenaRemap, ClockArenaState, ClockArenaStep, ClockArenaUnavailable,
+};
+pub use clock_digit_surfaces::{
+    ClockDigitSurface, ClockDigitSurfaceState, ClockSurfaceAccounting, ClockSurfaceChange,
+    ClockSurfaceChangeKind, ClockSurfaceLimits, ClockSurfaceRetirement, ClockSurfaceRetirements,
+    ClockSurfaceSource, ClockSurfaceSourceCount,
+};
 pub use clock_font::{ClockFont, ClockFontPool, ClockFontSettings};
 pub use controller::{ControllerBinding, ControllerControl, ControllerProfile, ControllerSource};
 pub use dirt_settings::DirtMode;
@@ -135,6 +146,7 @@ pub struct Settings {
     pub audio: AudioSettings,
     pub controls: ControlBindings,
     pub launch: LaunchSettings,
+    pub launcher: LauncherSettings,
     pub clock: ClockSettings,
     pub nes: NesSettings,
     pub spacewars: SpacewarsSettings,
@@ -144,6 +156,13 @@ pub struct Settings {
     pub pizza: PizzaSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
+}
+
+/// Device-wide launcher presentation, independent of launch and simulation settings.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LauncherSettings {
+    pub show_all: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -577,6 +596,29 @@ impl ClockEventTrigger {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockCellSwapPattern {
+    Shuffle,
+    MirrorHorizontal,
+    MirrorVertical,
+}
+
+impl ClockCellSwapPattern {
+    pub const ALL: [Self; 3] = [Self::Shuffle, Self::MirrorHorizontal, Self::MirrorVertical];
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCellSwapState {
+    pub pattern: ClockCellSwapPattern,
+    pub from_digits: [Option<u8>; 4],
+    pub to_digits: [Option<u8>; 4],
+    pub elapsed_ticks: u64,
+    pub progress_milli: u32,
+    pub participating_cells: u32,
+    pub moving_cells: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockDigitSlideState {
     pub from_digits: [Option<u8>; 4],
     pub to_digits: [Option<u8>; 4],
@@ -584,6 +626,43 @@ pub struct ClockDigitSlideState {
     pub progress_milli: u32,
     /// Manual previews roll the current digits, without fabricating a reading.
     pub preview: bool,
+}
+
+/// Reel phase and lock progress for the Slot Machine event. `retargets` counts
+/// the readings adopted mid-spin, which is how the event proves it lands on live
+/// time rather than on a snapshot taken when it started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockSlotMachineState {
+    pub phase: ClockSlotMachinePhase,
+    pub target_digits: [Option<u8>; 4],
+    pub locked_slots: [bool; 4],
+    /// Thousandths of a glyph each reel has travelled past its last whole stop.
+    pub reel_offset_milli: [u32; 4],
+    pub glyphs_passed: [u32; 4],
+    pub retargets: u32,
+    /// Manual previews spin the live reading, without fabricating a time.
+    pub preview: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSlotMachinePhase {
+    #[default]
+    SpinUp,
+    Spinning,
+    Settling,
+    Payout,
+}
+
+impl ClockSlotMachinePhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SpinUp => "spin-up",
+            Self::Spinning => "spinning",
+            Self::Settling => "settling",
+            Self::Payout => "payout",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -600,10 +679,14 @@ pub enum ClockEventKind {
     Crow = 7,
     Explosion = 8,
     Aquarium = 9,
+    CellSwap = 10,
+    Grass = 11,
+    SlotMachine = 12,
+    Spider = 13,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 14] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -614,6 +697,10 @@ impl ClockEventKind {
         Self::Crow,
         Self::Explosion,
         Self::Aquarium,
+        Self::CellSwap,
+        Self::Grass,
+        Self::SlotMachine,
+        Self::Spider,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -628,6 +715,10 @@ impl ClockEventKind {
             Self::Crow => "crow",
             Self::Explosion => "explosion",
             Self::Aquarium => "aquarium",
+            Self::CellSwap => "cell-swap",
+            Self::Grass => "grass",
+            Self::SlotMachine => "slot-machine",
+            Self::Spider => "spider",
         }
     }
 
@@ -643,6 +734,10 @@ impl ClockEventKind {
             Self::Crow => "Crow",
             Self::Explosion => "Explosion",
             Self::Aquarium => "Aquarium",
+            Self::CellSwap => "Cell Swap",
+            Self::Grass => "Grass",
+            Self::SlotMachine => "Slot Machine",
+            Self::Spider => "Spider",
         }
     }
 }
@@ -661,6 +756,10 @@ pub struct ClockEvents {
     pub crow: bool,
     pub explosion: bool,
     pub aquarium: bool,
+    pub cell_swap: bool,
+    pub grass: bool,
+    pub slot_machine: bool,
+    pub spider: bool,
 }
 
 impl Default for ClockEvents {
@@ -676,6 +775,10 @@ impl Default for ClockEvents {
             crow: true,
             explosion: true,
             aquarium: true,
+            cell_swap: true,
+            grass: true,
+            slot_machine: true,
+            spider: true,
         }
     }
 }
@@ -693,8 +796,127 @@ impl ClockEvents {
             ClockEventKind::Crow => self.crow,
             ClockEventKind::Explosion => self.explosion,
             ClockEventKind::Aquarium => self.aquarium,
+            ClockEventKind::CellSwap => self.cell_swap,
+            ClockEventKind::Grass => self.grass,
+            ClockEventKind::SlotMachine => self.slot_machine,
+            ClockEventKind::Spider => self.spider,
         }
     }
+}
+
+/// Persistent Clock habitat and paid plant diagnostics, including between events.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockGrassState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ceiling_optics: Option<ClockCeilingOptics>,
+    #[serde(default)]
+    pub ceiling_phase: String,
+    #[serde(default)]
+    pub ceiling_elapsed_ms: u64,
+    #[serde(default)]
+    pub ceiling_opening_milli: u16,
+    #[serde(default)]
+    pub ceiling_sequence: u64,
+    #[serde(default)]
+    pub ceiling_deliveries: u64,
+    #[serde(default)]
+    pub ceiling_cancellations: u64,
+    #[serde(default)]
+    pub ceiling_pending_material: usize,
+    #[serde(default)]
+    pub ceiling_planned_material: u64,
+    #[serde(default)]
+    pub ceiling_committed_material: u64,
+    #[serde(default)]
+    pub ceiling_cancelled_material: u64,
+    /// Grass tissue only. A retained moss mat outlives the patch it succeeded,
+    /// so it is counted on its own rather than folded into these totals.
+    #[serde(default)]
+    pub stressed_tissues: usize,
+    #[serde(default)]
+    pub dead_tissues: usize,
+    #[serde(default)]
+    pub moss_tissues: usize,
+    #[serde(default)]
+    pub moss_stressed: usize,
+    #[serde(default)]
+    pub moss_dead: usize,
+    pub biology_tick: u64,
+    pub soil_added: u64,
+    pub soil_retained: usize,
+    pub soil_exported: u64,
+    pub living_tissues: usize,
+    pub mature_blades: usize,
+    pub shoots: usize,
+    pub organisms: Vec<u64>,
+    pub reserves: [u64; 3],
+    pub intake: [u64; 3],
+    pub maintenance: [u64; 3],
+    pub development: [u64; 3],
+    pub seeded: usize,
+    pub refusal: Option<String>,
+    pub intensity: u16,
+    pub optical_refusals: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection: Option<ClockGrassInspection>,
+}
+
+/// Same completed simulation boundary used by sunlight presentation and queries.
+/// Coordinates are world units ×1000; intensities are ordinary 0–1000 units.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCeilingOptics {
+    pub simulation_tick: u64,
+    pub geometry_generation: u64,
+    /// First opening's identity and its left, right and ceiling coordinates.
+    /// Retained so a state written by the single-opening build still loads.
+    pub source_id: [u64; 2],
+    pub aperture_milli: [i32; 3],
+    /// Every live opening, left to right. Empty in a state written before the
+    /// ceiling could break in more than one place.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub apertures: Vec<ClockCeilingAperture>,
+    pub collider_generations: Vec<[u64; 4]>,
+    pub moving_blocker: Option<[u64; 2]>,
+    pub silhouettes_milli: Vec<Vec<[i32; 2]>>,
+    pub samples: Vec<ClockCeilingSample>,
+}
+
+/// One ceiling opening, in the same world mill units as the samples.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCeilingAperture {
+    pub source_id: [u64; 2],
+    pub aperture_milli: [i32; 3],
+}
+
+/// One fresh receiver: total and aperture-only intensity plus its first blocker.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCeilingSample {
+    pub position_milli: [i32; 2],
+    pub intensity: u16,
+    pub sunlight: u16,
+    pub first_blocker: Option<[u64; 2]>,
+}
+
+/// Bounded read-only view of one retained organism, in stable material cells.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockGrassInspection {
+    pub organism: Option<u64>,
+    pub tissues: Vec<ClockGrassTissue>,
+    pub connections: Vec<[u64; 2]>,
+    pub soil_cells: Vec<[i32; 2]>,
+    pub development_per_size: [u64; 3],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockGrassTissue {
+    pub id: u64,
+    pub cell: [i32; 2],
+    pub role: String,
+    pub size: u16,
+    pub health: u16,
+    pub development: [u64; 3],
+    pub invested: [u64; 3],
+    pub support: Option<[u64; 2]>,
 }
 
 /// Aquarium actors are steering agents, not native physics bodies. Water uses
@@ -775,6 +997,113 @@ pub struct ClockCrowState {
 
 fn shy_crow_water_tolerance() -> ClockCrowWaterTolerance {
     ClockCrowWaterTolerance::Shy
+}
+
+/// Bounded Spider visitor diagnostics, independent of the timed animation.
+/// The spider is the one visitor that moves in the run's physics arena.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockSpiderState {
+    pub visit_id: u64,
+    pub seed: u64,
+    pub phase: ClockSpiderPhase,
+    pub phase_tick: u64,
+    pub age_ticks: u64,
+    /// Ticks left before the visit must be leaving, by its budget.
+    pub remaining_ticks: u64,
+    pub position_milli: [i32; 2],
+    pub velocity_milli: [i32; 2],
+    /// The way the spider's back faces, in thousandths of a unit vector.
+    pub up_milli: [i32; 2],
+    pub mode: ClockSpiderMode,
+    /// What the legs hold, if anything.
+    pub support: Option<ClockSpiderHold>,
+    /// What the silk line is tied to, if it is tied.
+    pub anchor: Option<ClockSpiderHold>,
+    /// Whether a shot's line is on its way.
+    pub shooting: bool,
+    pub line_length_milli: Option<u32>,
+    pub climbs: u32,
+    pub swings: u32,
+    pub falls: u32,
+    pub recoveries: u32,
+    /// The visit ran out of time without getting out, and was retired where
+    /// it stood.
+    pub failed_exit: bool,
+    pub proxies: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderPhase {
+    Descending,
+    Crossing,
+    Climbing,
+    Crawling,
+    Swinging,
+    Recovering,
+    Leaving,
+}
+
+impl ClockSpiderPhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Descending => "descending",
+            Self::Crossing => "crossing",
+            Self::Climbing => "climbing",
+            Self::Crawling => "crawling",
+            Self::Swinging => "swinging",
+            Self::Recovering => "recovering",
+            Self::Leaving => "leaving",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderMode {
+    Free,
+    Crawling,
+    Hanging,
+}
+
+impl ClockSpiderMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Free => "free",
+            Self::Crawling => "crawling",
+            Self::Hanging => "hanging",
+        }
+    }
+}
+
+/// What the spider holds or is tied to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum ClockSpiderHold {
+    /// A lit digit cell, by its surface id.
+    Surface {
+        id: u32,
+        departing: bool,
+    },
+    /// A rigid body carrying digit cells, by its entity.
+    Rigid {
+        entity: u64,
+    },
+    /// A part of the frame: a rail, the ceiling beside the hatch, or the beam.
+    Frame {
+        part: ClockSpiderFramePart,
+    },
+    Floor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderFramePart {
+    LeftRail,
+    RightRail,
+    CeilingLeft,
+    CeilingRight,
+    Beam,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1027,10 +1356,146 @@ pub struct ClockDuckNavigationState {
     pub water: ClockDuckWaterState,
     #[serde(default)]
     pub recovery: ClockDuckRecoveryState,
+    #[serde(default)]
+    pub ledge: ClockDuckAutoLedgeState,
+    #[serde(default)]
+    pub flap_detour: ClockDuckFlapDetourState,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckFlapDetourPhase {
+    #[default]
+    Pending,
+    Approaching,
+    Recovering,
+    Perching,
+    Returning,
+    Finished,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckFlapDetourOutcome {
+    NotSelected,
+    Unsafe,
+    Expired,
+    Wet,
+    Blocked,
+    Interrupted,
+    TimedOut,
+    Deadline,
+    TakenOver,
+    Returned,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckFlapDetourState {
+    /// Development-only route selection; ordinary visits retain pull-ups.
+    #[serde(default)]
+    pub direct_landing: bool,
+    pub phase: ClockDuckFlapDetourPhase,
+    pub attempts: u32,
+    pub ticks: u32,
+    pub perch_ticks: u32,
+    pub clearance_queries: u32,
+    pub outcome: Option<ClockDuckFlapDetourOutcome>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckAutoLedgeOutcome {
+    Climbed,
+    Missed,
+    Blocked,
+    Wet,
+    Deadline,
+    TimedOut,
+    Interrupted,
+    TakenOver,
+}
+
+/// Automatic decisions are separate from the shared physical ledge state.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckAutoLedgeState {
+    pub active: bool,
+    pub target_body: Option<u64>,
+    pub attempts: u32,
+    pub completed: u32,
+    pub failed: u32,
+    pub attempt_ticks: u32,
+    pub hang_ticks: u32,
+    pub cooldown_ticks: u32,
+    pub candidates_checked: u32,
+    pub outcome: Option<ClockDuckAutoLedgeOutcome>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClockDuckFlapHold {
+    Standing,
+    Attachment,
+    Obstructed,
+}
+
+/// One rigid door flap. A missing body means the panel has closed or retired.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckFlapState {
+    pub generation: u64,
+    pub body_id: Option<u64>,
+    pub requested_open_milli: u32,
+    pub open_milli: u32,
+    pub hinge_milli: [i32; 2],
+    pub angle_milliradians: i32,
+    pub velocity_milli: [i32; 2],
+    pub angular_velocity_milliradians: i32,
+    pub hold: Option<ClockDuckFlapHold>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckLedgePhase {
+    #[default]
+    Free,
+    Reaching,
+    Hanging,
+    Climbing,
+    Dropping,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckLedgeReason {
+    NoEligibleEdge,
+    Obstructed,
+    SupportLost,
+    Disrupted,
+    Released,
+    ClimbBlocked,
+    CaptureFailed,
+    ClimbTimeout,
+}
+
+/// One authoritative attachment, fixed-size counters, and per-tick query work.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckLedgeState {
+    pub phase: ClockDuckLedgePhase,
+    pub support_body: Option<u64>,
+    pub anchor_milli: Option<[i32; 2]>,
+    pub progress_milli: u32,
+    pub rearm_required: bool,
+    pub cooldown_ticks: u32,
+    pub candidates_checked: u32,
+    pub clearance_queries: u32,
+    pub catches: u32,
+    pub climbs: u32,
+    pub releases: u32,
+    pub reason: Option<ClockDuckLedgeReason>,
 }
 
 /// Temporary course/controller telemetry. Position is in thousandths of render
-/// world units; the duck and its physics are absent during opening/resetting.
+/// world units. The character is absent during opening/resetting; its doors
+/// can still be moving in the shared physics world.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockDuckState {
     #[serde(default)]
@@ -1043,6 +1508,11 @@ pub struct ClockDuckState {
     pub obstacle_count: usize,
     pub entrance_open_milli: u32,
     pub exit_open_milli: u32,
+    /// Entrance then exit, independent of screen-side mirroring.
+    #[serde(default)]
+    pub flaps: [ClockDuckFlapState; 2],
+    #[serde(default)]
+    pub ledge: ClockDuckLedgeState,
     pub outcome: Option<ClockDuckOutcome>,
     /// Additive diagnostics: old schema-8 payloads may omit this object.
     #[serde(default)]
@@ -1641,7 +2111,10 @@ fn normalize_spacewars_player_view_height(value: f32) -> f32 {
 }
 
 pub const DEFAULT_PIZZA_DESIRED_BALLS: u32 = 24;
-pub const MAX_PIZZA_DESIRED_BALLS: u32 = 500;
+/// Experimental ceiling, not a recommended sustained population on a Pi.
+pub const MAX_PIZZA_LIVE_BALLS: u32 = 5_000;
+pub const DEFAULT_PIZZA_LIVE_BALL_LIMIT: u32 = 500;
+pub const MAX_PIZZA_DESIRED_BALLS: u32 = MAX_PIZZA_LIVE_BALLS;
 pub const DEFAULT_PIZZA_BALL_SPAWN_RATE: f32 = 0.10;
 pub const MIN_PIZZA_BALL_SPAWN_RATE: f32 = 0.01;
 pub const MAX_PIZZA_BALL_SPAWN_RATE: f32 = 0.99;
@@ -1649,26 +2122,34 @@ pub const MAX_PIZZA_BALL_SPAWN_RATE: f32 = 0.99;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PizzaSettings {
+    /// Includes spawned balls, fragments and the held ball.
+    pub live_ball_limit: u32,
     #[serde(default = "default_pizza_desired_balls")]
     pub desired_balls: u32,
     #[serde(default = "default_pizza_ball_spawn_rate")]
     pub ball_spawn_rate: f32,
+    pub automatic_events: bool,
 }
 
 impl Default for PizzaSettings {
     fn default() -> Self {
         Self {
+            live_ball_limit: DEFAULT_PIZZA_LIVE_BALL_LIMIT,
             desired_balls: DEFAULT_PIZZA_DESIRED_BALLS,
             ball_spawn_rate: DEFAULT_PIZZA_BALL_SPAWN_RATE,
+            automatic_events: true,
         }
     }
 }
 
 impl PizzaSettings {
     pub fn normalized(&self) -> Self {
+        let live_ball_limit = self.live_ball_limit.clamp(1, MAX_PIZZA_LIVE_BALLS);
         Self {
-            desired_balls: self.desired_balls.min(MAX_PIZZA_DESIRED_BALLS),
+            live_ball_limit,
+            desired_balls: self.desired_balls.min(live_ball_limit),
             ball_spawn_rate: normalize_pizza_ball_spawn_rate(self.ball_spawn_rate),
+            automatic_events: self.automatic_events,
         }
     }
 }

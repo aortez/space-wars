@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "device": "spacewars.local",
+  "board_serial": "ddde6ffbe45bcea8",
+  "reason": "Trial afef8ee0 reached slot B but failed before observing health because the old coexistence guard rejected the recovery service mount namespace; watchdog fallback returned to original slot A.",
+  "result": {
+    "boot_id": "340070d5-939e-4593-914a-e24ec9b52f12",
+    "source": "a05944ba94bd985386bac3f5276731135df9e6a3",
+    "script_sha256": "3b5071e3d484ee212004170fae08be260673deb53634983147fffeb85ceb78a6",
+    "probe_binary_sha256": "8ac878ee4ca5c4d2b17adb418dc81f87310cc076a0fa115ad8526040d090dbd9",
+    "original_boot_inventory_verified": true,
+    "original_boot_files": 109,
+    "consumed_trial_sha256_before": "f9f8ed32d30df3da790d9d33d9b189ced0bbd19ca91ef6c3435d163efa3698b9",
+    "consumed_trial_sha256_after": "f9f8ed32d30df3da790d9d33d9b189ced0bbd19ca91ef6c3435d163efa3698b9",
+    "retained_attempt": "/data/logs/spacewars-bootstrap-failed-afef8ee0/attempt",
+    "user_data_restored": false,
+    "root_slots_written": false,
+    "watchdog_opened": false,
+    "reboot_requested": false,
+    "automatic_retry": false,
+    "recovery_baseline_created": false,
+    "kiosk_and_device_service_restored": true
+  },
+  "preserved": {
+    "device_archive": "/data/logs/spacewars-bootstrap-failed-afef8ee0",
+    "off_device_evidence": "/home/data/workspace/space-wars-ota/target/ota-pi5-failed-trial-reconciliation-afef8ee0",
+    "boot_archive": {
+      "bytes": 121159680,
+      "sha256": "a277a271228de4df1eebd7d0938dd20c75ec27265ffc3aa53ff38b552384c04c"
+    },
+    "old_package": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
+    "trial_id": "afef8ee0a7016b1cb1e8516a328367c69576bf3638f929b319ab44333eeb9182",
+    "original_selector": {
+      "bytes": 2683,
+      "sha256": "9122876400ff500c46e3afa66c56ff4c944df8215d62921b7d392ef80d3a8f5e"
+    },
+    "original_boot_files": 109,
+    "retired_staged_files": 78,
+    "root_replacement_scratch_files": "retained unchanged; no fallback root cleanup"
+  },
+  "operator_procedure": {
+    "scope": "one reviewed consumed attempt on the exact unchanged fallback boot; not a general runtime retry or completed-bootstrap retirement",
+    "sha256": "3b5071e3d484ee212004170fae08be260673deb53634983147fffeb85ceb78a6",
+    "artifact": "/home/data/workspace/space-wars-ota/target/ota-pi5-failed-trial-reconciliation-afef8ee0/apply.sh",
+    "installation_lock_held": true,
+    "live_preflight_passed": true,
+    "boot_inventory_revalidated_by_native_probe": true,
+    "normal_default_unchanged": true,
+    "whole_reservation_and_package_renamed_together": true,
+    "no_data_archive_restored": true
+  },
+  "rehearsal": {
+    "test_groups": 7,
+    "scenarios": 27,
+    "interruption_checkpoints": 10,
+    "passed": true,
+    "limits": "filesystem fixtures and live read-only preflight; not physical power-loss qualification",
+    "log_sha256": "3935b334163c3076bfd6bd31a16d2f2c979347a44b562bc61f92b3f4c8c151b6"
+  },
+  "automatic_ota_enabled": false,
+  "new_trial_is_separate": true
+}

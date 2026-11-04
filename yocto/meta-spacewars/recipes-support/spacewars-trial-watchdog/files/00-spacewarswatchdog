@@ -1,0 +1,15 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+
+spacewarswatchdog_enabled() {
+    return 0
+}
+
+spacewarswatchdog_run() {
+    # The record is volatile and must move with /run into the selected root.
+    # Run before udev or any module that examines/mounts the candidate root.
+    mountpoint -q /run || mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run ||
+        fatal "Cannot prepare Space-Wars early recovery state"
+    /usr/sbin/spacewars-trial-watchdog --arm-trial ||
+        fatal "Space-Wars trial watchdog setup failed; waiting for recovery"
+}

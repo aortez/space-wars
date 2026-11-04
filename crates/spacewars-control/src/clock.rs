@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 20;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 23;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -25,6 +25,13 @@ pub struct ClockEventInfo {
     pub blocked_by_duck: bool,
     #[serde(default)]
     pub blocked_by_crow: bool,
+    /// A spider is visiting, and this event waits for it to leave, or is
+    /// another spider.
+    #[serde(default)]
+    pub blocked_by_spider: bool,
+    /// Why the run's arena would refuse the event now, if it would.
+    #[serde(default)]
+    pub blocked_by_arena: Option<engine_common::ClockArenaUnavailable>,
     pub automatic_ready_at_tick: u64,
 }
 
@@ -49,10 +56,20 @@ pub struct ClockState {
     pub body_count: usize,
     pub collider_count: usize,
     pub floor: engine_common::ClockFloorMode,
+    /// The run's shared rigid arena: who holds it, what each holder has in its
+    /// world, its last step and the bounds it takes claims within.
+    #[serde(default)]
+    pub arena: Option<engine_common::ClockArenaState>,
+    /// The lit digit cells a resident can attach to: a bounded sample of the
+    /// surfaces alive now, the latest changes to them and their accounting.
+    #[serde(default)]
+    pub digit_surfaces: Option<engine_common::ClockDigitSurfaceState>,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
     #[serde(default)]
     pub crow: Option<engine_common::ClockCrowState>,
+    #[serde(default)]
+    pub spider: Option<engine_common::ClockSpiderState>,
     #[serde(default)]
     pub explosion: Option<engine_common::ClockExplosionState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
@@ -62,9 +79,15 @@ pub struct ClockState {
     pub marquee: Option<engine_common::ClockMarqueeState>,
     pub digit_slide: Option<engine_common::ClockDigitSlideState>,
     #[serde(default)]
+    pub cell_swap: Option<engine_common::ClockCellSwapState>,
+    #[serde(default)]
+    pub grass: Option<engine_common::ClockGrassState>,
+    #[serde(default)]
     pub rain: Option<engine_common::ClockRainState>,
     #[serde(default)]
     pub aquarium: Option<engine_common::ClockAquariumState>,
+    #[serde(default)]
+    pub slot_machine: Option<engine_common::ClockSlotMachineState>,
     pub reading: Option<[u8; 3]>,
     /// Host-supplied local civil date, [year, month, day].
     pub date: Option<[u16; 3]>,
@@ -99,13 +122,17 @@ pub struct ClockTriggerRequest {
 }
 
 impl ClockTriggerRequest {
-    /// Queue acknowledgement is not admission. Ducks/crows become resident visits;
-    /// unlike timed animations, they do not remain in the Active lifecycle.
+    /// Queue acknowledgement is not admission. Ducks, crows and spiders become
+    /// resident visits; unlike timed animations, they do not remain in the
+    /// Active lifecycle.
     pub fn started_predicate(&self) -> ClockStatePredicate {
         ClockStatePredicate {
             scenario_revision: self.expected_scenario_revision,
-            lifecycle: (!matches!(self.event, ClockEventKind::Duck | ClockEventKind::Crow))
-                .then(|| "active".into()),
+            lifecycle: (!matches!(
+                self.event,
+                ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::Spider
+            ))
+            .then(|| "active".into()),
             event_kind: Some(self.event),
             phase: None,
             event_id: Some(self.expected_event_id.saturating_add(1)),
@@ -194,22 +221,33 @@ impl ClockStatePredicate {
                 duck.is_some()
             } else if kind == ClockEventKind::Crow {
                 state.crow.is_some()
+            } else if kind == ClockEventKind::Spider {
+                state.spider.is_some()
             } else {
                 Some(kind) == state.event_kind
             }
         });
-        let crow = (self.event_kind == Some(ClockEventKind::Crow))
-            .then_some(state.crow.as_ref())
-            .flatten();
-        let phase = crow.map(|crow| crow.phase.as_str()).or(duck
+        // A visitor's own phase, tick and identity, as the crow's and the
+        // spider's are, so a later animation never invalidates a wait for it.
+        let visitor = match self.event_kind {
+            Some(ClockEventKind::Crow) => state
+                .crow
+                .as_ref()
+                .map(|crow| (crow.phase.as_str(), crow.phase_tick, crow.visit_id)),
+            Some(ClockEventKind::Spider) => state
+                .spider
+                .as_ref()
+                .map(|spider| (spider.phase.as_str(), spider.phase_tick, spider.visit_id)),
+            _ => None,
+        };
+        let phase = visitor.map(|(phase, _, _)| phase).or(duck
             .map(|duck| duck.phase.as_str())
             .or(state.phase.as_deref()));
-        let phase_tick = crow.map_or_else(
+        let phase_tick = visitor.map_or_else(
             || duck.map_or(state.phase_tick, |duck| duck.phase_tick),
-            |crow| crow.phase_tick,
+            |(_, tick, _)| tick,
         );
-        // A later animation must not invalidate a wait for this crow visit.
-        let event_id = crow.map_or(state.event_id, |crow| crow.visit_id);
+        let event_id = visitor.map_or(state.event_id, |(_, _, id)| id);
         state.scenario_revision == self.scenario_revision
             && self
                 .lifecycle
@@ -411,16 +449,22 @@ mod tests {
             body_count: 0,
             collider_count: 0,
             floor: engine_common::ClockFloorMode::Closed,
+            arena: None,
+            digit_surfaces: None,
             meltdown: None,
             duck: None,
             crow: None,
+            spider: None,
             explosion: None,
             player_duck: None,
             automatic_events_suspended: false,
             marquee: None,
             digit_slide: None,
+            cell_swap: None,
+            grass: None,
             rain: None,
             aquarium: None,
+            slot_machine: None,
             reading: Some([12, 34, 56]),
             date: Some([2026, 9, 25]),
             date_label: Some("FRIDAY · SEPTEMBER 25".into()),
@@ -445,6 +489,181 @@ mod tests {
             assert!(json.contains(&format!("\"floor\":\"{}\"", mode.as_str())));
             assert_eq!(ClockState::from_json(&json).unwrap(), state);
         }
+    }
+
+    #[test]
+    fn arena_diagnostics_round_trip_with_named_owners_and_refusals() {
+        use engine_common::{
+            ClockArenaAccounting, ClockArenaClaim, ClockArenaLimits, ClockArenaOwner,
+            ClockArenaPopulation, ClockArenaRemap, ClockArenaState, ClockArenaStep,
+            ClockArenaUnavailable,
+        };
+        let mut state = clock_state();
+        let claim = |owner, resident, bodies| ClockArenaClaim {
+            owner,
+            resident,
+            population: ClockArenaPopulation::new(bodies, bodies),
+            budget: ClockArenaPopulation::new(4, 4),
+        };
+        state.arena = Some(ClockArenaState {
+            accounting: ClockArenaAccounting {
+                claims: 3,
+                residents: 2,
+                bodies: 7,
+                colliders: 7,
+                refused: 2,
+                steps: 600,
+                worlds: 1,
+                layout_incompatible: true,
+                last_remap: Some(ClockArenaRemap::Declined),
+                ..ClockArenaAccounting::default()
+            },
+            claims: vec![
+                claim(ClockArenaOwner::Soil, true, 1),
+                claim(ClockArenaOwner::Fixture { index: 0 }, true, 3),
+                claim(
+                    ClockArenaOwner::Event {
+                        event: ClockEventKind::Falling,
+                    },
+                    false,
+                    0,
+                ),
+            ],
+            floor: ClockArenaPopulation::new(3, 3),
+            last_step: Some(ClockArenaStep {
+                wall_us: 41,
+                sleeping_bodies: 3,
+                ..ClockArenaStep::default()
+            }),
+            limits: ClockArenaLimits {
+                claims: 6,
+                residents: 4,
+                capacity: ClockArenaPopulation::new(255, 288),
+            },
+        });
+        state.events.push(ClockEventInfo {
+            kind: ClockEventKind::Falling,
+            label: "Falling".into(),
+            effect: "physics".into(),
+            trigger: engine_common::ClockEventTrigger::Periodic,
+            duration_ticks: 600,
+            cooldown_ticks: 120,
+            enabled: true,
+            blocked_by_player: false,
+            blocked_by_duck: false,
+            blocked_by_crow: false,
+            blocked_by_spider: false,
+            blocked_by_arena: Some(ClockArenaUnavailable::LayoutIncompatible),
+            automatic_ready_at_tick: 0,
+        });
+        let json = state.to_json().unwrap();
+        for named in [
+            r#"{"kind":"soil"}"#,
+            r#"{"kind":"fixture","index":0}"#,
+            r#"{"kind":"event","event":"falling"}"#,
+            r#""last_remap":{"kind":"declined"}"#,
+            r#""blocked_by_arena":"layout-incompatible""#,
+        ] {
+            assert!(json.contains(named), "{named} in {json}");
+        }
+        assert_eq!(ClockState::from_json(&json).unwrap(), state);
+    }
+
+    #[test]
+    fn digit_surface_diagnostics_round_trip_with_named_sources_and_reasons() {
+        use engine_common::{
+            ClockDigitSurface, ClockDigitSurfaceState, ClockSurfaceAccounting, ClockSurfaceChange,
+            ClockSurfaceChangeKind, ClockSurfaceLimits, ClockSurfaceRetirement,
+            ClockSurfaceRetirements, ClockSurfaceSource, ClockSurfaceSourceCount,
+        };
+        let mut state = clock_state();
+        let change = |sequence, id, change| ClockSurfaceChange {
+            sequence,
+            tick: 420,
+            id,
+            change,
+        };
+        state.digit_surfaces = Some(ClockDigitSurfaceState {
+            accounting: ClockSurfaceAccounting {
+                live: 2,
+                departing: 1,
+                peak_live: 40,
+                admitted: 41,
+                handed_off: 3,
+                departed: 2,
+                retired: ClockSurfaceRetirements {
+                    replaced: 38,
+                    merged_away: 1,
+                    ..ClockSurfaceRetirements::default()
+                },
+                sequence: 85,
+            },
+            sources: vec![ClockSurfaceSourceCount {
+                source: ClockSurfaceSource::Slide,
+                live: 2,
+            }],
+            sample: vec![ClockDigitSurface {
+                id: 41,
+                slot: 3,
+                cell: [2, -1],
+                source: ClockSurfaceSource::Slide,
+                body: None,
+                origin_milli: [1250, -380],
+                angle_millidegrees: 0,
+                scale_milli: 600,
+                footprint_milli: [-400, -400, 400, 400],
+                departing: true,
+                opacity_milli: 1000,
+                clip_milli: Some([-2000, 3400]),
+            }],
+            recent: vec![
+                change(
+                    83,
+                    41,
+                    ClockSurfaceChangeKind::Admitted {
+                        slot: 3,
+                        cell: [2, -1],
+                        source: ClockSurfaceSource::Anchored,
+                    },
+                ),
+                change(
+                    84,
+                    41,
+                    ClockSurfaceChangeKind::HandedOff {
+                        from: ClockSurfaceSource::Anchored,
+                        to: ClockSurfaceSource::Slide,
+                    },
+                ),
+                change(
+                    85,
+                    40,
+                    ClockSurfaceChangeKind::Retired {
+                        reason: ClockSurfaceRetirement::MergedAway,
+                    },
+                ),
+            ],
+            limits: ClockSurfaceLimits {
+                live: 648,
+                retained_changes: 1296,
+                sample: 16,
+                recent: 16,
+            },
+        });
+        let json = state.to_json().unwrap();
+        for named in [
+            r#""source":"slide""#,
+            r#"{"kind":"admitted","slot":3,"cell":[2,-1],"source":"anchored"}"#,
+            r#"{"kind":"handed-off","from":"anchored","to":"slide"}"#,
+            r#"{"kind":"retired","reason":"merged-away"}"#,
+            r#""merged_away":1"#,
+        ] {
+            assert!(json.contains(named), "{named} in {json}");
+        }
+        assert_eq!(ClockState::from_json(&json).unwrap(), state);
+        let mut older: serde_json::Value = serde_json::from_str(&json).unwrap();
+        older.as_object_mut().unwrap().remove("digit_surfaces");
+        let older = ClockState::from_json(&older.to_string()).unwrap();
+        assert_eq!(older.digit_surfaces, None);
     }
 
     #[test]
@@ -481,6 +700,20 @@ mod tests {
                 obstacle_count: 3,
                 entrance_open_milli: 0,
                 exit_open_milli: 1000,
+                flaps: [
+                    engine_common::ClockDuckFlapState {
+                        generation: 2,
+                        body_id: Some(2100),
+                        requested_open_milli: 0,
+                        open_milli: 1000,
+                        hinge_milli: [-400000, -167600],
+                        angle_milliradians: 1571,
+                        hold: Some(engine_common::ClockDuckFlapHold::Attachment),
+                        ..Default::default()
+                    },
+                    Default::default(),
+                ],
+                ledge: Default::default(),
                 outcome: None,
                 navigation: None,
             },
@@ -961,8 +1194,24 @@ mod tests {
             obstacle_count: 3,
             entrance_open_milli: 0,
             exit_open_milli: 700,
+            flaps: Default::default(),
+            ledge: Default::default(),
             outcome: Some(engine_common::ClockDuckOutcome::Exited),
             navigation: Some(engine_common::ClockDuckNavigationState {
+                flap_detour: engine_common::ClockDuckFlapDetourState {
+                    phase: engine_common::ClockDuckFlapDetourPhase::Perching,
+                    attempts: 1,
+                    ticks: 110,
+                    perch_ticks: 12,
+                    ..Default::default()
+                },
+                ledge: engine_common::ClockDuckAutoLedgeState {
+                    attempts: 2,
+                    completed: 1,
+                    failed: 1,
+                    outcome: Some(engine_common::ClockDuckAutoLedgeOutcome::Climbed),
+                    ..Default::default()
+                },
                 recovery: engine_common::ClockDuckRecoveryState {
                     active: true,
                     interrupted_jumps: 2,
@@ -1094,6 +1343,8 @@ mod tests {
             .unwrap();
         navigation.remove("jump_profile");
         navigation.remove("recovery");
+        navigation.remove("ledge");
+        navigation.remove("flap_detour");
         let planning = navigation["planning"].as_object_mut().unwrap();
         for field in [
             "running_jumps",
@@ -1109,6 +1360,14 @@ mod tests {
         plan.remove("next_target");
         let older = ClockState::from_json(&careful_payload.to_string()).unwrap();
         let navigation = older.duck.unwrap().navigation.unwrap();
+        assert_eq!(
+            navigation.flap_detour,
+            engine_common::ClockDuckFlapDetourState::default()
+        );
+        assert_eq!(
+            navigation.ledge,
+            engine_common::ClockDuckAutoLedgeState::default()
+        );
         assert_eq!(
             navigation.recovery,
             engine_common::ClockDuckRecoveryState::default()
@@ -1140,6 +1399,8 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("navigation");
+        old_payload["duck"].as_object_mut().unwrap().remove("flaps");
+        old_payload["duck"].as_object_mut().unwrap().remove("ledge");
         state.duck.as_mut().unwrap().navigation = None;
         assert_eq!(
             ClockState::from_json(&old_payload.to_string()).unwrap(),
@@ -1170,6 +1431,8 @@ mod tests {
             blocked_by_player: false,
             blocked_by_duck: false,
             blocked_by_crow: false,
+            blocked_by_spider: false,
+            blocked_by_arena: None,
             automatic_ready_at_tick: 0,
         });
         assert_eq!(

@@ -441,8 +441,8 @@ injects the selected SSH public key, writes `/boot/hostname.txt`, grows the
 `/data` partition, can back up and restore existing `/data`, and can inject
 Wi-Fi credentials.
 
-After the first OTA-capable image is flashed, root filesystem updates can use
-the project-root A/B updater over SSH:
+Existing images without `engine-os-manager` can use the legacy project-root
+A/B updater over SSH:
 
 ```sh
 ./update.sh
@@ -453,11 +453,17 @@ Run these from the repository root. The OTA path builds unless `--skip-build`
 is passed, transfers the latest
 `spacewars-image-raspberrypi-spacewars.rootfs.ext4.gz` to the Pi, verifies its checksum,
 flashes it to the inactive slot with SSH key injection, switches boot slots,
-reboots, and verifies that `spacewars-kiosk.service` is active. The image
-includes a narrow sudoers entry for the `spacewars` user so the node script can
+reboots, and verifies that `spacewars-kiosk.service` is active. Those legacy
+images include a sudoers entry for the `spacewars` user so the node script can
 run `sudo /usr/sbin/ab-update-with-key ...` and `sudo systemctl reboot`, matching
 DirtSim's no-local-sudo update model. The lower-level command remains available
 as `cd yocto && npm run update`.
+
+Images containing `engine-os-manager` disable these unsigned rootfs helpers
+and their runtime sudo grants. The workstation script detects that boundary
+and stops before transfer. Their signed installation service and supervised
+bootstrap are being integrated; see [OTA status](ota-updates.md). Compatible
+development client/CLI updates use the root operator fast path below.
 
 The `.ext4.gz.boot-id` sidecar must match the device's `/boot/spacewars-boot-id`
 before transfer. The updater cannot replace boot files. An old Pi 5 image
@@ -466,7 +472,11 @@ changes also require a full flash. Profile selection and boot overrides persist
 across rootfs-only A/B updates. See [the compatibility boundary](picade.md#updates-and-the-boot-compatibility-boundary).
 
 SSH host keys live under `/data/ssh` so reflashes and A/B updates keep a stable
-device identity.
+device identity. New device-manager images also preserve login keys separately
+at `/data/spacewars-access/root` and `/data/spacewars-access/spacewars`. First
+boot imports each account's home key file once. Runtime keys do not grant root
+access; later key changes belong in these root-owned persistent files. See
+[operator provisioning and rollback behavior](ota-updates.md#persistent-ssh-login-keys).
 
 ### Read-only application logs
 
@@ -487,12 +497,12 @@ noninteractive reader, inheriting output and signals; it neither buffers the
 log nor contacts the application's control socket. It works while the app is
 hung, stopped, or restarting. SSH access to the device is still required.
 
-There is no new log store, polling loop, or per-frame logging. Existing
-journald rotation/retention remains unchanged: this image uses a volatile
-journal, so capture logs before rebooting. Startup and launch logs identify the
-renderer. Renderer selections, fallbacks, Clock setting changes, previews,
-pauses, and restarts provide a small event trail. User-provided marquee text
-is not included in settings-change records.
+Startup and launch logs identify the renderer. Renderer selections, fallbacks,
+Clock setting changes, previews, pauses, and restarts provide a small event
+trail. User-provided marquee text is not included in settings-change records.
+The image's [persistent system journal](#persistent-system-journal) retains
+previous boots for owner diagnostics; this restricted application reader still
+shows only the current boot.
 
 Installing the helper and its sudo rule requires **one normal rootfs update**;
 `--fast` cannot add them. They are included in the fast-update compatibility
@@ -505,9 +515,85 @@ Renderer row to raster. GPU mode supports either adapter; the `raster` choice
 at 1× uses direct geometry by default, while native-video scenarios retain
 their own path. Desktop and CPU-only headless benchmarks are unchanged.
 
+### Persistent system journal
+
+Images containing `spacewars-journal` keep the system journal in the root-owned
+`/data/spacewars-journal` directory, separate from kiosk-owned settings and the
+A/B root filesystems. Early boot logs stay in RAM. The journal flush service
+requires `/data` and the journal bind mount to succeed before copying those
+entries to disk. `/var/log` links into the `/var/volatile` tmpfs, and
+`systemd-tmpfiles` creates `/var/volatile/log` only after the flush, so
+preparation creates that directory itself. If preparation fails, journald
+continues using its bounded RAM store. On orderly shutdown it syncs and
+relinquishes the persistent store before unmounting it.
+
+Each slot binds the **same flat store** at `/var/log/journal/<current-machine-id>`.
+The system machine ID is unchanged. Journald opens a new file when the previous
+writer had a different ID, preserving the old file for reading and rotation.
+This gives both slots one retention budget instead of accumulating a separate
+budget for every root image. `SplitMode=none` keeps user messages in the system
+journal under the same budget; it grants no additional journal access to the
+kiosk account.
+
+| Setting | Persistent disk journal | Early-boot / fallback RAM journal |
+| --- | --- | --- |
+| Maximum use | 128 MiB | 16 MiB |
+| Keep free | 256 MiB | 16 MiB |
+| Maximum file size | 8 MiB | 2 MiB |
+| Maximum files | 32 | 16 |
+
+Compression is enabled. Only the size and file-count limits remove history,
+so busy devices drop old history sooner. Each boot starts at the image's
+build-time clock until timesyncd or NTP sets it. Time-based rotation and
+retention would therefore delete every boot's first file by its old start
+time, which is how generation 19 lost each boot's early entries. These are
+[journald retention limits](https://www.freedesktop.org/software/systemd/man/255/journald.conf.html),
+not a filesystem quota: rotation removes archived files and active-file
+allocation can temporarily exceed a target. Normal-priority messages sync
+every 30 seconds, so a sudden power loss or watchdog reset can lose the latest
+unsynced tail. Retention is not a backup.
+
+Use the owner account for previous boots and system-wide diagnostics. Selecting
+the directory explicitly includes the other slot's machine ID:
+
+```sh
+ssh swadmin@sw-picade-2.local sudo journalctl --directory=/data/spacewars-journal --list-boots --no-pager
+ssh swadmin@sw-picade-2.local sudo journalctl --directory=/data/spacewars-journal --boot=-1 --unit=spacewars-kiosk.service --no-pager
+ssh swadmin@sw-picade-2.local sudo journalctl --directory=/data/spacewars-journal --disk-usage
+```
+
+For an older failed trial, use its boot ID from `--list-boots` with
+`--boot=<boot-id>`; `-1` means the most recent retained previous boot. A rollback
+to an image predating this feature does not erase the directory: the same
+explicit-directory commands can read it, but that older image will not persist
+its own new logs. Existing volatile logs from boots before installation cannot
+be recovered.
+
+Installation requires a normal rootfs image update; `--fast` does not install
+the journal configuration or units. No kernel or boot partition change is
+needed. Check `systemctl status spacewars-journal systemd-journal-flush` and
+`grep /journal/ /proc/self/mountinfo` when diagnosing missing persistent logs.
+
+`yocto/tests/journal_test.py` runs real journald in disposable mount/PID
+namespaces. It covers early RAM logging and flush, clean restarts, changed slot
+machine IDs, a synced abrupt daemon kill followed by rollback, previous-boot
+queries, journal integrity, and rotation after flooding both slots. Boot IDs
+are simulated; this does not replace a real image boot and device reboot/trial
+qualification. The fixture never starts or stops the host's journal service.
+Preparation runs against an empty `/var/volatile` tmpfs, as on the device.
+Generation 19's first device boots found that an earlier fixture had created
+`/var/volatile/log` in advance, which hid the failure. The six journal tests
+passed on systemd 259.5 (workstation). The combined-slot flood fixture submits over 384 MiB of
+unique message payloads, checks usage at each batch against 128 MiB, and
+verifies that old entries expire while the latest synced marker remains.
+With the preparation fix, the full Yocto helper suite ran 71 Node tests and 120
+Python tests, with one pre-existing skip in each suite. Generation 19 was the
+first device boot of this feature. The fix still needs an image build and a
+device trial that reads the trial boot back from the store.
+
 ### Fast application updates
 
-After **one normal update** installs the fast-update helper and sudoers rule:
+After a current flash provisions `swadmin` and the v2 maintenance guard:
 
 ```sh
 ./update.sh --fast --target picade.local
@@ -515,7 +601,10 @@ After **one normal update** installs the fast-update helper and sudoers rule:
 ./update.sh --fast --target picade.local --dry-run
 ```
 
-The default host is still `spacewars.local`; always specify `picade.local` for
+The default SSH user is `swadmin`; noninteractive sudo supplies the operator
+privileges. `--user root` remains supported for an independently provisioned
+root login. See the [flash access and data-preservation flow](../yocto/README.md#flash)
+for owner-key provisioning. The default host is still `spacewars.local`; always specify `picade.local` for
 the cabinet. Fast mode builds the `spacewars` recipe only (no rootfs/image),
 exports the stripped `engine-client` and `spacewars-cli` together to
 `tmp/deploy/images/raspberrypi-spacewars/spacewars-fast/`, checks their AArch64
@@ -526,21 +615,25 @@ application restart. Games in progress end when the application restarts.
 
 The installed runtime identity must match the bundle. It fingerprints the
 build target, shared libraries in the recipe sysroot, installed service files,
-data initialization and installer helper. Missing helpers, changed libraries
-or service setup fail before installation: run a normal update without
-`--fast`. Hardware/kernel/firmware changes still require the full-flash checks
+device-service executable, data initialization and installer helper. Missing
+helpers, changed libraries or service setup fail before installation and need
+a compatible rootfs update or supervised bootstrap. Hardware/kernel/firmware changes still require the full-flash checks
 described above. Fast mode does **not** update OS packages, units, boot files,
 `engine-agent`, `engine-os-manager`, or `falling-benchmark`, and does not sync
-user data/ROMs. Use normal updates for those changes and `sync-data.sh` for ROMs.
+user data/ROMs. Use the rootfs update/bootstrap path for those changes and `sync-data.sh` for ROMs.
 The fingerprint is a conservative guard, not a general OS/package upgrade tool.
 
-The fast-update sudo permission is `/usr/sbin/spacewars-fast-update`; it accepts
-a fixed pair of binaries from a validated staging directory, reads them as the
-kiosk user, verifies hashes again, and serializes installs with a lock. It keeps
+The runtime kiosk UID has no fast-update sudo permission. The separately
+authenticated owner invokes `/usr/sbin/spacewars-fast-update` as root; its fixed
+device-manager entry point validates arguments, acquires the shared OTA/recovery
+lock, and rejects an unresolved trial or uncompleted trial watchdog. It then
+executes a fixed private worker with the lock inherited. The worker accepts a
+fixed pair of binaries from a private root-owned staging directory and verifies
+hashes again. It keeps
 backups before stopping the app and requires three control-API responses from
 the same new PID. A failed install/start/health check restores the previous pair
 and restarts it. No arbitrary copy command or generic service-control sudo is
-granted. The previous successful pair is retained, root-owned, under
+granted to the kiosk account. The previous successful pair is retained, root-owned, under
 `/usr/lib/spacewars-fast-update/` for manual recovery.
 
 Unlike A/B rootfs updates, this modifies the **current** root slot. File renames
@@ -549,6 +642,11 @@ during an update. Normal A/B updates replace fast-installed binaries in their
 destination slot. If SSH is lost during installation, reconnect and check
 `spacewars-cli status`/service health before retrying; do not assume success
 from a dropped connection.
+
+For OS, service or device-manager changes, a unit that allows them takes a
+[development image install](ota-development-installs.md) instead:
+`./update.sh --development --target sw-picade-2.local` writes the full image to
+the inactive slot and boots it as a trial that returns automatically on failure.
 
 After boot, [App Settings → Network](network-setup.md) can scan and connect using
 the cabinet, controller or touch input. Its timed trial restores the previous

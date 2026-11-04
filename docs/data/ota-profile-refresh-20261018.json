@@ -1,0 +1,228 @@
+{
+  "boot_id": "bef62885-8ebd-4f2c-bcfa-484388e7e52e",
+  "controls": [
+    "Three identical system-secret refreshes preserve VersionId and Updated signals",
+    "Explicit identical Update increments revision; Update2 with the old version returns VersionIdMismatch",
+    "Password-only Update changes revision despite equal visible settings",
+    "ClearSecrets changes revision",
+    "UpdateUnsaved and Save change revision and the Unsaved flag",
+    "A real registered secret agent is invoked: new/changed synthetic credentials increment revision; identical credentials preserve it",
+    "Deleting the synthetic profile removes it from the uncached inventory"
+  ],
+  "earlier_harness_failure": "The first candidate run passed the stored-secret controls but asserted a cached VersionId after a later Update. Replaced cached D-Bus proxies with uncached reads and reran in fresh private directories; both attempts preserved production state.",
+  "files": {
+    "build.log": {
+      "bytes": 9322,
+      "sha256": "6a000b9635e41963da18447f1a04c77df94b172ae1bc730df5bee02e808b1f87"
+    },
+    "clippy.log": {
+      "bytes": 471,
+      "sha256": "aac756ec0cf7429ae930cf1061ebf757e90b4fbf141419773434ab38f4c4102a"
+    },
+    "run-uncached/baseline.tar.gz": {
+      "bytes": 2185,
+      "sha256": "4730bb35b0deee3944fb2258ae0153472bf18744143269eb518fbc01cbd986b7"
+    },
+    "run-uncached/baseline/tests.log": {
+      "bytes": 612,
+      "sha256": "f4a1a1aa402d75d2297df8d175333ae6fcc39855df9720ecd908ce06c567a2cb"
+    },
+    "run-uncached/candidate.tar.gz": {
+      "bytes": 2425,
+      "sha256": "0baedb2f493fda167511e13c5f9b6629b5ad956edd5b3ad5e04666e43c12e189"
+    },
+    "run-uncached/candidate/tests.log": {
+      "bytes": 500,
+      "sha256": "db3cad49d16e2593c094929b6623bfa49b7182c0125848a85f68b36379713ad5"
+    },
+    "run-uncached/inputs.json": {
+      "bytes": 659,
+      "sha256": "acde52a61b23b86e4051b3f30808593cfe4230ce3e155974db6d48d80c2e1a2f"
+    },
+    "run-uncached/notifications.json": {
+      "bytes": 990,
+      "sha256": "25a12a94ea0d7e47ac4b0a3b511201093c84db86e9ec193d9bb224a2bc92111c"
+    },
+    "run-uncached/preservation.json": {
+      "bytes": 292,
+      "sha256": "cb05b84b08a8f457298bfa3ba5f08de9d0af231f77fd0fac81074c88227145e8"
+    },
+    "run-uncached/result.json": {
+      "bytes": 301,
+      "sha256": "f22b8ad7219c558d5f1be36414f67639d5d3e24e54a0b62ec0b993846bf2c614"
+    },
+    "run/candidate/tests.log": {
+      "bytes": 736,
+      "sha256": "493d808b0d0fc9f57d695d82f2dfe27c6d34a0859fe61e5993f11aebd5f6a5af"
+    },
+    "run/preservation.json": {
+      "bytes": 292,
+      "sha256": "cb05b84b08a8f457298bfa3ba5f08de9d0af231f77fd0fac81074c88227145e8"
+    },
+    "test-build.log": {
+      "bytes": 348,
+      "sha256": "c035b2d85a07179ceb2e955bc560e1200054c62eb2aa2ddd3c2cb9846bd4d90e"
+    }
+  },
+  "host": "spacewars.local",
+  "launcher": {
+    "bytes": 2959,
+    "path": "yocto/tests/nm-profile-refresh.sh",
+    "sha256": "382f6f4f024af9208f08c80540256710572c20e4cc1eb0154570a2048484f443"
+  },
+  "local_artifacts": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/nm-profile-refresh",
+  "notifications": {
+    "events": [
+      {
+        "version": 2
+      },
+      {
+        "updated": true
+      },
+      {
+        "updated": true
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 3
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 4
+      },
+      {
+        "updated": true
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 5
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 6
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 7
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 8
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 9
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 10
+      },
+      {
+        "updated": true
+      },
+      {
+        "updated": true
+      },
+      {
+        "version": 11
+      },
+      {
+        "updated": true
+      },
+      {
+        "updated": true
+      }
+    ],
+    "identical_refresh_updated_signals": 3,
+    "initial_version": 2,
+    "passed": true,
+    "version_after_explicit_update": 3
+  },
+  "original_regression": {
+    "after": 3,
+    "before": 2,
+    "message": "unchanged stored secret refresh changed VersionId",
+    "returncode": 101
+  },
+  "patch_sha256": "151f0f9187a890086ff8d01ae30dbd41813bbf7a93da7e6a43844484b6d20e89",
+  "preservation": {
+    "boot_unchanged": true,
+    "image_unchanged": true,
+    "kiosk_unchanged": true,
+    "passed": true,
+    "production_nm_unchanged": true,
+    "radio_clean": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_local_gatt_databases": []
+    }
+  },
+  "production_installed": false,
+  "provider": {
+    "candidate": {
+      "bytes": 22122088,
+      "sha256": "0034efd6fd2deba673a62a134a173e17d413a9defda1913fd855df9d43a2edf9"
+    },
+    "original_binary_sha256": "21fb145798fc2cde158edc50f3f9d6d9e3a8f00a216b1ae150c931eaa0db6e2d",
+    "upstream_archive_sha256": "1076c5ee2d60fa09e4af21f2d1bfe638973647c28c9b228d6d44a7044b735eaf",
+    "version": "1.46.6"
+  },
+  "qualification": {
+    "cases": {
+      "baseline": {
+        "returncode": 101,
+        "seconds": 0.338
+      },
+      "candidate": {
+        "returncode": 0,
+        "seconds": 0.392
+      }
+    },
+    "network_and_mount_namespaces_private": true,
+    "passed": true,
+    "production_replaced": false,
+    "synthetic_credentials_only": true
+  },
+  "remaining": [
+    "Build and verify a complete signed image containing this provider patch",
+    "Install a supervised trial and repeat the native Wi-Fi off/reconnect diagnostic",
+    "Complete time/OTA idle-cycle and Pi 4 qualification before unattended rollout"
+  ],
+  "remote_artifacts": "/data/spacewars-nm-qualification-20261018-151f0f91-uncached",
+  "schema": 1,
+  "scope": "Isolated Pi 5 native NetworkManager comparison; production daemon not replaced and live radio not toggled",
+  "source_base": "d7b6c554c07e05ccae9843a086bf6e78dc4d6a92",
+  "test_binary": {
+    "bytes": 24514776,
+    "sha256": "46a62c2f22eba5962d4a69142d2e3f7b7ff0a5e81ceca11105c81b8021561ac6"
+  },
+  "test_source": {
+    "bytes": 11734,
+    "path": "crates/engine-os-manager/tests/nm_profile_refresh.rs",
+    "sha256": "6172ae6478ed642900e1b43a6431dce5f1c2ee656d5e323d6705951570ac39da"
+  },
+  "validation": {
+    "clippy_all_targets": "passed with warnings denied",
+    "format": "passed",
+    "native_aarch64": "passed against old and patched real daemons",
+    "shell_syntax": "passed",
+    "yocto_networkmanager_install": "1629 tasks succeeded; 1619 reused"
+  }
+}

@@ -277,12 +277,193 @@ async fn connect(
     Ok(())
 }
 
+#[cfg(any(not(feature = "pi-kiosk"), test))]
 pub(super) async fn run(
     backend: &impl Backend,
     commands: Receiver<Command>,
     shared: Arc<Mutex<View>>,
 ) {
     run_with_timing(backend, commands, shared, CONNECT_TIME, CONFIRM_TIME).await;
+}
+
+#[cfg(any(feature = "pi-kiosk", test))]
+pub(super) trait Protection {
+    fn now(&self) -> Result<Duration, ()>;
+    async fn admit(&self) -> Result<(), ()>;
+    async fn renew(&self) -> Result<(), ()>;
+    async fn release(&self) -> Result<(), ()>;
+}
+
+#[cfg(all(target_os = "linux", any(feature = "pi-kiosk", test)))]
+impl Protection for spacewars_control::network::SetupHold {
+    fn now(&self) -> Result<Duration, ()> {
+        let now = nix::time::clock_gettime(nix::time::ClockId::CLOCK_BOOTTIME).map_err(|_| ())?;
+        Ok(Duration::new(
+            now.tv_sec().try_into().map_err(|_| ())?,
+            now.tv_nsec().try_into().map_err(|_| ())?,
+        ))
+    }
+    async fn admit(&self) -> Result<(), ()> {
+        self.admit().await.map_err(|_| ())
+    }
+    async fn renew(&self) -> Result<(), ()> {
+        self.renew().await.map_err(|_| ())
+    }
+    async fn release(&self) -> Result<(), ()> {
+        self.release().await.map_err(|_| ())
+    }
+}
+
+#[cfg(any(feature = "pi-kiosk", test))]
+struct Protected<'a, B, P>(&'a B, &'a P);
+
+#[cfg(any(feature = "pi-kiosk", test))]
+impl<B: Backend, P: Protection> Protected<'_, B, P> {
+    async fn permit(&self) -> Result<(), String> {
+        self.1.renew().await.map_err(|()| {
+            "Could not keep Wi-Fi available for this change. Go Back and retry.".into()
+        })
+    }
+}
+
+#[cfg(any(feature = "pi-kiosk", test))]
+impl<B: Backend, P: Protection> Backend for Protected<'_, B, P> {
+    async fn inventory(&self) -> Result<Inventory, String> {
+        self.0.inventory().await
+    }
+    async fn scan(&self, devices: &[String]) -> Result<(), String> {
+        self.permit().await?;
+        self.0.scan(devices).await
+    }
+    async fn checkpoint(&self, device: &str) -> Result<String, String> {
+        self.permit().await?;
+        self.0.checkpoint(device).await
+    }
+    async fn activate(
+        &self,
+        network: &Network,
+        password: Option<&str>,
+        trial: &mut Trial,
+    ) -> Result<(), String> {
+        self.permit().await?;
+        self.0.activate(network, password, trial).await
+    }
+    async fn ready(&self, trial: &Trial) -> Result<bool, String> {
+        self.0.ready(trial).await
+    }
+    async fn keep(&self, trial: &Trial) -> Result<(), String> {
+        self.permit().await?;
+        self.0.keep(trial).await
+    }
+    async fn rollback(&self, trial: &Trial) -> Result<(), String> {
+        // Losing the lease must not prevent cleanup of a known checkpoint.
+        self.0.rollback(trial).await
+    }
+    async fn manage(&self, id: &str, change: ProfileChange) -> Result<(), String> {
+        self.permit().await?;
+        self.0.manage(id, change).await
+    }
+}
+
+#[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
+pub(super) async fn run_protected(
+    backend: &impl Backend,
+    protection: &impl Protection,
+    commands: Receiver<Command>,
+    shared: Arc<Mutex<View>>,
+) {
+    protected_with_timing(
+        backend,
+        protection,
+        commands,
+        shared,
+        spacewars_control::network::SETUP_RENEW_INTERVAL,
+        CONNECT_TIME,
+        CONFIRM_TIME,
+    )
+    .await;
+}
+
+#[cfg(any(feature = "pi-kiosk", test))]
+pub(super) async fn protected_with_timing(
+    backend: &impl Backend,
+    protection: &impl Protection,
+    commands: Receiver<Command>,
+    shared: Arc<Mutex<View>>,
+    renew_interval: Duration,
+    connect_time: Duration,
+    confirm_time: Duration,
+) {
+    let admitted = future::or(protection.admit(), async {
+        while !commands.is_closed() {
+            async_io::Timer::after(Duration::from_millis(100)).await;
+        }
+        Err(())
+    })
+    .await;
+    if admitted.is_err() {
+        commands.close();
+        *shared.lock().unwrap() = View {
+            status: "Could not keep Wi-Fi available for setup. Go Back and retry.".into(),
+            ..View::default()
+        };
+        // Admission might have succeeded even if its response was lost.
+        let _ = protection.release().await;
+        return;
+    }
+
+    let finished = std::cell::Cell::new(false);
+    let lost = std::cell::Cell::new(false);
+    future::zip(
+        async {
+            run_with_timing(
+                &Protected(backend, protection),
+                commands.clone(),
+                shared.clone(),
+                connect_time,
+                confirm_time,
+            )
+            .await;
+            finished.set(true);
+        },
+        async {
+            let mut next = protection.now().map(|now| now + renew_interval);
+            while !finished.get() {
+                async_io::Timer::after(renew_interval.min(Duration::from_millis(100))).await;
+                if finished.get() {
+                    break;
+                }
+                let now = protection.now();
+                if next.is_err() || now.is_err() {
+                    lost.set(true);
+                    commands.close();
+                    break;
+                }
+                if now.unwrap() >= next.unwrap() {
+                    if protection.renew().await.is_err() {
+                        lost.set(true);
+                        // Let the existing transaction cancel/rollback. Dropping
+                        // its future here could abandon a known checkpoint.
+                        commands.close();
+                        break;
+                    }
+                    next = protection.now().map(|now| now + renew_interval);
+                }
+            }
+        },
+    )
+    .await;
+    let _ = protection.release().await;
+    if lost.get() {
+        let mut view = shared.lock().unwrap();
+        view.inventory.can_connect = false;
+        view.inventory.can_manage = false;
+        view.inventory.can_scan = false;
+        view.status = format!(
+            "Wi-Fi setup lost connection protection. Check the connection, then Rescan to retry. {}",
+            view.status
+        );
+    }
 }
 
 pub(super) async fn run_with_timing(

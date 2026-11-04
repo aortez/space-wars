@@ -5,6 +5,7 @@ use engine_common::ClockEventProfile;
 mod autonomous;
 mod falling;
 mod join;
+mod ledges;
 mod meltdown;
 mod movement;
 mod takeover;
@@ -356,6 +357,7 @@ fn player_joins_live_rain_and_keeps_visible_panels_through_cleanup_in_all_layout
         let mut scene = scenario(viewport);
         let mut settings = scene.state.settings();
         settings.rain_amount = ClockRainAmount::Heavy;
+        settings.events.slot_machine = false;
         scene.step(
             &[
                 ClockAction::configure(settings),
@@ -409,7 +411,16 @@ fn player_joins_live_rain_and_keeps_visible_panels_through_cleanup_in_all_layout
             let player = state.player_duck.unwrap();
             assert_eq!(player.session_id, current.session_id);
             assert!(player.floor_open_milli.is_some());
-            assert_eq!((state.body_count, state.collider_count), (4, 4));
+            let flaps = player
+                .duck
+                .flaps
+                .iter()
+                .filter(|f| f.body_id.is_some())
+                .count();
+            assert_eq!(
+                (state.body_count, state.collider_count),
+                (4 + flaps, 4 + flaps)
+            );
             if let Some(rain) = state.rain {
                 assert!(rain.duck_joined && !rain.duck_course);
                 assert_eq!(rain.duck_phase, ClockRainDuckPhase::HandedOff);

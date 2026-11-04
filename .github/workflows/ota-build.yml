@@ -1,0 +1,74 @@
+name: OTA image candidate
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ota-image-candidate-main
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    name: Build and qualify Pi rootfs candidate
+    if: >-
+      github.repository == 'aortez/space-wars' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      SOURCE: ${{ github.sha }}
+    steps:
+      - name: Check out selected main source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Reclaim unused SDK space with a short deadline
+        run: python3 .github/ci/ota_runner_cleanup.py
+      - name: Install image inspection dependencies
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends e2fsprogs python3-yaml
+      - name: Install validator compiler
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.89.0'
+      - name: Build image validator
+        run: cargo build --locked --profile ci -p engine-ota --features publisher --example image_candidate
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Run complete OTA recovery suite
+        # Nightly and manual candidates require all sweeps at this exact source.
+        # A PR smoke selection is never accepted as publication evidence.
+        run: python3 .github/ci/ota_test_selection.py run --full
+      - name: Build selected source in isolated container
+        run: |
+          python3 .github/ci/ota_container_build.py \
+            --source-checkout "$GITHUB_WORKSPACE" --source "$SOURCE" \
+            --output "$RUNNER_TEMP/ota-build" \
+            --cpus 4 --memory-gib 12 --timeout-minutes 330
+      - name: Qualify and package exact image
+        run: |
+          python3 .github/ci/ota_candidate.py \
+            --policy "$RUNNER_TEMP/ota-build/policy.json" \
+            --build-record "$RUNNER_TEMP/ota-build/build.json" \
+            --gzip-image "$RUNNER_TEMP/ota-build/rootfs.ext4.gz" \
+            --validator "$GITHUB_WORKSPACE/target/ci/examples/image_candidate" \
+            --output "$RUNNER_TEMP/ota-candidate"
+      - name: Upload unsigned candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ota-candidate-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ota-candidate/image.ext4.zst
+            ${{ runner.temp }}/ota-candidate/candidate.json
+            ${{ runner.temp }}/ota-candidate/qualification.json
+            ${{ runner.temp }}/ota-candidate/build.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

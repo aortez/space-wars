@@ -4,6 +4,23 @@
 //! solver supplies either exact O(n²) gravity or deterministic Barnes-Hut
 //! gravity, making this scenario both an interactive toy and a scale lab.
 
+mod capacity;
+pub mod capacity_lab;
+#[cfg(test)]
+mod capacity_tests;
+#[cfg(test)]
+mod event_tests;
+mod events;
+mod field;
+pub mod profile;
+
+pub use events::{
+    DIRECTIONAL_GRAVITY_TICKS, FIXED_HZ, MAX_EVENT_GAP_TICKS, MIN_EVENT_GAP_TICKS,
+    PIZZA_ACTION_TRIGGER_EVENT, PIZZA_ACTION_VERSION, PIZZA_OBSERVATION_VERSION, PizzaAction,
+    PizzaEventDirection, PizzaEventKind, PizzaEventState, PizzaEventTrigger, PizzaObservation,
+};
+
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use engine_common::{
@@ -13,16 +30,19 @@ use engine_common::{
 };
 use engine_core::{Color, Vec2};
 use engine_gravity::{
-    GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver, GravityStepMetrics,
+    GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver,
+    GravitySourceShape, GravityStepMetrics,
 };
 use engine_rapier::world::{
-    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, ContactEvent,
-    PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
+    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
+    PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
 };
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
-pub const MAX_BALLS: usize = 500;
+pub const MAX_BALLS: usize = engine_common::MAX_PIZZA_LIVE_BALLS as usize;
+pub const DEFAULT_LIVE_BALL_LIMIT: usize = engine_common::DEFAULT_PIZZA_LIVE_BALL_LIMIT as usize;
+pub use capacity::{PizzaBirthCounts, PizzaPopulation};
 pub const MAX_BENCHMARK_BALLS: usize = 10_000;
 pub const DEFAULT_BENCHMARK_BALLS: usize = 300;
 pub const MIN_SPAWN_RATE: f32 = 0.01;
@@ -147,11 +167,16 @@ impl Default for PizzaBenchmarkConfig {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct PizzaStepMetrics {
+    pub total_time: Duration,
+    pub spawning_time: Duration,
+    pub damage_time: Duration,
     pub workload_time: Duration,
     pub lifecycle_time: Duration,
     pub gravity_time: Duration,
     pub collision_time: Duration,
     pub physics_time: Duration,
+    /// Complete canonical step, including contact collection and metrics.
+    pub physics_total_time: Duration,
     pub snapshot_time: Duration,
     pub added: usize,
     pub removed: usize,
@@ -212,22 +237,27 @@ impl Default for PizzaBounds {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PizzaConfig {
+    pub live_ball_limit: usize,
     pub desired_ball_count: usize,
     pub ball_spawn_rate: f32,
     pub bounds: PizzaBounds,
     pub gravity: PizzaGravityModel,
+    /// Applied when the run is created. Manual requests remain available when off.
+    pub automatic_events: bool,
     pub benchmark: Option<PizzaBenchmarkConfig>,
 }
 
 impl PizzaConfig {
     pub fn normalized(&self) -> Self {
         let benchmark = self.benchmark.map(PizzaBenchmarkConfig::normalized);
+        let live_ball_limit = self.live_ball_limit.clamp(1, MAX_BALLS);
         let maximum_balls = if benchmark.is_some() {
             MAX_BENCHMARK_BALLS
         } else {
-            MAX_BALLS
+            live_ball_limit
         };
         Self {
+            live_ball_limit,
             desired_ball_count: benchmark
                 .map(|benchmark| benchmark.ball_count)
                 .unwrap_or(self.desired_ball_count)
@@ -241,6 +271,7 @@ impl PizzaConfig {
             gravity: benchmark
                 .map(|benchmark| benchmark.gravity)
                 .unwrap_or(self.gravity),
+            automatic_events: self.automatic_events && benchmark.is_none(),
             benchmark,
         }
     }
@@ -248,10 +279,12 @@ impl PizzaConfig {
     pub fn benchmark(benchmark: PizzaBenchmarkConfig, bounds: PizzaBounds) -> Self {
         let benchmark = benchmark.normalized();
         Self {
+            live_ball_limit: DEFAULT_LIVE_BALL_LIMIT,
             desired_ball_count: benchmark.ball_count,
             ball_spawn_rate: MAX_SPAWN_RATE,
             bounds,
             gravity: benchmark.gravity,
+            automatic_events: false,
             benchmark: Some(benchmark),
         }
     }
@@ -260,10 +293,12 @@ impl PizzaConfig {
 impl Default for PizzaConfig {
     fn default() -> Self {
         Self {
+            live_ball_limit: DEFAULT_LIVE_BALL_LIMIT,
             desired_ball_count: 24,
             ball_spawn_rate: 0.10,
             bounds: PizzaBounds::default(),
             gravity: PizzaGravityModel::Fast,
+            automatic_events: true,
             benchmark: None,
         }
     }
@@ -271,6 +306,8 @@ impl Default for PizzaConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BallState {
+    /// Diagnostic ancestry only; never consulted by physics or damage.
+    pub fragment_generation: u8,
     pub id: u64,
     pub position: Vec2,
     pub velocity: Vec2,
@@ -284,6 +321,7 @@ pub struct BallState {
 impl BallState {
     fn new(id: u64, position: Vec2, radius: f32, color: Color) -> Self {
         Self {
+            fragment_generation: 0,
             id,
             position,
             velocity: Vec2::ZERO,
@@ -308,22 +346,37 @@ pub struct PizzaState {
     pub pointer_position: Vec2,
     pub cursor_velocity: Vec2,
     pub last_step_metrics: PizzaStepMetrics,
+    birth_counts: PizzaBirthCounts,
+    // Normal gameplay only: contact damage needs ID lookup, benchmarks do not.
+    ball_indices: Option<HashMap<u64, usize>>,
     seed: u64,
     next_ball_id: u64,
     rng: StdRng,
+    events: events::Events,
     physics: Option<PhysicsWorld>,
     gravity_solver: GravitySolver,
     gravity_participants: Vec<GravityParticipant>,
 }
 
 impl PizzaState {
+    pub fn event_state(&self) -> PizzaEventState {
+        self.events.state()
+    }
+
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
         // Benchmark walls and fixture dimensions are part of the workload.
         // Resizing the presentation must not silently change the physics case.
         if self.config.benchmark.is_some() {
             return;
         }
-        self.config.bounds = PizzaBounds::from_aspect_ratio(aspect_ratio);
+        let bounds = PizzaBounds::from_aspect_ratio(aspect_ratio);
+        // The host refreshes the viewport every UI tick. Rebuilding an unchanged
+        // world discards solver/contact history and makes physics depend on how
+        // fixed updates happened to be grouped into rendered frames.
+        if self.config.bounds == bounds {
+            return;
+        }
+        self.config.bounds = bounds;
         for ball in &mut self.balls {
             contain_ball(ball, self.config.bounds);
         }
@@ -505,6 +558,7 @@ impl PizzaState {
                 &mut physics,
                 *ball,
                 self.held_ball_id == Some(ball.id),
+                self.config.benchmark.is_none(),
             ));
         }
         self.physics = Some(physics);
@@ -513,9 +567,17 @@ impl PizzaState {
     fn push_ball(&mut self, ball: BallState) {
         if let Some(physics) = &mut self.physics {
             assert!(
-                insert_physics_ball(physics, ball, self.held_ball_id == Some(ball.id)),
+                insert_physics_ball(
+                    physics,
+                    ball,
+                    self.held_ball_id == Some(ball.id),
+                    self.config.benchmark.is_none()
+                ),
                 "Pizza generated an invalid or duplicate physics ball"
             );
+        }
+        if let Some(indices) = &mut self.ball_indices {
+            assert!(indices.insert(ball.id, self.balls.len()).is_none());
         }
         self.balls.push(ball);
     }
@@ -531,18 +593,26 @@ impl PizzaState {
                 "Pizza metadata and physics lifecycle stay aligned"
             );
         }
-        Some(self.balls.swap_remove(index))
+        let removed = self.balls.swap_remove(index);
+        if let Some(indices) = &mut self.ball_indices {
+            assert_eq!(indices.remove(&id), Some(index));
+            if let Some(moved) = self.balls.get(index) {
+                indices.insert(moved.id, index);
+            }
+        }
+        Some(removed)
     }
 
     fn advance_spawner(&mut self) {
         if self.balls.len() >= self.config.desired_ball_count
-            || self.balls.len() >= MAX_BALLS
+            || self.balls.len() >= self.config.live_ball_limit
             || self.rng.random::<f32>() >= self.config.ball_spawn_rate
         {
             return;
         }
         let ball = self.random_ball();
         self.push_ball(ball);
+        self.birth_counts.spawned += 1;
     }
 
     fn apply_pointer_action(&mut self, action: PointerAction) {
@@ -568,8 +638,9 @@ impl PizzaState {
         let id = if let Some(id) = selected {
             id
         } else {
-            if self.balls.len() >= MAX_BALLS {
+            if self.balls.len() >= self.config.live_ball_limit {
                 self.remove_replaceable_ball();
+                self.birth_counts.pointer_replaced += 1;
             }
             let max_radius = MAX_RANDOM_BALL_RADIUS
                 .min(self.config.bounds.width * 0.5)
@@ -580,6 +651,7 @@ impl PizzaState {
             let ball = self.allocate_ball(self.pointer_position, radius, color);
             let id = ball.id;
             self.push_ball(ball);
+            self.birth_counts.pointer_created += 1;
             id
         };
 
@@ -662,7 +734,10 @@ impl PizzaState {
     }
 
     fn ball_mut(&mut self, id: u64) -> Option<&mut BallState> {
-        self.balls.iter_mut().find(|ball| ball.id == id)
+        match &self.ball_indices {
+            Some(indices) => indices.get(&id).map(|index| &mut self.balls[*index]),
+            None => self.balls.iter_mut().find(|ball| ball.id == id),
+        }
     }
 
     fn remove_replaceable_ball(&mut self) {
@@ -681,6 +756,10 @@ impl PizzaState {
     }
 }
 
+fn wall_thickness(bounds: PizzaBounds) -> f32 {
+    (bounds.width.min(bounds.height) * 0.02).max(0.001)
+}
+
 fn create_physics_world(config: &PizzaConfig) -> PhysicsWorld {
     let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
         gravity: Vec2::ZERO,
@@ -696,7 +775,7 @@ fn create_physics_world(config: &PizzaConfig) -> PhysicsWorld {
         0,
     );
 
-    let thickness = (config.bounds.width.min(config.bounds.height) * 0.02).max(0.001);
+    let thickness = wall_thickness(config.bounds);
     let half_width = config.bounds.width * 0.5;
     let half_height = config.bounds.height * 0.5;
     let wall_geometry = [
@@ -759,7 +838,7 @@ fn ball_collider_id(id: u64) -> ColliderId {
     ColliderId::new(PhysicsId::new(id), BALL_COLLIDER_ROLE, 0)
 }
 
-fn insert_physics_ball(physics: &mut PhysicsWorld, ball: BallState, held: bool) -> bool {
+fn insert_physics_ball(physics: &mut PhysicsWorld, ball: BallState, held: bool, ccd: bool) -> bool {
     let mut collider = ColliderSpec::ball(ball_collider_id(ball.id), ball.radius);
     collider.density = 1.0;
     collider.friction = 0.3;
@@ -775,6 +854,9 @@ fn insert_physics_ball(physics: &mut PhysicsWorld, ball: BallState, held: bool) 
             position: ball.position,
             linear_velocity: ball.velocity,
             can_sleep: false,
+            // Keep fast bodies inside physical walls without a frame-dependent
+            // containment/rebuild pass. Benchmark collision settings stay fixed.
+            ccd_enabled: ccd,
             ..BodySpec::default()
         },
         &[collider],
@@ -789,11 +871,22 @@ fn pizza_gravity_config(model: PizzaGravityModel) -> GravityConfig {
     }
 }
 
-fn collect_gravity_participants(participants: &mut Vec<GravityParticipant>, balls: &[BallState]) {
+fn collect_gravity_participants(
+    participants: &mut Vec<GravityParticipant>,
+    balls: &[BallState],
+    bounded_interior: bool,
+) {
     participants.clear();
     participants.extend(balls.iter().map(|ball| {
         let mut participant =
             GravityParticipant::dynamic(GravityId::new(ball.id), ball.position, ball.mass());
+        // A ball center inside another ball would otherwise feel a nearly
+        // singular point-mass pull and gain an extreme single-update kick.
+        if bounded_interior {
+            participant.source_shape = GravitySourceShape::UniformSphere {
+                radius: ball.radius,
+            };
+        }
         if !ball.moving {
             participant.response_scale = 0.0;
         }
@@ -810,7 +903,8 @@ fn apply_gravity_to_physics(state: &mut PizzaState) -> GravityStepMetrics {
         gravity_participants,
         ..
     } = state;
-    collect_gravity_participants(gravity_participants, balls);
+    // Benchmarks keep their legacy point-mass workload.
+    collect_gravity_participants(gravity_participants, balls, config.benchmark.is_none());
     let outputs = gravity_solver
         .solve(gravity_participants, pizza_gravity_config(config.gravity))
         .expect("normalized Pizza bodies form valid gravity participants");
@@ -838,7 +932,7 @@ fn apply_gravity_to_classic(state: &mut PizzaState) -> GravityStepMetrics {
         gravity_participants,
         ..
     } = state;
-    collect_gravity_participants(gravity_participants, balls);
+    collect_gravity_participants(gravity_participants, balls, false);
     let outputs = gravity_solver
         .solve(gravity_participants, pizza_gravity_config(config.gravity))
         .expect("normalized Pizza balls form valid gravity participants");
@@ -850,36 +944,36 @@ fn apply_gravity_to_classic(state: &mut PizzaState) -> GravityStepMetrics {
 }
 
 fn apply_contact_damage(state: &mut PizzaState) {
-    let contacts = state
+    let physics = state
         .physics
         .as_ref()
-        .expect("interactive Pizza uses canonical physics")
-        .contact_events()
-        .to_vec();
-    for contact in contacts {
+        .expect("interactive Pizza uses canonical physics");
+    let indices = state
+        .ball_indices
+        .as_ref()
+        .expect("normal Pizza indexes its live metadata");
+    // Borrow contacts directly. Preserve contact order and the separate, ordered
+    // subtraction for each participant; never aggregate impulses or change mass.
+    for contact in physics.contact_events() {
         if contact.collider_a.role != BALL_COLLIDER_ROLE
             || contact.collider_b.role != BALL_COLLIDER_ROLE
         {
             continue;
         }
-        apply_contact_damage_to_ball(state, contact.collider_a.entity, contact);
-        apply_contact_damage_to_ball(state, contact.collider_b.entity, contact);
-    }
-}
-
-fn apply_contact_damage_to_ball(state: &mut PizzaState, entity: PhysicsId, contact: ContactEvent) {
-    let id = entity.value();
-    let body = ball_body_id(id);
-    let mass = state
-        .physics
-        .as_ref()
-        .and_then(|physics| physics.body_mass(body))
-        .unwrap_or(1.0)
-        .max(f32::EPSILON);
-    if let Some(ball) = state.ball_mut(id)
-        && !ball.invincible
-    {
-        ball.hp -= contact.impulse_magnitude / mass * DAMAGE_SCALAR;
+        for entity in [contact.collider_a.entity, contact.collider_b.entity] {
+            let id = entity.value();
+            let mass = physics
+                .body_mass(ball_body_id(id))
+                .unwrap_or(1.0)
+                .max(f32::EPSILON);
+            if let Some(index) = indices.get(&id) {
+                let ball = &mut state.balls[*index];
+                debug_assert_eq!(ball.id, id);
+                if !ball.invincible {
+                    ball.hp -= contact.impulse_magnitude / mass * DAMAGE_SCALAR;
+                }
+            }
+        }
     }
 }
 
@@ -888,17 +982,23 @@ impl Scenario for PizzaScenario {
     type Config = PizzaConfig;
 
     fn init(config: Self::Config, seed: u64) -> Self::State {
+        let config = config.normalized();
+        let events = events::Events::new(seed, config.automatic_events, config.benchmark.is_some());
+        let ball_indices = config.benchmark.is_none().then(HashMap::new);
         let mut state = PizzaState {
-            config: config.normalized(),
+            ball_indices,
+            config,
             balls: Vec::new(),
             tick: 0,
             held_ball_id: None,
             pointer_position: Vec2::ZERO,
             cursor_velocity: Vec2::ZERO,
             last_step_metrics: PizzaStepMetrics::default(),
+            birth_counts: PizzaBirthCounts::default(),
             seed,
             next_ball_id: 1,
             rng: StdRng::seed_from_u64(seed),
+            events,
             physics: None,
             gravity_solver: GravitySolver::new(),
             gravity_participants: Vec::new(),
@@ -913,6 +1013,8 @@ impl Scenario for PizzaScenario {
             for action in actions {
                 if let Action::Pointer(pointer) = action {
                     state.apply_pointer_action(*pointer);
+                } else if let Some(PizzaAction::TriggerEvent(kind)) = PizzaAction::decode(action) {
+                    state.events.request(kind);
                 }
             }
         }
@@ -968,42 +1070,63 @@ impl Scenario for PizzaScenario {
             return StepResult::default();
         }
 
+        let total_started = Instant::now();
+        state.events.begin_tick();
         let mut metrics = PizzaStepMetrics::default();
+        let spawning_started = Instant::now();
         state.advance_held_ball(dt);
         state.advance_spawner();
+        metrics.spawning_time = spawning_started.elapsed();
 
         let gravity_started = Instant::now();
         metrics.gravity = apply_gravity_to_physics(state);
+        let field_applied = field::apply(state);
         metrics.gravity_time = gravity_started.elapsed();
 
         let physics = state
             .physics
             .as_mut()
             .expect("interactive Pizza uses the canonical physics world");
+        let physics_started = Instant::now();
         metrics.rapier = physics.step(dt * WORLD_TIME_SCALE);
+        metrics.physics_total_time = physics_started.elapsed();
+        // The event owns only this update's acceleration. Clear even on its
+        // final update, leaving no persistent force during pause or afterward.
+        if field_applied {
+            physics.clear_forces();
+        }
         metrics.physics_time = metrics.rapier.wall_time;
         metrics.collision_time = metrics.rapier.narrow_phase_time + metrics.rapier.solver_time;
 
         let snapshot_started = Instant::now();
         state.sync_from_rapier();
         metrics.snapshot_time = snapshot_started.elapsed();
+        let damage_started = Instant::now();
         apply_contact_damage(state);
+        metrics.damage_time = damage_started.elapsed();
 
         let lifecycle_started = Instant::now();
-        let balls_before_explosions = state.balls.len();
+        let births_before = state.birth_counts;
         explode_dead_balls(state);
-        let balls_after_explosions = state.balls.len();
         metrics.lifecycle_time = lifecycle_started.elapsed();
-        metrics.added = balls_after_explosions.saturating_sub(balls_before_explosions);
-        metrics.removed = balls_before_explosions.saturating_sub(balls_after_explosions);
+        metrics.added =
+            (state.birth_counts.fragments_created - births_before.fragments_created) as usize;
+        metrics.removed = (state.birth_counts.exploded - births_before.exploded) as usize;
+        metrics.total_time = total_started.elapsed();
         state.last_step_metrics = metrics;
+        state.events.finish_tick();
         state.tick += 1;
         StepResult::default()
     }
 
-    fn observe(_state: &Self::State) -> Observation {
+    fn observe(state: &Self::State) -> Observation {
         Observation {
-            payload: Vec::new(),
+            payload: serde_json::to_vec(&PizzaObservation {
+                version: PIZZA_OBSERVATION_VERSION,
+                tick: state.tick,
+                event: state.event_state(),
+            })
+            .expect("Pizza observation contains only bounded integers and enums"),
         }
     }
 
@@ -1030,6 +1153,7 @@ impl Scenario for PizzaScenario {
                 }),
             );
         }
+        field::render_cue(state, &mut frame);
         if let Some(benchmark) = state.config.benchmark {
             let counts = state.benchmark_counts();
             let mut text = RenderText::new(
@@ -1053,7 +1177,7 @@ impl Scenario for PizzaScenario {
     }
 
     fn tick_model() -> TickModel {
-        TickModel::FixedTimestep { hz: 60 }
+        TickModel::FixedTimestep { hz: FIXED_HZ }
     }
 }
 
@@ -1179,8 +1303,16 @@ fn explode_dead_balls(state: &mut PizzaState) {
     }
     dead.reverse();
 
-    for parent in dead {
-        if state.balls.len() >= MAX_BALLS {
+    state.birth_counts.exploded += dead.len() as u64;
+    for parent in &dead {
+        state.birth_counts.exploded_by_generation
+            [usize::from(parent.fragment_generation).min(3)] += 1;
+        state.birth_counts.exploded_by_size[profile::size_band(parent.radius)] += 1;
+    }
+    let parent_count = dead.len();
+    for (parent_index, parent) in dead.into_iter().enumerate() {
+        if state.balls.len() >= state.config.live_ball_limit {
+            state.birth_counts.fragment_parents_skipped += (parent_count - parent_index) as u64;
             break;
         }
         let division_size = parent.radius / EXPLOSION_DIVISIONS as f32;
@@ -1203,10 +1335,15 @@ fn explode_dead_balls(state: &mut PizzaState) {
                     (offset + parent.velocity * EXPLOSION_PARENT_VELOCITY_FACTOR) * velocity_scale;
                 let color = parent.color.random_variation(100.0 / 255.0, &mut state.rng);
                 let mut fragment = state.allocate_ball(parent.position + offset, radius, color);
+                fragment.fragment_generation = parent.fragment_generation.saturating_add(1);
                 fragment.velocity = velocity;
                 contain_ball(&mut fragment, state.config.bounds);
                 state.push_ball(fragment);
-                if state.balls.len() >= MAX_BALLS {
+                state.birth_counts.fragments_created += 1;
+                if state.balls.len() >= state.config.live_ball_limit {
+                    state.birth_counts.fragment_capacity_stops += 1;
+                    state.birth_counts.fragment_parents_skipped +=
+                        (parent_count - parent_index - 1) as u64;
                     return;
                 }
             }
@@ -1462,6 +1599,52 @@ mod tests {
                 .iter()
                 .all(|ball| ball.velocity.x.is_finite() && ball.velocity.y.is_finite())
         );
+    }
+
+    #[test]
+    fn normal_play_bounds_gravity_between_overlapping_centers() {
+        // Overlapping fragments can bring two centers this close together.
+        let positions = [Vec2::new(0.5, 0.25), Vec2::new(0.5 + 2.6e-6, 0.25)];
+        let mut normal = PizzaScenario::init(
+            PizzaConfig {
+                desired_ball_count: 0,
+                ..PizzaConfig::default()
+            },
+            7,
+        );
+        for position in positions {
+            let ball = normal.allocate_ball(position, 0.003, Color::WHITE);
+            normal.push_ball(ball);
+        }
+        apply_gravity_to_physics(&mut normal);
+        normal.sync_from_rapier();
+
+        // The legacy benchmark keeps its point-mass workload.
+        let mut benchmark = PizzaScenario::init(
+            PizzaConfig::benchmark(
+                PizzaBenchmarkConfig {
+                    backend: PizzaPhysicsBackend::Classic,
+                    gravity: PizzaGravityModel::Fast,
+                    workload: PizzaBenchmarkWorkload::Sparse,
+                    ball_count: 2,
+                },
+                PizzaBounds::default(),
+            ),
+            7,
+        );
+        for (ball, position) in benchmark.balls.iter_mut().zip(positions) {
+            ball.position = position;
+            ball.radius = 0.003;
+            ball.velocity = Vec2::ZERO;
+        }
+        apply_gravity_to_classic(&mut benchmark);
+
+        for ball in &normal.balls {
+            assert!(ball.velocity.length() < 1.0e-5, "{:?}", ball.velocity);
+        }
+        for ball in &benchmark.balls {
+            assert!(ball.velocity.length() > 100.0, "{:?}", ball.velocity);
+        }
     }
 
     #[test]

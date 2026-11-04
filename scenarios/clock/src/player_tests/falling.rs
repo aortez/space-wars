@@ -22,17 +22,11 @@ fn player(aspect: f32, responsive: bool) -> ClockState {
 }
 
 fn world(state: &ClockState) -> &engine_rapier::world::PhysicsWorld {
-    if let Some(duck) = &state.duck_visit {
-        duck.arena_world()
-    } else if let Some(ActiveEvent::Falling(event)) = &state.active_event {
-        event.vacant_arena().unwrap().arena_world()
-    } else {
-        panic!("shared world expected");
-    }
+    state.arena.world().expect("shared world expected")
 }
 
 fn world_mut(state: &mut ClockState) -> &mut engine_rapier::world::PhysicsWorld {
-    state.duck_visit.as_mut().unwrap().arena_world_mut()
+    state.arena.world_mut().expect("shared world expected")
 }
 
 fn batch(state: &ClockState) -> Vec<(BodyId, Vec2)> {
@@ -64,7 +58,8 @@ fn falling_shares_one_world_through_dismiss_rejoin_reformation_and_completion() 
         for responsive in [false, true] {
             let mut state = player(aspect, responsive);
             let before = state.player_duck_state().unwrap();
-            let base = state.duck_visit.as_ref().unwrap().physics_counts();
+            let base = (world(&state).body_count(), world(&state).collider_count());
+            let base_flaps = state.flap_body_count();
             state.preview_event(ClockEventKind::Falling);
             assert_eq!(state.player_duck_state(), Some(before.clone()));
             assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
@@ -85,7 +80,7 @@ fn falling_shares_one_world_through_dismiss_rejoin_reformation_and_completion() 
             assert!(state.duck_visit.is_none());
             assert_eq!(state.event_id(), id);
             assert_eq!(state.phase_tick(), 42);
-            assert_eq!(state.body_count(), base.0 + count - 1);
+            assert_eq!(state.body_count(), base.0 + count - 1 - base_flaps);
             assert_ne!(batch(&state), initial_batch, "vacant arena still simulates");
             let retained = batch(&state);
             toggle(&mut state, 2);
@@ -115,8 +110,14 @@ fn falling_shares_one_world_through_dismiss_rejoin_reformation_and_completion() 
                 batch(&state).is_empty(),
                 "no invisible bars during reformation"
             );
-            assert_eq!(state.body_count(), base.0);
-            assert_eq!(state.collider_count(), base.1);
+            assert_eq!(
+                state.body_count(),
+                base.0 - base_flaps + state.flap_body_count()
+            );
+            assert_eq!(
+                state.collider_count(),
+                base.1 - base_flaps + state.flap_body_count()
+            );
             ticks(&mut state, REFORMING_TICKS as usize);
             assert_eq!(state.event_kind(), None);
             assert_eq!(state.player_duck_session().unwrap().1, 2);
@@ -158,6 +159,11 @@ fn falling_steps_the_player_once_even_at_entry_and_the_last_event_tick() {
                     baseline.player_duck_state(),
                     "aspect={aspect} opening={opening} tick={elapsed}: no doubled gravity/movement"
                 );
+                assert_eq!(
+                    composed.arena_accounting().steps,
+                    baseline.arena_accounting().steps,
+                    "aspect={aspect} opening={opening} tick={elapsed}: one arena step"
+                );
             }
         }
     }
@@ -196,7 +202,11 @@ fn falling_pause_live_reading_and_replacement_release_only_the_event_batch() {
             state.configure(settings);
             state.preview_event(ClockEventKind::ColorCycle);
             assert_eq!(state.player_duck_state(), player);
-            assert_eq!(state.body_count(), if leave { 0 } else { base });
+            assert_eq!(state.body_count(), if leave { base - 1 } else { base });
+            if leave {
+                ticks(&mut state, 30);
+                assert_eq!(state.body_count(), 0, "closing flaps finish cleanup");
+            }
             state.set_aspect_ratio(0.6);
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
             assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
@@ -211,7 +221,7 @@ fn contact_fixture() -> (ClockState, BodyId) {
     state.configure(settings);
     toggle(&mut state, 1);
     let duck = state.duck_visit.as_mut().unwrap();
-    duck.course.as_mut().unwrap().surfaces = vec![Surface {
+    duck.terrain.course.as_mut().unwrap().surfaces = vec![Surface {
         start: 0.0,
         end: duck.width,
         height: 0.0,
@@ -304,6 +314,10 @@ fn automatic_falling_is_available_and_its_first_frame_matches_shared_physics() {
         crow: false,
         explosion: false,
         aquarium: false,
+        cell_swap: false,
+        grass: false,
+        slot_machine: false,
+        spider: false,
     };
     state.configure(settings);
     assert!(!state.automatic_events_suspended());
@@ -339,6 +353,7 @@ fn falling_out_or_walking_out_leaves_the_batch_and_floor_alive_until_cleanup() {
     for exit in [false, true] {
         let mut state = player(4.0 / 3.0, false);
         let base = state.body_count();
+        let base_flaps = state.flap_body_count();
         state.preview_event(ClockEventKind::Falling);
         let duck = state.duck_visit.as_ref().unwrap();
         let position = if exit {
@@ -365,7 +380,7 @@ fn falling_out_or_walking_out_leaves_the_batch_and_floor_alive_until_cleanup() {
         assert!(!batch(&state).is_empty());
         assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
         ticks(&mut state, FALLING_TICKS as usize - 31);
-        assert_eq!(state.body_count(), base - 1);
+        assert_eq!(state.body_count(), base - 1 - base_flaps);
         assert!(batch(&state).is_empty());
         ticks(&mut state, REFORMING_TICKS as usize);
         assert_eq!(state.event_kind(), None);

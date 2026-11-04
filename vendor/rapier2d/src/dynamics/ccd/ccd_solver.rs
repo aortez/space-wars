@@ -320,15 +320,17 @@ impl CCDSolver {
                                 continue;
                             }
 
-                            #[cfg(feature = "ccd-diagnostics")]
-                            let contact_span = PhaseSpan::new(Phase::ContactLookup);
-                            let smallest_dist = narrow_phase
-                                .contact_pair(*ch1, ch2)
-                                .and_then(|p| p.find_deepest_contact())
-                                .map(|c| c.1.dist)
-                                .unwrap_or(0.0);
-                            #[cfg(feature = "ccd-diagnostics")]
-                            drop(contact_span);
+                            // Most CCD candidates are rejected using shape thickness
+                            // alone. Traverse the contact graph only if that check passes.
+                            let smallest_dist = || {
+                                #[cfg(feature = "ccd-diagnostics")]
+                                let _contact_span = PhaseSpan::new(Phase::ContactLookup);
+                                narrow_phase
+                                    .contact_pair(*ch1, ch2)
+                                    .and_then(|p| p.find_deepest_contact())
+                                    .map(|c| c.1.dist)
+                                    .unwrap_or(0.0)
+                            };
 
                             let rb2 = bh2.and_then(|h| bodies.get(h));
 
@@ -508,15 +510,17 @@ impl CCDSolver {
                                 continue;
                             }
 
-                            #[cfg(feature = "ccd-diagnostics")]
-                            let contact_span = PhaseSpan::new(Phase::ContactLookup);
-                            let smallest_dist = narrow_phase
-                                .contact_pair(*ch1, ch2)
-                                .and_then(|p| p.find_deepest_contact())
-                                .map(|c| c.1.dist)
-                                .unwrap_or(0.0);
-                            #[cfg(feature = "ccd-diagnostics")]
-                            drop(contact_span);
+                            // Most CCD candidates are rejected using shape thickness
+                            // alone. Traverse the contact graph only if that check passes.
+                            let smallest_dist = || {
+                                #[cfg(feature = "ccd-diagnostics")]
+                                let _contact_span = PhaseSpan::new(Phase::ContactLookup);
+                                narrow_phase
+                                    .contact_pair(*ch1, ch2)
+                                    .and_then(|p| p.find_deepest_contact())
+                                    .map(|c| c.1.dist)
+                                    .unwrap_or(0.0)
+                            };
 
                             let rb1 = bh1.map(|h| &bodies[h]);
                             let rb2 = bh2.map(|h| &bodies[h]);
@@ -662,15 +666,17 @@ impl CCDSolver {
                         continue;
                     }
 
-                    #[cfg(feature = "ccd-diagnostics")]
-                    let contact_span = PhaseSpan::new(Phase::ContactLookup);
-                    let smallest_dist = narrow_phase
-                        .contact_pair(*ch1, ch2)
-                        .and_then(|p| p.find_deepest_contact())
-                        .map(|c| c.1.dist)
-                        .unwrap_or(0.0);
-                    #[cfg(feature = "ccd-diagnostics")]
-                    drop(contact_span);
+                    // Most CCD candidates are rejected using shape thickness
+                    // alone. Traverse the contact graph only if that check passes.
+                    let smallest_dist = || {
+                        #[cfg(feature = "ccd-diagnostics")]
+                        let _contact_span = PhaseSpan::new(Phase::ContactLookup);
+                        narrow_phase
+                            .contact_pair(*ch1, ch2)
+                            .and_then(|p| p.find_deepest_contact())
+                            .map(|c| c.1.dist)
+                            .unwrap_or(0.0)
+                    };
 
                     if let Some(toi) = TOIEntry::try_from_colliders_with_thickness(
                         query_pipeline.dispatcher,

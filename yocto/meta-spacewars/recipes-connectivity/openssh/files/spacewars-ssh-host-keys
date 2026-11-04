@@ -1,7 +1,32 @@
 #!/bin/sh
 set -eu
+umask 077
 
 DATA_SSH_DIR="/data/ssh"
+
+mountpoint -q /data || { echo "SSH host keys require mounted /data" >&2; exit 1; }
+[ ! -L "$DATA_SSH_DIR" ] || { echo "Refusing symlinked SSH host-key store" >&2; exit 1; }
+for state in /data/spacewars-bootstrap /data/spacewars-system; do
+    if [ -L "$state" ] || { [ -e "$state" ] && [ ! -d "$state" ]; }; then
+        echo "Invalid persistent migration state" >&2
+        exit 1
+    fi
+done
+for record in /data/spacewars-bootstrap/active /data/spacewars-system/recovery; do
+    if [ -e "$record" ] || [ -L "$record" ]; then
+        # A missing store on an installed device is data loss. Do not resurrect
+        # old root-image keys or let key generation silently change its identity.
+        [ -d "$DATA_SSH_DIR" ] || { echo "Missing preserved SSH host-key store" >&2; exit 1; }
+        for key_type in rsa ecdsa ed25519; do
+            key="$DATA_SSH_DIR/ssh_host_${key_type}_key"
+            if [ -L "$key" ] || [ ! -f "$key" ] || [ ! -s "$key" ]; then
+                echo "Missing or invalid preserved SSH host key" >&2
+                exit 1
+            fi
+        done
+        exit 0
+    fi
+done
 
 has_data_host_keys() {
     [ -f "$DATA_SSH_DIR/ssh_host_ed25519_key" ] || \

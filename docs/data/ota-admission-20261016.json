@@ -1,0 +1,209 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-17T01:31:13.245866+00:00",
+  "source_commit": "3715ada6f9c2660a11e592cc55ee4b68df8e11bb",
+  "branch": "feat/ota-updates-254",
+  "scope": "Host GitHub origin admission and read-only live adapter checks. No OTA candidate was built or admitted from GitHub, no release was published, and no Pi or repository configuration was changed.",
+  "source_files": {
+    ".github/ci/ota_admission.py": "67b42e4bbedd79c3e321c00ce5c104499bceaa1594a9229698d56fa480eddb77",
+    ".github/ci/test_ota_admission.py": "57de73a36060d6fccb15ef296499bd817fd4c3235bd33218a19a3bba051ecdec",
+    ".github/ci/ota_delivery.py": "58a829ff868548201352b5d12747a8d6599fdf1688cf740d501504ab5de2eae5"
+  },
+  "checks": [
+    {
+      "name": "complete-ci-python-helper-suite",
+      "command": "python3 -m unittest discover -s .github/ci -p 'test_*.py'",
+      "result": "passed",
+      "passed": 116,
+      "new_admission_tests": 29,
+      "duration_seconds": 9.942,
+      "log": {
+        "path": "target/ota-admission-python-suite-final.log",
+        "bytes": 216,
+        "sha256": "161748bcfbb93b07822dc505d0e7980026d04f21d34f93b77f21c576c5cf8d68"
+      },
+      "environment": "Temporary verified PowerShell 7.6.6 prepended to PATH for existing Windows helper tests; no global installation"
+    },
+    {
+      "name": "live-github-adapter",
+      "result": "passed",
+      "evidence": {
+        "path": "target/ota-admission-live-adapter-final.json",
+        "bytes": 5850,
+        "sha256": "a119a867c5d07cec28a9637601450b29152c0cda05694058b2b048011ec197c2"
+      },
+      "scope": "Exact existing main CI run and artifact transport, not the full OTA candidate context or an OTA image qualification"
+    },
+    {
+      "name": "python-compile-and-diff-check",
+      "result": "passed",
+      "commands": [
+        "python3 -m py_compile .github/ci/ota_admission.py .github/ci/test_ota_admission.py",
+        "git diff --cached --check"
+      ]
+    }
+  ],
+  "live_probe": {
+    "scope": "Read-only live adapter/CI compatibility; this is not an OTA candidate or an OTA publication authorization",
+    "observed_at": "2026-10-17T01:30:23Z",
+    "run": {
+      "id": 38964193098,
+      "run_attempt": 1,
+      "workflow_id": 337552153,
+      "path": ".github/workflows/ci.yml",
+      "head_sha": "1df24f2b574400a7b9ae78145c67402721aae907",
+      "head_branch": "main",
+      "event": "push",
+      "created_at": "2026-10-16T20:42:39Z",
+      "started_at": "2026-10-16T20:42:39Z",
+      "completed_at": "2026-10-16T21:13:57Z",
+      "workflow_sha256": "4cbe3f5049cd63beeea577b2ff29f87b6136fd12ba67a20e0c5b4470340764a0",
+      "jobs": {
+        "Linux workspace": {
+          "id": 117186730205,
+          "started_at": "2026-10-16T20:43:21Z",
+          "completed_at": "2026-10-16T21:13:57Z",
+          "steps": [
+            "Test CI reports, build identity, and input diagnostic safety",
+            "Build optimized Linux test executables",
+            "Run Linux workspace tests",
+            "Run PR UI functional tests",
+            "Check default GPU kiosk client (no display required)"
+          ]
+        },
+        "Pi hardware profiles and update safety": {
+          "id": 117186730477,
+          "started_at": "2026-10-16T20:43:22Z",
+          "completed_at": "2026-10-16T20:44:20Z",
+          "steps": [
+            "Verify unprivileged installer sandbox",
+            "Run npm --prefix yocto test"
+          ]
+        },
+        "AArch64 core and scenario": {
+          "id": 117186730539,
+          "started_at": "2026-10-16T20:43:22Z",
+          "completed_at": "2026-10-16T20:44:18Z",
+          "steps": [
+            "Run cargo check --locked -p engine-nes -p scenario-falling -p scenario-nes --target aarch64-unknown-linux-gnu"
+          ]
+        },
+        "NES core, golden tests, and benchmark": {
+          "id": 117186730552,
+          "started_at": "2026-10-16T20:43:22Z",
+          "completed_at": "2026-10-16T20:44:33Z",
+          "steps": [
+            "Run cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets"
+          ]
+        },
+        "Spacewars AI deterministic baselines": {
+          "id": 117186730633,
+          "started_at": "2026-10-16T20:43:21Z",
+          "completed_at": "2026-10-16T20:46:13Z",
+          "steps": [
+            "Verify navigation-v1 baseline",
+            "Verify strategy-v1 baseline"
+          ]
+        },
+        "Spacewars experimental recovery": {
+          "id": 117186730639,
+          "started_at": "2026-10-16T20:43:22Z",
+          "completed_at": "2026-10-16T20:46:37Z",
+          "steps": [
+            "Test recovery profiles and native ground/boarding behavior",
+            "Test experimental supported-corridor observations",
+            "Lint recovery code and diagnostics"
+          ]
+        },
+        "Windows client": {
+          "id": 117186730684,
+          "started_at": "2026-10-16T20:43:21Z",
+          "completed_at": "2026-10-16T20:48:23Z",
+          "steps": [
+            "Run cargo check --locked -p engine-client --all-targets"
+          ]
+        },
+        "Windows release validation": {
+          "id": 117186730846,
+          "started_at": "2026-10-16T20:43:21Z",
+          "completed_at": "2026-10-16T20:55:32Z",
+          "steps": [
+            "Verify selected head",
+            "Build and validate extracted release"
+          ]
+        }
+      }
+    },
+    "artifact": {
+      "id": 12075821892,
+      "name": "linux-test-timings",
+      "bytes": 246622,
+      "sha256": "81f48eb17eb75df021827501b1baa562c91ac2a5de75f33781f780d62977d909"
+    },
+    "zip_members": [
+      "_temp/spacewars-ci-timings/gpu-check.seconds",
+      "_temp/spacewars-ci-timings/gpu-text.seconds",
+      "_temp/spacewars-ci-timings/build.seconds",
+      "_temp/spacewars-ci-timings/kms.seconds",
+      "_temp/spacewars-ci-timings/lyon.seconds",
+      "_temp/spacewars-ci-timings/physics-diagnostics.seconds",
+      "_temp/spacewars-ci-timings/ui-list.json",
+      "_temp/spacewars-ci-timings/ui-pr-list.json",
+      "_temp/spacewars-ci-timings/ui.seconds",
+      "_temp/spacewars-ci-timings/workspace.seconds",
+      "space-wars/space-wars/target/cargo-timings/cargo-timing-20261016T204504.909138461Z.html",
+      "space-wars/space-wars/target/cargo-timings/cargo-timing.html",
+      "space-wars/space-wars/target/nextest/ci/junit.xml",
+      "space-wars/space-wars/target/nextest/ui-pr/junit.xml",
+      "space-wars/space-wars/target/nextest/physics-diagnostics/junit.xml",
+      "space-wars/space-wars/target/clock-regression/collision-recovery-hyperpixel-0-flowing-light-mixed.trace.json",
+      "space-wars/space-wars/target/clock-regression/collision-recovery-picade-1-careful-light-mixed.trace.json",
+      "space-wars/space-wars/target/clock-regression/collision-recovery.json",
+      "space-wars/space-wars/target/clock-regression/mixed-smoke-hyperpixel-0-careful-heavy-mixed.trace.json",
+      "space-wars/space-wars/target/clock-regression/mixed-smoke-hyperpixel-0-flowing-heavy-mixed.trace.json",
+      "space-wars/space-wars/target/clock-regression/mixed-smoke-picade-0-careful-heavy-mixed.trace.json",
+      "space-wars/space-wars/target/clock-regression/mixed-smoke-picade-0-flowing-heavy-mixed.trace.json",
+      "space-wars/space-wars/target/clock-regression/mixed-smoke-portrait-42-careful-heavy-mixed.trace.json",
+      "space-wars/space-wars/target/clock-regression/mixed-smoke-portrait-42-flowing-heavy-mixed.trace.json",
+      "space-wars/space-wars/target/clock-regression/mixed-smoke.json",
+      "space-wars/space-wars/target/clock-regression/recovery-smoke-picade-42-careful-heavy-rain-cleared.trace.json",
+      "space-wars/space-wars/target/clock-regression/recovery-smoke-portrait-42-flowing-heavy-rain-cleared.trace.json",
+      "space-wars/space-wars/target/clock-regression/recovery-smoke.json"
+    ],
+    "source_files": {
+      ".github/ci/ota_admission.py": "67b42e4bbedd79c3e321c00ce5c104499bceaa1594a9229698d56fa480eddb77",
+      ".github/ci/ota_delivery.py": "58a829ff868548201352b5d12747a8d6599fdf1688cf740d501504ab5de2eae5"
+    }
+  },
+  "verified_boundaries": [
+    "Trusted workflow hashes and exact required jobs/steps are selected outside candidate artifacts",
+    "Current run and explicit attempt endpoints agree on exact main source, repository, workflow, event and successful result",
+    "Both source CI and OTA build are independently checked; PR/fork/foreign/stale runs and missing/skipped qualification steps reject",
+    "Artifact run/source/repository, exact source-run-attempt name, expiry and producer time window are checked",
+    "Artifact ZIP length and SHA-256 match GitHub records before parsing; API bearer token is absent from artifact-host requests",
+    "ZIP metadata allocation and expanded member sizes are bounded; traversal, duplicate entries, links, directories, encrypted entries and malformed CRC reject",
+    "New run attempts or changed artifact/job identities during download reject before yielding files",
+    "Private temporary files are removed on exit and downstream validation failure; origin receipt is not a signing authorization",
+    "API JSON and artifact reads recheck session deadline between partial reads; network errors redact signed CDN locations"
+  ],
+  "observed_remote_configuration": {
+    "repository_id": 3003186,
+    "main_protected": true,
+    "ota_build_workflow_present": false,
+    "github_environments": []
+  },
+  "limitations": [
+    "This is a library, not a configured OTA build/signing/publication workflow.",
+    "The live run covers remote main 1df24f2b574400a7b9ae78145c67402721aae907, not this unpushed OTA branch.",
+    "Artifact metadata has no attempt/producer-job identity; name and creation-window checks rely on the reviewed workflow limiting the uploader.",
+    "Image format, actual expanded hashes, embedded source/boot/protocol/data identity and complete Yocto provenance still require independent pinned validation.",
+    "Workflow hashing does not by itself pin actions/dependencies or prove tests did not suppress command failures.",
+    "The unsigned receipt is evidence only; later jobs need fresh authoritative admission and independently approved exact content.",
+    "Durable publisher history, current-parent selection, generation allocation, retention/renewal, protected role jobs, promotion approval and credentials remain to integrate.",
+    "No physical device bootstrap, installation or recovery result is claimed."
+  ],
+  "next_work": [
+    "Pin external Yocto layer revisions and record toolchain/config/source provenance in a real OTA candidate build.",
+    "Wire the unprivileged build/qualification and origin checks into isolated protected signing and serialized delivery jobs."
+  ]
+}

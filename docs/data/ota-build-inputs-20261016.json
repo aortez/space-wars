@@ -1,0 +1,456 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-17T01:51:55.972698+00:00",
+  "source_commit": "7e69bc00038b0590883c9d06e9432eb937520351",
+  "branch": "feat/ota-updates-254",
+  "scope": "Pinned local Yocto build, embedded actual toolchain provenance, exact rootfs/boot artifact checks and Zstandard packaging round trip. No GitHub workflow, feed, signing credential or physical device was changed.",
+  "source_files": {
+    ".github/ci/ota_build_inputs.py": "42dde6f83413c9748e35420e9c60ab3afdbffd1481ab41eca0b34a89bb0f7f56",
+    ".github/ci/test_ota_build_inputs.py": "94f4b2cb66ca328566e2dc43550f26d5de5ba98a24db47da1dcf9c17bd3a4b5b",
+    "yocto/kas-spacewars.yml": "0e212eb14c3bec039ad9759b4848f45c453564393fa70939c5267fcffa5aad83",
+    "yocto/meta-spacewars/lib/spacewars/build_provenance.py": "3756875f210c82fa3514c551369c2bf681b75ceabe901edbc055729757fef6de",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "0d7ddc262db0e8624b521406b77867a2439eb062c9a5e2880003c548444b85a8",
+    "yocto/tests/build_provenance_test.py": "012aebffb7a010728878f89bcb9bece46d3247f3b3ef2223c9f96d86339b917f"
+  },
+  "checks": [
+    {
+      "name": "ci-python-helpers",
+      "command": "python3 -m unittest discover -s .github/ci -p 'test_*.py'",
+      "result": "passed",
+      "passed": 123,
+      "duration_seconds": 10.631,
+      "log": {
+        "path": "target/ota-build-inputs-python-tests.log",
+        "bytes": 224,
+        "sha256": "35ef77ea9347145fe4897462bf7d6c330da49a97f14caece99e19340533ef7b0"
+      },
+      "environment": "Temporary verified PowerShell 7.6.6 prepended to PATH for existing Windows helper tests"
+    },
+    {
+      "name": "yocto-tools",
+      "command": "npm --prefix yocto test",
+      "result": "passed",
+      "javascript_passed": 51,
+      "python_passed": 79,
+      "log": {
+        "path": "target/ota-build-inputs-yocto-tests.log",
+        "bytes": 6919,
+        "sha256": "7c53bbe22fda2566b934d3ccb76fa97924330f7254476bfc2076696d914ddadc"
+      }
+    },
+    {
+      "name": "real-pinned-image-build",
+      "command": "python3 .github/ci/ota_build_inputs.py --source 7e69bc00038b0590883c9d06e9432eb937520351 --build-directory /home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu --cache /home/data2/yocto-cache --output target/ota-pinned-build-inputs.json",
+      "result": "passed",
+      "duration_seconds": 418.44,
+      "tasks_total": 6768,
+      "tasks_reused": 6733,
+      "log": {
+        "path": "target/ota-pinned-image-build-first.log",
+        "bytes": 20813,
+        "sha256": "c094c1ee6d859557dbf320e0f2f115210f56fe8cda953061bd2b9f2f9d5cb9b3"
+      },
+      "warning": "Ubuntu 26.04 has not been validated by the pinned Yocto release"
+    },
+    {
+      "name": "actual-rootfs-audit",
+      "command": "python3 target/ota-pinned-image-audit.py",
+      "result": "passed",
+      "script": {
+        "path": "target/ota-pinned-image-audit.py",
+        "bytes": 5397,
+        "sha256": "8dd3085eb47ea177834f1d9e24683e0e9619d2c767e7dd9d5d21c3ca1f7ff168"
+      },
+      "log": {
+        "path": "target/ota-pinned-image-audit.log",
+        "bytes": 485,
+        "sha256": "595f0699dc5a1c6ca1ae424151f377582164dc80e709870f72353f070f2bdbf8"
+      }
+    },
+    {
+      "name": "actual-boot-artifact-audit",
+      "command": "python3 target/ota-pinned-boot-audit.py",
+      "result": "passed",
+      "script": {
+        "path": "target/ota-pinned-boot-audit.py",
+        "bytes": 4523,
+        "sha256": "31fd089889bd1ec7427f7ae8551c285578bb52be8612f1f5101e3e60eaff9a0a"
+      },
+      "log": {
+        "path": "target/ota-pinned-boot-audit.log",
+        "bytes": 661,
+        "sha256": "0fca949f0e31e7908dbe87c4a1f1935add55c6235ffa50ab3291b0a4594fd794"
+      }
+    },
+    {
+      "name": "bootstrap-packaging-fixture",
+      "result": "passed",
+      "duration_seconds": 28.32,
+      "log": {
+        "path": "target/ota-pinned-package.log",
+        "bytes": 823,
+        "sha256": "2f3afb57667eb8cf1e2ba2139e2da0c4fb7d25087bed16518a8b724a80e64bfd"
+      },
+      "scope": "Pi 5/HyperPixel plan with manufactured WIC root PARTUUIDs; not a selected physical Pi layout"
+    },
+    {
+      "name": "actual-zstandard-roundtrip",
+      "result": "passed",
+      "evidence": {
+        "path": "target/ota-pinned-zstd-roundtrip.json",
+        "bytes": 579,
+        "sha256": "e3ebf679ea421fc2fe9c136f32a72462ed6af3b985a32682b54be2142b26b18e"
+      }
+    },
+    {
+      "name": "host-artifact-tools-build",
+      "command": "cargo build --locked -p engine-ota --features publisher --example bootstrap_package --example boot_artifact_probe --example image_identity_probe",
+      "result": "passed",
+      "log": {
+        "path": "target/ota-pinned-artifact-tools-build.log",
+        "bytes": 72,
+        "sha256": "2b34696728dc82b03cbf6311d7e3a6a41658bbde097834c3010a78bc82842c1a"
+      }
+    }
+  ],
+  "build_inputs": {
+    "configuration": {
+      "Cargo.lock": {
+        "bytes": 196778,
+        "sha256": "1e37900a35db9e7834df96b8f6ed560bdfc8426994a57b8474716841b198f45a"
+      },
+      "yocto/kas-spacewars.yml": {
+        "bytes": 4242,
+        "sha256": "0e212eb14c3bec039ad9759b4848f45c453564393fa70939c5267fcffa5aad83"
+      },
+      "yocto/meta-spacewars/conf/machine/raspberrypi-spacewars.conf": {
+        "bytes": 1765,
+        "sha256": "18da888bd9aa7cea9dfc5278d690e5b69a2df1dd9b4ccdd2b5b6fb30ee4a7d94"
+      }
+    },
+    "expanded_kas_sha256": "1b2f9287f3367bc8bc4983d3613957177c37df0818063c2d565b5c81e1804661",
+    "generated_configuration": {
+      "bblayers.conf": {
+        "bytes": 679,
+        "sha256": "098b39152c6574114b8ca19657c78ed00373ab2b7e6426bd8bf154c042f3eadb"
+      },
+      "local.conf": {
+        "bytes": 2673,
+        "sha256": "d833b4f6a360ef74067c3ff08e4ddae4c3ea2767cd98fe157453e06700d401d7"
+      }
+    },
+    "kas_version": "5.4",
+    "layers": {
+      "meta-openembedded": {
+        "commit": "0f00f8b9a21950640da8c5707343e5540133f86e",
+        "url": "https://git.openembedded.org/meta-openembedded"
+      },
+      "meta-pi-base": {
+        "commit": "ce48602dfefd4ee7f3d3010086e685ede3fb17b9",
+        "url": "https://github.com/aortez/sparkle-duck-shared.git"
+      },
+      "meta-raspberrypi": {
+        "commit": "018d44467c4f09eb63f8ea5e86e85d755250cf89",
+        "url": "https://git.yoctoproject.org/meta-raspberrypi"
+      },
+      "meta-rust-bin": {
+        "commit": "eaea247f32f247ab525112d2fbc16e16a553d880",
+        "url": "https://github.com/rust-embedded/meta-rust-bin.git"
+      },
+      "poky": {
+        "commit": "4fb7016a07507683359ebd620f1951fd5ea44bfa",
+        "url": "https://git.yoctoproject.org/poky"
+      }
+    },
+    "local_layer": {
+      "path": "yocto/meta-spacewars",
+      "source_commit": "7e69bc00038b0590883c9d06e9432eb937520351"
+    },
+    "machine": "raspberrypi-spacewars",
+    "output": {
+      "blob": {
+        "bytes": 137671519,
+        "sha256": "f1faa29e6113cf86d24c061dc5b99be2fb19e2ed2501926ea92c41bcf8d2dd28"
+      },
+      "image_identity": {
+        "architecture": "aarch64",
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "10e99b2bd4ca2bf0be8643735eb2d1e75cac7b8eccb3834757252ff5e1e7c134"
+          },
+          "os_manager": {
+            "bytes": 11171072,
+            "sha256": "2a4742bcfe962bbbfc9b2f4ad99f913bdcdd2f09c989db7650460f67cda3e375"
+          }
+        },
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "build_id": "rootfs-d4ad3f85c313763482a5231bb574c1e793d61459aa22abb2ce0b8e72889b64ab",
+        "data": {
+          "reads": {
+            "max": 1,
+            "min": 1
+          },
+          "writes": 1
+        },
+        "layout": "spacewars-ab-v1",
+        "machine": "raspberrypi-spacewars",
+        "recovery_protocol": 2,
+        "rootfs_tree": "d4ad3f85c313763482a5231bb574c1e793d61459aa22abb2ce0b8e72889b64ab",
+        "schema": 1,
+        "source": {
+          "commit": "7e69bc00038b0590883c9d06e9432eb937520351",
+          "dirty": false,
+          "revision": "7e69bc00038b",
+          "schema": 1
+        },
+        "updater_protocol": 1
+      },
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261017014048.ext4.gz"
+    },
+    "schema": 1,
+    "source_commit": "7e69bc00038b0590883c9d06e9432eb937520351",
+    "target": "spacewars-image"
+  },
+  "actual_image": {
+    "scope": "Actual pinned local Yocto image inspection; not publication, a GitHub build, or a device installation",
+    "source_commit": "7e69bc00038b0590883c9d06e9432eb937520351",
+    "input_record": {
+      "bytes": 3272,
+      "sha256": "2beba6f8fb13b037b1858990d8e444bd90767a7f3ea5619a0a333b99796cbed5"
+    },
+    "compressed": {
+      "bytes": 137671519,
+      "sha256": "f1faa29e6113cf86d24c061dc5b99be2fb19e2ed2501926ea92c41bcf8d2dd28"
+    },
+    "expanded": {
+      "bytes": 528482304,
+      "sha256": "81fea758ecdb812da97ddfbf1f92cf9bf8c7b7e09280ac800ca5e892179a07a4"
+    },
+    "image_identity": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 23470072,
+          "sha256": "10e99b2bd4ca2bf0be8643735eb2d1e75cac7b8eccb3834757252ff5e1e7c134"
+        },
+        "os_manager": {
+          "bytes": 11171072,
+          "sha256": "2a4742bcfe962bbbfc9b2f4ad99f913bdcdd2f09c989db7650460f67cda3e375"
+        }
+      },
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-d4ad3f85c313763482a5231bb574c1e793d61459aa22abb2ce0b8e72889b64ab",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 2,
+      "rootfs_tree": "d4ad3f85c313763482a5231bb574c1e793d61459aa22abb2ce0b8e72889b64ab",
+      "schema": 1,
+      "source": {
+        "commit": "7e69bc00038b0590883c9d06e9432eb937520351",
+        "dirty": false,
+        "revision": "7e69bc00038b",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "compiler_provenance": {
+      "kiosk_feature": "pi-kiosk-gpu",
+      "profile": "release",
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "schema": 1,
+      "source": {
+        "commit": "7e69bc00038b0590883c9d06e9432eb937520351",
+        "dirty": false,
+        "revision": "7e69bc00038b",
+        "schema": 1
+      },
+      "tools": {
+        "cargo": {
+          "details": "cargo 1.94.0 (85eff7c80 2026-01-15)\nrelease: 1.94.0\ncommit-hash: 85eff7c80277b57f78b11e28d14154ab12fcf643\ncommit-date: 2026-01-15\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.3 vendored)\nlibcurl: 8.17.0-DEV (sys:0.4.84+curl-8.17.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 [64-bit]",
+          "version": "1.94.0"
+        },
+        "cc": {
+          "details": "aarch64-poky-linux-gcc (GCC) 13.5.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        },
+        "rustc": {
+          "details": "rustc 1.94.0 (4a4ef493e 2026-03-02)\nbinary: rustc\ncommit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db\ncommit-date: 2026-03-02\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.0\nLLVM version: 21.1.8",
+          "version": "1.94.0"
+        }
+      }
+    },
+    "provenance_metadata": {
+      "kind": "regular",
+      "mode": 420,
+      "uid": 0,
+      "gid": 0
+    },
+    "binary_checks": {
+      "engine-client": {
+        "bytes": 23470072,
+        "sha256": "10e99b2bd4ca2bf0be8643735eb2d1e75cac7b8eccb3834757252ff5e1e7c134",
+        "elf_architecture": "aarch64"
+      },
+      "engine-os-manager": {
+        "bytes": 11171072,
+        "sha256": "2a4742bcfe962bbbfc9b2f4ad99f913bdcdd2f09c989db7650460f67cda3e375",
+        "elf_architecture": "aarch64"
+      }
+    },
+    "fsck": "passed read-only forced check",
+    "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-pinned-image-audit-pf85fpvh",
+    "image_record_parser": "passed",
+    "rootfs_toolchain_record_matches_selected_source": true
+  },
+  "boot_artifact": {
+    "rootfs": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261017014048.ext4.gz",
+      "compressed_bytes": 137671519,
+      "compressed_sha256": "f1faa29e6113cf86d24c061dc5b99be2fb19e2ed2501926ea92c41bcf8d2dd28",
+      "expanded_bytes": 528482304,
+      "expanded_sha256": "81fea758ecdb812da97ddfbf1f92cf9bf8c7b7e09280ac800ca5e892179a07a4"
+    },
+    "disk": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261017014048.wic.gz",
+      "compressed_bytes": 187144672,
+      "compressed_sha256": "522e80e98220092db61c84b629d98b8081837d0d4d0e678b6b8c76ba89a50dd5",
+      "expanded_bytes": 7679770624,
+      "expanded_sha256": "51a7448db8d0888b2c4f7d9c3d36bb3e5eaf1d22ec34f8558ec84d0a5a6967c7"
+    },
+    "partition_table": [
+      {
+        "number": 1,
+        "type": 12,
+        "start_sector": 8192,
+        "sectors": 307200
+      },
+      {
+        "number": 2,
+        "type": 131,
+        "start_sector": 319488,
+        "sectors": 6291456
+      },
+      {
+        "number": 3,
+        "type": 131,
+        "start_sector": 6610944,
+        "sectors": 6291456
+      },
+      {
+        "number": 4,
+        "type": 131,
+        "start_sector": 12902400,
+        "sectors": 2097152
+      }
+    ],
+    "root_partuuids": [
+      "076c4a2a-02",
+      "076c4a2a-03"
+    ],
+    "identity": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 23470072,
+          "sha256": "10e99b2bd4ca2bf0be8643735eb2d1e75cac7b8eccb3834757252ff5e1e7c134"
+        },
+        "os_manager": {
+          "bytes": 11171072,
+          "sha256": "2a4742bcfe962bbbfc9b2f4ad99f913bdcdd2f09c989db7650460f67cda3e375"
+        }
+      },
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-d4ad3f85c313763482a5231bb574c1e793d61459aa22abb2ce0b8e72889b64ab",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 2,
+      "rootfs_tree": "d4ad3f85c313763482a5231bb574c1e793d61459aa22abb2ce0b8e72889b64ab",
+      "schema": 1,
+      "source": {
+        "commit": "7e69bc00038b0590883c9d06e9432eb937520351",
+        "dirty": false,
+        "revision": "7e69bc00038b",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "boot_probe": {
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "hardware_profile": "hdmi",
+      "immutable_bytes": 85396458,
+      "immutable_files": 103,
+      "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+      "provisioned_default": null,
+      "trial": null
+    },
+    "rootfs_record_matches_sidecar": true,
+    "rootfs_and_fat_manifest_match": true,
+    "default_cmdline_unchanged": true,
+    "trial_uses_full_config_copy": true,
+    "boot_contains_exact_initramfs_sha256": "461ab4531c05f96c235610855951be26cb4b764e7d7ea2c9da075087b9485c4a",
+    "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-pinned-boot-audit-d6inm7c2",
+    "probe_command": [
+      "/home/data/workspace/space-wars-ota/target/debug/examples/boot_artifact_probe",
+      "/home/data/workspace/space-wars-ota/target/ota-pinned-boot-audit-d6inm7c2/boot",
+      "/home/data/workspace/space-wars-ota/target/ota-pinned-boot-audit-d6inm7c2/image.json",
+      "076c4a2a-02",
+      "076c4a2a-03"
+    ]
+  },
+  "zstandard_roundtrip": {
+    "scope": "Actual image Zstandard round trip using local bootstrap packaging fixture; WIC PARTUUIDs are not physical Pi installation authorization",
+    "compressed": {
+      "bytes": 131825106,
+      "sha256": "30d041d85df6be7beb292da7181b45ae55cace6edd9b7174439c91bd773cfae6"
+    },
+    "expanded": {
+      "bytes": 528482304,
+      "sha256": "81fea758ecdb812da97ddfbf1f92cf9bf8c7b7e09280ac800ca5e892179a07a4"
+    },
+    "source": {
+      "schema": 1,
+      "commit": "7e69bc00038b0590883c9d06e9432eb937520351",
+      "dirty": false,
+      "revision": "7e69bc00038b"
+    },
+    "elapsed_seconds": 0.33
+  },
+  "future_workflow_pin_candidates": {
+    "repository": "aortez/space-wars",
+    "purpose": "Observed immutable candidates for later unprivileged build workflow; not yet used by the current host build",
+    "kas_image_index": "ghcr.io/siemens/kas/kas@sha256:11f076b79b84f57cb7d933941ff619f09a7c17e562e1643d13836d5f8d0a92f3",
+    "kas_image_amd64": "ghcr.io/siemens/kas/kas@sha256:0911a72a5474d5287ecf546c9aa039aea0f04326531271996c2efb18a7e9569a",
+    "kas_source": "81bab5294be29de4b64adedce962d36184bfc66f",
+    "actions_checkout_v7": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "actions_upload_artifact_v4": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+  },
+  "limitations": [
+    "The compiler record is inside the image; complete layer/configuration provenance is currently an external build record. The final artifact/history must bind it, or it must be embedded before image identity calculation.",
+    "The host input builder validates the produced sidecar/source and compressed gzip bytes; independent full image validation remains a separate stage.",
+    "The local audit scripts exercise actual artifacts but are not yet the pinned, reusable image-qualification stage for GitHub signing jobs.",
+    "This is a warm-cache local host build, not a fresh/container/GitHub runner build or proof of daily build capacity.",
+    "No OTA build workflow exists remotely; main source CI for this unpushed source has not run.",
+    "No production root, protected signing environment, promotion, publication or device installation is claimed.",
+    "The current host builder invokes the normal Node build wrapper. The observed pinned kas container does not include Node; container integration must deliberately adapt the driver or supply a pinned Node runtime.",
+    "The generated bootstrap fixture has WIC PARTUUIDs and must not be used on the existing physical Pis without fresh device-specific selection and qualification."
+  ],
+  "next_work": [
+    "Make image qualification and candidate packaging reusable under pinned publisher tooling, with complete provenance bound to the artifact.",
+    "Add the isolated unprivileged Pi build workflow and connect same-source CI/run admission, protected role signing and serialized delivery.",
+    "Continue installed-runtime and supervised physical bootstrap/rollback qualification before enabling production automatic installation."
+  ]
+}

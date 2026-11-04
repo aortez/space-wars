@@ -1,6 +1,9 @@
 //! Shared, headless plant physiology. See `docs/plants.md` for units and order.
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod grass;
+pub mod moss;
+
 pub type TissueId = u64;
 pub type OrganismId = u64;
 /// Nutrients, water, chemical energy, in abstract integer resource units.
@@ -11,13 +14,18 @@ pub enum Role {
     Root,
     Runner,
     Shoot,
+    /// Thin photosynthetic surface tissue with capped passive supply from an
+    /// eligible solid surface instead of roots.
+    Moss,
 }
 impl Role {
-    fn index(self) -> usize {
+    /// Position in the role-ordered `Config` tables.
+    pub fn index(self) -> usize {
         match self {
             Self::Root => 0,
             Self::Runner => 1,
             Self::Shoot => 2,
+            Self::Moss => 3,
         }
     }
 }
@@ -38,6 +46,10 @@ pub struct Tissue {
     pub role: Role,
     pub cell: [i32; 2],
     pub size: u16,
+    /// Paid resource units toward the next size; never transferable.
+    pub development: Resources,
+    /// Lifetime development spending, including completed size increments.
+    pub invested: Resources,
     pub support: Option<Support>,
     pub health: u16,
     pub shortage_ticks: u32,
@@ -54,12 +66,21 @@ pub struct Config {
     pub max_organisms: usize,
     pub max_intents: usize,
     pub max_size: u16,
-    pub capacity_per_size: [Resources; 3],
-    pub maintenance_per_size: [Resources; 3],
-    pub growth_per_size: [Resources; 3],
+    /// Role-ordered tables: root, runner, shoot, moss.
+    pub capacity_per_size: [Resources; 4],
+    pub maintenance_per_size: [Resources; 4],
+    pub growth_per_size: [Resources; 4],
+    pub development_per_size: Resources,
     pub root_intake_per_size: Resources,
     pub shoot_energy_per_size: u64,
     pub local_light_threshold: u16,
+    /// Moss surface supply per size per tick at full availability; no energy.
+    pub moss_intake_per_size: Resources,
+    /// Moss energy per size per tick once light reaches `moss_light_saturation`.
+    pub moss_energy_per_size: u64,
+    pub moss_light_saturation: u16,
+    /// Moss local light deficit threshold, separate from the shoot threshold.
+    pub moss_light_threshold: u16,
     pub grace_ticks: u32,
     pub damage_per_tick: u16,
     pub recovery_per_tick: u16,
@@ -72,12 +93,17 @@ impl Default for Config {
             max_organisms: 64,
             max_intents: 16,
             max_size: 16,
-            capacity_per_size: [[20; 3], [10; 3], [20; 3]],
-            maintenance_per_size: [[1, 1, 1], [1, 1, 1], [1, 2, 2]],
-            growth_per_size: [[3; 3], [2; 3], [4; 3]],
+            capacity_per_size: [[20; 3], [10; 3], [20; 3], [24; 3]],
+            maintenance_per_size: [[1, 1, 1], [1, 1, 1], [1, 2, 2], [1, 1, 1]],
+            growth_per_size: [[3; 3], [2; 3], [4; 3], [20; 3]],
+            development_per_size: [4; 3],
             root_intake_per_size: [4, 3, 0],
             shoot_energy_per_size: 8,
             local_light_threshold: 250,
+            moss_intake_per_size: [2, 2, 0],
+            moss_energy_per_size: 2,
+            moss_light_saturation: 50,
+            moss_light_threshold: 25,
             grace_ticks: 3,
             damage_per_tick: 20,
             recovery_per_tick: 10,
@@ -91,16 +117,38 @@ pub enum Rejection {
     Space,
     Support,
     Unaffordable,
+    Shade,
     TissueLimit,
     OrganismLimit,
     WorkLimit,
     Stale,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UptakeZero {
+    NoContact,
+    SupplyOrRounding,
+    Capacity,
+}
+
+/// Passive nutrient/water contact supply for one living absorbing tissue.
+/// Energy is never part of contact supply.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ContactIntake {
+    pub eligible: bool,
+    pub offered: Resources,
+    pub accepted: Resources,
+    pub overflow: Resources,
+    pub zero: [Option<UptakeZero>; 2],
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Ledger {
     pub tick: u64,
     pub intake: Resources,
+    pub roots: BTreeMap<TissueId, ContactIntake>,
+    /// Moss surface supply, recorded separately from root dirt contact.
+    pub surfaces: BTreeMap<TissueId, ContactIntake>,
     pub maintenance: Resources,
     pub unmet: Resources,
     pub growth: Resources,
@@ -125,6 +173,8 @@ pub enum Intent {
         cell: [i32; 2],
         support: Option<Support>,
     },
+    /// Pay at most one unit of each resource toward the next shoot size.
+    Develop { tissue: TissueId },
     /// Relative maintenance priority inside a living component; does not waive costs.
     Allocate { tissue: TissueId, priority: u16 },
 }
@@ -134,6 +184,8 @@ pub enum Intent {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Exposure {
     pub dirt_contact: bool,
+    /// Living moss touching an eligible solid surface of its own support.
+    pub surface_contact: bool,
     pub nutrients: u16,
     pub water: u16,
     pub light: u16,
@@ -142,6 +194,17 @@ pub trait Environment {
     fn exposure(&self, tissue: &Tissue) -> Exposure;
     fn space_available(&self, cell: [i32; 2], role: Role, size: u16) -> bool;
     fn support_valid(&self, support: Option<Support>, cell: [i32; 2]) -> bool;
+}
+impl<E: Environment + ?Sized> Environment for &E {
+    fn exposure(&self, tissue: &Tissue) -> Exposure {
+        (**self).exposure(tissue)
+    }
+    fn space_available(&self, cell: [i32; 2], role: Role, size: u16) -> bool {
+        (**self).space_available(cell, role, size)
+    }
+    fn support_valid(&self, support: Option<Support>, cell: [i32; 2]) -> bool {
+        (**self).support_valid(support, cell)
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Observation {
@@ -154,6 +217,81 @@ pub struct Observation {
 }
 pub trait PlantBrain {
     fn decide(&mut self, observation: &Observation) -> Vec<Intent>;
+}
+
+/// A policy candidate's first refusal in its checked order, or its proposal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Limit {
+    Cadence,
+    Shade,
+    Shortage,
+    /// The parent is recovering from damage and waits before spending.
+    Damage,
+    Occupied,
+    Size,
+    Spread,
+    Space,
+    Support,
+    Population,
+    Work,
+    Resource,
+    Proposed,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Decision {
+    pub available: Resources,
+    pub cost: Resources,
+    pub size: u16,
+    pub parent: TissueId,
+    pub role: Role,
+    pub cell: [i32; 2],
+    pub limit: Limit,
+}
+/// Advisory policy output; runtime admission and post-upkeep costs are final.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Plan {
+    pub waiting: Option<Limit>,
+    pub intents: Vec<Intent>,
+    pub decisions: Vec<Decision>,
+}
+
+/// Each living tissue's connected component pool, built once per plan rather
+/// than walking the graph for every candidate. Severed components never share
+/// purchasing power.
+fn component_pools(o: &Observation) -> BTreeMap<TissueId, Resources> {
+    let mut neighbors: BTreeMap<TissueId, Vec<TissueId>> = o
+        .tissues
+        .iter()
+        .filter(|t| t.health > 0)
+        .map(|t| (t.id, Vec::new()))
+        .collect();
+    for (a, b) in &o.connections {
+        if neighbors.contains_key(a) && neighbors.contains_key(b) {
+            neighbors.get_mut(a).unwrap().push(*b);
+            neighbors.get_mut(b).unwrap().push(*a);
+        }
+    }
+    let mut pools = BTreeMap::new();
+    for id in neighbors.keys() {
+        if pools.contains_key(id) {
+            continue;
+        }
+        let mut group = BTreeSet::new();
+        let mut pending = vec![*id];
+        while let Some(current) = pending.pop() {
+            if group.insert(current) {
+                pending.extend(&neighbors[&current]);
+            }
+        }
+        let mut pool = [0; 3];
+        for t in o.tissues.iter().filter(|t| group.contains(&t.id)) {
+            add(&mut pool, t.stores);
+        }
+        for member in group {
+            pools.insert(member, pool);
+        }
+    }
+    pools
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -200,8 +338,17 @@ impl Plants {
                 .flatten()
                 .any(|v| *v > 1_000_000)
             || config.root_intake_per_size.iter().any(|v| *v > 1_000_000)
+            || config
+                .development_per_size
+                .iter()
+                .any(|v| *v == 0 || *v > 1_000_000)
             || config.shoot_energy_per_size > 1_000_000
             || config.root_intake_per_size[2] != 0
+            || config.moss_intake_per_size.iter().any(|v| *v > 1_000_000)
+            || config.moss_intake_per_size[2] != 0
+            || config.moss_energy_per_size > 1_000_000
+            || !(1..=1000).contains(&config.moss_light_saturation)
+            || config.moss_light_threshold > 1000
             || config
                 .growth_per_size
                 .iter()
@@ -368,6 +515,8 @@ impl Plants {
                 role,
                 cell,
                 size,
+                development: [0; 3],
+                invested: [0; 3],
                 support,
                 health: 100,
                 shortage_ticks: 0,
@@ -399,6 +548,50 @@ impl Plants {
     }
     fn apply(&mut self, intent: &Intent, env: &impl Environment) -> Result<(), Rejection> {
         match *intent {
+            Intent::Develop { tissue } => {
+                let t = self.tissues.get(&tissue).ok_or(Rejection::Invalid)?.clone();
+                if t.health == 0 {
+                    return Err(Rejection::Dead);
+                }
+                if t.role != Role::Shoot || t.size >= 3 || t.size >= self.config.max_size {
+                    return Err(Rejection::Invalid);
+                }
+                // Use this tick's physiology result: no additional exposure query,
+                // and connected sunlight cannot waive the shoot's local deficit.
+                if t.shade_ticks != 0 {
+                    return Err(Rejection::Shade);
+                }
+                if t.shortage_ticks != 0 {
+                    return Err(Rejection::Unaffordable);
+                }
+                if !env.support_valid(t.support, t.cell) {
+                    return Err(Rejection::Support);
+                }
+                if !env.space_available(t.cell, t.role, t.size + 1) {
+                    return Err(Rejection::Space);
+                }
+                let target = self.config.development_per_size;
+                let cost = std::array::from_fn(|i| u64::from(t.development[i] < target[i]));
+                let group = self
+                    .components()
+                    .into_iter()
+                    .find(|g| g.contains(&tissue))
+                    .unwrap();
+                let total = self.total(&group);
+                if (0..3).any(|i| total[i] < cost[i]) {
+                    return Err(Rejection::Unaffordable);
+                }
+                let next = self.tissues.get_mut(&tissue).unwrap();
+                add(&mut next.development, cost);
+                add(&mut next.invested, cost);
+                if next.development == target {
+                    next.size += 1;
+                    next.development = [0; 3];
+                }
+                add(&mut self.ledger.growth, cost);
+                self.distribute(&group, std::array::from_fn(|i| total[i] - cost[i]));
+                Ok(())
+            }
             Intent::Allocate { tissue, priority } => {
                 let t = self.tissues.get_mut(&tissue).ok_or(Rejection::Invalid)?;
                 if t.health == 0 {
@@ -450,6 +643,8 @@ impl Plants {
                         role,
                         cell,
                         size,
+                        development: [0; 3],
+                        invested: [0; 3],
                         support,
                         health: 100,
                         shortage_ticks: 0,
@@ -507,23 +702,66 @@ impl Plants {
         self.normalize();
         for group in self.components() {
             let mut pool = self.total(&group);
+            let mut capacity = [0; 3];
+            for id in &group {
+                add(&mut capacity, self.capacity(*id));
+            }
             for id in &group {
                 let t = &self.tissues[id];
                 let e = samples[id];
+                // Passive contact supply: roots from dirt, moss from any eligible surface.
+                let contact = match t.role {
+                    Role::Root => Some((e.dirt_contact, self.config.root_intake_per_size)),
+                    Role::Moss => Some((e.surface_contact, self.config.moss_intake_per_size)),
+                    Role::Runner | Role::Shoot => None,
+                };
                 let mut intake = [0; 3];
-                if t.role == Role::Root && e.dirt_contact {
+                if let Some((true, rates)) = contact {
                     for (i, fraction) in [e.nutrients, e.water].into_iter().enumerate() {
-                        intake[i] = self.config.root_intake_per_size[i]
-                            * u64::from(t.size)
-                            * u64::from(fraction)
-                            / 1000;
+                        intake[i] = rates[i] * u64::from(t.size) * u64::from(fraction) / 1000;
                     }
                 }
-                if t.role == Role::Shoot {
-                    intake[2] =
-                        self.config.shoot_energy_per_size * u64::from(t.size) * u64::from(e.light)
-                            / 1000;
+                if let Some((eligible, _)) = contact {
+                    let accepted =
+                        std::array::from_fn(|i| intake[i].min(capacity[i].saturating_sub(pool[i])));
+                    let record = ContactIntake {
+                        zero: std::array::from_fn(|i| {
+                            if !eligible {
+                                Some(UptakeZero::NoContact)
+                            } else if intake[i] == 0 {
+                                Some(UptakeZero::SupplyOrRounding)
+                            } else if accepted[i] == 0 {
+                                Some(UptakeZero::Capacity)
+                            } else {
+                                None
+                            }
+                        }),
+                        eligible,
+                        offered: intake,
+                        accepted,
+                        overflow: std::array::from_fn(|i| intake[i] - accepted[i]),
+                    };
+                    if t.role == Role::Root {
+                        self.ledger.roots.insert(*id, record);
+                    } else {
+                        self.ledger.surfaces.insert(*id, record);
+                    }
                 }
+                intake[2] = match t.role {
+                    Role::Shoot => {
+                        self.config.shoot_energy_per_size * u64::from(t.size) * u64::from(e.light)
+                            / 1000
+                    }
+                    // Shade-adapted response: full yield from the saturation level upward.
+                    Role::Moss => {
+                        let saturation = u64::from(self.config.moss_light_saturation);
+                        self.config.moss_energy_per_size
+                            * u64::from(t.size)
+                            * u64::from(e.light).min(saturation)
+                            / saturation
+                    }
+                    Role::Root | Role::Runner => 0,
+                };
                 add(&mut pool, intake);
                 add(&mut self.ledger.intake, intake);
             }
@@ -548,8 +786,12 @@ impl Plants {
                 } else {
                     0
                 };
-                let shade =
-                    t.role == Role::Shoot && samples[&id].light < self.config.local_light_threshold;
+                let threshold = match t.role {
+                    Role::Shoot => Some(self.config.local_light_threshold),
+                    Role::Moss => Some(self.config.moss_light_threshold),
+                    Role::Root | Role::Runner => None,
+                };
+                let shade = threshold.is_some_and(|limit| samples[&id].light < limit);
                 t.shade_ticks = if shade {
                     t.shade_ticks.saturating_add(1)
                 } else {
@@ -605,6 +847,25 @@ impl Plants {
     }
     /// External damage/topology events occur between ticks. Their loss is
     /// inspectable immediately in the current ledger, before its next reset.
+    /// Cutting/crushing reduces health; a killed tissue loses its canonical share.
+    /// Dead cells remain occupied until the host explicitly removes them.
+    pub fn damage(&mut self, id: TissueId, amount: u16) -> Result<(), Rejection> {
+        if amount > 100 || !self.tissues.contains_key(&id) {
+            return Err(Rejection::Invalid);
+        }
+        if amount == 0 {
+            return Ok(());
+        }
+        self.normalize();
+        let t = self.tissues.get_mut(&id).unwrap();
+        t.health = t.health.saturating_sub(amount);
+        if t.health == 0 {
+            add(&mut self.ledger.loss, t.stores);
+            t.stores = [0; 3];
+        }
+        self.normalize();
+        Ok(())
+    }
     pub fn sever(&mut self, a: u64, b: u64) -> Result<(), Rejection> {
         if !self.edges.contains(&edge(a, b)) {
             return Err(Rejection::Invalid);
@@ -615,13 +876,21 @@ impl Plants {
         Ok(())
     }
     pub fn remove(&mut self, id: u64) -> Result<(), Rejection> {
-        if !self.tissues.contains_key(&id) {
+        self.remove_many(&[id])
+    }
+    /// Simultaneous cutting loses the pre-cut shares, independent of ID order.
+    pub fn remove_many(&mut self, ids: &[TissueId]) -> Result<(), Rejection> {
+        let ids: BTreeSet<_> = ids.iter().copied().collect();
+        if ids.iter().any(|id| !self.tissues.contains_key(id)) {
             return Err(Rejection::Invalid);
         }
         self.normalize();
-        let t = self.tissues.remove(&id).unwrap();
-        add(&mut self.ledger.loss, t.stores);
-        self.edges.retain(|(a, b)| *a != id && *b != id);
+        for id in &ids {
+            let t = self.tissues.remove(id).unwrap();
+            add(&mut self.ledger.loss, t.stores);
+        }
+        self.edges
+            .retain(|(a, b)| !ids.contains(a) && !ids.contains(b));
         self.normalize();
         Ok(())
     }

@@ -4,6 +4,7 @@ members = [
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-gravity",
+    "crates/engine-material",
     "crates/engine-nes",
     "crates/engine-rapier",
     "crates/engine-soil",
@@ -15,9 +16,12 @@ members = [
     "crates/spacewars-cli",
     "crates/engine-agent",
     "crates/engine-os-manager",
+    "crates/engine-ota",
     "scenarios/clock",
+    "scenarios/garden-lab",
     "scenarios/falling",
     "scenarios/line-mover",
+    "scenarios/material-lab",
     "scenarios/nes",
     "scenarios/null",
     "scenarios/pizza",
@@ -34,6 +38,7 @@ exclude = [
     "vendor/i-slint-renderer-femtovg",
     "vendor/lyon_tessellation",
     "vendor/rapier2d",
+    "vendor/tough",
 ]
 
 [workspace.package]
@@ -50,6 +55,7 @@ clap = { version = "4", features = ["derive"] }
 cpal = "0.18.2"
 directories = "6"
 gilrs = { version = "0.11.2", default-features = false, features = ["xinput"] }
+libm = "0.2"
 rand = { version = "0.9", features = ["std_rng"] }
 rayon = "1.12"
 png = "0.17"
@@ -78,6 +84,7 @@ engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 engine-agent = { path = "crates/engine-agent" }
 engine-gravity = { path = "crates/engine-gravity" }
+engine-material = { path = "crates/engine-material" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
 engine-soil = { path = "crates/engine-soil" }
@@ -85,9 +92,11 @@ engine-terrain = { path = "crates/engine-terrain" }
 engine-water = { path = "crates/engine-water" }
 spacewars-ai = { path = "crates/spacewars-ai" }
 spacewars-control = { path = "crates/spacewars-control" }
+scenario-garden-lab = { path = "scenarios/garden-lab" }
 scenario-clock = { path = "scenarios/clock" }
 scenario-falling = { path = "scenarios/falling" }
 scenario-line-mover = { path = "scenarios/line-mover" }
+scenario-material-lab = { path = "scenarios/material-lab" }
 scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
@@ -98,6 +107,9 @@ scenario-terrain-lab = { path = "scenarios/terrain-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
 
 [patch.crates-io]
+# Inject the device's usable time without disabling expiration enforcement.
+# See vendor/tough/SPACEWARS_PATCH.md; signature verification is unchanged.
+tough = { path = "vendor/tough" }
 # Exact round joins for the Pi GPU profile, with reference diagnostic controls.
 lyon_tessellation = { path = "vendor/lyon_tessellation" }
 # Pi-selected CPU glyph masks; the library retains its vector default/control.

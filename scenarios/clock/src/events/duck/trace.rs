@@ -28,21 +28,28 @@ pub(crate) struct Sample {
     recovery: engine_common::ClockDuckRecoveryState,
 }
 
+impl Sample {
+    pub(crate) fn touches_exit_flap(&self) -> bool {
+        self.contacts
+            .iter()
+            .any(|contact| contact.entity == flaps::body(1).entity.value())
+    }
+}
+
 impl DuckEvent {
-    pub(crate) fn trace_sample(&self) -> Option<Sample> {
-        let world = self.world.as_ref()?;
+    pub(crate) fn trace_sample(&self, world: &PhysicsWorld) -> Option<Sample> {
         let motion = world.motion(DUCK_BODY)?;
         Some(Sample {
             tick: self.tick,
             // Entrance-relative X, world Y, like the controller. Public
             // navigation positions remain screen-space (see entrance side).
-            position: [self.position()?.x, motion.position.y],
+            position: [self.position(world)?.x, motion.position.y],
             velocity: [
                 motion.linear_velocity.x * self.direction,
                 motion.linear_velocity.y,
             ],
-            support: self.supported_surface(),
-            grounded: self.grounded(),
+            support: self.supported_surface(world),
+            grounded: self.grounded(world),
             contacts: world
                 .surface_contacts(DUCK_COLLIDER)
                 .take(8)

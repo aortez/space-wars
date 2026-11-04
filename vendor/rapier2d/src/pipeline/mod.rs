@@ -8,8 +8,12 @@ pub use event_handler::ChannelEventCollector;
 #[cfg(feature = "alloc")]
 pub use event_handler::EventHandler;
 pub use physics_hooks::ActiveHooks;
+#[cfg(all(feature = "alloc", feature = "dim2"))]
+pub use physics_hooks::ContactImpulse;
 #[cfg(feature = "alloc")]
-pub use physics_hooks::{ContactModificationContext, PairFilterContext, PhysicsHooks};
+pub use physics_hooks::{
+    ContactModificationContext, PairFilterContext, PhysicsHooks, SolverContactBatchContext,
+};
 #[cfg(feature = "alloc")]
 pub use physics_pipeline::PhysicsPipeline;
 #[cfg(feature = "alloc")]

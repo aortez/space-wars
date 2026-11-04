@@ -36,10 +36,12 @@ use crate::raster;
 use crate::render::{self, Viewport};
 
 mod performance_overlay;
+#[cfg(test)]
+mod pizza_tests;
 mod profiling;
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
-const MAX_FIXED_STEPS_PER_TICK: usize = 5;
+pub(crate) const MAX_FIXED_STEPS_PER_TICK: usize = 5;
 #[cfg(test)]
 const BENCHMARK_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 static NEXT_SCENARIO_REVISION: AtomicU64 = AtomicU64::new(1);
@@ -78,10 +80,12 @@ pub struct ScenarioControls {
     audio: Option<engine_common::AudioSettings>,
     request: Option<ScenarioControlRequest>,
     clock_state: Option<spacewars_control::ClockState>,
+    pizza_status: Option<PizzaStatus>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScenarioControlRequest {
+    PizzaGravity { revision: u64 },
     Pause,
     Resume,
     Restart,
@@ -99,7 +103,89 @@ pub fn new_scenario_controls() -> SharedScenarioControls {
     Rc::new(RefCell::new(ScenarioControls::default()))
 }
 
+/// Bounded normal/benchmark Pizza status exposed by the existing `status` command.
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct PizzaStatus {
+    pub scenario_revision: u64,
+    pub paused: bool,
+    #[serde(flatten)]
+    pub observation: scenario_pizza::PizzaObservation,
+    pub ball_count: usize,
+    pub population: scenario_pizza::PizzaPopulation,
+    pub held_ball_id: Option<u64>,
+}
+
+impl PizzaStatus {
+    fn can_trigger(&self) -> bool {
+        self.paused
+            && matches!(
+                self.observation.event,
+                scenario_pizza::PizzaEventState::Idle {
+                    pending_manual: None,
+                    ..
+                }
+            )
+    }
+}
+
 impl ScenarioControls {
+    pub(crate) fn pizza_status(&self) -> Option<&PizzaStatus> {
+        self.pizza_status.as_ref()
+    }
+
+    pub(crate) fn request_pizza_gravity(&mut self) -> bool {
+        let Some(status) = self.pizza_status.as_ref() else {
+            return false;
+        };
+        if self.request.is_some() || !status.can_trigger() {
+            return false;
+        }
+        self.request = Some(ScenarioControlRequest::PizzaGravity {
+            revision: status.scenario_revision,
+        });
+        true
+    }
+
+    fn publish_pizza_status(
+        &mut self,
+        scenario: &HostedScenario,
+        revision: u64,
+        paused: bool,
+        window: &MainWindow,
+    ) {
+        self.pizza_status = scenario.inner.pizza_status().map(|mut status| {
+            status.scenario_revision = revision;
+            status.paused = paused;
+            status
+        });
+        window.set_pizza_event_available(self.pizza_status.as_ref().is_some_and(|s| {
+            !matches!(
+                s.observation.event,
+                scenario_pizza::PizzaEventState::Disabled
+            )
+        }));
+        window.set_pizza_event_can_trigger(
+            self.request.is_none()
+                && self
+                    .pizza_status
+                    .as_ref()
+                    .is_some_and(PizzaStatus::can_trigger),
+        );
+        window.set_pizza_event_status(
+            if self.pizza_status.as_ref().is_some_and(|s| {
+                matches!(
+                    s.observation.event,
+                    scenario_pizza::PizzaEventState::Active { .. }
+                )
+            }) {
+                "Gravity active · Resume to continue"
+            } else {
+                "Starts in this world · Grabbing and flinging stay available"
+            }
+            .into(),
+        );
+    }
+
     pub fn request_clock_benchmark(&mut self, case: client_scenarios::ClockBenchmarkCase) -> bool {
         if self.request.is_some() || self.clock_state.is_none() {
             return false;
@@ -130,7 +216,10 @@ impl ScenarioControls {
         if !self.clock_state().is_some_and(|state| {
             state.can_trigger
                 && state.events.iter().any(|entry| {
-                    entry.kind == event && !entry.blocked_by_duck && !entry.blocked_by_crow
+                    entry.kind == event
+                        && !entry.blocked_by_duck
+                        && !entry.blocked_by_crow
+                        && !entry.blocked_by_spider
                 })
         }) {
             return false;
@@ -208,6 +297,7 @@ impl ScenarioControls {
 
     pub fn clear(&mut self) {
         self.request = None;
+        self.pizza_status = None;
     }
 
     fn take_request(&mut self) -> Option<ScenarioControlRequest> {
@@ -295,12 +385,6 @@ pub fn validate_scenario(name: &str) -> Result<(), HostError> {
 pub fn scenario_names() -> Vec<&'static str> {
     client_scenarios::registrations()
         .iter()
-        .map(|registration| registration.id)
-        .collect()
-}
-
-pub fn launcher_scenario_names() -> Vec<&'static str> {
-    client_scenarios::launcher_registrations()
         .map(|registration| registration.id)
         .collect()
 }
@@ -564,6 +648,9 @@ pub fn start_scenario_loop(
     controls
         .borrow_mut()
         .publish_clock_state(&scenario, scenario_revision, paused);
+    controls
+        .borrow_mut()
+        .publish_pizza_status(&scenario, scenario_revision, paused, window);
     if scenario_name == "clock" {
         crate::clock_controls::publish_settings(window, settings.clock);
     }
@@ -649,6 +736,8 @@ pub fn start_scenario_loop(
 
     let mut last_realtime_emulated_frames = 0;
     let mut last_realtime_submitted_frames = 0;
+    let mut last_worker_updates = 0;
+    let mut presented_worker_frame = None;
     let mut last_diagnostics_revision = input.borrow().runtime_diagnostics_revision();
     let mut last_diagnostics_scenario_revision = scenario_revision;
     let mut last_diagnostics_paused = paused;
@@ -666,6 +755,12 @@ pub fn start_scenario_loop(
         let now = Instant::now();
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
+        if window.get_install_fenced() {
+            input.borrow_mut().clear();
+            controls.borrow_mut().clear();
+            accumulator = Duration::ZERO;
+            return;
+        }
         if let Some(audio) = controls.borrow().audio
             && settings.audio != audio
         {
@@ -740,6 +835,8 @@ pub fn start_scenario_loop(
             performance = PerformanceStats::new(tick_model, now);
             last_realtime_emulated_frames = 0;
             last_realtime_submitted_frames = 0;
+            last_worker_updates = 0;
+            presented_worker_frame = None;
             let presentation = crate::gpu_scene::start_session(
                 &window,
                 renderer,
@@ -775,6 +872,7 @@ pub fn start_scenario_loop(
         }
 
         controls.borrow_mut().publish_clock_state(&scenario, scenario_revision, paused);
+        controls.borrow_mut().publish_pizza_status(&scenario, scenario_revision, paused, &window);
         let clock_settings = controls.borrow().clock_state.as_ref().map(|clock| clock.settings);
         publish_runtime_clock_settings(
             &window,
@@ -796,6 +894,10 @@ pub fn start_scenario_loop(
             last_realtime_submitted_frames = telemetry.submitted_video_frames;
             trace_realtime_telemetry(telemetry);
             (updates, frames)
+        } else if let Some(total) = scenario.inner.simulation_worker_updates() {
+            let updates = total.saturating_sub(last_worker_updates) as usize;
+            last_worker_updates = total;
+            (updates, 0)
         } else {
             (step_result.updates, 0)
         };
@@ -810,10 +912,11 @@ pub fn start_scenario_loop(
             scoreboard.record(scenario_revision, &result);
             scoreboard.publish(&window, &result);
         }
-        window.set_game_over_visible(game_over);
+        set_game_over(&window, game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
         drop(result_trace);
+        let worker_frame = scenario.inner.simulation_worker_frame().map(|frame| (frame, viewport));
         if scenario.has_realtime_runtime() {
             input_projections.clear();
             projection_viewport = viewport;
@@ -835,7 +938,7 @@ pub fn start_scenario_loop(
                     }
                 }
             }
-        } else {
+        } else if !worker_frame_on_screen(worker_frame, presented_worker_frame) {
             let scene_started = Instant::now();
             let scene_trace = crate::frame_trace::Scope::new(crate::frame_trace::Stage::HostScene);
             let frames = scenario.render_frames(renderer, viewport);
@@ -857,6 +960,7 @@ pub fn start_scenario_loop(
             );
             drop(publish_trace);
             submitted_frames = 1;
+            presented_worker_frame = worker_frame;
             if !paused {
                 let internal = if renderer == RenderBackend::Raster {
                     scaled_viewport(viewport, raster_scale)
@@ -1063,6 +1167,37 @@ fn step_scenario_inner(
 
     if let Some(request) = controls.take_request() {
         match request {
+            ScenarioControlRequest::PizzaGravity { revision } => {
+                if *paused
+                    && !*benchmark_active
+                    && controls
+                        .pizza_status
+                        .as_ref()
+                        .is_some_and(|s| s.scenario_revision == revision)
+                    && scenario.inner.pizza_status().is_some_and(|s| {
+                        matches!(
+                            s.observation.event,
+                            scenario_pizza::PizzaEventState::Idle {
+                                pending_manual: None,
+                                ..
+                            }
+                        )
+                    })
+                {
+                    deliver_pointer_cancellation(scenario, input, input_projections);
+                    input.clear();
+                    scenario.step(
+                        &[scenario_pizza::PizzaAction::TriggerEvent(
+                            scenario_pizza::PizzaEventKind::DirectionalGravity,
+                        )
+                        .encode()],
+                        Duration::ZERO,
+                    );
+                    *paused = false;
+                    *accumulator = Duration::ZERO;
+                }
+                return HostStepResult::default();
+            }
             ScenarioControlRequest::ClockSettings(settings) => {
                 if *paused {
                     scenario.inner.configure_clock(settings);
@@ -1316,6 +1451,15 @@ fn step_scenario_inner(
         return HostStepResult::default();
     }
 
+    // The worker advances time itself; the UI thread only forwards input.
+    if scenario.inner.has_simulation_worker() {
+        let actions = scenario.actions(input, *benchmark_active, input_projections);
+        if !actions.is_empty() {
+            scenario.publish_realtime_actions(&actions, Instant::now());
+        }
+        return HostStepResult::default();
+    }
+
     match (tick_model, fixed_dt) {
         (TickModel::FixedTimestep { .. } | TickModel::EmulatorClock, Some(dt)) => {
             *accumulator += elapsed;
@@ -1449,6 +1593,15 @@ fn publish_runtime_clock_settings(
         crate::clock_controls::publish_settings(window, clock_settings);
         window.invoke_clock_settings_applied();
     }
+}
+
+fn set_game_over(window: &MainWindow, game_over: bool) {
+    if game_over && !window.get_game_over_visible() {
+        // Reset focus before exposing the result so external state observers
+        // do not see a selection carried over from the previous result.
+        window.set_game_over_focus_index(0);
+    }
+    window.set_game_over_visible(game_over);
 }
 
 fn set_ingame_menu(window: &MainWindow, paused: bool) {
@@ -1638,7 +1791,16 @@ fn measured_diagnostics_label(value: Option<f32>) -> String {
         .unwrap_or_else(|| "--".into())
 }
 
-fn fixed_step_duration(tick_model: TickModel) -> Option<Duration> {
+/// A simulation worker publishes frames on its own schedule. One already
+/// presented at the current viewport stays on screen without presenting again.
+fn worker_frame_on_screen(
+    frame: Option<(u64, Viewport)>,
+    presented: Option<(u64, Viewport)>,
+) -> bool {
+    frame.is_some() && frame == presented
+}
+
+pub(crate) fn fixed_step_duration(tick_model: TickModel) -> Option<Duration> {
     match tick_model {
         TickModel::FixedTimestep { hz } => Some(Duration::from_secs_f64(1.0 / hz.max(1) as f64)),
         TickModel::Variable | TickModel::EmulatorClock => None,
@@ -2673,6 +2835,7 @@ mod tests {
         );
         let mut controls = ScenarioControls::default();
         controls.publish_clock_state(&scenario, 7, false);
+        // The spider waits for the player's duck, as a second duck does.
         for event in ClockEventKind::ALL {
             let expected = matches!(
                 event,
@@ -2681,10 +2844,13 @@ mod tests {
                     | ClockEventKind::ColorCycle
                     | ClockEventKind::Marquee
                     | ClockEventKind::DigitSlide
+                    | ClockEventKind::CellSwap
                     | ClockEventKind::Rain
                     | ClockEventKind::Crow
                     | ClockEventKind::Explosion
                     | ClockEventKind::Aquarium
+                    | ClockEventKind::Grass
+                    | ClockEventKind::SlotMachine
             );
             assert_eq!(controls.request_clock_event(event), expected, "{event:?}");
             if expected {
@@ -2711,6 +2877,22 @@ mod tests {
         }
         slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
         MainWindow::new().unwrap()
+    }
+
+    #[test]
+    fn a_new_game_over_starts_on_play_again_before_slint_reacts() {
+        let window = render_test_window();
+        set_game_over(&window, true);
+        // The player chose New Match on the previous result.
+        window.set_game_over_focus_index(1);
+        set_game_over(&window, false);
+        set_game_over(&window, true);
+        // No event loop has run, so Slint's change handler has not reset it.
+        assert_eq!(window.get_game_over_focus_index(), 0);
+        // An unchanged result keeps the player's current selection.
+        window.set_game_over_focus_index(2);
+        set_game_over(&window, true);
+        assert_eq!(window.get_game_over_focus_index(), 2);
     }
 
     #[test]
@@ -3372,6 +3554,13 @@ mod tests {
             ScenarioStartMode::Normal,
         )
         .unwrap();
+        scenario.step(
+            &[scenario_pizza::PizzaAction::TriggerEvent(
+                scenario_pizza::PizzaEventKind::DirectionalGravity,
+            )
+            .encode()],
+            Duration::ZERO,
+        );
         let frames = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
         let projections =
             render::frame_projections(&frames, TEST_VIEWPORT, scenario.frame_layout());
@@ -3390,6 +3579,19 @@ mod tests {
         let actions = scenario.actions(&mut input, false, &projections);
         scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
         input.press(input::GameKey::Pause);
+        let event_before_pause = scenario
+            .as_any()
+            .downcast_ref::<PizzaClientScenario>()
+            .unwrap()
+            .state
+            .event_state();
+        assert!(matches!(
+            event_before_pause,
+            scenario_pizza::PizzaEventState::Active {
+                elapsed_ticks: 2,
+                ..
+            }
+        ));
 
         let mut accumulator = Duration::ZERO;
         let mut controls = ScenarioControls::default();
@@ -3418,6 +3620,7 @@ mod tests {
             .downcast_ref::<PizzaClientScenario>()
             .expect("scenario should host Pizza");
         assert!(paused);
+        assert_eq!(pizza.state.event_state(), event_before_pause);
         assert!(pizza.state.held_ball_id.is_none());
         assert!(!pizza.state.balls[0].invincible);
         assert!(pizza.state.balls[0].moving);

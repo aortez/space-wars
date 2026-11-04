@@ -72,6 +72,9 @@ pub(crate) struct RainEvent {
 }
 
 impl RainEvent {
+    pub fn own_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
+        self.floats.as_ref().map(|f| &f.world)
+    }
     pub fn new(
         layout: Layout,
         seed: u64,

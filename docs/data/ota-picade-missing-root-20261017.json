@@ -1,0 +1,375 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "date_timezone": "America/Los_Angeles",
+  "device": "sw-picade.local",
+  "board": "Raspberry Pi 4 Model B Rev 1.4",
+  "medium": "PNY USB 3.0 FD, serial 07019B7D2F242124",
+  "medium_bytes": 62305959936,
+  "hardware_profile": "picade",
+  "case": "missing-root",
+  "scope": "One supervised early-boot diagnostic after completed bootstrap; no signed OTA candidate, quarantine or promotion failure tested",
+  "baseline_record": "ota-picade-bootstrap-success-20261017.json",
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 23470072,
+        "sha256": "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc"
+      },
+      "os_manager": {
+        "bytes": 11252736,
+        "sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+    "schema": 1,
+    "source": {
+      "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+      "dirty": false,
+      "revision": "e9867188d211",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+  "source": {
+    "native_helper": "c8861b4c19fa8a69f546209c2b1f0bc932c942c6",
+    "native_helper_sha256": "61c100792eeb34e35e58cb2c0f4bcc6ec99322c451dbf4f2c6865574f27a2edd",
+    "activation_runner_sha256": "b6f775a81592e998ff31430bfb09fd157fed2a231478d49a93dec7ea46b4a9f1",
+    "cleanup_runner": "17bca3a4bf94bbae020b19559c54ef9e962b5248",
+    "cleanup_runner_sha256": "bf125fc29e3948c59e161583860a8a60b6c0987c20f40f88d18185afbd9fa071",
+    "clean": true
+  },
+  "diagnostic_id": "3ad026c0a8a7ad16ccab46f451e2969f7b272064fba8e1a80cf9ab4bf4214fda",
+  "plan_sha256": "ef2a97e47f42b1b5cdafda5a87b02d595d71782e73b2f7dbbab56e6b961f8ab7",
+  "baseline": {
+    "generation": 0,
+    "slot": "b",
+    "recovery_sha256": "0b2048f3d88e006e18d972e49b13514e02ab0da720f888ad5a0e254a61541abe",
+    "completed_bootstrap_sha256": "e832343dd67cc533b4472dc5dac53cbd837c2b4886168869ceb333f8ffeb49ae"
+  },
+  "activation": {
+    "origin_boot_id": "7d1a472c-a5b2-406d-83f6-b4dd94f23166",
+    "started_utc": "2026-10-18T02:26:02.393283+00:00",
+    "reboot_job_accepted": true,
+    "consumed_before_request": true,
+    "activation_requests": 1
+  },
+  "observation": {
+    "elapsed_seconds": 258.576,
+    "connection_loss_observed": true,
+    "watchdog_interval_consistent": true,
+    "trial_userspace_observed": false,
+    "runner_requested_additional_reboot": false,
+    "scope": "Normal return observed after one diagnostic request; no serial trace of missing-root trial or exact watchdog reset time"
+  },
+  "normal_return": {
+    "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+    "image_kernel_media_and_default_unchanged": true,
+    "baseline_and_completed_bootstrap_unchanged": true,
+    "firmware_tryboot": false,
+    "initial_recovery_status": {
+      "schema": 1,
+      "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+      "uptime_ms": 11555,
+      "progress": {
+        "stage": "blocked",
+        "phase": null,
+        "transaction": null,
+        "good_build_id": null,
+        "candidate_build_id": null,
+        "detail": "invalid boot evidence: trial selector does not match the provisioned root template"
+      }
+    }
+  },
+  "cleanup": {
+    "operator_restoration_required": true,
+    "original_trial_selector_restored": true,
+    "normal_recovery_healthy": {
+      "schema": 1,
+      "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+      "uptime_ms": 182183,
+      "progress": {
+        "stage": "healthy",
+        "phase": null,
+        "transaction": null,
+        "good_build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "candidate_build_id": null,
+        "detail": null
+      }
+    },
+    "record_sha256": "bfedea50c89141fd240665524abe84a005e5fea8b9cbaf49e4e93ae38b00dd28",
+    "repeated_activation_rejected": true,
+    "repeat_rejection": "Error: Boot(\"recovery qualification: diagnostic activation already consumed or not prepared\")",
+    "production_recovery_unchanged": true,
+    "selected_persistent_stores_unchanged": false,
+    "settings_roms_pairings_wifi_and_keys_unchanged": true,
+    "local_gatt_database": {
+      "changed_files": 1,
+      "before": "5fb63e833ad0ac34351517e71729361c4ec370c7b8e05d3070c04b98fc19c9ec",
+      "after": "3f4ca4fae420f116e5fa5a5b6367a8df5973c2aefadea51abb6e89ce696ddfbd",
+      "interpretation": "BlueZ stores the generated adapter-local service database separately from peer pairing records; all other file digests and all owners/modes/links match",
+      "source": "https://github.com/bluez/bluez/blob/5.72/src/gatt-database.c#L1461-L1483"
+    },
+    "first_postcheck_stopped_after_safe_restoration": true,
+    "cleanup_resumed_without_activation": true
+  },
+  "access": {
+    "administrator_and_runtime_logins_verified": true,
+    "administrator_sudo_verified": true,
+    "runtime_unrestricted_sudo_denied": true,
+    "runtime_helper_denied": true,
+    "runtime_logind_denied": true,
+    "storage_errors_observed": false,
+    "initial_checker_expected_can_reboot_no_but_system_bus_denies_call": true
+  },
+  "kiosk": {
+    "health_samples": [
+      {
+        "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+        "uptime_ms": 184026,
+        "process_id": 818,
+        "start_ticks": 915,
+        "invocation_id": "201c8bd3619943a59d15625a0cbbdd62",
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "control_response": 1,
+        "presented_frames": 4686
+      },
+      {
+        "boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+        "uptime_ms": 186965,
+        "process_id": 818,
+        "start_ticks": 915,
+        "invocation_id": "201c8bd3619943a59d15625a0cbbdd62",
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "control_response": 2,
+        "presented_frames": 4806
+      }
+    ],
+    "ui": {
+      "schema_version": 1,
+      "revision": 1,
+      "screen": "gameplay",
+      "active_scenario": "spacewars",
+      "selected_scenario": "spacewars",
+      "selected_control": null,
+      "controls": [],
+      "actions": [],
+      "scenario_revision": 1,
+      "paused": false,
+      "benchmark_active": false,
+      "error": null
+    },
+    "screenshot_pixels": [
+      1024,
+      768
+    ],
+    "screenshot_visually_reviewed": true
+  },
+  "validation": {
+    "host_ota_unit_passed": 339,
+    "host_ota_unit_ignored": 8,
+    "host_ota_integration_passed": 22,
+    "workstation_runner_tests_passed": 7,
+    "scoped_clippy_passed": true,
+    "rust_1_89_check_passed": true,
+    "aarch64_release_build_passed": true,
+    "ota_test_log": {
+      "path": "target/ota-recovery-qualification-host-tests.log",
+      "sha256": "0242591a88adf78646b6c959cb6a8707000f8507f15584fdee94027217b52d30"
+    }
+  },
+  "automatic_ota_enabled": false,
+  "physical_failure_matrix_qualified": false,
+  "candidate_quarantine_tested": false,
+  "private_evidence": "/home/data/workspace/space-wars-ota/target/ota-picade-missing-root-c8861b4",
+  "evidence_files": {
+    "activate-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "activate.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "activate.json": {
+      "bytes": 2396,
+      "sha256": "53e4b0adf55ea268da53ebf725ef5248f6e758f7b1cebffcbf4628337d130529"
+    },
+    "activation-start.json": {
+      "bytes": 138,
+      "sha256": "7f1448c1d089ea0b6eaf793d8b5ce0764aaa642cbce9e4690fa8ef4072ec5e98"
+    },
+    "check-final-access.py": {
+      "bytes": 2142,
+      "sha256": "fa18dff33d67aa1821431d4fe6047e83986748d24bb875bb16ec0eaf9887bc01"
+    },
+    "final-access-verified.json": {
+      "bytes": 317,
+      "sha256": "ad180ae842b9bd7b4d7512efed5233aad8d680abe9d1b06061f2a9965c3c1d95"
+    },
+    "final-access.json": {
+      "bytes": 997,
+      "sha256": "48f517b1bde752d962bf9cd70bf30b3b370c52be788fc8ae1437cc7fdaf2d137"
+    },
+    "health-before.json": {
+      "bytes": 322,
+      "sha256": "fd7c44913c68051620ff77e1e2bd0d0a7013d4deaba2fe3228f5d5b482732627"
+    },
+    "inspect-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "inspect.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inspect.json": {
+      "bytes": 2039,
+      "sha256": "f38edf31d0abde560079bdf0fcfb4f965e13061f5b2550c62a2e3bf4e7525af9"
+    },
+    "observations.jsonl": {
+      "bytes": 7755,
+      "sha256": "6aba44d5ac980fc4f52316d46195e393de25042169c61430d0ad64e0436d2f39"
+    },
+    "plan.json": {
+      "bytes": 2350,
+      "sha256": "bce66cf66ba61431aff49341c2f9502ac1f5b53bd6a59f608422f67fcaa88cf2"
+    },
+    "prepare-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "prepare.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "prepare.json": {
+      "bytes": 2397,
+      "sha256": "f22a1caf6df96659721554d844a924dd11b78eeaeb4f1a7c6bdb459f07461c73"
+    },
+    "recovery-before-cleanup.json": {
+      "bytes": 363,
+      "sha256": "32e4345c9350805c9f1bb469b9122da3862913a81e782cba564bea60750054ed"
+    },
+    "reference.json": {
+      "bytes": 16087,
+      "sha256": "7f5f35317cd031394c775b44fb050ec69280730a37828cf91fb0c1d918de9490"
+    },
+    "restorations/20261018T023038Z-994578e8/recovery-after.json": {
+      "bytes": 329,
+      "sha256": "8f0189db3e07a4e8afa82f62d2fe01d0c647e8eb1e67a51da41403dea8eda2ee"
+    },
+    "restorations/20261018T023038Z-994578e8/restore-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "restorations/20261018T023038Z-994578e8/restore.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "restorations/20261018T023038Z-994578e8/restore.json": {
+      "bytes": 2430,
+      "sha256": "1dab69ac9d6cc6606a53b91fec416d4df567fbd789fac21ed78f7b148ebdfe58"
+    },
+    "restorations/20261018T023038Z-994578e8/stores-after.json": {
+      "bytes": 8406,
+      "sha256": "9071ff2a365429111be85144a5e0ed6b2c8fb89ca9f37deb12626a7a618d1d62"
+    },
+    "restorations/20261018T023301Z-f2ce1145/health-after.json": {
+      "bytes": 683,
+      "sha256": "23ae6fb748c06a021a4c1c2592f4c22fa8e61e92c5df5529d18dfc6ef4980c9c"
+    },
+    "restorations/20261018T023301Z-f2ce1145/recovery-after.json": {
+      "bytes": 330,
+      "sha256": "165e0b67def53a4157514853a6a4958b0fd359128dbb2024780dbdf1dfecf536"
+    },
+    "restorations/20261018T023301Z-f2ce1145/repeat-rejected.json": {
+      "bytes": 151,
+      "sha256": "811fbc2a18bd755a8bcd3ef45c433fcf0e02e1e288b57d81ef29fec575de3c3d"
+    },
+    "restorations/20261018T023301Z-f2ce1145/restore-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "restorations/20261018T023301Z-f2ce1145/restore.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "restorations/20261018T023301Z-f2ce1145/restore.json": {
+      "bytes": 2430,
+      "sha256": "1dab69ac9d6cc6606a53b91fec416d4df567fbd789fac21ed78f7b148ebdfe58"
+    },
+    "restorations/20261018T023301Z-f2ce1145/runner-source.json": {
+      "bytes": 174,
+      "sha256": "0bd0c9097a259a788e0a51576bd526ce337e180d2581e286aeb3e96cdb3962f9"
+    },
+    "restorations/20261018T023301Z-f2ce1145/screenshot.png": {
+      "bytes": 92296,
+      "sha256": "8ab08062ff9e573a18a02cd6ff1e00d9cd26af195b118d3bb37eb1d84d37f5fb"
+    },
+    "restorations/20261018T023301Z-f2ce1145/stores-after.json": {
+      "bytes": 8406,
+      "sha256": "9071ff2a365429111be85144a5e0ed6b2c8fb89ca9f37deb12626a7a618d1d62"
+    },
+    "restorations/20261018T023301Z-f2ce1145/stores-comparison.json": {
+      "bytes": 356,
+      "sha256": "197115ed53606ffea0299844ebd1035f7725e2adb09475cfce70d29ef829749e"
+    },
+    "restorations/20261018T023301Z-f2ce1145/ui-after.json": {
+      "bytes": 291,
+      "sha256": "4dc61e38ad78ec602fe2b692ea60da875df73b2c1002f85b004d14884fade1ba"
+    },
+    "restorations/20261018T023301Z-f2ce1145/verification.json": {
+      "bytes": 845,
+      "sha256": "5987836c97f8817513f765fc06be1dd90f620d786d0c4cad6d5e28a6c6344202"
+    },
+    "returned-bluetooth-attributes": {
+      "bytes": 1081,
+      "sha256": "69a2a70a06bb476fc0d10a8f69648c9aae47ba45ef3576b827e5c6d74862acaf"
+    },
+    "returned-kernel.log": {
+      "bytes": 27946,
+      "sha256": "19195432437769d20fd83153a13d6de30b820d1f260be5779a9501bbde2dec79"
+    },
+    "returned.json": {
+      "bytes": 3568,
+      "sha256": "3dddabcc70190f90ce2377e9b30ecba305aed19c2adeb099f67d72a9a9a5ca78"
+    },
+    "runner.json": {
+      "bytes": 690,
+      "sha256": "cdb9288a455917c3316902510957b862346b1adb8a4284100c68425a5d276845"
+    },
+    "service-before-cleanup.json": {
+      "bytes": 127,
+      "sha256": "5e48a42a3c0da66a2a8f438208d93b505d58fc2220181ce016458e79f2e34b73"
+    },
+    "stores-before.json": {
+      "bytes": 8406,
+      "sha256": "ae5f5c964b3e31460e92f2e495d2e80ba04a4d621ee49bf00968ee25bdec77f0"
+    },
+    "ui-before.json": {
+      "bytes": 291,
+      "sha256": "46a591eaf5ff282bff435247f4d155757124b0850980b4536ff8f37d232aab73"
+    }
+  },
+  "remaining": [
+    "Use an isolated signed test feed/candidate to qualify ordinary updater and app-health failure with quarantine and bounded explicit retry",
+    "Exercise interrupted promotion and remaining Pi 4/5 physical failure cases",
+    "Reviewed trust/staging/service/policy provisioning before automatic OTA rollout",
+    "Separate rollout to sw-picade-2.local"
+  ]
+}

@@ -1,0 +1,153 @@
+{
+  "date": "2026-10-15",
+  "source_base": "82470f552d863599fbc7a265bdfff60913e32ec3",
+  "scope": "Operator-only fast update migration, removal of runtime unsigned-install/reboot sudo grants in new images, disabled legacy slot mutation, and inherited cross-tool lock with recovery/watchdog admission. No installed Pi privileges or boot state changed.",
+  "source_files_sha256": {
+    "crates/engine-os-manager/src/lib.rs": "660d2631ac0e08f7a069bdc2bab72d90ca6b43e7283341d9c70fefbd632a6580",
+    "crates/engine-os-manager/src/main.rs": "2be5f533ba240146b2ae40e905b37f62bb42a7c1d37b85b9005303ed8ed16c9d",
+    "crates/engine-os-manager/src/maintenance.rs": "e41e33ca262248bcaba4096ab1d30a1e91c0c3d3aa4aa10c8946e0a52b7fd4f9",
+    "crates/engine-os-manager/tests/maintenance_cli.rs": "457e00f90f8c5cf412e0bb7b6e5ec280fcbe42a7d253d606ce887b57c468041d",
+    "crates/engine-os-manager/tests/recovery_command_fixture.py": "d14e2ef2dfb53c52d06f78bda7362d2f2a86d1157f093d79005a6314c60e1287",
+    "crates/engine-ota/src/boot_linux.rs": "ac91be5f0cade060bf434210bf2dc1737769ea290efbb2eab341a8b5f58b797f",
+    "crates/engine-ota/src/install_lock.rs": "64a8dd3171a6c60f7106588d1bed7885007815ee972c11d9750cc9f85ef702c6",
+    "crates/engine-ota/src/lib.rs": "a2c913a2dc267e9a59cfda670e89d5a8516e757e38ef71ce9d82006c36f380a0",
+    "crates/engine-ota/src/recovery.rs": "5faff06f1458fbe3929edb14be51f62bced014e76058989092ed4c65cfad7a2e",
+    "crates/engine-ota/src/recovery_tests.rs": "f203b9ee971abd9d6be2c947937a461d85b2a8aadd9b35398e541e331514f524",
+    "crates/engine-ota/src/watchdog_linux.rs": "3f4a70d93eb8d244e3bec53181fbae796c326a99218534c07053aa389fdff34c",
+    "crates/engine-ota/src/watchdog_linux_tests.rs": "76e61874ce4e8f8c50ccfc213fe43a77ef1dd6bba27454f3259b3f8fb3efef50",
+    "docs/ota-updates.md": "23e265d1fa3d9d93528eab22f2accc3a204e816f53b603a39800b1444404fb39",
+    "docs/pi-kiosk.md": "c5a4575bf74d1b49a84c4ed54cce928aad0729d8f62b52a130cded1754f6b7dc",
+    "update.sh": "495a3fff36f732d77541ad139d5d00cb4d3fc6be177c35d78af92cf205165659",
+    "yocto/README.md": "e71d282560ca7c8ee12fcdfe54af6fa1f78791188dffcbc9b15a3f2855d6aefe",
+    "yocto/meta-spacewars/recipes-core/images/spacewars-image.bb": "22014d03291adfb48f6ccd3cfc6b10764ee446df1665c32fdd711b745b07244f",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update-wrapper.sh": "cf9fdf0ac8e92417665e6e9e39db57962f41b28b61df0e79e3fc2b13db2bf1a4",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh": "161c7a40f879b4c2c8afd64b4c86b422fb2b5d0b8526e9b49b2ce02c0b19b5f0",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer-wrapper.sh": "022bfd940f30a66bd8f310a80cb4b1c2833e254d459e8781181fbbe13a6c89cb",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh": "205de0c9922522e2b650f258fe8e74dda76485fc957deac13380518c64122954",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "336fc21ffb1be744ff377778642c1ed5f7bff68a5e7218c14a08feadbb6cf741",
+    "yocto/meta-spacewars/recipes-support/ab-boot/ab-boot-manager.bbappend": "f9fddb40f6f6f88b22f858dd50c201486f4e7669e4bd9c206083a7befd6cdd91",
+    "yocto/meta-spacewars/recipes-support/ab-boot/files/ab-boot-manager": "a3a4947edae8df0e552dd0ffa0e8c118bf7be0fa3daf6ca8cb4ad6f5e8944a12",
+    "yocto/meta-spacewars/recipes-support/ab-boot/files/spacewars-legacy-update-disabled": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594",
+    "yocto/scripts/fast-update.mjs": "1b3ea986be61370304ee849ec852a7b2cfe2e692539cabbba6b74ac1ee65de68",
+    "yocto/scripts/update.mjs": "f1a82a9fa0804f07b8e9179e14cb09eaefb5218bed3f523cf8e3579625c5e60a",
+    "yocto/scripts/yolo-update.mjs": "22d934497bacce340387615a62c87d16977245ab42c6663ae1a8fd978298892c",
+    "yocto/tests/fast-update.test.mjs": "fcc13614fe1bdf2a3b866395ac5f7c2fd2f16bc996c769b0a37c6aae167f7550",
+    "yocto/tests/fast_installer_test.py": "7c4d97bc0c78f48f54a64f6d2a2704a90d0a5b26df009bfb21c8b499c04a84d7",
+    "yocto/tests/maintenance_policy_test.py": "37b4ec04864ffbdab40913bb736e813fcba21d82490d96cb03e5fea5943bbadd",
+    "yocto/tests/renderer_switch_test.py": "67e2d944b0b4d227a2c9c70a526887bce39d4384537cb8728d33554c85ac0463",
+    ".github/workflows/ci.yml": "8933769040ba92b67f39482558e5ec46f636336f8046f435c086269c99cb20c4"
+  },
+  "checks": {
+    "host-tests": {
+      "log": "target/ota-maintenance-host-tests.log",
+      "sha256": "c5dbc4933e6066355c7dddfaddd2177e63749ab3ab177127a3f74a9c1025f8a2",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.57s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.52s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.26s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 75 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.77s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "log": "target/ota-maintenance-clippy.log",
+      "sha256": "c4b84ee3fec8f53bb62e925fc7d9cd02d72dbbbad2feba4395f8845c54289581",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.09s"
+      ]
+    },
+    "rust189": {
+      "log": "target/ota-maintenance-rust189.log",
+      "sha256": "3f9e85162ff0cd16c90a31db9a5be4ca47060bc5488b1ced9329dcb8b837aeea",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.57s"
+      ]
+    },
+    "watchdog-tests": {
+      "log": "target/ota-maintenance-watchdog-tests.log",
+      "sha256": "23b98e3598bcbac5dfd9a93f86b2a326c4b6fdc9910c5d9aaa92620a543ce89f",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.85s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 73 filtered out; finished in 0.01s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+      ]
+    },
+    "aarch64": {
+      "log": "target/ota-maintenance-aarch64.log",
+      "sha256": "427def9ab15e378486b401fcd1eeb0647f8c85ed309af0d653f109c3e6788fbc",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.56s",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.79s"
+      ]
+    },
+    "tooling": {
+      "log": "target/ota-maintenance-tooling.log",
+      "sha256": "e0f576a60473faa7709e1a9ab002c9e24a6df2c0c60047d72cc53171349a7c08",
+      "exit_code": 0,
+      "summary": [
+        "\u2139 tests 38",
+        "\u2139 pass 38",
+        "Ran 61 tests in 28.619s",
+        "OK"
+      ]
+    },
+    "client-tests": {
+      "log": "target/ota-maintenance-client-tests.log",
+      "sha256": "60f57104eb3ca6d146299eae095dfe71218e4a917e25b771df96c3d06d7f1842",
+      "exit_code": 0,
+      "summary": [
+        "\u2139 tests 8",
+        "\u2139 pass 8"
+      ]
+    },
+    "legacy-tests": {
+      "log": "target/ota-maintenance-legacy-tests.log",
+      "sha256": "c346f1228fe88f4ab3cb336ffa610dc3a34ec7c7bb7d05df7a1c222f2d928881",
+      "exit_code": 0,
+      "summary": [
+        "Ran 1 test in 0.002s",
+        "OK"
+      ]
+    },
+    "shellcheck": {
+      "log": "target/ota-maintenance-shellcheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_code": 0,
+      "summary": []
+    }
+  },
+  "command_fixture": {
+    "fixture_root": "/home/data/workspace/space-wars-ota/target/ota-recover-command-spj6zmtx",
+    "exit_code": 0,
+    "stdout": "{\n  \"uid\": 0,\n  \"pid\": 1,\n  \"unprovisioned\": {\n    \"schema\": 1,\n    \"boot_id\": \"046d9f1b-06c1-44e6-a302-da0c967fc2a5\",\n    \"uptime_ms\": 15189514,\n    \"progress\": {\n      \"stage\": \"unprovisioned\",\n      \"phase\": null,\n      \"transaction\": null,\n      \"good_build_id\": null,\n      \"candidate_build_id\": null,\n      \"detail\": null\n    }\n  },\n  \"existing_state\": {\n    \"schema\": 1,\n    \"boot_id\": \"046d9f1b-06c1-44e6-a302-da0c967fc2a5\",\n    \"uptime_ms\": 15189546,\n    \"progress\": {\n      \"stage\": \"blocked\",\n      \"phase\": null,\n      \"transaction\": null,\n      \"good_build_id\": null,\n      \"candidate_build_id\": null,\n      \"detail\": \"invalid boot evidence: installed recovery image record is unavailable or invalid: storage failure: No such file or directory (os error 2)\"\n    }\n  },\n  \"existing_state_preserved\": true,\n  \"production_device_nodes_present\": false,\n  \"maintenance_wrappers_hold_shared_lock\": true,\n  \"busy_lock_and_corrupt_journal_reject_both_helpers\": true\n}\n",
+    "stderr": ""
+  },
+  "pi5_output": "uid=1000(spacewars) gid=1000(spacewars) groups=1000(spacewars),19(input),29(audio),44(video)\nde606400-dc75-446e-b26b-385592b0f562\n\nrunning 1 test\ntest install_lock::tests::inherited_helper_retains_the_lock_after_the_parent_releases_its_copy ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 76 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest recovery::tests::maintenance_requires_a_terminal_transaction_and_the_current_good_default ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 76 filtered out; finished in 0.02s\n\n\nrunning 1 test\ntest watchdog_linux::tests::only_durable_success_can_open_and_disarm_and_repeat_calls_do_not_reopen ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 76 filtered out; finished in 0.01s\n\ndevice mutations require the root-owned service\ndevice mutations require the root-owned service\nde606400-dc75-446e-b26b-385592b0f562\n",
+  "pi5_binaries": {
+    "ota-maintenance-pi5-tests": {
+      "bytes": 4723656,
+      "sha256": "5135107d208bd54a523f49530006ef17f59b61b8df20e91c78f786436b4957d7"
+    },
+    "ota-maintenance-pi5-manager": {
+      "bytes": 10691728,
+      "sha256": "8a782d16b3d840371a284cc55399ecc04ef161541c23b6222c400e165cc2b5c7"
+    }
+  },
+  "limitations": [
+    "Image packaging/effective sudo policy has not yet been verified in a rebuilt artifact for this change",
+    "Physical Pis still retain old installed helpers and sudo grants until supervised root bootstrap updates both slots",
+    "No physical root execution, block write, watchdog open, boot change or reboot",
+    "Maintenance holds and the verified workstation A/B endpoint remain incomplete",
+    "Persistent root operator-key provisioning and signed/fast-client admission behavior require integration before enabling automatic updates"
+  ]
+}

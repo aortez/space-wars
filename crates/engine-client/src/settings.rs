@@ -313,6 +313,36 @@ mod tests {
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
+    fn launcher_filter_defaults_recovers_and_preserves_other_preferences() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        for launcher in ["", "[launcher]\n", "[launcher]\nshow_all = 'invalid'\n"] {
+            fs::write(&path, format!("[launch]\nscenario = 'garden-lab'\nseed = 123\n[audio]\nmaster_volume = 0.05\n{launcher}")).unwrap();
+            let mut loaded = load_settings(&path).unwrap().settings;
+            assert!(!loaded.launcher.show_all);
+            for show_all in [true, false] {
+                loaded.launcher.show_all = show_all;
+                save_settings(&loaded, &path).unwrap();
+                let saved = load_settings(&path).unwrap().settings;
+                assert_eq!(saved.launcher.show_all, show_all);
+                assert_eq!(saved.launch.scenario, "garden-lab");
+                assert_eq!(saved.launch.seed, 123);
+                assert_eq!(saved.audio.master_volume, 0.05);
+            }
+        }
+        fs::write(
+            &path,
+            "[launcher]\nshow_all = true\nfuture_view = 'tiles'\n",
+        )
+        .unwrap();
+        let mut loaded = load_settings(&path).unwrap().settings;
+        loaded.launcher.show_all = false;
+        save_settings(&loaded, &path).unwrap();
+        let stored: toml::Table = toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(stored["launcher"]["future_view"].as_str(), Some("tiles"));
+    }
+
+    #[test]
     fn clock_fonts_migrate_and_preserve_the_selected_pool() {
         use engine_common::{ClockFont, ClockFontPool};
         let directory = tempfile::tempdir().unwrap();
@@ -576,6 +606,10 @@ enabled = true
                 crow: false,
                 explosion: false,
                 aquarium: false,
+                cell_swap: false,
+                grass: false,
+                slot_machine: false,
+                spider: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -702,6 +736,10 @@ enabled = true
                     engine_common::ClockEventKind::Crow
                         | engine_common::ClockEventKind::Explosion
                         | engine_common::ClockEventKind::Aquarium
+                        | engine_common::ClockEventKind::CellSwap
+                        | engine_common::ClockEventKind::Grass
+                        | engine_common::ClockEventKind::SlotMachine
+                        | engine_common::ClockEventKind::Spider
                 )
             );
         }
@@ -726,6 +764,10 @@ enabled = true
                     kind,
                     engine_common::ClockEventKind::Explosion
                         | engine_common::ClockEventKind::Aquarium
+                        | engine_common::ClockEventKind::CellSwap
+                        | engine_common::ClockEventKind::Grass
+                        | engine_common::ClockEventKind::SlotMachine
+                        | engine_common::ClockEventKind::Spider
                 )
             );
         }
@@ -733,6 +775,31 @@ enabled = true
         settings.clock.events.explosion = false;
         let loaded: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
         assert_eq!(loaded.clock, settings.clock);
+    }
+
+    #[test]
+    fn cell_swap_defaults_on_for_old_settings_and_round_trips_opt_out_with_off_profile() {
+        let mut value = toml::Value::try_from(Settings::default()).unwrap();
+        value["clock"]["event_profile"] = toml::Value::String("off".into());
+        let events = value["clock"]["events"].as_table_mut().unwrap();
+        events.remove("cell_swap");
+        for (_, enabled) in events.iter_mut() {
+            *enabled = toml::Value::Boolean(false);
+        }
+        let mut settings: Settings = value.try_into().unwrap();
+        assert_eq!(
+            settings.clock.event_profile,
+            engine_common::ClockEventProfile::Off
+        );
+        for kind in engine_common::ClockEventKind::ALL {
+            assert_eq!(
+                settings.clock.events.enabled(kind),
+                kind == engine_common::ClockEventKind::CellSwap
+            );
+        }
+        settings.clock.events.cell_swap = false;
+        let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored.clock, settings.clock);
     }
 
     #[test]

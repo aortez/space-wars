@@ -10,7 +10,7 @@ when flashing; see [Picade and hardware profiles](../docs/picade.md).
 Install KAS on the build host:
 
 ```sh
-pip3 install kas
+pip3 install kas==5.4
 ```
 
 Yocto builds on Ubuntu 24.04 may also need unprivileged user namespaces enabled:
@@ -58,6 +58,60 @@ builds and experiment data. Preview with `npm run cache:check`, apply separately
 with `npm run cache:clean`, or set `SPACEWARS_BUILD_CACHE=report` / `off` to
 preview / disable automatic cleanup. No sibling checkout or Yocto cache is pruned.
 
+The five external layers are pinned to full commits in `kas-spacewars.yml`.
+Updating those commits is an explicit source change; a later branch tip does not
+silently change the image. GPU/software aliases inherit the same pins.
+
+For an OTA input record, run the unprivileged builder from the repository root:
+
+```sh
+python3 .github/ci/ota_build_inputs.py \
+  --source <full-source-commit> \
+  --build-directory /absolute/path/outside-the-checkout/yocto-build \
+  --cache /absolute/path/to/yocto-cache \
+  --output target/ota-build-inputs.json
+```
+
+The source and layers must be clean. This command uses kas 5.4, fixes its working
+directory, drops inherited credentials/implicit build overrides, runs the normal
+GPU build, and compares source/layer/configuration identities before and after.
+It rejects extra BitBake configuration such as `auto.conf`, and does not reset
+changed layers at the end. The new output file records the exact deployed gzip
+image hash/name instead of relying on its mutable alias. It also records the
+full layer commits, configuration hashes, source and image sidecar identity.
+The exact pre-build record is also embedded as
+`/usr/share/spacewars/build-inputs.json`; the recipe checks its selected SHA-256
+and source before installation. `--direct-kas` runs kas without the local Node
+wrapper for the pinned build container, which already supplies GNU host tools.
+
+Inside the recipe, `/usr/share/spacewars/build.json` records the actual Rust,
+Cargo and target C compiler version responses, target, profile, selected kiosk
+feature and source. The file is included in the final rootfs tree identity.
+These records are build evidence, not publication authorization. Independent
+validation of the actual image contents, signed metadata and device rollout
+remain separate steps described in [OTA updates](../docs/ota-updates.md).
+The [candidate validator](../docs/ota-updates.md#rootfs-candidate-qualification)
+requires the embedded input record and independently selected source/toolchain
+policy before it accepts or packages the actual ext4 bytes.
+
+The [OTA candidate workflow](../.github/workflows/ota-build.yml) uses a standard
+GitHub-hosted Ubuntu runner with bounded cleanup of unused SDKs before building.
+The [container helper](../.github/ci/ota_container_build.py) also runs locally
+from a clean, committed checkout, without deleting host SDKs or sharing caches:
+
+```sh
+python3 .github/ci/ota_container_build.py \
+  --source-checkout "$PWD" --source <full-source-commit> \
+  --output /absolute/path/to/new-build-result \
+  --cpus 4 --memory-gib 12
+```
+
+The output directory contains the exact gzip, build record and caller's image
+policy. Use `ota_candidate.py` to qualify/package it before candidate upload;
+see [standard-runner details](../docs/ota-updates.md#standard-runner-candidate-build).
+The helper pins the container to the selected number of available CPU cores;
+BitBake/Make use that affinity, capped at eight jobs on larger workstations.
+
 `rm_work` is enabled. The build warns below 25 GiB free, stops scheduling tasks
 below 20 GiB, and halts below 10 GiB. Free space and rerun to resume.
 `npm test` runs hardware-profile, compiled input-layout and update-compatibility
@@ -93,7 +147,58 @@ the boot partition; back up custom boot overrides separately from `/data`.
 The flash script follows the DirtSim flow: it uses `bmaptool` when a
 `.wic.bmap` exists, otherwise falls back to `gzip | dd`, injects your SSH public
 key, writes `/boot/hostname.txt`, grows the `/data` partition, and preserves an
-existing `/data` partition when requested.
+existing `/data` partition by default through a verified backup and restore.
+
+Flashing requires GNU `install` to assign numeric image owners even when those
+accounts do not exist on the workstation. The tool selects a verified GNU
+implementation from the standard system paths and uses its absolute path through
+sudo. On Ubuntu systems whose default `install` is uutils, install the
+`gnu-coreutils` package. A missing GNU implementation stops the command before
+any disk operations.
+
+Current images include an SSH-only owner account, `swadmin` (UID 1001), with
+passwordless sudo. The kiosk still runs as `spacewars` (UID 1000) with its
+limited permissions. Neither account has a usable password, and images contain
+no shared login key. Flashing provisions the selected `--ssh-key` for both
+roles; use `--admin-ssh-key /path/to/owner.pub` to select a separate owner key.
+After boot, use `ssh swadmin@HOST.local` and `sudo -i` for administration.
+
+If image writing and data restoration succeeded but SSH provisioning failed,
+finish that step with `--access-only --device /dev/sdX --expected-serial SERIAL`,
+using the same `--image`, `--profile` and public-key options. This checks the
+drive serial and installed root's boot identity, installs and verifies the key
+files, and unmounts the filesystems. It does not reflash or repeat data restore.
+
+Login keys live in root-owned `/data/spacewars-access/{root,spacewars,swadmin}`.
+Updates and rollbacks retain those files, including deliberate empty-file
+revocations. Restoring an older data partition without an admin role provisions
+the selected owner key. Existing admin keys are preserved; explicitly pass
+`--replace-admin-key` to replace them or re-enable revoked admin access. The
+running image never copies kiosk keys into the admin role. An existing owner
+can explicitly import `/home/swadmin/.ssh/authorized_keys` into an empty role
+with `sudo engine-os-manager maintenance import-admin-keys`.
+
+Full flashing recreates the partition table; it does not leave `/data` in place.
+The flash utility first requires a clean source filesystem with no pending
+journal recovery, so a read-only backup cannot silently miss recent changes.
+If this check fails, shut down the Pi cleanly or repair the offline filesystem
+before retrying. It backs up an existing data partition by default, preserving
+numeric owners, modes, hardlinks, symlinks, ACLs and extended attributes. It
+verifies file contents and metadata before writing the image, then verifies the
+restored copy. A failure stops the operation. Backups remain under
+`target/flash-backups/` until the owner removes them after checking the new boot.
+Saved `backup_data: false` settings no longer bypass preservation; use the
+explicit `--discard-data` option to start without saved settings, ROMs, Wi-Fi
+profiles, Bluetooth pairings or SSH identities. Unmount desktop-auto-mounted
+partitions before flashing. Existing OTA recovery journals require a deliberate
+migration; they cannot be copied onto newly assigned root-slot identities.
+
+For example, preview a Picade reflash using the verified removable drive:
+
+```sh
+npm run flash -- --profile picade --hostname sw-picade \
+  --device /dev/sdX --ssh-key ~/.ssh/id_ed25519.pub --dry-run
+```
 
 To configure Wi-Fi on first boot, create `wifi-creds.local` before flashing:
 
@@ -123,45 +228,37 @@ access, and the hostname. A raw image defaults to HDMI, not HyperPixel.
 
 ## OTA Update
 
-After an OTA-capable image has been flashed once, later root filesystem updates
-can be pushed from the repository root over SSH to the inactive A/B slot:
+This branch is migrating to the [verified device updater](../docs/ota-updates.md).
+New images remove the kiosk account's unsigned-install and general reboot sudo
+grants. Their old `ab-update`, `ab-update-with-key` and direct slot-switch commands
+are disabled so they cannot bypass the signed-image/recovery contract. The
+production installation service is still being integrated; these images are
+not yet ready for automatic rollout.
 
-```sh
-./update.sh
-./update.sh --skip-build
-```
+The legacy `./update.sh`/`npm run yolo` A/B path remains for older images only.
+It stops on images containing the new device manager. Do not restore the old
+sudoers rules as a workaround. Existing devices need the supervised root
+bootstrap, which preserves `/data` and provisions recovery plus separately
+authenticated operator access. Kernel, firmware and shared boot changes remain
+outside ordinary rootfs updates. SSH host identity remains in `/data/ssh`.
 
-`./update.sh` follows the DirtSim model: it builds unless `--skip-build` is
-passed, transfers the latest
-`spacewars-image-raspberrypi-spacewars.rootfs.ext4.gz`, verifies the checksum on the Pi,
-injects the configured SSH public key into the inactive slot, switches the boot
-slot, reboots, and verifies that `spacewars-kiosk.service` is active. The image
-grants the `spacewars` user passwordless sudo for the A/B helper, restricted
-application-update helper, and `systemctl reboot`. The lower-level command remains available as
-`npm run update` from this directory.
-
-For the cabinet, use `./update.sh --target picade.local`. Updates require the
-image's `.ext4.gz.boot-id` sidecar to match `/boot/spacewars-boot-id` on the
-device. This updater does not replace boot files: migration from the old Pi 5
-image, or any later kernel/firmware/profile-definition change, requires a full
-image flash. Hardware selection and boot overrides survive rootfs-only updates.
-See [the compatibility boundary](../docs/picade.md#updates-and-the-boot-compatibility-boundary).
-
-SSH host keys live under `/data/ssh` so reflashes and A/B updates keep a stable
-device identity.
-
-`npm run yolo` is the lower-level A/B update command and keeps the explicit
-confirmation prompt unless `--yes` or `--hold-my-mead` is passed.
-
-For client-only iteration after one normal update installs the helper, use
-`./update.sh --fast --target picade.local` from the repository root (or
-`npm run update -- --fast --target picade.local` here). This builds just the
+For client-only iteration after that bootstrap installs the maintenance guard,
+use `./update.sh --fast --target picade.local` from the repository
+root (or `npm run update -- --fast --target picade.local` here).
+Fast mode defaults to `swadmin`, using noninteractive sudo for the guarded
+installer, root-owned staging and deployment network holds. `--user root`
+remains available for separately provisioned root SSH access. The
+runtime `spacewars` account remains available for diagnostics and data transfer.
+This builds just the
 application recipe and deploys the matching client/CLI pair, checks runtime
 compatibility, and restarts the app without flashing/rebooting. `--skip-build`
 reuses the exported bundle; `--dry-run` has no build/network side effects.
+When the device service is present, the updater also obtains and renews a
+deployment network hold before transferring files. It retains that hold through
+restart, health checks and cleanup, and then releases it. A service/admission
+failure stops new update steps; it does not terminate an installer already
+writing. Older images without the manager retain their legacy behavior. These
+hooks do not enable unsigned A/B updates on managed images; the verified
+installer and physical rollout are still in progress.
 See [fast application updates](../docs/pi-kiosk.md#fast-application-updates)
 for the exact scope and recovery limitations.
-
-The first image that enables this privilege still has to be installed through
-`npm run flash` or another root-capable path. A Pi already running an older
-image without the sudoers rule cannot self-update without root credentials.

@@ -160,6 +160,22 @@ impl Controller {
             } else if wrong_landing {
                 self.recovery.stats.wrong_landings += 1;
             } else if !observed.grounded && !in_flight {
+                // Crossing a thin retained-soil edge can briefly lift the body off
+                // known ground, without losing the route. Keep the real airborne state;
+                // no jump or landing is granted until canonical contact returns.
+                let feet = observed.position.y - context.radius;
+                let shallow_descent = self.retained_soil_steps
+                    && observed.velocity.y <= context.radius
+                    && context.course.surfaces.iter().any(|s| {
+                        let height = context.floor + s.height;
+                        observed.position.x >= s.start + context.radius
+                            && observed.position.x <= s.end - context.radius
+                            && feet >= height - context.radius * 0.25
+                            && feet - height <= context.radius
+                    });
+                if shallow_descent {
+                    return None;
+                }
                 self.recovery.stats.lost_support += 1;
             } else {
                 return None;

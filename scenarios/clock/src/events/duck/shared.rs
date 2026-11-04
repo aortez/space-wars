@@ -1,65 +1,50 @@
 //! A visit's physical arena can outlive its character while a timed event uses
-//! it. Ownership moves (never clones) to that event when the duck leaves, and
-//! can move back on rejoin. There is one world and one step in either case.
+//! it. When the character leaves, the run's `ClockArena` keeps the terrain it
+//! stood on, still under the visit's claim, and a player who rejoins gets a new
+//! character on that terrain. There is one world and one step in either case,
+//! the arena's own.
 use super::*;
+use engine_common::ClockEventKind;
 
-/// A physical event leases a visit's world, retaining it if the character leaves.
-/// It never creates a second world or owns the visit's controller/lifetime.
-pub(crate) struct VisitArena {
-    vacant: Option<Box<DuckEvent>>,
+/// The leased arena's terrain, under its character or left vacant.
+pub(crate) fn leased_terrain<'a>(
+    player: Option<&'a mut DuckEvent>,
+    vacant: &'a mut Option<ArenaTerrain>,
+) -> &'a mut ArenaTerrain {
+    if let Some(player) = player {
+        assert!(vacant.is_none());
+        &mut player.terrain
+    } else {
+        vacant.as_mut().expect("one shared arena owner")
+    }
 }
 
-impl VisitArena {
-    pub fn claim(player: &mut DuckEvent) -> Self {
-        player.claim_arena();
-        Self { vacant: None }
-    }
+/// The terrain a leased arena's character left, before the arena's step.
+pub(crate) fn prepare_vacant(
+    arena: &mut ClockArena,
+    panels: PanelAuthority,
+    soil: Option<&mut crate::grass::SoilHabitat>,
+) {
+    let (terrain, world) = arena.vacant_with_world().expect("one shared arena owner");
+    terrain.advance_panels(Some(world), panels, None);
+    terrain.synchronize_soil(soil);
+    world.clear_forces();
+}
 
-    pub fn get<'a>(&'a self, player: Option<&'a DuckEvent>) -> &'a DuckEvent {
-        player
-            .or(self.vacant.as_deref())
-            .expect("one shared arena owner")
-    }
-
-    pub fn get_mut<'a>(&'a mut self, player: Option<&'a mut DuckEvent>) -> &'a mut DuckEvent {
-        if let Some(player) = player {
-            assert!(self.vacant.is_none());
-            player
-        } else {
-            self.vacant.as_deref_mut().expect("one shared arena owner")
-        }
-    }
-
-    pub fn vacant(&self) -> Option<&DuckEvent> {
-        self.vacant.as_deref()
-    }
-
-    pub fn retain(&mut self, mut duck: Box<DuckEvent>) {
-        assert!(self.vacant.is_none());
-        duck.retire_from_arena();
-        self.vacant = Some(duck);
-    }
-
-    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
-        let mut duck = self.vacant.take()?;
-        duck.rejoin_arena(session, seat);
-        Some(duck)
-    }
-
-    pub fn step<'a>(
-        &'a mut self,
-        player: Option<&'a mut DuckEvent>,
-        water: Option<&WaterWorld>,
-        panels_advanced: bool,
-    ) -> &'a mut DuckEvent {
-        let occupied = player.is_some();
-        let duck = self.get_mut(player);
-        if occupied {
-            duck.step_with_environment(water, panels_advanced);
-        } else {
-            duck.step_unoccupied_arena(panels_advanced);
-        }
-        duck
+/// `kind` ends its lease. A character still in the arena keeps the world until
+/// its own reset has finished with it; a vacant arena's terrain goes now.
+pub(crate) fn end_lease(
+    player: Option<&mut DuckEvent>,
+    arena: &mut ClockArena,
+    kind: ClockEventKind,
+) {
+    arena.release(Owner::Event(kind));
+    if let Some(player) = player {
+        assert!(arena.vacant.is_none());
+        player.release_arena(arena);
+    } else {
+        assert!(arena.vacant.take().is_some(), "one shared arena owner");
+        arena.release(Owner::Visit);
     }
 }
 
@@ -68,55 +53,54 @@ impl DuckEvent {
         self.buoyant.as_ref().map(BuoyantBody::body)
     }
 
-    pub fn claim_arena(&mut self) -> &mut PhysicsWorld {
+    /// `kind` leases the visit's arena, which the visit builds now if it has
+    /// not stepped yet.
+    pub fn claim_arena(&mut self, arena: &mut ClockArena, kind: ClockEventKind) {
         assert!(!self.arena_claimed);
-        self.ensure_world();
+        self.ensure_world(arena);
+        arena.claim(Owner::Event(kind));
         self.arena_claimed = true;
-        self.world.as_mut().unwrap()
     }
 
-    pub fn arena_world(&self) -> &PhysicsWorld {
-        self.world.as_ref().expect("leased arena")
-    }
-
-    pub fn arena_world_mut(&mut self) -> &mut PhysicsWorld {
-        self.world.as_mut().expect("leased arena")
-    }
-
-    pub fn release_arena(&mut self) {
+    /// Lets the arena go as well when the visit has already finished with it.
+    pub fn release_arena(&mut self, arena: &mut ClockArena) {
         assert!(self.arena_claimed);
         self.arena_claimed = false;
-        if self.phase == EventPhase::Resetting {
-            self.world = None;
+        if self.phase == EventPhase::Resetting && self.door_panels().iter().all(Option::is_none) {
+            arena.release(Owner::Visit);
         }
     }
 
-    pub fn retire_from_arena(&mut self) {
-        assert!(self.arena_claimed);
-        self.reset(ClockDuckOutcome::Dismissed);
-        self.player = None;
+    /// The character leaves an arena an event still holds. Its body and flaps
+    /// go with it, and the terrain stays behind with the visit's claim.
+    pub fn leave_arena(mut self, arena: &mut ClockArena) {
+        assert!(self.arena_claimed && arena.vacant.is_none());
+        let world = arena.world_mut().expect("leased arena");
+        world.remove_entity(DUCK_ENTITY);
+        self.remove_flaps(world);
+        arena.vacant = Some(self.terrain);
     }
 
-    pub fn rejoin_arena(&mut self, session_id: u64, seat: u8) {
-        assert!(self.arena_claimed && self.player.is_none());
-        if self.entry_arena_opacity.is_some() {
-            self.entry_arena_opacity = Some(self.arena_opacity());
-        }
-        self.player = Some(PlayerControl::new(
-            session_id,
-            seat,
-            1.0,
-            OPENING_TICKS + PLAYER_EXIT_DELAY_TICKS,
-        ));
-        if self.course.is_some() {
+    /// A player's new character on the vacant terrain, if there is one. It
+    /// takes the visit's claim back, and the arena fades in from `opacity`,
+    /// the opacity the event shows it at.
+    pub fn rejoin_arena(
+        arena: &mut ClockArena,
+        opacity: f32,
+        session_id: u64,
+        seat: u8,
+    ) -> Option<Self> {
+        let terrain = arena.vacant.take()?;
+        let world = arena.world_mut().expect("leased arena");
+        let mut duck = Self::with_player(Self::on_terrain(terrain), session_id, seat);
+        duck.arena_claimed = true;
+        duck.preserve_arena_opacity(opacity);
+        if duck.terrain.course.is_some() {
             // An automatic visitor did not need this wall, but a new player
             // needs the same entrance boundary as an ordinary player spawn.
-            self.insert_entrance_wall();
+            duck.insert_entrance_wall(world);
         }
-        self.tick = 0;
-        self.jumps = 0;
-        self.outcome = None;
-        self.enter(EventPhase::Opening);
+        Some(duck)
     }
 
     pub fn player_finished(&self) -> bool {
@@ -150,24 +134,164 @@ impl DuckEvent {
     pub fn preserve_arena_opacity(&mut self, opacity: f32) {
         self.entry_arena_opacity = Some(opacity);
     }
+}
 
-    fn step_unoccupied_arena(&mut self, panels_advanced: bool) {
-        assert!(self.arena_claimed && self.player.is_none());
-        self.advance_panels(panels_advanced);
-        let world = self.arena_world_mut();
-        world.clear_forces();
-        world.step(DT);
+#[cfg(test)]
+mod soil_tests {
+    use super::*;
+
+    #[test]
+    fn clock_grass_contract_partial_soil_maps_only_retained_supported_material() {
+        for direction in [-1.0, 1.0] {
+            let layout = Layout::new(800.0 / 480.0);
+            let mut duck = TestDuck::new_platforms(layout, 42);
+            duck.face(direction);
+            duck.spawn();
+            let mut soil = crate::grass::SoilHabitat::new(layout);
+            let plan = soil.admit(&[(-duck.width * 0.5, duck.width * 0.5)], |site| {
+                // An actual short bank, leaving most course surfaces bare.
+                site.min.x < -duck.width * 0.5 + 20.0 || site.max.x > -duck.width * 0.5 + 80.0
+            });
+            assert!(!plan.sites.is_empty());
+            let accounting = soil.accounting();
+            duck.synchronize_soil(Some(&mut soil));
+            assert!(!duck.terrain.soil_supports.is_empty());
+            let course = duck.terrain.course.as_ref().unwrap();
+            let navigation = duck.terrain.soil_course.as_ref().unwrap();
+            // An inset layer fills each surface's own top rows, so retained
+            // material never changes the height the planner navigates, and the
+            // runner meets no step where the material begins or ends.
+            for (index, surface) in navigation.surfaces.iter().enumerate() {
+                let original = course.surfaces[duck.terrain.soil_navigation_owners[index]];
+                assert_eq!(surface.height, original.height);
+                assert!(surface.start >= original.start && surface.end <= original.end);
+            }
+            assert!(
+                duck.terrain.soil_supports.iter().all(|(index, _, max)| {
+                    (max.y - (layout.floor_y + navigation.surfaces[*index].height)).abs() < 0.01
+                }),
+                "mapped material tops out on its own surface line"
+            );
+            // Settle onto actual dirt through the canonical solver.
+            let (index, min, max) = duck.terrain.soil_supports[0];
+            let rest = Vec2::new((min.x + max.x) * 0.5, max.y + duck.radius);
+            let world = duck.arena.world_mut().unwrap();
+            world.set_pose(DUCK_BODY, rest, 0.0, true);
+            for _ in 0..30 {
+                world.step(DT);
+            }
+            assert_eq!(duck.supported_surface(), Some(index));
+            assert_eq!(soil.accounting(), accounting);
+
+            // Actual support loss must clear mapping even while dirt is retained
+            // and falling. Restoring a floor cannot reattach detached columns.
+            // The runner keeps the real floor support it was already standing
+            // on, which never depended on the inset material.
+            soil.revalidate(Some(&[]), true);
+            soil.advance_loss(std::time::Duration::from_millis(250));
+            duck.synchronize_soil(Some(&mut soil));
+            assert!(duck.terrain.soil_supports.is_empty());
+            assert_eq!(duck.supported_surface(), Some(index));
+            duck.synchronize_soil(None);
+            assert!(duck.terrain.soil_course.is_none());
+        }
+    }
+}
+
+#[cfg(test)]
+mod navigation_contract {
+    use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
+    use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
+    use std::time::Duration;
+
+    fn ticks(state: &mut ClockState, count: u64) {
+        for _ in 0..count {
+            ClockScenario::step(state, &[], Duration::from_nanos(16_666_667));
+        }
     }
 
-    pub(super) fn advance_panels(&mut self, already_advanced: bool) {
-        let hull = self.clearance_hull();
-        if let Some(floor) = &mut self.responsive_floor {
-            if !already_advanced {
-                floor.step_dry(f64::from(DT), hull);
-            }
-            if let Some(world) = &mut self.world {
-                floor.move_panels(world);
+    /// `synchronize_soil` drops a navigation surface narrower than three radii,
+    /// because `planner::plan` refuses such a surface as a landing *and* as a
+    /// takeoff, so a runner standing on one could never plan its way off.
+    /// Dropping it leaves the planner blind to geometry that is still solid,
+    /// and `supported_surface` then reads the material as debris.
+    ///
+    /// An inset layer never raises a surface, so no narrow raised segment is
+    /// produced and nothing is ever dropped. This pins that: while material is
+    /// retained, the navigation course covers exactly what the course covers,
+    /// including after an event has opened the floor and exported columns. If
+    /// some later habitat mounds material above a surface again, this fails
+    /// rather than stranding a runner on a sliver the planner cannot see.
+    #[test]
+    fn clock_grass_contract_navigation_never_hides_material_from_the_planner() {
+        let mut checked = 0u32;
+        for aspect in [0.6f32, 4.0 / 3.0, 800.0 / 480.0] {
+            for (seed, disturb) in [
+                (1u64, None),
+                (3, Some(ClockEventKind::Falling)),
+                (5, Some(ClockEventKind::Explosion)),
+            ] {
+                let mut s = ClockScenario::init(
+                    ClockConfig {
+                        aspect_ratio: aspect,
+                        event_profile: ClockEventProfile::Off,
+                        ..Default::default()
+                    },
+                    seed,
+                );
+                ClockScenario::step(
+                    &mut s,
+                    &[
+                        ClockAction::set_reading(ClockReading::new(10, 42, 0).unwrap()),
+                        ClockAction::trigger_event(ClockEventKind::Grass),
+                    ],
+                    Duration::ZERO,
+                );
+                ticks(&mut s, 7 * 60);
+                if let Some(kind) = disturb {
+                    let mut waited = 0;
+                    while !s.can_trigger_event() && waited < 2000 {
+                        ticks(&mut s, 1);
+                        waited += 1;
+                    }
+                    ClockScenario::step(
+                        &mut s,
+                        &[ClockAction::trigger_event(kind)],
+                        Duration::ZERO,
+                    );
+                    ticks(&mut s, 300);
+                }
+                let mut waited = 0;
+                while !s.can_trigger_event() && waited < 4000 {
+                    ticks(&mut s, 1);
+                    waited += 1;
+                }
+                ClockScenario::step(
+                    &mut s,
+                    &[ClockAction::trigger_event(ClockEventKind::Duck)],
+                    Duration::ZERO,
+                );
+                for _ in 0..crate::events::duck::DUCK_TICKS {
+                    ticks(&mut s, 1);
+                    let Some(duck) = s.duck_scene() else { break };
+                    let (Some(course), Some(navigation)) = (
+                        duck.terrain.course.as_ref(),
+                        duck.terrain.soil_course.as_ref(),
+                    ) else {
+                        continue;
+                    };
+                    let navigable: f32 = navigation.surfaces.iter().map(|s| s.end - s.start).sum();
+                    let real: f32 = course.surfaces.iter().map(|s| s.end - s.start).sum();
+                    assert!(
+                        navigable >= real - 0.01,
+                        "aspect={aspect} seed={seed} disturb={disturb:?}: the planner lost \
+                         {:.2} units of real support",
+                        real - navigable
+                    );
+                    checked += 1;
+                }
             }
         }
+        assert!(checked > 0, "the navigation course was never built");
     }
 }

@@ -1,0 +1,267 @@
+{
+  "schema": 1,
+  "issue": 265,
+  "source": {
+    "base": "20d6e55eeded15fefc72f7602ceafc03125dabc9",
+    "files": {
+      "crates/engine-os-manager/src/time_runtime.rs": "e370df48ccd69d8e93325cefb2601857ee8913c086d5eb07019cac8fd1373a3e",
+      "crates/engine-os-manager/src/network_watch.rs": "405223b9a5345fa3da8865c3e95a98810279efa6a61cfcd8c9024f3203f28e33",
+      "crates/engine-os-manager/src/update_native.rs": "e6ee95002b305ab3fade8155031a4112b0a1f4ddd66745d3b988f3a86302aa1e",
+      "crates/engine-os-manager/src/time_runtime_tests.rs": "dd4be123764d952803b43601bbfca5a76a3a830e83108e44815f262507cd6768",
+      "crates/engine-os-manager/src/network_service_tests.rs": "e75e5d63e829fb0f700f4a8b4881df0e78c616850de93f5d87fa71a6c9b0df6f",
+      "crates/engine-os-manager/src/update_runtime_tests.rs": "8bd2b1d5ef0285fa71c0d3c0ef32886db77f13fc34b839e50d5ae2047a69656b"
+    }
+  },
+  "canary": {
+    "source": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+    "generation": 3,
+    "publication": {
+      "schema": 1,
+      "result": "published",
+      "source": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+      "publisher": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+      "intent_sha256": "edc3c25978fd8711461296b17d97078a99b4526371075f4082d85366b3a4796c",
+      "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+      "current": {
+        "manifest_sha256": "317a2c12cb861d531f30997bfa636213f6247c3c449535d8f87cd5b024a909c1",
+        "version": 4,
+        "timestamp": {
+          "bytes": 469,
+          "sha256": "8806dc43584c7cb6c60115d5bcc4049e3315e4b3239f21436612c992e5615b62"
+        }
+      },
+      "generation": 3,
+      "channel": "nightly",
+      "payload": {
+        "bytes": 132952880,
+        "sha256": "a7441455535981025696d32919c491d78a147e4c6b35b0f988c227899ae82fb0"
+      },
+      "release_id": 416212208,
+      "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+      "publication_scope": "Owner-supervised branch candidate",
+      "main_ci_admission_claimed": false,
+      "automatic_installation_enabled": false
+    },
+    "image": {
+      "schema": 1,
+      "build_id": "rootfs-f0764c6326270a95e2c5634a8df6ae760fbe8c6c1ea8a808f6fc126f2227f46c",
+      "rootfs_tree": "f0764c6326270a95e2c5634a8df6ae760fbe8c6c1ea8a808f6fc126f2227f46c",
+      "source": {
+        "schema": 1,
+        "commit": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+        "dirty": false,
+        "revision": "f58d725bb7c2"
+      },
+      "machine": "raspberrypi-spacewars",
+      "architecture": "aarch64",
+      "layout": "spacewars-ab-v1",
+      "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+      "updater_protocol": 1,
+      "recovery_protocol": 2,
+      "data": {
+        "reads": {
+          "min": 1,
+          "max": 1
+        },
+        "writes": 1
+      },
+      "binaries": {
+        "client": {
+          "bytes": 26557944,
+          "sha256": "5f9b7e3c226495ffc06cfbe952da0b6ec1119f9697bfe442c1088f8713435711"
+        },
+        "os_manager": {
+          "bytes": 11261952,
+          "sha256": "80e1c3d1fdd9cb721af4712d6c9393816ed30a58e6d3abe2819e67ad74ac7b6a"
+        }
+      }
+    },
+    "compressed": {
+      "bytes": 132952880,
+      "sha256": "a7441455535981025696d32919c491d78a147e4c6b35b0f988c227899ae82fb0"
+    },
+    "pi5_install": {
+      "passed": true,
+      "original_boot": "2ff5cbbf-ad5d-4b26-b787-53c21ac16931",
+      "trial_boot": "04ebb362-35ea-413e-aebf-62b364b51d6c",
+      "commit_observed_seconds": 93.111,
+      "settings_migration": {
+        "before_sha256": "b262e763bc3642a0549599fe517466550ec54fbd4708a4fc0023a451c90e8215",
+        "after_sha256": "0337fa18032e1b13571a8f15bcfcd8cc57f4710c41bed6c1195aa13f2d5b7695",
+        "previous_values_preserved": true,
+        "added_defaults": {
+          "clock.events.aquarium": true,
+          "clock.events.cell_swap": true,
+          "launcher.show_all": false
+        },
+        "before_bytes_matched_retained_archive": true
+      },
+      "other_durable_stores_unchanged": true,
+      "local_gatt_cache_regenerated": true,
+      "trial_automatic_completion": "no-candidate"
+    },
+    "pi5_normal_boot": {
+      "boot_id": "27e98de1-0c2c-4356-ab26-e05d73307ba1",
+      "healthy": true,
+      "tryboot": false,
+      "generation": 3,
+      "update": {
+        "phase": "idle",
+        "reason": "network-unavailable",
+        "schedule": {
+          "generation": 70,
+          "channel": "release",
+          "selection_generation": 2,
+          "active": null,
+          "next_ms": 86405690,
+          "due": false,
+          "completion": "failed"
+        },
+        "progress": null,
+        "ready": null,
+        "manual_pending": false
+      },
+      "durable_stores_unchanged": true,
+      "qualification_passed": false
+    },
+    "pi5_restart": {
+      "passed": true,
+      "host": "spacewars.local",
+      "boot_id": "27e98de1-0c2c-4356-ab26-e05d73307ba1",
+      "daily_allowance_preserved": true,
+      "kiosk_instance_unchanged": true,
+      "observed_seconds": 21.779
+    },
+    "pi5_partial_offline": {
+      "passed": false,
+      "host": "spacewars.local",
+      "boot_id": "27e98de1-0c2c-4356-ab26-e05d73307ba1",
+      "observed_seconds": 219,
+      "samples": 206,
+      "phase": "offline-wait",
+      "failure": "SSH activity remained unknown after reservations expired; Wi-Fi never entered owned-off state within 220-second bound",
+      "expired_hold_samples": 94,
+      "due_offline_and_handoff_exercised": false,
+      "original_policy_and_channel_restored": true,
+      "emergency_radio_restore_used": false,
+      "kiosk_instance_unchanged": true,
+      "durable_stores_unchanged": true,
+      "boot_and_image_unchanged": true,
+      "owner_session_probe_after_restore": {
+        "schema": 1,
+        "active_tcp_connections": 1,
+        "active_ssh_connections": 1,
+        "other_tcp_listeners": 4,
+        "active_ssh_units": 1,
+        "socket_active": true,
+        "admission_hook_loaded": true,
+        "configuration_supported": true,
+        "host_namespace_confirmed": true,
+        "observation_complete": false,
+        "ssh_activity": true
+      }
+    },
+    "picade_resume": {
+      "final_state": {
+        "healthy": true,
+        "channel_restored": "release",
+        "boot_and_image_unchanged": true,
+        "kiosk_instance_unchanged": true,
+        "download_resume_qualification_passed": false,
+        "reason": "Retained partial and daily allowance survived restart, but resumed download cancelled before Ready; later diagnostic network status timed out"
+      },
+      "retained_partial_bytes": 34856960,
+      "retained_partial_sha256": "dd6bd83f4f7968f540f46aee802da392b7f0f950fc910e7685b79f8f27d49ff5",
+      "compressed_total_bytes": 132952880,
+      "completion": "cancelled",
+      "ready_observed": false,
+      "diagnostic_network_status_timed_out_seconds": 30,
+      "scope": "Installed g2 downloader, source 5b420c95b87b0a01f41f74c424ac80f4f1c098cf; no install or reboot"
+    }
+  },
+  "correction": {
+    "regression": "native_network_read_accepts_publication_after_the_callers_clock_sample",
+    "before_fix": "FAILED: a valid observation published one millisecond after the caller clock sample was rejected",
+    "host_tests_passed": 194,
+    "ignored": 3,
+    "rust": "1.89.0",
+    "clippy": "passed --all-targets --no-deps -D warnings",
+    "formatting": "passed",
+    "aarch64_tests": [
+      {
+        "host": "spacewars.local",
+        "binary_sha256": "d644fd5f09c070c2e553c05a46331d0d6ec6ee34a447d278dde089a57aa29f92",
+        "boot_id": "27e98de1-0c2c-4356-ab26-e05d73307ba1",
+        "runtime_tests": 20,
+        "clock_guard_tests": 1,
+        "elapsed_seconds": 2.141,
+        "installed_state_unchanged": true,
+        "installation_or_reboot": false,
+        "limit": "Isolated runtime fixtures and read-only native network adapter clock regression; installed services are unchanged, not a signed deployment of the correction"
+      },
+      {
+        "host": "sw-picade-2.local",
+        "binary_sha256": "d644fd5f09c070c2e553c05a46331d0d6ec6ee34a447d278dde089a57aa29f92",
+        "boot_id": "17580888-c48c-44c6-97db-29431d4b3298",
+        "runtime_tests": 20,
+        "clock_guard_tests": 1,
+        "elapsed_seconds": 3.298,
+        "installed_state_unchanged": true,
+        "installation_or_reboot": false,
+        "limit": "Isolated runtime fixtures and read-only native network adapter clock regression; installed services are unchanged, not a signed deployment of the correction"
+      }
+    ],
+    "installed_on_devices": false
+  },
+  "limits": [
+    "Generation 3 predates the observation-ordering correction. Isolated ARM tests do not qualify an installed corrected service.",
+    "The normal-boot admission failure and Picade cancellation/delay remain retained failures. Their precise causes are not established by the clock-ordering regression.",
+    "No claim of successful verified interrupted-download resume, frame-time qualification or unattended installation.",
+    "Automatic installation and publication remain disabled; the hosted cold image capacity run was still in progress."
+  ],
+  "evidence": {
+    "canary_root": "/home/data/workspace/space-wars-ota-startup/target/startup-canary",
+    "canary_sha256": {
+      "publication.json": "73b36c247fdb7f7cee8fc0c73e7b2be0bb129ff1bc02b5b7dfa780364388fe33",
+      "review.json": "047c22f3a865bd6763337f730bb7fde7b39fbcbcd46eef4acc0ed8701af28103",
+      "candidate/candidate.json": "b87b08b97cdab0f183cb07cfba14dfc1366bcf920ce90bc7e5ba9a9e0ddcba51",
+      "candidate/qualification.json": "d4d7502017cf6aabe85952200210be91a4115acd5df47be78da7a7372fdb5889",
+      "install/before.json": "1b3907b266b342db74b105ab710d5609518eab818fe65e9b4d66e1970c937062",
+      "install/after.json": "fa9766c0d14d2b99772f374938282abc051d70d80768a2bce088abddce06ac97",
+      "install/result.json": "2da7d19ccbcc1246fb1b493406e8f5e6e6574706a9bf20840fb02214d3a77d1b",
+      "install/observations.jsonl": "070b20b0cde69af3a6df2e3720dcbbba8e8e10cf6af249d92c4e12ea5a85e672",
+      "install/trial-startup-status-and-journal.log": "ddd9828eb0e87d5e841ea2180a74fe1c4665e2f5551ff0872a9e033a5d11d422",
+      "install/normal-boot/observations.jsonl": "0d45f2e552e0799d593ceaaf0c05c3869aeb50be54e296def008577c66fc96be",
+      "install/normal-boot/after.json": "779b67d7282873db1a5455eb0af161e8cc8a1a3ef7298a2882895366e4cadcab",
+      "restart/result.json": "6c6da508dbdd79ad18f5156b77a0d13ad689d904b6484b5d14df7da309283c67",
+      "partial-offline/device-evidence.tar.gz": "d128763ab3cd8e153baa75b41230a88a87e6f400538064c0c3edf75a65035ee2",
+      "partial-offline/after.json": "b590c2a7c16f13bcf0efbbbc7d76a619adb19908c4824f3ce3db8973a703ab09",
+      "picade2-resume/interrupt-status.json": "a3c3a4d3e6999b9c60dae62fa075f8ab709a60a61b2ff2831801d70a1dc22185",
+      "picade2-resume/restart-observations.json": "ec3b8f028fecefa5bfc6e90b4d244734f84d416e97531fbdab089b1671e90c1e",
+      "picade2-resume/resume-observations.jsonl": "1ef2aeff74b9f066d3b1aec7b9cccd453597a73e9864c7edd8699d52f824d878",
+      "picade2-resume/final-state.json": "8d226235ea0004a7f57f6663f832bde17cc298e874845bc9d8708e9470856658",
+      "picade2-network-diagnostic/observations.jsonl": "4ea2aecfa4e6385f3cb782f1b72ce653fb594d7c0ed637b9f77197caac019fc3",
+      "picade2-network-diagnostic/restored-status.json": "9bbf949416fe11045da64c8de4a3aeddbb283174ef13359fdb058d380fe1719d",
+      "partial-offline/session-probe-after.json": "0d05b09422731b129460bb7847338e45e7a0085d8d2373b7adbd39c848602594"
+    },
+    "correction_root": "/home/data/workspace/space-wars-ota-network/target/network-qualification",
+    "correction_sha256": {
+      "before-fix.log": "f6bf5005df7f912934ae49f39b220ac1d5c0f676f74a3226578cdd044e8ba2f9",
+      "host-tests.log": "200a2e56f418915c63e14fadcf53782242093bac29383d1c29732efb0d52aff5",
+      "clippy.log": "a71979ae50d461ff25da1a2686762cba759f53254b1b354d879c21fdc9e32c83",
+      "aarch64-build.log": "11e9e1bb475dda31cdf718991c252087397cc028ccc2060f1e97bbcb8cb10305",
+      "engine-os-manager-tests": "d644fd5f09c070c2e553c05a46331d0d6ec6ee34a447d278dde089a57aa29f92",
+      "qualify-data.py": "ca73e89ec1b97a02fec724d05723dd7cdc987bfc1d30a448ccdbaa7772b9c98f",
+      "spacewars.local-data/before.json": "e8ee4418e5c16fdb3b66b85b3fe1b59ce12c40ec1997caaa03ba26734e62cab7",
+      "spacewars.local-data/after.json": "e8ee4418e5c16fdb3b66b85b3fe1b59ce12c40ec1997caaa03ba26734e62cab7",
+      "spacewars.local-data/result.json": "07f73092917c5ec31c832551ccede9d5277ff77ca05e2bc7f7d2acadd6939ade",
+      "spacewars.local-data/runtime-tests.log": "374fdef84151e79fad0383cc15710b14755a31dfab46021a03e3c84fbfc774f1",
+      "spacewars.local-data/clock-guards.log": "3cd508719db421e1dcea7dc56d102c215ed9351d47b438feae0a143528e2cc0e",
+      "sw-picade-2.local-data/before.json": "c1385eaeb456aa465ef5a5a09011838407bd5c5ae347d953b8060558faa0f8fc",
+      "sw-picade-2.local-data/after.json": "c1385eaeb456aa465ef5a5a09011838407bd5c5ae347d953b8060558faa0f8fc",
+      "sw-picade-2.local-data/result.json": "ac1a198d943c1870d27146c12ecba44ce50a78c64ecbcdf0f4a5bf81087a9277",
+      "sw-picade-2.local-data/runtime-tests.log": "24b19b95d27b2b48c3635551389a5213f5a5046679d01043895a7ab8bd75b4fb",
+      "sw-picade-2.local-data/clock-guards.log": "3cd508719db421e1dcea7dc56d102c215ed9351d47b438feae0a143528e2cc0e"
+    }
+  }
+}

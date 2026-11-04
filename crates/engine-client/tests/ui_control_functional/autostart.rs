@@ -74,6 +74,43 @@ fn back(h: &mut FunctionalHarness, settings: &UiState) -> UiState {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn autostart_clock_launch_and_disable_smoke() {
+    let mut settings = engine_common::Settings::default();
+    settings.audio.muted = true;
+    settings.autostart.enabled = true;
+    settings.autostart.activity = "clock".into();
+    settings.autostart.delay_seconds = 5;
+    run("autostart-smoke", settings, |h| {
+        h.wait_until_ready();
+        let before = saved(h);
+        let game = wait_screen(h, UiScreen::Gameplay);
+        assert_eq!(game.active_scenario.as_deref(), Some("clock"));
+        h.pause_guarded(&game);
+        let pause = wait_screen(h, UiScreen::PauseMain);
+        let root = h.activate_guarded("pause.return-to-launcher", &pause);
+        let preferences = preferences(h, &root);
+        assert_eq!(
+            control_value(&preferences, "autostart.activity.next"),
+            Some("Clock")
+        );
+        h.activate_guarded("autostart.activity.previous", &preferences);
+        let preferences = wait_saved(h);
+        assert_eq!(
+            control_value(&preferences, "autostart.activity.next"),
+            Some("Off")
+        );
+        back(h, &preferences);
+        assert_stays(h, UiScreen::LauncherMain, Duration::from_secs(6));
+        let after = saved(h);
+        assert!(!after.autostart.enabled);
+        assert_eq!(after.spacewars, before.spacewars);
+        assert_eq!(after.launch, before.launch);
+        assert_eq!(after.audio, before.audio);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn autostart_clock_is_sticky_and_preserves_preferences_on_explicit_exit() {
     let mut settings = engine_common::Settings::default();
     settings.audio.master_volume = 0.05;

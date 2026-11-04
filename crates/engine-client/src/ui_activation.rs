@@ -29,6 +29,20 @@ struct ActivationTarget {
 }
 
 pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
+    if window.get_updates_visible() || window.get_install_fenced() {
+        if crate::updates::inventory(window)
+            .iter()
+            .any(|c| c.id == control_id && c.enabled)
+        {
+            if control_id == "updates.confirm" {
+                window.invoke_updates_confirm();
+            } else {
+                window.invoke_updates_cancel();
+            }
+            return true;
+        }
+        return false;
+    }
     if window.get_genomes_visible()
         && crate::genome_controls::inventory(window)
             .iter()
@@ -140,6 +154,7 @@ fn activation_target(
         },
         "launcher.scenario.previous" => launcher(0, UiAction::Left),
         "launcher.scenario.next" => launcher(0, UiAction::Right),
+        "launcher.scenarios.show_all" => launcher(9, UiAction::Confirm),
         "launcher.start" => launcher(1, UiAction::Confirm),
         "launcher.new-match" => launcher(6, UiAction::Confirm),
         "launcher.settings" => launcher(2, UiAction::Confirm),
@@ -160,6 +175,7 @@ fn activation_target(
         "settings.autostart" => sound(4, UiAction::Confirm),
         "settings.controllers" => sound(7, UiAction::Confirm),
         "settings.network" => sound(8, UiAction::Confirm),
+        "settings.updates" => sound(9, UiAction::Confirm),
         "sound.back" => sound(5, UiAction::Confirm),
         "sound.retry" => sound(6, UiAction::Confirm),
         "autostart.activity.previous" => ActivationTarget {
@@ -207,6 +223,7 @@ fn activation_target(
             focus: ActivationFocus::TouchTest,
             action: UiAction::Back,
         },
+        "pause.pizza.gravity" => pause_main(6),
         "pause.resume" => pause_main(0),
         "pause.restart" => pause_main(1),
         "pause.new-match" => pause_main(4),
@@ -233,6 +250,10 @@ fn activation_target(
         "pause.clock.crow" => pause_clock(14, UiAction::Confirm),
         "pause.clock.explosion" => pause_clock(15, UiAction::Confirm),
         "pause.clock.aquarium" => pause_clock(17, UiAction::Confirm),
+        "pause.clock.cell-swap" => pause_clock(18, UiAction::Confirm),
+        "pause.clock.grass" => pause_clock(19, UiAction::Confirm),
+        "pause.clock.slot-machine" => pause_clock(20, UiAction::Confirm),
+        "pause.clock.spider" => pause_clock(21, UiAction::Confirm),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -279,12 +300,14 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.combat.break-duration"
         | "launcher.settings.pizza.spawn-rate"
         | "launcher.settings.clock.digit-slide" => 3,
-        "launcher.settings.travel.loose-dirt"
+        "launcher.settings.pizza.automatic-events"
+        | "launcher.settings.travel.loose-dirt"
         | "launcher.settings.spacewars.asteroids"
         | "launcher.settings.match.break-interval"
         | "launcher.settings.combat.mission"
         | "launcher.settings.clock.event-profile" => 4,
-        "launcher.settings.spacewars.player-health"
+        "launcher.settings.pizza.live-ball-limit"
+        | "launcher.settings.spacewars.player-health"
         | "launcher.settings.match.break-duration"
         | "launcher.settings.combat.asteroid-interval"
         | "launcher.settings.clock.falling" => 5,
@@ -303,6 +326,10 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.clock.crow" => 13,
         "launcher.settings.clock.explosion" => 14,
         "launcher.settings.clock.aquarium" => 16,
+        "launcher.settings.clock.cell-swap" => 17,
+        "launcher.settings.clock.grass" => 18,
+        "launcher.settings.clock.slot-machine" => 19,
+        "launcher.settings.clock.spider" => 20,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

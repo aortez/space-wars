@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "date": "2026-10-22",
+  "issue": 523,
+  "pull_request": 526,
+  "scope": "Generation 9 installation findings and local follow-up; physical SSH qualification remains pending",
+  "installation": {
+    "source_commit": "f64831ca2e16f4a52f6929eacbccab45f0c92ed4",
+    "generation": 9,
+    "build_id": "rootfs-30017937f5276c01a9b93263a23b3989d6197f01a23ba502a513ab3100af2995",
+    "boot_id": "e7ecf6e1-8cf4-4dc5-b39a-73f841a5a197",
+    "actual_slot": "a",
+    "default_slot": "a",
+    "good_slot": "a",
+    "tryboot": true,
+    "transaction": "ff8196a9175ce2209e6a5e8a8d707dbe775452e5440b0dafb3283ae47ab7dd87",
+    "trial_committed": true,
+    "normal_boot_tested": false,
+    "release_restored": true,
+    "partial_offline": false,
+    "saved_data_preserved": true,
+    "game_frames_advanced": true,
+    "installed_binary_hashes_verified": true,
+    "network_manager_unchanged": true,
+    "normal_updater_staging_passed": false,
+    "ssh_device_qualification_run": false
+  },
+  "generation_8_staging": {
+    "outcome": "Cancelled on generation 8; cause not established",
+    "stopping_after_seconds": 70.8,
+    "returned_to_idle_after_seconds": 288.2,
+    "idle_before_service_restart_seconds": 104.27,
+    "prior_stuck_updater_claim": "Incorrect: observation log shows autonomous completion before restart",
+    "service_restart_necessity": "Not established; updater had already settled",
+    "storage_delay_hypothesis": "Plausible but unproven"
+  },
+  "diagnostics": {
+    "device_observation": "Repeated coordinator-busy responses while observation timestamps advanced; direct NetworkManager probe healthy",
+    "reproduction": "An otherwise idle coordinator with a 150 ms refresh returned coordinator-busy to the status request that initiated the refresh",
+    "before_fix": "Regression test failed with actual=null and deferred=coordinator-busy",
+    "fix": "Serve the latest completed snapshot without queuing a refresh; allow at most 250 ms for initial publication",
+    "invariants": [
+      "Original observation clock preserved",
+      "Busy or older-than-five-second snapshots omit actual radio and activity evidence",
+      "Storage and coordinator failures remain explicit",
+      "Diagnostics never authorize radio changes or downloads",
+      "Durable mutation acknowledgement ordering unchanged"
+    ],
+    "device_contains_fix": false
+  },
+  "download_storage_fixture": {
+    "blocking_io": "Channel barrier simulates an outstanding payload flush after all payload bytes arrive",
+    "cases": [
+      "healthy observation and successful renewal",
+      "stale network observation",
+      "failed hold renewal"
+    ],
+    "passed": true,
+    "assertions": [
+      "Network hold remains until IO finishes",
+      "Healthy renewal does not cancel the attempt",
+      "Lost observation or failed renewal cancels without revival",
+      "Cancelled attempt returns to idle without service restart",
+      "No early Ready, duplicate daily attempt, or release of another owner hold"
+    ],
+    "limitation": "Injected blocking IO and network failures do not identify the physical generation 8 cancellation cause"
+  },
+  "validation": {
+    "rust_library": {
+      "passed": 203,
+      "ignored": 3
+    },
+    "rust_binary_and_integration": {
+      "passed": 28,
+      "ignored": 2
+    },
+    "isolated_root_setup_tests": {
+      "passed": 2,
+      "included_in_default_ignored": true
+    },
+    "python_network_service_contract": {
+      "passed": 3
+    },
+    "clippy_all_targets_recovery_qualification": "passed, warnings denied",
+    "rust_1_89_all_targets_recovery_qualification": "passed",
+    "aarch64_all_targets_recovery_qualification": "passed",
+    "rustfmt": "passed",
+    "diff_whitespace": "passed"
+  },
+  "raw_install_evidence": "target/ssh-storage-523/f64831ca/install/",
+  "remaining": [
+    "Build and publish a signed image containing the diagnostic fix",
+    "Qualify sequential fresh SSH logins, bounded status responses, storage contention and refusal logs on the installed image"
+  ]
+}

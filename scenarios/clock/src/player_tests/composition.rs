@@ -1,9 +1,10 @@
 use super::*;
 
-const VISUAL: [ClockEventKind; 3] = [
+const VISUAL: [ClockEventKind; 4] = [
     ClockEventKind::ColorCycle,
     ClockEventKind::Marquee,
     ClockEventKind::DigitSlide,
+    ClockEventKind::CellSwap,
 ];
 
 fn off_player(seed: u64) -> ClockState {
@@ -65,12 +66,15 @@ fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anythin
     settings.events.crow = true;
     settings.events.explosion = true;
     settings.events.aquarium = true;
+    settings.events.cell_swap = true;
+    settings.events.grass = true;
     state.configure(settings);
     let session = state.player_duck_state();
     for cycle in 0..3 {
+        // The spider waits for the player's duck.
         for event in ClockEventKind::ALL
             .into_iter()
-            .filter(|k| *k != ClockEventKind::Duck)
+            .filter(|k| !matches!(k, ClockEventKind::Duck | ClockEventKind::Spider))
             .filter(|k| cycle == 0 || *k != ClockEventKind::Crow)
         {
             state.next_event();
@@ -143,6 +147,8 @@ fn filtered_schedule_has_no_backlog_and_reconfigures_without_changing_saved_enab
     settings.events.color_cycle = false;
     settings.events.marquee = false;
     settings.events.digit_slide = false;
+    settings.events.slot_machine = false;
+    settings.events.spider = false;
     state.configure(settings);
     assert!(state.automatic_events_suspended());
     ticks(&mut state, 6000);

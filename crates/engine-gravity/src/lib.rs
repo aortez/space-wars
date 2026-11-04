@@ -56,8 +56,9 @@ pub enum GravitySourceShape {
     /// at the center. Radius must be finite and positive. With softening, the
     /// interior still meets the softened exterior field at the surface.
     ///
-    /// Spherical sources are always evaluated directly, including when their
-    /// source policy requests a tree: a point aggregate would lose this field.
+    /// Hierarchical spherical sources join the Barnes-Hut tree. A node is
+    /// replaced by its point aggregate only for targets outside every source
+    /// sphere it contains, so each target still sees each source's own field.
     UniformSphere { radius: f32 },
 }
 
@@ -300,6 +301,18 @@ impl Node {
         self.first_child == NO_NODE
     }
 
+    /// Whether a target lies outside every spherical source in this node,
+    /// given their largest squared radius. Source centers lie within the node
+    /// bounds, so it suffices to clear that radius from the nearest boundary.
+    fn clear_of_source_spheres(self, radius_squared: f64, x: f64, y: f64) -> bool {
+        if radius_squared == 0.0 {
+            return true;
+        }
+        let dx = ((x - self.center_x).abs() - self.half_extent).max(0.0);
+        let dy = ((y - self.center_y).abs() - self.half_extent).max(0.0);
+        dx * dx + dy * dy > radius_squared
+    }
+
     fn size_squared(self) -> f64 {
         let size = self.half_extent * 2.0;
         size * size
@@ -316,6 +329,12 @@ pub struct GravitySolver {
     partition_scratch: Vec<usize>,
     source_leaf: Vec<u32>,
     nodes: Vec<Node>,
+    /// Whether any hierarchical source is spherical. Point-only trees skip
+    /// all sphere bookkeeping.
+    hierarchical_spheres: bool,
+    /// Largest squared spherical source radius in each node's subtree; only
+    /// maintained when `hierarchical_spheres` is set.
+    node_sphere_radius_squared: Vec<f64>,
     traversal_stack: Vec<u32>,
     accumulators: Vec<Acceleration64>,
     outputs: Vec<GravityOutput>,
@@ -416,6 +435,7 @@ impl GravitySolver {
 
         self.hierarchical_sources.clear();
         self.direct_sources.clear();
+        let mut hierarchical_spheres = false;
         let mut previous = None;
         for &index in &self.stable_order {
             let participant = participants[index];
@@ -438,14 +458,19 @@ impl GravitySolver {
                 return Err(GravityError::InvalidResponseScale(participant.id));
             }
             if participant.source_mass > 0.0 {
-                match (participant.source_policy, participant.source_shape) {
-                    (GravitySourcePolicy::Hierarchical, GravitySourceShape::Point) => {
+                match participant.source_policy {
+                    GravitySourcePolicy::Hierarchical => {
                         self.hierarchical_sources.push(index);
+                        hierarchical_spheres |= matches!(
+                            participant.source_shape,
+                            GravitySourceShape::UniformSphere { .. }
+                        );
                     }
-                    _ => self.direct_sources.push(index),
+                    GravitySourcePolicy::Direct => self.direct_sources.push(index),
                 }
             }
         }
+        self.hierarchical_spheres = hierarchical_spheres;
         Ok(())
     }
 
@@ -519,12 +544,59 @@ impl GravitySolver {
 
         let aggregation_started = Instant::now();
         self.aggregate_mass(participants);
+        if self.hierarchical_spheres {
+            self.aggregate_sphere_radii(participants);
+        }
         self.metrics.aggregation_time = aggregation_started.elapsed();
 
         let traversal_started = Instant::now();
         let theta_squared = f64::from(theta).powi(2);
         let softening_squared = f64::from(config.softening).powi(2);
         let interaction_scale = f64::from(config.interaction_scale);
+        if self.hierarchical_spheres {
+            self.apply_to_targets_with_spheres(
+                participants,
+                theta_squared,
+                softening_squared,
+                interaction_scale,
+            );
+        } else {
+            self.apply_to_targets::<false>(
+                participants,
+                theta_squared,
+                softening_squared,
+                interaction_scale,
+            );
+        }
+        self.metrics.traversal_time = traversal_started.elapsed();
+    }
+
+    // Kept out of line so `solve` holds only the point-only traversal, as it
+    // did before spherical sources could join the tree.
+    #[inline(never)]
+    fn apply_to_targets_with_spheres(
+        &mut self,
+        participants: &[GravityParticipant],
+        theta_squared: f64,
+        softening_squared: f64,
+        interaction_scale: f64,
+    ) {
+        self.apply_to_targets::<true>(
+            participants,
+            theta_squared,
+            softening_squared,
+            interaction_scale,
+        );
+    }
+
+    /// Point-only trees compile without any sphere checks.
+    fn apply_to_targets<const SPHERES: bool>(
+        &mut self,
+        participants: &[GravityParticipant],
+        theta_squared: f64,
+        softening_squared: f64,
+        interaction_scale: f64,
+    ) {
         for target_order_index in 0..self.stable_order.len() {
             let target_index = self.stable_order[target_order_index];
             let target = participants[target_index];
@@ -537,7 +609,7 @@ impl GravitySolver {
                 softening_squared,
                 interaction_scale,
             );
-            self.apply_tree_acceleration(
+            self.apply_tree_acceleration::<SPHERES>(
                 participants,
                 target_index,
                 theta_squared,
@@ -545,7 +617,6 @@ impl GravitySolver {
                 interaction_scale,
             );
         }
-        self.metrics.traversal_time = traversal_started.elapsed();
     }
 
     fn build_tree(&mut self, participants: &[GravityParticipant]) {
@@ -689,6 +760,34 @@ impl GravitySolver {
         }
     }
 
+    /// Record each subtree's largest sphere radius, so traversal never replaces
+    /// a node by its point aggregate for a target inside one of its spheres.
+    fn aggregate_sphere_radii(&mut self, participants: &[GravityParticipant]) {
+        self.node_sphere_radius_squared.clear();
+        self.node_sphere_radius_squared
+            .resize(self.nodes.len(), 0.0);
+        for node_index in (0..self.nodes.len()).rev() {
+            let node = self.nodes[node_index];
+            self.node_sphere_radius_squared[node_index] = if node.leaf() {
+                let start = node.first_source as usize;
+                let end = start + node.source_count as usize;
+                self.source_order[start..end]
+                    .iter()
+                    .map(|&participant_index| {
+                        source_radius_squared(participants[participant_index].source_shape)
+                    })
+                    .fold(0.0, f64::max)
+            } else {
+                (0..4)
+                    .map(|child| self.node_sphere_radius_squared[node.first_child as usize + child])
+                    .fold(0.0, f64::max)
+            };
+        }
+    }
+
+    // Each traversal variant calls this once per target. Without inlining, the
+    // call costs point-only trees several percent even with no direct sources.
+    #[inline(always)]
     fn apply_direct_sources(
         &mut self,
         participants: &[GravityParticipant],
@@ -716,7 +815,7 @@ impl GravitySolver {
         }
     }
 
-    fn apply_tree_acceleration(
+    fn apply_tree_acceleration<const SPHERES: bool>(
         &mut self,
         participants: &[GravityParticipant],
         target_index: usize,
@@ -773,6 +872,12 @@ impl GravitySolver {
             if node.path_marker != marker
                 && distance_without_softening > 0.0
                 && node.size_squared() < theta_squared * distance_without_softening
+                && (!SPHERES
+                    || node.clear_of_source_spheres(
+                        self.node_sphere_radius_squared[node_index as usize],
+                        f64::from(target.position.x),
+                        f64::from(target.position.y),
+                    ))
             {
                 let distance_squared = distance_without_softening + softening_squared;
                 let inverse_distance = distance_squared.sqrt().recip();
@@ -920,6 +1025,13 @@ fn source_distance_squared(shape: GravitySourceShape, distance_squared: f64) -> 
         GravitySourceShape::UniformSphere { radius } => {
             distance_squared.max(f64::from(radius).powi(2))
         }
+    }
+}
+
+fn source_radius_squared(shape: GravitySourceShape) -> f64 {
+    match shape {
+        GravitySourceShape::Point => 0.0,
+        GravitySourceShape::UniformSphere { radius } => f64::from(radius).powi(2),
     }
 }
 

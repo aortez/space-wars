@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-15T17:40:53.114957+00:00",
+  "source_base": "c64a84e1f7a61c74d78daaa9e31627d122fd76a4",
+  "source_files_sha256": {
+    "Cargo.lock": "a583bccfcbccb13e0cfdd79bf57da07dd9cbdaf19912006783920fa250825151",
+    "crates/engine-os-manager/Cargo.toml": "712be3c8d9aa6b3a324caaefa5a197406e213a45bbeee370868f0136c66b7db8",
+    "crates/engine-os-manager/src/kiosk_health.rs": "a5f9930069638251d2d3d8728f40625b565394cce7cff4eced233e17d4530b61",
+    "crates/engine-os-manager/src/kiosk_health_tests.rs": "0721dc3988d23712cc68aa48b60cfe498b394a88009d0a9d8fd3d0581f36bde3",
+    "crates/engine-ota/examples/image_identity_probe.rs": "f4ef455ad3c55f145e31f792d082e8049b8e61d0c5a5f2928ef51393dcbdeb30",
+    "crates/engine-ota/src/image_identity.rs": "ed10bb053c348426ba5812ca93e1f399c50b55258c9fbdfef5aec879d38ec8be",
+    "crates/engine-ota/src/image_identity_tests.rs": "6c86243c489321d69bd0b502f96ec130950f8a3ed2a46afafa7cefd67b16f399",
+    "crates/engine-ota/src/lib.rs": "a2ca071c0f012dc851fbfa2272f807b4062bc20eb3a239d5f6a4328d6a5e9ac9",
+    "crates/engine-ota/tests/fixtures/image-identity-v1.json": "8640dcd6a900ea0ea9ed646f628a5083fce5b947acaf995cde425ef78e3c1b3d",
+    "docs/ota-updates.md": "3890c5b92ca332b07c302b0d3d9c604123d47ce141f54e3e0ba98b3ebfb72d0c",
+    "yocto/meta-spacewars/lib/spacewars/image_identity.py": "3c1db2cf729be285a2f0b44cbabea1f8adb22b1367563f9454fde558e9019cec",
+    "yocto/meta-spacewars/recipes-core/images/spacewars-image-identity.inc": "c3be3ca9ed6e312ecd96a18c41c714d08ea52637c9e39233a2ce38d4e309f2d1",
+    "yocto/meta-spacewars/recipes-core/images/spacewars-image.bb": "c4aa991f1e0980b9ac8e9062988db7ea84636f79007e2eccda3e2e9eb2ff980a",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "acd987fc58cbc0fe7caaf208d1338676741cee585c2a1ae56035264de935487d",
+    "yocto/tests/image_identity_test.py": "f352707bb1dd4eea79102b48f5ccf522440674bfec69e2b4aeaf95cba0b6f5cd"
+  },
+  "layer_revisions": {
+    "poky": {
+      "revision": "4fb7016a07507683359ebd620f1951fd5ea44bfa",
+      "status": ""
+    },
+    "meta-raspberrypi": {
+      "revision": "018d44467c4f09eb63f8ea5e86e85d755250cf89",
+      "status": ""
+    },
+    "meta-openembedded": {
+      "revision": "0f00f8b9a21950640da8c5707343e5540133f86e",
+      "status": ""
+    },
+    "meta-rust-bin": {
+      "revision": "eaea247f32f247ab525112d2fbc16e16a553d880",
+      "status": ""
+    },
+    "meta-pi-base": {
+      "revision": "ce48602dfefd4ee7f3d3010086e685ede3fb17b9",
+      "status": ""
+    }
+  },
+  "validation": {
+    "host_87_tests": {
+      "sha256": "853f46e1cd030c62b68608fac939058d3fb54c54fd9dccb460cc401cd7384699",
+      "output": "   Compiling regex-automata v0.4.14\n   Compiling syn v3.0.9\n   Compiling serde v1.0.228\n   Compiling zerofrom v0.1.7\n   Compiling futures-util v0.3.32\n   Compiling aws-lc-sys v0.46.0\n   Compiling snafu-derive v0.8.9\n   Compiling async-recursion v1.1.1\n   Compiling tracing v0.1.44\n   Compiling yoke v0.8.2\n   Compiling zerovec v0.11.6\n   Compiling zerotrie v0.2.4\n   Compiling serde_plain v1.0.2\n   Compiling olpc-cjson v0.1.4\n   Compiling enumflags2 v0.7.12\n   Compiling zvariant_utils v3.3.0\n   Compiling engine-common v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-common)\n   Compiling aws-lc-rs v1.18.2\n   Compiling tinystr v0.8.3\n   Compiling potential_utf v0.1.5\n   Compiling icu_collections v2.1.1\n   Compiling icu_locale_core v2.1.1\n   Compiling zvariant_derive v5.9.2\n   Compiling snafu v0.8.9\n   Compiling zvariant v5.9.2\n   Compiling icu_provider v2.1.1\n   Compiling rustls-webpki v0.103.15\n   Compiling icu_normalizer v2.1.1\n   Compiling icu_properties v2.1.2\n   Compiling rustls v0.23.46\n   Compiling tokio-macros v2.7.2\n   Compiling futures-executor v0.3.32\n   Compiling idna_adapter v1.2.1\n   Compiling globset v0.4.19\n   Compiling matchers v0.2.0\n   Compiling futures v0.3.32\n   Compiling idna v1.1.0\n   Compiling tracing-subscriber v0.3.23\n   Compiling tokio v1.53.3\n   Compiling url v2.5.8\n   Compiling spacewars-control v0.1.0 (/home/data/workspace/space-wars-ota/crates/spacewars-control)\n   Compiling zbus_names v4.3.1\n   Compiling zbus_macros v5.13.2\n   Compiling zbus v5.13.2\n   Compiling tokio-util v0.7.20\n   Compiling tough v0.24.0 (/home/data/workspace/space-wars-ota/vendor/tough)\n   Compiling engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n   Compiling engine-os-manager v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-os-manager)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.50s\n     Running unittests src/lib.rs (target/debug/deps/engine_os_manager-1960fcd786dbf614)\n\nrunning 12 tests\ntest kiosk_health::tests::required_state_probe_preserves_user_files_and_removes_temporary_data ... ok\ntest kiosk_health::tests::process_start_parser_handles_comm_parentheses_and_rejects_wrong_identity ... ok\ntest kiosk_health::tests::control_challenge_checks_os_credentials_nonce_size_and_framing ... ok\ntest kiosk_health::worker::tests::worker_bounds_output_and_rejects_failure ... ok\ntest kiosk_health::worker::tests::exited_worker_group_is_cleaned_before_its_pid_can_be_reused ... ok\ntest linux::tests::private_provider_decodes_the_real_dbus_signatures_and_correlates_identity ... ok\ntest linux::tests::private_provider_restart_or_new_packet_during_read_is_retried ... ok\ntest linux::tests::private_provider_failed_adjustment_and_spike_cannot_confirm_sync ... ok\ntest kiosk_health::worker::tests::existing_worker_prevents_a_second_probe_and_eof_does_not_bypass_deadline ... ok\ntest kiosk_health::worker::tests::worker_deadline_covers_slow_output_and_stuck_descendants ... ok\ntest kiosk_health::tests::executable_identity_checks_bytes_owner_and_inode ... ok\ntest kiosk_health::tests::live_process_and_private_systemd_evidence_produce_only_coherent_samples ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.86s\n\n     Running unittests src/main.rs (target/debug/deps/engine_os_manager-1273f3cbaa02f506)\n\nrunning 1 test\ntest daemon::tests::rtc_deadline_kills_its_worker_even_when_observation_is_busy ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s\n\n     Running tests/local_service.rs (target/debug/deps/local_service-ff2eb3cfa39895f5)\n\nrunning 6 tests\ntest state_rejects_public_permissions_symlinks_and_oversized_files ... ok\ntest private_state_is_atomic_exclusive_and_detects_corruption ... ok\ntest peer_authorization_uses_credentials_not_request_fields ... ok\ntest status_and_bounded_subscription_use_typed_versioned_requests ... ok\ntest connection_capacity_is_bounded_without_an_unbounded_queue_of_workers ... ok\ntest incomplete_requests_have_an_absolute_deadline ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.12s\n\n     Running tests/time_validity.rs (target/debug/deps/time_validity-b2546c3f4036f9c7)\n\nrunning 14 tests\ntest failed_rtc_persistence_does_not_revoke_network_time ... ok\ntest accepted_forward_and_backward_steps_use_boot_elapsed_time ... ok\ntest absent_uninitialized_unqualified_reset_and_unreadable_rtc_stay_unknown ... ok\ntest fresh_applied_non_spike_completion_is_usable_and_deduplicated ... ok\ntest new_boot_does_not_reuse_previous_network_success_as_current_time ... ok\ntest marker_checkpoint_link_and_sticky_kernel_state_are_not_completion ... ok\ntest qualified_retained_rtc_is_usable_but_does_not_invent_cross_boot_sync_age ... ok\ntest loss_of_wifi_and_overdue_sync_do_not_make_running_time_unknown ... ok\ntest provider_restart_needs_its_own_success_and_keeps_prior_running_time ... ok\ntest same_boot_rtc_service_restart_reuses_the_confirmed_boot_decision ... ok\ntest future_receipt_and_generation_overflow_are_rejected ... ok\ntest suspend_age_uses_boottime_and_does_not_treat_sleep_as_a_clock_step ... ok\ntest unexplained_clock_change_stays_invalid_after_restart_until_a_new_receipt ... ok\ntest service_restart_preserves_age_and_does_not_recount_cached_packet ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/lib.rs (target/debug/deps/engine_ota-77d878ff7936b67e)\n\nrunning 32 tests\ntest image_identity::tests::python_generated_image_matches_descriptor_and_survives_channel_promotion ... ok\ntest image_identity::linux::tests::installed_reader_rejects_symlinks_permissions_owner_size_and_missing_state ... ok\ntest image_identity::tests::signed_metadata_cannot_relabel_packaged_content_or_compatibility ... ok\ntest image_identity::tests::malformed_or_incoherent_image_records_are_rejected ... ok\ntest recovery::tests::corrupted_or_cross_phase_records_fail_validation ... ok\ntest recovery::tests::failed_journal_replace_releases_no_action_and_requires_reopen ... ok\ntest recovery::tests::health_proofs_cannot_be_reused_after_a_gap_or_from_a_different_trial ... ok\ntest recovery::tests::duplicate_trial_request_and_stale_transaction_cannot_repeat_reboot ... ok\ntest recovery::tests::journal_rejects_world_readable_state_and_symlinked_files ... ok\ntest recovery::tests::default_changes_only_after_continuous_health_and_old_root_is_retained ... ok\ntest recovery::tests::journal_rejects_stale_plans_and_never_replaces_corruption_with_bootstrap ... ok\ntest recovery::tests::next_update_stops_advertising_retained_slot_before_overwriting_it ... ok\ntest recovery::tests::promotion_interruption_reconciles_both_selector_choices ... ok\ntest recovery::tests::trial_requires_matching_firmware_token_new_boot_and_actual_candidate ... ok\ntest recovery::tests::journal_reopen_keeps_attempt_floor_and_lock_excludes_a_second_owner ... ok\ntest recovery::tests::unknown_roots_wrong_devices_and_unqualified_recovery_never_grant_writes ... ok\ntest recovery::tests::service_restart_before_selector_commit_requires_fresh_health_window ... ok\ntest recovery::tests::trial_timeout_uses_boot_uptime_and_cannot_be_extended_by_service_restart ... ok\ntest recovery::tests::uncommitted_temporary_file_never_supersedes_the_last_complete_journal ... ok\ntest recovery_linux::tests::cloned_disk_uuid_cannot_hide_behind_the_single_udev_alias ... ok\ntest recovery_linux::tests::different_disk_data_bind_mounts_duplicates_and_unknown_root_fail_closed ... ok\ntest recovery_linux::tests::even_a_read_only_inactive_mount_prevents_installation ... ok\ntest recovery::tests::explicit_retry_is_bounded_and_never_lowers_persisted_history ... ok\ntest recovery_linux::tests::layout_identity_survives_device_enumeration_but_changes_with_geometry_or_uuid ... ok\ntest recovery_linux::tests::mounted_device_numbers_choose_both_slots_without_parsing_name_suffixes ... ok\ntest recovery_linux::tests::overlapping_out_of_disk_duplicate_and_unequal_partitions_are_rejected ... ok\ntest recovery::tests::reset_or_service_restart_before_trial_preserves_old_root_and_quarantines_attempt ... ok\ntest recovery::tests::generation_floor_commits_before_writing_and_corrupt_write_never_arms_trial ... ok\ntest recovery::tests::wrong_executable_build_or_unwritable_state_cannot_produce_health_proof ... ok\ntest recovery::tests::stale_controls_frames_missing_requests_gaps_and_process_restarts_break_health ... ok\ntest recovery_linux::tests::root_selectors_are_strict_and_duplicate_root_arguments_are_rejected ... ok\ntest recovery_linux::tests::malformed_or_oversized_kernel_evidence_is_rejected ... ok\n\ntest result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n\n     Running tests/verification.rs (target/debug/deps/verification-c240b2e2f2ffe43f)\n\nrunning 22 tests\ntest compatibility_and_downgrade_gates_return_specific_reasons ... ok\ntest corrupt_truncated_and_oversized_payloads_are_rejected ... ok\ntest feed_endpoints_require_https_without_credentials_or_path_ambiguity ... ok\ntest caller_readable_or_symlinked_trust_state_is_rejected ... ok\ntest metadata_size_is_bounded_before_parsing ... ok\ntest trust_store_is_exclusive_and_corruption_does_not_rebootstrap ... ok\ntest quarantined_newest_image_does_not_fall_back_to_an_older_download ... ok\ntest cancelled_metadata_check_still_retains_observed_time ... ok\ntest signed_unsupported_schema_is_not_an_installable_candidate ... ok\ntest structurally_valid_storage_corruption_cannot_reset_trust_history ... ok\ntest compatible_generation_is_retained_when_a_new_boot_image_is_published ... ok\ntest unknown_expired_and_backwards_time_never_accept_metadata ... ok\ntest signature_threshold_requires_distinct_authorized_signatures ... ok\ntest image_identity_survives_promotion_and_rejects_relabelled_generations ... ok\ntest replay_after_restart_is_rejected_without_discarding_the_current_cached_feed ... ok\ntest accepted_root_rotation_is_retained_across_restart_and_offline_validation ... ok\ntest persisted_recovery_quarantine_allows_only_a_freshly_verified_bounded_retry ... ok\ntest interrupted_new_publication_invalidates_old_evidence_but_preserves_the_new_version_floor ... ok\ntest signed_channels_and_offline_install_survive_reopening_the_store ... ok\ntest signed_feed_cannot_escape_the_channel_or_image_contract ... ok\ntest signed_metadata_lengths_cannot_override_the_local_size_limit ... ok\ntest removing_a_candidate_from_a_new_feed_revokes_its_cached_approval ... ok\n\ntest result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s\n\n   Doc-tests engine_os_manager\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests engine_ota\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+    },
+    "yocto_95_tests": {
+      "sha256": "55d6aeb0a5e7b85e3126942d1c7d1b94ba590aa5633f1056be8a756224f44e7f",
+      "output": "\n> spacewars-yocto@0.1.0 test\n> node --test tests/*.test.mjs && python3 -m unittest discover -s tests -p '*_test.py'\n\n\u2714 pressure and budget policy has explicit boundaries (0.625564ms)\n\u2714 healthy or missing profiles never invoke Cargo (0.88403ms)\n\u2714 default dry run selects workspace packages but preserves every file (0.88375ms)\n\u2714 apply delegates deletion to Cargo and writes one audit report (0.747794ms)\n\u2714 empty package selection can never become a whole-target clean (0.902084ms)\n\u2714 unexpected workspace, preview path, and Cargo failure prevent apply (0.848773ms)\n\u2714 pin opts out of automatic cleanup (0.313238ms)\n\u2714 pre-build report mode is non-destructive and auto applies the same policy (0.976202ms)\n\u2714 a different build filesystem never causes unrelated cache cleanup (0.387808ms)\n\u2714 help and update dry-run bypass even an invalid maintenance configuration (43.179417ms)\n\u2714 reject symlinks, including a relocated target and a pin introduced during preview (0.74019ms)\n\u2714 allocated-byte count deduplicates hard links and invalid limits fail closed (0.420179ms)\n\u2714 real Cargo preserves dependencies/evidence and honors the build lock (814.166658ms)\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nBuild --target spacewars, then use bundle: /home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/spacewars-fast\nCheck restricted helper/runtime compatibility; verify hashes; copy pair; restart and health-check; rollback on failure.\nDry run: no build, SSH connection, files transferred, or remote changes.\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nFast update: spacewars@picade.local (client + CLI, application restart, no reboot)\nengine-client: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nspacewars-cli: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nFast update: spacewars@spacewars.local (client + CLI, application restart, no reboot)\nengine-client: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\nspacewars-cli: 64 bytes, sha256=3d36d1a967b1ee7c7a39e99ad4296f8dbe1df7070c6c12f85f16bc7a3d039fba\n\u2714 fast arguments are explicit and reject full-image flags/remote shell syntax (0.880554ms)\n\u2714 bundle requires matching identities, complete binary pair, architecture and checksums (1.451556ms)\n\u2714 missing/mismatched remote helper requires a full update (0.566163ms)\n\u2714 dry run has no build, network or artifact reads (0.723198ms)\n\u2714 runtime mismatch aborts before copying or stopping the app (0.550053ms)\n\u2714 fast update builds only the recipe, transfers a pair, calls fixed helper, cleans staging (0.814339ms)\n\u2714 failed install still cleans only its own staged pair and reports failure (0.664117ms)\n\u2714 wrapper routes --fast and legacy yolo refuses it instead of flashing (45.488103ms)\n\u2714 normal builds and updates use the GPU bundle; software stays separate (0.41551ms)\n\u2714 build selection defaults to GPU and rejects conflicting switches (0.202731ms)\n\u2714 normal image includes GPU libraries and boots the build-selected renderer (0.650822ms)\n\u2714 shader-only edits invalidate the Pi application build (0.130746ms)\n\u2714 build and artifact paths isolate the unified machine from older checkouts (0.54873ms)\n\u2714 only explicit known hardware profiles can be flashed (0.237246ms)\n\u2714 HDMI selection uses the connected connector, not the first DRM card (22.188643ms)\n\u2714 missing HDMI detection leaves output selection to Slint (6.189362ms)\n\u2714 Picade routes audio to the HAT without touching backlight files (7.426023ms)\n\u2714 HyperPixel retains its existing rotation, USB audio and backlight workaround (5.691186ms)\n\u2714 Picade refuses unsupported boards instead of silently starting without its HAT (3.094661ms)\n\u2714 missing, invalid and ambiguous selections fail without executing boot-file content (6.934801ms)\n\u2714 Windows line endings are accepted in boot profile selection (6.388356ms)\n\u2714 rootfs-only updates require valid, identical boot identities (0.639772ms)\n\u2714 profile files keep HAT and HyperPixel GPIO overlays mutually exclusive (0.178365ms)\n\u2714 Picade udev identities separate the gamepad from utility and power keys (0.102572ms)\n\u2714 flash help documents explicit hardware selection without accessing disks or saved settings (14.139189ms)\n\u2139 tests 38\n\u2139 suites 0\n\u2139 pass 38\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 992.648691\n.........................................................\n----------------------------------------------------------------------\nRan 57 tests in 21.748s\n\nOK\n"
+    },
+    "clippy": {
+      "sha256": "53cf187ce6c3d147e64392f3f7a5e7afeecf6f591b61f338e56af499135f426b",
+      "output": "    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on build directory\n    Checking engine-common v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-common)\n    Checking engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Checking spacewars-control v0.1.0 (/home/data/workspace/space-wars-ota/crates/spacewars-control)\n    Checking engine-os-manager v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-os-manager)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.34s\n"
+    },
+    "rust_1_89": {
+      "sha256": "78b39b7dbaf3bb4e783e83c19b5682027c3d738003bca511adfcc202fce4ee13",
+      "output": "    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n   Compiling libc v0.2.189\n   Compiling serde_core v1.0.228\n   Compiling syn v2.0.117\n    Checking regex-automata v0.4.14\n   Compiling syn v3.0.9\n    Checking uuid v1.23.1\n   Compiling jobserver v0.1.34\n   Compiling cc v1.2.60\n   Compiling cmake v0.1.58\n    Checking globset v0.4.19\n    Checking matchers v0.2.0\n   Compiling aws-lc-sys v0.46.0\n   Compiling tokio-macros v2.7.2\n    Checking tokio v1.53.3\n   Compiling synstructure v0.13.2\n   Compiling serde_derive v1.0.228\n   Compiling zerofrom-derive v0.1.7\n   Compiling yoke-derive v0.8.2\n   Compiling zerovec-derive v0.11.3\n   Compiling displaydoc v0.2.5\n   Compiling enumflags2_derive v0.7.12\n   Compiling futures-macro v0.3.32\n   Compiling pin-project-internal v1.1.11\n   Compiling tracing-attributes v0.1.31\n   Compiling async-trait v0.1.89\n   Compiling snafu-derive v0.8.9\n   Compiling thiserror-impl v2.0.18\n   Compiling async-recursion v1.1.1\n   Compiling serde_repr v0.1.20\n   Compiling clap_derive v4.6.1\n    Checking futures-util v0.3.32\n    Checking pin-project v1.1.11\n    Checking zerofrom v0.1.7\n    Checking tracing v0.1.44\n    Checking thiserror v2.0.18\n    Checking yoke v0.8.2\n    Checking tracing-subscriber v0.3.23\n    Checking zerovec v0.11.6\n    Checking zerotrie v0.2.4\n    Checking snafu v0.8.9\n    Checking clap v4.6.1\n    Checking tinystr v0.8.3\n    Checking potential_utf v0.1.5\n    Checking tokio-util v0.7.20\n    Checking icu_collections v2.1.1\n    Checking icu_locale_core v2.1.1\n    Checking serde v1.0.228\n    Checking icu_provider v2.1.1\n    Checking enumflags2 v0.7.12\n   Compiling zvariant_utils v3.3.0\n    Checking serde_plain v1.0.2\n    Checking olpc-cjson v0.1.4\n    Checking engine-common v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-common)\n    Checking icu_normalizer v2.1.1\n    Checking icu_properties v2.1.2\n   Compiling zvariant_derive v5.9.2\n    Checking futures-executor v0.3.32\n    Checking futures v0.3.32\n    Checking idna_adapter v1.2.1\n    Checking idna v1.1.0\n    Checking url v2.5.8\n   Compiling zvariant v5.9.2\n    Checking spacewars-control v0.1.0 (/home/data/workspace/space-wars-ota/crates/spacewars-control)\n    Checking zbus_names v4.3.1\n   Compiling zbus_macros v5.13.2\n    Checking zbus v5.13.2\n   Compiling aws-lc-rs v1.18.2\n   Compiling rustls v0.23.46\n    Checking rustls-webpki v0.103.15\n    Checking tough v0.24.0 (/home/data/workspace/space-wars-ota/vendor/tough)\n    Checking engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Checking engine-os-manager v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-os-manager)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.54s\n"
+    },
+    "aarch64_ota_tests_compile": {
+      "sha256": "4280f34844bd7892956abf33bf3b1c6c23814eb7b5cbdbd543e41f391104e7c2",
+      "output": "   Compiling engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.71s\n  Executable unittests src/lib.rs (target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-af8e6f7e01ee75e6)\n  Executable tests/verification.rs (target/aarch64-unknown-linux-gnu/debug/deps/verification-9fc1643a739345d5)\n"
+    },
+    "aarch64_device_service_compile": {
+      "sha256": "518d1f2b7ddb9f0880acef1b84c7c39a7317a9f20a4fe650d6eb83d72dfa3efc",
+      "output": "    Checking futures-io v0.3.32\n    Checking parking v2.2.1\n    Checking libc v0.2.189\n    Checking crossbeam-utils v0.8.21\n    Checking slab v0.4.12\n    Checking linux-raw-sys v0.12.1\n    Checking once_cell v1.21.4\n   Compiling enumflags2_derive v0.7.12\n   Compiling serde v1.0.228\n    Checking unicode-ident v1.0.24\n    Checking log v0.4.29\n    Checking regex-automata v0.4.14\n    Checking utf8parse v0.2.2\n    Checking winnow v0.7.15\n    Checking async-task v4.7.1\n   Compiling tracing-attributes v0.1.31\n    Checking anstyle-parse v1.0.0\n    Checking anstyle-query v1.1.5\n    Checking futures-lite v2.6.1\n    Checking proc-macro2 v1.0.106\n    Checking colorchoice v1.0.5\n    Checking futures-util v0.3.32\n    Checking tracing-core v0.1.36\n    Checking endi v1.1.1\n    Checking atomic-waker v1.1.2\n    Checking is_terminal_polyfill v1.70.2\n    Checking anstyle v1.0.14\n    Checking piper v0.2.5\n    Checking rustls v0.23.46\n    Checking concurrent-queue v2.5.0\n    Checking clap_lex v1.1.0\n    Checking anstream v1.0.0\n    Checking strsim v0.11.1\n    Checking lazy_static v1.5.0\n    Checking tracing-log v0.2.0\n    Checking sharded-slab v0.1.7\n   Compiling clap_derive v4.6.1\n    Checking event-listener v5.4.1\n    Checking quote v1.0.45\n    Checking clap_builder v4.6.0\n    Checking engine-common v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-common)\n    Checking syn v2.0.117\n   Compiling zvariant_utils v3.3.0\n    Checking event-listener-strategy v0.5.4\n    Checking async-executor v1.14.0\n    Checking async-channel v2.5.0\n    Checking async-lock v3.4.2\n    Checking async-broadcast v0.7.2\n    Checking blocking v1.6.2\n   Compiling serde_repr v0.1.20\n    Checking uuid v1.23.1\n   Compiling enumflags2 v0.7.12\n    Checking rustix v1.1.4\n    Checking ordered-stream v0.2.0\n    Checking thread_local v1.1.9\n    Checking nu-ansi-term v0.50.3\n   Compiling zvariant_derive v5.9.2\n    Checking errno v0.3.14\n    Checking getrandom v0.3.4\n    Checking cpufeatures v0.2.17\n    Checking sha2 v0.10.9\n    Checking signal-hook-registry v1.4.8\n    Checking nix v0.30.1\n    Checking globset v0.4.19\n    Checking matchers v0.2.0\n    Checking tracing v0.1.44\n    Checking futures-executor v0.3.32\n    Checking futures v0.3.32\n    Checking tracing-subscriber v0.3.23\n    Checking clap v4.6.1\n   Compiling zvariant v5.9.2\n    Checking spacewars-control v0.1.0 (/home/data/workspace/space-wars-ota/crates/spacewars-control)\n    Checking polling v3.11.0\n    Checking tempfile v3.27.0\n    Checking async-io v2.6.0\n    Checking tough v0.24.0 (/home/data/workspace/space-wars-ota/vendor/tough)\n    Checking zbus_names v4.3.1\n    Checking async-signal v0.2.14\n    Checking async-process v2.5.0\n   Compiling zbus_macros v5.13.2\n    Checking engine-ota v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-ota)\n    Checking zbus v5.13.2\n    Checking engine-os-manager v0.1.0 (/home/data/workspace/space-wars-ota/crates/engine-os-manager)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.28s\n"
+    },
+    "pi5_identity_tests": {
+      "sha256": "d13c29017222343a41b0408dbc54c4c8465a7c99a6efb29efba52e74d51395c6",
+      "output": "\nrunning 4 tests\ntest image_identity::tests::python_generated_image_matches_descriptor_and_survives_channel_promotion ... ok\ntest image_identity::linux::tests::installed_reader_rejects_symlinks_permissions_owner_size_and_missing_state ... ok\ntest image_identity::tests::signed_metadata_cannot_relabel_packaged_content_or_compatibility ... ok\ntest image_identity::tests::malformed_or_incoherent_image_records_are_rejected ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s\n\n"
+    }
+  },
+  "aarch64_fixture": {
+    "sha256": "cfcffaef6d74e93b127034c22a4e598641c4b5d15710738ab253d4ca30a1b93e",
+    "bytes": 46705248,
+    "remote_path": "/tmp/spacewars-ota-health-tests-20261015/image-identity-tests"
+  },
+  "yocto_build": {
+    "log_sha256": "d3264e70fba2ec5563e1d0e12c02fbf3be17ae4e0e6a367c8c807eb3142ee3ba",
+    "summary": "2026-10-15 10:37:47 - INFO     - NOTE: Running noexec task 6767 of 6768 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-image.bb:do_rm_work_all)\n2026-10-15 10:37:47 - INFO     - NOTE: Running noexec task 6768 of 6768 (/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/../space-wars-ota/yocto/meta-spacewars/recipes-core/images/spacewars-image.bb:do_build)\n2026-10-15 10:37:49 - INFO     - NOTE: Tasks Summary: Attempted 6768 tasks of which 6744 didn't need to be rerun and all succeeded.\n2026-10-15 10:37:49 - INFO     - \n2026-10-15 10:37:49 - INFO     - Summary: There was 1 WARNING message.",
+    "compiler_source_revision_export": "export SPACEWARS_BUILD_REVISION=\"c64a84e1f7a6-dirty\"",
+    "warning": "Build host Ubuntu 26.04 is not in the layer tested-distribution list."
+  },
+  "artifact_audit": {
+    "rootfs": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015173629.ext4.gz",
+      "compressed_bytes": 133759208,
+      "compressed_sha256": "2c330c8c21132418c1205bca38c5243219ef458c7b4ae8a6ed8138b8ed03bce6",
+      "expanded_bytes": 520093696,
+      "expanded_sha256": "48bb8c9c588377bb67f1dde89e44315cdbc56d5dbf552e6e2ed062bc4fd120e5"
+    },
+    "disk": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015173629.wic.gz",
+      "compressed_bytes": 183232678,
+      "compressed_sha256": "e4fe6d793f521b2571553909e80934cf1d3f203622f36c6f68c4fef1826fcc52",
+      "expanded_bytes": 7679770624,
+      "expanded_sha256": "3855b80aa407c4374a84e0c158b9954c8d3fb4a70e19a17d59cd76278391ead0"
+    },
+    "partition_table": [
+      {
+        "number": 1,
+        "type": 12,
+        "start_sector": 8192,
+        "sectors": 307200
+      },
+      {
+        "number": 2,
+        "type": 131,
+        "start_sector": 319488,
+        "sectors": 6291456
+      },
+      {
+        "number": 3,
+        "type": 131,
+        "start_sector": 6610944,
+        "sectors": 6291456
+      },
+      {
+        "number": 4,
+        "type": 131,
+        "start_sector": 12902400,
+        "sectors": 2097152
+      }
+    ],
+    "identity": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 23426808,
+          "sha256": "d92b52cf3843ad99f41e443395909e91f634f3c00bfaf6929cf5467c0aaa1f49"
+        },
+        "os_manager": {
+          "bytes": 3155448,
+          "sha256": "06d1b8ff55457e4692e047c023025ef9c4f5d4bd5256a71a38e3bde8e04647df"
+        }
+      },
+      "boot_identity": "b3bd502c2f6b5e2edcd5a9e0f150b97febe6d10e6f30a222ca5291b6cea0b82a",
+      "build_id": "rootfs-141aacc2752f26ca4632d5a8ee072102dc57da2813a21c2a7a27a709775a9bee",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 1,
+      "rootfs_tree": "141aacc2752f26ca4632d5a8ee072102dc57da2813a21c2a7a27a709775a9bee",
+      "schema": 1,
+      "source": {
+        "commit": "c64a84e1f7a61c74d78daaa9e31627d122fd76a4",
+        "dirty": true,
+        "revision": "c64a84e1f7a6-dirty",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "manifest_sha256": "87266263d6d98bcbf1e8e03a36b4532e68dabe8474ce7d0f9e520c5b35f9b36a",
+    "rootfs_record_matches_sidecar": true,
+    "final_binary_hashes_match": true,
+    "client_contains_compiled_revision": true,
+    "critical_modes_and_root_ownership_verified": true,
+    "boot_contains_exact_initramfs_sha256": "461ab4531c05f96c235610855951be26cb4b764e7d7ea2c9da075087b9485c4a",
+    "boot_loads_initramfs": true,
+    "root_wait_seconds": 30,
+    "stat_output": {
+      "image.json": "Inode: 186   Type: regular    Mode:  0644   Flags: 0x80000\nGeneration: 0    Version: 0x00000000:00000000\nUser:     0   Group:     0   Project:     0   Size: 949\nFile ACL: 0\nLinks: 1   Blockcount: 2\nFragment:  Address: 0    Number: 0    Size: 0\n ctime: 0x6ad10f57:00000000 -- Thu Oct 15 10:37:27 2026\n atime: 0x4d9b9ef0:00000000 -- Tue Apr  5 16:00:00 2011\n mtime: 0x4d9b9ef0:00000000 -- Tue Apr  5 16:00:00 2011\ncrtime: 0x6ad10f58:00000000 -- Thu Oct 15 10:37:28 2026\nSize of extra inode fields: 32\nInode checksum: 0x735eb9ed\nEXTENTS:\n(0):34129\n",
+      "source.json": "Inode: 9439   Type: regular    Mode:  0644   Flags: 0x80000\nGeneration: 0    Version: 0x00000000:00000000\nUser:     0   Group:     0   Project:     0   Size: 117\nFile ACL: 0\nLinks: 1   Blockcount: 2\nFragment:  Address: 0    Number: 0    Size: 0\n ctime: 0x6ad10f56:00000000 -- Thu Oct 15 10:37:26 2026\n atime: 0x6ad10f56:00000000 -- Thu Oct 15 10:37:26 2026\n mtime: 0x5aa27f70:00000000 -- Fri Mar  9 04:34:56 2018\ncrtime: 0x6ad10f59:00000000 -- Thu Oct 15 10:37:29 2026\nSize of extra inode fields: 32\nInode checksum: 0xc73fbbb2\nEXTENTS:\n(0):327705\n",
+      "boot-id": "Inode: 185   Type: regular    Mode:  0644   Flags: 0x80000\nGeneration: 0    Version: 0x00000000:00000000\nUser:     0   Group:     0   Project:     0   Size: 65\nFile ACL: 0\nLinks: 1   Blockcount: 2\nFragment:  Address: 0    Number: 0    Size: 0\n ctime: 0x6ad10f56:00000000 -- Thu Oct 15 10:37:26 2026\n atime: 0x6ad10f56:00000000 -- Thu Oct 15 10:37:26 2026\n mtime: 0x5aa27f70:00000000 -- Fri Mar  9 04:34:56 2018\ncrtime: 0x6ad10f58:00000000 -- Thu Oct 15 10:37:28 2026\nSize of extra inode fields: 32\nInode checksum: 0x03698f1d\nEXTENTS:\n(0):34128\n",
+      "engine-client": "Inode: 755   Type: regular    Mode:  0755   Flags: 0x80000\nGeneration: 0    Version: 0x00000000:00000000\nUser:     0   Group:     0   Project:     0   Size: 23426808\nFile ACL: 0\nLinks: 1   Blockcount: 45652\nFragment:  Address: 0    Number: 0    Size: 0\n ctime: 0x6ad10f56:00000000 -- Thu Oct 15 10:37:26 2026\n atime: 0x6ad10f56:00000000 -- Thu Oct 15 10:37:26 2026\n mtime: 0x5aa27f70:00000000 -- Fri Mar  9 04:34:56 2018\ncrtime: 0x6ad10f58:00000000 -- Thu Oct 15 10:37:28 2026\nSize of extra inode fields: 32\nInode checksum: 0x08993528\nEXTENTS:\n(ETB0):71318, (0-8739):48605-57344, (8740-22214):57606-71080, (22222-22284):71081-71143, (22310-22482):71144-71316, (22486):71317, (22487-22842):71319-71674, (22858-22862):71675-71679, (22865-22873):71680-71688, (22875-22877):71689-71691\n",
+      "engine-os-manager": "Inode: 756   Type: regular    Mode:  0755   Flags: 0x80000\nGeneration: 0    Version: 0x00000000:00000000\nUser:     0   Group:     0   Project:     0   Size: 3155448\nFile ACL: 0\nLinks: 1   Blockcount: 6156\nFragment:  Address: 0    Number: 0    Size: 0\n ctime: 0x6ad10f56:00000000 -- Thu Oct 15 10:37:26 2026\n atime: 0x6ad10f56:00000000 -- Thu Oct 15 10:37:26 2026\n mtime: 0x5aa27f70:00000000 -- Fri Mar  9 04:34:56 2018\ncrtime: 0x6ad10f58:00000000 -- Thu Oct 15 10:37:28 2026\nSize of extra inode fields: 32\nInode checksum: 0xf8f56515\nEXTENTS:\n(ETB0):75028, (0-2036):71692-73728, (2037-3066):73990-75019, (3070-3073):75020-75023, (3075-3077):75024-75026, (3079):75027, (3080-3081):75029-75030\n"
+    }
+  },
+  "rust_parser_accepts_packaged_record": true,
+  "hardware_scope": {
+    "pi5": "Four new identity tests run as the kiosk account in private temporary directories",
+    "pi4": "Still unreachable by mDNS and last-known IP",
+    "image_installed": false,
+    "real_watchdog_opened": false,
+    "reboot_requested": false,
+    "boot_or_partition_writes": false,
+    "qualification_remaining": [
+      "Installed identity/health under the final service sandbox",
+      "Trial watchdog and selector on both physical boards",
+      "Actual inactive-root writer and coordinator integration",
+      "Clean frozen production publishing and signed image delivery"
+    ]
+  }
+}

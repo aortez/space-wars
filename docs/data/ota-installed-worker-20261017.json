@@ -1,0 +1,301 @@
+{
+  "schema": 1,
+  "scope": "Installed background worker through the ordinary device API; connected network, explicit requests only. No image installation or reboot.",
+  "observations": [
+    {
+      "device": "spacewars.local",
+      "run": {
+        "host": "spacewars.local",
+        "channel": "nightly",
+        "source": "d574bc3d92c9dd4cd56bcb69699b8bc9512c0070",
+        "runner_sha256": "a43237a8fd758368bda1d14e138d34306be8fa13baa57e0f70f61d0408bc1ac4",
+        "utc": "2026-10-18T05:12:05.437473+00:00"
+      },
+      "result": {
+        "host": "spacewars.local",
+        "channel": "nightly",
+        "completion": "ready",
+        "expected": "ready",
+        "ready": {
+          "schema": 1,
+          "generation": 2,
+          "source_commit": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+          "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+          "channel": "nightly",
+          "machine": "raspberrypi-spacewars",
+          "architecture": "aarch64",
+          "layout": "spacewars-ab-v1",
+          "format": "rootfs-ext4-zstd",
+          "compressed": {
+            "bytes": 131865641,
+            "sha256": "3928c3ad6457286f37498d11dd9a995b34055c7de147bc0f94d4d7ee2dfbdf41"
+          },
+          "expanded": {
+            "bytes": 528482304,
+            "sha256": "f18d3697c9cf34382f29cf06627daacd32b1655b3119f824436e7d37b4b328b6"
+          },
+          "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+          "min_updater_protocol": 1,
+          "min_recovery_protocol": 2,
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "stores": {
+          "all_bytes_unchanged": true,
+          "durable_stores_unchanged": true,
+          "regenerated_local_gatt_databases": []
+        },
+        "elapsed_seconds": 43.79,
+        "image_and_boot_unchanged": true,
+        "kiosk_instance_unchanged": true,
+        "kiosk_progress_verified": true,
+        "original_channel_restored": true,
+        "automatic_installation_enabled": false
+      },
+      "boot_id": "2ff5cbbf-ad5d-4b26-b787-53c21ac16931",
+      "installed_image": {
+        "architecture": "aarch64",
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "0aa488ad9ef15d5436a42bda5705cf67d246f984666d43246c6def59cb092f3c"
+          },
+          "os_manager": {
+            "bytes": 11255296,
+            "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+          }
+        },
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+        "data": {
+          "reads": {
+            "max": 1,
+            "min": 1
+          },
+          "writes": 1
+        },
+        "layout": "spacewars-ab-v1",
+        "machine": "raspberrypi-spacewars",
+        "recovery_protocol": 2,
+        "rootfs_tree": "40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+        "schema": 1,
+        "source": {
+          "commit": "0a0434b165dc389d624117e502e5cfd8b3fe016d",
+          "dirty": false,
+          "revision": "0a0434b165dc",
+          "schema": 1
+        },
+        "updater_protocol": 1
+      },
+      "health_before": {
+        "boot_id": "2ff5cbbf-ad5d-4b26-b787-53c21ac16931",
+        "uptime_ms": 2224068,
+        "process_id": 885,
+        "start_ticks": 545,
+        "invocation_id": "36c61225703a4c20a58f0fd3020d6e93",
+        "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+        "control_response": 3,
+        "presented_frames": 131385
+      },
+      "health_after": {
+        "boot_id": "2ff5cbbf-ad5d-4b26-b787-53c21ac16931",
+        "uptime_ms": 2265745,
+        "process_id": 885,
+        "start_ticks": 545,
+        "invocation_id": "36c61225703a4c20a58f0fd3020d6e93",
+        "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+        "control_response": 4,
+        "presented_frames": 133888
+      },
+      "evidence": [
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/after.json",
+          "sha256": "8ec413c31aa74edd510e06ba9704359cd96b41f2a99a4468f708777dbdf202a9",
+          "bytes": 10406
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/before.json",
+          "sha256": "9013d568fe40c5e084d584fa542e1abd4a1664429968560a5d306084f792bf66",
+          "bytes": 9420
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/completed.json",
+          "sha256": "7267617c9a50eba4d36deb2560c2e1adaee0ddf9984b681239ad38cd84ecc4c6",
+          "bytes": 2659
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/observations.jsonl",
+          "sha256": "6ac69e75f476ea5566aafd6ac3f2346e409bf2ab39aa14ad96531adfff5a0a56",
+          "bytes": 71636
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/request.json",
+          "sha256": "e36b40063a2b29770f6c1f4439292806c34ef69b310fc006cada243f814f9a0a",
+          "bytes": 66
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/restore-channel.json",
+          "sha256": "8ae57e850836cbea65e398ab0a2d825797f5c0ab3fde6edadfba2f9ba677eb2c",
+          "bytes": 66
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/restored-status.json",
+          "sha256": "3c675d7aa3c8815b193389d16cfb683e30bf769967ae3b96c0b440f39bbff39f",
+          "bytes": 1729
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/result.json",
+          "sha256": "8ddf76c264b77fd5797833fc6145ae06bdcf0de8c2518b9d46066c5047f976e8",
+          "bytes": 1349
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/spacewars.local/nightly/run.json",
+          "sha256": "77b04315eb9ff6e0adac6d41ae9c99fbb98c019524e8f5dc83e7b3f3c42f72e0",
+          "bytes": 244
+        }
+      ]
+    },
+    {
+      "device": "sw-picade.local",
+      "run": {
+        "host": "sw-picade.local",
+        "channel": "release",
+        "source": "d574bc3d92c9dd4cd56bcb69699b8bc9512c0070",
+        "runner_sha256": "a43237a8fd758368bda1d14e138d34306be8fa13baa57e0f70f61d0408bc1ac4",
+        "utc": "2026-10-18T05:12:06.655700+00:00"
+      },
+      "result": {
+        "host": "sw-picade.local",
+        "channel": "release",
+        "completion": "no-candidate",
+        "expected": "no-candidate",
+        "ready": null,
+        "stores": {
+          "all_bytes_unchanged": true,
+          "durable_stores_unchanged": true,
+          "regenerated_local_gatt_databases": []
+        },
+        "elapsed_seconds": 5.096,
+        "image_and_boot_unchanged": true,
+        "kiosk_instance_unchanged": true,
+        "kiosk_progress_verified": true,
+        "original_channel_restored": true,
+        "automatic_installation_enabled": false
+      },
+      "boot_id": "c9200286-344e-4005-8298-ede3dba69319",
+      "installed_image": {
+        "architecture": "aarch64",
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "fcbf0e501fa9358e87b90d6cef5a7622faa69abeabda3146f6067ed385b5e3a8"
+          },
+          "os_manager": {
+            "bytes": 11255296,
+            "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+          }
+        },
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "data": {
+          "reads": {
+            "max": 1,
+            "min": 1
+          },
+          "writes": 1
+        },
+        "layout": "spacewars-ab-v1",
+        "machine": "raspberrypi-spacewars",
+        "recovery_protocol": 2,
+        "rootfs_tree": "5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "schema": 1,
+        "source": {
+          "commit": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+          "dirty": false,
+          "revision": "5b420c95b87b",
+          "schema": 1
+        },
+        "updater_protocol": 1
+      },
+      "health_before": {
+        "boot_id": "c9200286-344e-4005-8298-ede3dba69319",
+        "uptime_ms": 1246304,
+        "process_id": 821,
+        "start_ticks": 925,
+        "invocation_id": "cdb10b3af64c40fd978cbb4b8e8c1d82",
+        "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "control_response": 3,
+        "presented_frames": 21350
+      },
+      "health_after": {
+        "boot_id": "c9200286-344e-4005-8298-ede3dba69319",
+        "uptime_ms": 1251413,
+        "process_id": 821,
+        "start_ticks": 925,
+        "invocation_id": "cdb10b3af64c40fd978cbb4b8e8c1d82",
+        "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "control_response": 4,
+        "presented_frames": 21423
+      },
+      "evidence": [
+        {
+          "path": "target/ota-installed-worker-20261017/sw-picade.local/release/after.json",
+          "sha256": "00d34815020a654f45d2ce71ecf57f6ad4cae854238cf622fd914896669d59b2",
+          "bytes": 12283
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/sw-picade.local/release/before.json",
+          "sha256": "73abd4cd0bdd25a8e6d2522929f9dc28183f6e28e81a3744c217e2e123aee531",
+          "bytes": 12298
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/sw-picade.local/release/completed.json",
+          "sha256": "7771d22eecffda04b7441bb9fc63fbfedea9d548265241a7f66a5c27f8f8b6aa",
+          "bytes": 1808
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/sw-picade.local/release/observations.jsonl",
+          "sha256": "06186aa932414e2e3f86ceb3dcaaac3812790d764847364a8c68958044df731f",
+          "bytes": 8337
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/sw-picade.local/release/request.json",
+          "sha256": "5cdf760cdcb5a16d9098d6c8d81b5b5c7f07c7ada291f894fc10a45adce958af",
+          "bytes": 66
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/sw-picade.local/release/result.json",
+          "sha256": "a384c563bb30a30b0c8a32b8cc0b4861c457d409d89b8a72819b906a39f2cb6d",
+          "bytes": 483
+        },
+        {
+          "path": "target/ota-installed-worker-20261017/sw-picade.local/release/run.json",
+          "sha256": "151230e6560bc1a1815e69d386ebd9e113c14a45bf5712a868a1ada3996f526f",
+          "bytes": 244
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Initial boot-time preparation-unavailable statuses preceded these successful checks; their cause is not established.",
+    "No partial-offline, restart/resume, frame-time benchmark or interrupted-promotion qualification.",
+    "Automatic installation and automatic signed publishing remain disabled."
+  ],
+  "startup_followup": {
+    "device": "sw-picade.local",
+    "automatic_check_started_ms": 9794,
+    "recovery_service_start_ms": 9621.12,
+    "recovery_service_finished_ms": 11770.776,
+    "inference": "Preparation overlapped boot recovery, consistent with contention on the shared installation lock. The discarded preparation error prevents confirmation of the exact failing check.",
+    "evidence": {
+      "path": "target/ota-installed-worker-20261017/sw-picade.local/release/startup-journal.txt",
+      "sha256": "8000991f66765b3541c96b1675943ef9b1dd350f64f236dc55ee1ee2fa5090e3",
+      "bytes": 246
+    }
+  }
+}

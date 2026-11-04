@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "source_before_fix": "b8fb994",
+  "case": "Wi-Fi setup admission with a full table of expired SSH reservations",
+  "controls": {
+    "root_coordinator": "real Unix-socket server with private temporary state",
+    "setup_client": "spacewars_control::network::SetupHold used by the kiosk",
+    "radio": "fake; no writes observed",
+    "ssh_sessions": "busy; policy fixtures also cover unknown activity",
+    "holds": 32,
+    "expiry_ms": 120000
+  },
+  "before": {
+    "policy_error": "network hold capacity reached",
+    "shared_client_error": "network setup protection is unavailable"
+  },
+  "after": {
+    "setup_admit_renew_release": "passed",
+    "preserves_unexpired_ssh_and_other_hold_kinds": true,
+    "release_requires_idle_observation_and_quiet_grace": true,
+    "durable_commit_faults": "all four write boundaries preserve original reservations"
+  },
+  "validation": {
+    "manager_serial": {
+      "passed": 160,
+      "failed": 0,
+      "ignored": 2
+    },
+    "root_peer_integrations": {
+      "passed": 2,
+      "failed": 0,
+      "execution": "unshare --user --map-root-user; private state and fake radio"
+    },
+    "clippy": "passed with -D warnings",
+    "first_parallel_suite": {
+      "passed": 158,
+      "failed": 2,
+      "ignored": 2,
+      "failures": [
+        "network_controller::tests::timeout_never_acknowledges_a_hold_or_disappears_on_service_restart: network policy already has an owner",
+        "time_query::tests::rejected_method_reply_cannot_replenish_the_provider_allowance: device schedule already has an owner"
+      ],
+      "followup": "complete suite passed serially without changing code; cause of parallel ownership failures not established"
+    }
+  },
+  "picade_report": {
+    "boot_id_after_user_reboot": "18c00abc-873b-4b79-9e07-5f3ba94a2c01",
+    "network_after_reboot": "wireless enabled and available; game and system service active",
+    "historical_cause": "unconfirmed; previous boot journal unavailable",
+    "archive": "target/ota-picade-reboot-20261017"
+  },
+  "limits": [
+    "Host fixtures qualify policy decisions; native testing kept partial offline disabled and does not qualify automatic radio shutdown.",
+    "The hardware check used a temporary service override, then restored the original installed service. The flashed image still predates these fixes.",
+    "The older combined image ef44f5b does not include the subsequent setup-admission fix a76ec32."
+  ],
+  "artifacts": {
+    "target/ota-setup-reclaim-before.log": {
+      "bytes": 1028,
+      "sha256": "ea76360dc365ddb96cbb853b2effee8b1c70996475779fa39af2bf5019b3ebf6"
+    },
+    "target/ota-setup-client-before.log": {
+      "bytes": 720,
+      "sha256": "816aeaa5193f2f499f0d1bd3093dcbdc5151548f1c6cf77ff809a7cc34b35f1f"
+    },
+    "target/ota-setup-reclaim-tests.log": {
+      "bytes": 18688,
+      "sha256": "c0159af658b18b6217e6f559ad50b4e4d9ef3554a830c490e841c58685ebd4f4"
+    },
+    "target/ota-setup-reclaim-tests-serial.log": {
+      "bytes": 17471,
+      "sha256": "940acd670595aab06f0faf27a74a869f62d223a7d3aa646315da6215fb273b09"
+    },
+    "target/ota-setup-client-after.log": {
+      "bytes": 313,
+      "sha256": "478a3fbca9e9a59af56f525c24e0984f4ae6c42077eb1e8e753798ebcd57db8b"
+    },
+    "target/ota-setup-reclaim-clippy.log": {
+      "bytes": 173,
+      "sha256": "e807ad7a43486ad494999dcd846c3584d3930e51763b1313a90521c6ebf0e84d"
+    }
+  },
+  "hardware": {
+    "host": "sw-picade.local",
+    "model": "Raspberry Pi 4 Model B Rev 1.4",
+    "source": "a76ec32ce2ab2ebd047b1ce6e6d45dfca35ffe8a",
+    "local_archive": "target/ota-setup-live-a76ec32-b",
+    "build": {
+      "source": "a76ec32ce2ab2ebd047b1ce6e6d45dfca35ffe8a",
+      "dirty": false,
+      "utc": "2026-10-17T08:06:31.041545+00:00",
+      "artifacts": {
+        "engine-os-manager": {
+          "bytes": 13694944,
+          "sha256": "1bfa29ff60f9610dbca9410d2685824217d3ba4915b86e59a5992600003be07e"
+        },
+        "setup-probe": {
+          "bytes": 739824,
+          "sha256": "fe28a805705577a90837910ce6b04be8ae34b6565a4e4b97a7702187ae92b424"
+        },
+        "setup-probe.rs": {
+          "bytes": 1149,
+          "sha256": "40da50c8869da6878ae573e3e5a29e26f9efccdaf2aa1289be443a718758d6ca"
+        },
+        "Cargo.toml": {
+          "bytes": 236,
+          "sha256": "c05009eb5c22c71ea3cc4e2c11f4d79b11a56a43c886bafbfdf9654c9a9e49b8"
+        },
+        "Cargo.lock": {
+          "bytes": 7573,
+          "sha256": "a33f1fa7a9629cdb1c3b9d42f1b52dae60b14e4dcc628f835f654ed83247f02a"
+        }
+      },
+      "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+      "compiler": "aarch64-linux-gnu-gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+    },
+    "boot_id": "dcd3ab67-e327-4ba7-a68f-3a34b5140cf4",
+    "kiosk_pid": 826,
+    "game_process_and_boot_unchanged": true,
+    "account": "spacewars (UID 1000), through root-authorized su",
+    "fresh_ssh_logins": 32,
+    "successful_ssh_logins": 32,
+    "full_live_table": "setup correctly rejected",
+    "full_expired_table": "32 expired SSH reservations; setup admitted, renewed and released through the kiosk SetupHold client",
+    "after_release_holds": 0,
+    "radio_observation_unchanged": true,
+    "partial_offline": false,
+    "original_service_restored": {
+      "utc": "2026-10-17T08:10:50.330994+00:00",
+      "elapsed_seconds": 146.199,
+      "exit_code": 0,
+      "stdout": "active\nactive\n/proc/3108/exe: OK\ndcd3ab67-e327-4ba7-a68f-3a34b5140cf4\n",
+      "stderr": ""
+    },
+    "first_attempt": {
+      "archive": "target/ota-setup-live-a76ec32",
+      "result": "test launcher could not switch directly from swadmin to spacewars with sudo; original service restored before retrying via the permitted root shell",
+      "restore_exit_code": 0
+    },
+    "artifacts": {
+      "build.json": {
+        "bytes": 937,
+        "sha256": "f03aacb9e5d85170578df0ab3933032f20e06e7d25f3498456f260b382ed20a1"
+      },
+      "stage.sh": {
+        "bytes": 2330,
+        "sha256": "745dbdc5f76b4b2447e9b31b006b6ecd9ed1af57864fec74e8c6635801fadbbf"
+      },
+      "stage.json": {
+        "bytes": 755,
+        "sha256": "172775a5f3956fd991c31303385e15878a37cce0aa38dfa2d70a210658bd7f75"
+      },
+      "probe.py": {
+        "bytes": 2960,
+        "sha256": "3f63bd4119daca180c2880a50c5fd88c0c1c125462a4c330012129ef772f6237"
+      },
+      "setup-probe.rs": {
+        "bytes": 1149,
+        "sha256": "40da50c8869da6878ae573e3e5a29e26f9efccdaf2aa1289be443a718758d6ca"
+      },
+      "initial.json": {
+        "bytes": 1328,
+        "sha256": "5d5aefba7cab1f9acf6b1d801674bca816ed7658f8e7de649e728b2ea469e71f"
+      },
+      "full-live.json": {
+        "bytes": 6777,
+        "sha256": "d8919a584c6e97f550f016063e27dee277eb43ff61e5fab8793f474c648c929e"
+      },
+      "setup-blocked.json": {
+        "bytes": 188,
+        "sha256": "20a43d5a87f848a1b733e24c511a7e9fa24f847fb2e7004e22246e673fef5056"
+      },
+      "full-expired.json": {
+        "bytes": 6618,
+        "sha256": "4fdfe2b4231877c71ba32b302438706d858638e192aa0a28397e7620c27886af"
+      },
+      "setup-ready.json": {
+        "bytes": 200,
+        "sha256": "471a59a35b3461a250eaf0296322af96e4d0b1861e1a5bcb136688af9b439054"
+      },
+      "after-release.json": {
+        "bytes": 1331,
+        "sha256": "363218b5e00b3cfd3781315af89ea01c676acdac830e4f30a838bdab0b479dec"
+      },
+      "restore.sh": {
+        "bytes": 1076,
+        "sha256": "2703604fa1aa158f2264c264efe55ee9eabeca3d4b37774b2fe9c2be4324da6c"
+      },
+      "restore.json": {
+        "bytes": 201,
+        "sha256": "f4f9e4c96d676593e62ce30ab49a85f0ef600f34c7382c3d1d8e069616718977"
+      },
+      "run.log": {
+        "bytes": 407,
+        "sha256": "0f37cc5fad2b7834421e34fbb06500f6552dacec71aa74924bc7252e1da7e472"
+      },
+      "final-network.json": {
+        "bytes": 1301,
+        "sha256": "246769fb5c32e35368bce3ac1b95ddcb88d1c3cf33f0d8d181a3525eb6d262b4"
+      }
+    }
+  }
+}

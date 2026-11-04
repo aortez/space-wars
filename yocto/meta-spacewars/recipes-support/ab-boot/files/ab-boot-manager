@@ -88,29 +88,6 @@ cleanup_boot_dir() {
     fi
 }
 
-# Switch boot to specified slot.
-switch_boot_slot() {
-    new_slot="$1"
-    device=$(get_slot_device "$new_slot")
-
-    if ! prepare_boot_dir; then
-        return 1
-    fi
-    cmdline="$BOOT_DIR/$CMDLINE_NAME"
-    boot_flag="$BOOT_DIR/$BOOT_FLAG_NAME"
-
-    # Replace root= parameter (handle both sda2/sda3 and mmcblk0p2/mmcblk0p3 patterns).
-    sed -i "s|root=/dev/[^[:space:]]*|root=${device}|" "$cmdline"
-
-    # Write slot marker.
-    echo "$new_slot" > "$boot_flag"
-
-    sync "$cmdline" "$boot_flag" 2>/dev/null || sync
-    cleanup_boot_dir
-
-    echo "Boot slot switched to $new_slot ($device)"
-}
-
 # Get data partition device.
 get_data_device() {
     base_device=$(get_base_device)
@@ -167,11 +144,8 @@ case "$1" in
         slot=$(get_inactive_slot) && get_slot_device "$slot"
         ;;
     switch)
-        if [ -z "$2" ]; then
-            echo "usage: $0 switch {a|b}" >&2
-            exit 1
-        fi
-        switch_boot_slot "$2"
+        echo "Direct slot switching is disabled; the recovery journal owns boot selection." >&2
+        exit 1
         ;;
     status)
         show_status

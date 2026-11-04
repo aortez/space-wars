@@ -60,11 +60,24 @@ impl Layout {
     }
 
     pub fn cell_center(self, id: SegmentId, cell: digits::GridCell) -> Vec2 {
-        let origin = self.digit_origin(usize::from(id.digit_slot));
+        self.slot_cell_center(usize::from(id.digit_slot), cell)
+    }
+
+    pub fn slot_cell_center(self, slot: usize, cell: digits::GridCell) -> Vec2 {
+        let origin = self.digit_origin(slot);
         Vec2::new(
             origin.x + (f32::from(cell.x) + 0.5) * self.pitch,
             origin.y + (f32::from(cell.y) + 0.5) * self.pitch,
         )
+    }
+
+    /// The band of y a slot's glyph occupies, which the slides and reels that
+    /// carry glyphs through a slot are clipped to.
+    pub fn digit_band(self) -> [f32; 2] {
+        [
+            self.face_origin.y,
+            self.face_origin.y + FACE_HEIGHT_UNITS * self.pitch,
+        ]
     }
 
     pub fn segment_center(self, id: SegmentId) -> Vec2 {

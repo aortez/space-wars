@@ -1,0 +1,454 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "source": "60ed6a64527c8c1b3aa89734e2896ea1142bd74d",
+  "candidate_source": "04b6cb75f8639772e2de4bd86fe1ae795614be04",
+  "scope": "supervised bootstrap preparation and recovery preservation; not an enabled OTA updater",
+  "pi5": {
+    "host": "spacewars.local",
+    "boot_id": "44771fa5-7e78-450f-8ee6-261ec35715da",
+    "original_source": "5f3eafc80e0b6589696b55e321b4493fdb5cdcb3",
+    "active_slot": "a",
+    "target_slot": "b",
+    "package_sha256": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
+    "status": "replacement preservation, inactive-root installation and staging passed; first live trial hit service mount-check defect; unfed watchdog returned to original slot A; source fix and native sandbox checks pass; corrected-image trial pending",
+    "raw_backup_failure": {
+      "partition": "/dev/sda3",
+      "copied_bytes": 3123773440,
+      "sense_key": "0x3",
+      "asc": "0x11",
+      "ascq": "0x0",
+      "sectors": [
+        12711936,
+        12712136
+      ],
+      "boot_copy_completed_and_exported": true,
+      "inactive_copy_completed": false
+    },
+    "data_export": {
+      "selection_version": 2,
+      "entries": 18747,
+      "payload_bytes": 1463240131,
+      "archive": {
+        "bytes": 1504819712,
+        "sha256": "019a557c17edee5034a6c34ce1aa28ef69507b11fdf5c04864882b67e7405b8b"
+      },
+      "binding_sha256": "5c75cbb862e33974a944ae95b2ba7cf20fbf29a27a8f4dfe487b8677320d1bf6",
+      "operator_source": "60ed6a64527c8c1b3aa89734e2896ea1142bd74d",
+      "metadata_checked_before_and_after": true,
+      "host_hash_and_full_tar_read_verified": true,
+      "temporary_stale_socket_moves": 8,
+      "socket_locations_restored": true,
+      "services_restarted_and_active": true,
+      "extraction_content_modes_links_nanosecond_timestamps_verified": true,
+      "numeric_owners_retained_in_archive": true,
+      "numeric_owners_recreated": false,
+      "install_authority": false,
+      "private_local_path": "target/ota-pi5-bootstrap-04b6cb7/direct-data-export-02"
+    },
+    "root_image_written": false,
+    "boot_selector_changed": false,
+    "reboot_requested": false,
+    "production_recovery_baseline": false,
+    "replacement": {
+      "user_selected_and_erasure_authorized": true,
+      "model": "SanDisk Extreme Pro",
+      "bytes": 128043712512,
+      "serial": "00000000000000000000",
+      "serial_alone_is_unique": false,
+      "selection_also_binds": [
+        "model",
+        "capacity",
+        "USB path",
+        "connection sequence",
+        "unmounted whole disk"
+      ],
+      "hostname": "spacewars",
+      "profile": "hyperpixel",
+      "image_source": "04b6cb75f8639772e2de4bd86fe1ae795614be04",
+      "prepared_command": "python3 target/flash-spacewars-replacement.py",
+      "input_manifest": "target/spacewars-replacement-plan.json",
+      "dry_run_passed": true,
+      "mapped_image_source_verified_bytes": 637599744,
+      "selected_data_entries": 18148,
+      "selected_data_payload_bytes": 1450912068,
+      "selected_directories": 942,
+      "selected_files": 17204,
+      "selected_links": 2,
+      "wifi_profiles_present": 1,
+      "ssh_host_keys_present": true,
+      "administrator_key_present": true,
+      "old_recovery_journals_present": false,
+      "device_written": true,
+      "physical_restore_verified": true,
+      "boot_verified": true,
+      "pending": "clean corrected image and explicit failed-attempt reconciliation before a new bound trial; current Pi is running original slot A",
+      "resume_dry_run_passed": true,
+      "completed_before_profile_failure": {
+        "evidence": "owner-provided terminal output; independently observed resulting partition layout",
+        "image_write": true,
+        "mapped_image_readback_bytes": 637599744,
+        "data_partition_grown": true,
+        "data_partition_bytes": 108633299456,
+        "hostname_written": true,
+        "data_restore_started": false
+      },
+      "profile_failure": {
+        "message": "Flashed image does not contain unified hardware profiles and boot metadata.",
+        "cause": "unprivileged existence checks could not enter a root-mounted FAT filesystem under the private umask",
+        "image_contains_required_profile": true,
+        "regression_reproduced_exact_error": true,
+        "fix": "privileged presence/identity reads and profile write readback; finish path repeats provisioning after checking image identity",
+        "hardware_tests_passed": 16,
+        "physical_finish_pending": false
+      },
+      "full_data_restore_rehearsal": {
+        "archive": {
+          "bytes": 1504819712,
+          "sha256": "019a557c17edee5034a6c34ce1aa28ef69507b11fdf5c04864882b67e7405b8b"
+        },
+        "data_entries": 18148,
+        "data_payload_bytes": 1450912068,
+        "directories": 942,
+        "files": 17204,
+        "links": 2,
+        "root_configuration_imported": false,
+        "recovery_journals_imported": false,
+        "contents_verified": true,
+        "numeric_owners_verified": true,
+        "modes_verified": true,
+        "links_verified": true,
+        "nanosecond_timestamps_verified": true,
+        "extended_attributes_verified": true,
+        "scope": "actual selected data archive restored into isolated root-container tmpfs; replacement-device restoration and boot remain pending"
+      },
+      "physical_final_readback_verified": true,
+      "restoration_completed": {
+        "evidence": "owner-provided --finish execution output",
+        "boot_and_root_identity_verified": true,
+        "hardware_profile_selected": "hyperpixel",
+        "data_entries_restored_and_verified": 18148,
+        "numeric_owners_verified": true,
+        "access_provisioning_completed": false,
+        "final_readback_completed": false
+      },
+      "empty_root_key_failure": {
+        "root_key_bytes": 0,
+        "archive_uid": 0,
+        "archive_gid": 0,
+        "archive_mode": "0600",
+        "actual_stat_description": "regular empty file",
+        "previously_required_description": "regular file",
+        "regression_reproduced": true,
+        "fix": "compare numeric file type and mode bits; retain exact owner, group and regular-file link-count checks",
+        "empty_role_files_preserved": true,
+        "unsafe_metadata_rejection_tests_passed": true
+      },
+      "actual_store_access_provisioning_rehearsal": {
+        "actual_archive_access_store_checked": true,
+        "administrator_preserved": true,
+        "root_access_remained_empty": true,
+        "role_bytes_owners_modes_and_link_counts_unchanged": true,
+        "scope": "isolated root fixture with actual archived access store and frozen-image account files; no physical disk changes"
+      },
+      "access_provisioning_completed": true,
+      "ready_for_first_boot": true,
+      "completed_resume_command": "python3 target/flash-spacewars-replacement.py --finish-access",
+      "completion": {
+        "receipt_path": "target/spacewars-replacement-complete.json",
+        "receipt_sha256": "8fdb09536efb9e796c9d16ddba0a3126c3bc2700b0934add796d0c1168d2f06d",
+        "receipt": {
+          "schema": 1,
+          "image_source": "04b6cb75f8639772e2de4bd86fe1ae795614be04",
+          "device": "/dev/sdb",
+          "archive": {
+            "bytes": 1504819712,
+            "sha256": "019a557c17edee5034a6c34ce1aa28ef69507b11fdf5c04864882b67e7405b8b"
+          },
+          "mapped_image_readback_this_invocation": false,
+          "data_restored_this_invocation": false,
+          "data_and_access_verified": true,
+          "filesystems_unmounted": true
+        },
+        "receipt_inspected": true,
+        "user_reported_administrator_access": "preserved",
+        "user_reported_final_verified_entries": 18148,
+        "all_four_partitions_observed_unmounted": true,
+        "boot_verified": false
+      },
+      "first_boot": {
+        "evidence_path": "target/ota-pi5-replacement-first-boot-20261017/verification.json",
+        "evidence_sha256": {
+          "capture.json": "5be74571136388097b4feebb2fe77463d9912e5f101f3620a571c1ed7c6c9b94",
+          "bootstrap-probe.json": "8785966e06b5ac593101e2dd72c7d3d08fcb242e5229e1dd0a6a11f7a6e09f7f",
+          "kernel-journal.stdout": "06baa23fca82107fc467d24290c92600eb3b4bb4c62d7ac06aed080b75539e77",
+          "services.stdout": "6f63ca05e3f44256f97e655833715bfc1d9a55924e7bec85d5061f8a2960b654",
+          "binaries.stdout": "fb5f55a33e74b3683148318534aab349e463ed9ffd9a95fc3b4f7eac380d97d3",
+          "original-disk.json": "2c4b0599b4e14bd6427d11aef807af6f574e5886d503ac4a432a99886ed81f78"
+        },
+        "operator_source": "6b0d9ee",
+        "schema": 1,
+        "observed_at": "2026-10-17T21:02:47.168724+00:00",
+        "host": "spacewars.local",
+        "boot_id": "1dee0405-e541-414d-9711-44d237849481",
+        "uptime_seconds_at_final_check": 284.78,
+        "image_source": "04b6cb75f8639772e2de4bd86fe1ae795614be04",
+        "board": "Raspberry Pi 5 Model B Rev 1.1",
+        "board_serial": "ddde6ffbe45bcea8",
+        "medium_model": "Extreme_Pro",
+        "medium_bytes": 128043712512,
+        "active_slot": "a",
+        "layout_id": "26156f3a6af2248d2d5b684f9d49b8616ad14601b073048edd9535a080ea55a6",
+        "root_device": "/dev/sda2",
+        "data_device": "/dev/sda4",
+        "data_partition_bytes": 108633299456,
+        "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+        "hardware_profile": "hyperpixel",
+        "fresh_image_boot_inventory_verified": true,
+        "installed_and_running_executable_hashes_verified": true,
+        "wifi_connected": true,
+        "system_clock_synchronized": true,
+        "administrator_uid": 1001,
+        "administrator_sudo_uid": 0,
+        "runtime_uid": 1000,
+        "runtime_unrestricted_sudo_denied": true,
+        "services": {
+          "spacewars-kiosk.service": {
+            "MainPID": "880",
+            "NRestarts": "0",
+            "ExecMainStatus": "0",
+            "ActiveState": "active",
+            "SubState": "running"
+          },
+          "spacewars-system.service": {
+            "MainPID": "881",
+            "NRestarts": "0",
+            "ExecMainStatus": "0",
+            "ActiveState": "active",
+            "SubState": "running"
+          }
+        },
+        "failed_units": [],
+        "service_warning_entries": 0,
+        "storage_error_entries": 0,
+        "kernel_warning_scope": "Other board/driver startup warnings are retained in the private kernel journal. Goodix at 0x14 did not respond; the 0x5d touchscreen and DPI framebuffer then registered successfully.",
+        "original_disk_on_workstation": {
+          "device": "/dev/sdb",
+          "model": "SanDisk 3.2Gen1",
+          "bytes": 123048296448,
+          "serial": "0401843f23a06e8d407779c23f89428fc6f81f6b4c71579cecb2ef50a2e3dbca3747000000000000000000004cbc7cb2ff89801891558107c63087e7",
+          "all_partitions_unmounted": true,
+          "writes_or_repairs_attempted": false
+        },
+        "scope": "First boot and observed running-system health; no full-media surface test, bootstrap reservation, trial activation, baseline publication or automatic OTA installation.",
+        "verification_sha256": "85bf6ecb20b862f99a1d0c1e4851a0b317fc1ffec5b07298f8596466c9ca21f7"
+      },
+      "bootstrap_evidence": "ota-pi5-replacement-bootstrap-20261017.json"
+    },
+    "boot_id_scope": "original failing disk preparation; replacement boot identity is recorded separately",
+    "original_disk_workstation_diagnosis": {
+      "schema": 1,
+      "assessment_date": "2026-10-17",
+      "source": "owner-run read-only diagnostic; saved log independently inspected",
+      "model": "SanDisk 3.2Gen1",
+      "bytes": 123048296448,
+      "serial": "0401843f23a06e8d407779c23f89428fc6f81f6b4c71579cecb2ef50a2e3dbca3747000000000000000000004cbc7cb2ff89801891558107c63087e7",
+      "workstation_device": "/dev/sdb",
+      "original_pi_device": "/dev/sda",
+      "same_failed_sector_on_both_hosts": 12712136,
+      "workstation_kernel_sense": "Medium Error / Unrecovered read error",
+      "successful_control_read_sectors": [
+        0,
+        12711936
+      ],
+      "workstation_failed_read_bytes": 4096,
+      "direct_io": true,
+      "full_scan_started": false,
+      "disk_writes": false,
+      "repairs_attempted": false,
+      "diagnostic_exit_status": 3,
+      "diagnostic_issue": "ENODATA (errno 61) escaped the read-failure classifier; kernel evidence nevertheless confirms the same unrecovered read error.",
+      "diagnostic_fix": "ENODATA now follows the failed-read path; injected-error regression passed without accessing the disk.",
+      "assessment": "Read failure follows this drive between the Pi 5 and workstation. Retire from service; retain only as a recovery source for now.",
+      "limits": "Does not isolate flash chips versus internal controller/firmware, measure total damaged capacity, or test writes or retention.",
+      "evidence": {
+        "workstation_log": {
+          "path": "target/original-pi5-disk-check-vf4cjtlj/diagnostic.log",
+          "sha256": "2de2826bc0f2690d589b6f4ece0cd569921d4180a1965b6423a65950dd8d496c"
+        },
+        "pi_log": {
+          "path": "target/ota-pi5-bootstrap-04b6cb7/backup-failure-device.txt",
+          "sha256": "c4d9ca6f52ed42120e1a6c8ec941be167dea046b968a1eebeb5402112c9ab491"
+        }
+      },
+      "private_assessment_path": "target/original-pi5-disk-check-vf4cjtlj/assessment.json",
+      "private_assessment_sha256": "9e58144f29ceffdc7153b20fdbe71792a654159ac87f3f1f5da9b13cc997a37e"
+    },
+    "original_disk_attempt_fields": "boot_id, original_source, raw_backup_failure, data_export and top-level mutation flags above describe the retired original-disk attempt"
+  },
+  "checks": {
+    "archive_tests_passed": 4,
+    "data_backup_tests_passed": 6,
+    "gnu_tar_xattr_acl_restoration_test_passed": true,
+    "engine_ota_all_targets_clippy": "passed",
+    "format_and_diff_check": "passed",
+    "offline_archive_restore_root_container_tests_passed": 7,
+    "yocto_node_tests": {
+      "passed": 70,
+      "skipped": 1
+    },
+    "yocto_python_tests": {
+      "passed": 87,
+      "skipped": 1
+    },
+    "hardware_profile_tests_passed": 16,
+    "flash_storage_host_tests": {
+      "passed": 15,
+      "skipped": 1
+    }
+  },
+  "remaining": [
+    "Prepare a new bootstrap binding and preservation run on the verified Pi 5 replacement, then complete staged/canonical recovery qualification.",
+    "Revalidate the Picade after its reboot, then complete root installation, staged/canonical health checks and baseline handoff.",
+    "Qualify failure recovery and physical restoration on both board types.",
+    "Provision production trust, publish signed candidates and integrate user installation policy."
+  ],
+  "pi4": {
+    "host": "sw-picade.local",
+    "boot_id": "aa39e2eb-6db8-4c8c-acd2-e26e6ae66e3a",
+    "original_source": "5f3eafc80e0b6589696b55e321b4493fdb5cdcb3",
+    "active_slot": "a",
+    "target_slot": "b",
+    "package_sha256": "6e82e8b84c59c0357914fbec444e32c85f447d70f278ca8eb7169c8a1a5f008e",
+    "status": "fallback files and access checks complete; reboot observed before root installation; original slot A and both services running",
+    "raw_copies_sha256": "0aec5f63dab2f82e9817398975a6566f87f57bef2f259848015c19d231ebd9f4",
+    "boot_copy": {
+      "bytes": 157286400,
+      "sha256": "0867ce13b05a44db3362e7ecff219424a07a425cca93050ecd6876df4c2fc30d"
+    },
+    "inactive_root_copy": {
+      "bytes": 3221225472,
+      "sha256": "72ea9ac0774e574e5430b055e44827941828002784b830a1f7cc4c115946430d"
+    },
+    "source_copy_and_readback_checks_passed": true,
+    "original_boot_mount_restored_writable": true,
+    "root_image_written": false,
+    "boot_selector_changed": false,
+    "reboot_requested": false,
+    "production_recovery_baseline": false,
+    "private_local_path": "target/ota-pi4-bootstrap-04b6cb7",
+    "raw_export_independently_verified": true,
+    "boot_filesystem_check": {
+      "method": "fsck.fat -n on independent raw copy",
+      "result": "dirty bit only; no changes made"
+    },
+    "data_backup": {
+      "receipt_sha256": "d2b3f5c211b7b466af2699f75e8cbe7a4f66615a55a6fd3a395bf9c973fcc2dd",
+      "receipt": {
+        "schema": 1,
+        "selection_version": 2,
+        "binding_sha256": "49007f3126798c95977e1534180c565bf5e717b8b9fe933b526b1c182dda3b49",
+        "source_sha256": "77bc60dbe80a25a2f42bda405129e4621a3e83c9dd70cd3d4897c17bc196e3c7",
+        "entries": 1206,
+        "payload_bytes": 1254556718,
+        "archive": {
+          "bytes": 1256737792,
+          "sha256": "b3bd435726e364c2613f72a9bf1fed0e02fbd133b646fd1de7a2a058ae9def57"
+        }
+      },
+      "source_matches": true
+    },
+    "data_export_independently_verified": true,
+    "data_extraction": {
+      "archive_sha256": "b3bd435726e364c2613f72a9bf1fed0e02fbd133b646fd1de7a2a058ae9def57",
+      "entries": 1206,
+      "files": 694,
+      "links": 331,
+      "directories": 181,
+      "content_modes_links_nanosecond_timestamps_verified": true,
+      "numeric_owners_retained_in_archive": true,
+      "numeric_owners_recreated": false,
+      "scope": "unprivileged workstation extraction; ownership restore and physical recovery not qualified"
+    },
+    "original_files": {
+      "schema": 1,
+      "scope": "immutable original files only; independent export, restartable replacements and effective privilege/service checks remain pending",
+      "receipt_sha256": "c0c87d939403489bcc1f07cc4617f0bb00bca5285bcbfaae0f6736618b3e21e3",
+      "original_files": 21,
+      "original_bytes": 11195636,
+      "reused": false,
+      "original_files_match": true,
+      "ready_for_write": false
+    },
+    "originals_independently_exported_and_verified": true,
+    "replacement_preflight_failure": {
+      "error": "ImageMismatch",
+      "journal_created": false,
+      "root_files_replaced": false,
+      "cause": "verified package file descriptors were at EOF before replacement re-verification",
+      "fix": {
+        "source": "6d350bdf32db61650dddb3821a4f36084c9b36a6",
+        "sha256": "a0f0f36f99e4a1aad52383b1f784da58fcb3e22ce54e5e307e9fe89f5551c441",
+        "remote": "/run/spacewars-bootstrap-fix-6d350bd/bootstrap_replace_legacy",
+        "change": "rewind previously verified shared file descriptors before rechecking full contents",
+        "regression_failed_before_fix": true,
+        "replacement_tests_passed": 16,
+        "clippy": "passed",
+        "os_candidate_unchanged": true
+      }
+    },
+    "fallback_replacement": {
+      "schema": 1,
+      "scope": "fixed fallback-root files replaced; effective privilege, service and login checks still required",
+      "originals_sha256": "c0c87d939403489bcc1f07cc4617f0bb00bca5285bcbfaae0f6736618b3e21e3",
+      "journal_sha256": "38cdfbf95c5d40d28e28ae3ef280a32c3e9a6bda24c62fda8f2c48c97ab0a80d",
+      "files_replaced": 21,
+      "directories_created": 0,
+      "ready_for_trial": false
+    },
+    "operator_access": {
+      "independent_administrator_uid": 1001,
+      "administrator_sudo_uid": 0,
+      "independent_runtime_uid": 1000,
+      "runtime_unrestricted_sudo_denied": true,
+      "runtime_recovery_command_denied": true,
+      "runtime_logind_can_reboot_denied": true,
+      "runtime_not_in_disk_group": true,
+      "loaded_configuration_check_passed": true,
+      "scope": "observed access checks; no boot activation or production qualification"
+    },
+    "effective_access": {
+      "sudo_policy_sha256": "54dcc3f3d5114921950d47e50aba3afaa414a650bf6afd4d43854e381ed367fa",
+      "permitted_sudo_commands": 3,
+      "root_sshd_configuration_sha256": "a73546d62e9f271baf017732b892fe01d8fcb5e8861bd6b41102eb7c8c2e9e85",
+      "runtime_sshd_configuration_sha256": "a73546d62e9f271baf017732b892fe01d8fcb5e8861bd6b41102eb7c8c2e9e85",
+      "administrator": {
+        "account_sha256": "98c240cd9a0c579b3ad1f5df4b753113c4368c798a28e77eda929e1391d46d74",
+        "sudo_policy_sha256": "130e5890a212da1838fea2f1f34973421783a5f11fda506108872ead4c43f238",
+        "sshd_configuration_sha256": "a73546d62e9f271baf017732b892fe01d8fcb5e8861bd6b41102eb7c8c2e9e85"
+      },
+      "checked_services": [
+        "sshd@spacewars-bootstrap-check.service",
+        "persistent-data-init.service",
+        "persistent-data-bind.service",
+        "spacewars-data-init.service",
+        "spacewars-access.service",
+        "NetworkManager.service"
+      ]
+    },
+    "connection_interruption": {
+      "root_install_command_started": false,
+      "reobserved_boot_id": "82f17023-c743-493b-8472-18c4bbfad025",
+      "reboot_cause": "not established",
+      "root_device": "/dev/sda2",
+      "manager_sha256": "786bc3eae058204467a4992b0970d6837d8eb551cab84aac4204728ca7b11dc6",
+      "legacy_migration_journal_sha256": "38cdfbf95c5d40d28e28ae3ef280a32c3e9a6bda24c62fda8f2c48c97ab0a80d",
+      "administrator_uid": 1001,
+      "sudo_uid": 0,
+      "services": {
+        "spacewars-kiosk.service": "active",
+        "spacewars-system.service": "active"
+      }
+    }
+  }
+}

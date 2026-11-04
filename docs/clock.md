@@ -286,7 +286,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, and **Explosion** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, **Slot Machine**, and **Spider** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -299,8 +299,8 @@ can also be changed live through **Pause → Clock Controls**, without relaunchi
 
 One global periodic schedule selects one enabled, eligible event, avoiding the previous
 kind when another is eligible. Adding event types does not multiply the trigger
-rate. Timed animations never overlap. Duck and Crow are admissions into separately
-timed visits: admitting either from idle immediately releases the animation slot into cooldown,
+rate. Timed animations never overlap. Duck, Crow and Spider are admissions into separately
+timed visits: admitting one from idle immediately releases the animation slot into cooldown,
 so an ordinary subsequent event can play on its course. After completion or cancellation, there is a shared
 2-second cooldown, followed by a new idle wait for periodic events. Digit Slide
 preserves the pending periodic deadline instead of restarting that wait; a
@@ -318,9 +318,54 @@ the Off profile still disables every automatic event.
 | `duck` | Admit one independent floor-course runner | 35 s visit, exit appears 20 s after spawn | 30 s after departure |
 | `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
 | `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
+| `cell-swap` | Occupied cells shuffle or exchange mirrored positions, no physics | 1 s, plus up to 0.25 s to reconcile a changed time | 20 s |
 | `rain` | Variable showers, pools and a passive rubber duck | 20 s rain + 20 s drain + 2 s cleanup | 45 s |
 | `crow` | One visitor with wingbeat flight, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
+| `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
+
+### Cell swaps
+
+**Cell Swap** occasionally exchanges the lit cells across the clock face. A
+seeded choice selects a random permutation, pairs across the horizontal
+centerline, or pairs across the vertical centerline. Mirrored partners must both
+be occupied; unmatched cells stay in place. A mirror with no partners falls back
+to a shuffle. Curved paths stay inside the digit face and finish at the exchanged
+positions. With an unchanged reading the event ends there after 60 simulation
+ticks (one second). Colon, AM/PM, date, scenery and the floor keep their normal
+behavior. The animation adds no physics bodies and preserves an existing duck
+visit; the crow withdraws from moving digit perches.
+
+A reading change updates authoritative time immediately without restarting the
+paths or starting Digit Slide. At the end of the exchange, obsolete cells fade
+out and new cells brighten over 15 ticks; unchanged cells remain lit. Further
+corrections retarget from the current brightness and replace the pending target.
+They can extend the fade only until tick 90 (1.5 seconds after admission), so
+there is no queue of old clock faces. Seconds-only updates do not restart either
+phase. Pause freezes progress while accepting the latest reading. Font changes
+follow the existing deferral until completion. Cancellation and resize restore
+the latest reading using the existing event cleanup path.
+
+Use **Cell Swap** in launcher settings or live Clock Controls, select it in the
+**Preview Event** picker and press **Preview & Resume**, or run
+`spacewars-cli clock trigger cell-swap`. The saved `clock.events.cell_swap`
+switch defaults to On when missing; an existing Off profile remains Off. Manual
+previews work with the switch disabled. Next Event honors the switch. The event
+uses the shared periodic cadence and a 20-second reuse delay. The catalog reports
+the maximum 90-tick envelope; an unchanged reading completes at tick 60.
+
+`clock state` exposes `cell_swap` with the chosen pattern, original/latest digits,
+elapsed ticks, movement progress in thousandths, participating cells and moving
+cells. The top-level phase is `swapping` or `reconciling`. There are at most 216
+cells (four 6×9 grids), one bounded permutation and two fixed opacity arrays.
+Mapping allocates only at admission; stepping allocates no event-owned storage.
+Tests bound the retained event state and permutation to 4 KiB and rendered
+geometry to fewer than 1,600 primitives, including the ordinary frame and glow.
+Future attached moss/digit-surface work (#223/#228) must carry attachment identity
+through this mapping when that feature lands.
+
+Local validation and screen captures are described in
+[cell-swap validation](clock-cell-swap-validation.md).
 
 ### Exploding digits
 
@@ -340,10 +385,11 @@ without adding an invisible ceiling collider.
 At most **239 cells** exist (216 digit-grid cells plus 23 label pixels); Classic
 uses at most 119. Standalone
 events use four fixed floor/wall bodies and the existing center drain. With a
-duck, the cells instead enter its **existing mechanics world**, which advances
-once per tick. Debris can hit the duck; controller ownership and motion continue.
-Departure/rejoining hands the same arena back and forth without duplicating
-bodies. The crow leaves when the digit perches disappear.
+duck, the cells instead enter the run's arena beside the visit, which advances
+once per tick. Debris can hit the duck and any resting residents; controller
+ownership and motion continue. Departure and rejoining leave the debris in the
+same world without duplicating bodies. The crow leaves when the digit perches
+disappear.
 
 At reformation, only the event's debris bodies are removed. Their last poses
 become **fully opaque returning blocks**, not a fading overlay on a second face.
@@ -528,6 +574,126 @@ Actual device captures: [flight](screenshots/clock/picade-crow-flight-device.png
 [hopping](screenshots/clock/picade-crow-hopping-device.png), and
 [rain](screenshots/clock/picade-crow-rain-device.png).
 
+### Spider visitor
+
+Set **Spider** on or off in Clock settings, or select **Spider → Preview &
+Resume** in Clock Controls. Next Event includes it in the normal enabled-event
+cycle. Previewing a spider adds one visitor; previewing it again, or asking
+for one while a duck, a crow or an event the spider would not keep live is
+running, reports why and changes nothing. Choosing **Off** prevents future
+automatic admissions, not the current visit. The switch is saved with the
+other event switches, and older settings files default it to On.
+
+The spider comes in on a line from a beam above the hatch in the canopy,
+lets itself down past the digits to just under them, shoots a line to the
+underside of the nearest digit by the hatch and swings in under it, climbs
+up and crawls round the digit, upward where the way is clear. From under a
+cell it ties a line at its feet, lets some out and drops to hang and swing
+on it, then climbs back; from the top of one digit it may cross to the
+other digit by the hatch on a line, swinging across. When its own reckoning
+of the way out says it is time, it crawls round to a top or a side with sky
+above it, shoots a line straight up to the ceiling, or to the beam through
+the hatch, climbs it, crawls along the ceiling to the hatch, up through it,
+and out of the view on a line to the beam. Every move is one of
+[the mechanic's](clock-spider-mechanics.md) intents on
+[the spider's physical body](#the-spider-on-the-digits): nothing is moved by
+hand, and there is one line at a time, so nothing is left behind.
+
+The visit is seeded and replays exactly. Where it ties its line is planned
+from the published surfaces, by the cells' drawn boxes: a crossing is shot
+only when the straight line to its mark passes no other cell, and a shot up
+on the way out only when the cell it would come to is the one the body
+meets on the way and is not a pocket, a cell whose row the spider could get
+round neither end of. The arena's own ray has the last word, and a shot that
+still fails is tried elsewhere. The time keeps running and the digits change
+normally: a digit retired from under the spider drops it, and it catches what
+is within reach, or lands on the floor, walks under the nearest digit and
+climbs it on a line. Flung onto a rail, it shoots a line to the digit beside
+the rail and climbs that, once; from the ceiling it simply leaves.
+
+The visit is solo. Only Digit Slide and Color Cycle run beside it; every
+other event waits for it, a player's duck summoned meanwhile is refused with
+the same notice, and the spider itself waits for a duck visit, a player's
+duck, a crow and any event it does not keep live, taking nothing over. Those
+rules are in one place, `spider::visit::compatible_event`, an exhaustive
+match, so a new event kind has to say whether it may run beside the spider
+before Clock compiles. The scheduler resumes after departure through the
+ordinary 30-second reuse delay, with no backlog.
+
+The visit's budget is **30 seconds**, entrance and exit included. It starts
+leaving when the time left, less a five-second reserve, is no more than its
+reckoning of the way out: five seconds for the way round the digit, the
+climb to the ceiling at its reel's pace, and the crawl along the ceiling to
+the hatch at its crawl speed. A visit still inside ten seconds past its budget is reported as
+a **failed exit** for one tick and then taken away where it stands, which
+the accounting counts apart from departures; the reuse delay runs either
+way. Pause and zero-dt ticks freeze it. A resize cancels it, because its
+frame is the old view's, and restarting or leaving Clock drops it with the
+run. Resident balls and the arena's other owners are untouched throughout.
+
+`clock state` exposes `spider` separately from the timed `event_kind`: visit
+ID and seed, phase (`descending`, `crossing`, `climbing`, `crawling`,
+`swinging`, `recovering`, `leaving`), phase, age and remaining ticks,
+position, velocity and up vector in thousandths, the mechanic's mode
+(`free`, `crawling`, `hanging`), what the legs hold and what the line is tied
+to (a `surface` with its id and whether it is departing, a `rigid` body, a
+`frame` part or the `floor`), whether a shot is on its way, the line's
+length, counts of climbs, swings, falls and recoveries, the failed-exit flag
+and the proxies in the arena. The catalog's `blocked_by_spider` names an
+admission the spider rule refuses, in either direction. From idle:
+
+```sh
+spacewars-cli clock trigger spider
+spacewars-cli clock wait --event spider --phase crawling --timeout 20s
+spacewars-cli screenshot /tmp/clock-spider.png
+```
+
+The renderer draws the spider as a small eight-legged body with its back to
+whatever it holds, its legs stepping as it crawls and trailing when it hangs,
+its silk line and a shot on its way, and the hatch in the canopy while a
+spider is in the arena, on the shared code-native path of the raster and
+vector adapters. The time stays legible: the way out goes up through the
+canopy, not through the digits.
+
+[Spider visit qualification](#spider-visit-qualification-2026-11-01) under
+Verification records the route envelope over every view and font, what the
+tests prove, the caps and the benchmarks; `./benchmark-clock.sh --cases
+spider` measures one visit per cycle in the headless client.
+
+The pictures come from the client's own renderer, through a capture test
+that always runs a sample and writes every other frame when given a
+directory:
+
+```sh
+SPACEWARS_SPIDER_VISIT_ARTIFACTS=/tmp/clock-spider-visit \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client spider_visit_renders
+cd /tmp/clock-spider-visit/800x480
+ffmpeg -framerate 30 -i frame-%04d.png -vf "scale=400:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../spider-visit.gif
+```
+
+| Down the line through the hatch | Round the digit |
+| --- | --- |
+| ![The spider lets itself down past the digits on a line from the beam above the hatch](screenshots/clock/spider-visit-descent.png) | ![The spider crawls round the 2 of 12:40](screenshots/clock/spider-visit-crawl.png) |
+
+| Hanging and swinging under the digit | Up to the ceiling by the hatch |
+| --- | --- |
+| ![The spider hangs on a line from under the digit](screenshots/clock/spider-visit-swing.png) | ![The spider climbs its line to the ceiling beside the open hatch](screenshots/clock/spider-visit-exit.png) |
+
+![The whole visit at 800×480, every other frame](screenshots/clock/spider-visit.gif)
+
+In the portrait view the same seed drops the spider three pitches under the
+2, the most a swing lets out, so a drop looks alike in a tall view and a
+wide one:
+
+![The spider hangs three pitches under the 2 in the 480×800 view](screenshots/clock/spider-visit-portrait.png)
+
+On `sw-picade` (Pi 4, 1024×768, the cabinet's Classic 24-hour face), from
+the [qualification's](#spider-visit-qualification-2026-11-01) second visit:
+
+| Hanging on its line under the 9 | Crawling under the 9's bottom row |
+| --- | --- |
+| ![The spider hangs on a line from the 9's lowest cell on the Picade](screenshots/clock/picade-spider-hanging-device.png) | ![The spider crawls under the 9's bottom row on the Picade](screenshots/clock/picade-spider-crawling-device.png) |
+
 ### Managed floor and drain
 
 The ordinary floor is **closed by default**, including unsynchronized startup,
@@ -559,8 +725,8 @@ instead; they do not also open the ordinary drain. Their physical floor/pit/tank
 geometry is unchanged. The Duck course keeps its entrance/exit fade to the
 ordinary closed floor; water labs return to it on completion.
 
-One small scenario-owned manager tracks the timed event and resident visit's
-independent claims; the floor closes only after both have released it.
+One small scenario-owned manager tracks the timed event's and the visit's
+independent floor claims; the floor closes only after both have released it.
 Its fixed geometry supplies Falling's slabs. Rain and Meltdown's shared
 event-owned actuator updates only each event's two existing
 floor pools, conservatively remapping retained water and releasing uncovered
@@ -615,7 +781,8 @@ With Classic, the event uses **320 columns, at most 512 water parcels, and one d
 128 floor columns plus 192 digit columns; 192 parcel slots are protected for
 atomic digit retirement. With a duck there are four bodies/five colliders: one
 duck, two persistent moving panels and a fixed pair of side walls. The rigid
-world is allocated only for the duck's visit and released when it exits.
+world is the run's arena, which the visit claims and lets go when it exits; the
+world goes with it unless residents keep the arena.
 Source admission
 reserves two new parcel slots for this tick's outlets; already airborne outlet
 parcels count toward the same budget. Capacity pressure defers unadmitted rain
@@ -694,24 +861,28 @@ all cleanup as drainage.
 There are at most 12 steering actors, with no native fish bodies. A bounded
 96×64 navigation grid routes around lit cells, colon, AM/PM and retained course
 geometry. Fish sample water current, scatter gently near the duck, and regroup.
+Their bodies retain a bounded pitch while facing changes through a narrowed
+turn silhouette; clear-path lookahead smooths routes between glyphs. See the
+[swimming review](fish-swimming.md) for behavior and the interactive comparison.
 Time/format edits revalidate routes. A fish embedded or trapped by newly lit
 geometry moves to the nearest reachable clearance point without changing its
 identity; `clearance_corrections` counts these exceptional adjustments. Font
 changes defer until the event ends.
 
-Joining leases one native duck world, stepped once after the water. An existing
-visit retains its controller, session, position and course/panels; two visible
-lower liner bodies retain water beneath course gaps. New player visits use the
-Aquarium panels. Dismissal retains the vacant arena for rejoining. Completion,
-replacement and cancellation remove only event-owned resources, preserving a
-continuing duck. The crow's existing water sensors cause it to leave a wet perch.
+Joining claims the run's arena beside the event, stepped once after the water.
+An existing visit retains its controller, session, position and course/panels;
+two visible lower liner bodies retain water beneath course gaps. New player
+visits use the Aquarium panels. Dismissal removes the character, and the
+visit's claim stays with its terrain for rejoining. Completion, replacement and
+cancellation remove only event-owned resources, preserving a continuing duck.
+The crow's existing water sensors cause it to leave a wet perch.
 
 One event-owned fixed body provides cuboid colliders for every visible lit cell,
 including the dim/bright colon and visible AM/PM. The duck collides with sides,
 tops and undersides. Reading/format changes replace only this bounded cell list.
 If a newly lit cell overlaps the duck, a nearest-clear-side correction preserves
 its body/session and increments `duck_clearance_corrections`. Normal swimming
-uses native contacts. The digit body is removed when Aquarium releases the arena.
+uses native contacts. The digit body is removed when Aquarium lets its claim go.
 
 **Hold Down to dive**, with up to four seconds of downward strokes. Releasing
 Down restores ordinary buoyancy. Two seconds resting at the surface refills an
@@ -837,6 +1008,67 @@ events, including slides. With only Digit Slide enabled there is no periodic tim
 Manual `digit-slide` triggers and **Preview & Resume** roll the *current* digits
 out and back in. They never fabricate a different clock reading. This preview
 works even with the switch/profile Off and is reported as `preview: true`.
+
+### Slot Machine
+
+The four digit slots turn like reels, scramble through glyphs, then decelerate
+and lock left to right onto the live reading, with a chase over the settled time.
+It is a periodic spectacle and not a replacement for the minute transition: Digit
+Slide keeps the quiet `TimeChange` roll it already owns, and the catalog does not
+permit two events over the digits at once.
+
+The 300 ticks (5 seconds) are allocated as named engineering defaults:
+
+| Phase | Ticks | What happens |
+| --- | --- | --- |
+| `spin-up` | 60 | Every reel accelerates from rest. |
+| `spinning` | 120 | Full speed, one glyph passing every 6 ticks. |
+| `settling` | 90 | Slots 0 to 3 begin stopping 22 ticks apart and each eases down over 24. |
+| `payout` | 30 | The settled reading runs a chase. |
+
+A reel's position is sampled from the tick rather than accumulated, so a replay
+is identical and a paused event cannot drift. The natural distance a reel covers
+is rounded to a whole stop and the profile scaled to it, about one percent of its
+speed, so every reel comes to rest on a glyph instead of between two. Cells
+travel and are clipped to their own slot, reusing Digit Slide's clipping, which
+separates the fill from the edge so the slot boundary neither gains a false
+stroke nor leaks half a stroke into the arena. The dim slot anchors stay fixed
+throughout, and the colon and AM/PM follow the latest reading without spinning.
+
+**The reels scramble, they do not spell.** This is a measured limit:
+`fonts::glyph` composes Classic, the default font, from seven bar regions, so a
+seven-segment face cannot express most letters; `build.rs` samples the bundled
+DejaVu outlines for `'0'..='9'` alone; and at 6x9 cells O/0, D/Q, I/1, S/5, B/8
+and Z/2 are indistinguishable anyway. Every scramble frame is therefore drawn
+through `fonts::sampled`, the 5x7 upsample the Matrix face is built from, whoever
+the selected face font is. The **first** frame of each reel is the digit the face
+was showing, so the takeover begins by moving rather than by replacing, and the
+**last two** stops before each lock are digits in the face's own font, so a reel
+resolves out of noise into legitimate readings and never comes to rest on a
+letter.
+
+The reels land on live time. A reel still turning adopts a newer reading without
+restarting, so a minute rolling over mid-spin is invisible and is counted as a
+`retargets` in diagnostics; a slot that has already locked keeps what it landed
+on until the ordinary face takes over at completion. A blank leading digit in
+12-hour mode is a real stop, so that reel still turns and still locks.
+
+Preview spins and lands on the current reading and never fabricates a different
+time, works with the switch or profile Off, and reports `preview: true`. A
+scheduled admission reports `false`: a periodic event has no previous reading
+either, so unlike Digit Slide's time-change roll the flag has to come from the
+admission rather than from the snapshot. The
+event creates no physics. Its measured worst frame is **1028 draw primitives**
+across wide, narrow and portrait, held at 1100 by the contract below. That is
+well above Digit Slide's documented sub-300 for a comparable transition, and the
+difference is real rather than waste: a slide moves only the slots whose digit
+changed, through one step, while every reel here turns continuously with two
+glyph frames in its window. A cell is drawn through the cheaper unclipped path
+unless it straddles the band's edge, which also gives it a proper stroke instead
+of two rectangles. The clock's own frame ceiling is 1800.
+`render::slot_machine_contract` holds the travel, the anchors, the brightness and
+that budget; `events::slot_machine::tests` holds the phase partition, the lock
+order, retargeting and replay.
 
 Falling releases the illuminated digit pieces as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
@@ -968,8 +1200,9 @@ previews, not new scenarios; normal Clock startup is unchanged. See
 [spilling displacement and verification](design/water.md#displacement-driven-spills).
 
 Duck lifts a hinged section of the wooden wall and spawns a yellow pixel duck.
-The entrance flap closes flush behind it and stays closed for the rest of the
-visit. The duck makes two vertical
+The entrance flap closes flush behind it once clear, and stays closed for the
+rest of the visit. Standing on the flap or a validated attachment holds closure
+until released. The duck makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
 then plays wall-tag across raised platforms and gaps. Each visit independently
 selects a seeded course pattern and movement personality. The patterns are:
@@ -1097,11 +1330,40 @@ switch the personality to `careful` to watch the adjacent route on the same cour
 These overrides are independent and do not change event scheduling.
 The seeded physics comparison below
 exercises both profiles.
-The upright pixel sprite and hinged wooden doors are presentation, not articulated
-physics. Doors are logical backstage entry/exit markers, not trapping colliders.
-Both flaps use the existing entry/exit timing, ease at each end of the swing and
-close into a continuous frame. A small pin at the top and the exposed cut edge
-make the hinge visible while the flap moves.
+The upright pixel sprite follows its round physical hull. The hinged wooden
+doors are rigid kinematic surfaces in the same mechanics world. Their shared
+description supplies the visible rail width, hinge, angle and physical footprint
+in both orientations. At most two door bodies/colliders exist, with stable
+identities during a visit; closed panels leave no horizontal collider behind.
+A small pin at the top and the exposed cut edge make the hinge visible.
+
+Standing contact or a valid nearby attachment holds a pending closure. A bounded
+swept-box check also stops closure before it enters the duck's hull. Once clear,
+the flap resumes from its held pose at the ordinary rate, without catching up to
+an expired deadline. An empty exit stays open until the visit ends. Ordinary
+jumps inherit the supporting point's current physical velocity. The flaps have
+no spring response or extra jump bonus; [#474](https://github.com/aortez/space-wars/issues/474)
+records that future experiment. Shared ledge mechanics support
+[player controls](clock-duck-player-ledges-validation.md) and an
+[occasional automatic pull-up detour](clock-duck-flap-detour-validation.md).
+
+The public duck diagnostics include `flaps` in entrance/exit order, reporting
+requested/actual opening, hinge, angle, body ID, motion and any standing,
+attachment or obstruction hold. Older payloads may omit this additive field.
+[Rigid-flap validation and target-size captures](clock-duck-flaps-validation.md)
+cover standing, jumping, delayed closure, shared ownership and cleanup.
+
+`SPACEWARS_CLOCK_DUCK_FLAP_DETOUR=direct-landing` selects the separate
+[direct-landing experiment](clock-duck-direct-flap-validation.md) on those
+occasional visits. It uses ordinary jumps to reach the narrow upper edge of a
+nearly closed flap, perches briefly, then returns to the course. Default visits
+retain the pull-up route; the experiment does not change saved settings.
+
+An open exit becomes the automatic duck's destination, even behind it. A
+committed jump or climb finishes first; a grounded duck within one body length
+of tagging the opposite wall gets at most 0.75 seconds to finish that tag before
+turning. Normal acceleration, recovery and visit deadlines still apply. See
+[exit-priority validation and captures](clock-duck-exit-validation.md).
 
 This close-up uses the production renderer at half speed, with the camera moved
 to the entrance of the 800×480 layout:
@@ -1124,11 +1386,14 @@ Phases are `opening`, `running`, `exiting`, and `resetting`. A fall or a runner
 still blocked at 34.5 seconds enters reset; successful exits normally occur sooner.
 `exiting` starts when the door appears, even if the duck is still heading toward
 the entrance before its final return crossing.
-Reset immediately removes the actor and, if not leased to a sharing physical
-event, its course physics. It fades the course over half a second and keeps the
+Reset immediately removes the actor and releases attachments. The flaps finish
+closing within the half-second reset; unless an event still holds the arena, the
+visit then lets its claim go, and the world goes too unless residents keep it.
+The course fades over that half second and keeps the
 last outcome until the fixed 35-second visit envelope ends. Rain/Falling/Meltdown
-retain their course/material until their own cleanup. Resize/restart release both
-lifetimes; compatible previews preserve the visit. Narrow
+retain their course/material until their own cleanup. Resize finishes both the
+visit and the event, and restart ends the run; compatible previews preserve the
+visit. Narrow
 layouts scale the duck and jump height down; wider layouts increase running
 speed and horizontal course spacing while keeping the action below the face.
 
@@ -1177,7 +1442,11 @@ if all are disabled, a brief “No events enabled” notice replaces no event.
 During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide, Rain and Crow without
 replacing the duck. If all enabled events need the arena, a brief notice asks
 you to wait for the duck to leave (or take control and dismiss it). Another Crow
-admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 12; `NextEvent`
+admission waits for its existing visit to end. During a spider visit it cycles
+Color Cycle and Digit Slide, the events that keep the digits where they are,
+and a request for any other reports that the spider is visiting; another
+Spider admission waits for its visit to end, and the spider itself waits for a
+duck, a crow or an event it would not keep live. Preferences are unchanged. The Clock action protocol is version 12; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -1235,6 +1504,14 @@ queries. Tests cover both entrance directions/profiles, opening/running/jumping/
 exiting, exact body/contact continuity, normal bounded braking, controller-neutral
 gating, event composition and cleanup. Raster captures compare the takeover frame
 pixel-for-pixel on Picade, HyperPixel and portrait layouts.
+
+**Ledges:** Hold Jump to catch a reachable course edge or door-flap tip. Release
+Jump to keep hanging, then press it again to pull up. Down drops and takes priority
+over Jump while attached; release Jump before trying another catch. There is no
+hang stamina timer or sideways shimmy. Real support loss or disruption still
+releases the duck. A held catch/climb input never becomes an automatic ground jump.
+Taking over a hanging duck retains its anchor; a committed safe climb can finish.
+Pause, disconnect and takeover retain the usual neutral-input gate.
 
 A fresh **grounded** press is required for a land jump: no held-button auto-hop, opening
 jump buffer, landing buffer or mid-air extra jump. Inputs carry the visit ID and
@@ -1336,15 +1613,17 @@ batch limit. IDs occupy separate bounded
 namespaces; geometry and the body-ID list are allocated at event boundaries,
 not rebuilt each tick. Rendering reads the same body poses used for contacts.
 
-Dismissal, falling out or walking out removes only the character. Falling then
-owns the exact existing arena until completion, so the remaining bars keep
-moving. A new visit can take that arena back with a fresh controller/session ID;
-it does not reset the bars, floor or event clock. An occupied arena stays opaque.
+Dismissal, falling out or walking out removes only the character. The visit's
+claim stays with its terrain while Falling holds the arena, so the remaining
+bars keep moving on the same ground until completion. A new visit takes that
+claim back with a fresh controller/session ID; it does not reset the bars, floor
+or event clock. An occupied arena stays opaque.
 After 210 falling ticks the event removes **only its batch** before the 90-tick
 visual reformation, so there are no invisible bars flying back through the duck.
 A duck formerly standing on a bar becomes airborne normally. Finishing or
-replacing Falling preserves a live player; if nobody remains, the last floor
-claim and world are released.
+replacing Falling preserves a live player. If no character remains, the
+visit's terrain goes with Falling's claim, and the world goes too unless
+residents keep the arena.
 
 **Joining standalone Falling:** The existing Rapier world moves into the player
 arena intact, retaining every body, collider, contact, mass, pose and velocity.
@@ -1414,7 +1693,7 @@ dismiss/rejoin, subsequent events, deterministic replay and cleanup. Production
 raster/vector captures exercise live and late entry on Picade, HyperPixel and
 portrait layouts; the world raster is unchanged at the join action itself.
 
-Falling and Meltdown share the same arena lease lifecycle. Leaving retains the
+Falling and Meltdown hold the arena the same way. Leaving retains the
 exact world for the event; rejoining uses a fresh session without resetting
 blocks, water or event time. Finishing/replacing the event removes only its own
 material and leaves the player/floor intact. Responsive panels continue their
@@ -1449,7 +1728,9 @@ bytes). Version 10 extends the player setpoint and rejects the old version-9
 payload instead of silently interpreting an incomplete command. Optional JSON
 diagnostics include `run_held`, `dive_held`, `swim_strokes`,
 `swim_cooldown_ticks`, `dive_ticks_left`, and `dive_recharging`;
-`spacewars-cli clock state` prints them alongside immersion and velocity.
+`spacewars-cli clock state` prints them alongside immersion and velocity. The
+existing `player_duck.duck.ledge` diagnostics expose phase, support, anchor, rearm
+state and catch/climb/release counts; text output includes the ledge controls.
 
 Deterministic movement fixtures use production physics for flat-ground speed
 and jump comparisons on Picade/HyperPixel/portrait layouts, a deep pool for
@@ -1581,6 +1862,16 @@ segment poses and resource counts. Water/material accounting, passive-duck
 suppression and zero-body/zero-collider/closed-floor cleanup are also checked.
 Every case is bounded to 3,600 ticks, including event cleanup after duck departure.
 
+Dry controls still require zero collision-recovery ticks. Rain-cleared controls
+must exit from the last bank with dry, grounded footing and recovery finished.
+They need not have zero recovery: altered arrival timing can bring a duck into
+contact with the opening physical exit flap. The focused seed-1 Flowing/Light
+fixture covers this at all three layouts, observes the actual panel contact,
+requires one lost-support recovery within one second without an escape jump,
+and retains tick-by-tick replay and complete cleanup. The recorded contact is at
+tick 1250, recovery runs at 1253–1290, and the duck exits at 1333. No collision
+response, movement tuning or visit deadline was changed for this regression.
+
 Run the small suite or explicitly opt into the sweep:
 
 ```sh
@@ -1601,7 +1892,8 @@ normal, surface velocity, separation), course support, behavior, jump target and
 recovery state. Sampling is post-physics; the behavior/plan is the command decision
 that preceded that step. Coordinates are entrance-relative X and world Y; the
 artifact includes the static course spans/heights and body radius. Course entity
-IDs start at 1000, Falling digit bodies at 3000, Meltdown blocks at 4000.
+IDs start at 1000, entrance/exit flaps are 2100/2101, Falling digit bodies at 3000,
+and Meltdown blocks at 4000.
 The trace has **no production runtime or logging cost**. Files are written once
 per case instead of repeatedly serializing the full sweep's contact histories.
 
@@ -1893,8 +2185,10 @@ Falling releases Rapier at reformation; automatic Duck releases it on exit/reset
 at most 28 moving bars plus two AM/PM letters and four arena bodies, with
 123 colliders for Falling (32 bodies / 100 colliders without AM/PM),
 or eight bodies/colliders at the Duck course ceiling, with no accumulating debris.
-Player visits keep their own arena across compatible events, with shared Falling/Meltdown
-resource/lifetime bounds described above.
+Player visits keep the run's arena across compatible events, with shared Falling/Meltdown
+resource/lifetime bounds described above. Residents keep it for the whole run;
+[Sharing the run's physics arena](#sharing-the-runs-physics-arena) gives its
+bounds.
 
 ## Extending the event system
 
@@ -1907,11 +2201,461 @@ Animation randomness uses a separate per-event seed, never the schedule's RNG.
 The catalog declares each event's trigger (`periodic` or `time-change`), affected area and timing. Add a kind, its
 settings/launcher control, catalog entry, and an enum implementation when adding
 an event; keep shared lifecycle tests and add event-specific tests. Finishing or
-resizing drops the active event and restores the latest face and base palette.
+resizing drops the active event and restores the latest face and base palette;
+residents of the run's physics arena stay through a resize, as below.
 Restart/relaunch constructs a fresh scenario. There is no plugin framework and
 no concurrent scheduler events: affected-area metadata does not permit overlap.
 Marquee composes presentation passes *inside* one event; it does not opt out of
 the shared scheduling or cleanup rules.
+
+### Returning digit cells to their places
+
+Several events take the reading apart, and every one of them has to put it back
+by moving matter. A step where the cells vanish and re-materialize in place reads
+as a glitch rather than an animation, however short it is.
+`events/explosion/reassembly.rs` is the reference implementation, and states the
+rules in its own comments:
+
+- A cell travels from where it actually is to where it belongs. It never appears
+  at the goal.
+- A surplus cell joins a neighbour and shrinks, rather than fading out.
+- A shortfall splits a new cell from existing debris and grows it from zero size.
+- A reading that changes mid-animation retargets without restarting trajectories,
+  so a colon blink or a new second does not jerk the whole face.
+- The dim anchors are the substrate. They stay put while the lit cells move.
+
+`SegmentRepresentation::Reforming` carries the rule in the type. Its payload is a
+`Reformation` whose fields are private and which only
+`SegmentState::begin_reforming` can build, from the segment's actual position,
+angle and the lit cells it came apart with. No later reading changes those
+cells, so a second ticking over during the return cannot redraw what is coming
+home. There is no way to describe a segment as reforming at its own anchor
+having never been lit, which is precisely the case that renders as a reading
+appearing at the goal out of nothing.
+
+A reading's light-blocking geometry is the reading. `render::plant_face_polygons`
+and the visible frame both go through `render_marquee_face`, so a digit carried
+off stops shading the plants it used to stand over, and one part way across
+shades what it is actually over.
+
+Conformance, measured rather than read:
+
+| Event | How the reading returns | Standard |
+| --- | --- | --- |
+| Exploding digits | Flights easing position, angle and size together, retargeting in flight | Reference |
+| Falling digits | Reforms from each segment's real landing pose, cross-fading the old shape into the new | Met |
+| Cell swaps | Per-cell quadratic bezier with opposing bow; the 15-tick fade only corrects a reading that changed mid-swap | Met |
+| Digit Slide | The old glyph slides out and the new one slides in, clipped per cell | Met |
+| Slot Machine | Every reel opens on the glyph the face was showing and turns, clipped to its own slot, onto a whole stop; nothing is faded on | Met |
+| Meltdown | Cells liquefy on real floor contact, and the face refills bottom-up and row-staggered as the puddle drains | Met by refill |
+| Aquarium | The face stays anchored and solid throughout; nothing comes apart | Not applicable |
+| Marquee, clock recipes | The reading dissolves into its own animation, which opens on the anchored pose | Met |
+| Marquee, text recipes | The reading is carried clear of the frame and brought back the same way | Met |
+
+Meltdown is the one sanctioned departure, and it is worth being exact about why.
+Its cells do not travel home: each one grows upward from its own bottom edge at
+its final position, row by row. What travels is the matter, through the water -
+a cell becomes liquid on real contact with the panel top, its area is ledgered
+into the pool, and the pool is reclaimed over exactly the ticks the face refills
+in. A digit climbing back out of a draining puddle reads as the melt running
+backwards, which is what the event is about. Any new event wanting this
+treatment owes the same thing: a physical account of where the matter went and a
+return coupled to it, not an alpha ramp standing in for one.
+
+The measurements behind that table, at a 800x480 face with seed 7. Meltdown's
+solid cells are all gone by tick 180, which is 240 ticks before the reform starts
+at 420, so none is ever discarded on screen when the reform begins; across the 90
+reform ticks the reading's ink climbs from 2.14 to 96.10 while the puddle drains
+from 97 parcels to none, and the ink is 96.12 on both the last reform tick and
+the first anchored tick, so the hand back is seamless. The marquee used to drop
+the reading's ink from 95.40 to 0.00 by tick 45 with its geometry never moving at
+all, and Clock spin and Digit spin compounded that by drawing their copy at a
+rotation-fitted scale that landed on none of the face's 88 lit cells and on one
+of them respectively. All four clock recipes now open on 88 of 88 cells with a
+cell side equal to the face's own 18.77 px. Through a clock recipe's handover the
+two copies of the reading sum to the face's full ink: Clock wave and Clock spin
+hold 90.00 of 90 for the whole visit, while Clock chase and Digit spin floor at
+49.93 and 48.26, which is their own chase and sweep patterns dimming cells to
+half rather than anything being put out. `render::face_handover_contract` holds
+all of this, with the floor set at 45% of the face's ink.
+
+### Following the digits: surfaces
+
+A resident that stands on a digit, such as a crow, a snail or a patch of moss,
+has to ride whatever the digit does. `scenarios/clock/src/digit_surfaces.rs`
+publishes each lit digit cell as a *surface* it can attach to, and its module
+comment states the contract. The colon only blinks in place and the AM/PM
+pixels are too small to carry anything, so neither is a surface.
+
+- **Identity.** A surface's id is the serial it was admitted with, which a run
+  never reuses. A restart is a new run and starts again from 1. Where a surface
+  was admitted (its slot and cell) is provenance, not identity: a swapped cell
+  keeps its id at its new place, and a replaced glyph's cells are new surfaces
+  even where they overlap the old ones.
+- **Frame.** `origin`, `angle` and `scale` map a local point in grid units to
+  the world, so a local point survives a resize. The `footprint` is the
+  supporting rectangle in the surface's own frame, a lit cell's being
+  0.4 grid units either side of its centre. A footprint that shrinks off a
+  local point drops that attachment, while the surface goes on.
+- **Lifecycle.** A surface is admitted once, handed off between geometry
+  sources any number of times, departs at most once and is retired once, with
+  a reason. A *departing* surface carries what is on it until it is retired
+  but takes nothing new. Nothing comes back from departing or retired.
+- **Presentation.** `opacity` and `clip` say how a surface is drawn, not
+  whether it exists. A surface can be invisible and still carry things, and
+  surfaces sharing one drawn cell sum to its ink.
+
+| Source | What moves the surface |
+| --- | --- |
+| `anchored` | At rest on its place in the face |
+| `slide` | Digit Slide's slide through its slot |
+| `rigid` | A rigid body in the event's world, named by `body` |
+| `ballistic` | Standalone Meltdown's ballistic step |
+| `return` | An authored path home after physical motion |
+| `refill` | Meltdown's refill, growing each new cell upward |
+| `swap` | Cell Swap's exchange paths and its correcting fade |
+| `reel` | A Slot Machine reel |
+| `marquee` | A Marquee carrying the face with its own transform |
+
+| Retirement | Why |
+| --- | --- |
+| `replaced` | Its glyph gave way to another: a new reading, font or format, or the glyph an event brings in |
+| `interrupted` | The event moving it ended early, away from its place |
+| `merged-away` | A surplus Explosion block shrank into its neighbour |
+| `melted` | Melted on contact with the floor |
+| `exited` | Left the view as a solid |
+| `reclaimed` | Solid material Meltdown reclaimed when the face refilled |
+
+What each event does with the face's surfaces:
+
+| Event | Surfaces |
+| --- | --- |
+| Face at rest | One per lit cell. Seconds, the colon, colour and a resize keep every id. A changed glyph, from a reading, font or format, is replaced |
+| Digit Slide | A changed slot's old glyph, or every slot's in a preview, slides out departing, and each cell is retired once it is clipped out. The new glyph is admitted sliding in and handed back at the end. Unchanged slots keep their ids |
+| Falling | Each cell rides its segment's body, then returns. Cells the new reading still lights come home as themselves, the rest fade out departing and new ones fade in |
+| Exploding digits | Blocks carry the cells' surfaces through the burst and the flight home. A surplus block departs and is merged away when it has shrunk to nothing. A block split off the debris is a new surface that grows from zero |
+| Meltdown | Solid blocks carry their surfaces until they melt, leave the view or are reclaimed. The refill is a new face that grows upward. Water is never a surface |
+| Marquee, clock recipes | The face's surfaces ride the recipe's transform, at the opacity the recipe draws. The fading anchored copy is presentation and owns nothing |
+| Marquee, text recipes | The face's surfaces are carried clear of the frame and brought back as themselves |
+| Cell Swap | Each surface rides its exchange to the cell it lands on. A reading that changes fades surfaces out and new ones in |
+| Slot Machine | The opening glyph rides its reel out departing. Each reel's lock glyph is admitted when it comes into the window. Scrambled frames are texture and carry nothing |
+| Color Cycle, Rain, Aquarium, visitors | The face stays anchored |
+
+An event cut short, by a preview, a resize or anything else that ends it
+early, never snaps a piece home. A departing piece is retired for its own
+reason wherever it is. Of the rest, a piece resting at its own cell is handed
+back, which includes every piece of an event that has not moved yet, and a
+piece away from it is retired `interrupted`. A Marquee that has moved the face
+retires it `interrupted`; Clock chase, which never moves it, hands it back.
+
+`ClockState::digit_surfaces` publishes every surface after each step, in a
+fixed order: the slots no event holds, then the active event's pieces.
+Publication is a read of the state that also draws the face, so a published
+pose is where the cell is drawn. Clock makes it once, at the end of each step
+or resize. The ledger finds that step's hand-offs and departures in it, and
+`digit_surfaces` and the control state serve it until the next. A reading or
+setting applied while paused arrives in a step that does not tick, and is
+published like any other. `surface_changes` keeps the last 1,296 lifecycle
+changes, numbered in sequence. That is a convenience, not a bound on a step: a
+step that ends an event and changes the reading, font and format at once
+records several changes for some surfaces. A consumer that finds a gap has
+missed some, and catches up from the publication: a surface it holds that is no
+longer published has been retired. At most 648 surfaces are alive at once, an
+outgoing and an incoming glyph in every slot with room for a retargeted
+cross-fade. The events keep within that by construction, and debug builds and
+the tests check it.
+
+Clock's control state reports them as `digit_surfaces`, from schema 22. Its
+`accounting` gives the surfaces `live` and `departing` now, `peak_live`, and
+over the run those `admitted`, `handed_off`, `departed` and `retired` by reason,
+with the last change's `sequence`. `sources` counts the live surfaces each source
+is moving. `sample` holds the lowest id in each slot for each source, departing
+or not, with its pose in world mill units, at most 16 of them. `recent` holds
+the latest 16 changes. `limits` gives those bounds. Text `clock state` prints
+the counts, the run, the sample and the latest changes.
+
+`digit_surface_tests.rs` holds the contract. Every check reads the rendered
+frame, so a pose the face does not actually draw fails. A marker fixture stands
+in for a resident: it attaches a local point to a surface and follows only what
+the contract publishes. The sweep runs every event at every layout, through all
+four fonts, resizes part way through each and before each moves, changes the
+reading, format and font while paused, and replays events cut short by each
+other, repeated and paused. It checks that each surface lives one lifecycle and
+that the same inputs record the same one.
+
+### Sharing the run's physics arena
+
+Rigid bodies that meet a visiting duck, or outlive the event that made them,
+live in the run's one arena: `ClockArena` in `scenarios/clock/src/arena.rs`.
+Its module comment states the rules, and `arena_contract.rs` holds them:
+
+- **One world, one step.** There is at most one arena world, and every tick
+  that moves time steps it exactly once, whoever holds it. A tick that does not
+  move time steps nothing.
+- **Owners claim it.** A visit claims it for its terrain and character, and
+  one event at a time shares it beside a visit: Aquarium, Explosion, Falling or
+  Meltdown. The spider claims it for its stay, with its body, its line, the
+  frame it climbs and a proxy for each digit cell
+  ([below](#the-spider-on-the-digits)). Residents keep it for the rest of the
+  run: retained soil, and the development arena fixtures. The first claim
+  builds the world and the last to let go takes it away. Each owner's bodies
+  take identities from its own ranges in `arena::ids::canonical`, and an owner
+  that lets go takes only those. A visit brings its own gravity and solver
+  scale while it holds the arena, and the residents' own return once it has
+  gone.
+- **Claims are bounded.** Each owner declares a budget of bodies, colliders
+  and joints. The arena holds at most **255 bodies / 288 colliders** and one
+  joint, the spider's line: a visit, the largest event, soil and one fixture
+  together, so everything Clock ships fits. The spider takes no more room than
+  the largest event, so beside a visit and the residents it fits where an
+  event would, and it never shares the arena with an event that has bodies.
+  At most **6** owners hold it at once, and at most **4** of them are
+  residents, soil included. A claim beyond those is refused before anything
+  changes, as `residents` or `capacity`. So is a visit, an event or a spider
+  that uses the floor while the residents do not fit the view, as
+  `layout-incompatible`. Debug builds audit every step: each body belongs to
+  exactly one owner holding the arena, or to the floor kept under whoever
+  rests on it, and no owner exceeds its budget, joints included.
+- **Residents rest on real support.** Soil is fixed in place. A fixture's
+  balls rest on a visit's terrain while the visit holds the arena, on an
+  event's own floor, or otherwise on the floor the arena keeps under them,
+  closed or open at the drain. They are never pinned to support that has gone,
+  and they leave the arena only by falling out of the view.
+- **A resize keeps residents.** It still finishes visits and events, but the
+  residents stay in the same world. A resting ball beyond a narrower view comes
+  in just far enough to lie within it, keeping its height and motion
+  (`clamped`). Balls that could only come in by landing in each other or in the
+  floor stay where they are, with the floor they stood on (`declined`), and the
+  arena takes nothing that uses the floor until a resize they fit, or their
+  leaving.
+- **The run ends once.** Restart and leaving Clock each drop every world the
+  run held, exactly once, and the next run starts with no residents, claims or
+  world. Nothing of a run is kept on disk, so an application restart starts
+  clean too.
+
+An event that needs rigid bodies in the shared world declares an `Owner` with
+its identity ranges and budget, asks `arena::admits` before it changes
+anything, claims the arena rather than building a world of its own, and lets
+go of only its own claim. If its budget raises `ARENA_CAPACITY`, record the new
+caps here. Standalone Falling and Explosion still step worlds of their own, so
+their bodies meet residents only once a player joins and the arena adopts that
+world. Clock's state publishes all of this in its
+[`arena` object](#public-controls-and-synchronized-captures) and each event's
+`blocked_by_arena`, and `clock trigger` fails an event the arena would refuse
+with `action-unavailable` and the arena's notice.
+
+To see residents in the real client, start Clock with the development arena
+fixture. `SPACEWARS_CLOCK_ARENA_FIXTURE=default` drops the ordinary fixture's
+three balls onto the floor, and `two-owners` adds a second owner with two balls
+near the walls, where every visit's course has ground. Any other value, as in
+ordinary Clock, starts none. The balls are drawn pale, like the wood they rest
+on.
+
+Start the client with the switch and choose Clock in the launcher, so that the
+run starts in the window's own view. A direct `--scenario clock` start can build
+the run before the window has a size, in the default 1280×720 view. A 1024×768
+window then brings the outer balls in (`clamped`), but a near-square or portrait
+window is narrower than the fixtures fit: the arena declines them as after any
+such resize, and `clock state` shows `layout incompatible=true`.
+
+```sh
+SPACEWARS_CLOCK_ARENA_FIXTURE=two-owners cargo run --release -p engine-client
+# Choose Clock in the launcher and start it, then:
+spacewars-cli clock state
+spacewars-cli clock trigger duck
+spacewars-cli clock trigger meltdown
+spacewars-cli clock events
+```
+
+At rest, the two owners hold the arena with all five balls asleep on the closed
+floor (timings vary by machine):
+
+```text
+Arena: 2 claims, 2 residents (at most 6 and 4); 6 bodies, 6 colliders, 0 joints (at most 255, 288, 1); floor 1 bodies
+Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders
+Arena run: 1 worlds, 183 steps; granted=2 released=0 refused=0; layout incompatible=false, last remap=None
+Arena step: 3 us (collision detection 2 us, solver 0 us); bodies active=0 sleeping=5; pairs candidate=5 contact=5, contacts=5, CCD substeps=1
+```
+
+The duck's visit joins their world as a third claim, and its course takes the
+place of the floor the arena kept. Beside it the two owners leave no room for
+Meltdown, so `clock trigger meltdown` fails with `action-unavailable: The arena
+has no room for this`, and `clock events` shows `blocked by arena=capacity` for
+Meltdown, Explosion and Aquarium:
+
+```text
+Arena: 3 claims, 2 residents (at most 6 and 4); 10 bodies, 10 colliders, 0 joints (at most 255, 288, 1); floor 0 bodies
+Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders; visit 5/11 bodies, 5/11 colliders
+```
+
+The PR smoke workflow
+`clock::arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run`
+runs the same sequence under Xvfb. It then restarts mid-visit and starts again
+from the launcher, each time finding the fixtures alone in a fresh world.
+`client_scenarios::clock::arena_tests` draws a settled two-owner run through
+both render adapters; set `SPACEWARS_CLOCK_ARTIFACTS=DIR` to keep its PNG and
+SVG captures. The `residents`
+[benchmark fixture](clock-performance-lab.md#fixed-workload-benchmarks) is idle
+Clock with the same two owners, and measures what residents cost at rest;
+[Idle arena residents](clock-performance-lab.md#idle-arena-residents-2026-10-31)
+records it.
+
+Known limits:
+
+- An automatic visit's duck can push a resting ball out through its door. The
+  ball then leaves the arena like any other fall.
+- A floor that closes at once, as Rain's panels do when Rain finishes part-way
+  open, can appear under a resident resting below its surface, and the solver
+  lifts the resident out.
+- A declined resize lasts until a resize the residents fit, or until they leave.
+- Standalone Falling and Explosion meet residents only after a player joins.
+- While an event simulates apart from the arena (standalone Falling,
+  Explosion, Meltdown or Aquarium, or Rain's floats), plants, the ceiling's
+  light and soil delivery see only that event's world, if it has one. A
+  fixture's balls neither crush plants nor block light or soil meanwhile. Soil,
+  the one resident Clock ships, is unaffected, because those checks treat it
+  separately.
+
+### The spider on the digits
+
+Issue [#382](https://github.com/aortez/space-wars/issues/382) puts the spider
+of [the mechanics document](clock-spider-mechanics.md) on the actual digits,
+in the run's arena. `scenarios/clock/src/spider.rs` is the adapter between
+the two, and its module comment states the contract. The visit that comes
+and goes by it, its rendering and its controls are the
+[Spider visitor](#spider-visitor) section's, from
+[#383](https://github.com/aortez/space-wars/issues/383). A test, or the
+visit, admits a spider, sets its intent each tick and reads it back.
+
+- **What it holds.** The frame, the floor the arena keeps under it, and the
+  lit digit cells, through a proxy for each cell the face publishes. A cell
+  carried by a rigid body in the arena itself, as a shared Falling's or
+  Explosion's pieces are, has no proxy over that body: the spider holds the
+  body through its own colliders, as it holds any support. A cell carried by
+  a body in an event's own world, as a standalone Falling's or Explosion's
+  are, gets a proxy like any other, posed and turned as the piece is drawn.
+  Nothing else in the arena is a support. Soil, a fixture's balls, a visit's
+  character and course and an event's pieces that carry no surface stay solid
+  obstacles, and each refusal is counted as `foreign`. A departing cell
+  carries what is already on it and takes nothing new, counted as
+  `departing`.
+- **Proxies.** A proxy is a kinematic body with one cuboid: the part of the
+  cell's footprint inside the band it is drawn in and inside the room, between
+  the rails and from the floor to the ceiling, posed in the surface's frame,
+  so collision and attachment follow the drawn geometry. A cell drawn fainter
+  than the surface contract counts as drawn, or carried out of the room, as a
+  text Marquee sweeps the face past the rails, has none; a turned cell has
+  one only while it lies within the room. Every moving tick the face is
+  published early, once the active event has stepped and before the arena's
+  step, so each proxy takes the pose the step ends at: a sliding cell carries
+  the spider with the velocity it has, and a proxy born for a cell coming
+  into view starts from where the cell stood. A cell being clipped reshapes
+  its cuboid in place, keeping its collider and whatever holds it
+  (`PhysicsWorld::set_cuboid`), and a retired cell takes its proxy away, so
+  the spider loses that hold as from any support that has gone. The spider
+  keeps at most **233** proxies, which keeps it within the room an event
+  takes. Under ordinary readings the face draws at most 159 cells at once in
+  the shipped fonts, during Falling's cross-fade in Sans. A reading
+  retargeted every few ticks during Falling's return draws more, 323 at one
+  every two ticks, and then the farthest cells from the spider go without,
+  counted as `unproxied`.
+- **The frame.** The two side rails, the ceiling on either side of a hatch
+  four pitches wide above the middle of the face, and a beam just above the
+  view spanning the hatch. The spider comes in by tying a line to the beam
+  and letting it out through the hatch, and leaves the same way. The
+  renderer draws the hatch while a spider is in the arena. The
+  floor is the arena's own, kept under the spider as under a resting fixture,
+  closed or open at the drain. A visit's course is not a support in this
+  release.
+- **Lifecycle.** The spider rides a departing cell until the cell is retired
+  as it leaves its slot, or until it is carried off the cell's drawn part on
+  the way, and then falls, or catches a cell of the new glyph within reach,
+  which is another surface. A glyph replaced by a reading, font or format
+  change is retired under it the same way. A glyph that comes between the
+  spider and its anchor cuts the line, as `obstructed`. Seconds and the colon
+  change nothing. A reading or setting applied while paused is published at
+  once, and the spider reads `retired` for a cell it still holds the proxy of
+  until the next moving tick takes it away. A tick that does not move time
+  freezes it. A resize cancels it, because its frame is the old view's, and
+  restarting or leaving Clock drops its world with the run.
+- **The claim.** `Owner::Spider` is not a resident: it comes and goes, it is
+  refused while the residents do not fit the view, and it rests, so the arena
+  keeps a floor under it. Its budget is **239 bodies / 239 colliders / 1
+  joint**: its body, five frame parts, the proxies and its line. It is
+  admitted beside soil and one fixture, or a visit, and refused beside two
+  fixtures and a visit, as Meltdown is. A start inside the frame, the floor,
+  a drawn cell or anything else solid, or outside the room, is refused as
+  `blocked` before anything is claimed. Once a visit has gone, Clock's own
+  gravity and solver scale return while the spider holds the arena, as they
+  do for residents alone.
+- **Size and pace.** The spider's radius is 0.3 pitch, a little under a
+  cell's 0.8, and its weights are measured under Clock's 400 units/s². The
+  arena rescales its gravity with the other resting owners' whenever a visit
+  changes the world's. Its silk reaches across the room from the floor to
+  the beam, and is let out and taken in at whatever pace crosses the room in
+  three and four seconds, so a small spider in a tall view still comes in
+  and goes out within a visit; it crawls at seven radii per second.
+
+`ClockState` takes `admit_spider(position)`, `set_spider_intent(intent)`,
+which is refused while a visit drives the spider, `spider_fixture_state()`
+and `remove_spider()`, and reports `spider_accounting()`: spiders admitted,
+refused, removed and cancelled, and visits departed and failed to leave;
+`spider_state()` is the visit's published state, none for a spider a test
+admitted. The fixture's state names what the legs hold and what the line is
+tied to as a `Hold`: a surface with its id, source and whether it is
+departing, a retired surface, a rigid body, a frame part or the floor. It counts the proxies, the cells without one, the rigid
+bodies the spider may hold, the refusals of the last tick and the ticks the
+spider has been in the arena, beside the mechanic's own state.
+
+`spider/tests.rs` holds the contract, through every font and the wide,
+narrow and portrait views. The route it takes is the acceptance fixture: up
+to a digit on a line, along its underside across a cell seam, off the end into
+a swing on the line, back up, and out with the old glyph when the minute
+changes, with and without resident balls in the arena. Every hold is checked
+against the published surface and the drawn face, every proxy against the
+drawn part of its cell through a preview slide, and the proxies and rigid
+bodies against every event's publication, visitors included. The rest covers
+a departing cell passing within reach and never caught, a glyph replaced
+under the spider, a glyph that comes between, a text Marquee sweeping the
+face past the rails, the seconds and the colon, a resize, refusals, a visit
+leaving the arena's settings behind, a blocked start, a proxy's first step,
+the paused clock and the end of the run.
+
+Known limits:
+
+- A spider beside an event with its own solid face, as Aquarium's digit
+  compound or Meltdown's refill beside its melted blocks, has proxies standing
+  beside that event's bodies. The spider's visit excludes those events, so
+  this is never seen in ordinary Clock.
+- A cell sliding out of its slot carries the spider down with it as its drawn
+  part shrinks at the band's edge, so the spider is carried off the drawn
+  part before the cell is retired. A cell a text Marquee carries past a rail
+  is clipped at the rail the same way, and the spider holding it is let go
+  there, onto the rail.
+- Beside a duck visit the floor is the visit's course, which the spider may
+  not hold: it loses the floor as `Removed` when the visit starts and rests on
+  the course as on any obstacle until the visit has gone.
+
+The drawings come from an ignored test that records the acceptance route
+and the entrance, at Clock scale in Classic. They are diagnostic drawings of
+the physics state over the drawn face, not the Clock renderer. The dashed
+blue outlines are the proxies.
+
+```sh
+SPACEWARS_CLOCK_SPIDER_CAPTURE=/tmp/clock-spider cargo +1.89.0 test --locked --profile ci -p scenario-clock --lib spider::tests::capture -- --ignored
+cd /tmp/clock-spider
+inkscape --export-type=png climb.svg slide.svg descent.svg
+cd /tmp/clock-spider/route && inkscape --export-type=png frame-*.svg
+ffmpeg -framerate 30 -i frame-%04d.png -vf "split[a][b];[a]palettegen=max_colors=64:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../route.gif
+```
+
+![Up to the cell on a line, along the underside and off the end into a swing](screenshots/clock/spider-arena-climb.png)
+
+![The minute changes: the old 3 carries the spider out of its slot, and it falls past the new 4](screenshots/clock/spider-arena-slide.png)
+
+| In through the hatch | The whole route, in real time |
+| --- | --- |
+| ![Tied to the beam above the hatch, the spider lets itself down into the room](screenshots/clock/spider-arena-descent.png) | ![The acceptance route from the floor to the fall, one frame every other tick](screenshots/clock/spider-arena-route.gif) |
 
 ### Composed Marquee effects
 
@@ -1932,8 +2676,12 @@ Explicit previews work even with the Marquee switch or profile Off.
 
 The active recipe and message are captured when the event starts. A setting change is saved
 for the next event; Preview deliberately replaces the current one. Each event
-lasts 720 fixed ticks (12 seconds). The ordinary face crossfades out/in over
-45 ticks at either end. Pause freezes playback. Time continues to be authoritative:
+lasts 720 fixed ticks (12 seconds), with 45-tick handovers at either end. A clock
+recipe animates the face's own cells, so it opens on the anchored pose and the
+reading dissolves into its own animation; a text recipe brings its own content,
+so the reading is carried clear of the frame and comes back the same way, as
+["Returning digit cells to their places"](#returning-digit-cells-to-their-places)
+requires. The dim anchors stay put throughout either one. Pause freezes playback. Time continues to be authoritative:
 clock recipes rebuild their lit cells from the latest supplied reading, including
 the colon and AM/PM, without advancing playback. Text never replaces the actual
 time state. Completion, resize, restart, and preview replacement restore the
@@ -2059,11 +2807,11 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **20** and reports scenario-instance revision,
+`clock state` uses schema version **23** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
-reading/target digits, active font, palette RGB, physics counts, floor ownership mode, and typed live `settings`.
+reading/target digits, active font, palette RGB, physics counts, floor ownership mode, the run's `arena`, its `digit_surfaces`, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
@@ -2107,6 +2855,12 @@ null until sampled. `left_to_right` remains the **entrance side**; use
 current crossing's surface transitions; total jumps include warm-up jumps. Navigation fields retain
 the final controller state during reset, not a claim of a still-live body.
 
+The optional `spider` object is present while a spider visits; the
+[Spider visitor](#spider-visitor) section lists its fields. `clock wait`
+accepts its phases (`descending`, `crossing`, `climbing`, `crawling`,
+`swinging`, `recovering`, `leaving`) with `--event spider`, matched against
+the visit rather than the timed event, as a crow's are.
+
 `navigation.planning` adds `pattern` (`platforms`, `terraces`, `two-jump`,
 `shortcut`), surface count, current physical support (null when
 airborne or despawned), generation attempts/fallback status, measured acceleration,
@@ -2141,10 +2895,10 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 19 and
+after completion or cancellation. Use matching client/CLI builds: schema 22 and
 older requests are rejected. The internal Clock action payload is version 12;
-event ordinals 0–8 are unchanged and Aquarium is 9. Configure contains a
-little-endian u16 switch mask (bits 0–9, reserved bits rejected),
+event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
+little-endian u16 switch mask (bits 0–13, reserved bits rejected),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 font ID, rotation (0/1) and nonempty four-bit font-pool bytes, a crow-water-tolerance
 byte (0 Varied, 1 Shy, 2 Hardy), and 1–32 message
@@ -2153,8 +2907,31 @@ same bytes followed by a little-endian u16 year and u8 month/day. Version 1–11
 actions are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 
+The `arena` object reports the run's shared rigid arena. Its `accounting` gives
+the owners holding the arena now (`claims`, of which `residents`), the bodies,
+colliders and joints in its world, and over the run the claims `granted`,
+`released` and `refused`, its `steps` and `worlds`, `layout_incompatible`, and
+`last_remap` (`exact`, `clamped` with the number `moved`, or `declined`).
+`refused` counts the previews, player joins and fixtures the arena turned away.
+The schedule leaves out events the arena would refuse, and `clock trigger` fails
+one before it reaches the arena, so neither counts. `claims` lists each owner in
+the order it claimed the arena (`visit`, `event` with its kind, `soil`, or
+`fixture` with its index), whether it is a resident, and its bodies and colliders
+beside its budget. `floor` counts the floor the arena keeps under resting
+residents while no visit's terrain is one; the claims and the floor together
+account for everything in the world. `last_step` is the arena's last step: wall,
+collision-detection and solver time in microseconds, CCD substeps, active and
+sleeping bodies, candidate and contact pairs, and contacts. It is null before the
+first step. `limits` gives the most claims and residents the arena holds at once,
+and its capacity in bodies, colliders and joints. Each catalog entry's
+`blocked_by_arena` is null, or the reason the arena would refuse that event now:
+`residents`, `capacity` or `layout-incompatible`. `clock trigger` then fails with
+`action-unavailable` and the arena's notice. Text `clock state` prints the
+arena's counts, claims, run totals and last step, and `clock events` shows each
+event's refusal.
+
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 20, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 23, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -2171,8 +2948,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 20, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, or `explosion`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 23, `event`
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, or `spider`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification
@@ -2489,8 +3266,11 @@ The mixed-default live UI workflow also passed under Xvfb using the debug client
 
 Fixed single-platform, stepped and gap fixtures run at all seven aspect ratios.
 Every confirmed landing must match the planned collider's actual physical
-support. Every course must tag both walls, complete at least three traversals
-of its surface links, exit and release all bodies. Separate fault injection
+support. Every course must complete its initial traversal and tag the far wall,
+exit and release all bodies. Once the exit opens, the duck may leave before
+finishing its return crossing; a second wall tag or three complete traversals
+are no longer required. The aspect-4, seed-79 regression exercises that early
+departure with one completed crossing. Separate fault injection
 verifies short, long and wrong-surface classifications, refusal of impossible
 plans, bounded retries and timeout cleanup. Forced generator exhaustion checks
 the fallback course at every aspect ratio; pause, resize, replacement and
@@ -2512,7 +3292,7 @@ confirmed target contact, and every jump must begin grounded.
 
 The normal pattern matrix covers four seeds × four patterns × seven aspects ×
 two profiles (224 runs). Its extended sweep covers seeds 4–31. Both enforce
-zero missed landings/falls/timeouts, both wall tags, at least three traversals
+zero missed landings/falls/timeouts, the initial far-wall tag and traversal
 (counting skipped links), bounded bodies and complete cleanup. Rendering tests
 cover all four patterns with both personalities at four resolutions.
 
@@ -2611,6 +3391,171 @@ CPU construction costs, not Pi or end-to-end latency measurements.
 
 **Marquee has not been deployed or tested on the Pi.** Ask before deploying.
 
+### Spider visit qualification (2026-11-01)
+
+Issue [#384](https://github.com/aortez/space-wars/issues/384) is the
+completion gate for [#162](https://github.com/aortez/space-wars/issues/162):
+proof that the ordinary spider visit of [#383](#spider-visitor) delivers
+its route with the actual climbing and silk physics, readable rendering and
+a bounded lifetime. The proof is `spider/tests/qualify.rs` beside the
+visit's own tests, the route envelope below, the captures of the
+[Spider visitor](#spider-visitor) section, and the benchmarks.
+
+**Route envelope.** Every supported view and font over six seeds, from the
+ignored probe `spider::tests::qualify::probe_route_envelope` (the same visits
+`probe_visit_sweep` prints one line each for). A visit's length is from its
+admission to its departure, given as the median and the longest of the six;
+"left at" is the median age at which they started leaving. The budget is
+30 s with up to 10 s more for the way out; nothing failed to leave.
+
+| View | Font | Departed | Swung | Fell | Visit (s) median / longest | Left at (s) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 800×480 | Classic | 6/6 | 6/6 | 1/6 | 20.8 / 30.1 | 15.8 |
+| 800×480 | Matrix | 6/6 | 6/6 | 1/6 | 20.5 / 22.9 | 15.5 |
+| 800×480 | Sans | 6/6 | 6/6 | 1/6 | 20.5 / 23.4 | 15.6 |
+| 800×480 | Serif | 6/6 | 6/6 | 0/6 | 20.6 / 22.0 | 15.5 |
+| 1024×768 | Classic | 6/6 | 6/6 | 0/6 | 21.0 / 22.3 | 15.8 |
+| 1024×768 | Matrix | 6/6 | 6/6 | 2/6 | 22.4 / 28.4 | 15.3 |
+| 1024×768 | Sans | 6/6 | 6/6 | 1/6 | 22.1 / 25.5 | 15.6 |
+| 1024×768 | Serif | 6/6 | 6/6 | 1/6 | 22.4 / 28.1 | 15.9 |
+| 4:1 | Classic | 6/6 | 6/6 | 6/6 | 20.7 / 24.0 | 15.4 |
+| 4:1 | Matrix | 6/6 | 6/6 | 1/6 | 23.9 / 29.1 | 15.8 |
+| 4:1 | Sans | 6/6 | 6/6 | 1/6 | 23.5 / 30.2 | 15.5 |
+| 4:1 | Serif | 6/6 | 6/6 | 0/6 | 20.8 / 25.6 | 15.7 |
+| 480×800 | Classic | 6/6 | 6/6 | 0/6 | 22.4 / 30.3 | 15.2 |
+| 480×800 | Matrix | 6/6 | 6/6 | 0/6 | 22.2 / 24.0 | 13.4 |
+| 480×800 | Sans | 6/6 | 6/6 | 0/6 | 21.6 / 22.6 | 15.4 |
+| 480×800 | Serif | 6/6 | 6/6 | 0/6 | 21.4 / 22.7 | 16.2 |
+
+Every visit swung at least once. Falls are landings on the floor, every one
+recovered from: after a line cut by the silk crossing a cell on the way up,
+or, in the 4:1 view in Classic, when the entry's swing sets the spider down
+on the floor under the low digits, which ends that climb at once and sends
+it up by the floor's own route.
+
+**What the tests prove.**
+
+- The drawn line is the physical one, every tick: exactly one line
+  primitive per silk line or shot, from the body to the anchor the physics
+  has, and nothing of the spider drawn once it has gone. The published
+  `anchor` and `shooting` agree with the fixture.
+- The spider stays on the drawn face while the digits move: through a
+  minute change by a contiguous forward minute, the old glyph slides out
+  under the spider, which rides the departing cell with its legs' hold
+  inside the cell's visible footprint and on a drawn cell every tick, is let
+  go as the cell is retired at the band's edge or carries it off its drawn
+  part, recovers, and departs; the time shows the new minute.
+- Visits repeat within their budgets beside residents: three automatic
+  Demo visits beside the fixture's three balls, the spider's claim within
+  its budget and the arena within capacity every tick, at most one joint,
+  at most 233 proxies, one physical step a tick, the balls still there
+  after each, the reuse delay set once per departure from its own tick, and
+  one world all along.
+- A first visit makes the run its world, kept for the run; two fixtures and
+  a duck visit leave the spider no room, which the catalog reports as
+  `capacity`, and a preview meanwhile is turned away by the visitor rule
+  before the arena is asked, changing nothing: the duck's visit goes on
+  untouched.
+- Off admits no spider in two minutes while a manual preview still does;
+  Calm brings one in after its idle wait.
+- From #383: exact replay, bounded drawing, the schedule and reuse delay,
+  busy notices for a duck, a crow, a player's duck, Rain and Meltdown,
+  exclusion both ways for every kind, the time changing under a crawl and a
+  swing, a way out that keeps going from under the spider ending in a
+  reported failed exit, pause, disable, resize, residents preserved. From
+  #382: every hold against the published contract and the drawn face,
+  proxies against every event's publication, retirement under the spider,
+  a glyph coming between, the frame, refusals, the paused clock and the end
+  of the run. From #381: the mechanic's own contact, reach, grip, slack and
+  taut swings, reeling, line replacement, release velocity, occlusion and
+  anchor removal.
+
+**Caps and timing.** 30-second budget, five-second reserve, the way out
+reckoned at five seconds plus the climb to the ceiling at the reel's pace
+and the crawl along it, ten seconds of exit grace, 233 proxies, one line at
+a time, the spider's arena budget of 239 bodies, 239 colliders and one
+joint. Clock's silk crosses the room in three seconds down and four up, the
+spider crawls at seven radii a second, and a swing lets out at most three
+pitches of line.
+
+**Benchmarks.** `./benchmark-clock.sh --cases spider` runs one visit per
+cycle of the budget, the exit grace and the cooldown in the headless client,
+with the digits' proxies reposed as the seconds change. On the development
+workstation at 1024×768, raster scale 1, three independent 69-second runs
+each (CPU-only: no drawing, upload or vsync):
+
+| Case | step ms/frame | scene | prepare | total | worst row p95 |
+| --- | --- | --- | --- | --- | --- |
+| idle | 0.004–0.006 | 0.024–0.028 | 1.72–1.94 | 1.75–1.97 | 2.93–3.27 |
+| spider | 0.026–0.041 | 0.023–0.032 | 1.68–2.08 | 1.73–2.15 | 2.82–3.04 |
+| residents | 0.008–0.014 | 0.023–0.031 | 1.69–2.05 | 1.72–2.10 | 2.85–2.98 |
+
+The spider's physics, its frame and up to 233 proxies cost about 0.02–0.035
+ms a tick here, over the empty arena's step; the frame's cost is the raster
+preparation of the face in every case.
+
+**Picade (2026-11-02).** The same source (`8e7a9ed3`, the pull request's
+head), built by the Yocto recipe for `raspberrypi-spacewars` (release,
+aarch64, `pi-kiosk-gpu`; `engine-client` SHA-256
+`d49ae20519ab58df20781b284b6244ad7d9a7eecc3bf3beec3245d45d287075c`,
+compatibility `cbf51bf0…`), on `sw-picade`: Raspberry Pi 4 Model B Rev 1.4,
+Linux `6.6.63-v8`, HDMI 1024×768 at 60 Hz, FemtoVG on V3D 4.2.14.0 with Mesa
+25.1.6, renderer preference `raster` at scale 1, the cabinet's own settings
+(24-hour, Classic, Calm, twelve event switches; the spider defaulted to On).
+The fast updater refused the cabinet's installed runtime (`de3ca81f…`, an
+image from `e150c7a6`, before the OS manager's development installs), so
+nothing was installed: the bundle's client and CLI ran from tmpfs under the
+kiosk unit through a runtime drop-in with a copy of the settings, and the
+kiosk was returned to its installed client afterwards.
+
+Three previewed visits (`spacewars-cli clock trigger spider`), the third
+beside the floor's soil resident, each departed with `failed_exit=false`. The
+first, screenshot-free, made the run's world and left after 1257 arena steps
+(21.0 s). The second, with a screenshot at every phase change (the captures
+in the [Spider visitor](#spider-visitor) section), came down the beam line in
+2.4 s, climbed under the digit by the hatch, fell and recovered from the
+floor, climbed on two more digits, entered a swing under the 9 at 10.5 s,
+decided to leave at 11.0 s, shot a line to the ceiling's right at 14.0 s,
+crawled along the ceiling to the hatch as the clock turned 17:50 beneath it,
+and was gone at 23.4 s (1 climb, 1 fall, 2 recoveries, 50 proxies). The
+third, screenshot-free, climbed at 2.9 s, swung from 4.0 to 5.7 s, crawled
+over the digit including a crossing at 14.6 s, fell and recovered at 15.8 s,
+left from 16.9 s by a line to a digit and then to the beam, and was gone at
+22.5 s (3 climbs, 1 swing, 2 falls, 2 recoveries, 52 proxies). The CLI polled
+the published state twice a second throughout; the live `status` window
+spanning the third visit reported a step of 2.3 ms mean, 3.1 ms p95 and 6.8
+ms max, and frame intervals of 16.67 ms mean, 16.81 ms p95 and 18.2 ms max.
+
+Four basic KMS traces of 240 loops, without screenshots (`spacewars-cli host
+render-trace start`/`read`; intervals from consecutive `flip_kernel_us`,
+skipped refreshes from `flip_sequence`; loop CPU is the CPU-observed loop
+time, not GPU execution):
+
+| Trace | Completed flips | Mean Hz | Interval p95 / max (ms) | Skipped refreshes | Loop CPU mean / max (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| First visit, descent | 240 | 60.004 | 16.668 / 16.702 | 0 | 4.75 / 7.85 |
+| Third visit, descent | 240 | 60.004 | 16.668 / 16.675 | 0 | 7.26 / 10.78 |
+| Third visit, crawling (7–12 s) | 240 | 60.004 | 16.668 / 16.684 | 0 | 7.30 / 10.52 |
+| Third visit, leaving (17–22 s) | 240 | 60.007 | 16.668 / 16.681 | 0 | 7.29 / 12.59 |
+
+CPU-only benchmarks on the same cabinet with the kiosk paused in the
+background, the copied script and the tmpfs client: 1024×768, raster scale 1,
+seed 7, 69 simulated seconds after two of warm-up, three independent
+processes per case. The governor stayed `ondemand`; readings before and after
+each run ranged over 66–76 °C and 1.1–1.5 GHz, so throttling is not ruled
+out.
+
+| Case | step ms/frame | scene | prepare | total | worst row p95 |
+| --- | --- | --- | --- | --- | --- |
+| idle | 0.074–0.076 | 0.125–0.129 | 7.14–7.32 | 7.34–7.53 | 8.23–8.63 |
+| spider | 0.281–0.291 | 0.136–0.141 | 7.13–7.37 | 7.55–7.80 | 8.85–10.04 |
+| residents | 0.127–0.134 | 0.125–0.129 | 7.15–7.35 | 7.41–7.62 | 8.69–9.03 |
+
+The spider's physics, frame and proxies cost about 0.21 ms a tick on the Pi
+4 over idle's step, with at most 95 bodies and colliders in the fixture; the
+frame's cost is the raster preparation of the face in every case, about 7.2
+ms there, and the live display held every refresh in the traced windows.
+
 ## Device captures
 
 The stored captures retain their original RGB pixels; their alpha channels were
@@ -2671,3 +3616,6 @@ original saved settings were restored after the check.
 [Live Clock controls](screenshots/clock/live-controls.png) ·
 [Falling preview](screenshots/clock/live-falling.png) ·
 [Color Cycle replacing Falling](screenshots/clock/live-color-cycle.png)
+
+The Grass introduction also starts a temporary sunlight opportunity. See
+[ceiling timing, material ownership and measured decline](clock-ceiling.md).

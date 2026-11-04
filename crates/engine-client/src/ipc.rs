@@ -50,6 +50,7 @@ struct ControlRequest {
 #[cfg(unix)]
 #[derive(Debug)]
 enum ControlCommand {
+    Health(spacewars_control::HealthRequest),
     InputPress(InputPressRequest),
     Screenshot { output: PathBuf },
     Status,
@@ -168,6 +169,28 @@ pub fn control_socket_path() -> PathBuf {
 }
 
 #[cfg(unix)]
+fn health_state(nonce: u64) -> spacewars_control::HealthState {
+    thread_local! { static RESPONSES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) }; }
+    let ui_responses = RESPONSES.with(|count| {
+        let next = count.get().saturating_add(1);
+        count.set(next);
+        next
+    });
+    #[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
+    let presented_frames = i_slint_backend_linuxkms::profiling::presented_frames();
+    #[cfg(not(all(target_os = "linux", feature = "pi-kiosk")))]
+    let presented_frames = None;
+    spacewars_control::HealthState {
+        schema_version: spacewars_control::HEALTH_SCHEMA_VERSION,
+        nonce,
+        process_id: std::process::id(),
+        build_revision: env!("SPACEWARS_BUILD_REVISION").into(),
+        ui_responses,
+        presented_frames,
+    }
+}
+
+#[cfg(unix)]
 pub fn start_control_server(
     window: &MainWindow,
     socket_path: PathBuf,
@@ -237,7 +260,14 @@ fn spawn_listener(
     }
 
     let listener = UnixListener::bind(&socket_path)?;
-    fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))?;
+    let mode = if socket_path == Path::new(spacewars_control::KIOSK_CONTROL_SOCKET) {
+        // The runtime directory is owned by the kiosk service. Its group also
+        // admits the independent root service with its restricted capabilities.
+        0o660
+    } else {
+        0o600
+    };
+    fs::set_permissions(&socket_path, fs::Permissions::from_mode(mode))?;
     tracing::info!(path = %socket_path.display(), "control socket listening.");
 
     thread::spawn(move || {
@@ -285,6 +315,19 @@ fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<C
 fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
     let mut lines = body.lines();
     match lines.next() {
+        Some(spacewars_control::HEALTH_COMMAND) => {
+            let payload = lines
+                .next()
+                .ok_or_else(|| invalid_mutation_request("health requires one JSON request line"))?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "health accepts exactly one JSON request line",
+                ));
+            }
+            spacewars_control::HealthRequest::from_json(payload)
+                .map(ControlCommand::Health)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
         Some(INPUT_PRESS_COMMAND) => {
             let payload = lines.next().ok_or_else(|| {
                 invalid_mutation_request("input press requires one JSON request line")
@@ -635,6 +678,22 @@ fn handle_request(
     scenario_controls: &host::SharedScenarioControls,
     input_automation: &mut InputAutomation,
 ) {
+    if (window.get_install_fenced() || window.get_updates_visible())
+        && !matches!(
+            &request.command,
+            ControlCommand::Health(_)
+                | ControlCommand::UiState
+                | ControlCommand::Status
+                | ControlCommand::Screenshot { .. }
+                | ControlCommand::UiPress(_)
+                | ControlCommand::UiActivate(_)
+        )
+    {
+        request
+            .response
+            .error("Install handoff blocks app mutations.");
+        return;
+    }
     match request.command {
         ControlCommand::InputPress(press) => {
             input_automation.press(window, press, request.response, ui_state_tracker)
@@ -665,6 +724,15 @@ fn handle_request(
         }
         ControlCommand::Status => {
             let mut diagnostics = window.get_runtime_diagnostics().to_string();
+            if !window.get_launcher_visible()
+                && !window.get_launcher_busy()
+                && let Some(status) = scenario_controls.borrow().pizza_status()
+            {
+                diagnostics.push_str("\npizza=");
+                diagnostics.push_str(
+                    &serde_json::to_string(status).expect("bounded Pizza status serializes"),
+                );
+            }
             diagnostics.push_str(&format!(
                 "\nraster_upload_format={}",
                 crate::raster::publication::requested_format().name(),
@@ -695,6 +763,16 @@ fn handle_request(
                 window.get_settings_save_pending()
             ));
             request.response.ok(diagnostics);
+        }
+        ControlCommand::Health(health) => {
+            // Exercise presentation while the launcher or a paused game is
+            // otherwise static. This is not user input and does not affect idle
+            // or postponement accounting. The next sample observes completion.
+            window.window().request_redraw();
+            match serde_json::to_string(&health_state(health.nonce)) {
+                Ok(json) => request.response.ok(json),
+                Err(error) => request.response.error(error.to_string()),
+            }
         }
         ControlCommand::UiState => {
             match ui_state(window, ui_state_tracker).and_then(|state| state.to_json()) {
@@ -1160,6 +1238,26 @@ fn validate_clock_trigger(
             ControlFailureCode::ActionUnavailable,
             "A crow is already visiting; wait for departure",
         ))
+    } else if clock
+        .events
+        .iter()
+        .any(|event| event.kind == request.event && event.blocked_by_spider)
+    {
+        Some((
+            ControlFailureCode::ActionUnavailable,
+            if clock.spider.is_some() {
+                "A spider is visiting; wait for departure"
+            } else {
+                "The spider waits for the duck, crow or event to finish"
+            },
+        ))
+    } else if let Some(unavailable) = clock
+        .events
+        .iter()
+        .find(|event| event.kind == request.event)
+        .and_then(|event| event.blocked_by_arena)
+    {
+        Some((ControlFailureCode::ActionUnavailable, unavailable.notice()))
     } else if !clock.can_trigger {
         Some((
             ControlFailureCode::ActionUnavailable,
@@ -1402,6 +1500,7 @@ fn validate_ui_preconditions(
 #[cfg(unix)]
 fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState, ProtocolError> {
     let screen = classify_screen(ScreenVisibility {
+        updates: window.get_updates_visible() || window.get_install_fenced(),
         launcher_busy: window.get_launcher_busy(),
         sound: window.get_sound_visible(),
         device_info: window.get_device_info_visible(),
@@ -1425,6 +1524,9 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            updates_controls: crate::updates::inventory(window),
+            updates_focus: window.get_updates_focus(),
+            updates_message: window.get_updates_message().to_string(),
             genome_controls: if window.get_genomes_visible() {
                 crate::genome_controls::inventory(window)
             } else {
@@ -1479,6 +1581,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             selected_scenario: selected_scenario.clone(),
             world_seed: window.get_launcher_seed_text().to_string(),
             launcher_focus_index: window.get_launcher_focus_index(),
+            launcher_show_all: window.get_launcher_show_all(),
             launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
             launcher_controls_focus_index: window.get_launcher_controls_focus_index(),
             ingame_menu_focus_index: window.get_ingame_menu_focus_index(),
@@ -1512,7 +1615,12 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             spacewars_player_1: window.get_launcher_p1_controller().to_string(),
             spacewars_player_2: window.get_launcher_p2_controller().to_string(),
             pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
+            pizza_live_ball_limit: window.get_launcher_pizza_live_ball_limit_text().to_string(),
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
+            pizza_automatic_events: window.get_launcher_pizza_automatic_events(),
+            pizza_event_available: window.get_pizza_event_available(),
+            pizza_event_can_trigger: window.get_pizza_event_can_trigger(),
+            pizza_event_status: window.get_pizza_event_status().to_string(),
             expedition_players: window.get_launcher_expedition_players().to_string(),
             clock_time_format: window.get_launcher_clock_time_format().to_string(),
             clock_show_date: window.get_launcher_clock_show_date(),
@@ -1530,6 +1638,10 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_aquarium_enabled: window.get_launcher_clock_aquarium_enabled(),
             clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
             clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
+            clock_cell_swap_enabled: window.get_launcher_clock_cell_swap_enabled(),
+            clock_grass_enabled: window.get_launcher_clock_grass_enabled(),
+            clock_slot_machine_enabled: window.get_launcher_clock_slot_machine_enabled(),
+            clock_spider_enabled: window.get_launcher_clock_spider_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
                 window.get_launcher_clock_rain_amount().to_string()
             } else {
@@ -1635,17 +1747,25 @@ mod tests {
         for event in ClockEventKind::ALL {
             let request = ClockTriggerRequest::new(&clock, event);
             let result = validate_clock_trigger(&request, &ui, &clock);
-            if clock
+            let entry = clock
                 .events
                 .iter()
                 .find(|entry| entry.kind == event)
-                .unwrap()
-                .blocked_by_duck
-            {
+                .unwrap();
+            if entry.blocked_by_duck {
                 let failure = result.unwrap_err();
                 assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
                 assert!(failure.message.contains("dismiss the duck"));
                 assert_eq!(failure.current_clock_state, Some(clock.clone()));
+            } else if entry.blocked_by_spider {
+                // The spider waits for the player's duck; none is visiting.
+                assert_eq!(event, ClockEventKind::Spider);
+                let failure = result.unwrap_err();
+                assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+                assert_eq!(
+                    failure.message,
+                    "The spider waits for the duck, crow or event to finish"
+                );
             } else {
                 result.unwrap();
             }
@@ -1671,6 +1791,22 @@ mod tests {
             &clock,
         )
         .unwrap();
+        // Whatever the run's arena would refuse is unavailable, for its reason.
+        let mut refused = clock.clone();
+        let rain = refused
+            .events
+            .iter_mut()
+            .find(|event| event.kind == ClockEventKind::Rain)
+            .unwrap();
+        rain.blocked_by_arena = Some(engine_common::ClockArenaUnavailable::LayoutIncompatible);
+        let request = ClockTriggerRequest::new(&refused, ClockEventKind::Rain);
+        let failure = validate_clock_trigger(&request, &ui, &refused).unwrap_err();
+        assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+        assert_eq!(
+            failure.message,
+            engine_common::ClockArenaUnavailable::LayoutIncompatible.notice()
+        );
+        assert_eq!(failure.current_clock_state, Some(refused));
         let request = ClockTriggerRequest::new(&clock, ClockEventKind::Marquee);
         ui.screen = UiScreen::PauseMain;
         assert_eq!(
@@ -1940,6 +2076,7 @@ mod tests {
                 assert_eq!(output, PathBuf::from("/tmp/shot.png"));
             }
             ControlCommand::Status
+            | ControlCommand::Health(_)
             | ControlCommand::InputPress(_)
             | ControlCommand::UiState
             | ControlCommand::UiPress(_)
@@ -2000,6 +2137,39 @@ mod tests {
             Ok(ControlCommand::Status)
         ));
         assert!(parse_command("status\nextra\n").is_err());
+    }
+
+    #[test]
+    fn health_requires_a_single_versioned_challenge() {
+        assert!(matches!(
+            parse_command("health\n{\"schema_version\":1,\"nonce\":42}\n"),
+            Ok(ControlCommand::Health(spacewars_control::HealthRequest {
+                nonce: 42,
+                ..
+            }))
+        ));
+        for body in [
+            "health\n",
+            "health\n{\"schema_version\":2,\"nonce\":42}\n",
+            "health\n{\"schema_version\":1,\"nonce\":42}\nextra\n",
+            "health\n{\"schema_version\":1,\"nonce\":42,\"healthy\":true}\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn health_responses_advance_and_keep_the_callers_challenge() {
+        let first = health_state(42);
+        let second = health_state(43);
+        assert_eq!(first.nonce, 42);
+        assert_eq!(second.nonce, 43);
+        assert_eq!(first.process_id, std::process::id());
+        assert_eq!(first.build_revision, env!("SPACEWARS_BUILD_REVISION"));
+        assert_eq!(second.ui_responses, first.ui_responses + 1);
+        // Unit tests have not activated a DRM output. UI responses alone are
+        // deliberately insufficient to confirm presentation health.
+        assert_eq!(first.presented_frames, None);
     }
 
     #[test]

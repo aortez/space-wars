@@ -1,18 +1,18 @@
 use super::*;
-use crate::events::duck::DuckEvent;
+use crate::events::duck::{ArenaTerrain, DuckEvent, DuckView};
 
-pub(super) fn render(frame: &mut RenderFrame, event: &DuckEvent, debug: bool) {
+pub(super) fn render(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool) {
     render_with_course(frame, event, debug, true);
 }
 
 pub(super) fn render_with_course(
     frame: &mut RenderFrame,
-    event: &DuckEvent,
+    event: &DuckView<'_>,
     debug: bool,
     draw_course: bool,
 ) {
     if draw_course {
-        render_arena(frame, event, event.arena_opacity());
+        render_arena(frame, &event.terrain, event.arena_opacity());
     }
     let opacity = event.course_opacity();
     if opacity <= 0.0 {
@@ -21,42 +21,42 @@ pub(super) fn render_with_course(
     render_actor(frame, event, debug, opacity);
 }
 
-pub(super) fn render_arena(frame: &mut RenderFrame, event: &DuckEvent, opacity: f32) {
+pub(super) fn render_arena(frame: &mut RenderFrame, terrain: &ArenaTerrain, opacity: f32) {
     if opacity <= 0.0 {
         return;
     }
-    if let Some(drain) = event.drain_floor {
+    if let Some(drain) = terrain.drain_floor {
         // Preserve the original bank geometry and edge styling on handoff.
-        render_floor(frame, drain.geometry(), event.layout.pitch, opacity);
+        render_floor(frame, drain.geometry(), terrain.layout.pitch, opacity);
         return;
     }
-    let layout = event.layout;
-    if let Some(course) = &event.course {
+    let layout = terrain.layout;
+    if let Some(course) = &terrain.course {
         let spans = course.surfaces.iter().map(|surface| {
-            let a = event
+            let a = terrain
                 .render_position(Vec2::new(surface.start.max(0.0), 0.0))
                 .x;
-            let b = event
-                .render_position(Vec2::new(surface.end.min(event.width), 0.0))
+            let b = terrain
+                .render_position(Vec2::new(surface.end.min(terrain.width), 0.0))
                 .x;
             (a.min(b), a.max(b), surface.height)
         });
         course_slabs(frame, layout, opacity, spans);
     } else {
-        let pit = event.obstacles[1];
-        for (start, end) in [(0.0, pit.start), (pit.end, event.width)] {
+        let pit = terrain.obstacles[1];
+        for (start, end) in [(0.0, pit.start), (pit.end, terrain.width)] {
             slab(
                 frame,
-                event,
+                terrain,
                 Vec2::new(start, layout.bounds_min.y),
                 Vec2::new(end, layout.floor_y),
                 opacity,
             );
         }
-        for obstacle in event.obstacles.iter().filter(|o| o.height > 0.0) {
+        for obstacle in terrain.obstacles.iter().filter(|o| o.height > 0.0) {
             slab(
                 frame,
-                event,
+                terrain,
                 Vec2::new(obstacle.start, layout.floor_y),
                 Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
                 opacity,
@@ -65,7 +65,7 @@ pub(super) fn render_arena(frame: &mut RenderFrame, event: &DuckEvent, opacity: 
     }
 }
 
-fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity: f32) {
+fn render_actor(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool, opacity: f32) {
     let radius = event.radius;
     let orange = RenderColor::rgb(1.0, 0.48, 0.08);
     if debug && let Some(arc) = event.debug_arc() {
@@ -121,6 +121,8 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity
         );
     }
     let yellow = RenderColor::rgb(1.0, 0.88, 0.12);
+    let ledge = event.ledge_state();
+    let attached = event.ledge_anchor().is_some();
     // Code-native pixel art renders identically through both presentation paths.
     let rows = [
         "       YYYY  ",
@@ -161,7 +163,7 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity
             );
         }
     }
-    let stride = if event.feet_moving() {
+    let stride = if !attached && event.feet_moving() {
         ((event.tick / 6) % 2) as f32 * pixel
     } else {
         0.0
@@ -175,13 +177,54 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity
                 } else {
                     -offset_x - pixel * 2.0
                 },
-                -radius,
+                if attached { -radius * 0.45 } else { -radius },
             );
         rect(
             frame,
             event,
             min,
             min + Vec2::new(pixel * 2.0, pixel),
+            orange,
+            ACTIVE_CELL_LAYER,
+            1.0,
+        );
+    }
+    // Pose-only wings meet the authoritative anchor; they add no collision hull
+    // or animation-driven movement. Both adapters consume these same primitives.
+    if ledge.phase != engine_common::ClockDuckLedgePhase::Free {
+        let shoulder = position + Vec2::new(event.facing() * radius * 0.2, radius * 0.3);
+        let hand = event.ledge_anchor().map_or_else(
+            || {
+                position
+                    + Vec2::new(
+                        event.facing() * radius * 1.3,
+                        if ledge.phase == engine_common::ClockDuckLedgePhase::Reaching {
+                            radius * 2.0
+                        } else {
+                            0.0
+                        },
+                    )
+            },
+            |anchor| Vec2::new(anchor.x * event.direction + event.width * 0.5, anchor.y),
+        );
+        let elbow = (shoulder + hand) * 0.5 + Vec2::new(-event.facing() * pixel, -pixel);
+        for (from, to) in [(shoulder, elbow), (elbow, hand)] {
+            let from = event.render_position(from);
+            let to = event.render_position(to);
+            frame.push_primitive(
+                ACTIVE_CELL_LAYER,
+                RenderPrimitive::Line(engine_common::RenderLine::new(
+                    RenderPoint::new(from.x, from.y),
+                    RenderPoint::new(to.x, to.y),
+                    Stroke::new(yellow, pixel),
+                )),
+            );
+        }
+        rect(
+            frame,
+            event,
+            hand - Vec2::splat(pixel * 0.5),
+            hand + Vec2::splat(pixel * 0.5),
             orange,
             ACTIVE_CELL_LAYER,
             1.0,
@@ -225,14 +268,14 @@ fn course_slabs(
     }
 }
 
-fn slab(frame: &mut RenderFrame, event: &DuckEvent, min: Vec2, max: Vec2, opacity: f32) {
-    let a = event.render_position(min);
-    let b = event.render_position(max);
+fn slab(frame: &mut RenderFrame, terrain: &ArenaTerrain, min: Vec2, max: Vec2, opacity: f32) {
+    let a = terrain.render_position(min);
+    let b = terrain.render_position(max);
     floor::slab(
         frame,
         Vec2::new(a.x.min(b.x), a.y),
         Vec2::new(a.x.max(b.x), b.y),
-        event.layout.pitch,
+        terrain.layout.pitch,
         opacity,
     );
 }

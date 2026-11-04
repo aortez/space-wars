@@ -3,8 +3,13 @@ use super::*;
 use rapier2d::{parry::query::DefaultQueryDispatcher, prelude::QueryPipeline};
 
 mod areas;
+mod lighting;
 pub use areas::{
     AreaValidation, QueryArea, QueryChange, QueryColliderState, QueryFrame, RegionChanges,
+};
+pub use lighting::{
+    LightingVisibility, MAX_LIGHT_COLLIDERS, MAX_LIGHT_FOOTPRINTS, MAX_OPTICAL_EXCLUSIONS,
+    OpaqueFootprint, VisibilityCounters, light_collider_id,
 };
 
 #[derive(Clone)]

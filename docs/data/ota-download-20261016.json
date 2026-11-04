@@ -1,0 +1,154 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-16T22:31:16.242485+00:00",
+  "source_commit": "c323dc0938237096eb14f2551f6fa1a14e869558",
+  "branch": "feat/ota-updates-254",
+  "issue": "https://github.com/aortez/space-wars/issues/265",
+  "scope": "Bounded HTTPS signed-feed check and image staging library; device service, scheduling and network-hold integration remain",
+  "source_files": {
+    "Cargo.lock": "8af431d2e46523f5cf8e1347cdc04b7293b27e645be8994729b006a8c2897347",
+    "crates/engine-ota/Cargo.toml": "23981fc13b89ac06f70fa321594101139bb13ad689381ed1f7269f7eabb5f553",
+    "crates/engine-ota/src/download.rs": "f034964040c8341842d3d4f687311b7cb3c0dd02cf4f3473050a1ee022b1cfe1",
+    "crates/engine-ota/src/download_tests.rs": "88469d62d029f471229219574f8a26ae2fb8514993e0ea905e3b1293ce0f15b4",
+    "crates/engine-ota/src/lib.rs": "730a8e16a5289ccb8ba34c161c3e15f36dc0259703a9136691b95686e3de523c",
+    "crates/engine-ota/src/staging_linux.rs": "46c0d6ea5eb510451ff93978775fc85518b81d13ae2eba85c10a236faedbd953",
+    "crates/engine-ota/src/staging_tests.rs": "1db413f112d423153218a108ca7c604c4cef7184c4bf3f66a8fb921d7f5f9ab2",
+    "crates/engine-ota/tests/fixtures/download-localhost-cert.der": "af175dbb50d57410b3c8cc1889ff963525ab12dec8803bf567670eea5c6b9799",
+    "crates/engine-ota/tests/fixtures/download-localhost-key.pk8": "5fb59406c37ec9952700c2a9a51f20ebb35225402a15753f36cbb00e7c7d1a45",
+    "docs/ota-updates.md": "510a7dab21ca19f09cbed196b85ebfc7f55d442cae20adf82833040bec4bd4d6",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "102c3f71484aee41f06e73ca0345315cc62baa35cd3657d262668ec19a47e61b"
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked -p engine-ota -- --test-threads=1",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-download-full-final.log",
+      "sha256": "c23af65009383f8f6b395e1dbb7011c54e0bf4f11acec4f67e7cf9bee8fb7443",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.63s",
+        "test result: ok. 275 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 179.70s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-download-clippy-final.log",
+      "sha256": "0b5df825559ed99987f40db654f9fd6986969538585115e22f2086dbc12e658a",
+      "results": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.43s"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-download-msrv-final.log",
+      "sha256": "b2cb7f4b24b0242ed826bd225e7cedb5f1dd2825a16cafab4b4d46cfeee14130",
+      "results": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.91s"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --locked -p engine-ota --target aarch64-unknown-linux-gnu --no-run --message-format=json",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-download-arm-final.log",
+      "sha256": "20956086d06b4660501875e462b9aa2e2b28a6598a987884388558ea6ca7f5c1",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.41s"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-download-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "results": [],
+      "exit_code": 0
+    }
+  ],
+  "yocto_helpers": {
+    "command": "Python unittest Yocto helper suite (71 tests)",
+    "path": "/home/data/workspace/space-wars-ota/target/ota-download-yocto.log",
+    "sha256": "b12743d97d9e691afe3f9e2271553794b16aa5fd5839631b355a16692d259566",
+    "results": [
+      "Ran 71 tests in 28.653s",
+      "OK"
+    ]
+  },
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "fixture_directory": "/data/spacewars/ota-download-fixtures.jSAKTx",
+      "data_free_bytes_before": 94319706112,
+      "artifact": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-download-arm-final-tests",
+        "sha256": "89c89a36f85587871ba7501c597d81a0267e51abd2c5a55baaf1985a34599c5b",
+        "bytes": 26811328
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 264 filtered out; finished in 13.74s",
+      "network": "Loopback HTTP/HTTPS fixture servers only, plus workstation SSH for the test run",
+      "production_staging_opened": false,
+      "installed_service_changes": false,
+      "root_partition_writes": false,
+      "reboots": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "fixture_directory": "/data/spacewars/ota-download-fixtures.y85JWj",
+      "data_free_bytes_before": 44368056320,
+      "artifact": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-download-arm-final-tests",
+        "sha256": "89c89a36f85587871ba7501c597d81a0267e51abd2c5a55baaf1985a34599c5b",
+        "bytes": 26811328
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 264 filtered out; finished in 29.28s",
+      "network": "Loopback HTTP/HTTPS fixture servers only, plus workstation SSH for the test run",
+      "production_staging_opened": false,
+      "installed_service_changes": false,
+      "root_partition_writes": false,
+      "reboots": false
+    }
+  ],
+  "fixture_method": {
+    "metadata": "Ephemeral signed Release/Nightly TUF feeds, loopback HTTP servers and real local TLS handshakes",
+    "payload": "Small nonbootable zstd fixtures with signed compressed and expanded lengths/digests",
+    "tls": "Public test-only localhost certificate and private key; production uses platform certificate verification",
+    "timing": "CLOCK_BOOTTIME with injected offset for suspend/deadline cases; no host clock changes",
+    "pi_filesystem": "Private UID 1000 fixture directories under /data/spacewars; production root-owned staging opener not used"
+  },
+  "test_coverage": [
+    "Completed bytes reverified without another image download",
+    "Cancelled/interrupted transfers resume with exact Range and strong If-Range validator",
+    "Inconsistent range/validator/416 permits one full restart; ignored Range consumes full 200 without an extra request",
+    "Refusals, rate limits and server failure retain partial bytes without retry",
+    "Invalid lengths, encoding and corrupt bytes cannot publish Ready",
+    "Unknown, lost, expired and backwards time; latest observed time persists after cancellation",
+    "No candidate or installed/unselected channel clears obsolete staging without image download",
+    "HTTPS redirect, credential, downgrade and request limits; metadata/query diagnostic redaction",
+    "Real TLS valid certificate accepted; unknown CA and wrong hostname rejected before HTTP",
+    "Stalled headers/body cancelled by independent preparation, progress and session deadlines"
+  ],
+  "harness_note": "Full host suite used the serial runner because pre-existing bootstrap fixture concurrency failures reproduce on the unchanged baseline; see ota-staging-20261016.json. No shared-target baseline builds ran during this validation.",
+  "remaining": [
+    "Persistent boot/daily time and OTA schedulers with independent retry/due state",
+    "Device-service worker and visible read-only status plus coalesced Check now",
+    "Network/time admission and independent owned-hold renewal/release, including early NTP handoff",
+    "Production private staging provisioning and authoritative device/history refresh",
+    "Low-priority worker execution and outbound-IP service sandbox integration",
+    "Production signing/feed, final installer service and Ask/Automatic policy",
+    "Supervised bootstrap and physical recovery, data preservation and frame-time qualification"
+  ],
+  "live_installation_performed": false,
+  "auto_update_enabled": false,
+  "pushed": false
+}

@@ -1,0 +1,684 @@
+{
+  "active_ssh": {
+    "activation": {
+      "returncode": 0,
+      "stderr": "",
+      "stdout": ""
+    },
+    "evidence": "Activation harness completed with exit 0; saved trace collected read-only from the Pi 5 drive.",
+    "samples": 6,
+    "seconds": 30,
+    "wireless_remained_enabled": true
+  },
+  "date": "2026-10-18",
+  "detached_pi5": {
+    "full_radio_cycle_result": "Failed: off observed at 121 seconds; manual time request was skipped as recent-success; automatic OTA check never started.",
+    "independent_restore_seconds": 540,
+    "offline_collection": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/pi5-offline-cav3543x",
+    "offline_recovery": {
+      "after_sha256": "e5f91b9f97cc4c7c51215fe91ac69077131d289e97ea59c839c1968bc75ddb49",
+      "applied": true,
+      "before_sha256": "ad1fec4ae2529e40890a1e7be598646d09ad0327b71feda1feb195b79bce0b4f",
+      "offline_readback_verified": true,
+      "post_boot_verification": "passed: SSH, original service, kiosk, committed image, clean radio state and successful Release check",
+      "report": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/pi5-network-recovery-b5ghh3h_/result.json",
+      "scope": "Exact-state radio ownership reset with partial-offline disabled; generation 458 to 459; OTA records, boot files and image preserved.",
+      "validation": "Real controller reproduces SSH rejection from collected state and admits SSH from recovered state without radio writes. Validator uses controller/store source identical to installed f58d725."
+    },
+    "outcome": "Read-only offline collection recovered 576 samples. Cleanup enabled Wi-Fi but retained owned_off=true, an enable transition in returned phase, and external-radio-change suspension. This state blocks SSH admission across reboot.",
+    "owner_recovery_requested": true,
+    "partial_restoration": {
+      "policy_partial_offline": false,
+      "runtime_restored_marker": true,
+      "ssh_recovered": true,
+      "update_channel": "release"
+    },
+    "physical_failure_cause": "Persisted radio reconciliation blocks SSH; why the monitor latched external-radio-change during cleanup still needs native signal tracing.",
+    "post_recovery": {
+      "boot_id": "8a3a1171-3b1f-4980-bcfe-d222bd7ba1f9",
+      "boot_phase": "committed",
+      "image_install_requested": false,
+      "image_source": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+      "kiosk_active": true,
+      "manual_check": "no-candidate",
+      "manual_check_error": null,
+      "original_service_restored": true,
+      "ota_channel": "release",
+      "owned_off": false,
+      "partial_offline": false,
+      "pending": null,
+      "runtime_drop_ins": [],
+      "service_healthy": true,
+      "startup_check": "failed: network-unavailable",
+      "suspended": null,
+      "wireless_available": true
+    },
+    "qualification_passed": false,
+    "reboot_observed_in_saved_update_state": "9b2a51fb-8f34-4f91-809a-d6b2e237156d",
+    "remote_evidence": "/data/spacewars-system/qualification/ota-idle-20261018-2",
+    "restoration_verified": true,
+    "retained_transition_boot_id": "27e98de1-0c2c-4356-ab26-e05d73307ba1",
+    "test_limit_seconds": 420,
+    "timeline_seconds": {
+      "due_offline_start": 123,
+      "first_offline": 121,
+      "handoff_start": 134,
+      "last_sample": 273
+    }
+  },
+  "files": {
+    "activation-failure.log": {
+      "bytes": 1600,
+      "sha256": "480c26836bea287f5a6b2e4d88a88af5c569438221bd47d83c94d12a3004402b"
+    },
+    "arm-tests-build.log": {
+      "bytes": 340,
+      "sha256": "26b4cb52f78063e0edc1fdfea2118b63f131a169bdc0b7b1c853e80c5c6a9879"
+    },
+    "build.json": {
+      "bytes": 3400,
+      "sha256": "9cf84e5757f026be0affbd37b3f0e0c764c73281a26f2dfe5f1a977601c63f39"
+    },
+    "build.log": {
+      "bytes": 19529,
+      "sha256": "6cbc186ef2c0d92e52e6b610f2e170b32a1c45f82681fed87e44aebb548d1446"
+    },
+    "clippy.log": {
+      "bytes": 554,
+      "sha256": "07b7a7c2a5ad5fc4334fd1b49a21552605c17bb7ae813d3c9698bb43c10b7c39"
+    },
+    "host-tests.log": {
+      "bytes": 22293,
+      "sha256": "525be314e7cfa567c9eb01e8990f1f209a9bf33f9162f376a9f78a55b5c37569"
+    },
+    "image-config-verification.json": {
+      "bytes": 3060,
+      "sha256": "316c8c63faa1f0964f354ed3a012bc137537f114372c17c68784fb734feaa67c"
+    },
+    "offline-recovery-validation.log": {
+      "bytes": 150,
+      "sha256": "fbd70efca93d69dc02e4ac4edbb9fd9348706b7db2c58cb9a36bd86fc8604516"
+    },
+    "partial-offline-2/activation.json": {
+      "bytes": 54,
+      "sha256": "6379c17d798191f995d43b0950ea7787779fe29c9af7354b25de37a514ff207d"
+    },
+    "partial-offline-2/restore-timer.json": {
+      "bytes": 18,
+      "sha256": "e00c803f2a3fac3717055bbf609ef9127241020adb3d07337c2929c77610f7de"
+    },
+    "partial-offline-2/start-intent.json": {
+      "bytes": 201,
+      "sha256": "577df7f9db6dadcf56bc4ce038994d1d49c82de33112a58e8e21709de7f3086c"
+    },
+    "partial-offline-2/start-response.json": {
+      "bytes": 18,
+      "sha256": "e00c803f2a3fac3717055bbf609ef9127241020adb3d07337c2929c77610f7de"
+    },
+    "pi4-session-tests.log": {
+      "bytes": 755,
+      "sha256": "817b40a9311d71225e0786977bb56b4e3be26f51579297420737e9969017f72e"
+    },
+    "pi5-after-offline-recovery.log": {
+      "bytes": 3998,
+      "sha256": "c2a1493d3cf91de75479171428560d4eadf6f514767ec93ed03fbb87d2e0f35b"
+    },
+    "pi5-after-recovery-services.log": {
+      "bytes": 1503,
+      "sha256": "3cc7928e8c51908bb8774e727f629d5e5ae39f68b42e7e9966e1939cef52064c"
+    },
+    "pi5-after-recovery-update-check.jsonl": {
+      "bytes": 2287,
+      "sha256": "8015708bbadb88d01a595dd0536da7cd82e44639b3a8c8aa26ffca203979b8d9"
+    },
+    "pi5-network-recovery-b5ghh3h_/result.json": {
+      "bytes": 272,
+      "sha256": "8eb30b8f3eb0e0498b201c90980124ca8934bab52b0eb501d9ac584857d62158"
+    },
+    "pi5-offline-cav3543x/data/spacewars-system/qualification/ota-idle-20261018-2/observations.jsonl": {
+      "bytes": 1231395,
+      "sha256": "020fee7466c3e2a9f224c471a24fa1b0c413281db6eeae84688ef2885d30b336"
+    },
+    "pi5-offline-cav3543x/data/spacewars-system/qualification/ota-idle-20261018-2/restore.log": {
+      "bytes": 2353,
+      "sha256": "a7827a481851b6c07c0d0d4056f973d2ae87ba3de92c57f2313d58dfe6a2b90b"
+    },
+    "pi5-offline-cav3543x/manifest.json": {
+      "bytes": 14080,
+      "sha256": "040772f0a199dfb979b98ebcc98a1b17b5786b063f8301b181f6f739cdb75769"
+    },
+    "pi5-reconnect-2.log": {
+      "bytes": 104,
+      "sha256": "fa3ddb1d1e4dfbefbddf9bd8cbbc4b774eb771c4353708669c6ebb89c73f7973"
+    },
+    "pi5-reconnect.log": {
+      "bytes": 104,
+      "sha256": "fa3ddb1d1e4dfbefbddf9bd8cbbc4b774eb771c4353708669c6ebb89c73f7973"
+    },
+    "pi5-recovery-final-status.log": {
+      "bytes": 3601,
+      "sha256": "34168fee8661e259938f46b5ff0f68d9a253ecca8210125c543b83bae65eda22"
+    },
+    "policy.json": {
+      "bytes": 291,
+      "sha256": "63a756ff0c5ee337cf85ab6c758e42ef51e84f6da2672825f6a0835e6c4ecdd3"
+    },
+    "qualification.log": {
+      "bytes": 304,
+      "sha256": "ebd9e83a329113b18852ec5ffeaabdc7ebed5d19955892e82635cfac41d91f6b"
+    },
+    "recover-pi5-network.py": {
+      "bytes": 9513,
+      "sha256": "ff11be03836258d643e45dc2df554d87638712143530b05f7068bcc4eecdadbc"
+    },
+    "source.patch": {
+      "bytes": 9215,
+      "sha256": "2d6770b2b096e1c54aacc9535a36211728a2fed656450523608762e4a085eeb1"
+    },
+    "ssh-native-qualification-2/after.json": {
+      "bytes": 4900,
+      "sha256": "ac196b2cd7169e962f962fa598e8438338112eb877925c155dab51a0f6e7b7ee"
+    },
+    "ssh-native-qualification-2/before.json": {
+      "bytes": 6158,
+      "sha256": "0abd6ab978ce21dcc4b49f53ec135707595e16aa3ab9dec5b9280a26798281f6"
+    },
+    "ssh-native-qualification-2/files.json": {
+      "bytes": 389,
+      "sha256": "22a271d16f1ce44f90cf4b6b4896e48963eede02561797dfeb3c1a6e6fc98706"
+    },
+    "ssh-native-qualification-2/fresh-login.log": {
+      "bytes": 37,
+      "sha256": "bfa32ca8ed42c911e0759908944579684df66b22d563739b28dd892b69a0d460"
+    },
+    "ssh-native-qualification-2/isolated-state.tar.gz": {
+      "bytes": 905,
+      "sha256": "315c8bed49d86a6f22d495e3afc847e74e151d7efd07e2b60168a062b0f13fe9"
+    },
+    "ssh-native-qualification-2/result.json": {
+      "bytes": 983,
+      "sha256": "7cc6a8a4d34f77dde6ba1b6456fa0ecdf445b76c164f4be9591fc7612f5f9290"
+    },
+    "ssh-native-qualification-2/run-isolated.log": {
+      "bytes": 947,
+      "sha256": "6add4501ea0b690ebab9a8d6089190e5be406de737750df7d009b1cd86d2ced1"
+    },
+    "ssh-native-qualification-2/run.log": {
+      "bytes": 92,
+      "sha256": "3e603e9834c0cec56d5cc352c8fe9c0e865162f6d324ad2fd48097321d178748"
+    },
+    "ssh-native-qualification/run.log": {
+      "bytes": 892,
+      "sha256": "d74ad32b14da84c1b0a5b1e4276ffdb29401490a3f2361050775cdf6b8fb7fbe"
+    },
+    "ssh-recovery-aarch64.log": {
+      "bytes": 280,
+      "sha256": "a6991cd1db0b042035a795be716c488a7de01f941bd9ae1b340239c9bad04c32"
+    },
+    "ssh-recovery-clippy.log": {
+      "bytes": 175,
+      "sha256": "97e4a9f24af9e120512129f6c6b3d900492e0a85eade0fa68b99fc8f5781c939"
+    },
+    "ssh-recovery-exact-state.log": {
+      "bytes": 210,
+      "sha256": "664fe7e79389a7b42e00ad0bf2fd941cf7b30d2bdd6703796a1522179d0a5338"
+    },
+    "ssh-recovery-full-tests.log": {
+      "bytes": 22723,
+      "sha256": "e5cb8e6de239be505e5dc8fe527294e26db1e687009e2d98d146642abf3527d9"
+    },
+    "ssh-recovery-native-build-2.jsonl": {
+      "bytes": 238000,
+      "sha256": "3773243072fb4fa20963f888ea09feb5efb35bce90137411de7bf263e9e81815"
+    },
+    "ssh-recovery-native-clippy-2.log": {
+      "bytes": 175,
+      "sha256": "b9e18849c4d2925b19b501998a1c06eb6c9171a54b85b6e2475a244bfc5dfbe5"
+    },
+    "ssh-recovery-opt-in.log": {
+      "bytes": 594,
+      "sha256": "b81ad3cc276898532e5ffdfdc4b81965ed50d51794606166b2d692a519621784"
+    },
+    "ssh-recovery-regression-before.log": {
+      "bytes": 1825,
+      "sha256": "613752925d3065ada1e4a0bfd17839ac5cd29db4bf67e5304df5e8d82306e7b2"
+    },
+    "ssh-recovery-source.patch": {
+      "bytes": 14763,
+      "sha256": "a6865597a34d2766e232854378f6ff8eb0d07725e4f6c59eac4f8467af3e7bae"
+    },
+    "ssh-recovery-tests.log": {
+      "bytes": 1783,
+      "sha256": "66035bcb0530400cb2440e22375654010a14613a220bc6f4c9638e0c238cd216"
+    },
+    "yocto-tests.log": {
+      "bytes": 207,
+      "sha256": "4b3947e3ea8d46a17dd71b7f185273a2eb9ed701c16c9865197f8f5293673177"
+    }
+  },
+  "first_harness_attempt": {
+    "correction": "Use the installed bounded HTTPS client.",
+    "production_runtime_restored": true,
+    "reason": "getent was absent; stopped before any policy change or detached cycle"
+  },
+  "fixes": {
+    "capabilities_unchanged": true,
+    "host_namespace": "systemd OpenFile pins /proc/1/ns/net; validate PID/name/count, kernel namespace type, device/inode identity and close-on-exec",
+    "masked_standalone_servers": [
+      "dnsmasq.service",
+      "rpcbind.service",
+      "rpcbind.socket"
+    ],
+    "unknown_listeners_still_defer_idle": true
+  },
+  "implementation_commit": "22e49a2fd72ae32505b543518212161cd629f95f",
+  "issue": 265,
+  "next_qualification": [
+    "Build and qualify a persistent image containing the tested SSH recovery fix before another disruptive live-radio test, or provide an independent recovery path",
+    "Trace native radio notifications and correct their reconciliation; the external-change suspension cause remains unproven",
+    "Correct skipped-sync harness and require clean radio state plus fresh SSH in restoration checks, then repeat detached off/time-wake/OTA/off qualification",
+    "Signed-image normal boot and verified interrupted/resumed download",
+    "Frame-time impact before unattended rollout"
+  ],
+  "retained_evidence": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification",
+  "runtime_preview": {
+    "base_commit": "271d298222bc10c4a5b793e8cccf38a6534f5e40",
+    "binary": {
+      "bytes": 16917640,
+      "sha256": "4586bcc0090755ca73aa5f7637c2a8c29d7d76996f31649702dac270300cda81"
+    },
+    "patch": {
+      "bytes": 9215,
+      "sha256": "2d6770b2b096e1c54aacc9535a36211728a2fed656450523608762e4a085eeb1"
+    },
+    "scope": "Temporary runtime override of the installed device service, retaining its production sandbox. No image installation requested."
+  },
+  "sandbox_controls": {
+    "spacewars.local": [
+      {
+        "case": "no-fd",
+        "observation": {
+          "active_ssh_connections": 1,
+          "active_ssh_units": 1,
+          "active_tcp_connections": 1,
+          "admission_hook_loaded": true,
+          "configuration_supported": true,
+          "host_namespace_confirmed": false,
+          "observation_complete": false,
+          "other_tcp_listeners": 4,
+          "schema": 1,
+          "socket_active": true,
+          "ssh_activity": true
+        }
+      },
+      {
+        "case": "host-fd",
+        "observation": {
+          "active_ssh_connections": 1,
+          "active_ssh_units": 1,
+          "active_tcp_connections": 1,
+          "admission_hook_loaded": true,
+          "configuration_supported": true,
+          "host_namespace_confirmed": true,
+          "observation_complete": false,
+          "other_tcp_listeners": 4,
+          "schema": 1,
+          "socket_active": true,
+          "ssh_activity": true
+        }
+      },
+      {
+        "case": "wrong-type",
+        "observation": {
+          "active_ssh_connections": 1,
+          "active_ssh_units": 1,
+          "active_tcp_connections": 1,
+          "admission_hook_loaded": true,
+          "configuration_supported": true,
+          "host_namespace_confirmed": false,
+          "observation_complete": false,
+          "other_tcp_listeners": 4,
+          "schema": 1,
+          "socket_active": true,
+          "ssh_activity": true
+        }
+      },
+      {
+        "case": "private-net",
+        "observation": {
+          "active_ssh_connections": 0,
+          "active_ssh_units": 1,
+          "active_tcp_connections": 0,
+          "admission_hook_loaded": true,
+          "configuration_supported": true,
+          "host_namespace_confirmed": false,
+          "observation_complete": false,
+          "other_tcp_listeners": 0,
+          "schema": 1,
+          "socket_active": true,
+          "ssh_activity": true
+        }
+      }
+    ],
+    "sw-picade-2.local": [
+      {
+        "case": "no-fd",
+        "observation": {
+          "active_ssh_connections": 1,
+          "active_ssh_units": 1,
+          "active_tcp_connections": 1,
+          "admission_hook_loaded": true,
+          "configuration_supported": true,
+          "host_namespace_confirmed": false,
+          "observation_complete": false,
+          "other_tcp_listeners": 4,
+          "schema": 1,
+          "socket_active": true,
+          "ssh_activity": true
+        }
+      },
+      {
+        "case": "host-fd",
+        "observation": {
+          "active_ssh_connections": 1,
+          "active_ssh_units": 1,
+          "active_tcp_connections": 1,
+          "admission_hook_loaded": true,
+          "configuration_supported": true,
+          "host_namespace_confirmed": true,
+          "observation_complete": false,
+          "other_tcp_listeners": 4,
+          "schema": 1,
+          "socket_active": true,
+          "ssh_activity": true
+        }
+      },
+      {
+        "case": "wrong-type",
+        "observation": {
+          "active_ssh_connections": 1,
+          "active_ssh_units": 1,
+          "active_tcp_connections": 1,
+          "admission_hook_loaded": true,
+          "configuration_supported": true,
+          "host_namespace_confirmed": false,
+          "observation_complete": false,
+          "other_tcp_listeners": 4,
+          "schema": 1,
+          "socket_active": true,
+          "ssh_activity": true
+        }
+      },
+      {
+        "case": "private-net",
+        "observation": {
+          "active_ssh_connections": 0,
+          "active_ssh_units": 1,
+          "active_tcp_connections": 0,
+          "admission_hook_loaded": true,
+          "configuration_supported": true,
+          "host_namespace_confirmed": false,
+          "observation_complete": false,
+          "other_tcp_listeners": 0,
+          "schema": 1,
+          "socket_active": true,
+          "ssh_activity": true
+        }
+      }
+    ]
+  },
+  "schema": 1,
+  "ssh_recovery_fix": {
+    "aarch64_build": "passed",
+    "base_commit": "0102814b44f90df32b467cafd0f1dac406b2cde8",
+    "behavior": "Permit protected SSH recovery when saved radio writes or suspended ownership belong to an earlier boot; retain the fault for explicit resume. Same-boot reconciliation and exclusive-store locking remain required.",
+    "clippy": "passed with warnings denied",
+    "deployed": false,
+    "exact_saved_state_replay": "passed: original collected radio fault, policy and deployment state preserved; no radio commands issued",
+    "format": "passed",
+    "manager_tests": {
+      "failed": 0,
+      "ignored": 3,
+      "passed": 200
+    },
+    "native_recovery_qualification": {
+      "boot_id": "8a3a1171-3b1f-4980-bcfe-d222bd7ba1f9",
+      "case_inputs": "actual retained Pi 5 record; current-boot controls change only boot identity and checksum",
+      "cases": [
+        {
+          "coordinator": "stopped",
+          "result": "admitted",
+          "retained_state_boot": "previous"
+        },
+        {
+          "coordinator": "stopped",
+          "result": "rejected after the normal 45-second deadline",
+          "retained_state_boot": "current"
+        },
+        {
+          "coordinator": "running",
+          "result": "admitted",
+          "retained_state_boot": "previous"
+        },
+        {
+          "coordinator": "running",
+          "result": "rejected after the normal 45-second deadline",
+          "retained_state_boot": "current"
+        }
+      ],
+      "execution": "Explicitly enabled ignored integration test; actual ssh-network-admit child executable and loopback TCP accepted sockets on port 22 in private network and mount namespaces.",
+      "files": {
+        "engine-os-manager": {
+          "bytes": 16917640,
+          "sha256": "ef61e4594041899d29fb272f681c6e67fea358f5eaa33d5976064edd640b655e"
+        },
+        "retained-state.json": {
+          "bytes": 735,
+          "sha256": "ad1fec4ae2529e40890a1e7be598646d09ad0327b71feda1feb195b79bce0b4f"
+        },
+        "tests": {
+          "bytes": 1839952,
+          "sha256": "23bcfc28a19d4115a7c34c694ab25f3fad59fd06864d742abbda7d1385896a40"
+        }
+      },
+      "first_attempt": {
+        "artifacts": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/ssh-native-qualification",
+        "passed": false,
+        "result": "Previous-boot stopped-service admission succeeded; evidence retention then failed with EXDEV when renaming across a bind-mount alias. The harness now retains files within the mounted paths. No production state changed."
+      },
+      "fresh_login_passed": true,
+      "host": "spacewars.local",
+      "implementation_commit": "3c7aecf4f3e46a49842844684ae09507877efb4f",
+      "invocation_id": "07b73757600f4e04931876fd26b3c5aa",
+      "kiosk_pid_unchanged": true,
+      "limits": "Qualifies the actual SSH executable and coordinator/fallback paths with unavailable radio observations on Pi 5. Does not qualify real NetworkManager signals, actual reboot recovery, live off/time-wake/OTA/off cycling, deployment or unattended rollout.",
+      "live_radio_writes": false,
+      "local_artifacts": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/ssh-native-qualification-2",
+      "namespace_isolation": [
+        "mount",
+        "network"
+      ],
+      "passed": true,
+      "production_fix_deployed": false,
+      "production_image_unchanged": true,
+      "production_radio_clean": true,
+      "production_service_unchanged": true,
+      "radio_backend": "Unavailable observation fixture; radio writes and shutdown guards panic.",
+      "real_device_reboot": false,
+      "remote_artifacts": "/data/spacewars-ssh-qualification-20261018-3c7aecf-2",
+      "seconds": 90.14,
+      "setup_connection_pause": {
+        "mitigation": "Remaining setup, execution and collection shared one SSH control connection; a separate fresh login passed afterwards, then the control connection was closed.",
+        "observed": "Fresh SSH connection timed out at the banner after multiple separate setup connections; recovered after a pause without reboot or policy edit.",
+        "suspected_cause": "Unexpired 120-second SSH reservations reaching admission capacity; no contemporaneous capacity snapshot proves the cause."
+      },
+      "state_preservation": "Original radio fault, policy and deployments preserved in all four cases; incoming SSH banner bytes were not consumed.",
+      "test_source": "crates/engine-os-manager/tests/ssh_recovery_cli.rs",
+      "test_source_sha256": "a1fa82476829c1d6922e13453cd9a0ce683f9d6569ca84ea47ee6fd0e2174c0f",
+      "unit": "spacewars-ssh-qualification-20261018-2.service",
+      "validation": {
+        "aarch64_build": "passed",
+        "clippy_all_targets": "passed with warnings denied",
+        "format": "passed",
+        "ordinary_host_invocation": "1 ignored as intended"
+      }
+    },
+    "patch_sha256": "a6865597a34d2766e232854378f6ff8eb0d07725e4f6c59eac4f8467af3e7bae",
+    "regressions_before_fix": "Both new controller regressions fail with SSH protection awaits radio reconciliation"
+  },
+  "unsigned_image": {
+    "descriptor": {
+      "compressed": {
+        "bytes": 132991750,
+        "sha256": "d1d2b450cc827ef462bd1d2c2cd18f07f04c1693f1e75a6f5a44b97fba4bfc82"
+      },
+      "expanded": {
+        "bytes": 532676608,
+        "sha256": "f47b0a187b913c144a8b007b8dba8dd32ee8247331e71a5f30bc942b916aacd0"
+      },
+      "format": "rootfs-ext4-zstd",
+      "schema": 1
+    },
+    "installed": false,
+    "published": false,
+    "qualification": {
+      "build_inputs": {
+        "configuration": {
+          "Cargo.lock": {
+            "bytes": 197180,
+            "sha256": "bbe48c3b92779783f263526d3f9180ebf0ca77d3726045204ba53ffb9cb34021"
+          },
+          "yocto/kas-spacewars.yml": {
+            "bytes": 4705,
+            "sha256": "8d77be0d6b8419b38658cbeb803a38a4fb53deb815605591376638cfc54be423"
+          },
+          "yocto/meta-spacewars/conf/machine/raspberrypi-spacewars.conf": {
+            "bytes": 1765,
+            "sha256": "18da888bd9aa7cea9dfc5278d690e5b69a2df1dd9b4ccdd2b5b6fb30ee4a7d94"
+          }
+        },
+        "expanded_kas_sha256": "7a68f07279ff6bdd6925be3afeda980c6fe9e7fb086ac633fc318494552effdf",
+        "kas_version": "5.4",
+        "layers": {
+          "meta-openembedded": {
+            "commit": "0f00f8b9a21950640da8c5707343e5540133f86e",
+            "url": "https://git.openembedded.org/meta-openembedded"
+          },
+          "meta-pi-base": {
+            "commit": "ce48602dfefd4ee7f3d3010086e685ede3fb17b9",
+            "url": "https://github.com/aortez/sparkle-duck-shared.git"
+          },
+          "meta-raspberrypi": {
+            "commit": "018d44467c4f09eb63f8ea5e86e85d755250cf89",
+            "url": "https://git.yoctoproject.org/meta-raspberrypi"
+          },
+          "meta-rust-bin": {
+            "commit": "eaea247f32f247ab525112d2fbc16e16a553d880",
+            "url": "https://github.com/rust-embedded/meta-rust-bin.git"
+          },
+          "poky": {
+            "commit": "4fb7016a07507683359ebd620f1951fd5ea44bfa",
+            "url": "https://git.yoctoproject.org/poky"
+          }
+        },
+        "local_layer": {
+          "path": "yocto/meta-spacewars",
+          "source_commit": "22e49a2fd72ae32505b543518212161cd629f95f"
+        },
+        "machine": "raspberrypi-spacewars",
+        "schema": 1,
+        "source_commit": "22e49a2fd72ae32505b543518212161cd629f95f",
+        "target": "spacewars-image"
+      },
+      "build_inputs_sha256": "443e38826947adb61a5b3d3e92b60673e39dc6efa5e495340eba537fcdfe9634",
+      "compiler": {
+        "kiosk_feature": "pi-kiosk-gpu",
+        "profile": "release",
+        "rust_target": "aarch64-unknown-linux-gnu",
+        "schema": 1,
+        "source": {
+          "commit": "22e49a2fd72ae32505b543518212161cd629f95f",
+          "dirty": false,
+          "revision": "22e49a2fd72a",
+          "schema": 1
+        },
+        "tools": {
+          "cargo": {
+            "details": "cargo 1.94.0 (85eff7c80 2026-01-15)\nrelease: 1.94.0\ncommit-hash: 85eff7c80277b57f78b11e28d14154ab12fcf643\ncommit-date: 2026-01-15\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.3 vendored)\nlibcurl: 8.17.0-DEV (sys:0.4.84+curl-8.17.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 [64-bit]",
+            "version": "1.94.0"
+          },
+          "cc": {
+            "details": "aarch64-poky-linux-gcc (GCC) 13.5.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+          },
+          "rustc": {
+            "details": "rustc 1.94.0 (4a4ef493e 2026-03-02)\nbinary: rustc\ncommit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db\ncommit-date: 2026-03-02\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.0\nLLVM version: 21.1.8",
+            "version": "1.94.0"
+          }
+        }
+      },
+      "expanded": {
+        "bytes": 532676608,
+        "sha256": "f47b0a187b913c144a8b007b8dba8dd32ee8247331e71a5f30bc942b916aacd0"
+      },
+      "image": {
+        "architecture": "aarch64",
+        "binaries": {
+          "client": {
+            "bytes": 26567800,
+            "sha256": "01da201aaad5895b826820ec201cf788421a9df4cf233398786c66355aefddf7"
+          },
+          "os_manager": {
+            "bytes": 11264768,
+            "sha256": "5094aa544c06765a483565d4f5977f8620284926b3a67d83c859243efcdd10eb"
+          }
+        },
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "build_id": "rootfs-f0be457273851e9501e223aa6b9ba0fa8359817fa2de6ee10e8e484d5a69a4d8",
+        "data": {
+          "reads": {
+            "max": 1,
+            "min": 1
+          },
+          "writes": 1
+        },
+        "layout": "spacewars-ab-v1",
+        "machine": "raspberrypi-spacewars",
+        "recovery_protocol": 2,
+        "rootfs_tree": "f0be457273851e9501e223aa6b9ba0fa8359817fa2de6ee10e8e484d5a69a4d8",
+        "schema": 1,
+        "source": {
+          "commit": "22e49a2fd72ae32505b543518212161cd629f95f",
+          "dirty": false,
+          "revision": "22e49a2fd72a",
+          "schema": 1
+        },
+        "updater_protocol": 1
+      },
+      "schema": 1
+    },
+    "service_and_mask_contents_verified": true
+  },
+  "validation": {
+    "aarch64_build": true,
+    "clippy": true,
+    "formatting": true,
+    "host_device_service": {
+      "execution": "cargo test --profile ci -p engine-os-manager -- --test-threads=1",
+      "ignored": 3,
+      "passed": 197,
+      "toolchain": "Rust 1.89.0"
+    },
+    "host_parallel_control": "Initial one-process parallel libtest run hit five inherited-lock fixture conflicts. The documented isolated/serial execution passed.",
+    "picade_session_tests": {
+      "passed": 6,
+      "test_binary": {
+        "bytes": 13900864,
+        "sha256": "7d9fa649cf334fdc90cdbcdd867b2d3f3d11e994eacadef19f08949df08b2ffc"
+      }
+    },
+    "yocto_python": {
+      "skipped": 1,
+      "tests": 95
+    }
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-16T22:03:24.278357+00:00",
+  "source_commit": "4c1527f0eda944b60c50a0b967c758e1e91c275d",
+  "branch": "feat/ota-updates-254",
+  "issue": "https://github.com/aortez/space-wars/issues/265",
+  "scope": "Private staging, strict resume response validation, compressed/expanded verification and publication; no production HTTP worker or installation",
+  "source_files": {
+    "crates/engine-ota/src/staging_linux.rs": "779d3ca0142c30d17d3805842e4bf18a33e97be7733035380f773dde7295750b",
+    "crates/engine-ota/src/staging_tests.rs": "0a8579703202fad31e969fd1d511eb32fed6519fd928c02fa6e8d80d1206e647",
+    "crates/engine-ota/src/install_linux.rs": "e11b9bfe332e9495bf77aefbf29e5e4a4d67ecbe99b0fcc9c03e85e284c2d9d8",
+    "crates/engine-ota/src/install_linux_tests.rs": "fe4284316485c6239224a63395d83c01a4773949d9e04cbe615dd7226563e596",
+    "crates/engine-ota/src/repository.rs": "515f563686e35768764717ba06c2410dacf7ef4635e29eeda7c03390b5aac618",
+    "crates/engine-ota/src/lib.rs": "e4af6344274fd02c4fb29d37aa22563c872df1aada46a31300fea1fc4ec7cd85"
+  },
+  "host_serial": {
+    "build_command": "cargo test --locked -p engine-ota --no-run --message-format=json",
+    "commands": [
+      "/home/data/workspace/space-wars-ota/target/ota-staging-4c1527f-engine_ota --test-threads=1",
+      "/home/data/workspace/space-wars-ota/target/ota-staging-4c1527f-verification --test-threads=1"
+    ],
+    "method": "After touching lib.rs to force rebuild, copy executables to unique revision-named paths, confirm all 264 unit tests (including 21 staging cases) and 22 integration tests are listed, then run the copies serially.",
+    "artifacts": [
+      {
+        "name": "engine_ota",
+        "path": "/home/data/workspace/space-wars-ota/target/ota-staging-4c1527f-engine_ota",
+        "sha256": "271bd17e1cd30957e6bd72dab258dfad3e37c8aadcc0dbb87e0e3573a34ef9d8",
+        "bytes": 114245453,
+        "listed_test_count": 264
+      },
+      {
+        "name": "verification",
+        "path": "/home/data/workspace/space-wars-ota/target/ota-staging-4c1527f-verification",
+        "sha256": "4ef303adbf516e0bbf7f69d4535f88492965bf61d4743f0f7b51ce7b3f93f14f",
+        "bytes": 81456300,
+        "listed_test_count": 22
+      }
+    ],
+    "runner": "/home/data/workspace/space-wars-ota/target/ota-staging-host-final.py",
+    "exit_code": 0,
+    "path": "/home/data/workspace/space-wars-ota/target/ota-staging-ota-serial-final.log",
+    "sha256": "a6aad69b2f9b105fca3ef51ec07895f70d7e5b9bdcad39e822c2521a9078ce16",
+    "results": [
+      "test result: ok. 256 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 170.93s",
+      "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s"
+    ]
+  },
+  "host_staging": {
+    "path": "/home/data/workspace/space-wars-ota/target/ota-staging-tests.log",
+    "sha256": "a381e48591e6ed09d323c917fc3f404489cef1a120435a9087025fd3eab0b691",
+    "results": [
+      "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 243 filtered out; finished in 0.26s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s"
+    ]
+  },
+  "checks": [
+    {
+      "command": "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-staging-clippy.log",
+      "sha256": "549ba0f2bee090ebcc78e42f28f97e27411af8125f31aa120f843e026007e10b",
+      "results": []
+    },
+    {
+      "command": "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-staging-msrv.log",
+      "sha256": "50aad0370e60e98fabbd984181fbe903c92e4745e656ff40875ec3150e3e6f07",
+      "results": []
+    },
+    {
+      "command": "cargo test --locked -p engine-ota --lib --target aarch64-unknown-linux-gnu --no-run --message-format=json",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-staging-aarch64.log",
+      "sha256": "467cfc76275cf7314c640cd2728177b6125015e0fc5123e4b8b57c4f7aa17fa7",
+      "results": []
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "path": "/home/data/workspace/space-wars-ota/target/ota-staging-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "results": []
+    }
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "fixture_directory": "/data/spacewars/ota-staging-fixtures.AQxlNr",
+      "data_free_bytes_before": 94367899648,
+      "artifact": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-staging-arm-tests",
+        "sha256": "44d3ee3d7e890a8d938580529b7535a66be0ed4442a1c939bee771c5d1809e9f",
+        "bytes": 21370584
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 243 filtered out; finished in 8.19s",
+      "production_staging_opened": false,
+      "installed_service_changes": false,
+      "root_partition_writes": false,
+      "reboots": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "fixture_directory": "/data/spacewars/ota-staging-fixtures.ZVcHIQ",
+      "data_free_bytes_before": 44416249856,
+      "artifact": {
+        "path": "/home/data/workspace/space-wars-ota/target/ota-staging-arm-tests",
+        "sha256": "44d3ee3d7e890a8d938580529b7535a66be0ed4442a1c939bee771c5d1809e9f",
+        "bytes": 21370584
+      },
+      "tests_exit_code": 0,
+      "tests_result": "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 243 filtered out; finished in 15.85s",
+      "production_staging_opened": false,
+      "installed_service_changes": false,
+      "root_partition_writes": false,
+      "reboots": false
+    }
+  ],
+  "fixture_method": {
+    "metadata": "Ephemeral Ed25519 signed TUF feeds, in-memory transport; no HTTP or production signing keys",
+    "payload": "Small nonbootable zstd fixtures with signed compressed and expanded hashes",
+    "space_exhaustion": "Injected bound on observed available filesystem bytes, not actual disk exhaustion",
+    "cancellation": "Every verification guard boundary, including compressed decoder reads",
+    "pi_filesystem": "UID 1000 private fixture directories under /data/spacewars; production root-owned staging is not opened"
+  },
+  "harness_findings": {
+    "current_default_parallel": {
+      "path": "/home/data/workspace/space-wars-ota/target/ota-staging-ota-full.log",
+      "sha256": "dc767696eeaf26e5fc46c975c74d06dd194d3658a99b21b66776300735ed510e",
+      "results": [
+        "test result: FAILED. 245 passed; 11 failed; 8 ignored; 0 measured; 0 filtered out; finished in 24.30s"
+      ]
+    },
+    "unchanged_baseline": {
+      "commit": "c779d0d",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-staging-baseline-parallel.log",
+      "sha256": "02433664c5076a71c88340cb6c38588c49bd1a3506740a59f2e63c3ad6314105",
+      "results": [
+        "test result: FAILED. 223 passed; 12 failed; 8 ignored; 0 measured; 0 filtered out; finished in 37.59s"
+      ]
+    },
+    "explanation": "Default parallel OTA fixtures reproduce Busy and elapsed-progress assertions on both versions. Serial validation is required; this is not fixed by staging.",
+    "invalidated_first_serial_run": {
+      "path": "/home/data/workspace/space-wars-ota/target/ota-staging-ota-serial.log",
+      "sha256": "951ef91f906d7817f181f04a019ecf5099dd0da9b73bbc863f49fef1f092d20f",
+      "results": [
+        "test result: FAILED. 254 passed; 2 failed; 8 ignored; 0 measured; 0 filtered out; finished in 176.74s"
+      ],
+      "reason": "The simultaneous baseline build replaced the shared test executable, causing two self-reexec fixtures to fail with ENOENT. Final serial run was isolated from builds."
+    },
+    "discarded_baseline_reuse_run": {
+      "path": "/home/data/workspace/space-wars-ota/target/ota-staging-baseline-reused.log",
+      "sha256": "1c52fd775efa6dc9915394f7dcdc375a866fb911b0a32593edd166060ccf10d3",
+      "results": [
+        "test result: ok. 235 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 175.23s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "reason": "Shared target-directory artifact reuse ran the 243-test baseline binary instead of current source. The evidence-count assertion caught the missing 21 tests. Final validation forced recompilation and ran uniquely copied executables after confirming their test inventory."
+    }
+  },
+  "remaining": [
+    "Production HTTPS transport with bounded requests, redirects, retries and no secret-bearing diagnostics",
+    "Two-minute preparation, thirty-minute total session and sixty-second no-progress deadlines",
+    "Persistent daily scheduler, Check now coalescing and channel-change cancellation",
+    "Time availability and network-hold ownership, including early NTP completion and Ethernet",
+    "Low-priority/throttled worker, externally visible update progress and Ask/Automatic integration",
+    "Fixed private staging directory provisioning, authoritative live device/history refresh and installer handoff",
+    "Production signing/feed and final installation policy/service integration",
+    "Supervised bootstrap and physical failure, preservation and frame-time qualification on both Pis"
+  ],
+  "live_installation_performed": false,
+  "auto_update_enabled": false,
+  "pushed": false
+}

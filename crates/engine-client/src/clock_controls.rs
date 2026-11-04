@@ -29,6 +29,10 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_aquarium_enabled(settings.events.aquarium);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.events.digit_slide);
+    window.set_launcher_clock_cell_swap_enabled(settings.events.cell_swap);
+    window.set_launcher_clock_slot_machine_enabled(settings.events.slot_machine);
+    window.set_launcher_clock_spider_enabled(settings.events.spider);
+    window.set_launcher_clock_grass_enabled(settings.events.grass);
     window.set_launcher_clock_rain_enabled(settings.events.rain);
     window.set_launcher_clock_rain_amount(settings.rain_amount.label().into());
     window.set_launcher_clock_marquee_preset(settings.marquee_preset.label().into());
@@ -52,6 +56,9 @@ pub(crate) fn install(
     let open_controls = Rc::clone(&controls);
     window.on_ingame_clock_open(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         if window.get_launcher_visible() || window.get_launcher_scenario() != "clock" {
             return;
         }
@@ -65,6 +72,9 @@ pub(crate) fn install(
     let adjust_controls = Rc::clone(&controls);
     window.on_ingame_clock_adjust(move |index, delta| {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         if !window.get_ingame_clock_visible() || window.get_clock_controls_pending() {
             return;
         }
@@ -92,6 +102,9 @@ pub(crate) fn install(
     let weak = window.as_weak();
     window.on_ingame_clock_preview(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         if !window.get_ingame_clock_visible() || window.get_clock_controls_pending() {
             return;
         }
@@ -110,6 +123,9 @@ pub(crate) fn install(
     let weak = window.as_weak();
     window.on_clock_settings_applied(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         let Ok(clock) = crate::clock_setup_from_window(&window) else {
             return;
         };
@@ -162,6 +178,10 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         }
         15 => settings.events.explosion = !settings.events.explosion,
         17 => settings.events.aquarium = !settings.events.aquarium,
+        18 => settings.events.cell_swap = !settings.events.cell_swap,
+        19 => settings.events.grass = !settings.events.grass,
+        20 => settings.events.slot_machine = !settings.events.slot_machine,
+        21 => settings.events.spider = !settings.events.spider,
         0 => {
             settings.time_format = match settings.time_format {
                 ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
@@ -236,7 +256,10 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))
         }
         UiAction::Left | UiAction::Right => {
-            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 17) {
+            if matches!(
+                index,
+                2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 17 | 18 | 19 | 20 | 21
+            ) {
                 window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
                     index, action,
                 ));
@@ -247,7 +270,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=21) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),

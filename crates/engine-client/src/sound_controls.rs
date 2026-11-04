@@ -36,7 +36,7 @@ pub(crate) fn install(
     let weak = window.as_weak();
     window.on_sound_open(move || {
         let Some(window) = weak.upgrade() else { return };
-        if window.get_launcher_busy()
+        if (window.get_launcher_busy() || window.get_install_fenced())
             || (!window.get_launcher_visible() && !window.get_ingame_menu_visible())
         {
             return;
@@ -50,7 +50,9 @@ pub(crate) fn install(
     let adjust_writer = writer.clone();
     window.on_sound_adjust(move |index, delta| {
         let Some(window) = weak.upgrade() else { return };
-        if !window.get_sound_visible() || window.get_launcher_busy() {
+        if !window.get_sound_visible()
+            || (window.get_launcher_busy() || window.get_install_fenced())
+        {
             return;
         }
         window.set_sound_focus_index(index);
@@ -71,7 +73,9 @@ pub(crate) fn install(
     let weak = window.as_weak();
     window.on_sound_retry(move || {
         let Some(window) = weak.upgrade() else { return };
-        if !window.get_sound_visible() || window.get_launcher_busy() {
+        if !window.get_sound_visible()
+            || (window.get_launcher_busy() || window.get_install_fenced())
+        {
             return;
         }
         let snapshot = settings.read().unwrap().clone();
@@ -131,9 +135,9 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
         UiAction::Up | UiAction::Down => {
             // Preserve the existing Back/Retry indices and stable CLI IDs.
             let order: &[i32] = if count == 7 {
-                &[0, 1, 2, 3, 4, 7, 8, 5, 6]
+                &[0, 1, 2, 3, 4, 7, 8, 9, 5, 6]
             } else {
-                &[0, 1, 2, 3, 4, 7, 8, 5]
+                &[0, 1, 2, 3, 4, 7, 8, 9, 5]
             };
             let position = order
                 .iter()
@@ -157,6 +161,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
         UiAction::Confirm if index == 4 => window.invoke_autostart_open(),
         UiAction::Confirm if index == 7 => window.invoke_controllers_open(),
         UiAction::Confirm if index == 8 => window.invoke_network_open(),
+        UiAction::Confirm if index == 9 => window.invoke_updates_open(),
         UiAction::Confirm if index == 6 && count == 7 => window.invoke_sound_retry(),
         UiAction::Back | UiAction::Controls | UiAction::Confirm
             if action != UiAction::Confirm || index == 5 =>

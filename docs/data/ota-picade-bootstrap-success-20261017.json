@@ -1,0 +1,432 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "date_timezone": "America/Los_Angeles",
+  "device": "sw-picade.local",
+  "board": "Raspberry Pi 4 Model B Rev 1.4",
+  "medium": "PNY USB 3.0 FD, serial 07019B7D2F242124",
+  "medium_bytes": 62305959936,
+  "hardware_profile": "picade",
+  "scope": "Completed supervised bootstrap and initial recovery handoff; full physical failure qualification and automatic OTA rollout remain pending",
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 23470072,
+        "sha256": "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc"
+      },
+      "os_manager": {
+        "bytes": 11252736,
+        "sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+    "schema": 1,
+    "source": {
+      "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+      "dirty": false,
+      "revision": "e9867188d211",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "reused_clean_image_record": "ota-pi5-bootstrap-success-20261017.json",
+  "image_rebuilt_this_run": false,
+  "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+  "previous_preparation": {
+    "record": "ota-bootstrap-live-20261017.json",
+    "record_member": "pi4",
+    "reconciliation": {
+      "boot_id": "82f17023-c743-493b-8472-18c4bbfad025",
+      "source": "e9867188d2118ce2653ce431004cdd53eba74218",
+      "original_boot_inventory_verified": true,
+      "original_boot_files": 109,
+      "preparation_archived_intact": true,
+      "archive_directory": "/data/logs/spacewars-bootstrap-prepared-04b6cb7/attempt",
+      "control_records_verified": 7,
+      "script_sha256": "aa8c7dd784f916fef06f7efb6dc8cf0e555593267669037963c656b1e6753fa2",
+      "root_slots_written": false,
+      "boot_files_written": false,
+      "user_data_restored": false,
+      "watchdog_opened": false,
+      "reboot_requested": false,
+      "trial_activation_ever_started": false,
+      "runtime_services_restored": true
+    },
+    "inspection": {
+      "boot_id": "82f17023-c743-493b-8472-18c4bbfad025",
+      "original_boot_inventory_verified": true,
+      "original_boot_files": 109,
+      "raw_data_originals_exports_reverified": true,
+      "legacy_replacement_checksum": "38cdfbf95c5d40d28e28ae3ef280a32c3e9a6bda24c62fda8f2c48c97ab0a80d",
+      "legacy_replacement_file_sha256": "cc82f4e09f16aff0321c76b49284005d6c49564ac7177ac6cd018b7e0eb2be0f",
+      "root_install_and_trial_absent": true,
+      "storage_errors_observed": false,
+      "initial_harness_compared_envelope_hash_to_payload_checksum": true,
+      "find_printf_unavailable_used_stat": true
+    },
+    "old_package_sha256": "6e82e8b84c59c0357914fbec444e32c85f447d70f278ca8eb7169c8a1a5f008e",
+    "activation_started": false
+  },
+  "selected_preservation": {
+    "package": "1340a097c9f56a7001f66935249e5fbf73daa6d10d3793ef396f84d57af3ffa9",
+    "raw": "529853943223748cfa4a06bab798e621aabb7143cdf129fa0971e1f0a7bbbc75",
+    "data": "408003e836a08f140ea25b523daab3870ca3bac3a849ab33873d88fe52070447",
+    "originals": "f058cc58b7ca044348cc1d4060b3cdd5893efac60aa2c00af0208f3ade720766"
+  },
+  "data_archive": {
+    "archive_sha256": "e02fbdd8bc70fec6bb927b82adcae6c047537d4b0b89c88d2251815da407287a",
+    "entries": 1210,
+    "files": 698,
+    "links": 331,
+    "directories": 181,
+    "content_modes_links_nanosecond_timestamps_verified": true,
+    "numeric_owners_retained_in_archive": true,
+    "numeric_owners_recreated": false,
+    "scope": "unprivileged workstation extraction; ownership restore and physical recovery not qualified"
+  },
+  "preservation_exports": {
+    "raw_verified": true,
+    "data_verified": true,
+    "originals_verified": true
+  },
+  "access_before_installation": {
+    "independent_administrator_uid": 1001,
+    "administrator_sudo_uid": 0,
+    "independent_runtime_uid": 1000,
+    "runtime_unrestricted_sudo_denied": true,
+    "runtime_recovery_command_denied": true,
+    "runtime_logind_can_reboot_denied": true,
+    "runtime_not_in_disk_group": true,
+    "loaded_configuration_check_passed": true
+  },
+  "root_install": {
+    "schema": 1,
+    "package_sha256": "1340a097c9f56a7001f66935249e5fbf73daa6d10d3793ef396f84d57af3ffa9",
+    "journal_sha256": "704282ce184aebff28c6ce6e216b685945cfe3e1b69d7d093238232663fcf67d",
+    "target": "b",
+    "expanded": {
+      "bytes": 528482304,
+      "sha256": "8a6e9c365a6b0e4af3c21dd6366f2bc92d7d15f397ffc237686d4fc4be3610e3"
+    },
+    "reused_written": false
+  },
+  "trial_id": "2e8e8c3fdf37de59155cdcdb140495c378ea2aeabdf4797ee008c849949ce5aa",
+  "request_boot_id": "82f17023-c743-493b-8472-18c4bbfad025",
+  "activation": {
+    "ssh_exit_status": 0,
+    "reboot_job_accepted": true,
+    "activation_repeated": false
+  },
+  "health_proofs": [
+    {
+      "boot_kind": "trial",
+      "slot": "b",
+      "transaction": "eb37a79ff25c613f49ed94df827edad6fa9da1940975bbc5c6c328ead96999c0",
+      "boot_id": "69f0ae4c-d7ba-4d6f-a78b-5a23e1dcaee3",
+      "started_ms": 11539,
+      "finished_ms": 71673,
+      "instance": {
+        "pid": 854,
+        "start_ticks": 828,
+        "invocation_id": "e2996f2e55e544c293299eb095f56932"
+      },
+      "healthy_window_ms": 60134
+    },
+    {
+      "boot_kind": "staged-normal",
+      "slot": "b",
+      "transaction": "4f30d5be02d090b59e3e2c2b18efe30c4dd0530f7116f746e322aff4b892127f",
+      "boot_id": "0d363d8d-582a-41ed-bec7-9521a0bb78b8",
+      "started_ms": 12668,
+      "finished_ms": 72986,
+      "instance": {
+        "pid": 833,
+        "start_ticks": 921,
+        "invocation_id": "fe39259c7a6a4e63acf2fb111a366530"
+      },
+      "healthy_window_ms": 60318
+    },
+    {
+      "boot_kind": "canonical-normal",
+      "slot": "b",
+      "transaction": "90e85b1b7c615e7929c4fa2467ba14017571ff0516d07394ef5ac418136158cc",
+      "boot_id": "7d1a472c-a5b2-406d-83f6-b4dd94f23166",
+      "started_ms": 12622,
+      "finished_ms": 73412,
+      "instance": {
+        "pid": 815,
+        "start_ticks": 813,
+        "invocation_id": "c1a1fa7bf0904b7b9a75d38c67c9fcaf"
+      },
+      "healthy_window_ms": 60790
+    }
+  ],
+  "watchdog_receipts": {
+    "boot_id": "69f0ae4c-d7ba-4d6f-a78b-5a23e1dcaee3",
+    "trial_id": "2e8e8c3fdf37de59155cdcdb140495c378ea2aeabdf4797ee008c849949ce5aa",
+    "early": {
+      "schema": 1,
+      "boot_id": "69f0ae4c-d7ba-4d6f-a78b-5a23e1dcaee3",
+      "trial_id": "2e8e8c3fdf37de59155cdcdb140495c378ea2aeabdf4797ee008c849949ce5aa",
+      "armed_boottime_ms": 1444,
+      "timeout_seconds": 210
+    },
+    "completion_receipt_observed": true,
+    "completion": {
+      "schema": 1,
+      "boot_id": "69f0ae4c-d7ba-4d6f-a78b-5a23e1dcaee3",
+      "trial_id": "2e8e8c3fdf37de59155cdcdb140495c378ea2aeabdf4797ee008c849949ce5aa"
+    },
+    "sha256": {
+      "early-watchdog.json": "6a0f588db5c7a31405d30e74e842d05abc981b1615706354801ab0674d1ee1b9",
+      "completed-watchdog.json": "5d46fcf66ca9e1502d01257efa49a4120e3006c4f0ce5287e88c0ced85088c20"
+    },
+    "receipt_archive": "/data/logs/spacewars-bootstrap-watchdog-e986718-picade",
+    "subsequent_normal_boot_id": "0d363d8d-582a-41ed-bec7-9521a0bb78b8",
+    "diagnostic_opened_watchdog": false,
+    "diagnostic_changed_timeout": false,
+    "full_physical_failure_matrix_qualified": false
+  },
+  "canonical_migration": {
+    "prepared_files": 107,
+    "reboot_job_accepted": true,
+    "phase": "confirmed",
+    "failure": null,
+    "finish_phase": "complete",
+    "completed_reservation": "/data/spacewars-bootstrap/completed"
+  },
+  "handoff": {
+    "boot_id": "7d1a472c-a5b2-406d-83f6-b4dd94f23166",
+    "slot": "b",
+    "completed_trial_sha256": "e832343dd67cc533b4472dc5dac53cbd837c2b4886168869ceb333f8ffeb49ae",
+    "baseline_sha256": "0b2048f3d88e006e18d972e49b13514e02ab0da720f888ad5a0e254a61541abe",
+    "baseline_generation": 0,
+    "retained_good": null,
+    "active_bootstrap_absent": true,
+    "retired_files": 78,
+    "retired_unique_blobs": 78,
+    "retired_archive_independently_exported_and_verified": true,
+    "boot_probe_sha256": "a65a7e185edd08a553112fe4b5084bd4aac043aa69fac9c4b11889f5a27be5ad",
+    "production_recovery_service_status": {
+      "schema": 1,
+      "boot_id": "7d1a472c-a5b2-406d-83f6-b4dd94f23166",
+      "uptime_ms": 1056462,
+      "progress": {
+        "stage": "healthy",
+        "phase": null,
+        "transaction": null,
+        "good_build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "candidate_build_id": null,
+        "detail": null
+      }
+    },
+    "production_recovery_service_accepted_baseline": true,
+    "baseline_and_completed_journal_unchanged": true,
+    "reboot_requested": false,
+    "trust_and_staging_unprovisioned": true,
+    "automatic_ota_enabled": false
+  },
+  "initial_recovery": {
+    "schema": 2,
+    "good": {
+      "slot": "b",
+      "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+      "generation": 0,
+      "payload": "8aced72e48517b4fbe93a836a70700db8f6bfaf42250133130354f71042aec55",
+      "expanded": "8a6e9c365a6b0e4af3c21dd6366f2bc92d7d15f397ffc237686d4fc4be3610e3",
+      "data": {
+        "reads": {
+          "min": 1,
+          "max": 1
+        },
+        "writes": 1
+      }
+    },
+    "retained_good": null,
+    "sequence": 0,
+    "transaction": null,
+    "failures": {}
+  },
+  "final_access_and_ui": {
+    "boot_id": "7d1a472c-a5b2-406d-83f6-b4dd94f23166",
+    "administrator_login_and_sudo": true,
+    "runtime_unrestricted_sudo_denied": true,
+    "runtime_recovery_denied": true,
+    "hostname_login_verified": true,
+    "controls_panel_opened": true,
+    "scenario": "spacewars",
+    "gameplay_restored_unpaused": true,
+    "same_kiosk_process": true,
+    "scope": "Logical UI routing; physical button/controller recognition not exercised"
+  },
+  "final_state": {
+    "boot_id": "7d1a472c-a5b2-406d-83f6-b4dd94f23166",
+    "slot": "b",
+    "normal_boot": true,
+    "firmware_tryboot": false,
+    "image_and_running_client_match": true,
+    "recovery_capability_fix_installed": true,
+    "services_active": true,
+    "storage_errors_observed": false,
+    "reservation": "completed",
+    "services": {
+      "spacewars-kiosk.service": {
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ActiveState": "active",
+        "SubState": "running"
+      },
+      "spacewars-system.service": {
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ActiveState": "active",
+        "SubState": "running"
+      },
+      "spacewars-recovery.service": {
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ActiveState": "active",
+        "SubState": "exited"
+      }
+    },
+    "scenario": "spacewars",
+    "paused": false,
+    "screenshot_pixels": [
+      1024,
+      768
+    ]
+  },
+  "private_evidence": "/home/data/workspace/space-wars-ota/target/ota-picade-bootstrap-e986718",
+  "private_reconciliation_evidence": "/home/data/workspace/space-wars-ota/target/ota-picade-reconcile-prepared-04b6cb7",
+  "evidence_files": {
+    "image-qualification.json": {
+      "bytes": 4315,
+      "sha256": "e28953f5bd27b5b7e71fcaec4cb30460e1cd702d888c6aa0044e014c5bda28cb"
+    },
+    "exported-raw-verified.json": {
+      "bytes": 647,
+      "sha256": "12e466d0d8ba4c85e9c0361ac3059d4e6428dd8fcd35d5913e1fda198afef59a"
+    },
+    "exported-data-verified.json": {
+      "bytes": 515,
+      "sha256": "5c82fd42ef54fd9e1ffbbba95335cfd335d4f0da730c0edf494bbf202394c1e6"
+    },
+    "exported-originals-verified.json": {
+      "bytes": 505,
+      "sha256": "dcfb875cf36db27d3310666b42282ed1f17a626bdd39f9e5786afd712ebccd32"
+    },
+    "data-extraction/extraction-verification.json": {
+      "bytes": 414,
+      "sha256": "5019ab47cfb9f0ff73c6d5c70ee55a1bffc7c016c04b0ef9663613bce33a6381"
+    },
+    "exported-completion/boot-trial/record.json": {
+      "bytes": 82149,
+      "sha256": "e832343dd67cc533b4472dc5dac53cbd837c2b4886168869ceb333f8ffeb49ae"
+    },
+    "initial-recovery.json": {
+      "bytes": 878,
+      "sha256": "0b2048f3d88e006e18d972e49b13514e02ab0da720f888ad5a0e254a61541abe"
+    },
+    "handoff-verification.json": {
+      "bytes": 1162,
+      "sha256": "739cb9e7872c1ae622f9d5d9458bcda3711bafb089b1a57b6ca91881352dcc78"
+    },
+    "canonical-boot-probe.json": {
+      "bytes": 3494,
+      "sha256": "448c2fd592a5ccdbdf97254fbfe1882a57c26b2c319021e20a6edb4542e6ae34"
+    },
+    "watchdog-receipts-verified.json": {
+      "bytes": 1078,
+      "sha256": "832446faf50a6412b35e5f0600e0dd131998012b8661e22ce80ca6b178cd14b7"
+    },
+    "final-access-ui/verification.json": {
+      "bytes": 425,
+      "sha256": "4df7ec21b439608546dcf891d9850219d77e3e655bafbf544a37ac92384a96b0"
+    },
+    "completed-normal-verified/verification.json": {
+      "bytes": 1686,
+      "sha256": "cee5e0d84c56a3f36df84a085563a169dd62385566fd93341fcebf4114154368"
+    },
+    "completed-normal-verified/screenshot.png": {
+      "bytes": 147480,
+      "sha256": "29b21350d7c8f1d6460f8b1d655fe6e4870f21b466bf828ba9dea3124fe6a829"
+    },
+    "installation-timing.json": {
+      "bytes": 102,
+      "sha256": "49249ad97b01f4437717fce9cfdfc8188fcd0cfe723e6a57ce31f9e91454dfd5"
+    },
+    "canonical-prepare-exit.json": {
+      "bytes": 202,
+      "sha256": "153f48e73d4fca9216363348ad9fb2b2c7904b3593e37e0b6df6fb44f492ca49"
+    },
+    "canonical-finish-exit.json": {
+      "bytes": 202,
+      "sha256": "1f65683ac8b771b261888c550f7166deeb939fac2f9dcb93a3bed2d6773b5193"
+    },
+    "bootstrap-verification-cost.json": {
+      "bytes": 615,
+      "sha256": "ca56c080cadef5bcc3558cc170b6c3b9b81b19c8f8529da424f832b4824e6753"
+    },
+    "canonical-preparation-observation.json": {
+      "bytes": 514,
+      "sha256": "05848733f3451498c73ea2b174284478b35d73dbc824167556b7d8c8258208f1"
+    }
+  },
+  "automatic_ota_enabled": false,
+  "other_devices_changed_in_this_run": false,
+  "remaining": [
+    "Pi 4 missing-root fallback and remaining Pi 4/5 deliberate update/recovery failure qualification",
+    "Reviewed trust/staging provisioning and signed-feed/install-policy validation before automatic installation",
+    "Separate rollout to sw-picade-2.local"
+  ],
+  "bootstrap_verification_cost": {
+    "scope": "Offline original/canonical inventory comparison and read-only timing/progress observations during the supervised bootstrap",
+    "same_files": 101,
+    "changed_or_added_files": [
+      "cmdline.txt",
+      "kernel8.img",
+      "kernel_2712.img",
+      "spacewars-boot-id",
+      "spacewars-boot-manifest.json",
+      "spacewars-device.txt",
+      "spacewars-kernel-build-id"
+    ],
+    "source": "e9867188d2118ce2653ce431004cdd53eba74218",
+    "staging_cpu_observation": "staging-observations.jsonl",
+    "followup": "Measure and reduce repeated whole-tree verification cost while retaining complete final verification and interruption/change detection.",
+    "operation_timings": {
+      "root_install_and_boot_staging": {
+        "started": "2026-10-18T00:53:06.438228+00:00",
+        "finished": "2026-10-18T01:08:10.903617+00:00",
+        "elapsed_seconds": 904.465
+      },
+      "canonical_preparation": {
+        "started": "2026-10-18T01:14:08.352751+00:00",
+        "finished": "2026-10-18T01:32:50.244514+00:00",
+        "elapsed_seconds": 1121.892
+      },
+      "archive_cleanup_and_handoff": {
+        "started": "2026-10-18T01:35:47.835984+00:00",
+        "finished": "2026-10-18T01:51:42.030765+00:00",
+        "elapsed_seconds": 954.195
+      }
+    },
+    "timing_scope": "Observed one-time bootstrap command wall time including verification; not a controlled benchmark or ordinary rootfs OTA timing"
+  }
+}

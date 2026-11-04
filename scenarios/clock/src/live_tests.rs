@@ -26,7 +26,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             ClockEventProfile::Calm,
             ClockEventProfile::Demo,
         ] {
-            for bits in 0..1024 {
+            for bits in 0..2048 {
                 for marquee_preset in ClockMarqueePreset::ALL {
                     let settings = ClockSettings {
                         fonts: Default::default(),
@@ -49,6 +49,10 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                             crow: bits & 128 != 0,
                             explosion: bits & 256 != 0,
                             aquarium: bits & 512 != 0,
+                            cell_swap: bits & 1024 != 0,
+                            grass: bits & 2048 != 0,
+                            slot_machine: bits & 4096 != 0,
+                            spider: bits & 8192 != 0,
                         },
                     };
                     assert_eq!(
@@ -116,7 +120,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
     for (offset, invalid) in [
         (2, 13),
         (3, 3),
-        (5, 4),
+        (5, 64),
         (6, 255),
         (7, 4),
         (8, 2),
@@ -170,6 +174,10 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
             crow: false,
             explosion: false,
             aquarium: false,
+            cell_swap: false,
+            grass: false,
+            slot_machine: false,
+            spider: false,
         },
         marquee_preset: ClockMarqueePreset::default(),
         rain_amount: ClockRainAmount::Varied,
@@ -232,6 +240,10 @@ fn live_cadence_changes_reschedule_only_when_needed_and_preserve_cooldowns() {
     settings.events.marquee = false;
     settings.events.rain = false;
     settings.events.aquarium = false;
+    settings.events.cell_swap = false;
+    settings.events.crow = false;
+    settings.events.explosion = false;
+    settings.events.spider = false;
     ClockScenario::step(
         &mut state,
         &[ClockAction::configure(settings)],

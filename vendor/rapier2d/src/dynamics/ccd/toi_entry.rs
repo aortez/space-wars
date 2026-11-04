@@ -61,7 +61,7 @@ impl TOIEntry {
             frozen2,
             start_time,
             end_time,
-            smallest_contact_dist,
+            || smallest_contact_dist,
             || co1.shape.0.ccd_thickness() + co2.shape.0.ccd_thickness(),
         )
     }
@@ -78,7 +78,7 @@ impl TOIEntry {
         frozen2: Option<Real>,
         start_time: Real,
         end_time: Real,
-        smallest_contact_dist: Real,
+        smallest_contact_dist: impl FnOnce() -> Real,
         shape_thickness_sum: impl FnOnce() -> Real,
     ) -> Option<Self> {
         #[cfg(feature = "ccd-diagnostics")]
@@ -112,17 +112,22 @@ impl TOIEntry {
         let thickness = {
             #[cfg(feature = "ccd-diagnostics")]
             let _thickness_span = crate::counters::ccd_probe::Span::new(true);
-            shape_thickness_sum() + smallest_contact_dist.max(0.0)
+            shape_thickness_sum()
         };
-        let is_pseudo_intersection_test = co1.is_sensor()
-            || co2.is_sensor()
-            || !co1.flags.solver_groups.test(co2.flags.solver_groups);
-
-        if (end_time - start_time) * vel12 < thickness {
+        let travel = (end_time - start_time) * vel12;
+        // The full threshold only adds a nonnegative contact distance. A pair
+        // rejected by shape thickness alone cannot reach the old threshold.
+        // Keep the original addition/comparison for all surviving candidates.
+        // This saves contact-graph traversal without changing cast order or TOIs.
+        if travel < thickness || travel < thickness + smallest_contact_dist().max(0.0) {
             #[cfg(feature = "ccd-diagnostics")]
             crate::counters::ccd_probe::rejected();
             return None;
         }
+
+        let is_pseudo_intersection_test = co1.is_sensor()
+            || co2.is_sensor()
+            || !co1.flags.solver_groups.test(co2.flags.solver_groups);
 
         // Compute the TOI.
         let identity = NonlinearRigidMotion::identity();

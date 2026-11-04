@@ -6,3 +6,10 @@ You should use the `slint` crate instead.
 
 **WARNING**: This crate does not follow the semver convention for versioning and can
 only be used with `version = "=x.y.z"` in Cargo.toml.
+
+Space-Wars adds `profiling::presented_frames()` for its local OTA health observer.
+It reports completed DRM page flips independently of optional trace/profiling
+capture. Requests, rendering and submissions alone do not advance it. The
+`health_counts_completed_page_flips_without_optional_profiling` regression covers
+that distinction; actual display/watchdog qualification is recorded separately
+in `docs/ota-updates.md`.

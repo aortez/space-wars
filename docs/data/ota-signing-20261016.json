@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-17T01:15:43.313615+00:00",
+  "source_commit": "e9c4f0038a125220e2f0a17b1a2d6120be5aa588",
+  "branch": "feat/ota-updates-254",
+  "scope": "Host role-signing implementation and fixtures. No protected workflow, production credential, public OTA feed, Pi service, boot state, partition, clock or radio was changed.",
+  "source_files": {
+    "crates/engine-ota/Cargo.toml": "7d4a0fbe42fabc380e8eb16c7f6e5ee5252b38bd4833a58ece23253278a053df",
+    "crates/engine-ota/examples/feed_sign.rs": "d2387a6293021a963150a472f7c3894c59ea42f153f26a5fc2643833272988b1",
+    "crates/engine-ota/src/lib.rs": "d367d4811a27a27261431b6e6426a675eebebd3b853df70ad1c50ae107fba08d",
+    "crates/engine-ota/src/repository.rs": "10b4f950fb80573560d955cb5d95deedbd7238703ed13ce99c9bfb1370ec1e4a",
+    "crates/engine-ota/src/signing.rs": "0a1ad3d8b6ba1cbc93bab54f0b9e7a81f7374ecaf76d85249e27a82a33f9a93a",
+    "crates/engine-ota/src/signing_tests.rs": "f434cceeb009cab07fbe4117ad31113b347f6482e3e251cf5303503577bf89a2",
+    "crates/engine-ota/tests/support/mod.rs": "d5d031d7765824937726512277a6d958f8a5e36f95281a377ae1fe16574bdb2c",
+    "docs/ota-updates.md": "cc86f0e8c96fae348ae880a49c96deaed2dcc079a5c3fc9da0b08e483a965724"
+  },
+  "tools": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)"
+  },
+  "checks": [
+    {
+      "name": "complete-ota-suite-with-publisher",
+      "command": "cargo test -p engine-ota --features publisher -- --test-threads=1",
+      "result": "passed",
+      "unit_passed": 306,
+      "unit_ignored": 8,
+      "signed_feed_integration_passed": 22,
+      "unit_duration_seconds": 180.17,
+      "integration_duration_seconds": 0.39,
+      "log": {
+        "path": "target/ota-signing-suite.log",
+        "bytes": 36335,
+        "sha256": "c31b2722d4f079afb75932b3c2d2f90a4f4f22c8eacd3f3d4827c93ac41d0a83"
+      },
+      "scope": "Final signing library, shared device catalog policy, existing recovery/install/download fixtures and signed-feed clients. Subsequent changes were documentation and expansion of the separately tested CLI case."
+    },
+    {
+      "name": "final-signing-cli",
+      "command": "cargo test -p engine-ota --features publisher --example feed_sign",
+      "result": "passed",
+      "passed": 3,
+      "duration_seconds": 0.03,
+      "log": {
+        "path": "target/ota-signing-cli-final.log",
+        "bytes": 631,
+        "sha256": "3c13a4a6105f05b06c12aa0216619b2b686004b5b906f2e300add91eb93f49d1"
+      },
+      "scope": "Exact preview hash; changed approval fails before key access; real PKCS#8 file signing under fixture policy; unsafe file types/permissions/links and size bounds."
+    },
+    {
+      "name": "all-features-clippy",
+      "command": "cargo clippy -p engine-ota --all-targets --all-features -- -D warnings",
+      "result": "passed",
+      "log": {
+        "path": "target/ota-signing-clippy-final.log",
+        "bytes": 369,
+        "sha256": "8d2f4ba0d5e41e500dbef307626c422daa2b1e6ecf2e136de168327675c01619"
+      }
+    },
+    {
+      "name": "publisher-minimum-rust-version",
+      "command": "cargo +1.89.0 check -p engine-ota --all-targets --features publisher",
+      "result": "passed",
+      "log": {
+        "path": "target/ota-signing-msrv-publisher.log",
+        "bytes": 315,
+        "sha256": "34554c432f852df94d36ff0a68d07b54dd3e0c588b8c058d544cd14b27dcbd8b"
+      }
+    },
+    {
+      "name": "default-device-build-minimum-rust-version",
+      "command": "cargo +1.89.0 check -p engine-ota -p engine-os-manager --all-targets",
+      "result": "passed",
+      "log": {
+        "path": "target/ota-signing-msrv-default.log",
+        "bytes": 522,
+        "sha256": "85df79aad50cba82b0ead422b180173d49d3cc553d894884c20f719ee822249b"
+      }
+    },
+    {
+      "name": "format",
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": {
+        "path": "target/ota-signing-fmt.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "new_signing_cases": 9,
+  "verified_boundaries": [
+    "Wrong proposal digest, changed descriptor, changed authority and stale proposal reject before KeySource.as_sign is called",
+    "Nightly credentials cannot sign Release, targets, snapshot or timestamp under the independently selected test authority",
+    "Two-key Release threshold rejects missing, repeated and foreign keys; extra supplied authority is refused",
+    "Each original KeySource is loaded once; original credentials are not reopened during signing",
+    "Canonical signature/object order produces identical Ed25519 metadata with reversed key input order and independently randomized signer maps",
+    "Channel append/renew preserves prior boot-compatible targets and prevents known generation/identity reassignment",
+    "Snapshot/timestamp references reject lower versions and changed bytes at the same version",
+    "Expired/changed/invalid policy, future-dated proposals, oversized inputs and exhausted versions reject",
+    "Requests cannot contain a root-signing operation, policy changes or unknown executable/path fields",
+    "Independently signed roles form a feed accepted by both Release/Nightly TrustStore consumers and publication.inventory; Release promotion retains original payload and generation"
+  ],
+  "limitations": [
+    "Authority and parent inputs must come from independently selected current publisher state; signatures alone do not establish freshness.",
+    "Admitted proposal hashes do not prove GitHub workflow identity, artifact provenance, source CI, expanded-image validation or maintainer approval.",
+    "The signing helper does not establish job/secret isolation or historical generation allocation; those caller controls are still required.",
+    "This operation appends or renews catalogs, not pruning or credential/root rotation.",
+    "A reserved publication must retain original signed outputs, especially for randomized signature algorithms.",
+    "All private credentials used in tests were ephemeral and confined to test memory or temporary directories. No production signing material was created."
+  ],
+  "remaining": [
+    "Implement and validate GitHub build/run/artifact admission and isolated, pinned signing/promotion workflows.",
+    "Provision protected environments and role-specific credentials; retain root signing authority offline.",
+    "Connect same-source CI and complete pinned-Yocto artifact validation to exact image approval.",
+    "Implement durable historical generation allocation, immutable promotion and safe candidate/history retention.",
+    "Automate daily metadata renewal without exposing Release/root/delegation authority to Nightly jobs.",
+    "Create the production public root/feed, embed the selected bundle and qualify actual supervised bootstrap and automatic installation on both Pis."
+  ]
+}

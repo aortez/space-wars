@@ -65,7 +65,10 @@ fn joining_rain_keeps_its_clock_water_panels_and_existing_actor_motion() {
         assert_eq!(after.duck_phase, ClockRainDuckPhase::HandedOff);
         assert!(after.duck_joined && !after.duck_course);
         assert_eq!(rain(&state).physics_counts(), (0, 0));
-        assert_eq!((state.body_count(), state.collider_count()), (4, 4));
+        assert_eq!(
+            (state.body_count(), state.collider_count()),
+            (4 + state.flap_body_count(), 4 + state.flap_body_count())
+        );
         ledger(&state);
         toggle(&mut state, 2);
         ticks(&mut state, 30);
@@ -90,7 +93,10 @@ fn join_before_passive_spawn_pause_dismiss_rejoin_and_resize_preserve_the_shower
     let session = state.player_duck_session();
     let player = state.player_duck_state();
     let water = state.rain_state();
-    assert_eq!((state.body_count(), state.collider_count()), (4, 4));
+    assert_eq!(
+        (state.body_count(), state.collider_count()),
+        (4 + state.flap_body_count(), 4 + state.flap_body_count())
+    );
     for _ in 0..120 {
         ClockScenario::step(&mut state, &[], Duration::ZERO);
     }
@@ -147,7 +153,7 @@ fn full_shower_retains_one_player_world_and_closes_dry_without_eviction() {
             assert_eq!(state.player_duck_session(), session);
             assert_eq!(
                 (state.body_count(), state.collider_count()),
-                (4, 4),
+                (4 + state.flap_body_count(), 4 + state.flap_body_count()),
                 "aspect={aspect} {:?}",
                 state.player_duck_state()
             );
@@ -207,7 +213,10 @@ fn replacing_rain_retains_the_panels_and_a_new_shower_starts_at_their_pose() {
             }
         }
         ticks(&mut state, 30);
-        assert_eq!((state.body_count(), state.collider_count()), (4, 4));
+        assert_eq!(
+            (state.body_count(), state.collider_count()),
+            (4 + state.flap_body_count(), 4 + state.flap_body_count())
+        );
         ledger(&state);
     }
     assert_eq!(state.player_duck_session().unwrap().0, player.session_id);
@@ -264,7 +273,10 @@ fn joining_during_cleanup_keeps_the_panels_when_the_event_finishes() {
         assert_eq!(state.event_kind(), None);
         assert_eq!(state.player_duck_session(), session);
         assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
-        assert_eq!((state.body_count(), state.collider_count()), (4, 4));
+        assert_eq!(
+            (state.body_count(), state.collider_count()),
+            (4 + state.flap_body_count(), 4 + state.flap_body_count())
+        );
         assert!(state.player_duck_state().unwrap().duck.grounded);
     }
 }

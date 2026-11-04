@@ -1,0 +1,109 @@
+From: Space-Wars maintainers <noreply@spacewars.local>
+Subject: [PATCH] timesync: expose a successful clock correction receipt
+
+systemd 255 touches the runtime synchronization notification even when
+clock_adjtime fails. A device update policy must not treat that as usable time.
+Expose a read-only receipt containing the accepted packet count and actual
+realtime/monotonic/boottime after correction. Leave the receipt unchanged on
+spikes or failed adjustment, and only notify successful synchronization after
+an accepted correction. The consumer also checks provider identity, current
+NTPMessage, the runtime notification, and kernel clock state.
+
+Upstream-Status: Inappropriate [Space-Wars versioned provider extension]
+---
+--- a/src/timesync/timesyncd-manager.c
++++ b/src/timesync/timesyncd-manager.c
+@@ -575,13 +575,19 @@
+                 r = manager_adjust_clock(m, offset, leap_sec);
+                 if (r < 0)
+                         log_error_errno(r, "Failed to call clock_adjtime(): %m");
+-
+-                (void) manager_save_time_and_rearm(m, dts.realtime);
+-
+-                /* If touch fails, there isn't much we can do. Maybe it'll work next time. */
+-                r = touch("/run/systemd/timesync/synchronized");
+-                if (r < 0)
+-                        log_debug_errno(r, "Failed to touch /run/systemd/timesync/synchronized, ignoring: %m");
++                else {
++                        /* Capture actual clocks after the accepted correction. Consumers correlate
++                         * this receipt with NTPMessage, our bus owner and the runtime notification. */
++                        triple_timestamp_now(&m->last_successful_sync);
++                        m->last_successful_sync_packet_count = m->packet_count;
++
++                        (void) manager_save_time_and_rearm(m, dts.realtime);
++
++                        /* If touch fails, there isn't much we can do. Maybe it'll work next time. */
++                        r = touch("/run/systemd/timesync/synchronized");
++                        if (r < 0)
++                                log_debug_errno(r, "Failed to touch /run/systemd/timesync/synchronized, ignoring: %m");
++                }
+         }
+ 
+         /* Save NTP response */
+@@ -600,6 +606,7 @@
+                                 "/org/freedesktop/timesync1",
+                                 "org.freedesktop.timesync1.Manager",
+                                 "NTPMessage",
++                                "SpacewarsLastSuccessfulSync",
+                                 NULL);
+ 
+         if (!m->talking) {
+@@ -613,7 +620,7 @@
+                 (void) sd_notifyf(false, "STATUS=Contacted time server %s (%s).", strna(pretty), m->current_server_name->string);
+         }
+ 
+-        if (!spike && !m->synchronized) {
++        if (!spike && m->last_successful_sync_packet_count == m->packet_count && !m->synchronized) {
+                 m->synchronized = true;
+ 
+                 log_struct(LOG_INFO,
+--- a/src/timesync/timesyncd-manager.h
++++ b/src/timesync/timesyncd-manager.h
+@@ -112,6 +112,10 @@
+         /* Indicates whether we ever managed to set the local clock from NTP */
+         bool synchronized;
+ 
++        /* Successful correction receipt; never updated for spikes or syscall failure. */
++        triple_timestamp last_successful_sync;
++        uint64_t last_successful_sync_packet_count;
++
+         /* save time event */
+         sd_event_source *event_save_time;
+         usec_t save_time_interval_usec;
+--- a/src/timesync/timesyncd-bus.c
++++ b/src/timesync/timesyncd-bus.c
+@@ -207,6 +207,26 @@
+         return sd_bus_message_close_container(reply);
+ }
+ 
++static int property_get_last_successful_sync(
++                sd_bus *bus,
++                const char *path,
++                const char *interface,
++                const char *property,
++                sd_bus_message *reply,
++                void *userdata,
++                sd_bus_error *error) {
++
++        Manager *m = ASSERT_PTR(userdata);
++
++        assert(reply);
++
++        return sd_bus_message_append(reply, "(tttt)",
++                                     m->last_successful_sync_packet_count,
++                                     m->last_successful_sync.realtime,
++                                     m->last_successful_sync.monotonic,
++                                     m->last_successful_sync.boottime);
++}
++
+ static const sd_bus_vtable manager_vtable[] = {
+         SD_BUS_VTABLE_START(0),
+ 
+@@ -221,6 +241,7 @@
+         SD_BUS_PROPERTY("PollIntervalMaxUSec", "t", bus_property_get_usec, offsetof(Manager, poll_interval_max_usec), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("PollIntervalUSec", "t", bus_property_get_usec, offsetof(Manager, poll_interval_usec), 0),
+         SD_BUS_PROPERTY("NTPMessage", "(uuuuittayttttbtt)", property_get_ntp_message, 0, SD_BUS_VTABLE_PROPERTY_EMITS_CHANGE),
++        SD_BUS_PROPERTY("SpacewarsLastSuccessfulSync", "(tttt)", property_get_last_successful_sync, 0, SD_BUS_VTABLE_PROPERTY_EMITS_CHANGE),
+         SD_BUS_PROPERTY("Frequency", "x", NULL, offsetof(Manager, drift_freq), 0),
+ 
+         SD_BUS_METHOD_WITH_ARGS("SetRuntimeNTPServers",

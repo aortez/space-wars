@@ -289,8 +289,8 @@ component ScenarioPicker inherits Rectangle {
     }
     Text {
         x: 72px; width: parent.width - 144px; height: parent.height;
-        text: root.title; color: #ffffff; font-size: 22px; font-weight: 700;
-        horizontal-alignment: center; vertical-alignment: center; overflow: elide;
+        text: root.title; color: #ffffff; font-size: parent.width < 540px ? 18px : 22px; font-weight: 700;
+        horizontal-alignment: center; vertical-alignment: center; wrap: word-wrap; overflow: elide;
     }
     MenuButton {
         x: parent.width - 59px; y: 3px; width: 56px; height: parent.height - 6px;
@@ -613,6 +613,18 @@ export component MainWindow inherits Window {
     callback autostart-adjust(int, int);
     callback autostart-start-now();
     callback autostart-return();
+    in property <bool> install-fenced: false;
+    in-out property <bool> updates-visible: false;
+    in property <string> updates-message;
+    in property <string> updates-confirm-label: "Install & restart";
+    in property <bool> updates-can-confirm: false;
+    in property <bool> updates-can-cancel: true;
+    in-out property <int> updates-focus: 1;
+    callback updates-open();
+    callback updates-confirm();
+    callback updates-cancel();
+    callback updates-activity();
+    callback updates-interrupted();
     in-out property <bool> sound-visible: false;
     in-out property <bool> network-visible: false;
     in-out property <int> network-focus-index: 0;
@@ -665,6 +677,7 @@ export component MainWindow inherits Window {
     in property <string> scoreboard-round;
     in property <string> scoreboard-planets;
     in property <[string]> launcher-scenarios;
+    in property <bool> launcher-show-all: false;
     in property <string> launcher-scenario-title: "Space-Wars";
     in-out property <string> launcher-scenario: "spacewars";
     in-out property <string> launcher-seed-text: "0";
@@ -697,7 +710,13 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-p1-zoom-text: "320";
     in-out property <string> launcher-p2-zoom-text: "320";
     in-out property <string> launcher-pizza-desired-balls-text: "24";
+    in-out property <string> launcher-pizza-live-ball-limit-text: "500";
     in-out property <string> launcher-pizza-spawn-rate-text: "0.10";
+    in-out property <bool> launcher-pizza-automatic-events: true;
+    in property <bool> pizza-event-available: false;
+    in property <bool> pizza-event-can-trigger: false;
+    in property <string> pizza-event-status;
+    callback ingame-pizza-gravity();
     in-out property <string> launcher-clock-time-format: "24-hour";
     in-out property <bool> clock-fonts-visible: false;
     in-out property <int> clock-font-focus: 0;
@@ -722,6 +741,10 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-aquarium-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
     in-out property <bool> launcher-clock-digit-slide-enabled: true;
+    in-out property <bool> launcher-clock-cell-swap-enabled: true;
+    in-out property <bool> launcher-clock-grass-enabled: true;
+    in-out property <bool> launcher-clock-slot-machine-enabled: true;
+    in-out property <bool> launcher-clock-spider-enabled: true;
     in-out property <bool> launcher-clock-rain-enabled: true;
     in-out property <string> launcher-clock-rain-amount: "Varied";
     in-out property <string> launcher-clock-marquee-preset: "Random";
@@ -766,6 +789,7 @@ export component MainWindow inherits Window {
     callback launcher-p2-zoom-in();
     callback launcher-p2-zoom-out();
     callback launcher-scenario-selected(string);
+    callback launcher-toggle-show-all();
     callback launcher-nes-rom-cycle(int);
     callback launcher-quit();
     callback ingame-resume();
@@ -1137,7 +1161,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: root.width < 632px ? root.width - 32px : 600px;
-            height: root.ingame-controls-visible || root.ingame-clock-visible ? (root.height < 456px ? root.height - 24px : 432px) : 326px;
+            height: root.ingame-controls-visible || root.ingame-clock-visible ? (root.height < 456px ? root.height - 24px : 432px) : root.pizza-event-available ? 390px : 326px;
             background: #080a12f7;
             border-color: #596273;
             border-width: 1px;
@@ -1352,6 +1376,31 @@ export component MainWindow inherits Window {
                 }
             }
 
+            if root.pizza-event-available && !root.ingame-controls-visible && !root.ingame-clock-visible: MenuButton {
+                x: 24px;
+                y: 276px;
+                width: parent.width - 48px;
+                height: 44px;
+                text: "Run gravity & resume";
+                enabled: root.pizza-event-can-trigger;
+                selected: root.ingame-menu-focus-index == 6;
+                activated => {
+                    root.ingame-menu-focus-index = 6;
+                    root.ingame-pizza-gravity();
+                }
+            }
+            if root.pizza-event-available && !root.ingame-controls-visible && !root.ingame-clock-visible: Text {
+                x: 24px;
+                y: 328px;
+                width: parent.width - 48px;
+                height: 40px;
+                text: root.pizza-event-status;
+                color: #80d8ff;
+                font-size: 14px;
+                wrap: word-wrap;
+                horizontal-alignment: center;
+            }
+
             // A conditional item tree keeps these controls out of the large
             // root initializer. Values/focus remain in MainWindow across opens.
             if root.ingame-clock-visible: Rectangle {
@@ -1394,27 +1443,54 @@ export component MainWindow inherits Window {
                     enabled: !root.clock-controls-pending;
                     activated => { root.clock-fonts-open(); }
                 }
-                ChoiceRow {
+                MenuButton {
                     x: 0px;
                     y: 56px;
-                    width: parent.width - 120px;
+                    width: (parent.width - 40px) / 5;
                     height: 48px;
-                    label: "Rain";
-                    value: root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off";
+                    text: "Rain\n" + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
                     selected: root.ingame-clock-focus-index == 12;
                     enabled: !root.clock-controls-pending;
-                    previous => { root.ingame-clock-adjust(12, -1); }
-                    next => { root.ingame-clock-adjust(12, 1); }
+                    activated => { root.ingame-clock-adjust(12, 1); }
                 }
                 MenuButton {
-                    x: parent.width - 112px;
+                    x: (parent.width + 10px) / 5;
                     y: 56px;
-                    width: 112px;
+                    width: (parent.width - 40px) / 5;
                     height: 48px;
                     text: "Date\n" + (root.launcher-clock-show-date ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 13;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(13, 1); }
+                }
+                MenuButton {
+                    x: 2 * (parent.width + 10px) / 5;
+                    y: 56px;
+                    width: (parent.width - 40px) / 5;
+                    height: 48px;
+                    text: "Cell Swap\n" + (root.launcher-clock-cell-swap-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 18;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(18, 1); }
+                }
+                MenuButton {
+                    x: 3 * (parent.width + 10px) / 5;
+                    y: 56px;
+                    width: (parent.width - 40px) / 5;
+                    height: 48px;
+                    text: "Grass\n" + (root.launcher-clock-grass-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 19;
+                    activated => { root.ingame-clock-adjust(19, 1); }
+                }
+                MenuButton {
+                    x: 4 * (parent.width + 10px) / 5;
+                    y: 56px;
+                    width: (parent.width - 40px) / 5;
+                    height: 48px;
+                    text: "Slot Machine\n" + (root.launcher-clock-slot-machine-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 20;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(20, 1); }
                 }
                 MenuButton {
                     x: 0px;
@@ -1500,20 +1576,23 @@ export component MainWindow inherits Window {
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(15, 1); }
                 }
+                // Three switches at a fifth of the row each and the recipe at
+                // two fifths, so the recipe keeps its room on a portrait panel.
                 MenuButton {
                     x: 0px;
                     y: 224px;
-                    width: 104px;
+                    width: (parent.width - 24px) / 5;
                     height: 48px;
                     text: "Marquee\n" + (root.launcher-clock-marquee-enabled ? "On" : "Off");
+                    text-padding: 6px;
                     selected: root.ingame-clock-focus-index == 9;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(9, 1); }
                 }
                 MenuButton {
-                    x: 112px;
+                    x: (parent.width - 24px) / 5 + 8px;
                     y: 224px;
-                    width: 94px;
+                    width: (parent.width - 24px) / 5;
                     height: 48px;
                     text: "Aquarium\n" + (root.launcher-clock-aquarium-enabled ? "On" : "Off");
                     text-padding: 6px;
@@ -1521,10 +1600,21 @@ export component MainWindow inherits Window {
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(17, 1); }
                 }
-                ChoiceRow {
-                    x: 214px;
+                MenuButton {
+                    x: 2 * (parent.width - 24px) / 5 + 16px;
                     y: 224px;
-                    width: parent.width - 214px;
+                    width: (parent.width - 24px) / 5;
+                    height: 48px;
+                    text: "Spider\n" + (root.launcher-clock-spider-enabled ? "On" : "Off");
+                    text-padding: 6px;
+                    selected: root.ingame-clock-focus-index == 21;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(21, 1); }
+                }
+                ChoiceRow {
+                    x: 3 * (parent.width - 24px) / 5 + 24px;
+                    y: 224px;
+                    width: 2 * (parent.width - 24px) / 5;
                     height: 48px;
                     label: "Recipe";
                     label-fraction: 0.25;
@@ -1706,6 +1796,15 @@ export component MainWindow inherits Window {
         }
         capture-key-pressed(event) => {
             if (UserActivity.key-event(event.text, true)) { return accept; }
+            if (root.updates-visible || root.install-fenced) {
+                if (event.text == Key.UpArrow) { root.keyboard-action(0, event.repeat); }
+                if (event.text == Key.DownArrow) { root.keyboard-action(1, event.repeat); }
+                if (event.text == Key.LeftArrow) { root.keyboard-action(2, event.repeat); }
+                if (event.text == Key.RightArrow) { root.keyboard-action(3, event.repeat); }
+                if (event.text == Key.Return) { root.keyboard-action(4, event.repeat); }
+                if (event.text == Key.Escape) { root.keyboard-action(5, event.repeat); }
+                return accept;
+            }
             if (root.launcher-busy) { return accept; }
             if (root.network-visible && root.network-password-visible) {
                 if (event.text == Key.Backspace) { root.network-command("network.erase"); return accept; }
@@ -1831,14 +1930,17 @@ export component MainWindow inherits Window {
 
             MenuPage {
                 available-width: parent.width; available-height: parent.height;
+                private property <bool> show-save-error: root.settings-save-error != "" && !root.launcher-controls-visible && !root.launcher-settings-visible;
                 // Scenario-specific forms retain their existing geometry in this pass.
-                height: Math.min(parent.height - 24px, root.launcher-controls-visible || root.launcher-settings-visible ? 440px : 520px);
+                height: Math.min(parent.height - 24px, root.launcher-controls-visible || root.launcher-settings-visible ? 440px : root.width < 600px ? 580px : 520px);
                 heading: root.launcher-settings-visible ? "Scenario Settings" : root.launcher-controls-visible ? "Controls" : "Space-Wars";
-                subtitle: root.launcher-error-text != "" ? root.launcher-error-text : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
-                error: root.launcher-error-text != "";
+                subtitle: root.launcher-error-text != "" ? root.launcher-error-text : self.show-save-error ? "Save failed. Retry Save in App Settings." : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
+                error: root.launcher-error-text != "" || self.show-save-error;
                 hint: root.launcher-controls-visible || root.launcher-settings-visible ? "" : root.launcher-focus-index == 0 ? (self.width < 600px ? "Left / Right browse · A confirm" : "Left / Right browse · A / Enter confirm · Start plays") : self.width < 600px ? "D-pad move · A select · Tap to choose" : "D-pad / arrows move · A / Enter selects · Tap to choose";
 
-                if !root.launcher-controls-visible && !root.launcher-settings-visible: Rectangle {
+                if !root.launcher-controls-visible && !root.launcher-settings-visible: launcher-body := Rectangle {
+                    private property <bool> stacked: root.width < 600px;
+                    private property <length> extra-row: self.stacked ? 60px : 0px;
                     x: 24px;
                     y: 82px;
                     width: parent.width - 48px;
@@ -1848,7 +1950,7 @@ export component MainWindow inherits Window {
                     ScenarioPicker {
                         x: 0px;
                         y: 0px;
-                        width: parent.width;
+                        width: parent.width - (launcher-body.stacked ? 0px : 160px);
                         height: 64px;
                         title: root.launcher-scenario-title;
                         selected: root.launcher-focus-index == 0;
@@ -1862,9 +1964,22 @@ export component MainWindow inherits Window {
                         }
                     }
 
+                    MenuButton {
+                        x: launcher-body.stacked ? 0px : parent.width - 148px;
+                        y: launcher-body.stacked ? 74px : 0px;
+                        width: launcher-body.stacked ? parent.width : 148px;
+                        height: launcher-body.stacked ? 48px : 64px;
+                        text: "Show all: " + (root.launcher-show-all ? "On" : "Off");
+                        selected: root.launcher-focus-index == 9;
+                        activated => {
+                            root.launcher-focus-index = 9;
+                            root.ui-action(4);
+                        }
+                    }
+
                     Rectangle {
                         x: 0px;
-                        y: 74px;
+                        y: 74px + launcher-body.extra-row;
                         width: parent.width;
                         height: 76px;
                         background: #00000000;
@@ -1875,7 +1990,7 @@ export component MainWindow inherits Window {
                             width: parent.width;
                             height: 40px;
                             wrap: word-wrap;
-                            text: root.launcher-material-arena ? (root.launcher-scenario == "spacewars-terrain-arena-duel" ? "Two mission bots in a generated three-planet arena" : "P1 human · P2 mission · Three generated planets") : root.launcher-material-travel ? (root.launcher-scenario == "spacewars-terrain-travel-duel" ? "Two mission bots on two planets" : "P1 human · P2 interplanetary mission") : root.launcher-scenario == "spacewars-terrain-jetpack" ? "P1 human · P2 jetpack crossing trial" : root.launcher-scenario == "spacewars-terrain-duel" ? "Watch two combat and recovery bots" : root.launcher-scenario == "spacewars-terrain-combat" ? "P1 human · P2 combat and recovery" : root.launcher-scenario == "spacewars-terrain-recovery" ? "P1 human · P2 asteroid strike and recovery" : root.launcher-scenario == "spacewars-terrain-ai" ? "P1 human · P2 swept-wing flight and capture" : root.launcher-scenario == "spacewars-terrain" ? "Land, claim, mine and recover on destructible ground" : root.launcher-material-match ? "Fight, mine, capture and rebuild on three destructible planets" : root.launcher-classic-spacewars ? "Classic orbital combat and berth capture" : root.launcher-scenario == "pizza" ? "Interactive many-body collision sandbox" : root.launcher-scenario == "clock" ? "Low-resolution clock driven by local device time" : root.launcher-scenario == "falling" ? "Rust-native NES homebrew game" : root.launcher-scenario == "nes" ? "User-supplied NES cartridge library" : root.launcher-surface-comparison ? (root.launcher-scenario == "spacewars-surface-round" ? "Try walking and landing on round ground" : root.launcher-scenario == "spacewars-surface-contour" ? "Try walking and landing on sloped ground" : "Try walking and landing on stepped ground") : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain") ? "Land, disembark and raise your planet's flag" : root.launcher-scenario == "spaceling-lab" ? "Spaceling movement and recovery lab" : root.launcher-scenario == "rover-lab" ? "Rapier rover and wheel mechanics lab" : "Physical landing and surface interaction lab";
+                            text: root.launcher-material-arena ? (root.launcher-scenario == "spacewars-terrain-arena-duel" ? "Two mission bots in a generated three-planet arena" : "P1 human · P2 mission · Three generated planets") : root.launcher-material-travel ? (root.launcher-scenario == "spacewars-terrain-travel-duel" ? "Two mission bots on two planets" : "P1 human · P2 interplanetary mission") : root.launcher-scenario == "spacewars-terrain-jetpack" ? "P1 human · P2 jetpack crossing trial" : root.launcher-scenario == "spacewars-terrain-duel" ? "Watch two combat and recovery bots" : root.launcher-scenario == "spacewars-terrain-combat" ? "P1 human · P2 combat and recovery" : root.launcher-scenario == "spacewars-terrain-recovery" ? "P1 human · P2 asteroid strike and recovery" : root.launcher-scenario == "spacewars-terrain-ai" ? "P1 human · P2 swept-wing flight and capture" : root.launcher-scenario == "spacewars-terrain" ? "Land, claim, mine and recover on destructible ground" : root.launcher-material-match ? "Fight, mine, capture and rebuild on three destructible planets" : root.launcher-classic-spacewars ? "Classic orbital combat and berth capture" : root.launcher-scenario == "pizza" ? "Interactive many-body collision sandbox" : root.launcher-scenario == "clock" ? "Low-resolution clock driven by local device time" : root.launcher-scenario == "falling" ? "Rust-native NES homebrew game" : root.launcher-scenario == "nes" ? "User-supplied NES cartridge library" : root.launcher-surface-comparison ? (root.launcher-scenario == "spacewars-surface-round" ? "Try walking and landing on round ground" : root.launcher-scenario == "spacewars-surface-contour" ? "Try walking and landing on sloped ground" : "Try walking and landing on stepped ground") : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain") ? "Land, disembark and raise your planet's flag" : root.launcher-scenario == "spaceling-lab" ? "Spaceling movement and recovery lab" : root.launcher-scenario == "garden-lab" ? "Grow grass, inspect roots and runners, and test light, shade and resources" : root.launcher-scenario == "rover-lab" ? "Rapier rover and wheel mechanics lab" : "Physical landing and surface interaction lab";
                             color: #e6edf7;
                             font-size: 16px;
                         }
@@ -1895,7 +2010,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: 158px;
+                        y: 158px + launcher-body.extra-row;
                         width: root.launcher-material-match ? (parent.width - 12px) * 0.60 : parent.width;
                         height: 56px;
                         text: "Play";
@@ -1909,7 +2024,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: 226px;
+                        y: 226px + launcher-body.extra-row;
                         width: (parent.width - 24px) / 3;
                         height: 52px;
                         text: "Scenario Settings";
@@ -1922,7 +2037,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: (parent.width + 12px) / 3;
-                        y: 226px;
+                        y: 226px + launcher-body.extra-row;
                         width: (parent.width - 24px) / 3;
                         height: 52px;
                         text: "Controls";
@@ -1935,7 +2050,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 2 * (parent.width + 12px) / 3;
-                        y: 226px;
+                        y: 226px + launcher-body.extra-row;
                         width: (parent.width - 24px) / 3;
                         height: 52px;
                         text: "App Settings";
@@ -1983,7 +2098,7 @@ export component MainWindow inherits Window {
                     MenuButton {
                         visible: root.launcher-material-match;
                         x: (parent.width - 12px) * 0.60 + 12px;
-                        y: 158px;
+                        y: 158px + launcher-body.extra-row;
                         width: (parent.width - 12px) * 0.40;
                         height: 56px;
                         text: "Play New World";
@@ -2300,7 +2415,7 @@ export component MainWindow inherits Window {
                         MenuButton {
                             x: 0px;
                             y: 104px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Events\n" + root.launcher-clock-event-profile;
                             selected: root.launcher-settings-focus-index == 4;
@@ -2310,58 +2425,77 @@ export component MainWindow inherits Window {
                             }
                         }
                         MenuButton {
-                            x: (parent.width + 8px) / 3;
+                            x: (parent.width + 8px) / 4;
                             y: 104px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Rain\n" + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
                             selected: root.launcher-settings-focus-index == 11;
                             activated => { root.launcher-settings-focus-index = 11; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: 2 * (parent.width + 8px) / 3;
+                            x: 2 * (parent.width + 8px) / 4;
                             y: 104px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Digit Slide\n" + (root.launcher-clock-digit-slide-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 3;
                             activated => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
                         }
-
-                        ChoiceRow {
-                            x: 0px;
-                            y: 156px;
-                            width: (parent.width - 12px) / 2;
+                        MenuButton {
+                            x: 3 * (parent.width + 8px) / 4;
+                            y: 104px;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
-                            label: "Falling";
-                            value: root.launcher-clock-falling-enabled ? "On" : "Off";
-                            selected: root.launcher-settings-focus-index == 5;
-                            previous => {
-                                root.launcher-settings-focus-index = 5;
-                                root.ui-action(2);
-                            }
-                            next => {
-                                root.launcher-settings-focus-index = 5;
-                                root.ui-action(3);
-                            }
+                            text: "Spider\n" + (root.launcher-clock-spider-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 20;
+                            activated => { root.launcher-settings-focus-index = 20; root.ui-action(3); }
                         }
 
-                        ChoiceRow {
-                            x: parent.width / 2 + 6px;
+                        MenuButton {
+                            x: 0px;
                             y: 156px;
-                            width: (parent.width - 12px) / 2;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
-                            label: "Color Cycle";
-                            value: root.launcher-clock-color-cycle-enabled ? "On" : "Off";
+                            text: "Falling\n" + (root.launcher-clock-falling-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 5;
+                            activated => { root.launcher-settings-focus-index = 5; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: (parent.width + 8px) / 5;
+                            y: 156px;
+                            width: (parent.width - 32px) / 5;
+                            height: 48px;
+                            text: "Color Cycle\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 6;
-                            previous => {
-                                root.launcher-settings-focus-index = 6;
-                                root.ui-action(2);
-                            }
-                            next => {
-                                root.launcher-settings-focus-index = 6;
-                                root.ui-action(3);
-                            }
+                            activated => { root.launcher-settings-focus-index = 6; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: 2 * (parent.width + 8px) / 5;
+                            y: 156px;
+                            width: (parent.width - 32px) / 5;
+                            height: 48px;
+                            text: "Cell Swap\n" + (root.launcher-clock-cell-swap-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 17;
+                            activated => { root.launcher-settings-focus-index = 17; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: 3 * (parent.width + 8px) / 5;
+                            y: 156px;
+                            width: (parent.width - 32px) / 5;
+                            height: 48px;
+                            text: "Grass\n" + (root.launcher-clock-grass-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 18;
+                            activated => { root.launcher-settings-focus-index = 18; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: 4 * (parent.width + 8px) / 5;
+                            y: 156px;
+                            width: (parent.width - 32px) / 5;
+                            height: 48px;
+                            text: "Slot Machine\n" + (root.launcher-clock-slot-machine-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 19;
+                            activated => { root.launcher-settings-focus-index = 19; root.ui-action(3); }
                         }
 
                         MenuButton {
@@ -2499,6 +2633,29 @@ export component MainWindow inherits Window {
                         }
                     }
 
+                    if root.launcher-scenario == "pizza": ChoiceRow {
+                        y: 260px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Live ball limit";
+                        value: root.launcher-pizza-live-ball-limit-text;
+                        selected: root.launcher-settings-focus-index == 5;
+                        previous => { root.launcher-settings-focus-index = 5; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 5; root.ui-action(3); }
+                    }
+
+                    if root.launcher-scenario == "pizza": ChoiceRow {
+                        x: 0px;
+                        y: 208px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Automatic events";
+                        value: root.launcher-pizza-automatic-events ? "On" : "Off";
+                        selected: root.launcher-settings-focus-index == 4;
+                        previous => { root.launcher-settings-focus-index = 4; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 4; root.ui-action(3); }
+                    }
+
                     Text {
                         visible: root.launcher-scenario == "rover-lab" || root.launcher-scenario == "falling";
                         x: 0px;
@@ -2536,11 +2693,11 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-spacewars-settings || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 322px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 17 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 21 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -2548,7 +2705,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-spacewars-settings || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 322px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: root.launcher-material-match ? "Play World" : "Start Game";
@@ -3178,7 +3335,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.sound-visible && !root.network-visible && !root.controllers-visible && !root.device-info-visible && !root.autostart-settings-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
+    if root.sound-visible && !root.updates-visible && !root.network-visible && !root.controllers-visible && !root.device-info-visible && !root.autostart-settings-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
         width: parent.width;
         height: parent.height;
         background: #050514;
@@ -3195,11 +3352,11 @@ export component MainWindow inherits Window {
                 x: 24px; y: 82px; width: parent.width - 48px; height: parent.height - 214px;
                 viewport-width: self.width;
                 viewport-height: settings-body.height;
-                property <int> focused-item: root.sound-focus-index == 8 ? 6 : root.sound-focus-index == 7 ? 5 : root.sound-focus-index == 5 || root.sound-focus-index == 6 ? -1 : root.sound-focus-index;
+                property <int> focused-item: root.sound-focus-index == 9 ? 7 : root.sound-focus-index == 8 ? 6 : root.sound-focus-index == 7 ? 5 : root.sound-focus-index == 5 || root.sound-focus-index == 6 ? -1 : root.sound-focus-index;
                 property <length> row-height: parent.row-height;
                 property <length> scroll-limit: Math.max(0px, self.viewport-height - self.height);
                 function reveal-focus() {
-                    if self.focused-item >= 0 && self.focused-item < 7 {
+                    if self.focused-item >= 0 && self.focused-item < 8 {
                         let top = self.focused-item * (self.row-height + 10px);
                         let bottom = top + self.row-height;
                         if -self.viewport-y > top { self.viewport-y = -top; }
@@ -3212,7 +3369,7 @@ export component MainWindow inherits Window {
                 init => { self.reveal-focus(); }
                 settings-body := Rectangle {
                     x: 0px; y: 0px;
-                    width: settings-scroll.width; height: 7 * settings-scroll.row-height + 60px;
+                    width: settings-scroll.width; height: 8 * settings-scroll.row-height + 70px;
                     VolumeRow {
                         x: 0px; y: 0px;
                         width: parent.width; height: settings-scroll.row-height;
@@ -3255,6 +3412,12 @@ export component MainWindow inherits Window {
                         width: parent.width; height: settings-scroll.row-height;
                         label: "Network"; navigation: true; selected: root.sound-focus-index == 8;
                         activated => { root.network-open(); }
+                    }
+                    SettingsRow {
+                        y: 7 * (settings-scroll.row-height + 10px);
+                        width: parent.width; height: settings-scroll.row-height;
+                        label: "Updates"; navigation: true; selected: root.sound-focus-index == 9;
+                        activated => { root.updates-open(); }
                     }
                 }
             }
@@ -3683,6 +3846,32 @@ export component MainWindow inherits Window {
                 selected: root.clock-font-focus == 9;
                 enabled: !root.clock-controls-pending;
                 activated => { root.clock-font-activate(9); }
+            }
+        }
+    }
+
+    if root.updates-visible || root.install-fenced: Rectangle {
+        width: parent.width; height: parent.height; background: #050514;
+        TouchArea { width: parent.width; height: parent.height; }
+        MenuPage {
+            available-width: parent.width; available-height: parent.height;
+            heading: "Updates";
+            subtitle: "Device software";
+            hint: root.updates-can-cancel ? "A / Enter select · B / Esc back" : "Waiting for the device service";
+            Text {
+                x: 24px; y: 88px; width: parent.width - 48px; height: parent.height - 240px;
+                text: root.updates-message; color: #d7efff; font-size: parent.width < 600px ? 16px : 20px;
+                wrap: word-wrap;
+            }
+            MenuButton {
+                x: 24px; y: parent.height - 140px; width: parent.width - 48px; height: 48px;
+                text: root.updates-confirm-label; selected: root.updates-focus == 0; enabled: root.updates-can-confirm;
+                activated => { root.updates-confirm(); }
+            }
+            MenuButton {
+                x: 24px; y: parent.height - 84px; width: parent.width - 48px; height: 48px;
+                text: root.install-fenced ? "Cancel" : "Back"; selected: root.updates-focus == 1; enabled: root.updates-can-cancel;
+                activated => { root.updates-cancel(); }
             }
         }
     }

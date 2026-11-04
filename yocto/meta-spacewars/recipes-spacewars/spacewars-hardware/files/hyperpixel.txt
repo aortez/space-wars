@@ -1,3 +1,4 @@
 # Existing HyperPixel 4.0 rectangular display. Rotation is set by the kiosk.
 [all]
 dtoverlay=vc4-kms-dpi-hyperpixel4
+dtoverlay=spacewars-profile-hyperpixel

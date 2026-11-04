@@ -1,0 +1,46 @@
+[Unit]
+Description=Space-Wars independent device service
+After=spacewars-data-init.service spacewars-rtc-capture.service dbus.service
+Requires=spacewars-data-init.service
+Wants=spacewars-rtc-capture.service systemd-timesyncd.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/engine-os-manager serve
+# Pin the host namespace before dropping process-inspection privileges.
+# Failed handoff is reported by serve and blocks idle shutdown, not startup.
+OpenFile=/proc/1/ns/net:spacewars-host-netns:read-only,graceful
+User=root
+Group=spacewars
+UMask=0077
+RuntimeDirectory=spacewars-system
+RuntimeDirectoryMode=0750
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/boot /data/spacewars-system /run/spacewars-system -/run/spacewars-install
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+# Native install flushes a validated inactive block partition and logind requires
+# CAP_SYS_ADMIN for its fixed trial reboot parameter. No mounts are permitted.
+CapabilityBoundingSet=CAP_SYS_TIME CAP_SYS_ADMIN
+RestrictNamespaces=yes
+SystemCallFilter=~@mount
+DevicePolicy=closed
+DeviceAllow=block-sd rw
+DeviceAllow=/dev/rtc0 rw
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

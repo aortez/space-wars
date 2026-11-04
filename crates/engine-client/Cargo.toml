@@ -19,6 +19,8 @@ engine-terrain = { workspace = true }
 engine-nes = { workspace = true }
 spacewars-ai = { workspace = true, features = ["terrain-recovery"] }
 spacewars-control = { workspace = true }
+scenario-garden-lab = { workspace = true }
+scenario-material-lab = { workspace = true }
 scenario-clock = { workspace = true }
 scenario-falling = { workspace = true }
 scenario-nes = { workspace = true }
@@ -53,6 +55,7 @@ futures-lite = "2"
 lyon_tessellation = { version = "=1.0.20", optional = true }
 
 [dev-dependencies]
+engine-rapier = { workspace = true }
 lyon_tessellation = "=1.0.20"
 
 [build-dependencies]

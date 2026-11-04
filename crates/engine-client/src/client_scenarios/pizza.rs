@@ -12,7 +12,7 @@ use crate::render::{FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "pizza",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Main(3),
     capabilities: ScenarioCapabilities {
         benchmark: true,
         headless_benchmark: true,
@@ -23,12 +23,13 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling.",
+    controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling, even during gravity events. Pause and choose Run gravity & resume to start one manually. Pizza settings include automatic events and a live ball limit (including fragments). Higher limits increase CPU use; 5,000 is experimental.",
     create,
 };
 
 pub(crate) struct PizzaClientScenario {
     pub(crate) state: PizzaState,
+    lab: Option<crate::pizza_lab::Recorder>,
 }
 
 fn create(
@@ -36,25 +37,112 @@ fn create(
     settings: &Settings,
     viewport: Viewport,
     mode: ScenarioStartMode,
-    _asset: &ScenarioAsset,
+    asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     let setup = settings.pizza.normalized();
     let bounds = PizzaBounds::from_aspect_ratio(viewport.aspect_ratio());
     let config = match mode {
         ScenarioStartMode::Normal => PizzaConfig {
+            live_ball_limit: setup.live_ball_limit as usize,
             desired_ball_count: setup.desired_balls as usize,
             ball_spawn_rate: setup.ball_spawn_rate,
             bounds,
             gravity: Default::default(),
+            automatic_events: setup.automatic_events,
             benchmark: None,
         },
         ScenarioStartMode::Benchmark(configuration) => {
             PizzaConfig::benchmark(configuration.pizza, bounds)
         }
     };
-    Ok(Box::new(PizzaClientScenario {
-        state: PizzaScenario::init(config, seed),
-    }))
+    let mut state = PizzaScenario::init(config, seed);
+    let lab = if let ScenarioAsset::PizzaLab(config) = asset {
+        if !mode.is_benchmark() {
+            state = if config.ordinary {
+                PizzaScenario::init(
+                    PizzaConfig {
+                        live_ball_limit: config.limit,
+                        automatic_events: false,
+                        bounds,
+                        ..Default::default()
+                    },
+                    seed,
+                )
+            } else {
+                scenario_pizza::capacity_lab::mixed_size_fixture(
+                    config.balls,
+                    config.limit,
+                    bounds,
+                    seed,
+                )
+                .map_err(|detail| ScenarioCreateError::RuntimeInitialization {
+                    name: "pizza",
+                    detail: detail.into(),
+                })?
+            };
+            Some(crate::pizza_lab::Recorder::new(config.clone()))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    if !mode.is_benchmark() && simulation_worker_requested() {
+        let worker = super::pizza_worker::PizzaWorkerClientScenario::spawn(
+            state,
+            lab,
+            viewport.aspect_ratio(),
+        )
+        .map_err(|error| ScenarioCreateError::RuntimeInitialization {
+            name: "pizza",
+            detail: format!("could not start the simulation worker: {error}"),
+        })?;
+        return Ok(Box::new(worker));
+    }
+    Ok(Box::new(PizzaClientScenario { state, lab }))
+}
+
+/// Normal play advances on a dedicated simulation thread unless
+/// SPACEWARS_PIZZA_SIMULATION_WORKER=0. Unit tests step directly unless it is
+/// 1, so they can drive updates synchronously; the worker has its own tests.
+fn simulation_worker_requested() -> bool {
+    match std::env::var("SPACEWARS_PIZZA_SIMULATION_WORKER").as_deref() {
+        Ok("0") => false,
+        Ok("1") => true,
+        _ => !cfg!(test),
+    }
+}
+
+/// One update with the lab hooks, shared by the direct and worker adapters.
+pub(super) fn step_with_lab(
+    state: &mut PizzaState,
+    lab: &mut Option<crate::pizza_lab::Recorder>,
+    actions: &[Action],
+    dt: Duration,
+) -> StepResult {
+    if let Some(lab) = lab {
+        lab.before_step(state, dt);
+    }
+    let result = PizzaScenario::step(state, actions, dt);
+    if let Some(lab) = lab {
+        lab.after_step(state, dt);
+    }
+    result
+}
+
+pub(super) fn status_of(state: &PizzaState) -> crate::host::PizzaStatus {
+    crate::host::PizzaStatus {
+        scenario_revision: 0,
+        paused: false,
+        observation: scenario_pizza::PizzaObservation {
+            version: scenario_pizza::PIZZA_OBSERVATION_VERSION,
+            tick: state.tick,
+            event: state.event_state(),
+        },
+        ball_count: state.balls.len(),
+        population: state.population(),
+        held_ball_id: state.held_ball_id,
+    }
 }
 
 impl ClientScenario for PizzaClientScenario {
@@ -62,12 +150,16 @@ impl ClientScenario for PizzaClientScenario {
         &REGISTRATION
     }
 
+    fn pizza_status(&self) -> Option<crate::host::PizzaStatus> {
+        Some(status_of(&self.state))
+    }
+
     fn tick_model(&self) -> TickModel {
         PizzaScenario::tick_model()
     }
 
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
-        PizzaScenario::step(&mut self.state, actions, dt)
+        step_with_lab(&mut self.state, &mut self.lab, actions, dt)
     }
 
     fn map_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {

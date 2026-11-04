@@ -10,10 +10,18 @@ header:
 distro: poky
 machine: raspberrypi-spacewars
 
+# The candidate builder supplies its cache explicitly. Keep the existing local
+# default when this variable is absent; never encode host cache paths in images.
+env:
+  SPACEWARS_CACHE_ROOT:
+  SPACEWARS_OTA_BUILD_INPUTS:
+  SPACEWARS_OTA_BUILD_INPUTS_SHA256:
+
 repos:
   poky:
     url: "https://git.yoctoproject.org/poky"
     branch: scarthgap
+    commit: 4fb7016a07507683359ebd620f1951fd5ea44bfa
     layers:
       meta:
       meta-poky:
@@ -21,10 +29,12 @@ repos:
   meta-raspberrypi:
     url: "https://git.yoctoproject.org/meta-raspberrypi"
     branch: scarthgap
+    commit: 018d44467c4f09eb63f8ea5e86e85d755250cf89
 
   meta-openembedded:
     url: "https://git.openembedded.org/meta-openembedded"
     branch: scarthgap
+    commit: 0f00f8b9a21950640da8c5707343e5540133f86e
     layers:
       meta-multimedia:
       meta-networking:
@@ -34,10 +44,12 @@ repos:
   meta-rust-bin:
     url: "https://github.com/rust-embedded/meta-rust-bin.git"
     branch: master
+    commit: eaea247f32f247ab525112d2fbc16e16a553d880
 
   meta-pi-base:
     url: "https://github.com/aortez/sparkle-duck-shared.git"
     branch: main
+    commit: ce48602dfefd4ee7f3d3010086e685ede3fb17b9
     layers:
       yocto/meta-pi-base:
 
@@ -74,15 +86,20 @@ local_conf_header:
     PERSISTENT_DATA_APP_USER = "spacewars"
     PERSISTENT_DATA_APP_GROUP = "spacewars"
 
-    BB_NUMBER_THREADS = "8"
-    PARALLEL_MAKE = "-j 8"
+    # Follow the available CPU affinity, including the candidate container's
+    # explicit CPU set. Keep the existing eight-job ceiling on workstations.
+    BB_NUMBER_THREADS = "${@oe.utils.cpu_count(at_most=8)}"
+    PARALLEL_MAKE = "-j ${BB_NUMBER_THREADS}"
 
     # Leave enough room for running tasks to finish and for other checkouts.
     BB_DISKMON_DIRS = "STOPTASKS,${TMPDIR},20G,200K HALT,${TMPDIR},10G,100K WARN,${TMPDIR},25G,300K"
     BB_DISKMON_WARNINTERVAL = "1G,50K"
 
     BB_ENV_PASSTHROUGH_ADDITIONS:append = " SPACEWARS_CACHE_ROOT"
-    SPACEWARS_CACHE_ROOT = "${@os.getenv('SPACEWARS_CACHE_ROOT', '/home/data/linux1/yocto-cache' if os.path.isdir('/home/data/linux1') else '/home/data/workspace/yocto-cache')}"
+    # Keep the imported value in BitBake's datastore. Worker processes sanitize
+    # os.environ, so resolving this again from their environment loses the
+    # explicitly selected cache and breaks isolated/container builds.
+    SPACEWARS_CACHE_ROOT ?= "${@'/home/data/linux1/yocto-cache' if os.path.isdir('/home/data/linux1') else '/home/data/workspace/yocto-cache'}"
     DL_DIR ?= "${SPACEWARS_CACHE_ROOT}/downloads"
     SSTATE_DIR ?= "${SPACEWARS_CACHE_ROOT}/sstate-cache"
 
@@ -111,7 +128,7 @@ local_conf_header:
 
   rpi: |
     DISABLE_SPLASH = "1"
-    CMDLINE:append = " console=tty1 fbcon=map:01"
+    CMDLINE:append = " console=tty1 fbcon=map:01 roottimeout=30"
 
     # The firmware selects the board's KMS driver. A separate file selects
     # cabinet/display hardware, and is preserved by rootfs-only A/B updates.
@@ -122,6 +139,7 @@ local_conf_header:
     dtoverlay=vc4-kms-v3d-pi5\n\
     [all]\n\
     arm_64bit=1\n\
+    initramfs spacewars-recovery.cpio.gz followkernel\n\
     include spacewars-device.txt\n\
     [all]\n\
     '

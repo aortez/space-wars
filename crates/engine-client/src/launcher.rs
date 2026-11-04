@@ -106,6 +106,7 @@ pub(crate) struct Launcher {
     settings: Arc<RwLock<Settings>>,
     catalog: SharedNesRomCatalog,
     writer: SaveSettings,
+    config_directory: Option<std::path::PathBuf>,
     pending: RefCell<Option<PendingLaunch>>,
     timer: Timer,
 }
@@ -127,6 +128,7 @@ impl Launcher {
             input,
             settings,
             catalog,
+            config_directory: settings_writer.config_directory().map(ToOwned::to_owned),
             writer: Arc::new(move |settings| settings_writer.save_blocking(settings.clone())),
             pending: RefCell::new(None),
             timer: Timer::default(),
@@ -137,7 +139,10 @@ impl Launcher {
         let Some(window) = self.window.upgrade() else {
             return;
         };
-        if window.get_launcher_busy() || !window.get_launcher_visible() {
+        if window.get_install_fenced()
+            || window.get_launcher_busy()
+            || !window.get_launcher_visible()
+        {
             return;
         }
         window.set_launcher_error_text("".into());
@@ -179,7 +184,10 @@ impl Launcher {
         let Some(window) = self.window.upgrade() else {
             return;
         };
-        if window.get_launcher_busy() || !window.get_launcher_visible() {
+        if window.get_install_fenced()
+            || window.get_launcher_busy()
+            || !window.get_launcher_visible()
+        {
             return;
         }
         window.set_launcher_error_text("".into());
@@ -253,12 +261,21 @@ impl Launcher {
         *self.pending.borrow_mut() = Some(pending);
 
         let writer = Arc::clone(&self.writer);
+        let config_directory = self.config_directory.clone();
         // The worker owns snapshots, never UI objects or the shared settings
         // lock. Dropping a window must not join a thread stuck in filesystem I/O.
         if let Err(error) = std::thread::Builder::new()
             .name("spacewars-launch-io".into())
             .spawn(move || {
-                prepare(launch, candidate, save_needed, catalog, writer, sender);
+                prepare(
+                    launch,
+                    candidate,
+                    save_needed,
+                    catalog,
+                    writer,
+                    sender,
+                    config_directory,
+                );
             })
         {
             let pending = self.pending.borrow_mut().take().unwrap();
@@ -399,6 +416,7 @@ fn prepare(
     catalog: crate::nes_roms::NesRomCatalog,
     writer: SaveSettings,
     sender: mpsc::Sender<PreparationMessage>,
+    config_directory: Option<std::path::PathBuf>,
 ) {
     if save_needed {
         if sender
@@ -426,7 +444,13 @@ fn prepare(
         return;
     }
     let started = Instant::now();
-    let result = crate::resolve_launch_asset(&launch, None, &settings, &catalog);
+    let result = crate::resolve_launch_asset(
+        &launch,
+        None,
+        &settings,
+        &catalog,
+        config_directory.as_deref(),
+    );
     let _ = sender.send(PreparationMessage::Ready(result, started.elapsed()));
 }
 
@@ -449,6 +473,7 @@ mod tests {
 
     struct Harness {
         window: MainWindow,
+        settings_writer: crate::settings_writer::SettingsWriter,
         launcher: Rc<Launcher>,
         _directory: tempfile::TempDir,
     }
@@ -468,6 +493,9 @@ mod tests {
             let (input, _) = input::new_shared_input();
             crate::install_ui_navigation(&window);
             crate::install_keyboard_navigation(&window, Rc::clone(&input));
+            let settings_writer =
+                crate::settings_writer::SettingsWriter::new(directory.path().join("settings.toml"))
+                    .unwrap();
             let mut launcher = Launcher::new(
                 &window,
                 Rc::new(RefCell::new(None)),
@@ -475,8 +503,7 @@ mod tests {
                 input,
                 settings,
                 catalog,
-                crate::settings_writer::SettingsWriter::new(directory.path().join("settings.toml"))
-                    .unwrap(),
+                settings_writer.clone(),
             );
             Rc::get_mut(&mut launcher).unwrap().writer = writer;
             let start = Rc::clone(&launcher);
@@ -484,6 +511,7 @@ mod tests {
             let harness = Self {
                 window,
                 launcher,
+                settings_writer,
                 _directory: directory,
             };
             harness.show_menu();
@@ -493,11 +521,12 @@ mod tests {
         }
 
         fn show_menu(&self) {
-            let settings = self.launcher.settings.read().unwrap();
+            let settings = self.launcher.settings.read().unwrap().clone();
             crate::show_launcher(
                 &self.window,
                 &crate::launch_from_settings(&settings),
-                &settings,
+                &self.launcher.settings,
+                &self.settings_writer,
                 &self.launcher.catalog,
             );
         }

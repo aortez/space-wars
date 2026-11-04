@@ -131,3 +131,408 @@ The foundation fixtures use controlled host inputs. Soil/raycast integration,
 a concrete grass brain, visible lab, ShipBrain and tree stability remain separate
 issues. Candidate acceptance also requires the registered foundation regression,
 formatting, whitespace and nextest plants-contract checks and independent review.
+
+## Renewable dirt contact adapter (#209)
+
+`engine_rapier::root_uptake::RootUptake` is a borrowed environmental view of one
+canonical `TerrainAssembly`, terrain, derived geometry and `PhysicsWorld`.
+A plant instance uses that support's local integer cell frame. Absorbing roots
+are lightweight points at terrain cell centers, independent of tissue size
+(size scales physiological capacity and intake, not geometric radius). The
+point must lie in canonical solid geometry whose source material equals the
+explicit `dirt` material ID. Air, proximity, other materials and VOID do not
+qualify. No neighbouring-cell search or face count multiplies intake.
+
+Use `TerrainAssembly::plant_support()` when seeding or growing attached tissue.
+It includes the canonical rigid body's slot and generation, so removing and
+replacing a body under the same scenario ID invalidates old attachments. The
+adapter checks that identity, body liveness, current terrain geometry, surface
+mode and synchronized assembly revisions on every query. Refresh geometry and
+synchronize colliders after edits before the next tick. An unsynchronized edit
+fails closed. Translation and rotation preserve support-local contact; removed
+support, material or tissue affects the next physiology boundary. Growth first
+samples on the following tick. Hosts must not reuse an attachment across worlds.
+
+Rates and availability are independently configurable 0..1000 fractions for
+nutrients and water. `Config::root_intake_per_size` specifies the maximum units
+per size per simulation second for this adapter. A fixed `tick_ms` of 1..1000
+specifies physiology duration. Effective fraction is
+`floor(rate * availability * tick_ms / 1_000_000)`; the runtime then floors
+`maximum * size * fraction / 1000`. There is no fractional carry: choose a
+fixed duration and rates large enough for the intended integer supply. The
+1000 ms default gives the foundation's 4 nutrient / 3 water allowance. Retune
+maintenance and grace if selecting another duration. Render schedules never
+choose duration or issue extra ticks; acceleration batches the same fixed ticks.
+Invalid controls reject atomically. Pause and zero elapsed ticks are no-ops.
+Queries are observational and the runtime samples each living root once; stale
+tick submissions reject before mutation. The substrate is renewable and never
+loses material or gains unused ecology fields.
+
+`contact()` distinguishes eligible, dead, non-root, missing/mismatched support,
+stale geometry, air and ineligible material. Ledger `roots` records each living
+root's eligible contact, offered intake, accepted storage and overflow in tissue
+ID order. Zero accepted intake distinguishes no contact, supply/rounding and
+capacity. The existing aggregate `intake` remains offered intake; discarded
+amounts remain in `loss`, preserving the original conservation equation.
+Acceptance is into the connected component before maintenance. No energy is
+supplied by this adapter; hosts compose shoot lighting separately. Dead roots
+are absent from intake ledgers and remain inspectable through `contact()`.
+
+Non-ignored `root_uptake_contract` fixtures exercise actual terrain assemblies:
+positive/air/non-dirt/dead contacts, transformed and replaced supports, terrain
+removal and stale synchronization, query/tick duplication, pause, independent
+shortage damage/recovery/death, growth timing, invalid controls, duration scaling
+and 1000-second renewable bounded accounting across ordinary/accelerated batches.
+Long runs provide a finite energy endowment sufficient for the test duration.
+This adapter advances the environment milestone toward Garden Lab; plant light
+integration, grass policy, lab presentation and ordinary gameplay remain later
+issues.
+
+## Directional light adapter (#210)
+
+`engine_rapier::plant_light::PlantLight::publish` composes measured overhead
+illumination with `RootUptake`, without changing the tissue ledger or physiology.
+This supplies the light input for the environment milestone toward Garden Lab;
+it does not wire Garden/Clock, implement grass policy or add localized lamps.
+`full_sun(direction)` supplies 1000; `dim_room(direction)` supplies 50 on the
+same linear scale. Direction is a unit world-space vector toward the source,
+provided independently of gravity and camera. Both presets use identical
+geometry and accounting. Incident exposure is floored to the runtime's integer
+0..1000 scale without multiplying by tick duration. Shade compares that measured
+intensity with `local_light_threshold`, so full sun remains 1000 at subsecond
+ticks and the shade threshold needs no duration adjustment.
+
+Shoot energy retains the foundation's per-logical-tick units:
+`floor(shoot_energy_per_size * size * light / 1000)` abstract chemical-energy
+units offered each completed plant tick. The coefficient is not a per-second
+rate and the adapter applies no additional duration multiplier. With the default
+coefficient 8 and size 1, full sun offers 8 and dim room floors to 0 units per
+tick. Hosts choosing a different fixed physiology duration must tune per-tick
+energy, maintenance and grace coherently for their intended simulation speed;
+incident intensity and shade classification remain unchanged. Root nutrient and
+water supply retain their independent per-second controls and `tick_ms` scaling
+from #209; this adapter does not change those inputs or ledger accounting.
+
+Pass the complete tissue set for one support, across all its organisms, to one
+publication and one publisher per simulation boundary. Use
+`publish_with_occluders` to also supply `WorldOccluders`: world-space disks from
+all other relevant supports, tagged with this exact tick and geometry revision.
+`publish` is the convenience form for scenes with no external lightweight
+occluders. At most 256 local tissues plus external disks combined (including
+local roots and dead elements) are admitted atomically, before allocation or
+query work. External disks do not add receivers or root supply. Shoot and runner
+elements declare opaque world-space disks:
+center = support pose applied to terrain cell center; radius =
+`cell_size * 0.25 * sqrt(size)`. Roots have no optical footprint. These declared
+disks are the initial blade/leaf/structural approximation, not colliders or a
+second physics world. Dead above-ground tissue stays opaque until removed.
+A future woody role must explicitly supply its geometry before integration.
+All attached elements must name the assembly's current generational support.
+A caller-reserved surface namespace plus never-reused tissue ID identifies each
+disk; reserve that namespace from physical entity IDs and other tissue sets.
+
+Each living Shoot samples once at its disk's source-facing boundary. Only its
+own local boundary contact is exempt under the shared 0.001-world-unit endpoint
+policy. Neighboring tissue, even in the same organism, blocks. Coincident disks
+with distinct identities block one another. A receiver embedded in an ordinary
+solid remains blocked; no organism-wide exclusion exists. Sensors are ignored;
+all other canonical solids (including terrain) block. This initial adapter has
+no transparent physical override. Physical water represented as a collider is
+therefore opaque here; hosts needing transparent water require a scoped policy
+extension rather than silently excluding an entity.
+
+Complete terrain edits, assembly synchronization and the normal canonical step
+before publishing. The adapter copies the canonical query snapshot and derives
+tissue transforms from that same borrowed world. Its borrowed root view prevents
+world/support/terrain mutation until the view is released. Supply a monotonic
+geometry revision changing with every optical movement, source/shape change or
+removal, and the completed simulation tick. Publisher tick monotonicity prevents
+repeated publication through the same publisher. Do not create publishers per
+batch or partition a support into independently capped sets. Each receiving
+support's publication must include every relevant external lightweight disk;
+external supports need no tissue colliders. The external simulation owner must
+transform disk centers using those supports' authoritative canonical poses,
+retain the declared radii and stable surface IDs, and rebuild the disk list
+after motion, tissue removal or support replacement. Supply the matching tick
+and geometry revision in `WorldOccluders`; stale tags reject before queries.
+Tags assert host publication ordering, not an automatic detector of stale
+caller geometry. The adapter copies the supplied disks for the query and
+validates their finite centers, positive finite radii and unique identities
+across local and external geometry. Never resubmit the receiving support's
+own disks in the external list. Root inputs and receiver transforms remain
+local to the receiving support; external tissue from any organism still blocks.
+
+Query batches are at most 64 receivers, with at most 256 rays total, 65536 disk
+tests and 524288 collider-record visits per publication; shared canonical shape
+complexity admission also applies. No render work, stagger or persistent exposure
+cache exists. Publish every physiology boundary after growth, removal or motion;
+new growth first samples on the following tick. `environment(tick)` requires
+exact tick equality (maximum exposure age zero), stricter than shared lighting's
+one-tick age. Pass the returned environment to that matching plant tick only.
+Repeated reads perform no new rays. Diagnostics retain intensity, blocked/ray
+counts, first blocker, total work, tick and geometry revision. Changed Shoot
+records reject through the existing invalid-exposure sentinel, before physiology
+mutation; stale access, overflow, duplicate identity and invalid sources return
+explicit `LightingError`s. Failed admission leaves the publisher unchanged.
+
+Non-ignored `plant_light_contract` fixtures cover canonical solids/terrain,
+sensors, removal, own-surface contact, same-organism and overlapping shade,
+transformed support/source frames, deterministic repeated publication, aggregate
+batch caps, invalid/stale inputs and actual preset energy intake with unchanged
+root supply. Two-support fixtures also prove collider-free external shade,
+blocker diagnostics, support translation/rotation and tissue-removal refresh,
+fixed-sequence replay, aggregate local/external overflow, external identity
+conflicts and publication-tag validation. These are headless adapter claims,
+not visible host acceptance.
+
+## Grass policy (#211)
+
+`engine_core::plants::grass` adds the inspectable P3 policy toward the Garden Lab
+milestone. Policy identity is `0x6772617373000001` (grass version 1). `Traits`
+identity 1 defaults to a four-cell Chebyshev spread radius, 32 total tissues,
+size-two absorbing roots, size-one blades/runners, one growth opportunity per
+fixed tick (`growth_interval_ticks = 1`), and a finite `[30,30,30]`
+planting endowment. Retain the full `Grass` value, including trait identity,
+origin, support and local up, with host replay inputs. Traits select geometry
+and initial planting reserves; they never replace `Config` costs or survival.
+`plant()` is an explicit host planting action, not part of policy updates. It
+creates one root representing the planted germinating seed. Reproduction and
+seed dispersal are absent. Dead patches never call planting automatically.
+
+The policy consumes the shared owned `Observation` and a borrowed environment,
+returning a `Plan` of shared `Intent`s. It prioritizes establishing blades, then
+absorbing roots below runners, then lateral runner expansion, breaking ties in
+ascending tissue ID and positive/negative tangent order. It purchases at most
+one adjacent tissue per tick. All living components spend their own canonical
+shares; no lineage-wide pool crosses a severed edge. Each candidate records
+parent, target role/size/cell, available component resources, configured cost
+and an occupied/size/spread/space/support/population/work/resource/proposed limit.
+A slower configured growth cadence records `Plan::waiting = Cadence` without
+skipping physiology or maintenance.
+The authoritative ledger supplies the final post-maintenance outcome. Resource
+estimates precede that tick's intake and upkeep, so a proposal can still be
+rejected after upkeep. Each failed candidate remains inspectable. The policy
+never screens candidates by light: blades can enter shade and acquire the
+runtime's local deficit independently of their sunlit neighbors.
+
+`engine_rapier::grass::GrassEnvironment` composes the measured physiology view
+with stricter grass placement. Roots AND runners require actual solid dirt at
+the cell center. Blades require air within the terrain domain. Tissue is still
+lightweight; no per-cell rigid bodies are created. `local_up()` rotates actual
+world gravity into the canonical support's frame, then selects its dominant
+cardinal axis (ties choose Y). It rejects zero/nonfinite gravity. Construct or
+refresh the policy's up from this input when host gravity relative to support
+changes. The tangent is perpendicular to that local up, not screen horizontal.
+
+Host boundary order is: finish canonical movement/terrain synchronization;
+apply cuts/crushing via `Plants::damage` and explicit debris removal via
+`remove`; call `detach_invalid` against current grass placement/support; observe
+the remaining complete support-local tissue set; publish `PlantLight` once;
+wrap its matching environment with `GrassEnvironment`; plan and submit one
+fixed `Plants::tick`. For external lightweight occluders use the existing
+`publish_with_occluders` combined admission, never separate capped publications.
+The host must reserve the namespace and monotonically tag geometry revisions.
+Pause/zero elapsed time skips publication and physiology entirely. Accelerated
+viewing repeats these same boundaries. Fixtures use 1000 ms ticks, unchanged
+foundation costs/intake coefficients, and actual root/light inputs: size-two
+roots offer up to 8 nutrients/6 water per tick; size-one full-sun blades offer
+8 energy, while dim-room blades offer zero after integer flooring. Starting
+reserves are never topped up by the policy.
+
+Damage accepts 0..100 health loss. Killed tissue loses its canonical resource
+share and ceases intake, maintenance and growth. Its occupied cell and optical
+footprint persist until explicit removal. Surviving health can recover through
+ordinary physiology; removed blades can be repurchased from living remnants.
+`detach_invalid` removes cells whose support is lost/stale or whose current
+substrate/space is invalid, discarding their existing shares. Surviving fragments
+retain their original policy/lineage and component-local resources. A severed
+shoot can use only its retained nutrients/water and actual light; disconnection
+does not grant new soil supply. Hosts must consume the immediate topology-loss
+ledger before the next tick resets it.
+
+Planning visits at most four candidate sites per living tissue and proposes
+at most one intent. Component pools are built once using bounded graph walks;
+site scans cost O(N²), and storage is O(N) plus the at-most-4N decision trace.
+Runtime's stricter configured population/intent limits still apply. Lighting's
+256 combined local/external admission and publication-wide ray/geometry ceilings
+remain unchanged and failures must propagate to the host. Do not use multiple
+publishers to bypass those limits. The grass default of 32 tissues leaves room
+for other admitted optical geometry but is not a reservation for it.
+
+Non-ignored `grass_policy_contract` fixtures cover paid topology, policy identity,
+exact fixed-seed replay, population/decision limits, pause/zero behavior,
+inspectable resource/spread limits, sever conservation, invalid damage atomicity
+and sustained no-revival after total death. `grass_growth_contract` fixtures use
+canonical terrain and directional lighting for multi-shoot runner spread,
+translated/rotated support equivalence, independent nutrient/water/light limits,
+actual roof shade expansion and local death with healthy sunlit tissue,
+restoration before death, underground shade exemption, paid cutting/regrowth,
+query ceilings and support-loss accounting. These are deterministic headless
+claims. Garden Lab visuals, device captures, reproduction and evolution remain
+outside #211; no visible presentation or device performance is established here.
+
+## Paid shoot development runtime (issue #472 checkpoint)
+
+`Intent::Develop { tissue }` purchases at most one unit of each still-needed
+resource toward the next shoot size. `Tissue::development` records the paid
+N/W/E balance toward that increment, whose target is the configured shoot
+`development_per_size`. `Tissue::invested` records lifetime development spending;
+this is a diagnostic of resources already spent, not spendable stores. Both
+start at zero on newly constructed tissue. Completing the target resets only
+the current increment balance and atomically raises size by one, up to size
+three and the configured size ceiling. Every payment appears once in the
+existing growth ledger. Construction costs remain separate.
+
+Development executes after upkeep and requires a living shoot with no current
+resource or local light deficit, valid support, space for the next size and
+sufficient funds in its own living component. Refused intents change neither
+progress nor spending. Population/spread restrictions on new sites do not
+restrict this operation. Identity, edges, health and deficit history survive
+enlargement; expanded capacity receives only the unspent existing pool. Intake,
+maintenance and light geometry use the new size starting at the next physiology
+boundary. Work remains bounded by `max_intents`; one development intent pays
+at most three resource units. No additional light sample is taken for admission.
+Removal discards paid work with the tissue and does not refund it.
+
+Grass profile v2 (`0x6772617373000002`, trait/config identity 2) uses
+`grass::physiology()`: root uptake [8,8,0] per size per one-second tick and
+incremental development target [10,10,10] per added shoot size. Construction
+retains the default role costs. Roots remain size two, runners and new shoots
+size one; finite seed reserves remain [30,30,30]. Generic runtime defaults
+remain distinct from this selected grass profile.
+
+The policy prioritizes eligible root sites, shoot sites, then runner sites.
+When no new site can be proposed it develops the least-invested eligible shoot,
+using ID order to break ties. One development proposal pays one unit of each
+resource toward its target; 20 admitted proposals mature a blade. There is no
+age or establishment timer. Tissue/spread caps restrict new sites while still
+allowing development. Every candidate remains advisory until post-upkeep
+runtime admission. A shoot with a previous deficit is reconsidered after its
+physiology recovers; local shade cannot be funded by another shoot.
+
+`remove_many` validates the entire removal set before mutation, normalizes once,
+and records all pre-cut shares before redistributing survivor stores. It makes
+cut losses independent of removal order. Surviving IDs, health, topology among
+survivors and investment are retained; canonical store rounding can redistribute
+individual survivor shares without altering their total.
+
+## Moss organism (#213)
+
+`Role::Moss` is a fourth runtime role: thin photosynthetic surface tissue with
+capped passive supply from an eligible surface instead of roots. The role-ordered
+`Config` tables now hold root, runner, shoot and moss entries. Moss stays in the
+ordinary ledger and tick order: intake, upkeep, local deficit, growth. Defaults,
+per size per fixed one-second tick, compared with the grass shoot baseline:
+
+| Quantity | Moss | Grass shoot |
+| --- | --- | --- |
+| Capacity, each resource | 24 | 20 |
+| Maintenance (N,W,E) | 1,1,1 | 1,2,2 |
+| Construction (N,W,E) | 20,20,20 | 4,4,4 |
+| Passive supply (N,W) at full availability | 2,2 from surface contact | none; roots supply 8,8 per size (profile v3) |
+| Energy at the dim room (50) | 2 | 0 |
+| Energy in full sun (1000) | 2 | 8 |
+| Local light threshold | 25 | 250 |
+
+Moss energy saturates: `floor(moss_energy_per_size × size × min(light, s) / s)`
+with saturation `s = 50`, so the dim room already yields its full two units and
+full sun yields no more. One dim-room moss cell therefore nets one unit of each
+resource per tick, while a dim shoot earns nothing and accumulates a shade
+deficit. Darkness remains fatal: light below 25 starts the same grace/damage
+counter as grass, even while connected lit moss holds plenty of energy, and
+restoring light before death allows recovery. These are tuning defaults, not
+measured biology. The profile values come from `Config::default()`, which
+`grass::physiology()` (identity 3) inherits, so one runtime can hold both.
+
+`Exposure::surface_contact` carries moss eligibility; `dirt_contact` remains
+root-only. `Ledger::surfaces` records each living moss tissue's contact supply
+(eligibility, offered, accepted, overflow and zero reasons) separately from
+`Ledger::roots`; the shared record type is now `ContactIntake`. Contact supply
+never includes energy. Dead, detached or out-of-contact moss receives none.
+
+### Surface contact and placement
+
+`engine_rapier::moss::contact` treats a moss cell as a point at its
+support-local cell center. It is in contact when that center lies outside
+canonical solid geometry and any of the eight neighboring cell centers lies
+inside it, of any material: dirt, rock or other solids. Corner contact lets a
+patch wrap convex edges; nothing bridges a wider air gap. One check per tissue
+supplies at most one intake, however many neighbors touch. A cell inside solid
+reports `Enclosed`, a cell with no solid neighbor `Air`. `RootUptake::contact`
+and `MaterialUptake::contact` are now role-aware: roots keep #209's dirt-only
+rule (rock stays `Ineligible`), shoots and runners report `NotAbsorbing`, and
+moss uses the surface rule. `moss::site` additionally requires the finite terrain
+domain; `GrassEnvironment`, `RootUptake` and `MaterialUptake` all use it for
+`Role::Moss` placement, so mixed grass/moss patches validate together.
+
+Cells are support-local, and the runtime's occupancy and `space_available`
+checks carry no support. Give each separately moving support its own `Plants`
+runtime, light publisher and namespace. Translation and rotation preserve
+contact; a terrain edit must be refreshed and synchronized before
+`detach_invalid`, which then removes moss whose surface or support is gone and
+discards its shares. Removing the support body detaches the whole patch. Dead
+moss keeps its cell until removed, as other dead tissue does.
+
+### Light
+
+Living moss samples light at its own cell center with no surface exemption and
+declares no opaque disk: a thin mat shades nothing, while shoots and runners keep
+their disks. Moss under its own support, an overhang or the lab shade is
+blocked like any receiver. `plant_light::footprints` returns the world-space disks
+a publication declares for a support's tissues, so a host can pass them to other
+supports' publications as `WorldOccluders`; roots and moss contribute none.
+
+### Policy
+
+`moss::POLICY` is `0x6d6f737300000001`. `Traits` identity 1 defaults to one growth
+opportunity per four ticks, a 24-cell patch limit (living and dead cells of this
+policy on its support) and finite placement reserves `[24,24,24]`. Every element
+is size one. `Moss::place` is the deliberate host action that seeds one cell with
+those reserves as a new organism; the policy never plants, and dead patches are
+never revived. `plan` walks living tissue in ID order. Shaded, short or damaged
+tissue records a `Shade`, `Shortage` or new `Damage` limit and waits for its own
+recovery instead of spending shared reserves. Healthy tissue inspects the four
+side neighbors in a fixed support-frame order (+x, -x, +y, -y) and records the
+first refusal: population, size, work, occupied, support, space (no free
+surface-contact cell) or resource. The first affordable site becomes the single
+`Grow` intent. At most four decisions per tissue are recorded. Growth and the
+runtime's Manhattan adjacency keep each addition connected and paid from that
+component's own pool; component pools are shared helpers with grass.
+`Plan`, `Decision` and `Limit` now live in `plants`; `grass` uses them unchanged.
+The grass trait population limit counts only that grass policy's tissue on its
+support, so another species in the same runtime only consumes the shared
+runtime ceiling.
+
+Fixed seeds, configurations and action sequences replay exactly. Pause and zero
+elapsed ticks charge nothing, as for every role.
+
+### Measured fixture timings
+
+`moss_surface_contract` fixtures use canonical terrain, `PlantLight`, the
+`grass::physiology()` profile and 1000 ms ticks. A dim-room patch placed on a
+16×8 dirt bed beside a two-by-two rock pillar fills all 18 eligible surface cells
+(dirt surface, pillar side, corner and top) by second **77**, paying 17 × 20 per
+resource. On the same bed with grass planted beside it, after 200 seconds:
+
+| Light | Living grass tissue | Living moss tissue |
+| --- | --- | --- |
+| Full sun | 32 | 8 |
+| Dim room (50) | 0 | 10 |
+| Darkness | 0 | 0 |
+
+In full sun grass claims most surface cells first; moss is space-limited, not
+light-limited.
+
+Non-ignored fixtures cover: contact reasons for dirt, rock, pillar sides and
+corners, air, enclosed and dead tissue, with rock still rejected for roots;
+dim-light contiguous paid spread and replay; the grass/moss light comparison;
+a round rock with a smoothed contour surface, whose patch follows the curve down
+both flanks;
+a free-standing rock translated and turned upside down, where moss keeps its
+contact while the old top face loses light to its own support and dies back;
+terrain breakage with stale-geometry refusal, detachment, conserved loss and
+paid recolonization of exposed rock; removal of the support body; and a killed
+bridge that splits a patch, damaged parents waiting, and paid reclamation of the
+cleared cell. `moss_policy_contract` covers the headless policy and runtime
+accounting. Clock moss on digits (#223), succession on the retained Clock floor
+(#518), spores, seeds and fragment dispersal remain separate work.

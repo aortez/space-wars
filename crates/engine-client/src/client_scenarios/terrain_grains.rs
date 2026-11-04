@@ -15,7 +15,7 @@ use std::time::Duration;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "terrain-grains",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Extra,
     capabilities: ScenarioCapabilities {
         headless_benchmark: false,
         pointer_input: true,

@@ -357,3 +357,55 @@ fn player_assignment_reset_and_identical_model_policy_use_real_menu_callbacks() 
     assert_eq!(saved.controls.player_2_device, None);
     assert_eq!(saved.controls.controller_profiles, vec![profile]);
 }
+
+#[cfg(unix)]
+#[test]
+fn isolated_client_skips_hardware_but_retains_intentional_input() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.set_launcher_visible(false);
+    ui.set_launcher_scenario("clock".into());
+    let dir = tempfile::tempdir().unwrap();
+    let writer = SettingsWriter::new(dir.path().join("settings.toml")).unwrap();
+    let settings = Arc::new(RwLock::new(Settings::default()));
+    let (input, gamepads) = input::new_shared_input();
+    let controllers = controller_controls::install(&ui, settings, writer, gamepads.clone());
+    assert!(start_gamepad_pump(&ui, input.clone(), gamepads.clone(), controllers, true).is_none());
+    assert!(
+        gamepads
+            .borrow()
+            .physical_seat(0)
+            .is_none_or(|p| !p.connected)
+    );
+    assert_eq!(input.borrow_mut().take_clock_player_duck_requested(), None);
+    let state = spacewars_control::UiState {
+        schema_version: 1,
+        revision: 1,
+        screen: spacewars_control::UiScreen::Gameplay,
+        active_scenario: Some("clock".into()),
+        selected_scenario: "clock".into(),
+        selected_control: None,
+        controls: vec![],
+        actions: vec![],
+        scenario_revision: Some(1),
+        paused: false,
+        benchmark_active: false,
+        error: None,
+    };
+    let mut driver = SimulatedInput::new(input.clone(), gamepads.clone());
+    let request =
+        spacewars_control::InputPressRequest::new(&state, spacewars_control::InputButton::North);
+    let now = Instant::now();
+    driver.press(&ui, &state, request.clone(), now).unwrap();
+    assert!(gamepads.borrow().seat(0).unwrap().north);
+    assert_eq!(
+        input.borrow_mut().take_clock_player_duck_requested(),
+        Some(1)
+    );
+    assert_eq!(
+        driver.tick(&ui, &state, now + Duration::from_millis(request.hold_ms)),
+        Some((request, spacewars_control::InputReleaseReason::Elapsed))
+    );
+    assert!(!gamepads.borrow().seat(0).unwrap().north);
+    assert_eq!(input.borrow_mut().take_clock_player_duck_requested(), None);
+}

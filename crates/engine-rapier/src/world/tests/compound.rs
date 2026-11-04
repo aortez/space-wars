@@ -1,5 +1,48 @@
 use super::*;
 
+#[cfg(feature = "ccd-diagnostics")]
+#[test]
+fn ccd_shared_motion_rejects_before_contact_graph_lookup() {
+    use rapier2d::counters::ccd_probe;
+
+    for substeps in [1, 4] {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::ZERO,
+            max_ccd_substeps: substeps,
+            ..Default::default()
+        });
+        // Individually fast, close enough to share swept AABB candidates, but
+        // translating together. Their relative motion cannot close the gap.
+        for id in [1, 2] {
+            let (_, body, collider) = ball_ids(id);
+            assert!(world.insert_body(
+                body,
+                BodySpec {
+                    position: Vec2::new(id as f32 * 0.3, 0.0),
+                    linear_velocity: Vec2::new(100.0, 0.0),
+                    ccd_enabled: true,
+                    can_sleep: false,
+                    ..Default::default()
+                },
+                &[ColliderSpec::ball(collider, 0.1)]
+            ));
+        }
+        world.step(1.0 / 60.0);
+        ccd_probe::begin();
+        world.step(1.0 / 60.0);
+        let counts = ccd_probe::finish();
+        assert!(counts.toi_calls > 0, "substeps={substeps}: {counts:?}");
+        assert_eq!(counts.thickness_rejected, counts.toi_calls);
+        assert_eq!(counts.contact_lookup_calls, 0, "{counts:?}");
+        assert!(world.contact_events().is_empty());
+        for id in [1, 2] {
+            let motion = world.motion(ball_ids(id).1).unwrap();
+            assert_eq!(motion.linear_velocity, Vec2::new(100.0, 0.0));
+            assert!((motion.position.x - (id as f32 * 0.3 + 100.0 / 30.0)).abs() < 1e-5);
+        }
+    }
+}
+
 fn thickness_wall(collider: ColliderId, parts: usize, half_width: f32) -> ColliderSpec {
     ColliderSpec {
         shape: ColliderShape::Compound {

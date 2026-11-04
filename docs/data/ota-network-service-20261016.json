@@ -1,0 +1,157 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T19:48:28.932357+00:00",
+  "implementation_commit": "3b85c38e9aa274bcef7d9ea3954d5ab84c19a12c",
+  "scope": "Authenticated bounded Unix-socket control server around the serialized radio controller. The runtime serve command does not yet bind this socket or instantiate a native radio coordinator.",
+  "validation": {
+    "host_manager_tests": 77,
+    "host_temporary_filesystem": "ext4 under target/ota-bootstrap-finish-tmp",
+    "selected_tests_per_pi": 7,
+    "selected_parent_cases": 6,
+    "subprocess_helper_cases": 1,
+    "rust_msrv": "1.89.0",
+    "clippy_warnings_denied": true,
+    "format_checked": true,
+    "aarch64_compiled": true,
+    "artifact_source": "AArch64 debug test binary built from the clean implementation commit. Host tests used the identical source before commit. No packaged runtime image was built."
+  },
+  "contracts": {
+    "protocol_schema": 1,
+    "max_workers": 8,
+    "queue_capacity": 8,
+    "request_limit_bytes": 1024,
+    "response_limit_bytes": 16384,
+    "frame_deadline_seconds": 5,
+    "operation_wait_seconds": 30,
+    "periodic_tick_seconds": 2,
+    "client_requires_root_server": true,
+    "identity_from_request_json": false,
+    "tokens_in_replies": false,
+    "supported_commands": [
+      "status",
+      "set-policy",
+      "resume",
+      "admit",
+      "renew",
+      "release"
+    ]
+  },
+  "properties_exercised": [
+    "Real Unix peer credentials and /proc process start times establish ownership. Requests cannot override UID/PID, choose executables/paths/units, or use unsupported schemas. The client rejects a server with the wrong UID before sending its request.",
+    "A separate exec of the Rust test binary cannot release a temporary hold owned by its parent process. A deployment capability admitted by a child remains releasable by the same account after that child exits.",
+    "Lost-response reservation retries do not allocate another hold. Renewal and idempotent release work, and replies do not echo the capability.",
+    "A request arriving through the real Unix socket during a blocked fake shutdown receives no admission until the coordinator restores the fake radio and reads back availability.",
+    "Expired queued work and mismatched process start identity cannot mutate policy. Stale generations cannot replace saved settings; corrupt persisted policy reports unavailable status and permits no radio write.",
+    "Eight incomplete clients occupy bounded workers; excess connections are rejected promptly and incomplete frames expire. A disconnected coordinator reports unavailable rather than transient queue pressure.",
+    "Both Pis ran the same checked test binary as UID 1000 with temporary state/socket paths and a fake radio backend. The subprocess fixture uses the Rust binary itself, without requiring Python on the device."
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "temporary_directory": "/tmp/spacewars-network-service.b1ktWQ",
+      "test_binary": "engine_os_manager-27536c227643c67f",
+      "sha256": "4774b45ac6dd70e3354b79c7db12dd25f7b7292824b78aa99569802b44214147",
+      "passed_tests": 7,
+      "parent_cases": 6,
+      "subprocess_helper_cases": 1,
+      "seconds": 5.86,
+      "live_radio_writes": false,
+      "installed_service_changes": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "temporary_directory": "/tmp/spacewars-network-service.KbEtTZ",
+      "test_binary": "engine_os_manager-27536c227643c67f",
+      "sha256": "4774b45ac6dd70e3354b79c7db12dd25f7b7292824b78aa99569802b44214147",
+      "passed_tests": 7,
+      "parent_cases": 6,
+      "subprocess_helper_cases": 1,
+      "seconds": 5.95,
+      "live_radio_writes": false,
+      "installed_service_changes": false
+    }
+  ],
+  "limits": [
+    "serve does not bind the new network socket, and no native network actor or SSH admission hook is enabled in the runtime service.",
+    "Native SSH/session observation, the admission barrier, install guards, continuous NetworkManager change monitoring and expected setup profile changes still need integration.",
+    "The bootstrap access verifier currently rejects extra SSH ExecStartPre commands. The future hook and loaded-unit verifier must be updated together before image/bootstrap qualification.",
+    "The board fixtures use real Unix IPC and process credentials but fake radio/activity/guard observations. They do not qualify physical SSH/SCP/SFTP protection or live Wi-Fi shutdown.",
+    "One selected test is a subprocess fixture entry point, a no-op in the ordinary suite and exercised through child executions by the ownership case; the six parent cases provide the behavioral assertions.",
+    "No installed services, radio settings, credentials, data partitions, root/boot files or watchdog were modified. Boot IDs were unchanged within both runs.",
+    "Root connection details, supervised bootstrap, production signing/feed, downloader/install policy and full physical OTA qualification remain outstanding. The overall auto-update goal is incomplete."
+  ],
+  "logs": {
+    "host_full_ext4": {
+      "path": "target/ota-network-service-tests.log",
+      "bytes": 8635,
+      "sha256": "b1797dfe5eb47f0336d2194a523811c93e63fed724ea9aa88f0dd09d0b6891ce",
+      "test_results": [
+        "test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.47s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.84s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-network-service-clippy.log",
+      "bytes": 367,
+      "sha256": "e6f413e9979dd6dde523c50e65588777dde80f5c63786274425fe0ad115acd34"
+    },
+    "msrv": {
+      "path": "target/ota-network-service-msrv.log",
+      "bytes": 173,
+      "sha256": "a837af775ffa6a5c49cd99aa88b2a9a46ee26f22ac51bd3074b7072283aaf421"
+    },
+    "format": {
+      "path": "target/ota-network-service-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "aarch64": {
+      "path": "target/ota-network-service-aarch64.log",
+      "bytes": 174,
+      "sha256": "0c54f64e2ee85e0106f0d549160041de9f4ab46cf2f0cecc85479634eb1f63b9"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-network-service-aarch64.jsonl",
+      "bytes": 208478,
+      "sha256": "8b1718c816dcfac4ca4aae351217e58a6462116d6a8726a49c163883b97024d8"
+    },
+    "pi_run": {
+      "path": "target/ota-network-service-pis.log",
+      "bytes": 1020,
+      "sha256": "2400da1e3f77586bc5f10886d02e9fa9d0dac0916895a57ee786cea7a1e8ffa9"
+    },
+    "pi5_tests": {
+      "path": "target/ota-network-service-pi5-tests.log",
+      "bytes": 792,
+      "sha256": "072359f2510d743ab731206c82bcecd24182b619a7ce14d4406e2959f2ea49cd",
+      "test_results": [
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 5.86s"
+      ]
+    },
+    "pi4_tests": {
+      "path": "target/ota-network-service-pi4-tests.log",
+      "bytes": 792,
+      "sha256": "79eb07aa11cea58e3445215c154cc465a57dba64652bfc117e18aa2ae5e1c665",
+      "test_results": [
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 5.95s"
+      ]
+    },
+    "pi_script": {
+      "path": "target/ota-network-service-pis.py",
+      "bytes": 2677,
+      "sha256": "4f6c6377c44ba9f9893b6059959d704673d2129677b2fed98949f19fda82b724"
+    }
+  }
+}

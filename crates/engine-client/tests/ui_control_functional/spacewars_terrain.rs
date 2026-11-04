@@ -72,14 +72,36 @@ fn material_arena_duel_launch_pause_restart_and_both_renderers() {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn planetary_tank_drive_and_pause_smoke() {
+    run_planetary_tank_fixtures(
+        &["planetary-tank-fixture"],
+        &[(60, "drive"), (180, "brake")],
+    );
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn planetary_tank_fixture_motion_support_and_lifecycle() {
+    run_planetary_tank_fixtures(
+        &[
+            "planetary-tank-fixture",
+            "planetary-tank-fixture-angular",
+            "planetary-tank-comparison",
+            "planetary-tank-comparison-angular",
+        ],
+        &[
+            (60, "drive"),
+            (180, "brake"),
+            (300, "gap"),
+            (430, "fall"),
+            (600, "cleanup"),
+        ],
+    );
+}
+
+fn run_planetary_tank_fixtures(scenarios: &[&str], milestones: &[(usize, &str)]) {
     use super::*;
-    for scenario in [
-        "planetary-tank-fixture",
-        "planetary-tank-fixture-angular",
-        "planetary-tank-comparison",
-        "planetary-tank-comparison-angular",
-    ] {
+    for &scenario in scenarios {
         run_functional_test_with_seed("planetary-tanks", "winit-femtovg", 42, |h| {
             let ready = h.wait_until_ready();
             let mut launcher = h.activate_until_scenario(scenario, ready);
@@ -105,15 +127,9 @@ fn planetary_tank_fixture_motion_support_and_lifecycle() {
                 if scenario.contains("comparison") {
                     h.capture_screenshot(&format!("{scenario}-{renderer}-close-comparison.png"));
                 }
-                for (tick, label) in [
-                    (60, "drive"),
-                    (180, "brake"),
-                    (300, "gap"),
-                    (430, "fall"),
-                    (600, "cleanup"),
-                ]
-                .into_iter()
-                .filter(|_| !scenario.contains("comparison"))
+                for &(tick, label) in milestones
+                    .iter()
+                    .filter(|_| !scenario.contains("comparison"))
                 {
                     let diagnostics = performance::wait_status(h, |s| {
                         s.get("tank_fixture_tick")

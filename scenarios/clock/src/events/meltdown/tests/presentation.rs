@@ -8,6 +8,7 @@ pub(super) fn cell(position: Vec2) -> MeltCell {
         angle: 0.0,
         spin: 0.0,
         release_tick: 24,
+        piece: None,
     }
 }
 
@@ -86,7 +87,7 @@ fn meridiem_floor_impacts_and_unmelted_cleanup_credit_only_the_small_pixel_area(
             };
             event.initial_cells = 1;
             event.initial_area = event.cell_area * pixel.area_scale();
-            event.cells = vec![pixel];
+            event.replace_cells(vec![pixel], &mut state.surfaces);
             if reclaim_solid {
                 event.tick = MELTING_TICKS + DRAINING_TICKS - 1;
                 tick(&mut state);
@@ -94,10 +95,10 @@ fn meridiem_floor_impacts_and_unmelted_cleanup_credit_only_the_small_pixel_area(
                 assert_eq!((m.solid_microunits, m.reclaimed_microunits), (0, 32_400));
             } else {
                 event.tick = 100;
-                event.step_material(layout);
+                event.step_material(layout, &mut state.surfaces);
                 assert_eq!(event.cells.len(), 1, "no water before floor contact");
                 assert_eq!(event.water.stats().injected, 0.0);
-                event.step_material(layout);
+                event.step_material(layout, &mut state.surfaces);
                 assert!(event.cells.is_empty());
                 assert!((event.water.stats().injected - event.initial_area).abs() < 1e-8);
                 assert_eq!(event.diagnostics().solid_microunits, 0);
@@ -124,7 +125,7 @@ fn footprint_conversion_partitions_one_cell_across_columns_banks_and_gap() {
         let Some(crate::events::ActiveEvent::Meltdown(event)) = &mut state.active_event else {
             panic!()
         };
-        event.cells.clear();
+        event.replace_cells(Vec::new(), &mut state.surfaces);
         open_floor(event, 1.0);
         event.initial_cells = 1;
         event.initial_area = event.cell_area;
@@ -248,19 +249,22 @@ fn floor_and_drain_impacts_splash_once_and_conserve_the_entire_source() {
         let Some(crate::events::ActiveEvent::Meltdown(event)) = &mut state.active_event else {
             panic!()
         };
-        event.cells = vec![MeltCell {
-            position: Vec2::new(x, layout.floor_y + layout.pitch * 0.4 + 0.25),
-            velocity: Vec2::new(0.0, -1.0),
-            release_tick: 0,
-            ..cell(Vec2::ZERO)
-        }];
+        event.replace_cells(
+            vec![MeltCell {
+                position: Vec2::new(x, layout.floor_y + layout.pitch * 0.4 + 0.25),
+                velocity: Vec2::new(0.0, -1.0),
+                release_tick: 0,
+                ..cell(Vec2::ZERO)
+            }],
+            &mut state.surfaces,
+        );
         event.initial_cells = 1;
         event.initial_area = event.cell_area;
         event.tick = 100;
-        event.step_material(layout);
+        event.step_material(layout, &mut state.surfaces);
         assert_eq!(event.cells.len(), 1);
         assert_eq!(event.water.stats().injected, 0.0);
-        event.step_material(layout);
+        event.step_material(layout, &mut state.surfaces);
         assert!(event.cells.is_empty());
         assert!((event.water.stats().injected - event.cell_area).abs() < 1e-8);
         assert_eq!(
@@ -273,7 +277,7 @@ fn floor_and_drain_impacts_splash_once_and_conserve_the_entire_source() {
             3
         );
         for _ in 0..120 {
-            event.step_material(layout);
+            event.step_material(layout, &mut state.surfaces);
             assert!((event.water.stats().injected - event.cell_area).abs() < 1e-8);
         }
         assert_volume(&state);
@@ -352,7 +356,7 @@ fn a_falling_block_passes_through_existing_water_and_converts_only_at_the_floor(
     let Some(crate::events::ActiveEvent::Meltdown(event)) = &mut state.active_event else {
         panic!()
     };
-    event.cells.clear();
+    event.replace_cells(Vec::new(), &mut state.surfaces);
     event.initial_cells = 25;
     event.initial_area = 25.0 * event.cell_area;
     let spec = event.water.pools()[0].spec().clone();
@@ -377,10 +381,11 @@ fn a_falling_block_passes_through_existing_water_and_converts_only_at_the_floor(
         angle: 0.0,
         spin: 0.0,
         release_tick: 0,
+        piece: None,
     });
     event.tick = 100;
     assert!(event.cells[0].position.y - layout.pitch * 0.4 > layout.floor_y);
-    event.step_material(layout);
+    event.step_material(layout, &mut state.surfaces);
     assert_eq!(
         event.cells.len(),
         1,
@@ -388,7 +393,7 @@ fn a_falling_block_passes_through_existing_water_and_converts_only_at_the_floor(
     );
     assert!((event.water.stats().injected / event.cell_area - 24.0).abs() < 1e-8);
     event.cells[0].position.y = layout.floor_y + layout.pitch * 0.4;
-    event.step_material(layout);
+    event.step_material(layout, &mut state.surfaces);
     assert!(event.cells.is_empty(), "floor contact must melt the block");
     assert!((event.water.stats().injected / event.cell_area - 25.0).abs() < 1e-8);
     assert_volume(&state);

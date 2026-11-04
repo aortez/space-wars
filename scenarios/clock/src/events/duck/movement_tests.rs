@@ -3,10 +3,10 @@ use super::*;
 use engine_water::{Boundary, PoolSpec, WaterConfig};
 use planner::Surface;
 
-fn flat_player(aspect: f32, direction: f32) -> DuckEvent {
-    let mut duck = DuckEvent::new_player(Layout::new(aspect), 42, None, 1, 1);
-    duck.direction = direction;
-    duck.course.as_mut().unwrap().surfaces = vec![Surface {
+fn flat_player(aspect: f32, direction: f32) -> TestDuck {
+    let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
+    duck.face(direction);
+    duck.terrain.course.as_mut().unwrap().surfaces = vec![Surface {
         start: 0.0,
         end: duck.width,
         height: 0.0,
@@ -26,7 +26,7 @@ fn flat_player(aspect: f32, direction: f32) -> DuckEvent {
     duck
 }
 
-fn pool(duck: &DuckEvent, depth: f32) -> WaterWorld {
+fn pool(duck: &TestDuck, depth: f32) -> WaterWorld {
     let half = duck.width * 0.5;
     let columns = 64;
     let mut water = WaterWorld::new(
@@ -51,7 +51,7 @@ fn pool(duck: &DuckEvent, depth: f32) -> WaterWorld {
     water
 }
 
-fn floating() -> (DuckEvent, WaterWorld) {
+fn floating() -> (TestDuck, WaterWorld) {
     let mut duck = flat_player(4.0 / 3.0, 1.0);
     let water = pool(&duck, duck.radius * 4.0);
     for _ in 0..480 {
@@ -75,8 +75,8 @@ fn run_is_faster_but_does_not_raise_jump_height_on_any_target_layout() {
                     duck.step();
                 }
                 let speed = duck
-                    .world
-                    .as_ref()
+                    .arena
+                    .world()
                     .unwrap()
                     .motion(DUCK_BODY)
                     .unwrap()
@@ -284,10 +284,10 @@ fn shallow_water_uses_ground_jumps_and_down_does_not_push_through_the_floor() {
 fn swim_can_clear_a_low_bank_that_paddling_alone_cannot() {
     for direction in [-1.0, 1.0] {
         for swim in [false, true] {
-            let mut duck = DuckEvent::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
-            duck.direction = direction;
+            let mut duck = TestDuck::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
+            duck.face(direction);
             let bank = duck.width * 0.6;
-            duck.course.as_mut().unwrap().surfaces = vec![
+            duck.terrain.course.as_mut().unwrap().surfaces = vec![
                 Surface {
                     start: 0.0,
                     end: bank,
@@ -306,7 +306,7 @@ fn swim_can_clear_a_low_bank_that_paddling_alone_cannot() {
                 )),
                 Vec2::ZERO,
             ));
-            let geometry = arena::CourseGeometry::from_duck(&duck);
+            let geometry = arena::CourseGeometry::from_terrain(&duck.terrain);
             let mut water =
                 WaterWorld::new(WaterConfig::default(), geometry.water_pools()).unwrap();
             let wet_pool = usize::from(direction < 0.0);
@@ -347,8 +347,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
     for run in [false, true] {
         let (mut duck, mut water) = floating();
         let y = duck
-            .world
-            .as_ref()
+            .arena
+            .world()
             .unwrap()
             .motion(DUCK_BODY)
             .unwrap()
@@ -356,12 +356,11 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
             .y;
         // A left-high surface makes a right-going current through the real
         // water solver. The player paddles left against it; no synthetic flow.
-        duck.world.as_mut().unwrap().set_pose(
-            DUCK_BODY,
-            Vec2::new(-duck.radius * 3.0, y),
-            0.0,
-            true,
-        );
+        let start = Vec2::new(-duck.radius * 3.0, y);
+        duck.arena
+            .world_mut()
+            .unwrap()
+            .set_pose(DUCK_BODY, start, 0.0, true);
         let left = water.pools()[0]
             .columns()
             .take(32)
@@ -382,8 +381,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
         assert!(!duck.grounded());
         assert!(duck.feet_moving(), "paddling against a current animates");
         speeds.push(
-            duck.world
-                .as_ref()
+            duck.arena
+                .world()
                 .unwrap()
                 .motion(DUCK_BODY)
                 .unwrap()
@@ -393,8 +392,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
         // Releasing the stick stops propulsion, not buoyancy/current coupling.
         duck.set_player_input(0, false, run, false);
         let before = duck
-            .world
-            .as_ref()
+            .arena
+            .world()
             .unwrap()
             .motion(DUCK_BODY)
             .unwrap()
@@ -403,8 +402,8 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
         duck.step_with_water(Some(&water));
         assert!(!duck.feet_moving(), "releasing the stick stops paddling");
         let after = duck
-            .world
-            .as_ref()
+            .arena
+            .world()
             .unwrap()
             .motion(DUCK_BODY)
             .unwrap()

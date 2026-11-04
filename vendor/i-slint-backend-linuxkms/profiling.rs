@@ -309,6 +309,7 @@ struct Profile {
     current: Option<LoopSample>,
     samples: VecDeque<LoopSample>,
     loops_total: u64,
+    presented_frames: u64,
     counters_total: [u64; COUNTER_COUNT],
     trace: trace::Capture,
 }
@@ -332,6 +333,7 @@ impl Default for Profile {
             current: None,
             samples: VecDeque::new(),
             loops_total: 0,
+            presented_frames: 0,
             counters_total: [0; COUNTER_COUNT],
             trace: trace::Capture::default(),
         }
@@ -507,6 +509,13 @@ pub fn diagnostics() -> String {
     PROFILE.with(|profile| profile.borrow().diagnostics())
 }
 
+/// Completed DRM page flips on the UI thread. Available without profiling or
+/// tracing; submission, render-loop iterations and UI timers do not advance it.
+/// This is local display progress, not a claim about visible pixel correctness.
+pub fn presented_frames() -> Option<u64> {
+    PROFILE.with_borrow(|profile| profile.active.then_some(profile.presented_frames))
+}
+
 /// Bounded, explicitly armed CPU trace. Read/cancel never enable profiling.
 /// Captures 240 complete event-loop iterations, then stops its extra clocks.
 /// No file I/O, GL synchronization, shader modification or persistent settings.
@@ -565,6 +574,7 @@ pub(crate) fn page_flip_submitted() {
 /// drm-rs field name `duration`. Sequence differences wrap at u32::MAX.
 pub(crate) fn page_flip_completed(sequence: u32, kernel_time: Duration) {
     PROFILE.with_borrow_mut(|p| {
+        p.presented_frames = p.presented_frames.saturating_add(1);
         if !p.trace.recording() {
             return;
         }
@@ -1045,6 +1055,32 @@ mod tests {
         assert!(text.contains("kms_profile_enabled=false"));
         assert!(text.contains("kms_draws_total=0"));
         assert!(!text.contains("kms_draw_wall_avg_ms"));
+    }
+
+    #[test]
+    fn health_counts_completed_page_flips_without_optional_profiling() {
+        PROFILE.with_borrow_mut(|p| *p = Profile::default());
+        assert_eq!(presented_frames(), None);
+        PROFILE.with_borrow_mut(|p| p.active = true);
+        assert_eq!(presented_frames(), Some(0));
+        page_flip_submitted();
+        {
+            let _iteration = Scope::new(Stage::Loop);
+            count(Counter::Draws);
+        }
+        assert_eq!(presented_frames(), Some(0));
+        page_flip_completed(u32::MAX, Duration::from_secs(10));
+        page_flip_completed(0, Duration::from_secs(11));
+        assert_eq!(presented_frames(), Some(2));
+        PROFILE.with_borrow(|p| {
+            assert!(!p.enabled);
+            assert!(!p.trace.recording());
+            assert!(p.samples.is_empty());
+        });
+        PROFILE.with_borrow_mut(|p| p.presented_frames = u64::MAX);
+        page_flip_completed(1, Duration::from_secs(12));
+        assert_eq!(presented_frames(), Some(u64::MAX));
+        PROFILE.with_borrow_mut(|p| *p = Profile::default());
     }
 
     #[test]

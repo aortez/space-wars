@@ -12,7 +12,7 @@ use crate::render::{FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "rover-lab",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Extra,
     capabilities: ScenarioCapabilities {
         benchmark: false,
         headless_benchmark: false,

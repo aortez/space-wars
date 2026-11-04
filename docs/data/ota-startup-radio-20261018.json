@@ -1,0 +1,493 @@
+{
+  "automatic_installation_enabled": false,
+  "automatic_publication_enabled": false,
+  "ci": {
+    "result": "success",
+    "run": 39159071249,
+    "source": "1d5c67131e41f248672323ff036d5833456d9777",
+    "url": "https://github.com/aortez/space-wars/actions/runs/39159071249"
+  },
+  "files": {
+    "image-verification.json": {
+      "bytes": 5013,
+      "sha256": "fc660b7e2d88acedb96a03afc1098ccd5cd68463adebcd2ecc6bcd0709ef1928"
+    },
+    "install/normal-boot/result.json": {
+      "bytes": 637,
+      "sha256": "5c6d623df88432b73322d027fc5db4798e1d27b3508c0338b307d6858d2ef71d"
+    },
+    "install/normal-boot/startup-journal.log": {
+      "bytes": 246,
+      "sha256": "508b9a0c1dc9ef7fc15a542fcaf3e6238efd027b2e44d2397865f21794cd07ed"
+    },
+    "install/result.json": {
+      "bytes": 726,
+      "sha256": "eabca1537a464b4d1c6027bf54db7eccef3f78d6630d487cb08c3b919297fe18"
+    },
+    "install/selection.json": {
+      "bytes": 3128,
+      "sha256": "71a9fdc997977ab005a9a7eaadd2568f487af095913836006cfa11521d7d817a"
+    },
+    "native-helper/result.json": {
+      "bytes": 2023,
+      "sha256": "32cc660cd10c37a3ed879e1185de753d8242db9fcc7ed1b227f2d8426e743d9f"
+    },
+    "profile-diagnostic/analysis.json": {
+      "bytes": 3723,
+      "sha256": "4240cb83d981d49a06a942a2bea73eb39d899fc4915959c223bc94b594aea734"
+    },
+    "profile-diagnostic/cycle.sh": {
+      "bytes": 4127,
+      "sha256": "655191eb8706a551b15852116398cef09abd2e4868e0cf3da5fe2e9d13f66cf4"
+    },
+    "profile-diagnostic/nm-settings-connection.c": {
+      "bytes": 117082,
+      "sha256": "786f96ce0416fa576eb2bb7c0dda6e4be9e01f4fafa601f34ed1c356c7b74e93"
+    },
+    "profile-diagnostic/nm-settings.c": {
+      "bytes": 183946,
+      "sha256": "3503a9b8ae460bd94b0f5bbccbcba8dbd0087ebe861a4e25490046ba4ff0c1dc"
+    },
+    "profile-diagnostic/profiles.sh": {
+      "bytes": 1243,
+      "sha256": "b743bd80d11ad2d474274ae7821a4007b3f7f652e8105ea21014edb39602a0fe"
+    },
+    "profile-diagnostic/radio.py": {
+      "bytes": 8711,
+      "sha256": "72f91891e6a40d1c75c8718e4e5711ec3fdfd6c3537da1d159e1a09860291e53"
+    },
+    "profile-diagnostic/restore-controls.json": {
+      "bytes": 256,
+      "sha256": "b007d805b6f5276bc026897bc91354a7b95d5d7d7af9042abf24a13c15d51f99"
+    },
+    "profile-diagnostic/restore.sh": {
+      "bytes": 3506,
+      "sha256": "90132c0b968c6d900e647c7d93d275d654522d3cd828abb0af0e4801b6570b5a"
+    },
+    "profile-diagnostic/run/device-evidence.tar.gz": {
+      "bytes": 29676,
+      "sha256": "1e6f14b62f7925d08b15f8976643ebf9bb9479cca7d74ee52782be26f0aac9f1"
+    },
+    "profile-diagnostic/run/device/nm-journal.jsonl": {
+      "bytes": 119648,
+      "sha256": "7b52ba0d29b676744c1d80ac8c5883d9050221c3c2b798554de8be994522bf44"
+    },
+    "profile-diagnostic/run/device/radio-signals.log": {
+      "bytes": 13156,
+      "sha256": "662bc74812bd8e234d7745386db962bb46563a48a965ffb9d2e3b17535b807f4"
+    },
+    "profile-diagnostic/run/intent.json": {
+      "bytes": 1026,
+      "sha256": "415cfb26034473d18dd447012a5d8f77babbf0876be66457c346e88e00e5037f"
+    },
+    "profile-diagnostic/run/logging-after.json": {
+      "bytes": 276,
+      "sha256": "58c463ac82dd6b06e3ddddb1ecc7d4c5144650082b7beae86b2fea087c3f1f57"
+    },
+    "profile-diagnostic/run/result.json": {
+      "bytes": 461,
+      "sha256": "9b93e7a31a388fad745999b1992f4d7da21951c70d0a69c8032b4425995b871a"
+    },
+    "publication-result.json": {
+      "bytes": 1002,
+      "sha256": "28f2877af846c5d71f3b2bb29b54f295467195cd7850782af35b5c996d47fde5"
+    },
+    "restart/result.json": {
+      "bytes": 206,
+      "sha256": "cf7d16af54724bdf8f8fdbd90d4e3b16ae849669dcb411536785837098b096fb"
+    },
+    "review.json": {
+      "bytes": 5410,
+      "sha256": "8b1b98cd5395fbedd779e2e4d1def93d55957d35c73a8e608d361ede22a6696a"
+    },
+    "stage/result.json": {
+      "bytes": 191,
+      "sha256": "800fced18e8cfb1f1db3c772b7dcfdaa06fbed455a546578e1b8bf8badd47875"
+    }
+  },
+  "host": "spacewars.local",
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 26567800,
+        "sha256": "e8d9660cd0ec591846164901a1a0aff9011bca159df303d277eb6046b9305449"
+      },
+      "os_manager": {
+        "bytes": 11266304,
+        "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+      }
+    },
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "build_id": "rootfs-044cebdef1af1678bdbf74dc3a28dd6e2b37624a9298105f9f542a70de7ebb78",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "044cebdef1af1678bdbf74dc3a28dd6e2b37624a9298105f9f542a70de7ebb78",
+    "schema": 1,
+    "source": {
+      "commit": "1d5c67131e41f248672323ff036d5833456d9777",
+      "dirty": false,
+      "revision": "1d5c67131e41",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "image_helper_qualification": {
+    "boot_id": "da44b467-4432-4de5-bb05-aa65143848d0",
+    "cases": 4,
+    "elapsed_seconds": 90.23,
+    "files": {
+      "engine-os-manager": {
+        "bytes": 11266304,
+        "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+      },
+      "retained-state.json": {
+        "bytes": 735,
+        "sha256": "ad1fec4ae2529e40890a1e7be598646d09ad0327b71feda1feb195b79bce0b4f"
+      },
+      "tests": {
+        "bytes": 1839952,
+        "sha256": "23bcfc28a19d4115a7c34c694ab25f3fad59fd06864d742abbda7d1385896a40"
+      }
+    },
+    "fresh_login_passed": true,
+    "helper_from_qualified_image": true,
+    "host": "swadmin@spacewars.local",
+    "image": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 26567800,
+          "sha256": "e8d9660cd0ec591846164901a1a0aff9011bca159df303d277eb6046b9305449"
+        },
+        "os_manager": {
+          "bytes": 11266304,
+          "sha256": "5c2950ff38f2a356056a9b06e984a4371207cdd4e12a702544b7412aab9de93e"
+        }
+      },
+      "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+      "build_id": "rootfs-044cebdef1af1678bdbf74dc3a28dd6e2b37624a9298105f9f542a70de7ebb78",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 2,
+      "rootfs_tree": "044cebdef1af1678bdbf74dc3a28dd6e2b37624a9298105f9f542a70de7ebb78",
+      "schema": 1,
+      "source": {
+        "commit": "1d5c67131e41f248672323ff036d5833456d9777",
+        "dirty": false,
+        "revision": "1d5c67131e41",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "live_radio_writes": false,
+    "namespace_isolation": [
+      "mount",
+      "network"
+    ],
+    "passed": true,
+    "production_fix_deployed": false,
+    "production_image_unchanged": true,
+    "production_radio_clean": true,
+    "production_services_unchanged": true,
+    "real_device_reboot": false,
+    "remote_artifacts": "/data/spacewars-ssh-qualification-20261018-1d5c671-image"
+  },
+  "local_artifacts": "/home/data/workspace/space-wars-ota-idle/target/idle-qualification/readiness-image-1d5c671",
+  "normal_boot": {
+    "automatic_attempt_started_ms": 5731,
+    "automatic_completion": "no-candidate",
+    "boot_id": "bef62885-8ebd-4f2c-bcfa-484388e7e52e",
+    "elapsed_seconds": 50.153,
+    "host": "spacewars.local",
+    "maintenance_resume_logged": false,
+    "maintenance_wait_logged": false,
+    "manual_retry_used": false,
+    "network_manager_startup_complete_us": 11033761,
+    "passed": true,
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 1
+    }
+  },
+  "profile_diagnostic": {
+    "diagnostic_calls_get_secrets": false,
+    "interpretation": "The native SETTINGS debug journal records secrets request completed and new agent secrets processed immediately before the Wi-Fi VersionId changes 3 to 4. GetSettings is identical across that transition. These markers identify get_secrets_cb; source inspection shows its settings update increments VersionId without requiring different content. This identifies the update path, but does not establish unchanged in-memory secrets.",
+    "journal_events": [
+      {
+        "marker": "manager: startup complete",
+        "monotonic_us": 11033761
+      },
+      {
+        "marker": "secrets request completed",
+        "monotonic_us": 207526269
+      },
+      {
+        "marker": "new agent secrets processed",
+        "monotonic_us": 207526311
+      }
+    ],
+    "original_logging_restored": true,
+    "owner_resumes": 1,
+    "raw_settings_published": false,
+    "schema": 1,
+    "snapshots": [
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 3
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "2",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "3",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-baseline-9C9Zbi",
+        "uptime": 80.6
+      },
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [
+              "connection.timestamp"
+            ],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 3
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "2",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "3",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-offline-ZBBETJ",
+        "uptime": 203.87
+      },
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 4
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "2",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "3",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-fault-profiles-changed-RBCmPn",
+        "uptime": 207.56
+      },
+      {
+        "profiles": [
+          {
+            "changed_fields_since_previous": [
+              "connection.timestamp"
+            ],
+            "flags": 0,
+            "id": "1",
+            "type": "802-11-wireless",
+            "unsaved": false,
+            "version": 4
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 15,
+            "id": "2",
+            "type": "loopback",
+            "unsaved": true,
+            "version": 2
+          },
+          {
+            "changed_fields_since_previous": [],
+            "flags": 3,
+            "id": "3",
+            "type": "802-3-ethernet",
+            "unsaved": true,
+            "version": 2
+          }
+        ],
+        "snapshot": "profiles-restored-jl8TIT",
+        "uptime": 208.85
+      }
+    ],
+    "wireless_notifications": [
+      {
+        "seconds_since_first": "0.000000",
+        "serial": 2737,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "3.511256",
+        "serial": 2860,
+        "wireless_enabled": false
+      },
+      {
+        "seconds_since_first": "3.511535",
+        "serial": 2862,
+        "wireless_enabled": true
+      }
+    ]
+  },
+  "publication": {
+    "automatic_installation_enabled": false,
+    "channel": "nightly",
+    "current": {
+      "manifest_sha256": "921e09d926232db88d5dedf6e9975f11406ce606a36705e37a26f1c064c71815",
+      "timestamp": {
+        "bytes": 469,
+        "sha256": "d8c08ed1b0c149253309a0067cbe77b0a1fe3eab929d2afbee75fca331aabce0"
+      },
+      "version": 6
+    },
+    "generation": 5,
+    "intent_sha256": "b299656fe665a6852b31c02c10884784b3daac8dd2b52bfe439e59dc3eda45e8",
+    "main_ci_admission_claimed": false,
+    "payload": {
+      "bytes": 132946431,
+      "sha256": "9b4955e98f81fbb3baf14ff1431379293797a0a0ffb5b1209a3d78990dcf69f0"
+    },
+    "publication_scope": "Owner-supervised branch candidate",
+    "publisher": "f58d725bb7c28d47ce668fecc787b43a96f96fdf",
+    "release_id": 416212208,
+    "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+    "result": "published",
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "source": "1d5c67131e41f248672323ff036d5833456d9777"
+  },
+  "radio_diagnostic": {
+    "boot_id": "bef62885-8ebd-4f2c-bcfa-484388e7e52e",
+    "diagnostic_completed": true,
+    "emergency_radio_enable": false,
+    "fresh_ssh_passed": true,
+    "image_unchanged": true,
+    "kiosk_unchanged": true,
+    "off_at_seconds": 121,
+    "radio_cycle_passed": false,
+    "redundant_wireless_notification_qualified": true,
+    "restored": true,
+    "stores": {
+      "all_bytes_unchanged": true,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 0
+    },
+    "suspensions": [
+      "profiles-changed"
+    ]
+  },
+  "remaining_work": [
+    "Resolve the reconnect profile-revision conflict while preserving real profile-edit detection.",
+    "Complete the off/time-wake/OTA/off cycle on Pi 5.",
+    "Qualify Pi 4 and unattended rollout."
+  ],
+  "schema": 1,
+  "scope": "Supervised Pi 5 signed image, automatic startup check, service restart, and radio-only diagnostic. Full time/OTA idle cycle and unattended rollout remain unqualified.",
+  "service_restart": {
+    "boot_id": "bef62885-8ebd-4f2c-bcfa-484388e7e52e",
+    "daily_allowance_preserved": true,
+    "host": "spacewars.local",
+    "kiosk_instance_unchanged": true,
+    "observed_seconds": 21.339,
+    "passed": true
+  },
+  "signed_trial": {
+    "automatic_installation_enabled": false,
+    "elapsed_seconds": 97.049,
+    "generation": 5,
+    "host": "spacewars.local",
+    "original_boot": "da44b467-4432-4de5-bb05-aa65143848d0",
+    "passed": true,
+    "payload": "9b4955e98f81fbb3baf14ff1431379293797a0a0ffb5b1209a3d78990dcf69f0",
+    "stores": {
+      "all_bytes_unchanged": false,
+      "durable_stores_unchanged": true,
+      "regenerated_adapter_local_gatt_databases": 1
+    },
+    "trial_boot": "0d490964-71fd-4b99-a8c1-fbfbe88596e4"
+  },
+  "source": "1d5c67131e41f248672323ff036d5833456d9777",
+  "source_inspection": {
+    "conclusion": "get_secrets_cb processes the returned secrets and calls nm_settings_connection_update. _connection_changed_update increments VersionId even when _nm_settings_connection_set_connection finds an exactly equal profile.",
+    "limit": "GetSettings excludes secrets. Equal snapshots and unchanged persistent files do not prove that in-memory secrets stayed identical. DEBUG SETTINGS does not include the TRACE-level get-new-secrets context string.",
+    "origin": "https://download.gnome.org/sources/NetworkManager/1.46/NetworkManager-1.46.6.tar.xz",
+    "version": "NetworkManager 1.46.6"
+  },
+  "startup_regression": {
+    "attempt_start_ms": 5561,
+    "evidence": "Daily next_ms minus 86400000, correlated with native NetworkManager boot journal. The exact failing admission subcondition was not logged.",
+    "fix_source": "1d5c67131e41f248672323ff036d5833456d9777",
+    "native_fix_qualification_pending": false,
+    "network_manager_startup_complete_us": 10865816,
+    "reproduction": "Missing native radio observation while normal policy is already known causes NetworkUnavailable and ends the startup attempt; regression fails before the fix."
+  },
+  "validation": {
+    "aarch64_compile": "passed",
+    "clippy": "passed",
+    "format": "passed",
+    "manager_ignored": 4,
+    "manager_passed": 205
+  }
+}

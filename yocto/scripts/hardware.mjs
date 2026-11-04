@@ -39,7 +39,7 @@ export function assertBootCompatibility(expected, actual) {
   }
 }
 
-export function setHardwareProfile(utils, device, profile, bootIdentity, dryRun) {
+export function setHardwareProfile(utils, device, profile, bootIdentity, dryRun, { run = execFileSync } = {}) {
   const contents = deviceProfileText(profile);
   const partition = utils.getPartitionDevice(device, 1);
   if (dryRun) {
@@ -50,23 +50,33 @@ export function setHardwareProfile(utils, device, profile, bootIdentity, dryRun)
   const mountPoint = mkdtempSync(join(tmpdir(), 'spacewars-hardware-'));
   let mounted = false;
   try {
-    execFileSync('sudo', ['mount', partition, mountPoint], { stdio: 'pipe' });
+    run('sudo', ['mount', '-t', 'vfat', '-o', 'rw,nosuid,nodev,noexec', partition, mountPoint], { stdio: 'pipe' });
     mounted = true;
-    if (!existsSync(join(mountPoint, 'spacewars-profiles', `${profile}.txt`)) ||
-        !existsSync(join(mountPoint, 'spacewars-boot-id'))) {
+    // FAT inherits the mounting process's umask. Keep these reads privileged:
+    // existsSync would report a root-only mount as if the files were missing.
+    const bootIdPath = join(mountPoint, 'spacewars-boot-id');
+    const presence = run('sudo', ['/bin/sh', '-c',
+      'if test -f "$1" && test -f "$2"; then printf present; else printf absent; fi',
+      'spacewars-hardware', join(mountPoint, 'spacewars-profiles', `${profile}.txt`), bootIdPath],
+    { encoding: 'utf8', stdio: 'pipe' });
+    if (presence === 'absent') {
       throw new Error('Flashed image does not contain unified hardware profiles and boot metadata.');
     }
-    if (readFileSync(join(mountPoint, 'spacewars-boot-id'), 'utf8').trim() !== bootIdentity) {
+    if (presence !== 'present') throw new Error('Could not inspect the flashed boot filesystem.');
+    if (run('sudo', ['cat', bootIdPath], { encoding: 'utf8', stdio: 'pipe' }).trim() !== bootIdentity) {
       throw new Error('Flashed boot identity does not match the image sidecar. Check the selected artifacts.');
     }
     const selectionPath = join(mountPoint, 'spacewars-device.txt');
-    execFileSync('sudo', ['tee', selectionPath], { input: contents, stdio: ['pipe', 'ignore', 'pipe'] });
-    execFileSync('sudo', ['sync', '-f', selectionPath], { stdio: 'pipe' });
+    run('sudo', ['tee', selectionPath], { input: contents, stdio: ['pipe', 'ignore', 'pipe'] });
+    run('sudo', ['sync', '-f', selectionPath], { stdio: 'pipe' });
+    if (run('sudo', ['cat', selectionPath], { encoding: 'utf8', stdio: 'pipe' }) !== contents) {
+      throw new Error('Hardware profile readback differs from the selected profile.');
+    }
     utils.success(`Selected hardware profile: ${profile}`);
   } finally {
     // If unmount fails, leave the mount point intact. Never recursively remove it.
     if (mounted) {
-      execFileSync('sudo', ['umount', mountPoint], { stdio: 'pipe' });
+      run('sudo', ['umount', mountPoint], { stdio: 'pipe' });
     }
     rmdirSync(mountPoint);
   }

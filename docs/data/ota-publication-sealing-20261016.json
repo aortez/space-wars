@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-17T04:01:31.507177+00:00",
+  "implementation_base": "cfd20a1ed2c47940e7a23394d0a38e994da87e1d",
+  "scope": "Retained verified manifest and safe reconciliation of interrupted publication; GitHub remains mocked and all signing keys are disposable fixtures.",
+  "files": {
+    ".github/ci/ota_delivery.py": {
+      "bytes": 20485,
+      "sha256": "d1fe3f10f7a72441a767c427f6c56ef32ca9aa2796dbe5b7ac47c950ba8554c5"
+    },
+    ".github/ci/ota_publisher_journal.py": {
+      "bytes": 18587,
+      "sha256": "6660ae889fbd1c936ffaf3fb21b00b24116d87442a5ef2b9778b45f513590662"
+    },
+    ".github/ci/ota_publisher_fixture.py": {
+      "bytes": 10726,
+      "sha256": "33846572179370593a227e2479854e3b6c77caf5453750121691333ec4d686fa"
+    },
+    ".github/ci/test_ota_delivery.py": {
+      "bytes": 24319,
+      "sha256": "973a503dc80d271dc64fc7d0819554cc5845938d5134498aea2a0dc9ce63d1b5"
+    },
+    ".github/ci/test_ota_publisher_journal.py": {
+      "bytes": 12807,
+      "sha256": "64756f070ba67c41ce98d50ff9889b947dd43bc95976e41994c610cf44c00658"
+    }
+  },
+  "validation": {
+    "ci_python_passed": 181,
+    "focused_delivery_passed": 22,
+    "rust_signed_delivery_integration_passed": 1,
+    "rust_source_unchanged": "341-case full result and lint/MSRV checks are retained in ota-publisher-journal-20261016.json"
+  },
+  "fixtures": {
+    "synthetic": {
+      "schema": 1,
+      "scope": "ephemeral keys and MOCK GitHub only",
+      "image_scope": "synthetic payload; no rootfs qualification",
+      "compressed": {
+        "bytes": 11,
+        "sha256": "fb4516b50946085bd15d6807d1526c967afdfae509a6088b7817853bac9bed0c"
+      },
+      "transactions": [
+        {
+          "kind": "nightly",
+          "timestamp": 3,
+          "generation": 1
+        },
+        {
+          "kind": "release",
+          "timestamp": 4,
+          "generation": 1
+        },
+        {
+          "kind": "renew",
+          "timestamp": 5,
+          "generation": 1
+        }
+      ],
+      "retained_checkpoints": 42,
+      "public_assets": 24,
+      "aborted_version": 2,
+      "lost_checkpoint_reply_reconciled": true
+    },
+    "real_rootfs": {
+      "schema": 1,
+      "scope": "ephemeral keys and MOCK GitHub only",
+      "image_scope": "previously qualified rootfs; mocked origin and Pi evidence in this fixture",
+      "compressed": {
+        "bytes": 131792120,
+        "sha256": "eecfe55d24f628cbd2ab08c6ad578f01b7c71335acb3b1a530c7faaa8b6b9395"
+      },
+      "transactions": [
+        {
+          "kind": "nightly",
+          "timestamp": 3,
+          "generation": 1
+        },
+        {
+          "kind": "release",
+          "timestamp": 4,
+          "generation": 1
+        },
+        {
+          "kind": "renew",
+          "timestamp": 5,
+          "generation": 1
+        }
+      ],
+      "retained_checkpoints": 42,
+      "public_assets": 24,
+      "aborted_version": 2,
+      "lost_checkpoint_reply_reconciled": true
+    }
+  },
+  "reconciliation_contract": [
+    "Persist the exact independently verified feed_inventory manifest before any remote delivery mutation",
+    "A sealed manifest must match the root, retained metadata bytes and all payload references",
+    "Account for a matching previously visible publication without signing again or extending expiry",
+    "Before abandoning an unexposed attempt, quiesce previous jobs and clear the matching delivery reservation under the shared writer lock",
+    "Preserve every immutable asset, every consumed version and image generation; remove only an empty unfinished timestamp alias if needed",
+    "A visible or committed attempted timestamp returns already-visible; an unknown timestamp or reservation rejects",
+    "Any new upload still requires current signature/expiry verification"
+  ],
+  "logs": {
+    "target/ota-publication-sealing-all-python-tests.log": {
+      "bytes": 499,
+      "sha256": "ad785c06c30d6cf1b23bad962ce4e0a181373e6ec58f05d5e1d636f8d3208983"
+    },
+    "target/ota-publication-sealing-delivery-tests.log": {
+      "bytes": 121,
+      "sha256": "23d2bf918ded685b14df570cebce948061fa889a8206d04c340e3a190bc25f5f"
+    },
+    "target/ota-publication-sealing-rust-delivery.log": {
+      "bytes": 419,
+      "sha256": "7f9897d8e1ff531d52d4131bf2854f403e9594893ab6a6f749dae0ee481042f3"
+    },
+    "target/ota-publication-sealing-signed-fixture.json": {
+      "bytes": 641,
+      "sha256": "6be6c3ebab531583a4acfb05f440d8e4378fd2bb5883049ae3c50b4fc9b8f79f"
+    },
+    "target/ota-publication-sealing-signed-fixture.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-publication-sealing-real-image.json": {
+      "bytes": 680,
+      "sha256": "15fa9e1d5fd1727b907006aff7611912eb636c72415188aa84c45140fe2140f6"
+    },
+    "target/ota-publication-sealing-real-image.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "standard_profile_cold_build": {
+    "source": "cfd20a1ed2c47940e7a23394d0a38e994da87e1d",
+    "container_id": "2690774b44f67f4b4d7bb3d09cba132e96c1c36ba8e2a8455f3b6b41a63a76fa",
+    "cpus": 4,
+    "cpu_affinity": "0,1,2,3",
+    "memory_gib": 12,
+    "extra_swap": 0,
+    "status": "running from empty compiled/download caches; no capacity pass claimed",
+    "started_utc": "2026-10-17T03:53:17.422143747Z",
+    "log": "target/ota-standard-cold-cfd20a1.log",
+    "resource_samples": "target/ota-cold-resource-samples.jsonl"
+  },
+  "remaining": [
+    "Protected publisher workflow and actual root/genesis provisioning",
+    "Cold-build completion, candidate qualification and actual hosted-runner disk/capacity validation",
+    "Rotation, retention, installed service/UI handoff and physical Pi qualification"
+  ]
+}

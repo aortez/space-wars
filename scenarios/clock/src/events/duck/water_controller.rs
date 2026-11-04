@@ -13,6 +13,10 @@ pub(in crate::events::duck) struct WaterNavigation {
 }
 
 impl Controller {
+    pub fn water_active(&self) -> bool {
+        self.water.active
+    }
+
     pub fn facing(&self) -> f32 {
         self.water
             .facing

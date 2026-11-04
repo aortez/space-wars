@@ -1,0 +1,1403 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "date_timezone": "America/Los_Angeles",
+  "scope": "Owner-supervised physical signed Nightly trials on primary Pi 4 and Pi 5; automatic installation disabled",
+  "installer_source": "0a0434b165dc389d624117e502e5cfd8b3fe016d",
+  "publisher_source": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+  "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+  "feed_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+  "main_ci_admission_claimed": false,
+  "automatic_installation_enabled": false,
+  "automatic_publisher_enabled": false,
+  "release_channel_images": 0,
+  "candidates": [
+    {
+      "generation": 1,
+      "descriptor": {
+        "schema": 1,
+        "format": "rootfs-ext4-zstd",
+        "compressed": {
+          "bytes": 131866380,
+          "sha256": "700c7f50af011dc928964d9d6758044e5a78ed7690cae051e02940539393db51"
+        },
+        "expanded": {
+          "bytes": 528482304,
+          "sha256": "9d77f4188875de99999c62628aa30e8451d60116fb67320fc6ea9b0ce2fbac7b"
+        }
+      },
+      "image": {
+        "schema": 1,
+        "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+        "rootfs_tree": "40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+        "source": {
+          "schema": 1,
+          "commit": "0a0434b165dc389d624117e502e5cfd8b3fe016d",
+          "dirty": false,
+          "revision": "0a0434b165dc"
+        },
+        "machine": "raspberrypi-spacewars",
+        "architecture": "aarch64",
+        "layout": "spacewars-ab-v1",
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "updater_protocol": 1,
+        "recovery_protocol": 2,
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        },
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "0aa488ad9ef15d5436a42bda5705cf67d246f984666d43246c6def59cb092f3c"
+          },
+          "os_manager": {
+            "bytes": 11255296,
+            "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+          }
+        }
+      }
+    },
+    {
+      "generation": 2,
+      "descriptor": {
+        "schema": 1,
+        "format": "rootfs-ext4-zstd",
+        "compressed": {
+          "bytes": 131865641,
+          "sha256": "3928c3ad6457286f37498d11dd9a995b34055c7de147bc0f94d4d7ee2dfbdf41"
+        },
+        "expanded": {
+          "bytes": 528482304,
+          "sha256": "f18d3697c9cf34382f29cf06627daacd32b1655b3119f824436e7d37b4b328b6"
+        }
+      },
+      "image": {
+        "schema": 1,
+        "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "rootfs_tree": "5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "source": {
+          "schema": 1,
+          "commit": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+          "dirty": false,
+          "revision": "5b420c95b87b"
+        },
+        "machine": "raspberrypi-spacewars",
+        "architecture": "aarch64",
+        "layout": "spacewars-ab-v1",
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "updater_protocol": 1,
+        "recovery_protocol": 2,
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        },
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "fcbf0e501fa9358e87b90d6cef5a7622faa69abeabda3146f6067ed385b5e3a8"
+          },
+          "os_manager": {
+            "bytes": 11255296,
+            "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+          }
+        }
+      }
+    }
+  ],
+  "publications": [
+    {
+      "automatic_installation_enabled": false,
+      "channel": "nightly",
+      "current": {
+        "manifest_sha256": "87eb2745b1d1cd5d2161032a736c45f80aef37bf16d0648114549d4fb0d037a9",
+        "timestamp": {
+          "bytes": 469,
+          "sha256": "2cdca385a5b374b5d67bcb57f79a0720fdadbe0c6df12b39dc8d6d03e7726baf"
+        },
+        "version": 2
+      },
+      "delivery_source": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+      "generation": 1,
+      "main_ci_admission_claimed": false,
+      "payload": {
+        "bytes": 131866380,
+        "sha256": "700c7f50af011dc928964d9d6758044e5a78ed7690cae051e02940539393db51"
+      },
+      "publication_scope": "Owner-supervised branch candidate",
+      "published_utc": "2026-10-18T04:17:58Z",
+      "publisher": "9f8d9eba2b59afd89c331b3482dd4a024a54fa90",
+      "release_id": 416212208,
+      "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+      "result": "published",
+      "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+      "runner_sha256": "d2e25ba2270765fd156f28747f65aabe6986c08afd1e845ac6b90334636820ca",
+      "schema": 1,
+      "source": "0a0434b165dc389d624117e502e5cfd8b3fe016d"
+    },
+    {
+      "automatic_installation_enabled": false,
+      "channel": "nightly",
+      "current": {
+        "manifest_sha256": "0f86c861f918becc5f728f50797d55255a8d8b8140d061fd3c429302a6a10146",
+        "timestamp": {
+          "bytes": 469,
+          "sha256": "497f0d21d7b0f7f5f57f54c394c0442d180f61eba2c66667e0cb1e6803fee750"
+        },
+        "version": 3
+      },
+      "generation": 2,
+      "intent_sha256": "c3c8d1a33a5e6e51a6c4edebd5b3d767a7e236153cb3a910c471fba937d59ea4",
+      "main_ci_admission_claimed": false,
+      "payload": {
+        "bytes": 131865641,
+        "sha256": "3928c3ad6457286f37498d11dd9a995b34055c7de147bc0f94d4d7ee2dfbdf41"
+      },
+      "publication_scope": "Owner-supervised branch candidate",
+      "publisher": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+      "release_id": 416212208,
+      "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+      "result": "published",
+      "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+      "schema": 1,
+      "source": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf"
+    }
+  ],
+  "cases": [
+    {
+      "host": "sw-picade.local",
+      "case": "failure",
+      "passed": true,
+      "elapsed_seconds": 285.26,
+      "original_boot": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+      "trial_boot": "72a7ca3d-3e42-4d73-b5cc-108004f7203d",
+      "final_boot": "0fc268dd-d35a-448b-ad3a-db36fa572ae1",
+      "final_phase": "rolled-back",
+      "transaction": {
+        "id": "f5eefb2239204bd6cef65fd73ac3b67bc1f9b88871b4bf73d6ee4a3ec135c849",
+        "candidate_id": "25650b716c681519f86a87be17c66f43ab8cb1a4ff4c94a8629f7e691476358d",
+        "previous_good": {
+          "slot": "b",
+          "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+          "generation": 0,
+          "payload": "8aced72e48517b4fbe93a836a70700db8f6bfaf42250133130354f71042aec55",
+          "expanded": "8a6e9c365a6b0e4af3c21dd6366f2bc92d7d15f397ffc237686d4fc4be3610e3",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "candidate": {
+          "slot": "a",
+          "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+          "generation": 1,
+          "payload": "700c7f50af011dc928964d9d6758044e5a78ed7690cae051e02940539393db51",
+          "expanded": "9d77f4188875de99999c62628aa30e8451d60116fb67320fc6ea9b0ce2fbac7b",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "attempt": 1,
+        "origin_boot_id": "13f42efd-460e-4458-a9e5-bf3b1b5f4fe4",
+        "trial_boot_id": "72a7ca3d-3e42-4d73-b5cc-108004f7203d",
+        "phase": "rolled-back",
+        "health": null,
+        "failure": "health-timeout"
+      },
+      "highest_attempted_generation": 1,
+      "stores": {
+        "all_bytes_unchanged": false,
+        "durable_stores_unchanged": true,
+        "regenerated_local_gatt_databases": [
+          {
+            "path": "/data/bluetooth/DC:A6:32:D6:C5:5C/attributes",
+            "before": "3f4ca4fae420f116e5fa5a5b6367a8df5973c2aefadea51abb6e89ce696ddfbd",
+            "after": "aae4564722cc76cc2cad6d930d3e338388664a9d37c790530fd27372d2b01f45"
+          }
+        ]
+      },
+      "kiosk_progress_verified": true,
+      "automatic_installation_enabled": false,
+      "evidence_directory": "target/ota-signed-trials-20261017/sw-picade.local/failure",
+      "installed_image": {
+        "schema": 1,
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "rootfs_tree": "9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "source": {
+          "schema": 1,
+          "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+          "dirty": false,
+          "revision": "e9867188d211"
+        },
+        "machine": "raspberrypi-spacewars",
+        "architecture": "aarch64",
+        "layout": "spacewars-ab-v1",
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "updater_protocol": 1,
+        "recovery_protocol": 2,
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        },
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc"
+          },
+          "os_manager": {
+            "bytes": 11252736,
+            "sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14"
+          }
+        }
+      }
+    },
+    {
+      "host": "spacewars.local",
+      "case": "failure",
+      "passed": true,
+      "elapsed_seconds": 231.916,
+      "original_boot": "ec997cb4-c669-4b14-b593-e3b50d1f31d6",
+      "trial_boot": "2b388df2-1616-4306-ab57-ff2b166319a4",
+      "final_boot": "3b2bb292-1c38-4469-9795-279b675a42c4",
+      "final_phase": "rolled-back",
+      "transaction": {
+        "id": "31b97c5ca3013decfb6f2eb2478454284e723ed157172738ae3c86eda5d0b9a8",
+        "candidate_id": "25650b716c681519f86a87be17c66f43ab8cb1a4ff4c94a8629f7e691476358d",
+        "previous_good": {
+          "slot": "b",
+          "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+          "generation": 0,
+          "payload": "8aced72e48517b4fbe93a836a70700db8f6bfaf42250133130354f71042aec55",
+          "expanded": "8a6e9c365a6b0e4af3c21dd6366f2bc92d7d15f397ffc237686d4fc4be3610e3",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "candidate": {
+          "slot": "a",
+          "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+          "generation": 1,
+          "payload": "700c7f50af011dc928964d9d6758044e5a78ed7690cae051e02940539393db51",
+          "expanded": "9d77f4188875de99999c62628aa30e8451d60116fb67320fc6ea9b0ce2fbac7b",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "attempt": 1,
+        "origin_boot_id": "ec997cb4-c669-4b14-b593-e3b50d1f31d6",
+        "trial_boot_id": "2b388df2-1616-4306-ab57-ff2b166319a4",
+        "phase": "rolled-back",
+        "health": null,
+        "failure": "health-timeout"
+      },
+      "highest_attempted_generation": 1,
+      "stores": {
+        "all_bytes_unchanged": false,
+        "durable_stores_unchanged": true,
+        "regenerated_local_gatt_databases": [
+          {
+            "path": "/data/bluetooth/88:A2:9E:14:62:63/attributes",
+            "before": "ea1d3cfccb167b545d5a67dd85fab0e2286cf2f25026046bf28bafaca720ecfb",
+            "after": "adc541d68a38ffb6d98744516cd2327df7cd4da5b5cb8bea842b1b010575bd23"
+          }
+        ]
+      },
+      "kiosk_progress_verified": true,
+      "automatic_installation_enabled": false,
+      "evidence_directory": "target/ota-signed-trials-20261017/spacewars.local/failure",
+      "installed_image": {
+        "schema": 1,
+        "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "rootfs_tree": "9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+        "source": {
+          "schema": 1,
+          "commit": "e9867188d2118ce2653ce431004cdd53eba74218",
+          "dirty": false,
+          "revision": "e9867188d211"
+        },
+        "machine": "raspberrypi-spacewars",
+        "architecture": "aarch64",
+        "layout": "spacewars-ab-v1",
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "updater_protocol": 1,
+        "recovery_protocol": 2,
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        },
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "a7bab2b6f83fcf6422e73b5281e722dec7475235c3f148a4918570735e058cdc"
+          },
+          "os_manager": {
+            "bytes": 11252736,
+            "sha256": "1237efc67838d58d2031e371a1a06f3e5d81c5f31e3d85ae77b3ea7146634f14"
+          }
+        }
+      }
+    },
+    {
+      "host": "spacewars.local",
+      "case": "healthy",
+      "passed": true,
+      "elapsed_seconds": 99.253,
+      "original_boot": "3b2bb292-1c38-4469-9795-279b675a42c4",
+      "trial_boot": "d95a6727-ae1d-4d98-bbb1-5ba88de9d2c7",
+      "final_boot": "d95a6727-ae1d-4d98-bbb1-5ba88de9d2c7",
+      "final_phase": "committed",
+      "transaction": {
+        "id": "fda8395b5aef2ed7060906e318a05dec5c942d47780f9d792df56a4f16f2bd67",
+        "candidate_id": "25650b716c681519f86a87be17c66f43ab8cb1a4ff4c94a8629f7e691476358d",
+        "previous_good": {
+          "slot": "b",
+          "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+          "generation": 0,
+          "payload": "8aced72e48517b4fbe93a836a70700db8f6bfaf42250133130354f71042aec55",
+          "expanded": "8a6e9c365a6b0e4af3c21dd6366f2bc92d7d15f397ffc237686d4fc4be3610e3",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "candidate": {
+          "slot": "a",
+          "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+          "generation": 1,
+          "payload": "700c7f50af011dc928964d9d6758044e5a78ed7690cae051e02940539393db51",
+          "expanded": "9d77f4188875de99999c62628aa30e8451d60116fb67320fc6ea9b0ce2fbac7b",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "attempt": 2,
+        "origin_boot_id": "3b2bb292-1c38-4469-9795-279b675a42c4",
+        "trial_boot_id": "d95a6727-ae1d-4d98-bbb1-5ba88de9d2c7",
+        "phase": "committed",
+        "health": {
+          "transaction": "fda8395b5aef2ed7060906e318a05dec5c942d47780f9d792df56a4f16f2bd67",
+          "boot_id": "d95a6727-ae1d-4d98-bbb1-5ba88de9d2c7",
+          "started_ms": 6952,
+          "finished_ms": 67832,
+          "instance": {
+            "pid": 906,
+            "start_ticks": 558,
+            "invocation_id": "0e2971a9a1a747f5bc5aec35534a94ef"
+          }
+        },
+        "failure": null
+      },
+      "highest_attempted_generation": 1,
+      "stores": {
+        "all_bytes_unchanged": false,
+        "durable_stores_unchanged": true,
+        "regenerated_local_gatt_databases": [
+          {
+            "path": "/data/bluetooth/88:A2:9E:14:62:63/attributes",
+            "before": "adc541d68a38ffb6d98744516cd2327df7cd4da5b5cb8bea842b1b010575bd23",
+            "after": "784a53c62528491e089b6dc9098d33529df9d7043c4362840de3cf13afca515a"
+          }
+        ]
+      },
+      "kiosk_progress_verified": true,
+      "automatic_installation_enabled": false,
+      "evidence_directory": "target/ota-signed-trials-20261017/spacewars.local/healthy",
+      "installed_image": {
+        "schema": 1,
+        "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+        "rootfs_tree": "40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+        "source": {
+          "schema": 1,
+          "commit": "0a0434b165dc389d624117e502e5cfd8b3fe016d",
+          "dirty": false,
+          "revision": "0a0434b165dc"
+        },
+        "machine": "raspberrypi-spacewars",
+        "architecture": "aarch64",
+        "layout": "spacewars-ab-v1",
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "updater_protocol": 1,
+        "recovery_protocol": 2,
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        },
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "0aa488ad9ef15d5436a42bda5705cf67d246f984666d43246c6def59cb092f3c"
+          },
+          "os_manager": {
+            "bytes": 11255296,
+            "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+          }
+        }
+      },
+      "normal_boot": {
+        "host": "spacewars.local",
+        "passed": true,
+        "normal_boot": "2ff5cbbf-ad5d-4b26-b787-53c21ac16931",
+        "image": {
+          "schema": 1,
+          "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+          "rootfs_tree": "40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+          "source": {
+            "schema": 1,
+            "commit": "0a0434b165dc389d624117e502e5cfd8b3fe016d",
+            "dirty": false,
+            "revision": "0a0434b165dc"
+          },
+          "machine": "raspberrypi-spacewars",
+          "architecture": "aarch64",
+          "layout": "spacewars-ab-v1",
+          "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+          "updater_protocol": 1,
+          "recovery_protocol": 2,
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          },
+          "binaries": {
+            "client": {
+              "bytes": 23470072,
+              "sha256": "0aa488ad9ef15d5436a42bda5705cf67d246f984666d43246c6def59cb092f3c"
+            },
+            "os_manager": {
+              "bytes": 11255296,
+              "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+            }
+          }
+        },
+        "good": {
+          "slot": "a",
+          "build_id": "rootfs-40e06a9d4e47a697a22ed0e44a079022acbe0fe44a0413935c3f217f75dd50a6",
+          "generation": 1,
+          "payload": "700c7f50af011dc928964d9d6758044e5a78ed7690cae051e02940539393db51",
+          "expanded": "9d77f4188875de99999c62628aa30e8451d60116fb67320fc6ea9b0ce2fbac7b",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "elapsed_seconds": 51.399,
+        "stores": {
+          "all_bytes_unchanged": false,
+          "durable_stores_unchanged": true,
+          "regenerated_local_gatt_databases": [
+            {
+              "path": "/data/bluetooth/88:A2:9E:14:62:63/attributes",
+              "before": "784a53c62528491e089b6dc9098d33529df9d7043c4362840de3cf13afca515a",
+              "after": "c17dbfd0542dce9e80fa490dadd29035532910f78e7a62918221f4bcc9229876"
+            }
+          ]
+        },
+        "installed_time_service_usable": true,
+        "kiosk_progress_verified": true,
+        "automatic_installation_enabled": false
+      }
+    },
+    {
+      "host": "sw-picade.local",
+      "case": "fresh",
+      "passed": true,
+      "elapsed_seconds": 155.579,
+      "original_boot": "0fc268dd-d35a-448b-ad3a-db36fa572ae1",
+      "trial_boot": "6c1492de-9103-4983-bb1e-540281887ed3",
+      "final_boot": "6c1492de-9103-4983-bb1e-540281887ed3",
+      "final_phase": "committed",
+      "transaction": {
+        "id": "55d64b665155dafcf617cadb8561c3ea48ab39cfc2ee9b01ca2406f48ec4d6ad",
+        "candidate_id": "86fab715203f2609727776b61f206f1150c941a8b09fbd8ba30bcd7056f4f510",
+        "previous_good": {
+          "slot": "b",
+          "build_id": "rootfs-9b8451bb676da7abbee284aafc27b3cc8c55d4114386d4e107e0a94e9194587b",
+          "generation": 0,
+          "payload": "8aced72e48517b4fbe93a836a70700db8f6bfaf42250133130354f71042aec55",
+          "expanded": "8a6e9c365a6b0e4af3c21dd6366f2bc92d7d15f397ffc237686d4fc4be3610e3",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "candidate": {
+          "slot": "a",
+          "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+          "generation": 2,
+          "payload": "3928c3ad6457286f37498d11dd9a995b34055c7de147bc0f94d4d7ee2dfbdf41",
+          "expanded": "f18d3697c9cf34382f29cf06627daacd32b1655b3119f824436e7d37b4b328b6",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "attempt": 1,
+        "origin_boot_id": "0fc268dd-d35a-448b-ad3a-db36fa572ae1",
+        "trial_boot_id": "6c1492de-9103-4983-bb1e-540281887ed3",
+        "phase": "committed",
+        "health": {
+          "transaction": "55d64b665155dafcf617cadb8561c3ea48ab39cfc2ee9b01ca2406f48ec4d6ad",
+          "boot_id": "6c1492de-9103-4983-bb1e-540281887ed3",
+          "started_ms": 12283,
+          "finished_ms": 72428,
+          "instance": {
+            "pid": 854,
+            "start_ticks": 931,
+            "invocation_id": "e34d357b3aeb47de905b9afe8f5f3ca9"
+          }
+        },
+        "failure": null
+      },
+      "highest_attempted_generation": 2,
+      "stores": {
+        "all_bytes_unchanged": false,
+        "durable_stores_unchanged": true,
+        "regenerated_local_gatt_databases": [
+          {
+            "path": "/data/bluetooth/DC:A6:32:D6:C5:5C/attributes",
+            "before": "aae4564722cc76cc2cad6d930d3e338388664a9d37c790530fd27372d2b01f45",
+            "after": "44781ee3fe01bab21946d04dd604a2a17924165ec91e3e4a62ca229242ed6198"
+          }
+        ]
+      },
+      "kiosk_progress_verified": true,
+      "automatic_installation_enabled": false,
+      "evidence_directory": "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2",
+      "installed_image": {
+        "schema": 1,
+        "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "rootfs_tree": "5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+        "source": {
+          "schema": 1,
+          "commit": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+          "dirty": false,
+          "revision": "5b420c95b87b"
+        },
+        "machine": "raspberrypi-spacewars",
+        "architecture": "aarch64",
+        "layout": "spacewars-ab-v1",
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "updater_protocol": 1,
+        "recovery_protocol": 2,
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        },
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "fcbf0e501fa9358e87b90d6cef5a7622faa69abeabda3146f6067ed385b5e3a8"
+          },
+          "os_manager": {
+            "bytes": 11255296,
+            "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+          }
+        }
+      },
+      "normal_boot": {
+        "host": "sw-picade.local",
+        "passed": true,
+        "normal_boot": "c9200286-344e-4005-8298-ede3dba69319",
+        "image": {
+          "schema": 1,
+          "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+          "rootfs_tree": "5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+          "source": {
+            "schema": 1,
+            "commit": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+            "dirty": false,
+            "revision": "5b420c95b87b"
+          },
+          "machine": "raspberrypi-spacewars",
+          "architecture": "aarch64",
+          "layout": "spacewars-ab-v1",
+          "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+          "updater_protocol": 1,
+          "recovery_protocol": 2,
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          },
+          "binaries": {
+            "client": {
+              "bytes": 23470072,
+              "sha256": "fcbf0e501fa9358e87b90d6cef5a7622faa69abeabda3146f6067ed385b5e3a8"
+            },
+            "os_manager": {
+              "bytes": 11255296,
+              "sha256": "910e21a01b39a755e19f0e0bab9562a95fc671d4884b0f0903bb976d07894d55"
+            }
+          }
+        },
+        "good": {
+          "slot": "a",
+          "build_id": "rootfs-5de27d01d14fda4803f014a9da93cfbd6a9e9d952e325dec0dc11e66b6a55a5e",
+          "generation": 2,
+          "payload": "3928c3ad6457286f37498d11dd9a995b34055c7de147bc0f94d4d7ee2dfbdf41",
+          "expanded": "f18d3697c9cf34382f29cf06627daacd32b1655b3119f824436e7d37b4b328b6",
+          "data": {
+            "reads": {
+              "min": 1,
+              "max": 1
+            },
+            "writes": 1
+          }
+        },
+        "elapsed_seconds": 57.138,
+        "stores": {
+          "all_bytes_unchanged": false,
+          "durable_stores_unchanged": true,
+          "regenerated_local_gatt_databases": [
+            {
+              "path": "/data/bluetooth/DC:A6:32:D6:C5:5C/attributes",
+              "before": "44781ee3fe01bab21946d04dd604a2a17924165ec91e3e4a62ca229242ed6198",
+              "after": "e3e6cfa88ac63235791793d5854ec5ad40621c0ce9dfeb4f314f1bce710e3ec8"
+            }
+          ]
+        },
+        "installed_time_service_usable": true,
+        "kiosk_progress_verified": true,
+        "automatic_installation_enabled": false
+      }
+    }
+  ],
+  "tools": {
+    "target/release/examples/image_candidate": {
+      "bytes": 1682683,
+      "sha256": "1be89e5d1bd8721c94e5b715219279bd9aafb5b142394e62bfc49fb2bd129858"
+    },
+    "target/release/examples/feed_sign": {
+      "bytes": 5887148,
+      "sha256": "dc11f5ded874666a8e147dba76e69b004fc6500bfc13a12b2bff6a537a8ce8b4"
+    },
+    "target/release/examples/feed_inventory": {
+      "bytes": 6343024,
+      "sha256": "67fc72b657d49d8a418397595cde4a66de4d57e3a32fc4db4c7d490feafe8d18"
+    },
+    "target/aarch64-unknown-linux-gnu/release/examples/install_signed_trial": {
+      "bytes": 8213080,
+      "sha256": "8de94c6d49fea85e3c04955cbc192264787ea6d2f3de0f6ea06507c3046fca5e"
+    },
+    "target/aarch64-unknown-linux-gnu/release/examples/stage_update": {
+      "bytes": 10020016,
+      "sha256": "b0537270daea20aa22159ad1355864f222bf5eadb2d3182f10e651f75be06407"
+    },
+    "target/aarch64-unknown-linux-gnu/release/examples/boot_probe": {
+      "bytes": 910912,
+      "sha256": "24819e6da2c1aed9665419ff88d37727a90b63a615f17d62a48ffef2541707b7"
+    }
+  },
+  "evidence_files": {
+    "target/confirm-signed-normal.py": {
+      "bytes": 9268,
+      "sha256": "42adc44ae3b51896ece5c758b3b5a31c4eb6ddb74bdb5431f8e9990b09e166ce"
+    },
+    "target/ota-mutable-timestamp-tests.log": {
+      "bytes": 4150,
+      "sha256": "ccb2b098eb29c95379812309e79973971367ed1ae216f825b506f26bc022daf5"
+    },
+    "target/ota-picade-interrupted-retry-processes.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-picade-interrupted-retry-reconcile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-picade-third-attempt-refused.json": {
+      "bytes": 214,
+      "sha256": "2e5c2d1cb832829c9e77493c4402f93e1c7017d35c9151b4b2d4dbd378bc9bed"
+    },
+    "target/ota-signed-picade-reconciled.json": {
+      "bytes": 6663,
+      "sha256": "5983b2217e26b378e4029368771512681d2a7f167e6fc0576902396f568df798"
+    },
+    "target/ota-signed-picade-retry-status.json": {
+      "bytes": 6627,
+      "sha256": "59fd760f97a9379b216188cae331d124f4b45b8555c50a1c216a25e31fe4de6a"
+    },
+    "target/ota-signed-trial-candidate-0a0434b/build.json": {
+      "bytes": 3400,
+      "sha256": "5c2f7df06cd3ea3f108d0f372f5122745e5781a20f8cfea7a9080a8d36e022ae"
+    },
+    "target/ota-signed-trial-candidate-0a0434b/candidate.json": {
+      "bytes": 303,
+      "sha256": "c91b4fc04f1672948b03829654b67a0522feec91f1098b643c7ac2f641be0cbe"
+    },
+    "target/ota-signed-trial-candidate-0a0434b/qualification.json": {
+      "bytes": 4314,
+      "sha256": "1b73a702900e5fd255a0c365cc011e4f4e25ce1737fe8b6b66725b4263b6ef32"
+    },
+    "target/ota-signed-trial-candidate-5b420c9/build.json": {
+      "bytes": 3400,
+      "sha256": "4b89c153eaee6124e9d20b5ce72eeb2ec31141c4b8be1b3b2e57fadd55a6a158"
+    },
+    "target/ota-signed-trial-candidate-5b420c9/candidate.json": {
+      "bytes": 303,
+      "sha256": "38d66e92ac96d9eeb7283ccd44e4eef02c8d95c8d71298d0fcaf26efea2aa97d"
+    },
+    "target/ota-signed-trial-candidate-5b420c9/qualification.json": {
+      "bytes": 4314,
+      "sha256": "ba2ea0539e65eaa5e98c19ec701800dbb096e8f008c3b9a4edd626dabad58aed"
+    },
+    "target/ota-signed-trial-policy-0a0434b.json": {
+      "bytes": 290,
+      "sha256": "58f7ddc000b1c35b1e7c320c527864f68bfbdfef26e4c7aee12aacdc51be25c5"
+    },
+    "target/ota-signed-trial-policy-5b420c9.json": {
+      "bytes": 290,
+      "sha256": "c2c4b967739d782db1c2e1ea457f7d8afba351290068e95c088b78712eb2551f"
+    },
+    "target/ota-signed-trial-review-5b420c9.json": {
+      "bytes": 2799,
+      "sha256": "6186e2f8c5772caa2bc4bdf2055e11a9162693fdaef24dfdd382c14fe5d80bf1"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/activation-start.json": {
+      "bytes": 140,
+      "sha256": "ba1da8bd19688c6d7a852399b3b3d5ea95c36eeaf3cd6f724a69aa64ad748cf2"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/after.json": {
+      "bytes": 14680,
+      "sha256": "dd15c3d8cfb6b8283f170d3408b30895cbf9d62bc78e8da193ac355b71f323ab"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/before.json": {
+      "bytes": 12920,
+      "sha256": "01de87477d39339bb483c2cf5ee005d2bc252649e0ced79b028d881ad20286f6"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/fault-intent.json": {
+      "bytes": 163,
+      "sha256": "1dc956d149a8f4c9ee582fc1e83c698307f4678492d20952fa559bd2de575f65"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/fault-result.json": {
+      "bytes": 38,
+      "sha256": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/health-after-second.json": {
+      "bytes": 316,
+      "sha256": "18ba8895bc4278fc1b8e05add3e0261060ef9319d327b1cd3832bae0a6618be2"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/install-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/install.stderr": {
+      "bytes": 1352,
+      "sha256": "92082c19dab0108dac7d89c05d7114b7e353aecd049cd68a7ec68f4888d6771c"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/install.stdout": {
+      "bytes": 156,
+      "sha256": "f96a75e44a86b3109da2408d4a0f4e15294e10c815102511f8cd77a93558fa4a"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/observations.jsonl": {
+      "bytes": 10767,
+      "sha256": "6490b1668f106f2dc42ebc5294590b3ebc637e909e656c04518a9cd57d073778"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/ordinary-selection-rejected.json": {
+      "bytes": 118,
+      "sha256": "df58106798e43b43fe57ca160e5bb4911898634dac699e41d9f830537dcd5288"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/result.json": {
+      "bytes": 2113,
+      "sha256": "f328986b3c5d24b38f44dbbb8615b76452575f3f1bcb49fe308b5b77d3e8ab6c"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/run.json": {
+      "bytes": 543,
+      "sha256": "3a8d6ab9caf0d367e748ab3cbf1d3987ad6325c26959297d66206db1030710ab"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/selection-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/selection.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/selection.json": {
+      "bytes": 3130,
+      "sha256": "ae7270765161bd4da4b9cec4b3dba9fe3b0f9b993eb4adb84d89b0f222f57401"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/stores-comparison.json": {
+      "bytes": 356,
+      "sha256": "f86c6d0aa6700a2403be12e2d5171a39e6faf860869eb3326cc83636c42afb33"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/failure/trial-observed.json": {
+      "bytes": 6555,
+      "sha256": "8273210fa0d5c8a70a3ca8ef7afdab384c4e424dc81e64c5daea87479f9931c8"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/activation-start.json": {
+      "bytes": 140,
+      "sha256": "26b71e2d6cc6e14e2ffc9ad9886aa8f33d9fa238331ba91d472cdf8e14e59f72"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/after.json": {
+      "bytes": 15870,
+      "sha256": "0493e70bb86b3b004b9599979cc8e1ebb958ddb8b6549d1be8a632e2ba930404"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/before.json": {
+      "bytes": 14685,
+      "sha256": "7529dad9074501a5dd819f8e696cec035fef6f764dfcacc0ff7661cce081e39d"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/health-after-second.json": {
+      "bytes": 319,
+      "sha256": "b43e1888b365a6434980bc8d58aa5a77064dc7977eea91a491763ef0bc3b1705"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/install-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/install.stderr": {
+      "bytes": 1352,
+      "sha256": "9c7ac9c527b18a46c0b78c30835a9eab2868e0ca180ade2eb49634b3070d8b96"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/install.stdout": {
+      "bytes": 156,
+      "sha256": "ba0cd7b0ac4272afebe878dc072281198f217bc9e970e298baf0667a77923e01"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/after.json": {
+      "bytes": 16058,
+      "sha256": "ccada356b8a3abde727c417c01cde69d0c3496ad468d8f46d3a072a2a7fe67a3"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/before.json": {
+      "bytes": 7670,
+      "sha256": "e05b672f1619aa008317fc1270a3c2af534fc739c88f39e628aafe696575edc4"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/observations.jsonl": {
+      "bytes": 13361,
+      "sha256": "b2b4c5a8d411fb5886a34606378486391d71c1958c650dd99f28ae200ce7a8b8"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/reboot-intent.json": {
+      "bytes": 88,
+      "sha256": "086df509c7e09e7be577d6d0fb0a6c8fa14babeb9f619655d6122ec1ed52fc86"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/reboot-response.json": {
+      "bytes": 38,
+      "sha256": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/result.json": {
+      "bytes": 2079,
+      "sha256": "476e388a110155781d30df0f17c3b7d3a37f21a907e4995242a667475e904c1a"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/run.json": {
+      "bytes": 308,
+      "sha256": "527d73aa4d2f8f71efcd3453bbe4b139fb67a29f25f1f229845b26e5d665d386"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/screenshot.png": {
+      "bytes": 127874,
+      "sha256": "cdf86afade98ec67734f5c9f8a8d838704e2fcacd919dc745e73f2f686c8f913"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/normal-boot/ui.json": {
+      "bytes": 410,
+      "sha256": "55c33070566a2e71f99c0b59a97cd997f7043ba1b0756331b5e7f9183c5f08a2"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/observations.jsonl": {
+      "bytes": 4412,
+      "sha256": "389dc4114915cf2375b7562335cbd3dfe0853adfe61b632a78f06134288adb59"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/result.json": {
+      "bytes": 2435,
+      "sha256": "c23d9d004e535292b26cf44ece64a4a74302f1076c7ca43b4b82a060e0cafe3e"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/run.json": {
+      "bytes": 543,
+      "sha256": "fc708e9ea1ca67f35b903228d60603943aafa60436d863ef2988d57ce0fd3558"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/selection-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/selection.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/selection.json": {
+      "bytes": 3189,
+      "sha256": "44034b396215a297124e81759dffee842347c92cee2b2efecbaf8f7daab5df1b"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/stores-comparison.json": {
+      "bytes": 356,
+      "sha256": "d4994f2b2c81c45d45267aadd149d6fe495b1f924cdd0855b3a7f625c9115b38"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/healthy/trial-observed.json": {
+      "bytes": 6739,
+      "sha256": "dd2d2f186772fa80cc48e89a729f6847d266ac1d508f5b645176021602157b01"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/stage/after.json": {
+      "bytes": 12920,
+      "sha256": "7bd31c1294f365a132df8aed3fd1a37eea6a08b17511fc1874199862e9b6bce3"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/stage/before.json": {
+      "bytes": 12920,
+      "sha256": "6e0ae6ab8b2256df2f2e11c6746865f595cf81850e17799d51a4da9f1799371e"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/stage/result.json": {
+      "bytes": 218,
+      "sha256": "d80c56930e6d52961f2fe1abd47b49c81629037403ce9e2cefdb70e89e09ff07"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/stage/run.json": {
+      "bytes": 543,
+      "sha256": "3a8d6ab9caf0d367e748ab3cbf1d3987ad6325c26959297d66206db1030710ab"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/stage/stage-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/stage/stage.err": {
+      "bytes": 312843,
+      "sha256": "2f28d02b657bb76c76f93cbd302425b0cabf3b6e273aa4ae54ba3fedabeff9a3"
+    },
+    "target/ota-signed-trials-20261017/spacewars.local/stage/stage.json": {
+      "bytes": 2473,
+      "sha256": "1d2056a19e0882fc2203bf98a149cf88bedb526f22f9a3d6eccd9cae3ecaea73"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/activation-start.json": {
+      "bytes": 139,
+      "sha256": "62fa83345f832b4699ff140456d7311c439f4a274e394b83a1e51cbd2f484fa0"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/after.json": {
+      "bytes": 17448,
+      "sha256": "85c2d9a44ec533731052992777f8c729d9c36927d4d4b9569597622bf65d75c4"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/before.json": {
+      "bytes": 15707,
+      "sha256": "84856967c176011389a74bf553abdc86a80f5cf53323271f18226c041c090cc2"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/fault-intent.json": {
+      "bytes": 163,
+      "sha256": "518588f3561f92d899fc19d4875d58ab960f56d9eafd9200e14333bc5ccd3568"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/fault-result.json": {
+      "bytes": 38,
+      "sha256": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/health-after-second.json": {
+      "bytes": 316,
+      "sha256": "129ec7f2a819ec1b2ae16292c22e3971bf2d855095738e79a520b0f8ad240d5c"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/install-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/install.stderr": {
+      "bytes": 2579,
+      "sha256": "f3a35bc0b8f2fb6b7a96bf91e2f2024497774501763caa5393e0ae6ae4f597b2"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/install.stdout": {
+      "bytes": 156,
+      "sha256": "354c67a1e37b141e3863c92d7ff0d868aeca9910774e28914631e242de6701ff"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/observations.jsonl": {
+      "bytes": 11941,
+      "sha256": "113df59d09b3a8d4778405057a3edebb81ef602269a40f9334d17cf79a1ef393"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/ordinary-selection-rejected.json": {
+      "bytes": 118,
+      "sha256": "df58106798e43b43fe57ca160e5bb4911898634dac699e41d9f830537dcd5288"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/result.json": {
+      "bytes": 2112,
+      "sha256": "b275ff15773e77a1b7879cb3cb33d727429bea326ce32580965ae3de98f88ad7"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/run.json": {
+      "bytes": 543,
+      "sha256": "7d7eb8546ba7e9092a5c4e24c6d234c54044e5c0f804657d5c2a6cddd6a555d7"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/selection-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/selection.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/selection.json": {
+      "bytes": 3128,
+      "sha256": "993c0243bba68d232c8821dae35ea6bc09d74c7a8fce59a02a4eb73e61ee36a3"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/stores-comparison.json": {
+      "bytes": 356,
+      "sha256": "8a2ab762467dd5a418f447abf2e41196522112ffcf71c9d883262dbbd2f16f0c"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/failure/trial-observed.json": {
+      "bytes": 6539,
+      "sha256": "5f1c1ab605fd5f33b477cebe0eaed9463499010fa9dcaf5ba6a38d1fc602007e"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/activation-start.json": {
+      "bytes": 140,
+      "sha256": "0aa716eab49a7cbaa4aed21e22ea4d21cb6d641b92a442e859de0ad2015123cf"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/after.json": {
+      "bytes": 18728,
+      "sha256": "0ce9bbf056b61746e10ef56f5f28c1e8425cfd778920b4caa9e0cce4071f108c"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/before.json": {
+      "bytes": 17457,
+      "sha256": "d9f8a14464ab0271b74aa2dc09103392554ade79b98afdf83c95696d4c7f6b7d"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/health-after-second.json": {
+      "bytes": 319,
+      "sha256": "d2e5a4e67cec3646b1bf7c864b5f445f4704d69b2a137043c02adedb7992c043"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/install-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/install.stderr": {
+      "bytes": 2524,
+      "sha256": "065cd19296755b252c2c1a8daf1537c06996656260db3732cd3f54bd6682d2f0"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/install.stdout": {
+      "bytes": 156,
+      "sha256": "4b7da67d9a7393ed14738915cc86216a68296f9880f8d86a4ea096088c27633e"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/after.json": {
+      "bytes": 18851,
+      "sha256": "1bb416f1b00e8f7728f8d11f46270211c1994fbc276375957975ded098f7cb29"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/before.json": {
+      "bytes": 7665,
+      "sha256": "350131d572db3a95b292bec4ce56d5d8a5a1a27f967729be126cdfa9ae645bbe"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/observations.jsonl": {
+      "bytes": 10591,
+      "sha256": "791ac7a6a684f5d4d5a0f10ade1075b9a3ef1cfe77a516f48bc904e09cc3b736"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/reboot-intent.json": {
+      "bytes": 88,
+      "sha256": "736f68848a4eb893dbc7d95db634b694c3265dc8287e81a6930245cd6221537c"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/reboot-response.json": {
+      "bytes": 38,
+      "sha256": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/result.json": {
+      "bytes": 2079,
+      "sha256": "b9097eb029186650526762e9b502592d39af2a5c17a3b1ba49c0528235d64d1d"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/run.json": {
+      "bytes": 318,
+      "sha256": "a9583acf08bfc49452a55d4430ad0f7b6eb53f749887c4cdbd94bc7d744b59f9"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/screenshot.png": {
+      "bytes": 124156,
+      "sha256": "1a7449fe4afa94c2fc39507734daa8b6790f684a1aec5dba308e5c62a9da6fda"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/normal-boot/ui.json": {
+      "bytes": 291,
+      "sha256": "4dc61e38ad78ec602fe2b692ea60da875df73b2c1002f85b004d14884fade1ba"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/observations.jsonl": {
+      "bytes": 6492,
+      "sha256": "740f7eb8c9a47dfa9c66ffe2fc7319c38e6925f4290d14683af5fedc660b1f75"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/result.json": {
+      "bytes": 2435,
+      "sha256": "214a249c397f1cabc15e158531e921ebf28fea6b19ed86e14e0ceeed07abc0f1"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/run.json": {
+      "bytes": 541,
+      "sha256": "09cb0b2163b3ccee12f5f0d429a3cbd7dd0ebaf5c76fb1fa6bd5d9c8835332b7"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/selection-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/selection.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/selection.json": {
+      "bytes": 3128,
+      "sha256": "4d93ed545142b9487833333e28590a3acb7766bb44e33ec3b6f0a60aa5fb002a"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/stores-comparison.json": {
+      "bytes": 356,
+      "sha256": "ea5483009d8aa3fb0dfe989984c27a55e6401488b64b0303dafb36fb2302a60f"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/fresh-generation2/trial-observed.json": {
+      "bytes": 6733,
+      "sha256": "ffb115c4001452dd658d0209e61e80052404feedc141bfd8fb289f2f6445c4bc"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy/before.json": {
+      "bytes": 17449,
+      "sha256": "c06ed954b1752841df3ae0a25860074621f116cac889fcd3fd99d7b492f4e091"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy/run.json": {
+      "bytes": 543,
+      "sha256": "f3def7efb3a4b46d03606be46abe0ba3f6080411054291f48d060ba8609d4e76"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy/selection-exit.json": {
+      "bytes": 22,
+      "sha256": "b9f87d4ceb14f54a8787da14c5985aa499e13197fe39c8f0f4ecf87e7a01957e"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy/selection.err": {
+      "bytes": 61,
+      "sha256": "7e381775d309cb529dc0e5859f66682906b01684b82b7ca083d0d20c6db90bde"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy/selection.json": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/activation-start.json": {
+      "bytes": 140,
+      "sha256": "208b51f1a608effe84d3baa7e2468ad55274128f771fdcfb2b64e470c19d87d7"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/before.json": {
+      "bytes": 17465,
+      "sha256": "abff9e6bb58a13b73613a75fddf153070888e335a7f8f272eccf63caab3ac04c"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/install.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/install.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/observations.jsonl": {
+      "bytes": 202,
+      "sha256": "ef4438d97f57c3a3ec6119416f72702e20fcc295ba0dcc6fb87b4c24f861f722"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/reattached-observations.jsonl": {
+      "bytes": 2670,
+      "sha256": "352f57108259a9b721cab362e27d2388164761b43baf0b1f531e8cc9f56452b5"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/run.json": {
+      "bytes": 543,
+      "sha256": "f3def7efb3a4b46d03606be46abe0ba3f6080411054291f48d060ba8609d4e76"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/selection-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/selection.err": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/selection.json": {
+      "bytes": 3187,
+      "sha256": "1087039b1200acc34ee7972cf4a2735d959100a04cdeb87e5f5453c1c47967d6"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/healthy-after-sync/stopped-before-trial.json": {
+      "bytes": 6676,
+      "sha256": "8178ca7b4ca75373dd47463ea286d3b15673a815fa879d6bc9cb090cc2dcd33f"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage/after.json": {
+      "bytes": 15707,
+      "sha256": "befd423f19d0abe9c4ffb12ad8f80ef5ad9a2bb414b9c70b0097112564de6168"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage/before.json": {
+      "bytes": 15707,
+      "sha256": "4e073bce90599e20a12b5d588053a22dd9eecc244c442f70be00472263f124c5"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage/result.json": {
+      "bytes": 218,
+      "sha256": "35b527dfbb5919d22b0e1368ac030079c28b8a54055353b8d8791755bfa80fcd"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage/run.json": {
+      "bytes": 543,
+      "sha256": "7d7eb8546ba7e9092a5c4e24c6d234c54044e5c0f804657d5c2a6cddd6a555d7"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage/stage-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage/stage.err": {
+      "bytes": 312845,
+      "sha256": "d4796e069c5ec88a9a7f94b92aad376475be2b42c19b3734c812a9e5c01d3d92"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage/stage.json": {
+      "bytes": 2471,
+      "sha256": "f17b71f2f4629248292bf9945eea2b0dbb65cb08c8c3611079d67ac8ac65a567"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage-generation2/after.json": {
+      "bytes": 17457,
+      "sha256": "99acf2efb08539c1e2f269ccaed4a70c56d1e6ac43259bd78222fdab8e9a68af"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage-generation2/before.json": {
+      "bytes": 17457,
+      "sha256": "b2746fbc53056c18425475cc337acc0f36028296daefdd2c46a7fec173debe96"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage-generation2/result.json": {
+      "bytes": 218,
+      "sha256": "35b527dfbb5919d22b0e1368ac030079c28b8a54055353b8d8791755bfa80fcd"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage-generation2/run.json": {
+      "bytes": 541,
+      "sha256": "09cb0b2163b3ccee12f5f0d429a3cbd7dd0ebaf5c76fb1fa6bd5d9c8835332b7"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage-generation2/stage-exit.json": {
+      "bytes": 22,
+      "sha256": "1e3f6691f455051e8adb15d961e4bf3c7a17e83dd88b2afdd13315cc288250bb"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage-generation2/stage.err": {
+      "bytes": 312844,
+      "sha256": "93f2227317579d9a49416bc8068a5492559e8e2189509465e5877c8679ce7091"
+    },
+    "target/ota-signed-trials-20261017/sw-picade.local/stage-generation2/stage.json": {
+      "bytes": 2467,
+      "sha256": "a14996ec2bfdbdae20c49039d05ecedede0060477c6d5c72161edaecd7f9beca"
+    },
+    "target/ota-ssh-observer-lifetime-check.json": {
+      "bytes": 70,
+      "sha256": "4467a1157327ab13c98b47313f4afa524697d402ba03c65ee822c18b59c8d99a"
+    },
+    "target/ota-supervised-feed-after-trials.json": {
+      "bytes": 8523,
+      "sha256": "aae046b38673b065d11398cae9c8ca20df77e50872dd26be61dde50a12c77e2d"
+    },
+    "target/publish-supervised-candidate.py": {
+      "bytes": 10877,
+      "sha256": "f73e817c859afbed43ed06eb2db819a14629309ca9eec687bcbbecdea425eeb4"
+    },
+    "target/publish-supervised-generation2.py": {
+      "bytes": 11391,
+      "sha256": "fb8d830c99a5e0459c8c70f430dccbc26b867732f11c488f7ec094a8cf5b9bb7"
+    },
+    "target/resume-supervised-publication.py": {
+      "bytes": 3781,
+      "sha256": "d2e25ba2270765fd156f28747f65aabe6986c08afd1e845ac6b90334636820ca"
+    },
+    "target/signed-trial-device-v1.py": {
+      "bytes": 14955,
+      "sha256": "bc132547d9d807462fc9a1d61914d27599c8309ff6209f7d600240c2b3db5e46"
+    },
+    "target/signed-trial-device-v2.py": {
+      "bytes": 15355,
+      "sha256": "915702d49be96998464eec74e0b9f9e42254f3de36451e425de3ca07ec49a23b"
+    },
+    "target/signed-trial-device.py": {
+      "bytes": 15471,
+      "sha256": "f43ed5f1656c9487b0c1309f8dc8cda064c48fa5ff5572c826d805276dd5df92"
+    },
+    "target/signed-trial-generation2.py": {
+      "bytes": 14094,
+      "sha256": "e079bb46bb12a033118160afe307fb5cc5d42d5f1db96f48d846940730163fc3"
+    },
+    "/home/oldman/.spacewars-ota-signing/initial-supervised-20261017/public/supervised-0a0434b/admission.json": {
+      "bytes": 527,
+      "sha256": "aa889a8ec5bc3752e89cc0f7c3b752dc932996b988bc039a01f8df4c9b4a6680"
+    },
+    "/home/oldman/.spacewars-ota-signing/initial-supervised-20261017/public/supervised-0a0434b/inventory.json": {
+      "bytes": 1231,
+      "sha256": "87eb2745b1d1cd5d2161032a736c45f80aef37bf16d0648114549d4fb0d037a9"
+    },
+    "/home/oldman/.spacewars-ota-signing/initial-supervised-20261017/public/supervised-0a0434b/publication.json": {
+      "bytes": 983,
+      "sha256": "841e7b15e348b03cee3d946ac7a67a5b83a6fab5d5cf9d26a8e0df4197687f41"
+    },
+    "/home/oldman/.spacewars-ota-signing/initial-supervised-20261017/public/supervised-5b420c9/admission.json": {
+      "bytes": 526,
+      "sha256": "6a11461d79d37416c7aae0d54f76ec356e4f2e42990cbcbc9e2f0f8cfa0ee217"
+    },
+    "/home/oldman/.spacewars-ota-signing/initial-supervised-20261017/public/supervised-5b420c9/inventory.json": {
+      "bytes": 1503,
+      "sha256": "0f86c861f918becc5f728f50797d55255a8d8b8140d061fd3c429302a6a10146"
+    },
+    "/home/oldman/.spacewars-ota-signing/initial-supervised-20261017/public/supervised-5b420c9/publication.json": {
+      "bytes": 883,
+      "sha256": "9e8489204dc7ce8d79d0bd2efab91147716fec0b019d1105555fc22adab46a37"
+    }
+  },
+  "picade_observer_interruption": {
+    "source": "Workstation qualification runner, not the native recovery policy",
+    "sequence": [
+      "The first explicit retry selection was refused before installation because network time was not yet usable.",
+      "After synchronization, a fresh selection admitted generation-one attempt two.",
+      "The observer misclassified the retained previous rolled-back transaction as the new attempt failing.",
+      "Its SSH ControlMaster exit closed the installation channel after the Writing record was durable, before a trial reboot.",
+      "Confirmed the helper was absent and no reboot parameter was pending; restarted spacewars-recovery.service on the original good normal boot.",
+      "Recovery recorded interrupted-before-trial and retained attempt two; a third explicit selection was refused as Quarantined with unchanged history.",
+      "Corrected observer transaction matching and used SSH control stop to preserve existing channels; retained original runner bytes.",
+      "Published a new qualified image as generation two and used ordinary selection for attempt one without resetting generation-one history."
+    ],
+    "manual_service_reconciliation": true,
+    "automatic_interrupted_write_recovery_proven": false,
+    "prior_payload": "700c7f50af011dc928964d9d6758044e5a78ed7690cae051e02940539393db51",
+    "prior_payload_attempts": 2,
+    "third_attempt_refused": true,
+    "history_reset": false
+  },
+  "publisher_cache_fix": {
+    "commit": "5b420c95b87b0a01f41f74c424ac80f4f1c098cf",
+    "observation": "Canonical public timestamp URL retained the old CDN redirect after asset replacement; exact-byte verification stopped publication.",
+    "fix": "Bind mutable timestamp readback to the validated replacement asset ID on the credential-free public URL, retaining exact length and SHA-256 checks.",
+    "recovery": "Resumed the retained generation-one pending publication; no authority, role version or generation reset.",
+    "tests_passed": 23,
+    "command": "/usr/bin/python3 -m unittest discover -s .github/ci -p test_ota_delivery.py -v"
+  },
+  "preservation_scope": "Selected settings, ROMs, owner and kiosk access, Wi-Fi, SSH host identity and peer Bluetooth pairings preserved. Adapter-local BlueZ GATT attributes regenerated across boots; all bytes unchanged is not claimed.",
+  "remaining_gates": [
+    "Deliberate interruption around boot-selector promotion, physical power loss and independent recovery evidence",
+    "Installed download worker and offline/network behavior and game frame-time qualification",
+    "Second Picade rollout",
+    "Production main/CI candidate admission and isolated automated signing/publication/renewal",
+    "Serialized installer-service integration, update settings and overnight idle/countdown policy",
+    "Real Release promotion and tag-triggered publication; Release is currently empty"
+  ],
+  "publisher_state": {
+    "revision": 27,
+    "generation": 2,
+    "current": {
+      "manifest_sha256": "0f86c861f918becc5f728f50797d55255a8d8b8140d061fd3c429302a6a10146",
+      "timestamp": {
+        "bytes": 469,
+        "sha256": "497f0d21d7b0f7f5f57f54c394c0442d180f61eba2c66667e0cb1e6803fee750"
+      },
+      "version": 3
+    },
+    "pending": null
+  }
+}

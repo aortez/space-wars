@@ -1,0 +1,593 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "purpose": "Pi 4 and Pi 5 operator tryboot and early watchdog qualification",
+  "source_before_fix": "5a554cf1949dfbe521fa6786162330f54c0a7e63",
+  "image": {
+    "architecture": "aarch64",
+    "binaries": {
+      "client": {
+        "bytes": 23470072,
+        "sha256": "43cf9c13f156b811bb10a1157ae537f7e5ef73d0444a028ac7f35dce6ce2c3ad"
+      },
+      "os_manager": {
+        "bytes": 11174656,
+        "sha256": "1cb6d2a5a3c1494ca04682a88139cb9a4ebc83fbc5d7340de8b66dda0dc574d2"
+      }
+    },
+    "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+    "build_id": "rootfs-1dda4d26ccab4f1a176a1bbe89158bdd16af13f9df2b535e89526157356d6295",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    },
+    "layout": "spacewars-ab-v1",
+    "machine": "raspberrypi-spacewars",
+    "recovery_protocol": 2,
+    "rootfs_tree": "1dda4d26ccab4f1a176a1bbe89158bdd16af13f9df2b535e89526157356d6295",
+    "schema": 1,
+    "source": {
+      "commit": "5f3eafc80e0b6589696b55e321b4493fdb5cdcb3",
+      "dirty": false,
+      "revision": "5f3eafc80e0b",
+      "schema": 1
+    },
+    "updater_protocol": 1
+  },
+  "trial_id": "b9a9a8278cee17116cc0b174694ac536d9b5fa4be3f52ddba3ba949b75ba48cf",
+  "initial_boot_id": "e4fe492b-0b29-40ef-9ab5-7e55b47216a6",
+  "returned_boot_id": "1860ffed-9cc9-4cfd-a658-fda5be42c98d",
+  "activation": {
+    "requested_at": "2026-10-17T07:02:09.755086+00:00",
+    "exit_code": 0,
+    "stdout": "o \"/org/freedesktop/systemd1/job/1759\"\n",
+    "stderr": "",
+    "reply_at": "2026-10-17T07:02:09.843970+00:00"
+  },
+  "observations": {
+    "samples": 51,
+    "trial_boot_observed": false,
+    "early_watchdog_record_observed": false,
+    "returned_to_normal": true,
+    "qualification": "not established"
+  },
+  "hardware_probe": {
+    "utc": "2026-10-17T07:08:27.338875+00:00",
+    "binary_sha256": "7f5b913f4fcff4bda7bf951478ee4e44ea220925f204a1a1616c8c1bc47028b0",
+    "exit_code": 0,
+    "stdout": "1860ffed-9cc9-4cfd-a658-fda5be42c98d\n{\"probe_errno\":0,\"initial_timeout\":15,\"set_timeout\":210,\"readback_timeout\":210,\"hardware_seconds_left\":2,\"disable_errno\":0,\"close_errno\":0}\n1860ffed-9cc9-4cfd-a658-fda5be42c98d\n",
+    "stderr": ""
+  },
+  "diagnosis": {
+    "requested_timeout_seconds": 210,
+    "reported_timeout_seconds": 210,
+    "hardware_seconds_left": 2,
+    "register_calculation": "(210 << 16) & 0x000fffff == 2 << 16",
+    "core_ping_interval_ms": 7999,
+    "fix": "Clamp hardware timeout to 15 seconds and advertise a 15000 ms hardware heartbeat without changing the virtual timeout"
+  },
+  "cleanup": {
+    "utc": "2026-10-17T07:08:15.013349+00:00",
+    "exit_code": 0,
+    "stdout": "Restored original trial selector; no qualification inferred.\n",
+    "stderr": ""
+  },
+  "checks": {
+    "before": {
+      "exit_code": 1,
+      "stdout": "",
+      "expected_result": "counter assertion fails"
+    },
+    "fixed": {
+      "exit_code": 0,
+      "stdout": "19 BCM2835 register/deadline cases passed\n",
+      "expected_result": "19 register/deadline cases pass"
+    }
+  },
+  "limits": [
+    "The first failed trial was not directly observed; its precise reset path is not established.",
+    "The physical timer probe confirms the original kernel counter defect. Later fixed-kernel operator tests are recorded separately.",
+    "The corrected kernel passed same-root expiry on Pi 4 and Pi 5, and missing-root fallback on Pi 5. Pi 4 missing-root execution and post-promotion watchdog completion checks remain pending.",
+    "The tests temporarily selected a separately named kernel only for tryboot. The default kernel and root image remain the original 5f3eafc image, and all temporary boot changes were restored.",
+    "No recovery qualification flags, production recovery baseline or OTA trust were created. These tests do not qualify interruption during FAT writes or complete production OTA installation."
+  ],
+  "artifacts": {
+    "plan.json": {
+      "bytes": 3020,
+      "sha256": "df6b6a7fe3b0fec6f1d0eaa18408b8b5c49c3311bdccd9043011a1a90c57a4a8"
+    },
+    "activation.json": {
+      "bytes": 199,
+      "sha256": "80a29b56afc049314711a22ffadd87482f08518c37026dc317832c0889a1ae9f"
+    },
+    "observations.json": {
+      "bytes": 66037,
+      "sha256": "eeaf54070eb0018caead8bd5d2d7c31b8bf847d7ef32b6ba82e906af55983ef4"
+    },
+    "probe-timeout.c": {
+      "bytes": 2426,
+      "sha256": "8811839bb42ffe3b3dff8840ba033f279b3f71ae42898f03346b65faad851189"
+    },
+    "probe-timeout": {
+      "bytes": 70952,
+      "sha256": "7f5b913f4fcff4bda7bf951478ee4e44ea220925f204a1a1616c8c1bc47028b0"
+    },
+    "probe-timeout-result.json": {
+      "bytes": 416,
+      "sha256": "c95797449e28fe62d860cd0f8b727a4522ad0fcdce1d83daf55583335fec3b1a"
+    },
+    "restore.json": {
+      "bytes": 160,
+      "sha256": "ad01e465387597a2b7da55edaf9779931cb626e12bff1b3da166731d387c7aa1"
+    }
+  },
+  "local_archive": "target/ota-pi5-watchdog-trial-20261017",
+  "corrected_kernel": {
+    "source": "82fcfb0f938b54549e67d02fa75b6fffcc47777a",
+    "build_log": "target/ota-watchdog-image-build-82fcfb0.log",
+    "yocto_tasks": {
+      "total": 6768,
+      "reused": 6700,
+      "result": "passed"
+    },
+    "image_qualification": {
+      "schema": 1,
+      "image": {
+        "schema": 1,
+        "build_id": "rootfs-a255b0edee5d31c9f6a9dd8a79b5243a572f7cee2d415af2424653fb45107e19",
+        "rootfs_tree": "a255b0edee5d31c9f6a9dd8a79b5243a572f7cee2d415af2424653fb45107e19",
+        "source": {
+          "schema": 1,
+          "commit": "82fcfb0f938b54549e67d02fa75b6fffcc47777a",
+          "dirty": false,
+          "revision": "82fcfb0f938b"
+        },
+        "machine": "raspberrypi-spacewars",
+        "architecture": "aarch64",
+        "layout": "spacewars-ab-v1",
+        "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+        "updater_protocol": 1,
+        "recovery_protocol": 2,
+        "data": {
+          "reads": {
+            "min": 1,
+            "max": 1
+          },
+          "writes": 1
+        },
+        "binaries": {
+          "client": {
+            "bytes": 23470072,
+            "sha256": "5ef83da646835baa9728c3a197d7fef33c43baca14d1142ba863b1a2aa0fb62d"
+          },
+          "os_manager": {
+            "bytes": 11174656,
+            "sha256": "1cb6d2a5a3c1494ca04682a88139cb9a4ebc83fbc5d7340de8b66dda0dc574d2"
+          }
+        }
+      },
+      "build_inputs_sha256": "1d246cae2cb7ca5b1b48245aec52705be0f6bb450cd1286ae7b9b6999bd34abb",
+      "build_inputs": {
+        "schema": 1,
+        "source_commit": "82fcfb0f938b54549e67d02fa75b6fffcc47777a",
+        "kas_version": "5.4",
+        "machine": "raspberrypi-spacewars",
+        "target": "spacewars-image",
+        "layers": {
+          "meta-openembedded": {
+            "url": "https://git.openembedded.org/meta-openembedded",
+            "commit": "0f00f8b9a21950640da8c5707343e5540133f86e"
+          },
+          "meta-pi-base": {
+            "url": "https://github.com/aortez/sparkle-duck-shared.git",
+            "commit": "ce48602dfefd4ee7f3d3010086e685ede3fb17b9"
+          },
+          "meta-raspberrypi": {
+            "url": "https://git.yoctoproject.org/meta-raspberrypi",
+            "commit": "018d44467c4f09eb63f8ea5e86e85d755250cf89"
+          },
+          "meta-rust-bin": {
+            "url": "https://github.com/rust-embedded/meta-rust-bin.git",
+            "commit": "eaea247f32f247ab525112d2fbc16e16a553d880"
+          },
+          "poky": {
+            "url": "https://git.yoctoproject.org/poky",
+            "commit": "4fb7016a07507683359ebd620f1951fd5ea44bfa"
+          }
+        },
+        "local_layer": {
+          "path": "yocto/meta-spacewars",
+          "source_commit": "82fcfb0f938b54549e67d02fa75b6fffcc47777a"
+        },
+        "configuration": {
+          "Cargo.lock": {
+            "bytes": 196778,
+            "sha256": "1e37900a35db9e7834df96b8f6ed560bdfc8426994a57b8474716841b198f45a"
+          },
+          "yocto/kas-spacewars.yml": {
+            "bytes": 4705,
+            "sha256": "8d77be0d6b8419b38658cbeb803a38a4fb53deb815605591376638cfc54be423"
+          },
+          "yocto/meta-spacewars/conf/machine/raspberrypi-spacewars.conf": {
+            "bytes": 1765,
+            "sha256": "18da888bd9aa7cea9dfc5278d690e5b69a2df1dd9b4ccdd2b5b6fb30ee4a7d94"
+          }
+        },
+        "expanded_kas_sha256": "7a68f07279ff6bdd6925be3afeda980c6fe9e7fb086ac633fc318494552effdf"
+      },
+      "compiler": {
+        "schema": 1,
+        "source": {
+          "schema": 1,
+          "commit": "82fcfb0f938b54549e67d02fa75b6fffcc47777a",
+          "dirty": false,
+          "revision": "82fcfb0f938b"
+        },
+        "rust_target": "aarch64-unknown-linux-gnu",
+        "profile": "release",
+        "kiosk_feature": "pi-kiosk-gpu",
+        "tools": {
+          "rustc": {
+            "version": "1.94.0",
+            "details": "rustc 1.94.0 (4a4ef493e 2026-03-02)\nbinary: rustc\ncommit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db\ncommit-date: 2026-03-02\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.0\nLLVM version: 21.1.8"
+          },
+          "cargo": {
+            "version": "1.94.0",
+            "details": "cargo 1.94.0 (85eff7c80 2026-01-15)\nrelease: 1.94.0\ncommit-hash: 85eff7c80277b57f78b11e28d14154ab12fcf643\ncommit-date: 2026-01-15\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.3 vendored)\nlibcurl: 8.17.0-DEV (sys:0.4.84+curl-8.17.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 [64-bit]"
+          },
+          "cc": {
+            "details": "aarch64-poky-linux-gcc (GCC) 13.5.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+          }
+        }
+      },
+      "expanded": {
+        "bytes": 528482304,
+        "sha256": "10cc6ac89b65a590987c7fed28c1c0bf35fb752000233d9481246860dda7d5a2"
+      }
+    },
+    "operator_tests": [
+      {
+        "host": "spacewars.local",
+        "case": "same-root without userspace watchdog takeover",
+        "local_archive": "target/ota-pi5-fixed-watchdog-82fcfb0",
+        "trial_id": "0e91959a46e2ae7774c1b9e2b7c2e0a10738ef9fc790cb5045f12f9937b428a3",
+        "initial_boot_id": "1860ffed-9cc9-4cfd-a658-fda5be42c98d",
+        "initial_boot_count": 3,
+        "root_partuuid": "076c4a2a-02",
+        "activation": {
+          "requested_at": "2026-10-17T07:18:01.090569+00:00",
+          "reply_at": "2026-10-17T07:18:01.788629+00:00",
+          "exit_code": 0,
+          "stdout": "o \"/org/freedesktop/systemd1/job/3059\"\n",
+          "stderr": ""
+        },
+        "fixed_kernel": {
+          "source_artifact": "/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/Image-1-6.6.63+git0+52ff0d7571_e442e5c1ab-r0-raspberrypi-spacewars-20261017071309.bin",
+          "boot_path": "/boot/spacewars-wd82fcfb0.img",
+          "bytes": 27400704,
+          "sha256": "1fc9180b229f6debd937316a0d7a588eba0dd39abc35b073da49d50bd26406ea",
+          "build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "driver_sha256": "a0216686df1049917eaa5891a9e058cf00ab6df2de99736fa52204fa626e558a",
+          "frozen_utc": "2026-10-17T07:17:30.245983+00:00"
+        },
+        "observed_trial_samples": 66,
+        "first_trial": {
+          "utc": "2026-10-17T07:18:20.539666+00:00",
+          "elapsed_seconds": 28.436,
+          "boot_id": "6b985af6-23a3-4800-a860-c3960b701d83",
+          "uptime_seconds": 10.96,
+          "tryboot": true,
+          "boot_count": 4,
+          "early_watchdog": {
+            "schema": 1,
+            "boot_id": "6b985af6-23a3-4800-a860-c3960b701d83",
+            "trial_id": "0e91959a46e2ae7774c1b9e2b7c2e0a10738ef9fc790cb5045f12f9937b428a3",
+            "armed_boottime_ms": 716,
+            "timeout_seconds": 210
+          },
+          "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "last_trial": {
+          "utc": "2026-10-17T07:21:40.820228+00:00",
+          "elapsed_seconds": 228.717,
+          "boot_id": "6b985af6-23a3-4800-a860-c3960b701d83",
+          "uptime_seconds": 208.59,
+          "tryboot": true,
+          "boot_count": 4,
+          "early_watchdog": {
+            "schema": 1,
+            "boot_id": "6b985af6-23a3-4800-a860-c3960b701d83",
+            "trial_id": "0e91959a46e2ae7774c1b9e2b7c2e0a10738ef9fc790cb5045f12f9937b428a3",
+            "armed_boottime_ms": 716,
+            "timeout_seconds": 210
+          },
+          "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "returned_to_normal": {
+          "utc": "2026-10-17T07:22:02.698843+00:00",
+          "elapsed_seconds": 250.595,
+          "boot_id": "ebda99db-980e-4786-9d00-6afceeab3d0f",
+          "uptime_seconds": 11.46,
+          "tryboot": false,
+          "boot_count": 5,
+          "early_watchdog": null,
+          "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "restoration": {
+          "utc": "2026-10-17T07:22:51.151416+00:00",
+          "exit_code": 0,
+          "stdout": "Observed trial and automatic normal return; original boot assets restored.\nactive\nactive\n",
+          "stderr": ""
+        },
+        "result": "automatic return to original normal kernel; original boot asset hashes verified",
+        "artifacts": {
+          "plan.json": {
+            "bytes": 4325,
+            "sha256": "64ad0470814563610d3100f6f1a1f383201ce5e7844261d4289c70439ffcc77a"
+          },
+          "stage.sh": {
+            "bytes": 21803,
+            "sha256": "d47a31f140f62e801b27a508dc4b2a529233611d1bc7dfd6f800e3467a1ba4f8"
+          },
+          "stage-result.json": {
+            "bytes": 145,
+            "sha256": "14dc765aaa2f120ef2994f7328f311f8eef7576fd0861802c7e38f084e3de772"
+          },
+          "activate.sh": {
+            "bytes": 17892,
+            "sha256": "a54a6b24fd129cc85dc98715c882b68567ea1f3540a8c2fe451a937b4795d0d0"
+          },
+          "activation.json": {
+            "bytes": 199,
+            "sha256": "174f927590de9778573120ffcb2a7f5232ffd997e4a5b7ee9c7c10253284191e"
+          },
+          "monitor.py": {
+            "bytes": 4561,
+            "sha256": "b5f9e2eba9856b46950e4fb2e20dd97b4ba9795a42b9435e7a61874ff7508e59"
+          },
+          "observations.json": {
+            "bytes": 156702,
+            "sha256": "f9eef83283c03b98aa6a5136bc50a73ad5951960590c5730b52b2bae41dceed1"
+          },
+          "returned-to-normal.json": {
+            "bytes": 1599,
+            "sha256": "0a058826b75142a389a29c59e60b8a6baf9280f193b2afcfb7bedd955212b29d"
+          },
+          "restore.sh": {
+            "bytes": 33395,
+            "sha256": "c566493582b91bdcd44cedbb109608e7dac0546f2306bc2ba7038f7c4c221886"
+          },
+          "restore.json": {
+            "bytes": 190,
+            "sha256": "df03edab7dfa8745b2ead86866de5558a62a82d4d4c8a83d320a645eb574fb8a"
+          }
+        }
+      },
+      {
+        "host": "spacewars.local",
+        "case": "nonexistent root PARTUUID",
+        "local_archive": "target/ota-pi5-missing-root-82fcfb0",
+        "trial_id": "355baa4541bdc26aa8a7632c381265b39b36f625a19cb4d8e95c53465761445b",
+        "initial_boot_id": "ebda99db-980e-4786-9d00-6afceeab3d0f",
+        "initial_boot_count": 5,
+        "root_partuuid": "076c4a2a-02",
+        "activation": {
+          "requested_at": "2026-10-17T07:25:52.915562+00:00",
+          "reply_at": "2026-10-17T07:25:53.607203+00:00",
+          "exit_code": 0,
+          "stdout": "o \"/org/freedesktop/systemd1/job/1028\"\n",
+          "stderr": ""
+        },
+        "fixed_kernel": {
+          "source_artifact": "/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/Image-1-6.6.63+git0+52ff0d7571_e442e5c1ab-r0-raspberrypi-spacewars-20261017071309.bin",
+          "boot_path": "/boot/spacewars-wd82fcfb0.img",
+          "bytes": 27400704,
+          "sha256": "1fc9180b229f6debd937316a0d7a588eba0dd39abc35b073da49d50bd26406ea",
+          "build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "driver_sha256": "a0216686df1049917eaa5891a9e058cf00ab6df2de99736fa52204fa626e558a",
+          "frozen_utc": "2026-10-17T07:17:30.245983+00:00"
+        },
+        "observed_trial_samples": 0,
+        "first_trial": null,
+        "last_trial": null,
+        "returned_to_normal": {
+          "utc": "2026-10-17T07:29:55.759320+00:00",
+          "elapsed_seconds": 261.731,
+          "boot_id": "44771fa5-7e78-450f-8ee6-261ec35715da",
+          "uptime_seconds": 11.6,
+          "tryboot": false,
+          "boot_count": 7,
+          "early_watchdog": null,
+          "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "restoration": {
+          "utc": "2026-10-17T07:30:30.634293+00:00",
+          "exit_code": 0,
+          "stdout": "Returned to original normal boot; original boot assets restored.\nactive\nactive\n",
+          "stderr": ""
+        },
+        "result": "automatic return to original normal kernel; original boot asset hashes verified",
+        "artifacts": {
+          "plan.json": {
+            "bytes": 4312,
+            "sha256": "0aadc5408c9e41989288579dd3467135efc9064d6f3767450f1f4cf8da4449c2"
+          },
+          "stage.sh": {
+            "bytes": 21848,
+            "sha256": "487d02792eaffa8c91759ebc6a1a94fc0f039c37070b3eb877154cb5f7a7b2b9"
+          },
+          "stage-result.json": {
+            "bytes": 145,
+            "sha256": "498ca3cea41fe758c3b448156f247af26934a242c80861b662362de1e3c64f3b"
+          },
+          "activate.sh": {
+            "bytes": 17936,
+            "sha256": "d9e097681edf0ba6ff8f36c2e09cf949d73d7180492712d649827dcbae0a2c39"
+          },
+          "activation.json": {
+            "bytes": 199,
+            "sha256": "5bb77ea363bd268cc6812fbc4dd8340ca23f3b4a244c0c05a6d7b90ee0ef73df"
+          },
+          "monitor.py": {
+            "bytes": 4696,
+            "sha256": "6558cdcf060d84d31ba2ffc2434b179c04ce1fb47b7b2d2a350c708731f3cdd2"
+          },
+          "observations.json": {
+            "bytes": 20009,
+            "sha256": "39e1b9121469a85f3e01321b09df7d9a5cca0d68fb9652101399cb639f6a9f09"
+          },
+          "returned-to-normal.json": {
+            "bytes": 1598,
+            "sha256": "4ff6667e9679ada6695b017e1d89fc8d60e87e002e7eecd39b7b6eeab1e93b5e"
+          },
+          "restore.sh": {
+            "bytes": 33429,
+            "sha256": "092add841ba1edad26bc47498d32db8c759e8ce3d9f0e071acc41b0d73090f2d"
+          },
+          "restore.json": {
+            "bytes": 180,
+            "sha256": "879fa89c92f463f2115583f57ee9d39b0bb8850240b829c5f301cd970087684c"
+          }
+        },
+        "measurement_limit": "Trial userspace and early watchdog record were inaccessible because the root never mounted; exact reset time was not directly observed."
+      },
+      {
+        "host": "sw-picade.local",
+        "model": "Raspberry Pi 4 Model B Rev 1.4",
+        "serial": "100000006786f8b6",
+        "case": "same-root without userspace watchdog takeover",
+        "local_archive": "target/ota-pi4-primary-watchdog-82fcfb0",
+        "trial_id": "a114dc8ff6ffd54324e969f8bd10efe229e97f11213fef0fa389af6f4cac6e30",
+        "initial_boot_id": "18c00abc-873b-4b79-9e07-5f3ba94a2c01",
+        "initial_boot_count": null,
+        "root_partuuid": "076c4a2a-02",
+        "activation": {
+          "requested_utc": "2026-10-17T07:59:20.014340+00:00",
+          "reply_utc": "2026-10-17T07:59:21.508802+00:00",
+          "exit_code": 0,
+          "stdout": "o \"/org/freedesktop/systemd1/job/866\"\n",
+          "stderr": ""
+        },
+        "fixed_kernel": {
+          "source_artifact": "/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/Image-1-6.6.63+git0+52ff0d7571_e442e5c1ab-r0-raspberrypi-spacewars-20261017071309.bin",
+          "boot_path": "/boot/spacewars-wd82fcfb0.img",
+          "bytes": 27400704,
+          "sha256": "1fc9180b229f6debd937316a0d7a588eba0dd39abc35b073da49d50bd26406ea",
+          "build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "driver_sha256": "a0216686df1049917eaa5891a9e058cf00ab6df2de99736fa52204fa626e558a",
+          "frozen_utc": "2026-10-17T07:17:30.245983+00:00"
+        },
+        "observed_trial_samples": 65,
+        "first_trial": {
+          "utc": "2026-10-17T07:59:45.684958+00:00",
+          "elapsed_seconds": 33.28,
+          "boot_id": "0cb239f3-9640-41d6-8fa5-9313e3b9bf53",
+          "uptime_seconds": 15.06,
+          "tryboot": true,
+          "boot_count": null,
+          "early_watchdog": {
+            "schema": 1,
+            "boot_id": "0cb239f3-9640-41d6-8fa5-9313e3b9bf53",
+            "trial_id": "a114dc8ff6ffd54324e969f8bd10efe229e97f11213fef0fa389af6f4cac6e30",
+            "armed_boottime_ms": 1484,
+            "timeout_seconds": 210
+          },
+          "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "last_trial": {
+          "utc": "2026-10-17T08:03:05.520713+00:00",
+          "elapsed_seconds": 233.116,
+          "boot_id": "0cb239f3-9640-41d6-8fa5-9313e3b9bf53",
+          "uptime_seconds": 211.55,
+          "tryboot": true,
+          "boot_count": null,
+          "early_watchdog": {
+            "schema": 1,
+            "boot_id": "0cb239f3-9640-41d6-8fa5-9313e3b9bf53",
+            "trial_id": "a114dc8ff6ffd54324e969f8bd10efe229e97f11213fef0fa389af6f4cac6e30",
+            "armed_boottime_ms": 1484,
+            "timeout_seconds": 210
+          },
+          "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "returned_to_normal": {
+          "utc": "2026-10-17T08:03:32.701026+00:00",
+          "elapsed_seconds": 260.296,
+          "boot_id": "dcd3ab67-e327-4ba7-a68f-3a34b5140cf4",
+          "uptime_seconds": 15.61,
+          "tryboot": false,
+          "boot_count": null,
+          "early_watchdog": null,
+          "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "restoration": {
+          "utc": "2026-10-17T08:03:41.603076+00:00",
+          "exit_code": 0,
+          "stdout": "Returned to original normal boot; original boot assets restored.\nactive\nactive\n",
+          "stderr": ""
+        },
+        "result": "observed corrected-kernel trial and automatic return to original normal kernel; original boot asset hashes verified",
+        "measurement_limit": "This Pi 4 firmware does not expose boot count. Trial and normal boot IDs, kernel build IDs and the early arm record were observed directly.",
+        "artifacts": {
+          "plan.json": {
+            "bytes": 4137,
+            "sha256": "eebcb1009a2117499ca796e73fff07e9da23d6c6566a23e428dfcda1b1f0a893"
+          },
+          "stage.sh": {
+            "bytes": 21638,
+            "sha256": "826b3e822f18473f7e76d4607f2d8e575640c1ebbdc5c31b1bad39f2ab06984f"
+          },
+          "stage-result.json": {
+            "bytes": 144,
+            "sha256": "322640d41f4c11ec3d58f5295c5ea1fda3e7cbaf9d45c568720ab66654246d27"
+          },
+          "activate.sh": {
+            "bytes": 17727,
+            "sha256": "0f4e2163e46ba0c7c87b75073038f504223aae6c67f3d1609065a064c7920dfe"
+          },
+          "activation.json": {
+            "bytes": 199,
+            "sha256": "37ccb541a34bde93ab198f028e3a1705232521e547f19d952a3a2771a8b1ade5"
+          },
+          "monitor.py": {
+            "bytes": 4697,
+            "sha256": "c23dbd7c773fdf037ca355870e7029ab4e2ab671b0ffd1ca550a26b5fdeee639"
+          },
+          "observations.json": {
+            "bytes": 156260,
+            "sha256": "605c20e1b41fda2f5a6b86d110ac11e02ec19f7b922ec2444c8d1e40a6f189e7"
+          },
+          "returned-to-normal.json": {
+            "bytes": 1640,
+            "sha256": "2ce2176b235aa63750db5ddfb4a1522d38b6649bd7d8416c7171555c08b6eb94"
+          },
+          "restore.sh": {
+            "bytes": 33385,
+            "sha256": "cc10584ce77705c8c52c99bf14c28644564b2af6e26d6f6b0a8da1a73d5a80c8"
+          },
+          "restore.json": {
+            "bytes": 180,
+            "sha256": "e8d0ff2966f35265e7858cc497693251610a97d5c069413e58bbaa721bc621e2"
+          }
+        }
+      }
+    ]
+  }
+}

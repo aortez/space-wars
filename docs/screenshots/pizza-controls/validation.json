@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "capture": "Live production client through the public control socket on local Xvfb; X11 window resized to exact target dimensions. Raster scene presentation with software or femtovg UI composition. No deployment or device performance claim.",
+  "seed": 7,
+  "images": [
+    {
+      "file": "800x480-settings-software.png",
+      "width": 800,
+      "height": 480,
+      "backend": "winit-software",
+      "sha256": "6e6a4a718e9b8fb429bfd421cce965350956e1e92aba16902161df59ece831b5"
+    },
+    {
+      "file": "800x480-ready-software.png",
+      "width": 800,
+      "height": 480,
+      "backend": "winit-software",
+      "sha256": "11f5ff848b3d5b6a4814a231e2305c77c7bb07005bd4659c864a27c6889641db"
+    },
+    {
+      "file": "800x480-active-femtovg.png",
+      "width": 800,
+      "height": 480,
+      "backend": "winit-femtovg",
+      "sha256": "eaa4f94a95058d3e1238b4ed712feb728c55ee073efc9b1d6737dad5bf95b4c4"
+    },
+    {
+      "file": "800x480-running-femtovg.png",
+      "width": 800,
+      "height": 480,
+      "backend": "winit-femtovg",
+      "sha256": "1612fffdef37f45e57dc32894f4924ec680115ea784e2d96aaa43bce4b116bfe"
+    },
+    {
+      "file": "1024x768-active-femtovg.png",
+      "width": 1024,
+      "height": 768,
+      "backend": "winit-femtovg",
+      "sha256": "4e65bf9e992d46bb72716c089798234d32c04bd1fd7f6aaa55897e6851743d71"
+    },
+    {
+      "file": "480x800-active-femtovg.png",
+      "width": 480,
+      "height": 800,
+      "backend": "winit-femtovg",
+      "sha256": "6d320bbc82ce0e07343ad55673381f1398c55ef37894c40a636575818393a3eb"
+    }
+  ]
+}

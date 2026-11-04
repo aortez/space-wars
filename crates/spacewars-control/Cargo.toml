@@ -10,3 +10,11 @@ rust-version.workspace = true
 engine-common = { path = "../engine-common" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+async-io = "2"
+futures-lite = "2"
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = { workspace = true }

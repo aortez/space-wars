@@ -15,3 +15,4 @@ dtparam=coin=314
 dtparam=start=315
 # Keep the utility Enter/Escape keys and KEY_POWER at their upstream defaults.
 [all]
+dtoverlay=spacewars-profile-picade

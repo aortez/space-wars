@@ -5,6 +5,7 @@
 #   ./update.sh                         # Build + OTA flash + reboot + verify
 #   ./update.sh --skip-build            # Deploy the existing image
 #   ./update.sh --fast --target picade.local # Copy client/CLI, restart app only
+#   ./update.sh --development --target sw-picade-2.local # Full image as a trial
 #   ./update.sh --target 192.168.1.108   # Override the target host
 #   ./update.sh --user spacewars        # Override the SSH user
 #   ./update.sh --dry-run               # Show actions without changing the Pi
@@ -17,6 +18,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 YOCTO_DIR="$SCRIPT_DIR/yocto"
 TARGET_HOST="spacewars.local"
 REMOTE_USER="spacewars"
+REMOTE_USER_SET=false
+FAST=false
+DEVELOPMENT=false
 DRY_RUN=false
 SHOW_HELP=false
 UPDATE_ARGS=("$@")
@@ -31,8 +35,9 @@ Usage:
 Options:
   --target <host>       Target host [default: spacewars.local]
   --host <host>         Alias for --target
-  --user <user>         SSH user [default: spacewars]
+  --user <user>         SSH user [legacy: spacewars; fast: swadmin]
   --fast                Build/copy client + CLI and restart (no flash or reboot)
+  --development         Install a full image as a trial on a unit that allows it
   --remote-tmp <path>   Remote staging directory [default: /tmp]
   --image <path>        Use a specific rootfs .ext4.gz image
   --ssh-key <path>      Public SSH key to inject into the updated slot
@@ -45,14 +50,16 @@ Examples:
   ./update.sh
   ./update.sh --skip-build
   ./update.sh --fast --target picade.local
+  ./update.sh --development --target sw-picade-2.local
   ./update.sh --target 192.168.1.108 --dry-run
 
 User ROM data is persistent and deployed separately:
   ./sync-data.sh --dry-run
   ./sync-data.sh
 
-Fast updates require one normal image update to install the restricted helper.
-Use normal updates for OS, libraries, service, or hardware configuration changes.
+Fast updates require separately provisioned root access and the maintenance guard.
+New managed images disable legacy A/B helpers; see docs/ota-updates.md for migration.
+Development installs need a unit that enabled them; see docs/ota-development-installs.md.
 EOF
 }
 
@@ -71,7 +78,16 @@ while (( $# > 0 )); do
         --user)
             (( $# >= 2 )) || fail "Missing value for --user"
             REMOTE_USER="$2"
+            REMOTE_USER_SET=true
             shift 2
+            ;;
+        --fast)
+            FAST=true
+            shift
+            ;;
+        --development)
+            DEVELOPMENT=true
+            shift
             ;;
         --dry-run)
             DRY_RUN=true
@@ -87,6 +103,10 @@ while (( $# > 0 )); do
     esac
 done
 
+if [ "$FAST" = true ] && [ "$REMOTE_USER_SET" = false ]; then
+    REMOTE_USER=root
+fi
+
 if [ "$SHOW_HELP" = true ]; then
     usage
     exit 0
@@ -97,7 +117,8 @@ command -v npm >/dev/null 2>&1 || fail "npm is required to run the updater"
 
 (cd "$YOCTO_DIR" && npm run update -- "${UPDATE_ARGS[@]}")
 
-if [ "$DRY_RUN" = true ]; then
+# A development install reports its own trial outcome from the recovery record.
+if [ "$DRY_RUN" = true ] || [ "$DEVELOPMENT" = true ]; then
     exit 0
 fi
 

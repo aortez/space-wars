@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "exhaustive": [
+    "bootstrap::legacy_replace::tests::every_directory_and_file_boundary_resumes_without_replacing_preserved_originals",
+    "bootstrap::finish_files::tests::retirement_boundaries_resume_with_verified_copies_and_unchanged_canonical_files",
+    "bootstrap::root_install::tests::every_installation_boundary_resumes_with_the_original_selection_and_backup_binding"
+  ],
+  "required_pr": [
+    "bootstrap::legacy_replace::tests::replacement_preserves_original_inodes_attributes_and_empty_files",
+    "bootstrap::legacy_replace::tests::abrupt_process_exit_after_link_and_exchange_resumes",
+    "bootstrap::root_install::tests::real_ext4_install_retains_unused_tail_and_rechecks_completed_image_without_writing",
+    "bootstrap::root_install::tests::abrupt_process_exit_after_intent_flush_and_completion_is_restartable",
+    "bootstrap::root_install::tests::write_flush_readback_and_image_check_failures_cannot_publish_written",
+    "bootstrap::finish_files::tests::retirement_journal_flush_failures_preserve_copies_and_resume_without_recreating_files"
+  ]
+}

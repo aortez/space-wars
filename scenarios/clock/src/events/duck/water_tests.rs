@@ -1,9 +1,9 @@
 use super::*;
 use engine_water::{Boundary, PoolSpec, WaterConfig};
 
-fn floating_player(direction: f32) -> (DuckEvent, WaterWorld) {
-    let mut duck = DuckEvent::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
-    duck.direction = direction;
+fn floating_player(direction: f32) -> (TestDuck, WaterWorld) {
+    let mut duck = TestDuck::new_player(Layout::new(4.0 / 3.0), 42, None, 1, 1);
+    duck.face(direction);
     for _ in 0..90 {
         duck.step();
     }
@@ -14,7 +14,7 @@ fn floating_player(direction: f32) -> (DuckEvent, WaterWorld) {
     (duck, water)
 }
 
-fn deep_pool(duck: &DuckEvent) -> WaterWorld {
+fn deep_pool(duck: &TestDuck) -> WaterWorld {
     let half = duck.width * 0.5;
     let mut water = WaterWorld::new(
         WaterConfig::default(),
@@ -45,8 +45,8 @@ fn automatic_duck_paddles_without_learning_from_water_then_resumes_dry_jumps() {
             engine_common::ClockDuckJumpProfile::Careful,
             engine_common::ClockDuckJumpProfile::Flowing,
         ] {
-            let mut duck = DuckEvent::new_platforms(Layout::new(4.0 / 3.0), 42);
-            duck.direction = direction;
+            let mut duck = TestDuck::new_platforms(Layout::new(4.0 / 3.0), 42);
+            duck.face(direction);
             duck.select_jump_profile(Some(profile));
             // Interrupt the very first airborne warm-up rather than resetting
             // the body or inventing already-calibrated controller observations.
@@ -156,15 +156,15 @@ fn player_floats_and_paddles_in_screen_coordinates_without_input_creating_water(
 fn neutral_player_moves_with_real_water_flow_instead_of_braking_it_away() {
     let (mut duck, mut water) = floating_player(1.0);
     let y = duck
-        .world
-        .as_ref()
+        .arena
+        .world()
         .unwrap()
         .motion(DUCK_BODY)
         .unwrap()
         .position
         .y;
-    duck.world
-        .as_mut()
+    duck.arena
+        .world_mut()
         .unwrap()
         .set_pose(DUCK_BODY, Vec2::new(-100.0, y), 0.0, true);
     // A water-height gradient creates the current through the real pool solver.
@@ -175,8 +175,8 @@ fn neutral_player_moves_with_real_water_flow_instead_of_braking_it_away() {
             .unwrap();
     }
     let start = duck
-        .world
-        .as_ref()
+        .arena
+        .world()
         .unwrap()
         .motion(DUCK_BODY)
         .unwrap()

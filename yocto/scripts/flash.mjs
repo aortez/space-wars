@@ -1,23 +1,20 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'fs';
-import { tmpdir } from 'os';
+import { existsSync, statSync } from 'fs';
 import { basename, isAbsolute, join, resolve } from 'path';
 import { pathToFileURL } from 'url';
 import { defaultImageDir, preferredImages, YOCTO_DIR } from './paths.mjs';
 import { readBootIdentity, setHardwareProfile, validateProfile } from './hardware.mjs';
+import { ADMIN_USER, backupData, restoreData, readPublicKey, provisionAccess, preserveLegacyHostKeys, requireGnuInstall } from './flash-storage.mjs';
 
 const DEFAULT_IMAGE_DIR = defaultImageDir();
 const CONFIG_FILE = join(YOCTO_DIR, '.flash-config.json');
 const WIFI_CREDS_FILE = join(YOCTO_DIR, 'wifi-creds.local');
 const DEFAULT_HOSTNAME = 'spacewars';
 const DEFAULT_USER = 'spacewars';
-const DEFAULT_UID = 1000;
 const DATA_FREE_PERCENT = 10;
 const IMAGE_SUFFIX = '.wic.gz';
 const PREFERRED_IMAGES = preferredImages('wic.gz');
-const SSH_HOST_KEY_PATTERN = /^ssh_host_.*_key(\.pub)?$/;
 
 function usage() {
   console.log(`
@@ -31,7 +28,12 @@ Options:
   --image <path>       Use a specific .wic.gz image
   --profile <name>     Required: hdmi, hyperpixel, or picade
   --hostname <name>    Write /boot/hostname.txt after flashing [default: spacewars]
-  --ssh-key <path>     Public SSH key to inject
+  --ssh-key <path>     Runtime public SSH key (also the default owner key)
+  --admin-ssh-key <path> Separate owner key for swadmin, with passwordless sudo
+  --replace-admin-key  Explicitly replace a restored swadmin key/revocation
+  --access-only        Finish SSH key provisioning on an already-flashed image
+  --expected-serial <serial> Require this drive identity (required with --access-only)
+  --discard-data       Explicitly skip the existing /data backup and restore
   --interactive        Force interactive prompts instead of saved config
   --reconfigure        Re-select and save SSH key
   --list               List candidate devices and exit
@@ -73,10 +75,6 @@ async function loadPiBase() {
 
 function resolvePath(path) {
   return isAbsolute(path) ? path : resolve(process.cwd(), path);
-}
-
-function shellQuote(value) {
-  return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
 function imageFromPath(path) {
@@ -227,37 +225,14 @@ function getBmapPath(imagePath) {
   return existsSync(bmapPath) ? bmapPath : null;
 }
 
-async function maybeBackupData(utils, targetDevice, config, interactive, dryRun) {
-  if (dryRun || !utils.hasDataPartition(targetDevice)) {
+async function maybeBackupData(utils, targetDevice, discardData, dryRun) {
+  if (discardData || !utils.hasDataPartition(targetDevice)) return null;
+  if (dryRun) {
+    utils.info('Would back up /data with numeric ownership, ACLs and xattrs, then verify every copied file before flashing.');
     return null;
   }
-
-  utils.log('');
-  utils.info(`Found existing data partition on ${utils.getPartitionDevice(targetDevice, 4)}`);
-
-  let shouldBackup = (!interactive && config.backup_data !== undefined) ? config.backup_data : null;
-  if (shouldBackup === null) {
-    const doBackup = await utils.prompt('Backup /data before flashing? (Y/n): ');
-    shouldBackup = doBackup.toLowerCase() !== 'n';
-  } else {
-    utils.info(`Using backup setting from config: ${shouldBackup ? 'yes' : 'no'}`);
-  }
-
-  if (!shouldBackup) {
-    return null;
-  }
-
-  const backupDir = utils.backupDataPartition(targetDevice);
-  if (backupDir) {
-    return backupDir;
-  }
-
-  const continueAnyway = await utils.prompt('Continue without backup? (y/N): ');
-  if (continueAnyway.toLowerCase() !== 'y') {
-    throw new Error('Aborted.');
-  }
-
-  return null;
+  utils.info('Backing up /data before flashing. A failed or unverified backup stops the flash.');
+  return backupData(targetDevice);
 }
 
 async function getWifiForFlash(utils, willRestoreBackup, dryRun) {
@@ -270,106 +245,6 @@ async function getWifiForFlash(utils, willRestoreBackup, dryRun) {
   }
 
   return await utils.getWifiCredentials(WIFI_CREDS_FILE);
-}
-
-function backupHasWifiConfig(backupDir) {
-  if (!backupDir) {
-    return false;
-  }
-
-  try {
-    const connectionsDir = join(backupDir, 'NetworkManager/system-connections');
-    return readdirSync(connectionsDir).some(name => name.endsWith('.nmconnection'));
-  } catch {
-    return false;
-  }
-}
-
-function backupHasSshHostKeys(backupDir) {
-  if (!backupDir) {
-    return false;
-  }
-
-  try {
-    const sshDir = join(backupDir, 'ssh');
-    return readdirSync(sshDir).some(name => SSH_HOST_KEY_PATTERN.test(name) && !name.endsWith('.pub'));
-  } catch {
-    return false;
-  }
-}
-
-function listRootfsHostKeys(mountPoint) {
-  const sshDir = join(mountPoint, 'etc/ssh');
-  try {
-    return readdirSync(sshDir)
-      .filter(name => SSH_HOST_KEY_PATTERN.test(name))
-      .map(name => join(sshDir, name));
-  } catch {
-    return [];
-  }
-}
-
-function copySshHostKeysToBackup(utils, keyPaths, backupDir) {
-  const sshBackupDir = join(backupDir, 'ssh');
-  mkdirSync(sshBackupDir, { recursive: true });
-
-  const quotedKeys = keyPaths.map(shellQuote).join(' ');
-  execSync(`sudo cp -a ${quotedKeys} ${shellQuote(sshBackupDir)}/`, { stdio: 'pipe' });
-
-  const uid = process.getuid?.() ?? Number(execSync('id -u', { encoding: 'utf-8' }).trim());
-  const gid = process.getgid?.() ?? Number(execSync('id -g', { encoding: 'utf-8' }).trim());
-  execSync(`sudo chown -R ${uid}:${gid} ${shellQuote(sshBackupDir)}`, { stdio: 'pipe' });
-
-  utils.success('Preserved SSH host keys for /data restore.');
-}
-
-function preserveSshHostKeysFromRootfs(utils, targetDevice, backupDir, dryRun) {
-  if (dryRun) {
-    utils.info('Would preserve existing SSH host keys under /data/ssh if present.');
-    return backupDir;
-  }
-
-  if (backupHasSshHostKeys(backupDir)) {
-    utils.info('/data backup already contains SSH host keys.');
-    return backupDir;
-  }
-
-  for (const partitionNumber of [2, 3]) {
-    const rootfsPartition = utils.getPartitionDevice(targetDevice, partitionNumber);
-    const mountPoint = mkdtempSync(join(tmpdir(), 'spacewars-rootfs-keys-'));
-    let mounted = false;
-
-    try {
-      execSync(`test -b ${shellQuote(rootfsPartition)}`, { stdio: 'pipe' });
-      execSync(`sudo mount -o ro ${shellQuote(rootfsPartition)} ${shellQuote(mountPoint)}`, { stdio: 'pipe' });
-      mounted = true;
-
-      const keyPaths = listRootfsHostKeys(mountPoint);
-      const privateKeys = keyPaths.filter(path => !path.endsWith('.pub'));
-      if (privateKeys.length === 0) {
-        continue;
-      }
-
-      const effectiveBackupDir = backupDir ?? mkdtempSync(join(tmpdir(), `${utils.TEMP_PREFIX ?? 'spacewars-'}data-backup-`));
-      copySshHostKeysToBackup(utils, keyPaths, effectiveBackupDir);
-      return effectiveBackupDir;
-    } catch {
-      // The target may not have both rootfs slots yet, or the previous image may
-      // not have generated host keys. In either case first boot will generate
-      // stable keys in /data/ssh.
-    } finally {
-      if (mounted) {
-        try {
-          execSync(`sudo umount ${shellQuote(mountPoint)}`, { stdio: 'pipe' });
-        } catch {
-          // Ignore cleanup errors.
-        }
-      }
-      rmSync(mountPoint, { recursive: true, force: true });
-    }
-  }
-
-  return backupDir;
 }
 
 async function main() {
@@ -387,6 +262,12 @@ async function main() {
   const specifiedImage = argValue(args, '--image');
   const specifiedHostname = argValue(args, '--hostname');
   const specifiedSshKey = argValue(args, '--ssh-key');
+  const specifiedAdminKey = argValue(args, '--admin-ssh-key');
+  const accessOnly = args.includes('--access-only');
+  const expectedSerial = argValue(args, '--expected-serial');
+  if (accessOnly && (!specifiedDevice || !expectedSerial)) {
+    throw new Error('--access-only requires --device and --expected-serial.');
+  }
   const profile = listOnly ? null : validateProfile(argValue(args, '--profile'));
 
   const utils = await loadPiBase();
@@ -403,7 +284,11 @@ async function main() {
     return;
   }
 
+  utils.info(`SSH ownership tool: ${requireGnuInstall()}`);
   const config = await ensureSshKeyConfig(utils, specifiedSshKey, reconfigure, dryRun);
+  const runtimeKey = readPublicKey(config.ssh_key_path);
+  const adminKey = readPublicKey(resolvePath(specifiedAdminKey ?? config.ssh_key_path));
+  utils.info(`Owner login: ${ADMIN_USER} (SSH public key, passwordless sudo).`);
   const image = findImage(utils, specifiedImage);
   if (!image) {
     throw new Error('No image found. Run "npm run build" first, or pass --image <path>.');
@@ -436,6 +321,23 @@ async function main() {
     interactive,
   );
 
+  if (expectedSerial && selectedDeviceInfo.serial !== expectedSerial) {
+    throw new Error('The selected drive serial does not match --expected-serial.');
+  }
+  if (accessOnly) {
+    if (dryRun) {
+      utils.info(`Would finish SSH key provisioning on ${targetDevice} after checking the installed root identity.`);
+    } else {
+      const access = provisionAccess(targetDevice, runtimeKey, adminKey, {
+        replaceAdmin: args.includes('--replace-admin-key'), bootIdentity,
+      });
+      utils.info(`Administrator SSH access: ${access}.`);
+      if (access === 'preserved') utils.info('Use the existing administrator key. Empty/revoked access stays revoked; --replace-admin-key explicitly provisions the selected key.');
+      utils.success('SSH access provisioning complete. Keys verified and filesystems unmounted.');
+    }
+    return;
+  }
+
   if (utils.isLargeDevice(selectedDeviceInfo)) {
     utils.log('');
     utils.warn('Large device detected.');
@@ -464,9 +366,9 @@ async function main() {
   let backupDir = null;
   let restoredData = false;
   try {
-    backupDir = await maybeBackupData(utils, targetDevice, config, interactive, dryRun);
-    backupDir = preserveSshHostKeysFromRootfs(utils, targetDevice, backupDir, dryRun);
-    const backupContainsWifi = backupHasWifiConfig(backupDir);
+    backupDir = await maybeBackupData(utils, targetDevice, args.includes('--discard-data'), dryRun);
+    if (!dryRun) backupDir = preserveLegacyHostKeys(targetDevice, backupDir);
+    const backupContainsWifi = backupDir?.hasWifi ?? false;
     if (backupDir && !backupContainsWifi && !dryRun) {
       utils.info('/data backup does not contain Wi-Fi credentials; configuring Wi-Fi for this flash.');
     }
@@ -479,9 +381,14 @@ async function main() {
     });
 
     utils.growDataPartition(targetDevice, DATA_FREE_PERCENT, dryRun);
-    await utils.injectSSHKey(targetDevice, config.ssh_key_path, DEFAULT_USER, DEFAULT_UID, dryRun);
     await utils.setHostname(targetDevice, hostname, dryRun);
     setHardwareProfile(utils, targetDevice, profile, bootIdentity, dryRun);
+
+    if (backupDir && !dryRun) {
+      restoreData(targetDevice, backupDir);
+      restoredData = true;
+      utils.success(`Data restored and verified. Backup retained: ${backupDir.directory}`);
+    }
 
     if (wifiCredentials) {
       await utils.injectWifiCredentials(
@@ -492,14 +399,12 @@ async function main() {
       );
     }
 
-    if (backupDir) {
-      const restoreOkay = utils.restoreDataPartition(targetDevice, backupDir, dryRun);
-      if (!restoreOkay) {
-        throw new Error(`Failed to restore /data backup. Backup retained at: ${backupDir}`);
-      }
-      restoredData = true;
-      utils.cleanupBackup(backupDir);
-      backupDir = null;
+    if (dryRun) {
+      utils.info('Would restore and verify /data, provision the selected owner key, and preserve existing admin keys unless --replace-admin-key is selected.');
+    } else {
+      const access = provisionAccess(targetDevice, runtimeKey, adminKey, { replaceAdmin: args.includes('--replace-admin-key'), bootIdentity });
+      utils.info(`Administrator SSH access: ${access}.`);
+      if (access === 'preserved') utils.info('Use the existing administrator key. Empty/revoked access stays revoked; --replace-admin-key explicitly provisions the selected key.');
     }
 
     if (!dryRun) {
@@ -525,10 +430,11 @@ async function main() {
         utils.warn('No Wi-Fi credentials were injected.');
       }
       utils.info(`Boot the Pi and try: ssh ${DEFAULT_USER}@${hostname}.local`);
+      utils.info(`Administration: ssh ${ADMIN_USER}@${hostname}.local, then sudo -i`);
     }
   } catch (err) {
     if (backupDir) {
-      utils.warn(`Backup retained for recovery: ${backupDir}`);
+      utils.warn(`Backup retained for recovery: ${backupDir.directory}`);
     }
     throw err;
   }

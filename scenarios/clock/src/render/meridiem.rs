@@ -112,7 +112,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
             let center = glyph.cell_center(layout, cell);
             let side = layout.pitch * PIXEL_SIZE;
             let progress = if melting {
-                super::meltdown::reform_progress(state.phase_tick(), cell.y)
+                crate::events::meltdown::reform_progress(state.phase_tick(), cell.y)
             } else {
                 1.0
             };

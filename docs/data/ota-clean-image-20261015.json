@@ -1,0 +1,314 @@
+{
+  "date": "2026-10-15",
+  "scope": "Clean Yocto image, static installation privilege/permission audit, complete rootfs writer round trip into a temporary regular file, and actual packaged manager rejection from Pi 5 UID 1000.",
+  "source_commit": "b400523e25141bbae6a634bc6c5d6d432f331bea",
+  "checks": {
+    "ota-maintenance-yocto-build.log": {
+      "sha256": "b945523ba9f31de3dc2fbf3a88ca766c579f82583308e4cad8da01ea95345864",
+      "exit_code": 0
+    },
+    "ota-maintenance-boot-audit.log": {
+      "sha256": "30ac53ced3e107487f5f3b2f6ecfbf440a635008f6f1b52e933af8ee77a4176a",
+      "exit_code": 0
+    },
+    "ota-maintenance-image-audit.log": {
+      "sha256": "519231a99863b0eb3c3ea8ddb3d6032b7cf022054dd0e1c3098997ac67fbc95d",
+      "exit_code": 0
+    },
+    "ota-writer-clean-artifact.log": {
+      "sha256": "b69f4b036bdb24a3a88971b37d72df43ad980b5524feb871ab3b7dece4cea014",
+      "exit_code": 0
+    },
+    "ota-maintenance-packaged-pi5.log": {
+      "sha256": "78eddd6121c19d70fcaed3a636bb2584ebfeb087bfb7777d28b6229b2c0da6fb",
+      "exit_code": 0
+    }
+  },
+  "image_inspection": {
+    "artifact": {
+      "rootfs": {
+        "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015201352.ext4.gz",
+        "compressed_bytes": 134009497,
+        "compressed_sha256": "bc2e8b93d2fe0e74e03a4dc0c2297443f8dde8a2692ffe33baf78ed11057d4ad",
+        "expanded_bytes": 520093696,
+        "expanded_sha256": "f5d8280e8f5f98f7f56c3960f0ffa4f84b3badf5282d70b6bb581867c37c4286"
+      },
+      "disk": {
+        "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015201352.wic.gz",
+        "compressed_bytes": 183491191,
+        "compressed_sha256": "81fa86001d74b7c38417a251e83b95d9a1ff098d549ce0a52df4e20a375a07b3",
+        "expanded_bytes": 7679770624,
+        "expanded_sha256": "acb3ab2f80198bfeb558da67e28d6f8eb6df623ef45189833a65dbb1edd9f906"
+      },
+      "partition_table": [
+        {
+          "number": 1,
+          "type": 12,
+          "start_sector": 8192,
+          "sectors": 307200
+        },
+        {
+          "number": 2,
+          "type": 131,
+          "start_sector": 319488,
+          "sectors": 6291456
+        },
+        {
+          "number": 3,
+          "type": 131,
+          "start_sector": 6610944,
+          "sectors": 6291456
+        },
+        {
+          "number": 4,
+          "type": 131,
+          "start_sector": 12902400,
+          "sectors": 2097152
+        }
+      ],
+      "root_partuuids": [
+        "076c4a2a-02",
+        "076c4a2a-03"
+      ],
+      "identity": {
+        "architecture": "aarch64",
+        "binaries": {
+          "client": {
+            "bytes": 23426808,
+            "sha256": "54c8e6398be2ff57974c71d56ab7fca7fab1b022649c51253e771985919f8c08"
+          },
+          "os_manager": {
+            "bytes": 3645968,
+            "sha256": "4e053389daea5a468f82116d3c607f521a949e5e1e1ee2abf49811572f745c29"
+          }
+        },
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "build_id": "rootfs-3d7a6d39c5e3fb05bd5f04a31e4c81b282eef46e02ad2d7d4280ac066c5f8c65",
+        "data": {
+          "reads": {
+            "max": 1,
+            "min": 1
+          },
+          "writes": 1
+        },
+        "layout": "spacewars-ab-v1",
+        "machine": "raspberrypi-spacewars",
+        "recovery_protocol": 1,
+        "rootfs_tree": "3d7a6d39c5e3fb05bd5f04a31e4c81b282eef46e02ad2d7d4280ac066c5f8c65",
+        "schema": 1,
+        "source": {
+          "commit": "b400523e25141bbae6a634bc6c5d6d432f331bea",
+          "dirty": false,
+          "revision": "b400523e2514",
+          "schema": 1
+        },
+        "updater_protocol": 1
+      },
+      "boot_probe": {
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "hardware_profile": "hdmi",
+        "immutable_bytes": 85396458,
+        "immutable_files": 103,
+        "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+        "provisioned_default": null,
+        "trial": null
+      },
+      "rootfs_record_matches_sidecar": true,
+      "rootfs_and_fat_manifest_match": true,
+      "default_cmdline_unchanged": true,
+      "trial_uses_full_config_copy": true,
+      "boot_contains_exact_initramfs_sha256": "461ab4531c05f96c235610855951be26cb4b764e7d7ea2c9da075087b9485c4a",
+      "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-3xb11gfn",
+      "probe_command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "engine-ota",
+        "--example",
+        "boot_artifact_probe",
+        "--",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-3xb11gfn/boot",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-3xb11gfn/image.json",
+        "076c4a2a-02",
+        "076c4a2a-03"
+      ]
+    },
+    "root": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-3xb11gfn/rootfs-view",
+    "exact_helper_sources": {
+      "usr/sbin/spacewars-fast-update": "cf9fdf0ac8e92417665e6e9e39db57962f41b28b61df0e79e3fc2b13db2bf1a4",
+      "usr/sbin/spacewars-renderer": "022bfd940f30a66bd8f310a80cb4b1c2833e254d459e8781181fbbe13a6c89cb",
+      "usr/libexec/spacewars/fast-update": "161c7a40f879b4c2c8afd64b4c86b422fb2b5d0b8526e9b49b2ce02c0b19b5f0",
+      "usr/libexec/spacewars/renderer": "205de0c9922522e2b650f258fe8e74dda76485fc957deac13380518c64122954",
+      "usr/sbin/ab-update": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594",
+      "usr/sbin/ab-update-with-key": "20efb07e9eefecb010e724fb1f011067760bebd97e768f97a7fa6a06cce45594",
+      "usr/sbin/ab-boot-manager": "a3a4947edae8df0e552dd0ffa0e8c118bf7be0fa3daf6ca8cb4ad6f5e8944a12"
+    },
+    "image_permissions": {
+      "/usr/libexec/spacewars": {
+        "type": "directory",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/libexec/spacewars/fast-update": {
+        "type": "regular",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/libexec/spacewars/renderer": {
+        "type": "regular",
+        "mode": 448,
+        "uid": 0,
+        "gid": 0
+      },
+      "/usr/bin/engine-os-manager": {
+        "type": "regular",
+        "mode": 493,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-ota": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-logs": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      },
+      "/etc/sudoers.d/spacewars-renderer": {
+        "type": "regular",
+        "mode": 288,
+        "uid": 0,
+        "gid": 0
+      }
+    },
+    "runtime_sudo_rules": [
+      "spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-logs *",
+      "spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-renderer software, /usr/sbin/spacewars-renderer gpu"
+    ],
+    "runtime_groups": [
+      "input",
+      "audio",
+      "video",
+      "spacewars"
+    ],
+    "packaged_binary_identity": {
+      "engine-client": {
+        "bytes": 23426808,
+        "sha256": "54c8e6398be2ff57974c71d56ab7fca7fab1b022649c51253e771985919f8c08"
+      },
+      "engine-os-manager": {
+        "bytes": 3645968,
+        "sha256": "4e053389daea5a468f82116d3c607f521a949e5e1e1ee2abf49811572f745c29"
+      }
+    },
+    "ext4_block_bytes": 1024,
+    "scope": "Static artifact policy and ownership inspection; not live sudo/Pi qualification"
+  },
+  "writer": {
+    "descriptor": {
+      "architecture": "aarch64",
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-3d7a6d39c5e3fb05bd5f04a31e4c81b282eef46e02ad2d7d4280ac066c5f8c65",
+      "channel": "release",
+      "compressed": {
+        "bytes": 128610968,
+        "sha256": "d840106250a1fec85d12981af6c2692adc0aed6f40d18fda92a63528cd4fd679"
+      },
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "expanded": {
+        "bytes": 520093696,
+        "sha256": "f5d8280e8f5f98f7f56c3960f0ffa4f84b3badf5282d70b6bb581867c37c4286"
+      },
+      "format": "rootfs-ext4-zstd",
+      "generation": 2,
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "min_recovery_protocol": 1,
+      "min_updater_protocol": 1,
+      "schema": 1,
+      "source_commit": "b400523e25141bbae6a634bc6c5d6d432f331bea"
+    },
+    "result": null,
+    "source": {
+      "commit": "b400523e25141bbae6a634bc6c5d6d432f331bea",
+      "dirty": false,
+      "revision": "b400523e2514",
+      "schema": 1
+    },
+    "stages": [
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "writing",
+      "flushing",
+      "reading-back",
+      "reading-back",
+      "checking-filesystem",
+      "reading-back",
+      "reading-back"
+    ],
+    "target_is_temporary_regular_file": true
+  },
+  "packaged_manager_pi5_output": "de606400-dc75-446e-b26b-385592b0f562\nSpace-Wars independent device service\n\nUsage: ota-maintenance-packaged-manager-b400523 <COMMAND>\n\nCommands:\n  serve        Run the root-owned device service (normally started by systemd)\n  recover      Reconcile an existing recovery journal and observe a trial boot. Normally invoked by the separate spacewars-recovery service\n  maintenance  Separately authenticated root operator tools; not available on the device socket\n  status       Read a bounded JSON status snapshot independently of the game client\n  probe        Inspect the current time provider without changing clocks or state\n  help         Print this message or the help of the given subcommand(s)\n\nOptions:\n  -h, --help  Print help\ndevice mutations require the root-owned service\ndevice mutations require the root-owned service\nde606400-dc75-446e-b26b-385592b0f562\n",
+  "yocto_task_summary": "6768 tasks, 6717 reused, all succeeded; one unsupported Ubuntu 26.04 host warning",
+  "limitations": [
+    "Temporary regular-file target does not qualify block-device claiming, real persistence or reboot recovery",
+    "Test descriptor is derived locally for writer validation, not an authenticated production feed",
+    "No installed Pi privileges, boot files, root partitions or watchdog state were modified",
+    "Current devices have a different boot identity and require supervised data-preserving bootstrap",
+    "Persistent operator-key preservation, final admission/holds/service API, downloader, publishing/UI and full physical qualification remain incomplete"
+  ]
+}

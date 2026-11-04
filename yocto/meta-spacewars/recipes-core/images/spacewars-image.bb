@@ -5,6 +5,7 @@ LICENSE = "MIT"
 inherit pi-base-image
 inherit extrausers
 require spacewars-boot-identity.inc
+require spacewars-image-identity.inc
 
 # The upstream pi-base image class asks for networkmanager-nmtui, but the
 # NetworkManager recipe in this layer set does not emit that split package.
@@ -20,6 +21,9 @@ EXTRA_USERS_PARAMS = " \
     groupadd -g 1000 spacewars; \
     useradd -m -u 1000 -s /bin/bash -g spacewars -G input,video,audio spacewars; \
     usermod -p '*' spacewars; \
+    groupadd -g 1001 swadmin; \
+    useradd -m -u 1001 -s /bin/bash -g swadmin swadmin; \
+    usermod -p '*' swadmin; \
 "
 
 setup_spacewars_home() {
@@ -27,18 +31,27 @@ setup_spacewars_home() {
     touch ${IMAGE_ROOTFS}/home/spacewars/.ssh/authorized_keys
     chmod 600 ${IMAGE_ROOTFS}/home/spacewars/.ssh/authorized_keys
     chown -R spacewars:spacewars ${IMAGE_ROOTFS}/home/spacewars
+    install -d -m 700 ${IMAGE_ROOTFS}/home/swadmin/.ssh
+    touch ${IMAGE_ROOTFS}/home/swadmin/.ssh/authorized_keys
+    chmod 600 ${IMAGE_ROOTFS}/home/swadmin/.ssh/authorized_keys
+    chown -R swadmin:swadmin ${IMAGE_ROOTFS}/home/swadmin
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " setup_spacewars_home;"
 
 setup_spacewars_ota_sudoers() {
     install -d -m 0750 ${IMAGE_ROOTFS}/etc/sudoers.d
     cat > ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-ota << 'EOF'
-# Allow the kiosk user to perform A/B OTA updates through yocto/scripts/yolo-update.mjs.
-spacewars ALL=(root) NOPASSWD: /usr/sbin/ab-update-with-key *, /usr/bin/systemctl reboot
-# Application-only updates install a fixed client/CLI pair and restart only the kiosk.
-spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-fast-update *
+# Runtime installation is authorized only through the verified device service.
+# Unsigned development maintenance requires separately provisioned root access.
+# Do not restore legacy installer or general reboot grants for the kiosk UID.
 EOF
     chmod 0440 ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-ota
+    # Owner access is provisioned by the flash utility, never inherited from
+    # the kiosk's login keys. The image contains no password or shared key.
+    cat > ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-admin << 'EOF'
+swadmin ALL=(root) NOPASSWD: ALL
+EOF
+    chmod 0440 ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-admin
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " setup_spacewars_ota_sudoers;"
 
@@ -47,6 +60,18 @@ disable_text_console_for_kiosk() {
     ln -sf /dev/null ${IMAGE_ROOTFS}/etc/systemd/system/getty@tty1.service
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " disable_text_console_for_kiosk;"
+
+# Standalone listeners prevent safe network-idle detection. NetworkManager can
+# use dnsmasq as a private helper; rpcbind is a dependency of packagegroup-base-nfs
+# from the nfs distro feature, not a NetworkManager helper. Keep those packages
+# while masking unused standalone services and RPC socket activation at boot.
+disable_unused_network_servers() {
+    install -d ${IMAGE_ROOTFS}/etc/systemd/system
+    for unit in dnsmasq.service rpcbind.service rpcbind.socket; do
+        ln -sf /dev/null ${IMAGE_ROOTFS}/etc/systemd/system/$unit
+    done
+}
+ROOTFS_POSTPROCESS_COMMAND:append = " disable_unused_network_servers;"
 
 setup_boot_mount() {
     install -d ${IMAGE_ROOTFS}/boot
@@ -111,4 +136,5 @@ IMAGE_INSTALL:append = " \
     spacewars-hardware \
     spacewars-bluetooth \
     spacewars-ssh-host-keys \
+    spacewars-journal \
 "

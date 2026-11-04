@@ -171,6 +171,10 @@ impl From<UiActionArg> for UiAction {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum UiScreenArg {
+    #[value(name = "launcher.updates")]
+    LauncherUpdates,
+    #[value(name = "pause.updates")]
+    PauseUpdates,
     #[value(name = "launcher.busy")]
     LauncherBusy,
     #[value(name = "launcher.main")]
@@ -224,6 +228,8 @@ enum UiScreenArg {
 impl From<UiScreenArg> for UiScreen {
     fn from(screen: UiScreenArg) -> Self {
         match screen {
+            UiScreenArg::LauncherUpdates => Self::LauncherUpdates,
+            UiScreenArg::PauseUpdates => Self::PauseUpdates,
             UiScreenArg::LauncherBusy => Self::LauncherBusy,
             UiScreenArg::LauncherMain => Self::LauncherMain,
             UiScreenArg::LauncherGenomes => Self::LauncherGenomes,
@@ -398,12 +404,25 @@ fn main() -> ExitCode {
     }
 }
 
+fn default_socket() -> PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        let kiosk = PathBuf::from(spacewars_control::KIOSK_CONTROL_SOCKET);
+        if std::fs::symlink_metadata(&kiosk).is_ok_and(|metadata| metadata.file_type().is_socket())
+        {
+            return kiosk;
+        }
+    }
+    PathBuf::from(DEFAULT_CONTROL_SOCKET)
+}
+
 fn run() -> Result<(), CliError> {
     let args = Args::parse();
     let socket = args
         .socket
         .or_else(|| std::env::var_os("SPACEWARS_CONTROL_SOCKET").map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_CONTROL_SOCKET));
+        .unwrap_or_else(default_socket);
     let client = ControlClient::new(socket);
 
     match args.command {
@@ -1307,6 +1326,35 @@ mod tests {
     }
 
     #[test]
+    fn parses_updates_screens_for_press_activate_and_wait() {
+        for (name, expected) in [
+            ("launcher.updates", UiScreen::LauncherUpdates),
+            ("pause.updates", UiScreen::PauseUpdates),
+        ] {
+            for command in [
+                vec!["ui", "press", "back", "--expect-screen", name],
+                vec!["ui", "activate", "updates.back", "--expect-screen", name],
+                vec!["ui", "wait", "--screen", name],
+            ] {
+                let args =
+                    Args::try_parse_from(std::iter::once("spacewars-cli").chain(command)).unwrap();
+                let screen = match args.command {
+                    Command::Ui {
+                        command:
+                            UiCommand::Press { expect_screen, .. }
+                            | UiCommand::Activate { expect_screen, .. },
+                    } => expect_screen,
+                    Command::Ui {
+                        command: UiCommand::Wait { screen, .. },
+                    } => screen,
+                    _ => panic!("expected a UI command with a screen"),
+                };
+                assert_eq!(screen.map(UiScreen::from), Some(expected));
+            }
+        }
+    }
+
+    #[test]
     fn press_help_lists_all_actions() {
         let error = Args::try_parse_from(["spacewars-cli", "ui", "press", "unknown"])
             .unwrap_err()
@@ -1395,6 +1443,7 @@ mod tests {
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "crow"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "explosion"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "aquarium"]).is_ok());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "cell-swap"]).is_ok());
         for phase in ["warning", "exploding", "reforming"] {
             assert!(
                 Args::try_parse_from([

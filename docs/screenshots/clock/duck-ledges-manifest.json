@@ -1,0 +1,563 @@
+{
+  "source_commit": "8536cb8489cc8c846251648c704ecee79b1e2511",
+  "method": "Ordinary steering and Jump from the normal spawn, followed by explicit shared Catch/Climb/Release commands. No actor placement or jump tuning. Standing includes an ordinary turn toward the course.",
+  "renderers": "Production raster; production vector geometry exported through Slint SVG with native text. Local software captures, not device GPU captures.",
+  "viewports": [
+    [
+      800,
+      480
+    ],
+    [
+      1024,
+      768
+    ],
+    [
+      480,
+      800
+    ]
+  ],
+  "source_frames": 36,
+  "total_pngs": 72,
+  "max_primitives": 610,
+  "max_bodies": 9,
+  "max_flap_bodies": 2,
+  "selected": [
+    {
+      "path": "docs/screenshots/clock/ledge-800x480-left-reaching-raster.png",
+      "sha256": "b9ebfb25784f4f34bad326c16c45fcebf2bc57c631af9fe4c425a44a52507830",
+      "adapter": "raster",
+      "bodies": 8,
+      "colliders": 8,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 1000,
+            "requested_open_milli": 1000,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": false,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 11,
+          "catches": 0,
+          "clearance_queries": 0,
+          "climbs": 0,
+          "cooldown_ticks": 0,
+          "phase": "reaching",
+          "progress_milli": 0,
+          "rearm_required": false,
+          "reason": "no-eligible-edge",
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": true,
+        "navigation": null,
+        "obstacle_count": 4,
+        "outcome": null,
+        "position_milli": [
+          -356000,
+          -178833
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 10,
+          "submerged_milli": 0,
+          "tick": 46,
+          "velocity_milli": [
+            0,
+            129706
+          ]
+        }
+      },
+      "height": 480,
+      "name": "ledge-800x480-left-reaching",
+      "primitive_count": 596,
+      "seed": 42,
+      "stage": "reaching",
+      "width": 800
+    },
+    {
+      "path": "docs/screenshots/clock/ledge-800x480-left-hanging-raster.png",
+      "sha256": "3188477b3ebad71fd6f33e445b63b1364df810538ab96eeade7906d444557c2a",
+      "adapter": "raster",
+      "bodies": 9,
+      "colliders": 9,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 1000,
+        "flaps": [
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -400000,
+              -167600
+            ],
+            "hold": "attachment",
+            "open_milli": 1000,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": -1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2101,
+            "generation": 0,
+            "hinge_milli": [
+              400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 1000,
+            "requested_open_milli": 1000,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": false,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": [
+            -366000,
+            -157040
+          ],
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 2,
+          "climbs": 0,
+          "cooldown_ticks": 0,
+          "phase": "hanging",
+          "progress_milli": 0,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": 2100
+        },
+        "left_to_right": true,
+        "navigation": null,
+        "obstacle_count": 4,
+        "outcome": null,
+        "position_milli": [
+          -357040,
+          -164084
+        ],
+        "visit": {
+          "phase": "exiting",
+          "phase_tick": 42,
+          "submerged_milli": 0,
+          "tick": 122,
+          "velocity_milli": [
+            -3,
+            -2500
+          ]
+        }
+      },
+      "height": 480,
+      "name": "ledge-800x480-left-hanging",
+      "primitive_count": 610,
+      "seed": 42,
+      "stage": "hanging",
+      "width": 800
+    },
+    {
+      "path": "docs/screenshots/clock/ledge-800x480-left-pull-up-raster.png",
+      "sha256": "303f4752e899650c6952fcfa4ce06ce97e70a7f0b3ffec63ad07deb4b3815b5a",
+      "adapter": "raster",
+      "bodies": 9,
+      "colliders": 9,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 1000,
+        "flaps": [
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -400000,
+              -167600
+            ],
+            "hold": "attachment",
+            "open_milli": 1000,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": -1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2101,
+            "generation": 0,
+            "hinge_milli": [
+              400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 1000,
+            "requested_open_milli": 1000,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": false,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": [
+            -366000,
+            -157040
+          ],
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 2,
+          "climbs": 0,
+          "cooldown_ticks": 0,
+          "phase": "climbing",
+          "progress_milli": 600,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": 2100
+        },
+        "left_to_right": true,
+        "navigation": null,
+        "obstacle_count": 4,
+        "outcome": null,
+        "position_milli": [
+          -357040,
+          -148022
+        ],
+        "visit": {
+          "phase": "exiting",
+          "phase_tick": 62,
+          "submerged_milli": 0,
+          "tick": 142,
+          "velocity_milli": [
+            -3,
+            4891
+          ]
+        }
+      },
+      "height": 480,
+      "name": "ledge-800x480-left-pull-up",
+      "primitive_count": 610,
+      "seed": 42,
+      "stage": "pull-up",
+      "width": 800
+    },
+    {
+      "path": "docs/screenshots/clock/ledge-800x480-left-standing-raster.png",
+      "sha256": "8c5732b3ccaf0d4f764bce314c569f266b8e9d18fc528b1e7aeef0817fd1da84",
+      "adapter": "raster",
+      "bodies": 9,
+      "colliders": 9,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 1000,
+        "flaps": [
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -400000,
+              -167600
+            ],
+            "hold": "standing",
+            "open_milli": 1000,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": -1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2101,
+            "generation": 0,
+            "hinge_milli": [
+              400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 1000,
+            "requested_open_milli": 1000,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": true,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 0,
+          "climbs": 1,
+          "cooldown_ticks": 11,
+          "phase": "free",
+          "progress_milli": 1000,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": true,
+        "navigation": null,
+        "obstacle_count": 4,
+        "outcome": null,
+        "position_milli": [
+          -377732,
+          -149044
+        ],
+        "visit": {
+          "phase": "exiting",
+          "phase_tick": 104,
+          "submerged_milli": 0,
+          "tick": 184,
+          "velocity_milli": [
+            15957,
+            0
+          ]
+        }
+      },
+      "height": 480,
+      "name": "ledge-800x480-left-standing",
+      "primitive_count": 607,
+      "seed": 42,
+      "stage": "standing",
+      "width": 800
+    },
+    {
+      "path": "docs/screenshots/clock/ledge-1024x768-right-standing-vector.png",
+      "sha256": "1ea402285089f117062399ffb71fa458e98d85922ee890ded649b91b7baded12",
+      "adapter": "vector",
+      "bodies": 9,
+      "colliders": 9,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 1000,
+        "flaps": [
+          {
+            "angle_milliradians": -1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              320000,
+              -174400
+            ],
+            "hold": "standing",
+            "open_milli": 1000,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2101,
+            "generation": 0,
+            "hinge_milli": [
+              -320000,
+              -174400
+            ],
+            "hold": null,
+            "open_milli": 1000,
+            "requested_open_milli": 1000,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": true,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 0,
+          "climbs": 1,
+          "cooldown_ticks": 11,
+          "phase": "free",
+          "progress_milli": 1000,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": false,
+        "navigation": null,
+        "obstacle_count": 4,
+        "outcome": null,
+        "position_milli": [
+          302186,
+          -157443
+        ],
+        "visit": {
+          "phase": "exiting",
+          "phase_tick": 105,
+          "submerged_milli": 0,
+          "tick": 185,
+          "velocity_milli": [
+            -12766,
+            0
+          ]
+        }
+      },
+      "height": 768,
+      "name": "ledge-1024x768-right-standing",
+      "primitive_count": 604,
+      "seed": 42,
+      "stage": "standing",
+      "width": 1024
+    },
+    {
+      "path": "docs/screenshots/clock/ledge-480x800-left-hanging-vector.png",
+      "sha256": "e29dbcc73adeef1d67c529b7d447b0d73886341634bc685aaffe2c66a2ae2213",
+      "adapter": "vector",
+      "bodies": 9,
+      "colliders": 9,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 1000,
+        "exit_open_milli": 1000,
+        "flaps": [
+          {
+            "angle_milliradians": 1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -144000,
+              -189360
+            ],
+            "hold": "attachment",
+            "open_milli": 1000,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": -1571,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2101,
+            "generation": 0,
+            "hinge_milli": [
+              144000,
+              -189360
+            ],
+            "hold": null,
+            "open_milli": 1000,
+            "requested_open_milli": 1000,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": false,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": [
+            -131760,
+            -183024
+          ],
+          "candidates_checked": 0,
+          "catches": 1,
+          "clearance_queries": 2,
+          "climbs": 0,
+          "cooldown_ticks": 0,
+          "phase": "hanging",
+          "progress_milli": 0,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": 2100
+        },
+        "left_to_right": true,
+        "navigation": null,
+        "obstacle_count": 4,
+        "outcome": null,
+        "position_milli": [
+          -128534,
+          -185560
+        ],
+        "visit": {
+          "phase": "exiting",
+          "phase_tick": 46,
+          "submerged_milli": 0,
+          "tick": 126,
+          "velocity_milli": [
+            -1,
+            -899
+          ]
+        }
+      },
+      "height": 800,
+      "name": "ledge-480x800-left-hanging",
+      "primitive_count": 602,
+      "seed": 42,
+      "stage": "hanging",
+      "width": 480
+    }
+  ]
+}

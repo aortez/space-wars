@@ -1,0 +1,57 @@
+{
+  "files": {
+    "config.txt": {
+      "bytes": 85,
+      "sha256": "e857149e0a5aada0b953adf59160d869ba2f90bb94f3e2a9fe62383e54bb07d8"
+    },
+    "kernel8.img": {
+      "bytes": 17,
+      "sha256": "0d6dd0388ab852aede6810da50f34ebf9a4831c5bc63a7dae0a36c985c87701a"
+    },
+    "kernel_2712.img": {
+      "bytes": 17,
+      "sha256": "0d6dd0388ab852aede6810da50f34ebf9a4831c5bc63a7dae0a36c985c87701a"
+    },
+    "overlays/spacewars-profile-hdmi.dtbo": {
+      "bytes": 20,
+      "sha256": "ed00dae4b1eeffe09d79f2e520b29124d7fd1a01c216ff5e47ff46289a63597e"
+    },
+    "overlays/spacewars-profile-hyperpixel.dtbo": {
+      "bytes": 26,
+      "sha256": "9740e36a43b61faf595e0003460a7e0f39ad149385d4886cf8b3f12801e5d2b1"
+    },
+    "overlays/spacewars-profile-picade.dtbo": {
+      "bytes": 22,
+      "sha256": "45cb7909c4944db609a0825ed26b08a7c521b6861ce6545cf9a878683fbedf65"
+    },
+    "spacewars-cmdline.txt": {
+      "bytes": 75,
+      "sha256": "17822896883d0630486b37000023fab74290136bdeb77471412095b51b4d671d"
+    },
+    "spacewars-kernel-build-id": {
+      "bytes": 41,
+      "sha256": "5a84b79716842f146f7533d890cc7308cad7b21abdc29c1852c6b3bb8ad66672"
+    },
+    "spacewars-profiles/hdmi.txt": {
+      "bytes": 33,
+      "sha256": "9481b2d1e16958e1b2efb4247f28f83062451905f0b82ef75aec260ee787a854"
+    },
+    "spacewars-profiles/hyperpixel.txt": {
+      "bytes": 39,
+      "sha256": "0c4f63e3983b5c3b578e84852fe8012008e58284091e1e6e3e835c6069fec40d"
+    },
+    "spacewars-profiles/picade.txt": {
+      "bytes": 35,
+      "sha256": "512a8fc959a2618530a259247c6cebd1591830d64d2d388fc302266d4eee326a"
+    },
+    "spacewars-recovery.cpio.gz": {
+      "bytes": 17,
+      "sha256": "0d6dd0388ab852aede6810da50f34ebf9a4831c5bc63a7dae0a36c985c87701a"
+    },
+    "tryboot.txt": {
+      "bytes": 119,
+      "sha256": "0a14252e1e9b388ba463e7e643e424128081c5139e5cc6ee508ace2faf7c0181"
+    }
+  },
+  "schema": 2
+}

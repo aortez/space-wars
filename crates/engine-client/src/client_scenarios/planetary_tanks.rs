@@ -13,7 +13,7 @@ use std::time::Duration;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "planetary-tank-fixture",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Extra,
     capabilities: ScenarioCapabilities {
         benchmark: false,
         headless_benchmark: false,

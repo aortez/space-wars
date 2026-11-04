@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-17T02:50:17.816375+00:00",
+  "scope": "Prepared standard GitHub runner candidate workflow; no hosted build, publication or Pi installation performed.",
+  "files": {
+    ".github/workflows/ota-build.yml": {
+      "bytes": 2649,
+      "sha256": "f23214de1aa01bdecbb810a38c1a9f884f854e0bf9ea5550aa196844303aa3bf"
+    },
+    ".github/ci/ota_runner_cleanup.py": {
+      "bytes": 3324,
+      "sha256": "ffbfff3185281f80e86c357c6d046f4226a08326a303e45364fee457265ff570"
+    },
+    ".github/ci/ota_container_build.py": {
+      "bytes": 8804,
+      "sha256": "83f0d9398cd9922ccea71578d837b0575d2c0eb8ce72c72fa0875729f555d529"
+    },
+    ".github/ci/ota_candidate.py": {
+      "bytes": 9704,
+      "sha256": "6779e566835e002aa378fcbfa5394de9868d75c46eb73ed193cd17b651e31e04"
+    },
+    "yocto/kas-spacewars.yml": {
+      "bytes": 4705,
+      "sha256": "8d77be0d6b8419b38658cbeb803a38a4fb53deb815605591376638cfc54be423"
+    }
+  },
+  "runner": {
+    "label": "ubuntu-24.04",
+    "cpus": 4,
+    "container_memory_bytes": 12884901888,
+    "cleanup_seconds": 60,
+    "cleanup_kill_grace_seconds": 5,
+    "provisional_minimum_free_bytes": 64424509440,
+    "minimum_free_inodes": 500000,
+    "hosted_capacity": "pending"
+  },
+  "tests": {
+    "ci_helpers": 145,
+    "yocto_javascript": 51,
+    "yocto_python": 81,
+    "workflow_actionlint": "v1.7.12: passed",
+    "bitbake_cpu_affinity": [
+      {
+        "cpus": 1,
+        "BB_NUMBER_THREADS": "1",
+        "PARALLEL_MAKE": "-j 1"
+      },
+      {
+        "cpus": 4,
+        "BB_NUMBER_THREADS": "4",
+        "PARALLEL_MAKE": "-j 4"
+      },
+      {
+        "cpus": 8,
+        "BB_NUMBER_THREADS": "8",
+        "PARALLEL_MAKE": "-j 8"
+      }
+    ]
+  },
+  "container_wrapper": {
+    "status": "passed",
+    "seconds": 1.336,
+    "uid": 30000,
+    "cpus": 4,
+    "memory_bytes": 12884901888,
+    "mounts": [],
+    "effective_capabilities": 0,
+    "no_new_privileges": true,
+    "caller_credentials_absent": true,
+    "source_archive_collection_and_cleanup": "passed",
+    "qualification": "synthetic transport fixture, not an image or capacity test"
+  },
+  "image_assembly": {
+    "source": "7673fa123403f11ecc0f9bed9eab6780fe553280",
+    "seconds": 115.951,
+    "candidate": {
+      "schema": 1,
+      "format": "rootfs-ext4-zstd",
+      "compressed": {
+        "bytes": 131792120,
+        "sha256": "eecfe55d24f628cbd2ab08c6ad578f01b7c71335acb3b1a530c7faaa8b6b9395"
+      },
+      "expanded": {
+        "bytes": 528482304,
+        "sha256": "6c438f63aa823d8a6f0db2cc4f5e3996498e333df36f6e1d764799794be6ba75"
+      }
+    },
+    "files": [
+      "build.json",
+      "candidate.json",
+      "image.ext4.zst",
+      "qualification.json"
+    ]
+  },
+  "cold_build": {
+    "source": "75c0deed28e879b3a9b1c134a4ab8c0f84de8270",
+    "container": "spacewars-ota-build-75c0dee",
+    "status": "running at record time",
+    "cpus": 8,
+    "memory_gib": 24,
+    "limits": "workstation probe; not standard-runner qualification"
+  },
+  "logs": {
+    "target/ota-standard-runner-python-tests.log": {
+      "bytes": 463,
+      "sha256": "7953f58e13bcf82cdc870c9d66b3003d7e6f814668336d9b74b60c12f04e6593"
+    },
+    "target/ota-standard-runner-yocto-tests.log": {
+      "bytes": 6925,
+      "sha256": "ee4148ca5136fa4f7c148ab70f5a7a166b69712869d3d3c621ab4e12fb86d607"
+    },
+    "target/ota-standard-runner-actionlint.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-container-wrapper-smoke.log": {
+      "bytes": 1084,
+      "sha256": "8c3d35bb2a9ddc40bf32b957cb0f0150a0de2c7d4977d2af0dba3236ef43aa7e"
+    },
+    "target/ota-candidate-assembly-smoke.log": {
+      "bytes": 528,
+      "sha256": "aa7d512c6fda2913d214056015a2e27a875468e72089a86d01d48cabbcb602ba"
+    },
+    "target/ota-runner-concurrency-probe.json": {
+      "bytes": 249,
+      "sha256": "58cff85dcaeb985c6c18a3719747090552dcfcc82714c31cfa2918591da208c1"
+    }
+  }
+}

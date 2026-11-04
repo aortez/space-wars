@@ -1,0 +1,746 @@
+{
+  "source_commit": "40b9a225efcff4c5491c4120823a3f7d6915abc0",
+  "capture_method": "Normal manual Duck trigger, seeded selection, direct-landing experiment, Platforms course and explicit profile; entrance direction varied before start. No test body placement, forced support or movement/ledge commands. Local raster and Slint SVG/native-text exports, not device GPU screenshots.",
+  "reading": "10:08",
+  "date": "2026-10-17",
+  "stills_source_frames": 84,
+  "local_still_pngs": 168,
+  "clip_source_frames": 49,
+  "local_clip_pngs": 98,
+  "clip_fps": 20,
+  "clip_first_tick": 36,
+  "clip_last_tick": 180,
+  "max_sampled_bodies": 6,
+  "max_sampled_colliders": 6,
+  "max_sampled_detour_queries": 25,
+  "completed_attempt_ticks": [
+    133
+  ],
+  "matrix": [
+    {
+      "name": "direct-flap-800x480-right-Careful-resumed",
+      "width": 800,
+      "height": 480,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-800x480-right-Flowing-resumed",
+      "width": 800,
+      "height": 480,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-800x480-left-Careful-resumed",
+      "width": 800,
+      "height": 480,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-800x480-left-Flowing-resumed",
+      "width": 800,
+      "height": 480,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-1024x768-right-Careful-resumed",
+      "width": 1024,
+      "height": 768,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-1024x768-right-Flowing-resumed",
+      "width": 1024,
+      "height": 768,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-1024x768-left-Careful-resumed",
+      "width": 1024,
+      "height": 768,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-1024x768-left-Flowing-resumed",
+      "width": 1024,
+      "height": 768,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-480x800-right-Careful-resumed",
+      "width": 480,
+      "height": 800,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-480x800-right-Flowing-resumed",
+      "width": 480,
+      "height": 800,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-480x800-left-Careful-resumed",
+      "width": 480,
+      "height": 800,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    },
+    {
+      "name": "direct-flap-480x800-left-Flowing-resumed",
+      "width": 480,
+      "height": 800,
+      "seed": 12884901889,
+      "tick": 180,
+      "detour": {
+        "attempts": 1,
+        "clearance_queries": 0,
+        "direct_landing": true,
+        "outcome": "returned",
+        "perch_ticks": 36,
+        "phase": "finished",
+        "ticks": 133
+      },
+      "catches": 0,
+      "climbs": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "file": "direct-flap-800x480-left-Careful-perch-raster.png",
+      "adapter": "raster",
+      "bodies": 6,
+      "colliders": 6,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 125,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": 67,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -400000,
+              -167600
+            ],
+            "hold": "standing",
+            "open_milli": 125,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              400000,
+              -167600
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": true,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 0,
+          "clearance_queries": 0,
+          "climbs": 0,
+          "cooldown_ticks": 0,
+          "phase": "free",
+          "progress_milli": 0,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": true,
+        "navigation": {
+          "behavior": "seeking-support",
+          "body_radius_milli": 8000,
+          "calibrated_jumps": 0,
+          "course_seed": 12884901889,
+          "exit_visible": false,
+          "facing_right": true,
+          "flap_detour": {
+            "attempts": 1,
+            "clearance_queries": 0,
+            "direct_landing": true,
+            "outcome": null,
+            "perch_ticks": 18,
+            "phase": "perching",
+            "ticks": 53
+          },
+          "flight_ticks": null,
+          "jump_height_milli": null,
+          "jump_profile": "careful",
+          "ledge": {
+            "active": false,
+            "attempt_ticks": 0,
+            "attempts": 0,
+            "candidates_checked": 0,
+            "completed": 0,
+            "cooldown_ticks": 0,
+            "failed": 0,
+            "hang_ticks": 0,
+            "outcome": null,
+            "target_body": null
+          },
+          "planning": {
+            "acceleration_milli": null,
+            "confirmed_landings": 0,
+            "fallback_course": false,
+            "flowing_fallbacks": 0,
+            "generation_attempts": 2,
+            "moving_landings": 0,
+            "overshoots": 0,
+            "pattern": "platforms",
+            "plan": null,
+            "rejected_plans": 0,
+            "rejection": null,
+            "running_jumps": 0,
+            "skipped_platforms": 0,
+            "support": null,
+            "surface_count": 4,
+            "undershoots": 0,
+            "wrong_surface_landings": 0
+          },
+          "recovery": {
+            "active": false,
+            "escape_jumps": 0,
+            "interrupted_jumps": 0,
+            "lost_support": 0,
+            "no_target_ticks": 0,
+            "recoveries": 0,
+            "target_surface": null,
+            "ticks": 0,
+            "unstable_support": 0,
+            "wrong_landings": 0
+          },
+          "run_speed_milli": null,
+          "spawned_ticks": 64,
+          "speed_samples": 0,
+          "target_obstacle": null,
+          "wall_tags": [
+            0,
+            0
+          ],
+          "water": {
+            "interruptions": 0,
+            "paddling_ticks": 0,
+            "recoveries": 0,
+            "recovering_ticks": 0,
+            "target_surface": null
+          }
+        },
+        "obstacle_count": 3,
+        "outcome": null,
+        "position_milli": [
+          -394070,
+          -159201
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 64,
+          "submerged_milli": 0,
+          "tick": 100,
+          "velocity_milli": [
+            7,
+            0
+          ]
+        }
+      },
+      "height": 480,
+      "name": "direct-flap-800x480-left-Careful-perch",
+      "primitive_count": 589,
+      "seed": 12884901889,
+      "stage": "perch",
+      "width": 800,
+      "sha256": "004089581a56231fba839fd91f2ddf12780431de44fcc03894213bd45fa1df33"
+    },
+    {
+      "file": "direct-flap-1024x768-right-Flowing-perch-vector.png",
+      "adapter": "vector",
+      "bodies": 6,
+      "colliders": 6,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 167,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": -116,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              320000,
+              -174400
+            ],
+            "hold": "standing",
+            "open_milli": 167,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              -320000,
+              -174400
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": true,
+        "jumps": 1,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 0,
+          "clearance_queries": 0,
+          "climbs": 0,
+          "cooldown_ticks": 0,
+          "phase": "free",
+          "progress_milli": 0,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": false,
+        "navigation": {
+          "behavior": "seeking-support",
+          "body_radius_milli": 6400,
+          "calibrated_jumps": 0,
+          "course_seed": 12884901889,
+          "exit_visible": false,
+          "facing_right": false,
+          "flap_detour": {
+            "attempts": 1,
+            "clearance_queries": 0,
+            "direct_landing": true,
+            "outcome": null,
+            "perch_ticks": 18,
+            "phase": "perching",
+            "ticks": 52
+          },
+          "flight_ticks": null,
+          "jump_height_milli": null,
+          "jump_profile": "flowing",
+          "ledge": {
+            "active": false,
+            "attempt_ticks": 0,
+            "attempts": 0,
+            "candidates_checked": 0,
+            "completed": 0,
+            "cooldown_ticks": 0,
+            "failed": 0,
+            "hang_ticks": 0,
+            "outcome": null,
+            "target_body": null
+          },
+          "planning": {
+            "acceleration_milli": null,
+            "confirmed_landings": 0,
+            "fallback_course": false,
+            "flowing_fallbacks": 0,
+            "generation_attempts": 2,
+            "moving_landings": 0,
+            "overshoots": 0,
+            "pattern": "platforms",
+            "plan": null,
+            "rejected_plans": 0,
+            "rejection": null,
+            "running_jumps": 0,
+            "skipped_platforms": 0,
+            "support": null,
+            "surface_count": 4,
+            "undershoots": 0,
+            "wrong_surface_landings": 0
+          },
+          "recovery": {
+            "active": false,
+            "escape_jumps": 0,
+            "interrupted_jumps": 0,
+            "lost_support": 0,
+            "no_target_ticks": 0,
+            "recoveries": 0,
+            "target_surface": null,
+            "ticks": 0,
+            "unstable_support": 0,
+            "wrong_landings": 0
+          },
+          "run_speed_milli": null,
+          "spawned_ticks": 63,
+          "speed_samples": 0,
+          "target_obstacle": null,
+          "wall_tags": [
+            0,
+            0
+          ],
+          "water": {
+            "interruptions": 0,
+            "paddling_ticks": 0,
+            "recoveries": 0,
+            "recovering_ticks": 0,
+            "target_surface": null
+          }
+        },
+        "obstacle_count": 3,
+        "outcome": null,
+        "position_milli": [
+          312335,
+          -167077
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 63,
+          "submerged_milli": 0,
+          "tick": 99,
+          "velocity_milli": [
+            -93,
+            11
+          ]
+        }
+      },
+      "height": 768,
+      "name": "direct-flap-1024x768-right-Flowing-perch",
+      "primitive_count": 586,
+      "seed": 12884901889,
+      "stage": "perch",
+      "width": 1024,
+      "sha256": "86b1ef9b55d68c882bd0a6620112605603eca22460d1a435119ead8cd6d056e2"
+    },
+    {
+      "file": "direct-flap-480x800-left-Flowing-return-vector.png",
+      "adapter": "vector",
+      "bodies": 6,
+      "colliders": 6,
+      "duck": {
+        "cleared_obstacles": 0,
+        "entrance_open_milli": 125,
+        "exit_open_milli": 0,
+        "flaps": [
+          {
+            "angle_milliradians": 67,
+            "angular_velocity_milliradians": 0,
+            "body_id": 2100,
+            "generation": 0,
+            "hinge_milli": [
+              -144000,
+              -189360
+            ],
+            "hold": "standing",
+            "open_milli": 125,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              1,
+              1
+            ]
+          },
+          {
+            "angle_milliradians": 0,
+            "angular_velocity_milliradians": 0,
+            "body_id": null,
+            "generation": 0,
+            "hinge_milli": [
+              144000,
+              -189360
+            ],
+            "hold": null,
+            "open_milli": 0,
+            "requested_open_milli": 0,
+            "velocity_milli": [
+              0,
+              0
+            ]
+          }
+        ],
+        "grounded": false,
+        "jumps": 2,
+        "ledge": {
+          "anchor_milli": null,
+          "candidates_checked": 0,
+          "catches": 0,
+          "clearance_queries": 0,
+          "climbs": 0,
+          "cooldown_ticks": 0,
+          "phase": "free",
+          "progress_milli": 0,
+          "rearm_required": false,
+          "reason": null,
+          "releases": 0,
+          "support_body": null
+        },
+        "left_to_right": true,
+        "navigation": {
+          "behavior": "seeking-support",
+          "body_radius_milli": 2880,
+          "calibrated_jumps": 0,
+          "course_seed": 12884901889,
+          "exit_visible": false,
+          "facing_right": true,
+          "flap_detour": {
+            "attempts": 1,
+            "clearance_queries": 0,
+            "direct_landing": true,
+            "outcome": null,
+            "perch_ticks": 36,
+            "phase": "returning",
+            "ticks": 72
+          },
+          "flight_ticks": null,
+          "jump_height_milli": null,
+          "jump_profile": "flowing",
+          "ledge": {
+            "active": false,
+            "attempt_ticks": 0,
+            "attempts": 0,
+            "candidates_checked": 0,
+            "completed": 0,
+            "cooldown_ticks": 0,
+            "failed": 0,
+            "hang_ticks": 0,
+            "outcome": null,
+            "target_body": null
+          },
+          "planning": {
+            "acceleration_milli": null,
+            "confirmed_landings": 0,
+            "fallback_course": false,
+            "flowing_fallbacks": 0,
+            "generation_attempts": 2,
+            "moving_landings": 0,
+            "overshoots": 0,
+            "pattern": "platforms",
+            "plan": null,
+            "rejected_plans": 0,
+            "rejection": null,
+            "running_jumps": 0,
+            "skipped_platforms": 0,
+            "support": null,
+            "surface_count": 4,
+            "undershoots": 0,
+            "wrong_surface_landings": 0
+          },
+          "recovery": {
+            "active": false,
+            "escape_jumps": 0,
+            "interrupted_jumps": 0,
+            "lost_support": 0,
+            "no_target_ticks": 0,
+            "recoveries": 0,
+            "target_surface": null,
+            "ticks": 0,
+            "unstable_support": 0,
+            "wrong_landings": 0
+          },
+          "run_speed_milli": null,
+          "spawned_ticks": 83,
+          "speed_samples": 0,
+          "target_obstacle": null,
+          "wall_tags": [
+            0,
+            0
+          ],
+          "water": {
+            "interruptions": 0,
+            "paddling_ticks": 0,
+            "recoveries": 0,
+            "recovering_ticks": 0,
+            "target_surface": null
+          }
+        },
+        "obstacle_count": 3,
+        "outcome": null,
+        "position_milli": [
+          -138844,
+          -184205
+        ],
+        "visit": {
+          "phase": "running",
+          "phase_tick": 83,
+          "submerged_milli": 0,
+          "tick": 119,
+          "velocity_milli": [
+            11461,
+            56294
+          ]
+        }
+      },
+      "height": 800,
+      "name": "direct-flap-480x800-left-Flowing-return",
+      "primitive_count": 580,
+      "seed": 12884901889,
+      "stage": "return",
+      "width": 480,
+      "sha256": "540c85ef3c4b83afe62727645d7cf0e0ab2c978d4446cc9c5acbb6722b7dbe40"
+    },
+    {
+      "file": "direct-flap-800x480.gif",
+      "width": 800,
+      "height": 480,
+      "adapter": "raster",
+      "stage": "complete detour",
+      "sha256": "38ace4504d6e524b15033f4dd4f476c4e35bff2205d6cb57ddc9be782dbee0f7"
+    }
+  ],
+  "fixture_hashes": {
+    "/tmp/duck-direct-frames.json": "9002374eabd25c91d4d4240eb8236583dfacfa372ba09e4c80ff7dde53b2b291",
+    "/tmp/duck-direct-clip.json": "b75ae894aa89a052b84c57146e2dd854250a851cf82d23f9a8664492f22bc831"
+  }
+}

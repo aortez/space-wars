@@ -795,7 +795,7 @@ fn scenario_confirmation_focuses_play_without_changing_the_selection() {
     assert_eq!(window.get_launcher_scenario(), "clock");
     key(&window, Key::LeftArrow);
     assert_eq!(window.get_launcher_scenario(), "spacewars");
-    click(&window, 725.0, 125.0);
+    click(&window, 565.0, 125.0);
     assert_eq!(window.get_launcher_scenario(), "clock");
     click(&window, 75.0, 125.0);
     assert_eq!(window.get_launcher_scenario(), "spacewars");
@@ -955,6 +955,8 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     window.set_launcher_visible(true);
     window.show().unwrap();
     key(&window, Key::DownArrow);
+    assert_eq!(window.get_launcher_focus_index(), 9);
+    key(&window, Key::DownArrow);
     assert_eq!(window.get_launcher_focus_index(), 1);
     let starts = Rc::new(Cell::new(0));
     let started = Rc::clone(&starts);
@@ -1006,6 +1008,18 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     key(&window, Key::Return);
     assert_eq!(adjusted.get(), Some((13, 1)));
     key(&window, Key::DownArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 18);
+    key(&window, Key::Return);
+    assert_eq!(adjusted.get(), Some((18, 1)));
+    // Grass and Slot Machine finish the switch row, so Right walks out to them
+    // and wraps back to Rain where the row starts.
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 19);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 20);
+    key(&window, Key::Return);
+    assert_eq!(adjusted.get(), Some((20, 1)));
+    key(&window, Key::RightArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 12);
     key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
@@ -1056,14 +1070,28 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     window.on_clock_fonts_open(move || opened.set(true));
     click(&window, 649.0, 110.0);
     assert!(fonts_opened.get());
-    click(&window, 649.0, 166.0);
+    // The switch row has the same five columns as the event row below it, so
+    // Slot Machine is hittable at the far end rather than buried under Falling.
+    click(&window, 625.0, 166.0);
+    assert_eq!(adjusted.get(), Some((20, 1)));
+    click(&window, 512.0, 166.0);
+    assert_eq!(adjusted.get(), Some((19, 1)));
+    click(&window, 400.0, 166.0);
+    assert_eq!(adjusted.get(), Some((18, 1)));
+    click(&window, 287.0, 166.0);
     assert_eq!(adjusted.get(), Some((13, 1)));
-    click(&window, 529.0, 166.0);
+    click(&window, 175.0, 166.0);
     assert_eq!(adjusted.get(), Some((12, 1)));
     click(&window, 175.0, 334.0);
     assert_eq!(adjusted.get(), Some((9, 1)));
     click(&window, 649.0, 334.0);
     assert_eq!(adjusted.get(), Some((10, 1)));
+    // Spider sits between Aquarium and the recipe in the Marquee row, each
+    // switch a fifth of the row wide.
+    click(&window, 404.0, 334.0);
+    assert_eq!(adjusted.get(), Some((21, 1)));
+    click(&window, 285.0, 334.0);
+    assert_eq!(adjusted.get(), Some((17, 1)));
     // The extra launcher row must not overlap Back/Start at 800×480.
     window.set_ingame_menu_visible(false);
     window.set_launcher_visible(true);
@@ -1072,11 +1100,31 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 480.0, 168.0);
     assert!(window.get_launcher_clock_show_date());
     assert_eq!(window.get_launcher_settings_focus_index(), 12);
+    // The Events row has four columns now, with Spider at its far end and
+    // Digit Slide beside it.
+    assert!(window.get_launcher_clock_spider_enabled());
     click(&window, 649.0, 220.0);
+    assert!(!window.get_launcher_clock_spider_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 20);
+    click(&window, 500.0, 220.0);
     assert!(!window.get_launcher_clock_digit_slide_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 3);
     key(&window, Key::DownArrow);
     assert_eq!(window.get_launcher_settings_focus_index(), 4);
+    // This row now has the same five columns as the one below it, so its
+    // coordinates match, and its last column is Slot Machine.
+    assert!(window.get_launcher_clock_cell_swap_enabled());
+    click(&window, 400.0, 272.0);
+    assert!(!window.get_launcher_clock_cell_swap_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 17);
+    assert!(window.get_launcher_clock_grass_enabled());
+    click(&window, 525.0, 272.0);
+    assert!(!window.get_launcher_clock_grass_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 18);
+    assert!(window.get_launcher_clock_slot_machine_enabled());
+    click(&window, 649.0, 272.0);
+    assert!(!window.get_launcher_clock_slot_machine_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 19);
     assert!(window.get_launcher_clock_meltdown_enabled());
     click(&window, 175.0, 324.0);
     assert!(!window.get_launcher_clock_meltdown_enabled());
@@ -1236,6 +1284,8 @@ fn recreated_launcher_buttons_do_not_retain_pressed_state_or_lose_shortcuts() {
         assert_eq!(starts.get(), cycle * 2 + 1);
         window.set_launcher_focus_index(0);
         key(&window, Key::DownArrow);
+        assert_eq!(window.get_launcher_focus_index(), 9);
+        key(&window, Key::DownArrow);
         assert_eq!(window.get_launcher_focus_index(), 1);
         key(&window, Key::Return);
         assert_eq!(starts.get(), cycle * 2 + 2);
@@ -1273,6 +1323,7 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     window.set_launcher_visible(true);
     window.show().unwrap();
 
+    key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
@@ -1552,6 +1603,7 @@ fn pump_worker_until(window: &MainWindow, predicate: impl Fn() -> bool) {
     }
 }
 
+#[track_caller]
 fn pump_until(predicate: impl Fn() -> bool) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     while !predicate() {

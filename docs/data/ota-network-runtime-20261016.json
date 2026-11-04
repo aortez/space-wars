@@ -1,0 +1,255 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T20:59:41.312233+00:00",
+  "implementation_commit": "7fa708d4ea35f3bd7e9de40288c29e49a7f2592e",
+  "scope": "Native network coordinator startup/retry, continuous radio-change observation, canonical install exclusion and CLI control. No installed service or live radio mutations.",
+  "validation": {
+    "host_full_manager_tests": 93,
+    "host_selected_before_final_restart_test": 54,
+    "host_final_lifecycle_tests": 3,
+    "install_lock_tests": 4,
+    "final_selected_tests_per_pi": 55,
+    "final_behavioral_parent_cases_per_pi": 54,
+    "subprocess_helper_entrypoints_per_pi": 1,
+    "host_temporary_filesystem": "ext4 under target/ota-bootstrap-finish-tmp",
+    "rust_msrv": "1.89.0",
+    "clippy_warnings_denied": true,
+    "format_checked": true,
+    "aarch64_compiled": true,
+    "source_note": "The full host suite preceded the supervisor and its two additional lifecycle tests. The final three-test lifecycle run covers stale socket ownership, startup contention and restart with persisted policy. Final ARM tests contain all changes. No production source changed after the final checks. Artifacts were stripped for transfer; no packaged image was rebuilt.",
+    "static_systemd": {
+      "root": "/home/data/workspace/space-wars-ota/target/ota-ssh-units-hsxhlw33",
+      "exit_code": 0,
+      "scope": "Copied extracted image with the current device-service unit and SSH drop-in; no service jobs run. Existing vendor !! modifier warnings only."
+    }
+  },
+  "contracts": {
+    "radio_observation_deadline_seconds": 5,
+    "continuous_signal_queue_per_stream": 128,
+    "signal_message_bytes": 131072,
+    "expected_own_notifications_per_write": 1,
+    "supervisor_retry_initial_ms": 250,
+    "supervisor_retry_max_ms": 5000,
+    "supervisor_healthy_reset_seconds": 10,
+    "install_lock_held_through_final_observation_write_and_readback": true,
+    "network_initialization_blocks_time_service": false,
+    "partial_offline_default": false
+  },
+  "properties_exercised": [
+    "Private D-Bus signals reversed between snapshots retain a conflict even when actual radio values are unchanged. Signals from another sender are ignored.",
+    "Exactly one matching notification follows a prepared private-bus radio write; subsequent notifications are external. Invalidated properties and NetworkManager owner replacement suspend control.",
+    "A continuous-monitor conflict persists across controller restart. Failed reconciliation preserves suspension; explicit successful resume establishes a fresh baseline.",
+    "Policy ownership is acquired before replacing a stale socket; a second coordinator cannot unlink the active endpoint and a regular file is preserved.",
+    "Startup retries after a short policy-store owner releases its lock. A stopped coordinator is replaced after releasing its store and retaining the saved policy.",
+    "Native shutdown without a valid live install guard returns NotSubmitted before touching a host bus or install path. Canonical install-lock identity/exclusion tests also pass.",
+    "Both Pis ran fake-radio/private-bus fixtures as UID 1000. Read-only continuous native probes reported stable root-owned NetworkManager instances, enabled Wi-Fi and no pending checkpoints."
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "temporary_directory": "/tmp/spacewars-network-runtime.DFEOuL",
+      "temporary_free_bytes_before": 338984960,
+      "artifacts": {
+        "tests": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-network-runtime-tests",
+          "sha256": "f74fa5703b650cec4e61c39b82e0c81de02f19e12a0c08b12fab2fb1715eb520",
+          "bytes": 9248752
+        },
+        "manager": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-network-runtime-manager",
+          "sha256": "a3fb74ea325b779c30dd1153b6640d59655a3e5eb5b6e147b7231bc090cc5736",
+          "bytes": 14427336
+        }
+      },
+      "test_exit_code": 0,
+      "probe_exit_code": 0,
+      "probe": {
+        "actual": {
+          "bus_owner": ":1.8",
+          "checkpoint_count": 0,
+          "ethernet_available": false,
+          "networking_enabled": true,
+          "pid": 476,
+          "profile_count": 3,
+          "profile_revision": "48c969157b1cc8e9199587eef73a3642a65bf0dad470a584b85e85c81a795fe2",
+          "schema": 1,
+          "startup": false,
+          "state": 70,
+          "wireless_enabled": true,
+          "wireless_hardware_enabled": true
+        },
+        "change": null,
+        "samples": 9,
+        "schema": 1
+      },
+      "tests": 55,
+      "seconds": 8.34,
+      "real_radio_changes": false,
+      "installed_service_changes": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "temporary_directory": "/tmp/spacewars-network-runtime.qvYzCB",
+      "temporary_free_bytes_before": 3807625216,
+      "artifacts": {
+        "tests": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-network-runtime-tests",
+          "sha256": "f74fa5703b650cec4e61c39b82e0c81de02f19e12a0c08b12fab2fb1715eb520",
+          "bytes": 9248752
+        },
+        "manager": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-network-runtime-manager",
+          "sha256": "a3fb74ea325b779c30dd1153b6640d59655a3e5eb5b6e147b7231bc090cc5736",
+          "bytes": 14427336
+        }
+      },
+      "test_exit_code": 0,
+      "probe_exit_code": 0,
+      "probe": {
+        "actual": {
+          "bus_owner": ":1.6",
+          "checkpoint_count": 0,
+          "ethernet_available": false,
+          "networking_enabled": true,
+          "pid": 412,
+          "profile_count": 3,
+          "profile_revision": "48c969157b1cc8e9199587eef73a3642a65bf0dad470a584b85e85c81a795fe2",
+          "schema": 1,
+          "startup": false,
+          "state": 70,
+          "wireless_enabled": true,
+          "wireless_hardware_enabled": true
+        },
+        "change": null,
+        "samples": 8,
+        "schema": 1
+      },
+      "tests": 55,
+      "seconds": 12.3,
+      "real_radio_changes": false,
+      "installed_service_changes": false
+    }
+  ],
+  "limits": [
+    "The native coordinator and SSH admission hook have not been installed or exercised as a live root systemd service on either Pi. This is not physical idle/radio or OTA qualification.",
+    "Setup/deployment lifecycle holds and expected setup profile changes still need integration. The native SSH observer currently defers idle for the installed images additional listeners and unconfirmed host namespace.",
+    "The native install guard is integrated with the canonical lock, but service-hardened access and real concurrent install/radio behavior still need physical qualification.",
+    "The read-only probes did not induce a live external change or radio toggle; those changes were exercised only against private fixture D-Bus providers.",
+    "Static systemd verification uses a copied image, with the unreadable and unused sudo executable omitted. It does not establish booted service behavior.",
+    "No installed services, live radio settings, credentials, data/root/boot partitions, reboot state or watchdog changed. Boot IDs were unchanged within each device run.",
+    "Root access and supervised bootstrap remain pending; production signing/feed, downloader, install policy and end-to-end qualification remain outstanding."
+  ],
+  "logs": {
+    "host_full": {
+      "path": "target/ota-network-runtime-tests.log",
+      "bytes": 10441,
+      "sha256": "b7caea9ed92de7f08a8e14916fbb7095391802fb0e902202370f226d7f252d2b",
+      "test_results": [
+        "test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.13s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.83s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "host_selected_before_final_restart_test": {
+      "path": "target/ota-network-runtime-selected.log",
+      "bytes": 6053,
+      "sha256": "b49fa7e5918b4dac25797f52368b5314f0f67612399ec82420cbed43ea3c5c7b",
+      "test_results": [
+        "test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 16.56s"
+      ]
+    },
+    "host_final_lifecycle": {
+      "path": "target/ota-network-runtime-lifecycle.log",
+      "bytes": 712,
+      "sha256": "4fd1607cab95cc04904b130401fb8ad60968e9251f75e2995076a84e22b893ae",
+      "test_results": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 70 filtered out; finished in 1.00s"
+      ]
+    },
+    "install_lock": {
+      "path": "target/ota-network-runtime-install-lock.log",
+      "bytes": 760,
+      "sha256": "6d4ae780f8a3488945533f50959cdb8f9530b6c6286818bd2fd489a23daad1da",
+      "test_results": [
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 239 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-network-runtime-clippy.log",
+      "bytes": 367,
+      "sha256": "1d5b9e5e4ed5ecfefccc4bd977623978e6697b03505e6c588d728e2b247f0e07"
+    },
+    "msrv": {
+      "path": "target/ota-network-runtime-msrv.log",
+      "bytes": 173,
+      "sha256": "628c0c04e1c1f5444845afb5639ce235947a7204b6ca030b4d2d15137d29e358"
+    },
+    "format": {
+      "path": "target/ota-network-runtime-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "aarch64": {
+      "path": "target/ota-network-runtime-aarch64.log",
+      "bytes": 174,
+      "sha256": "6a5a44b7973a98b635fcdaa3db50d9fef7748d60d0ebc8cac4e69720ba7bcfa3"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-network-runtime-aarch64.jsonl",
+      "bytes": 208478,
+      "sha256": "596ba8dcc869fef2d74b6f3b735b847269264cff8a05355cfe4b36b11c735494"
+    },
+    "static_systemd": {
+      "path": "target/ota-network-runtime-systemd.log",
+      "bytes": 507,
+      "sha256": "65df299cb16890324ad5945e5b2398a3ff0c0a97a88c85879f5f4af99eefb166"
+    },
+    "device_runner": {
+      "path": "target/ota-network-runtime-pis.py",
+      "bytes": 3645,
+      "sha256": "4ce1986865286d1c5ea7c8dc613bdfcd4c91cb84e2e607546f0b207d398b75ec"
+    },
+    "device_run": {
+      "path": "target/ota-network-runtime-pis.log",
+      "bytes": 2393,
+      "sha256": "5fcda39b4337ad94b716c0f637aeb0a786a250754f0d6b1fdc0181dca9a354b5"
+    },
+    "pi5_tests": {
+      "path": "target/ota-network-runtime-pi5-tests.log",
+      "bytes": 5890,
+      "sha256": "dc75d6fdebb1116e7d2f75480c5ddfcddbc1ff78c35890b68d9ae1216774a36c",
+      "test_results": [
+        "test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 8.34s"
+      ]
+    },
+    "pi4_tests": {
+      "path": "target/ota-network-runtime-pi4-tests.log",
+      "bytes": 5891,
+      "sha256": "a86e21df4e5bc4e49674706ee12f50244a8262d4d03cf728e162eae6564f09a7",
+      "test_results": [
+        "test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 12.30s"
+      ]
+    },
+    "pi5_watch": {
+      "path": "target/ota-network-runtime-pi5-watch.log",
+      "bytes": 444,
+      "sha256": "4eedc11995c6bc2d7397d51bdb2b568c6a0ae161041eb95fa2b1405251f1cdc3"
+    },
+    "pi4_watch": {
+      "path": "target/ota-network-runtime-pi4-watch.log",
+      "bytes": 444,
+      "sha256": "bd49edec780b118c78a2cee5798a2e3b35ca3b983538f0b31ceedc50a0f98f36"
+    }
+  }
+}

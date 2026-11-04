@@ -25,6 +25,18 @@ const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(250);
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 
+#[path = "ui_control_functional/launcher_catalog.rs"]
+mod launcher_catalog;
+
+#[path = "ui_control_functional/material_lab.rs"]
+mod material_lab;
+
+#[path = "ui_control_functional/garden_lab.rs"]
+mod garden_lab;
+
+#[path = "ui_control_functional/pizza.rs"]
+mod pizza;
+
 #[path = "ui_control_functional/clock.rs"]
 mod clock;
 
@@ -69,6 +81,35 @@ mod spacewars_match;
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn kiosk_health_challenges_run_on_the_live_ui_thread() {
+    run_functional_test("kiosk-health", |harness| {
+        let before = harness.wait_until_ready();
+        let mut previous = 0;
+        for nonce in [17, 18, 19] {
+            let response = harness
+                .client
+                .request_before(
+                    &format!("health\n{{\"schema_version\":1,\"nonce\":{nonce}}}\n"),
+                    Instant::now() + Duration::from_secs(2),
+                )
+                .unwrap();
+            let health = spacewars_control::HealthState::from_json(&response, nonce).unwrap();
+            assert_eq!(health.process_id, harness.child.0.id());
+            assert!(health.ui_responses > previous);
+            // Xvfb exercises the UI responder, not physical DRM presentation.
+            assert_eq!(health.presented_frames, None);
+            previous = health.ui_responses;
+        }
+        let after = harness.client.ui_state().unwrap();
+        assert_eq!(
+            before, after,
+            "health checks must not navigate or act as input"
+        );
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_navigation_uses_the_public_control_api() {
     run_functional_test("launcher-navigation", |harness| {
         let mut state = harness.wait_until_ready();
@@ -76,6 +117,7 @@ fn launcher_navigation_uses_the_public_control_api() {
 
         let mut reached = BTreeSet::from([selected_control(&state)]);
         for action in [
+            UiAction::Down,
             UiAction::Down,
             UiAction::Right,
             UiAction::Down,
@@ -95,6 +137,7 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.controls".into(),
                 "launcher.quit".into(),
                 "launcher.scenario".into(),
+                "launcher.scenarios.show_all".into(),
                 "launcher.settings".into(),
                 "launcher.sound".into(),
                 "launcher.start".into(),
@@ -694,6 +737,7 @@ impl FunctionalHarness {
             .map_err(|error| format!("could not clone engine log handle: {error}"))?;
 
         let arguments = [
+            "--ignore-physical-controllers".to_string(),
             "--config-dir".to_string(),
             config_directory.display().to_string(),
             "--seed".into(),
@@ -710,6 +754,42 @@ impl FunctionalHarness {
             .env("RUST_LOG", "info")
             .env("SLINT_BACKEND", backend)
             .env("SPACEWARS_CONTROL_SOCKET", &socket_path)
+            .env(
+                "SPACEWARS_CLOCK_GRASS_INSPECT",
+                if test_name.starts_with("clock-grass-progress")
+                    || test_name.starts_with("clock-grass-shortage")
+                {
+                    "1"
+                } else {
+                    "0"
+                },
+            )
+            .env(
+                "SPACEWARS_CLOCK_GRASS_FIXTURE",
+                if test_name.starts_with("clock-grass-progress") {
+                    "favorable-v1"
+                } else if test_name.starts_with("clock-grass-shortage") {
+                    "shortage-v1"
+                } else {
+                    ""
+                },
+            )
+            .env(
+                "SPACEWARS_CLOCK_CEILING_OPTICS",
+                if test_name.starts_with("clock-ceiling-moving") {
+                    "1"
+                } else {
+                    "0"
+                },
+            )
+            .env(
+                "SPACEWARS_CLOCK_ARENA_FIXTURE",
+                if test_name.starts_with("clock-arena") {
+                    "two-owners"
+                } else {
+                    ""
+                },
+            )
             // These UI workflows must not reach the host's NetworkManager or
             // BlueZ. Wire-protocol tests supply their own private D-Bus daemon.
             .env(
@@ -839,6 +919,19 @@ impl FunctionalHarness {
     fn activate_until_scenario(&mut self, target: &str, mut state: UiState) -> UiState {
         if state.selected_scenario == target {
             return state;
+        }
+        if ![
+            "clock",
+            "spacewars",
+            "scorched-earth",
+            "pizza",
+            "falling",
+            "nes",
+        ]
+        .contains(&target)
+            && control_value(&state, "launcher.scenarios.show_all") == Some("Off")
+        {
+            state = self.activate_guarded("launcher.scenarios.show_all", &state);
         }
         let mut visited = BTreeSet::from([state.selected_scenario.clone()]);
         loop {
@@ -1183,8 +1276,9 @@ impl FunctionalHarness {
 impl Drop for FunctionalHarness {
     fn drop(&mut self) {
         let failed = self.failure.is_some() || thread::panicking();
-        let preserve =
-            failed || std::env::var("SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS").as_deref() == Ok("1");
+        let preserve = failed
+            || self.test_name.starts_with("clock-grass-smoke-")
+            || std::env::var("SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS").as_deref() == Ok("1");
         if failed {
             self.capture_live_failure_artifacts();
         }
@@ -1264,6 +1358,7 @@ fn assert_launcher_main(state: &UiState) {
         [
             "launcher.scenario.previous",
             "launcher.scenario.next",
+            "launcher.scenarios.show_all",
             "launcher.start",
             "launcher.settings",
             "launcher.controls",

@@ -11,6 +11,9 @@ clock contains an event system and various organisms. Currently we have nice thi
 like rain, a drain, exploding letters, melting letters, a parkour rubber ducky, a
 cautious crow... etc. Some events can overlap.
 
+Clock grass has an opt-in [root and runner cutaway](docs/clock-grass-inspection.md)
+for watching actual underground development without obscuring the digits.
+
 ## Why is it Called Space Wars?
 Being able to support my vision of the old 1985 Spacewar DOS game is a primary goal
 of this project. I can only hope to emulate the glory of this game's combat.
@@ -89,6 +92,12 @@ The local launcher includes the following scenarios and presets:
   timing, the event catalog, and synchronized preview controls; the
   [performance lab](docs/clock-performance-lab.md) provides repeatable CPU
   benchmarks and live host timings.
+- **Garden Lab** — a reproducible grass lifecycle testbed with underground
+  inspection, shade, light/resource controls, cutting and bounded playback.
+  See [Garden Lab](docs/garden-lab.md).
+- **Material Lab** — a falling-platen sandbox for impact, material yielding,
+  support and rebound, with slow playback, pause, single step and save/load.
+  Enable **Show all scenarios** in the launcher. See [Material Lab](docs/design/material-lab.md).
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 - **Spaceling Lab** — a single-body character walking and jumping on a rotating
@@ -194,6 +203,7 @@ Or start a scenario directly:
 ```sh
 cargo run -p engine-client -- --scenario pizza
 cargo run -p engine-client -- --scenario clock
+cargo run -p engine-client -- --scenario material-lab
 cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spaceling-lab
 cargo run -p engine-client -- --scenario surface-sortie
@@ -909,6 +919,11 @@ It builds and transfers just the matching client/CLI pair, then restarts the
 application without flashing or rebooting. One normal update is needed first
 to install the restricted helper. See [fast updates](docs/pi-kiosk.md#fast-application-updates)
 for compatibility checks and recovery details.
+
+For OS-level iteration on a unit that allows it, use
+`./update.sh --development --target sw-picade-2.local`. It installs the full
+image into the inactive slot as a trial, with the OTA watchdog and automatic
+return. See [development installs](docs/ota-development-installs.md).
 
 ## History
 

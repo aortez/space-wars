@@ -55,6 +55,7 @@ impl ConstraintsCounts {
 }
 
 pub(crate) struct ContactConstraintsSet {
+    pub report_applied_contact_impulses: bool,
     pub generic_jacobians: DVector,
     pub two_body_interactions: Vec<ContactManifoldIndex>,
     pub generic_two_body_interactions: Vec<ContactManifoldIndex>,
@@ -74,6 +75,7 @@ pub(crate) struct ContactConstraintsSet {
 impl ContactConstraintsSet {
     pub fn new() -> Self {
         Self {
+            report_applied_contact_impulses: false,
             generic_jacobians: DVector::zeros(0),
             two_body_interactions: vec![],
             generic_two_body_interactions: vec![],
@@ -530,12 +532,17 @@ impl ContactConstraintsSet {
         multibodies: &MultibodyJointSet,
         solver_bodies: &SolverBodies,
     ) {
+        let solved_dt = small_step_id as Real * params.dt;
+        // The first update holds the previous step's cache, not a completed
+        // internal step. Exclude it only for explicitly opted-in operations.
+        let accumulate_impulse = !self.report_applied_contact_impulses || small_step_id != 0;
         macro_rules! update_contacts(
             ($builders: ident, $constraints: ident) => {
                 for (builder, constraint) in self.$builders.iter().zip(self.$constraints.iter_mut()) {
                     builder.update(
                         &params,
-                        small_step_id as Real * params.dt,
+                        solved_dt,
+                        accumulate_impulse,
                         solver_bodies,
                         multibodies,
                         constraint,

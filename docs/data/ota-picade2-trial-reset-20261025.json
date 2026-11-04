@@ -1,0 +1,890 @@
+{
+  "schema": 1,
+  "purpose": "physical-recovery-case-summary",
+  "case": "trial-reset",
+  "outcome": "observed-pass",
+  "original_automated_observer_completed": true,
+  "owner_review_pending": true,
+  "owner_attestation_created": false,
+  "device": "sw-picade-2.local",
+  "binding": {
+    "device_id": "253c3a278e385d2d86a618903ec49717d05715da12ca4c75e1425f8ea7c5e690",
+    "layout_id": "d5772d7a209403254fd62a8171e3dbb10f2db3514e43254172882fa01939d071",
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "hardware_profile": "8f3a364ec78cb6e7e26b75db39a3b902ff9bb549b32f566c8135ef5e02df8cd6"
+  },
+  "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+  "recovery_protocol": 2,
+  "candidate_image": {
+    "schema": 1,
+    "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+    "rootfs_tree": "874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+    "source": {
+      "schema": 1,
+      "commit": "c68b21063f0bc062936285249a04b55d390acc4a",
+      "dirty": false,
+      "revision": "c68b21063f0b"
+    },
+    "machine": "raspberrypi-spacewars",
+    "architecture": "aarch64",
+    "layout": "spacewars-ab-v1",
+    "boot_identity": "321a18c544a7d646649d1875b4d27db857916d72ed92e9c54cc8c47da71d7b4a",
+    "updater_protocol": 1,
+    "recovery_protocol": 2,
+    "data": {
+      "reads": {
+        "min": 1,
+        "max": 1
+      },
+      "writes": 1
+    },
+    "binaries": {
+      "client": {
+        "bytes": 27676280,
+        "sha256": "d96ab80c338e00627cb78124ac5f4d549c3f41d9a313d2db04c3586e052f4f15"
+      },
+      "os_manager": {
+        "bytes": 11792768,
+        "sha256": "10ed320fb8c34f723e812a0bda32136b8c42852d056c1ff491296f4522f06c38"
+      }
+    }
+  },
+  "candidate": {
+    "slot": "a",
+    "build_id": "rootfs-874062255e973fe71795e213f6f846e1ae8e6ac00ef18e62fc6d38255c939703",
+    "generation": 14,
+    "payload": "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c",
+    "expanded": "976883a859d56a47f72441e601a1b7b2a989c8a6c761901bc9184337331bf4c1",
+    "data": {
+      "reads": {
+        "max": 1,
+        "min": 1
+      },
+      "writes": 1
+    }
+  },
+  "previous_good": {
+    "slot": "b",
+    "build_id": "rootfs-243c22b6abdfb5119afc15905e7cbcedae40db13ba27b7d18972fbd874509ee5",
+    "generation": 12,
+    "payload": "7ffb4b6c7f89bb014a4a13cfa5f1f24a096f660de526800b54fdbc377df4dd87",
+    "expanded": "4dfcff5cfb8fd3b4ec28bb286a0e0afb6277ed5d8f7eba0e02e355965b288da6",
+    "data": {
+      "reads": {
+        "min": 1,
+        "max": 1
+      },
+      "writes": 1
+    }
+  },
+  "transaction": "b7ea1bcd4003c0854605226cbc865b8cd66b65fe908700591828b1c8669d9996",
+  "origin_boot_id": "b1baa6a1-2122-406c-86b1-456c3285547e",
+  "trial_boot_id": "cb551471-89ff-4943-b2b6-0cca637b3410",
+  "return_boot_id": "cc1b10a3-51d6-46c4-b103-512676f0dedc",
+  "subsequent_normal_boot_id": "33a8e6f0-1f4a-4c2a-b052-33656afd2467",
+  "observed_return_seconds": 29.475300691003213,
+  "outer_observation_bound_seconds": 420,
+  "exact_hardware_reset_time_measured": false,
+  "software_reset": true,
+  "reset_request_acknowledged": true,
+  "host_reset_acknowledged": true,
+  "injection": {
+    "action": "normal-reboot",
+    "automatic_recovery_qualified": false,
+    "boot_id": "cb551471-89ff-4943-b2b6-0cca637b3410",
+    "case": "trial-reset",
+    "job": "/org/freedesktop/systemd1/job/838",
+    "next": "Observe the next boot and journal; never replay an uncertain reset",
+    "plan_sha256": "127b7028dab56cbc8b31235c29821289ba3c02fa8d5f71ac16ea2c3a84721249",
+    "reboot_queued": true,
+    "schema": 1,
+    "transaction": "b7ea1bcd4003c0854605226cbc865b8cd66b65fe908700591828b1c8669d9996",
+    "uptime_ms": 19524
+  },
+  "quarantine": {
+    "generation": 14,
+    "attempts": 1,
+    "reason": "trial-reset"
+  },
+  "data_preservation_scope": {
+    "preserved": true,
+    "removed": [
+      "ea1d3cfccb167b545d5a67dd85fab0e2286cf2f25026046bf28bafaca720ecfb  /data/bluetooth/DC:A6:32:82:36:12/attributes"
+    ],
+    "added": [
+      "b74e80eab47761bf4d405ede80391d2b3753dbb3c97c7e67f03be27b28690a46  /data/bluetooth/DC:A6:32:82:36:12/attributes"
+    ],
+    "regenerated_cache": [
+      "/data/bluetooth/DC:A6:32:82:36:12/attributes"
+    ]
+  },
+  "normal_boot": {
+    "passed": true,
+    "quarantine_survived": true,
+    "attempts": 1,
+    "automatic_retry_observed": false,
+    "boot_id": "33a8e6f0-1f4a-4c2a-b052-33656afd2467",
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 51385.64940018,
+    "utc_seconds": 1792914373.4055111
+  },
+  "closeout": {
+    "passed": true,
+    "generation": 12,
+    "slot": "b",
+    "release": true,
+    "partial_offline": false,
+    "attempts": 1,
+    "explicit_retry_remaining": true,
+    "ordinary_reselection_refused": true,
+    "prior_fault_receipts_preserved": true,
+    "physical_approval": false,
+    "shared_connection_closed": true,
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 51431.075640329,
+    "utc_seconds": 1792914418.8317509
+  },
+  "ordinary_reselection_refused": true,
+  "explicit_retry_remaining": true,
+  "prior_failures_preserved": true,
+  "release": true,
+  "partial_offline": false,
+  "installed_generation": 12,
+  "limitations": [
+    "One software-reset case; physical power loss and the remaining matrix are separate.",
+    "Return timing measures host observation, not an exact hardware reset timestamp.",
+    "WAN isolation combines owner confirmation and sampled direct-IP probes.",
+    "A missing queued receipt leaves fault attribution inconclusive.",
+    "Retained fake-super backup was verified; privileged offline restoration was not exercised.",
+    "The setup connection was renewed once before activation after the owner WAN-confirmation wait; no fault or install was replayed.",
+    "Generation 13 remains exhausted. Generation 14 retains one bounded explicit retry for a separately selected case; ordinary reselection is refused."
+  ],
+  "artifact_sha256": {
+    "activate-and-reset.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "activation-intent.json": {
+      "bytes": 333,
+      "sha256": "983c8bc00e55a7a4f1d3737e65e945b199b2e23d0cb24d1284bb164bd9cfe9c5"
+    },
+    "activation-result.json": {
+      "bytes": 4043,
+      "sha256": "71a3d3cdab1026d5ad2a25c2a338834974d2bdb2f9ff9d9b2f389299b0685cbc"
+    },
+    "after-stage.json": {
+      "bytes": 16776,
+      "sha256": "fd87d180ba078cd9e35d6ba68696bbba8f51cbfb4e4e49ea600f29b5fa7fb15b"
+    },
+    "backup-check.json": {
+      "bytes": 364,
+      "sha256": "450617fe726656370225de3a1aabd9d7927380e92a0cd748286ea0032027764d"
+    },
+    "backup-reverified.json": {
+      "bytes": 615,
+      "sha256": "d34c03f47f03463290169a71104c7206e3fb4ef33cbae31ade7ef4dc560296c0"
+    },
+    "baseline-result.json": {
+      "bytes": 285,
+      "sha256": "b1baad6b921c1100d1727f7cff84a5517e0bbe0798426098ee4c26f849e694e3"
+    },
+    "baseline-stores.json": {
+      "bytes": 83,
+      "sha256": "cb6049310c61774c748e3ba33e01f6b6d054b183320f74e32d1c6ade742c8782"
+    },
+    "before-activation-stores.json": {
+      "bytes": 83,
+      "sha256": "cb6049310c61774c748e3ba33e01f6b6d054b183320f74e32d1c6ade742c8782"
+    },
+    "before-activation.json": {
+      "bytes": 16782,
+      "sha256": "328cd7dcdc9559f6021b748e0c2058eb0edfccc3830678ae9fad8e45d8d2bbe2"
+    },
+    "before.json": {
+      "bytes": 16777,
+      "sha256": "1aa19c0a96329ae82894b6ad67dacb78f380e1cf157423b9a80d99b140d69d40"
+    },
+    "case.json": {
+      "bytes": 804,
+      "sha256": "ab505ba2b9ab25d946753c5bbd610a8b4177cb5cf59ccdc4dc07ab990e1d7e2b"
+    },
+    "case.template.json": {
+      "bytes": 846,
+      "sha256": "26d41369daae97410791d6c41d0e3dff63ff31160aa1f4ccb3f1d56b3e190173"
+    },
+    "closeout-first.json": {
+      "bytes": 16942,
+      "sha256": "9ee6421113d16495931448e80e9edfa9a8c19f50b710f10221c3a2128b59454a"
+    },
+    "closeout-idle-observations.json": {
+      "bytes": 2248,
+      "sha256": "ef8b2149dded11a4a29f61fb70248b6517615f56e571002835459397e423a2b9"
+    },
+    "closeout-prior-faults.json": {
+      "bytes": 9889,
+      "sha256": "21a497e714a3336d6fb3bafaeac03d756fdc2ed32a0a094eb5b3b8e6cbdcb9d4"
+    },
+    "closeout-result.json": {
+      "bytes": 431,
+      "sha256": "f6454d5a8bf74fcbd24890f1925c6e453d20ef4e849dc95075a7c4b45c7e5ea4"
+    },
+    "closeout-snapshot.json": {
+      "bytes": 16942,
+      "sha256": "a42f1ad8e77b7b28105c12b66e2b3d53e464d012c6ae58b54063c59900690e89"
+    },
+    "closeout-stores.json": {
+      "bytes": 377,
+      "sha256": "a0f4756fe7adaf763bca7b784b0c8fba3fc7ac2a7c9bb5f6a6e6631eb53ce980"
+    },
+    "closeout-ui.json": {
+      "bytes": 410,
+      "sha256": "55c33070566a2e71f99c0b59a97cd997f7043ba1b0756331b5e7f9183c5f08a2"
+    },
+    "closeout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "connection-closed.json": {
+      "bytes": 185,
+      "sha256": "ee48c42f65b39cca2e6c518037476bd1bb747f4145a14be88b01a85bf054aec1"
+    },
+    "control-path": {
+      "bytes": 34,
+      "sha256": "987a877abc9766eaecc87ebbdd2d91bbc8e62c793d8c6cabb3de799fa9ebf58d"
+    },
+    "device-fault.json": {
+      "bytes": 3510,
+      "sha256": "2c7c9b38b91fd97659fab1ba2d457bda98ece269a6255d3e37ec0362ce99cbe0"
+    },
+    "device-fault.result.json": {
+      "bytes": 509,
+      "sha256": "928d12057039c41143a0beb3f5e433d382a66dd83dc77089774287ccec27d7f8"
+    },
+    "draft-review-v2.json": {
+      "bytes": 1912,
+      "sha256": "d2b526d5442314ffbc408eacecaa83aa661f92e8547332d213d6939b8f23705a"
+    },
+    "draft-review.json": {
+      "bytes": 1822,
+      "sha256": "de95092bc0a5653dd4c8b77dfea4e33966915d3970f267104422d350a0fcf50e"
+    },
+    "expectation.json": {
+      "bytes": 2520,
+      "sha256": "f911ef88a44c29bf8431ac87bf9e56302c7984fdd8fa3d244fc4e3f5ca65e3d7"
+    },
+    "first-trial.json": {
+      "bytes": 6575,
+      "sha256": "a29f7a701b00cb30da4360fdc72907e7454c3a290045803bdb510658da9d00b9"
+    },
+    "helper-normal-refusal.json": {
+      "bytes": 126,
+      "sha256": "f6ae5c58c9c314df716f45fe611bf83b156762d7029bc3ab4a90a55f973b85f3"
+    },
+    "helper-upload-intent.json": {
+      "bytes": 351,
+      "sha256": "c6742c997da6e51b56054968c7267f4f76ffd4dd5655d1ee5ac713909ff69c0e"
+    },
+    "helper-upload-result.json": {
+      "bytes": 270,
+      "sha256": "8a2a6e7fb88d026ada9f7d8c392336eed9b5c79d7bb1a631e0be7aa920c2585a"
+    },
+    "initial-connect-intent.json": {
+      "bytes": 337,
+      "sha256": "0db78bc359339cb2016ebc5b72424143fa38baad4fed5164a27c55354b828606"
+    },
+    "initial-connect-result.json": {
+      "bytes": 165,
+      "sha256": "4a1eaad8b17aceb522bb386a87d376b639b1bb65dd71086d53d45b2c5df25a62"
+    },
+    "initial-prior-faults.json": {
+      "bytes": 9891,
+      "sha256": "95b15bb470d334f921835a8c9f7a2c8f0578f04914d34b13bc618272480df5e3"
+    },
+    "initial.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "injection/inspect-intent.json": {
+      "bytes": 252,
+      "sha256": "c278160d97f14a74e7478f3f39b371002893b0cd5aba50a8806027c3d9c63e8c"
+    },
+    "injection/inspect-response.json": {
+      "bytes": 3769,
+      "sha256": "b5009060e851bf66c6ae08dc924baddea76e42bf4e162abcf2a0ce7f19e75773"
+    },
+    "injection/plan.json": {
+      "bytes": 3128,
+      "sha256": "0ad71491dd2974fd0b7ae1ae1ed70b7390087e1f37eec960e9e9755c070c1043"
+    },
+    "injection/reset-intent.json": {
+      "bytes": 322,
+      "sha256": "a1abb6aa507d761e12a511e2d91648e774afd89626faad96dbc8ee351ba1a48a"
+    },
+    "injection/reset-response.json": {
+      "bytes": 612,
+      "sha256": "6e3ad9176ec41a4225a3a909536b8d7cbacc1491ad782896fecd68b9ce248644"
+    },
+    "injection/result.json": {
+      "bytes": 509,
+      "sha256": "928d12057039c41143a0beb3f5e433d382a66dd83dc77089774287ccec27d7f8"
+    },
+    "install-connection-ended.json": {
+      "bytes": 130,
+      "sha256": "cda165c0d37ab815b4b8ab14eebec3988c2d81746969ee4cbca6a65ab1e6c1e7"
+    },
+    "install.stderr": {
+      "bytes": 2413,
+      "sha256": "8be743c2609dda50f363aeda6f432de35ae03caf283b513107d4a911efe1765d"
+    },
+    "install.stdout": {
+      "bytes": 156,
+      "sha256": "6ab815bb9a54ff32a8b5c74cfe33e4a2ce2ca932e47b85a08eeb8c290ec5f23e"
+    },
+    "normal-connect-intent.json": {
+      "bytes": 337,
+      "sha256": "65b20fbfe2f2eaf14eb0ea6fc022f5f89cd6b5cea16a34695b11f691824328a3"
+    },
+    "normal-connect-result.json": {
+      "bytes": 164,
+      "sha256": "127490bfd2f4b21ecb7ab1c1fbb675691af5169d5f525337569141831a817fcb"
+    },
+    "normal-final.json": {
+      "bytes": 17238,
+      "sha256": "bb63d63bf80e834bbe36c93d462476dca6fc75adfc4566fae6fffb5120d9ff24"
+    },
+    "normal-first.json": {
+      "bytes": 17053,
+      "sha256": "02be49fa153c8ccbb4d1c76e4d65100d2a33539baf8419834d897d092c880f53"
+    },
+    "normal-reboot-intent.json": {
+      "bytes": 281,
+      "sha256": "0b8be73630136cc483b6025175b589c033b7c1d37e927c3dc492c730533377a2"
+    },
+    "normal-reboot-response.json": {
+      "bytes": 181,
+      "sha256": "0b8f85a225a59dce57f268a1614a72e4089ad5a0cf086fac86971a8279bd3bf1"
+    },
+    "normal-reboot.log": {
+      "bytes": 88,
+      "sha256": "c957091afd25fa4c0d1ddd01fa239b36e642f7d5d6363ecace2c6047e49031c3"
+    },
+    "normal-result.json": {
+      "bytes": 285,
+      "sha256": "360efc6e7736babcdf2bcfb8e878cb6dced0c489f0f00b454e7da05c76a48275"
+    },
+    "normal-stores.json": {
+      "bytes": 377,
+      "sha256": "a0f4756fe7adaf763bca7b784b0c8fba3fc7ac2a7c9bb5f6a6e6631eb53ce980"
+    },
+    "offline-after-normal-reboot.json": {
+      "bytes": 816,
+      "sha256": "5be264c849a115ff814e751fe884eeda064a8a6e7c89485ace8fd29376b2140d"
+    },
+    "offline-after-return.json": {
+      "bytes": 816,
+      "sha256": "2b366b3b47857e6d88c8a33f1f913a2bbbc72189dafc7d5b729a1c7bd69f7d2c"
+    },
+    "offline-before-normal-reboot.json": {
+      "bytes": 816,
+      "sha256": "6baa2efd620c7f53edbd358062bd49314aa8c7d9701ec98d15e297e3c3177b37"
+    },
+    "offline-before-selection.json": {
+      "bytes": 816,
+      "sha256": "451215550ad32d3b5f25fba08b3ce0e34437e3df8a95103607e202073465295f"
+    },
+    "offline-final-admission.json": {
+      "bytes": 816,
+      "sha256": "fa20aa5ad04da756fa749edc2766d3915c8b063fdb404c0e308383fe4ea9c44f"
+    },
+    "offline-result.json": {
+      "bytes": 336,
+      "sha256": "503fe959407cbd3869376a3d3f3dfe04ca18f492c54ede2427b868af3f7617dc"
+    },
+    "offline.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "online-baseline.json": {
+      "bytes": 828,
+      "sha256": "ec69f34dbff14f817bd6b5ed8b90c50174aa7d7072b1375bb47164d59cb726f5"
+    },
+    "ordinary-reselection.json": {
+      "bytes": 79,
+      "sha256": "6e93c08bec974a8cd9bfe843c6654f6e92918223c9465b90ef5c03525b962f0d"
+    },
+    "preactivation-prior-faults.json": {
+      "bytes": 9891,
+      "sha256": "481e05d4fa4426f98da20895737b994ec254e1849ad8c69f16b4ab2f9b3321be"
+    },
+    "preblock-online.json": {
+      "bytes": 830,
+      "sha256": "df0dc6e2f67f53a78bbf33ff525cc69324c43a2507b834266a720406b77f395a"
+    },
+    "preflight-selection.json": {
+      "bytes": 3129,
+      "sha256": "276af1e1a1cff6b4d2a18874dc05d85de3bcdca40874b445b32b0175ad4167ae"
+    },
+    "preflight-ui.json": {
+      "bytes": 410,
+      "sha256": "55c33070566a2e71f99c0b59a97cd997f7043ba1b0756331b5e7f9183c5f08a2"
+    },
+    "publisher-baseline.json": {
+      "bytes": 633,
+      "sha256": "71f4deb8d89d5e92b5ac8ffc0c210093a94adcf0a6201295db7b8c99e29a04e7"
+    },
+    "qualify-kiosk-hang.py": {
+      "bytes": 8375,
+      "sha256": "0757f97bae7ed891728d2284596d64f3c3f853f630c72689468f86b97113c6b3"
+    },
+    "qualify-trial-reset.py": {
+      "bytes": 3200,
+      "sha256": "35144278aaf79468f285a9ae4a552f6a529e6a899b2a117c85898403f7b7ce95"
+    },
+    "report.py": {
+      "bytes": 6662,
+      "sha256": "b339ccb9eab8a52b1f1ab88036adf4692b7635c2f02e20148582cd2bf3d70c8e"
+    },
+    "reset-connection-ended.json": {
+      "bytes": 167,
+      "sha256": "e11f194c869bbf244bdeb1527f16a0481eacb8e92bfdf82456a3263e058b29ac"
+    },
+    "reset-outcome.json": {
+      "bytes": 722,
+      "sha256": "57a5818c95408eb86b4b64fb78ed1a2369d3ff7cb5ca427ca9d0e5fd29edc616"
+    },
+    "reset_trial": {
+      "bytes": 3054928,
+      "sha256": "854ca49523654a57915aa30824becdb041bec9d2e00531a1edb317c325708256"
+    },
+    "restored-online.json": {
+      "bytes": 830,
+      "sha256": "a1cd85fb0be080416444047e4a531078b072538cbc4d4239d2aef1e6263943e9"
+    },
+    "resume-before.json": {
+      "bytes": 16781,
+      "sha256": "5ee61528d00cbf130e4d6348ed5736f59d61e7eb18e39bfd012c8b8df020a7dc"
+    },
+    "resume-boot.json": {
+      "bytes": 3475,
+      "sha256": "09d7f5bcf843f62d086cd5553b997467de390c1b9c81df5676cef5b1679a4ed5"
+    },
+    "resume-preparation-connect-intent.json": {
+      "bytes": 376,
+      "sha256": "6d1fc69e47cc1f6463adef95105bac213e72630f83e145d5e96aec0c764f0a9a"
+    },
+    "resume-preparation-connect-result.json": {
+      "bytes": 165,
+      "sha256": "1a55e871d7e33e0412921ed95f852486a8d35ad9de9589a828f3ccc656674fd4"
+    },
+    "resume-preparation-intent.json": {
+      "bytes": 1800,
+      "sha256": "b939f09412c2827bd6bdc5684323e1495aab1d55cff43c936b28a636882ab29a"
+    },
+    "resume-preparation-result.json": {
+      "bytes": 552,
+      "sha256": "2f9b2cc97e82e14cfad9f5151318bf959cf4361fceb9c1b87a9d6dadf7a0b568"
+    },
+    "resume-prior-faults.json": {
+      "bytes": 9890,
+      "sha256": "c29c64de4086033b6884aa8a29aafa6ee0e9216b42db118ee8caf93c8cef4c90"
+    },
+    "resume-stores.json": {
+      "bytes": 83,
+      "sha256": "cb6049310c61774c748e3ba33e01f6b6d054b183320f74e32d1c6ade742c8782"
+    },
+    "return-connect-intent.json": {
+      "bytes": 351,
+      "sha256": "dc182494693041eb34fe748c0011fd502f9ef00b8090d9c081872aa880775ad8"
+    },
+    "return-connect-result.json": {
+      "bytes": 165,
+      "sha256": "6458755abcb84f91af303931f9309cff421c743401d40397d13c3fff6d732800"
+    },
+    "return-final.json": {
+      "bytes": 17237,
+      "sha256": "b47ee288bacdbd1a306865eefdc7ebeeaa2c4ae030fe9c6b886c239f43f943ec"
+    },
+    "return-first.json": {
+      "bytes": 17052,
+      "sha256": "716aee8ac9e33f560910922c707adfa2501c4de9c7d671a48f9275b5914893dc"
+    },
+    "return-observed.json": {
+      "bytes": 167,
+      "sha256": "7662bd33b94958697a72cf4db109434b1e85499b05fa50740c6dc7fca0e62fc9"
+    },
+    "return-prior-faults.json": {
+      "bytes": 9891,
+      "sha256": "c773cde8e04ae04ac295488a8abbbb0600cb66dda56f1ef4e47d0126cad9233e"
+    },
+    "return-result.json": {
+      "bytes": 598,
+      "sha256": "8e26785c56934f256b4475ab2c318492f84882efa1d152b9dc5fa78e72a894f0"
+    },
+    "return-stores.json": {
+      "bytes": 377,
+      "sha256": "0fe0e1184abbac62ab5bf8e463ed621c1b75fa81f96545053f9f1909a5a9aef0"
+    },
+    "return.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "router-device-identity.json": {
+      "bytes": 460,
+      "sha256": "658adc19581a9fc511f0f599670c9f0be1b9e0e7d97ceb60df0adc92057135ac"
+    },
+    "router-owner-confirmation.json": {
+      "bytes": 292,
+      "sha256": "7c543fa86f9cab04a43feb8746281935b46a5c737aeea9bfa2dfd4b1be32cb09"
+    },
+    "router-restored.json": {
+      "bytes": 237,
+      "sha256": "be1566757bebed3089077772ecaa84cf2ec2b7db4e0f7463123675d09ef21f57"
+    },
+    "runner-verification.json": {
+      "bytes": 1444,
+      "sha256": "68299208f6e39a430a6ecde957e5f60a503d37f4626b2d45b60d9f2e8828509a"
+    },
+    "selection.json": {
+      "bytes": 3131,
+      "sha256": "eca6582c4c9a5b119d62773c5d73711095aada5ec3c297829bd874ab235cc450"
+    },
+    "snapshot-before.sh": {
+      "bytes": 1833,
+      "sha256": "ed921abc3ccd3b3030b029ce7bc1b6834ee549ecc56ae8d09cf9c1dc246d0641"
+    },
+    "stage-exit.json": {
+      "bytes": 149,
+      "sha256": "eaa42acc8f4d1117fae7324dcaafc10360b68ee6a9c109e45d16a38a210ad8f2"
+    },
+    "stage-intent.json": {
+      "bytes": 1156,
+      "sha256": "550517616079fec009eb464b2f97806104d7e446b5dfc4b6928cb5fe528409eb"
+    },
+    "stage-result.json": {
+      "bytes": 1177,
+      "sha256": "0a753da1b807bc85142cfcc245d39a3ac60be0367a3420d69ad72cbdf76ab73e"
+    },
+    "stage-stores.json": {
+      "bytes": 83,
+      "sha256": "cb6049310c61774c748e3ba33e01f6b6d054b183320f74e32d1c6ade742c8782"
+    },
+    "stage.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stage.stderr": {
+      "bytes": 317249,
+      "sha256": "e353547ee0dfb1af1bf454e8e6b7a7f0f6ecc39d4c9c2981d52aacc6baa54997"
+    },
+    "stage.stdout": {
+      "bytes": 2493,
+      "sha256": "04b9ba893fb7a6811b7e009593bd6d1076ed5008bf8335125be901d4ceaa2918"
+    },
+    "staging-ready.json": {
+      "bytes": 5972,
+      "sha256": "e653be0229a0740142223e36dd2d0738e61203a955dc70ddb5fba68587289162"
+    },
+    "test_trial.py": {
+      "bytes": 25365,
+      "sha256": "dccf896765ab9e5b16db6aa21f61a25023ee43e12a6c30ca3370c55922446f2f"
+    },
+    "tests.log": {
+      "bytes": 2979,
+      "sha256": "e5b3f94344d4fca1f288bbc3a9655113266717f635d57faa5ec6c5eabf8660b3"
+    },
+    "trial-connect-intent.json": {
+      "bytes": 334,
+      "sha256": "015d76a89a9239dbf940c24d8d20770bf7f1ce1d3cea585a5542469ff710d86c"
+    },
+    "trial-connect-result.json": {
+      "bytes": 164,
+      "sha256": "24d982ee61460b55ce8e4758770243cc37b1b20dd0854c92df32f8804b2e0ac4"
+    },
+    "trial-early-watchdog.json": {
+      "bytes": 208,
+      "sha256": "46a1e9232189e7ec62c20e660060feb3ba80f5bc908b008318d5adfd397752f1"
+    },
+    "trial-journal.jsonl": {
+      "bytes": 2286,
+      "sha256": "5efdc7acb655267f005fa49d1ea4e2292e95979a3701a45ca297ad49205fd874"
+    },
+    "trial-journal.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "trial.py": {
+      "bytes": 41086,
+      "sha256": "5196f0c6c20e9cab2597601db88e6db905c5f60dfdc47a3b4b835587237416ad"
+    },
+    "wan-probe.sh": {
+      "bytes": 1030,
+      "sha256": "7bbfd5668480f9112d1850a829188248d8e3bbce35c58097ca576e83fa3bd7df"
+    }
+  },
+  "external_references": [
+    {
+      "path": "/home/data/workspace/space-wars2/target/manual-install-qualification/c68b2106/preparation-result.json",
+      "bytes": 6863,
+      "sha256": "56b5f8cc932c74e21dc540e95ce57add667c27bf40a237756054a137d4537029"
+    },
+    {
+      "path": "/home/data/workspace/space-wars2/target/manual-install-qualification/c68b2106/publication/publication-result.json",
+      "bytes": 924,
+      "sha256": "8cc463f2aa974a3bfac51880adae1099134ee20d01b1aa8b7985cba7c6aed643"
+    },
+    {
+      "path": "/home/data/workspace/space-wars2/target/manual-install-qualification/c68b2106/publication/plan.json",
+      "bytes": 2753,
+      "sha256": "d822893e1ec171f2bd3c9f077339ace73626538c8c6ed4b59cac1ed30aae7170"
+    }
+  ],
+  "observed_local_date": "2026-10-25",
+  "timezone": "America/Los_Angeles",
+  "physical": {
+    "model": "Raspberry Pi 4 Model B Rev 1.2",
+    "serial": "10000000b47f9ef0",
+    "bootloader_revision": "224877da90f82a72dbcc9db10bcf059259f54680",
+    "medium_sectors": 245760000,
+    "medium": {
+      "ID_BUS": "usb",
+      "ID_MODEL": "USB_DISK",
+      "ID_MODEL_ID": "2000",
+      "ID_REVISION": "1100",
+      "ID_SERIAL": "SMI_USB_DISK-0:0",
+      "ID_TYPE": "disk",
+      "ID_VENDOR": "SMI",
+      "ID_VENDOR_ID": "090c"
+    }
+  },
+  "source_pull_request": "https://github.com/aortez/space-wars/pull/545",
+  "procedure": "One early software reset of a new signed generation-14 trial while WAN was blocked; automatic return to generation 12, a separate offline normal boot, and post-restoration refusal of ordinary candidate reselection.",
+  "private_evidence": "/home/data/workspace/space-wars2/target/trial-reset-runner-v1",
+  "original_case_report": {
+    "path": "target/trial-reset-runner-v1/case-report.json",
+    "bytes": 26418,
+    "sha256": "5e8d9140bac7329790f0177ae5e60dc55c825fb88cc009b3a4eea0b7af36e2e5"
+  },
+  "early_watchdog": {
+    "schema": 1,
+    "boot_id": "cb551471-89ff-4943-b2b6-0cca637b3410",
+    "trial_id": "b7ea1bcd4003c0854605226cbc865b8cd66b65fe908700591828b1c8669d9996",
+    "armed_boottime_ms": 1414,
+    "timeout_seconds": 210
+  },
+  "saved_data_preserved": true,
+  "ordinary_refusal_after_idle": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "Error: CandidateChanged\n"
+  },
+  "return_receipt": {
+    "passed": true,
+    "observed_return_seconds": 29.475300691003213,
+    "exact_reset_time_measured": false,
+    "reset_request_proof": {
+      "host_acknowledged": true,
+      "device_queued_receipt": true,
+      "reset_request_acknowledged": true
+    },
+    "physical_case_pass": true,
+    "note": "Without any queued receipt, recovery is observed but fault attribution awaits review; do not call it a case pass",
+    "separate_normal_boot_pending": true,
+    "physical_approval": false,
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 51345.136085704,
+    "utc_seconds": 1792914332.8921962
+  },
+  "publication": {
+    "automatic_installation_enabled": false,
+    "channel": "nightly",
+    "current": {
+      "manifest_sha256": "762dde992b9fe2f8d95ed936e6fea81e2fd5f196a9e37bfd166568d7446790d5",
+      "timestamp": {
+        "bytes": 471,
+        "sha256": "16e121aeeb38d3164a4797784127c6601c4b0a1d9d7742e8d519d8e7d42cf156"
+      },
+      "version": 15
+    },
+    "device_accessed": false,
+    "generation": 14,
+    "intent_sha256": "f8e4affed2cd5ab918bedbbfa32e295de6094515b22c79c2e5a1c8afb432b479",
+    "payload": {
+      "bytes": 133765909,
+      "sha256": "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c"
+    },
+    "physical_qualification_pending": true,
+    "plan_sha256": "d822893e1ec171f2bd3c9f077339ace73626538c8c6ed4b59cac1ed30aae7170",
+    "published": true,
+    "release_targets_unchanged": true,
+    "release_url": "https://github.com/aortez/space-wars/releases/tag/ota-feed",
+    "result": "published",
+    "root_sha256": "825dc96a49a8d2895bd65460289a5b5cba08275fa5207101ea61ff6f125c9bf9",
+    "schema": 1,
+    "signed": true,
+    "source": "c68b21063f0bc062936285249a04b55d390acc4a"
+  },
+  "main_ci": {
+    "conclusion": "success",
+    "event": "push",
+    "headSha": "c68b21063f0bc062936285249a04b55d390acc4a",
+    "source_tree_matches_tested_main": true,
+    "status": "completed",
+    "url": "https://github.com/aortez/space-wars/actions/runs/40157338461"
+  },
+  "helper_build": {
+    "schema": 1,
+    "source": "e777e2627d855c2ea3543284b4bed4ed8484e2a2",
+    "source_clean": true,
+    "recorded_utc": "2026-10-25T02:50:36.708647+00:00",
+    "target": "aarch64-unknown-linux-gnu",
+    "profile": "release",
+    "features": [
+      "recovery-qualification"
+    ],
+    "artifact": {
+      "path": "target/trial-reset-preparation/reset_trial",
+      "bytes": 3054928,
+      "sha256": "854ca49523654a57915aa30824becdb041bec9d2e00531a1edb317c325708256"
+    },
+    "logs": [
+      {
+        "path": "target/trial-reset-preparation/native-tests.log",
+        "bytes": 1161,
+        "sha256": "4fa65a4ca72e86d345c7b93bdc4aa87446d467e4b234851c2220d3426d393e84"
+      },
+      {
+        "path": "target/trial-reset-preparation/hang-host-tests.log",
+        "bytes": 678,
+        "sha256": "27169db13be5e6d1642e5b6f6ac6483ed538abc1e86cc711f5505fedea451ff8"
+      },
+      {
+        "path": "target/trial-reset-preparation/reset-host-tests.log",
+        "bytes": 408,
+        "sha256": "99fcd8fa0793f3c53257ab82a44af127708953e9ac565774066f747d9a7388e7"
+      },
+      {
+        "path": "target/trial-reset-preparation/clippy.log",
+        "bytes": 72,
+        "sha256": "a41051563a4cb5fc1b1bcdd9aa0ba28ca80f7736d629d90cc138218756e8e3a9"
+      },
+      {
+        "path": "target/trial-reset-preparation/aarch64-build.log",
+        "bytes": 161,
+        "sha256": "74aaa06787b464f62e2cc2dd45436942981402d6b82db7eb9c817314e035f273"
+      }
+    ],
+    "device_accessed": false,
+    "device_reset_executed": false,
+    "approval_created": false
+  },
+  "runner_verification": {
+    "schema": 1,
+    "passed": true,
+    "reviewed": true,
+    "reviewed_utc": "2026-10-25T03:37:26.846760+00:00",
+    "files": {
+      "trial.py": "5196f0c6c20e9cab2597601db88e6db905c5f60dfdc47a3b4b835587237416ad",
+      "test_trial.py": "dccf896765ab9e5b16db6aa21f61a25023ee43e12a6c30ca3370c55922446f2f",
+      "snapshot-before.sh": "ed921abc3ccd3b3030b029ce7bc1b6834ee549ecc56ae8d09cf9c1dc246d0641",
+      "wan-probe.sh": "7bbfd5668480f9112d1850a829188248d8e3bbce35c58097ca576e83fa3bd7df",
+      "qualify-trial-reset.py": "35144278aaf79468f285a9ae4a552f6a529e6a899b2a117c85898403f7b7ce95",
+      "qualify-kiosk-hang.py": "0757f97bae7ed891728d2284596d64f3c3f853f630c72689468f86b97113c6b3",
+      "reset_trial": "854ca49523654a57915aa30824becdb041bec9d2e00531a1edb317c325708256",
+      "report.py": "b339ccb9eab8a52b1f1ab88036adf4692b7635c2f02e20148582cd2bf3d70c8e",
+      "case.json": "ab505ba2b9ab25d946753c5bbd610a8b4177cb5cf59ccdc4dc07ab990e1d7e2b"
+    },
+    "local_tests_passed": 19,
+    "case_bound_to_published_generation": 14,
+    "source": "c68b21063f0bc062936285249a04b55d390acc4a",
+    "payload": {
+      "bytes": 133765909,
+      "sha256": "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c"
+    },
+    "planned_connections": [
+      "initial",
+      "trial-after-prepared-install",
+      "return-after-reset-intent-and-closure",
+      "normal-after-explicit-normal-reboot"
+    ],
+    "no_automatic_reconnect": true,
+    "reset_attempts": 1,
+    "physical_approval": false
+  },
+  "backup": {
+    "passed": true,
+    "archive": "/home/data/workspace/space-wars2/target/manual-install-qualification/f97a8d1d/backup-rsync-v2/recovery-exports-rsync-fake-super.tar",
+    "bytes": 86691840,
+    "sha256": "739389b0edd745d638cb141e3e857ddbe52c9ad31ebb9bc8b640158e978ccc6f",
+    "owner_disk_access_confirmed_previously": true,
+    "privileged_offline_restore_performed": false,
+    "note": "Decode fake-super metadata during separately reviewed offline restore; never restore consumed OTA history",
+    "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+    "monotonic": 36459.508366671,
+    "utc_seconds": 1792899447.2644775
+  },
+  "wan_isolation": {
+    "mechanism": "Owner-applied router parental controls for this device",
+    "owner_confirmation": {
+      "note": "Owner confirmed: WAN is blocked but LAN remains enabled for sw-picade-2 (192.168.1.142, dc:a6:32:82:36:0e).",
+      "device": "swadmin@sw-picade-2.local",
+      "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+      "monotonic": 51073.476930678,
+      "utc_seconds": 1792914061.2330418
+    },
+    "sampled_direct_ip_https": true,
+    "ipv6_external_route_before": false,
+    "restored": {
+      "note": "Owner confirmed: Internet access restored for sw-picade-2 (192.168.1.142, dc:a6:32:82:36:0e).",
+      "host_boot_id": "500991ca-cd3f-4d5d-8573-4ba2a794c1e9",
+      "monotonic": 51423.121885215,
+      "utc_seconds": 1792914410.8779962
+    }
+  },
+  "preparation_continuation": {
+    "reason": "The preparation SSH master was absent after approximately four hours waiting for the WAN block; its configured idle lifetime was 7200 seconds. The cause of closure was not observed.",
+    "one_new_preparation_connection": true,
+    "no_install_or_fault_had_started": true,
+    "same_normal_boot_reverified": true,
+    "history_and_data_reverified": true,
+    "readiness_receipt": "resume-preparation-result.json"
+  },
+  "remaining_qualification": {
+    "observed_cases": [
+      "healthy-trial",
+      "normal-boot",
+      "kiosk-hang",
+      "repeated-failure",
+      "trial-reset"
+    ],
+    "pending_cases": [
+      "root-startup-failure",
+      "recovery-service-failure",
+      "kiosk-crash",
+      "watchdog-handoff",
+      "interrupted-promotion",
+      "power-loss"
+    ],
+    "owner_review_pending": true,
+    "approval_created": false
+  },
+  "stage_receipt_note": "Pending and pre-publication flags in earlier preparation, helper-build, publication-plan and return receipts describe those earlier stages; publication, normal_boot and closeout contain their completed outcomes.",
+  "prior_failure_history": {
+    "6d385a570a35633b6aee96a5fcc4f17975b1ad822b5778f81d5c6971500031b5": {
+      "generation": 13,
+      "attempts": 2,
+      "reason": "health-timeout"
+    }
+  },
+  "final_failure_history": {
+    "654f84874e2a2a4eec36c2b60cbdca5f6b1608c35141f133fa23fa44e718152c": {
+      "generation": 14,
+      "attempts": 1,
+      "reason": "trial-reset"
+    },
+    "6d385a570a35633b6aee96a5fcc4f17975b1ad822b5778f81d5c6971500031b5": {
+      "generation": 13,
+      "attempts": 2,
+      "reason": "health-timeout"
+    }
+  }
+}

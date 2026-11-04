@@ -1,6 +1,7 @@
 name: Clock mixed-event regression
 
-# Optional headless behavior sweep; ten smoke/recovery cases remain on PRs.
+# Manual mixed-event sweep. Comprehensive nightly also runs this plus the three
+# extended duck platform/profile sweeps; fast regression cases remain on PRs.
 on:
   workflow_dispatch:
 
@@ -33,6 +34,7 @@ jobs:
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Replay the 240-visit sweep without a renderer or real-time waits
         run: |
           cargo nextest run --locked -p scenario-clock --cargo-profile ci --profile ci \

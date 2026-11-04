@@ -68,7 +68,8 @@ fn taking_control_of_a_wet_automatic_duck_preserves_rain_motion_and_its_clock() 
         state.phase_tick(),
         state.event_id(),
     );
-    let world = state.duck_visit.as_ref().unwrap().arena_world() as *const _;
+    let activity = engine_rapier::world::physics_activity();
+    let worlds = state.arena_accounting().worlds;
     state.toggle_player_duck(2);
     assert_eq!(state.duck_state(), None);
     let player = state.player_duck_state().unwrap();
@@ -85,9 +86,11 @@ fn taking_control_of_a_wet_automatic_duck_preserves_rain_motion_and_its_clock() 
         time
     );
     assert_eq!(
-        state.duck_visit.as_ref().unwrap().arena_world() as *const _,
-        world
+        engine_rapier::world::physics_activity(),
+        activity,
+        "the visit keeps its world"
     );
+    assert_eq!(state.arena_accounting().worlds, worlds, "the same arena");
 }
 
 #[test]
@@ -131,6 +134,10 @@ fn ordinary_demo_schedule_can_rain_on_an_existing_automatic_duck() {
         crow: false,
         explosion: false,
         aquarium: false,
+        cell_swap: false,
+        grass: false,
+        slot_machine: false,
+        spider: false,
     };
     state.configure(settings);
     for _ in 0..800 {
@@ -250,5 +257,67 @@ fn automatic_actor_departure_retains_shared_event_bodies_and_resize_releases_bot
         assert_eq!(state.event_kind(), None);
         assert_eq!((state.body_count(), state.collider_count()), (0, 0));
         assert_eq!(state.floor_mode(), engine_common::ClockFloorMode::Closed);
+    }
+}
+
+#[test]
+fn clock_grass_contract_automatic_duck_exits_retained_soil_course() {
+    for seed in [0, 1, 2, 215, 4242] {
+        let mut control_course_seed = None;
+        for introduction in [ClockEventKind::ColorCycle, ClockEventKind::Grass] {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    event_profile: ClockEventProfile::Off,
+                    ..Default::default()
+                },
+                seed,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[
+                    ClockAction::set_reading(ClockReading::new(12, 34, 56).unwrap()),
+                    ClockAction::preview_event(introduction),
+                ],
+                Duration::ZERO,
+            );
+            // Retained-soil case begins after the five-second delivery boundary.
+            ticks(&mut state, 301);
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Duck)],
+                Duration::ZERO,
+            );
+            let course_seed = state.duck_state().unwrap().navigation.unwrap().course_seed;
+            if let Some(control) = control_course_seed {
+                assert_eq!(
+                    course_seed, control,
+                    "matched admission count and Duck seed"
+                );
+            } else {
+                control_course_seed = Some(course_seed);
+            }
+            let mut result = None;
+            for tick in 1..=2500 {
+                ticks(&mut state, 1);
+                if let Some(duck) = state.duck_state() {
+                    if let Some(outcome) = duck.outcome {
+                        result = Some((tick, outcome, duck.cleared_obstacles, duck.obstacle_count));
+                        break;
+                    }
+                }
+            }
+            let (tick, outcome, cleared, count) = result.unwrap_or_else(|| {
+                panic!("seed={seed} introduction={introduction:?}: no outcome within 2500 ticks")
+            });
+            println!(
+                "seed={seed} introduction={introduction:?} tick={tick} outcome={outcome:?} cleared={cleared}/{count}"
+            );
+            assert_eq!(
+                outcome,
+                engine_common::ClockDuckOutcome::Exited,
+                "seed={seed} introduction={introduction:?}"
+            );
+            assert_eq!(cleared, count, "seed={seed} introduction={introduction:?}");
+        }
     }
 }

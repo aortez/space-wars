@@ -1,0 +1,314 @@
+{
+  "scope": "Pi 4 production GPU captures of seed 7; conservative pre-export windows.",
+  "desktop_replay_checked": true,
+  "pairs": {
+    "on-r1": {
+      "updates": 1200,
+      "fingerprints_identical": true
+    },
+    "on-r2": {
+      "updates": 1200,
+      "fingerprints_identical": true
+    },
+    "off-r1": {
+      "updates": 1200,
+      "fingerprints_identical": true
+    }
+  },
+  "runs": {
+    "every-on-r1": {
+      "simulation": "worker",
+      "ui_core_mean_pct": 31.42613151152861,
+      "process_mean_pct": 113.895327558863,
+      "longest_ui_core_ge95_s": 0,
+      "cpu_intervals": 18,
+      "kms_windows": 4,
+      "flip_intervals": 950,
+      "flip_ms": {
+        "mean": 16.665461052631578,
+        "p50": 16.666,
+        "p95": 16.673,
+        "p99": 16.682,
+        "max": 16.728
+      },
+      "flip_intervals_over_25ms": 0,
+      "ui_stage_mean_ms": {
+        "loop": 16.633248559748427,
+        "app_host_step": 0.009851905660377358,
+        "render": 16.264545822851154,
+        "flip_wait": 11.406902150943397
+      },
+      "update_ms": {
+        "mean": 14.512942173333334,
+        "p50": 15.204374,
+        "p95": 28.019009,
+        "p99": 46.25256099999999,
+        "max": 119.130012
+      },
+      "phase_mean_ms": {
+        "gravity": 2.0909890158333333,
+        "physics_total": 11.626847338333333,
+        "broad_phase": 1.0449354308333334,
+        "narrow_phase": 4.4346292775,
+        "solver": 1.9144170158333333,
+        "ccd": 1.941756775
+      },
+      "peak_updates_per_frame": 1.033,
+      "worker_dropped_backlogs": 44.0,
+      "event_game_speed": 0.8627488572933243,
+      "temperature_c": {
+        "mean": 69.05883333333333,
+        "p50": 69.14,
+        "p95": 70.601,
+        "p99": 70.601,
+        "max": 70.601
+      },
+      "throttle_bits": 0
+    },
+    "fresh-on-r1": {
+      "simulation": "worker",
+      "ui_core_mean_pct": 27.109666546286263,
+      "process_mean_pct": 108.05344889851932,
+      "longest_ui_core_ge95_s": 0,
+      "cpu_intervals": 18,
+      "kms_windows": 5,
+      "flip_intervals": 725,
+      "flip_ms": {
+        "mean": 19.423864827586208,
+        "p50": 16.666,
+        "p95": 33.336,
+        "p99": 49.978,
+        "max": 66.66
+      },
+      "flip_intervals_over_25ms": 110,
+      "ui_stage_mean_ms": {
+        "loop": 14.486770226027398,
+        "app_host_step": 0.009637605479452055,
+        "render": 11.245780795890411,
+        "flip_wait": 6.781292543835616
+      },
+      "update_ms": {
+        "mean": 14.253074995833334,
+        "p50": 14.984079000000001,
+        "p95": 26.267263,
+        "p99": 42.226371,
+        "max": 110.01455
+      },
+      "phase_mean_ms": {
+        "gravity": 2.1197668916666665,
+        "physics_total": 11.332048206666666,
+        "broad_phase": 0.9625445233333334,
+        "narrow_phase": 4.2530005625000005,
+        "solver": 1.85522703,
+        "ccd": 1.9429375466666667
+      },
+      "peak_updates_per_frame": 1.192,
+      "worker_dropped_backlogs": 48.0,
+      "event_game_speed": 0.8733830610894006,
+      "temperature_c": {
+        "mean": 66.92144444444445,
+        "p50": 67.192,
+        "p95": 69.14,
+        "p99": 69.14,
+        "max": 69.14
+      },
+      "throttle_bits": 0
+    },
+    "every-on-r2": {
+      "simulation": "worker",
+      "ui_core_mean_pct": 30.39381493114279,
+      "process_mean_pct": 112.39429813964726,
+      "longest_ui_core_ge95_s": 0,
+      "cpu_intervals": 18,
+      "kms_windows": 4,
+      "flip_intervals": 954,
+      "flip_ms": {
+        "mean": 16.66549685534591,
+        "p50": 16.665,
+        "p95": 16.673,
+        "p99": 16.68,
+        "max": 16.713
+      },
+      "flip_intervals_over_25ms": 0,
+      "ui_stage_mean_ms": {
+        "loop": 16.639100369519834,
+        "app_host_step": 0.009820441544885178,
+        "render": 16.28237635073069,
+        "flip_wait": 11.489968373695199
+      },
+      "update_ms": {
+        "mean": 14.704443549166667,
+        "p50": 14.920987,
+        "p95": 29.145462,
+        "p99": 47.522161,
+        "max": 125.02359
+      },
+      "phase_mean_ms": {
+        "gravity": 2.1753594499999998,
+        "physics_total": 11.70965901,
+        "broad_phase": 1.0057932183333333,
+        "narrow_phase": 4.45779638,
+        "solver": 1.9277017266666667,
+        "ccd": 1.974701895
+      },
+      "peak_updates_per_frame": 1.008,
+      "worker_dropped_backlogs": 55.0,
+      "event_game_speed": 0.850031908104586,
+      "temperature_c": {
+        "mean": 66.00155555555556,
+        "p50": 66.218,
+        "p95": 67.679,
+        "p99": 67.679,
+        "max": 67.679
+      },
+      "throttle_bits": 0
+    },
+    "fresh-on-r2": {
+      "simulation": "worker",
+      "ui_core_mean_pct": 27.008712487899324,
+      "process_mean_pct": 108.27686350435624,
+      "longest_ui_core_ge95_s": 0,
+      "cpu_intervals": 18,
+      "kms_windows": 5,
+      "flip_intervals": 681,
+      "flip_ms": {
+        "mean": 19.234997063142437,
+        "p50": 16.666,
+        "p95": 33.334,
+        "p99": 49.996,
+        "max": 50.013
+      },
+      "flip_intervals_over_25ms": 95,
+      "ui_stage_mean_ms": {
+        "loop": 14.204070263848397,
+        "app_host_step": 0.00960495918367347,
+        "render": 11.322716912536443,
+        "flip_wait": 6.942633188046647
+      },
+      "update_ms": {
+        "mean": 14.2771608425,
+        "p50": 15.219948,
+        "p95": 26.113672,
+        "p99": 40.601033,
+        "max": 108.228137
+      },
+      "phase_mean_ms": {
+        "gravity": 2.1083748058333334,
+        "physics_total": 11.364456080833333,
+        "broad_phase": 0.9438050375,
+        "narrow_phase": 4.2380323125,
+        "solver": 1.8596920458333335,
+        "ccd": 1.9791070608333334
+      },
+      "peak_updates_per_frame": 1.175,
+      "worker_dropped_backlogs": 45.0,
+      "event_game_speed": 0.8738255635054343,
+      "temperature_c": {
+        "mean": 65.7851111111111,
+        "p50": 66.218,
+        "p95": 67.192,
+        "p99": 67.192,
+        "max": 67.192
+      },
+      "throttle_bits": 0
+    },
+    "every-off-r1": {
+      "simulation": "worker",
+      "ui_core_mean_pct": 17.744815272627385,
+      "process_mean_pct": 28.8421920065925,
+      "longest_ui_core_ge95_s": 0,
+      "cpu_intervals": 16,
+      "kms_windows": 4,
+      "flip_intervals": 954,
+      "flip_ms": {
+        "mean": 16.665447589098534,
+        "p50": 16.665,
+        "p95": 16.668,
+        "p99": 16.679,
+        "max": 16.694
+      },
+      "flip_intervals_over_25ms": 0,
+      "ui_stage_mean_ms": {
+        "loop": 16.63672054906054,
+        "app_host_step": 0.009849698329853862,
+        "render": 16.329264013569937,
+        "flip_wait": 13.73865727348643
+      },
+      "update_ms": {
+        "mean": 1.7077495341666666,
+        "p50": 1.6107459999999998,
+        "p95": 2.951161,
+        "p99": 5.51938,
+        "max": 71.555959
+      },
+      "phase_mean_ms": {
+        "gravity": 0.4467450983333333,
+        "physics_total": 1.1713562916666667,
+        "broad_phase": 0.13397226333333334,
+        "narrow_phase": 0.32907392166666666,
+        "solver": 0.2573685883333333,
+        "ccd": 0.21005623750000002
+      },
+      "peak_updates_per_frame": 1.033,
+      "worker_dropped_backlogs": 7.0,
+      "event_game_speed": null,
+      "temperature_c": {
+        "mean": 64.1178125,
+        "p50": 64.27,
+        "p95": 64.757,
+        "p99": 64.757,
+        "max": 64.757
+      },
+      "throttle_bits": 0
+    },
+    "fresh-off-r1": {
+      "simulation": "worker",
+      "ui_core_mean_pct": 17.86641169239175,
+      "process_mean_pct": 28.52069389427674,
+      "longest_ui_core_ge95_s": 0,
+      "cpu_intervals": 16,
+      "kms_windows": 4,
+      "flip_intervals": 862,
+      "flip_ms": {
+        "mean": 16.83944199535963,
+        "p50": 16.665,
+        "p95": 16.669,
+        "p99": 16.702,
+        "max": 49.995
+      },
+      "flip_intervals_over_25ms": 7,
+      "ui_stage_mean_ms": {
+        "loop": 16.100334344110856,
+        "app_host_step": 0.009811192840646651,
+        "render": 15.193052024249422,
+        "flip_wait": 12.587457003464204
+      },
+      "update_ms": {
+        "mean": 1.6019026425,
+        "p50": 1.538728,
+        "p95": 2.965327,
+        "p99": 6.198652,
+        "max": 60.420773999999994
+      },
+      "phase_mean_ms": {
+        "gravity": 0.44181772333333336,
+        "physics_total": 1.0729164816666665,
+        "broad_phase": 0.11548348333333334,
+        "narrow_phase": 0.2982813425,
+        "solver": 0.23352498166666666,
+        "ccd": 0.20338966166666667
+      },
+      "peak_updates_per_frame": 1.083,
+      "worker_dropped_backlogs": 7.0,
+      "event_game_speed": null,
+      "temperature_c": {
+        "mean": 63.113375,
+        "p50": 62.809,
+        "p95": 64.27,
+        "p99": 64.27,
+        "max": 64.27
+      },
+      "throttle_bits": 0
+    }
+  }
+}

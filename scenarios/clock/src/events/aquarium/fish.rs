@@ -2,6 +2,7 @@ use super::*;
 use navigation::{Navigation, Obstacle};
 
 pub(crate) const MAX_FISH: usize = 12;
+const MAX_PITCH: f32 = 25.0 * std::f32::consts::PI / 180.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Species {
@@ -34,7 +35,10 @@ pub(crate) struct Fish {
     pub species: Species,
     pub position: Vec2,
     pub velocity: Vec2,
-    pub heading: f32,
+    /// Nose-up/down pitch; horizontal facing turns independently through depth.
+    pub pitch: f32,
+    pub facing: f32,
+    facing_target: f32,
     pub tail_phase: f32,
     pub(super) journey: Journey,
     frightened: u32,
@@ -42,6 +46,26 @@ pub(crate) struct Fish {
 }
 
 impl Fish {
+    fn update_posture(&mut self, scale: f32) {
+        // Keep the last facing during a hover or vertical passage. Tiny current
+        // changes must not trigger repeated left/right turns.
+        if self.velocity.x.abs() > scale * 0.35 {
+            self.facing_target = self.velocity.x.signum();
+        }
+        let turn_step = 6.0 * DT;
+        self.facing += (self.facing_target - self.facing).clamp(-turn_step, turn_step);
+        let desired_pitch = self
+            .velocity
+            .y
+            .atan2(self.velocity.x.abs().max(scale * 0.8))
+            .clamp(-MAX_PITCH, MAX_PITCH);
+        // Level out while turning edge-on, and relax toward level at rest.
+        let desired_pitch = desired_pitch * self.facing.abs();
+        self.pitch += (desired_pitch - self.pitch) * 0.1;
+        self.tail_phase = (self.tail_phase + 0.13 + self.velocity.length() / scale * 0.045)
+            .rem_euclid(std::f32::consts::TAU);
+    }
+
     pub fn visible(&self) -> bool {
         matches!(
             self.journey,
@@ -79,7 +103,9 @@ impl School {
                 },
                 position: Vec2::ZERO,
                 velocity: Vec2::ZERO,
-                heading: 0.0,
+                pitch: 0.0,
+                facing: 1.0,
+                facing_target: 1.0,
                 tail_phase: i as f32 * 1.7,
                 journey: Journey::Waiting,
                 frightened: 0,
@@ -215,7 +241,7 @@ impl School {
                 } else if gathering && (fish.position - port).length() < layout.pitch * 1.5 {
                     port
                 } else {
-                    self.nav.waypoint(fish.position, field)
+                    self.nav.waypoint(fish.position, field, water)
                 };
                 let mut steering = (target - fish.position).normalized();
                 let mut speed = layout.pitch
@@ -280,17 +306,17 @@ impl School {
                 for _ in 0..4 {
                     let delta = fish.velocity * (DT / 4.0);
                     let next = fish.position + delta;
-                    if self.nav.fits(next, water) {
+                    if self.nav.fits_route(next, water) {
                         fish.position = next;
                     } else if self
                         .nav
-                        .fits(fish.position + Vec2::new(delta.x, 0.0), water)
+                        .fits_route(fish.position + Vec2::new(delta.x, 0.0), water)
                     {
                         fish.position.x += delta.x;
                         fish.velocity.y *= 0.6;
                     } else if self
                         .nav
-                        .fits(fish.position + Vec2::new(0.0, delta.y), water)
+                        .fits_route(fish.position + Vec2::new(0.0, delta.y), water)
                     {
                         fish.position.y += delta.y;
                         fish.velocity.x *= 0.6;
@@ -302,14 +328,7 @@ impl School {
                     fish.journey = Journey::Leaving;
                 }
             }
-            if fish.velocity.length() > 1.0 {
-                let desired = fish.velocity.y.atan2(fish.velocity.x);
-                let difference = (desired - fish.heading + std::f32::consts::PI)
-                    .rem_euclid(std::f32::consts::TAU)
-                    - std::f32::consts::PI;
-                fish.heading += difference * 0.18;
-            }
-            fish.tail_phase += 0.13 + fish.velocity.length() / layout.pitch * 0.045;
+            fish.update_posture(layout.pitch);
         }
     }
 
@@ -320,5 +339,44 @@ impl School {
                 self.failed += 1;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod posture_tests {
+    use super::*;
+
+    #[test]
+    fn ascent_descent_hover_and_reversal_keep_the_body_upright() {
+        let layout = Layout::new(800.0 / 480.0);
+        let mut school = School::new(layout, 177, fish_radius(layout));
+        let fish = &mut school.fish[0];
+        for velocity in [Vec2::new(0.0, 100.0), Vec2::new(0.0, -100.0)] {
+            fish.velocity = velocity;
+            for _ in 0..180 {
+                fish.update_posture(layout.pitch);
+            }
+            assert!(fish.pitch.abs() <= MAX_PITCH);
+            assert!(fish.pitch.abs() > MAX_PITCH * 0.9);
+            assert_eq!(fish.pitch.signum(), velocity.y.signum());
+            assert_eq!(fish.facing, 1.0, "vertical travel retains facing");
+        }
+        fish.velocity = Vec2::new(-100.0, 0.0);
+        let mut edge_on = false;
+        for _ in 0..60 {
+            let previous = fish.facing;
+            fish.update_posture(layout.pitch);
+            assert!((fish.facing - previous).abs() <= 6.0 * DT + 1e-6);
+            assert!(fish.pitch.abs() <= MAX_PITCH);
+            edge_on |= fish.facing.abs() < 0.2;
+        }
+        assert!(edge_on);
+        assert_eq!(fish.facing, -1.0);
+        for tick in 0..180 {
+            fish.velocity = Vec2::new(if tick % 2 == 0 { 0.1 } else { -0.1 }, 0.0);
+            fish.update_posture(layout.pitch);
+            assert_eq!(fish.facing, -1.0, "hover jitter must not reverse facing");
+        }
+        assert!(fish.pitch.abs() < 0.001);
     }
 }

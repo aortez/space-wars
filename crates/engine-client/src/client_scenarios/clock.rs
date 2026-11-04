@@ -14,7 +14,11 @@ use super::{
 use crate::input::ClientInput;
 use crate::render::{FrameLayout, Viewport};
 
+#[cfg(test)]
+mod arena_tests;
 pub(super) mod benchmark;
+#[cfg(test)]
+mod digit_surface_tests;
 #[cfg(test)]
 mod floor_tests;
 #[cfg(test)]
@@ -28,7 +32,7 @@ mod rain_tests;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Main(0),
     capabilities: ScenarioCapabilities {
         benchmark: false,
         headless_benchmark: true,
@@ -39,7 +43,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck join/dismiss: D / North / Picade bottom-right blue.\nMove/paddle: arrows / joystick. Run: Shift / South (bottom).\nJump/swim: Space/Z / East (right). Down: dive up to 4s; release at surface to recover.\nPicade 2: bottom-left pink runs; middle yellow jumps/swims.\nJoining pad owns duck; keys=P1. Neutral floats/drifts.\nHold Jump to swim; fresh press to jump on land.\nOff stops automatic events only. Pause freezes motion.",
+    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck join/dismiss: D / North / Picade bottom-right blue.\nMove/paddle: arrows / joystick. Run: Shift / South (bottom).\nJump/swim: Space/Z / East (right). Down: dive up to 4s; release at surface to recover.\nPicade 2: bottom-left pink runs; middle yellow jumps/swims.\nJoining pad owns duck; keys=P1. Neutral floats/drifts.\nHold Jump to swim/catch ledges; fresh press to jump on land.\nHanging: release Jump, press again to climb; Down drops.\nOff stops automatic events only. Pause freezes motion.",
     create,
 };
 
@@ -74,15 +78,28 @@ fn create(
             benchmark: Some(driver),
         }));
     }
+    let grass_fixture = std::env::var("SPACEWARS_CLOCK_GRASS_FIXTURE").unwrap_or_default();
     let mut state = ClockScenario::init(
         ClockConfig {
+            ceiling_sunlight: grass_fixture != "shortage-v1",
+            ceiling_optics: std::env::var("SPACEWARS_CLOCK_CEILING_OPTICS").is_ok_and(|v| v == "1"),
+            grass_inspection: std::env::var("SPACEWARS_CLOCK_GRASS_INSPECT")
+                .is_ok_and(|v| v == "1"),
+            favorable_grass_fixture: grass_fixture == "favorable-v1",
             fonts: settings.clock.fonts,
             aspect_ratio: viewport.aspect_ratio(),
             water_lab: scenario_clock::ClockWaterLab::from_override(
                 std::env::var("SPACEWARS_CLOCK_WATER_LAB").ok().as_deref(),
             ),
+            arena_fixture: scenario_clock::arena_fixture::FixtureStart::from_override(
+                std::env::var("SPACEWARS_CLOCK_ARENA_FIXTURE")
+                    .ok()
+                    .as_deref(),
+            ),
             duck_debug_overlay: std::env::var("SPACEWARS_CLOCK_DUCK_DEBUG")
                 .is_ok_and(|value| value == "1"),
+            duck_direct_flap_landing: std::env::var("SPACEWARS_CLOCK_DUCK_FLAP_DETOUR")
+                .is_ok_and(|value| value == "direct-landing"),
             duck_jump_profile: duck_jump_profile(
                 std::env::var("SPACEWARS_CLOCK_DUCK_PROFILE")
                     .ok()
@@ -102,6 +119,9 @@ fn create(
         },
         seed,
     );
+    if grass_fixture == "shortage-v1" {
+        state.set_plant_conditions(0, [0; 2]);
+    }
     let reading = local_clock_reading();
     ClockScenario::step(
         &mut state,
@@ -227,6 +247,8 @@ impl ClientScenario for ClockClientScenario {
                     blocked_by_player: self.state.event_blocked_by_player(event.kind),
                     blocked_by_duck: self.state.event_blocked_by_duck(event.kind),
                     blocked_by_crow: self.state.event_blocked_by_crow(event.kind),
+                    blocked_by_spider: self.state.event_blocked_by_spider(event.kind),
+                    blocked_by_arena: self.state.event_blocked_by_arena(event.kind),
                     automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
                 })
                 .collect(),
@@ -237,16 +259,22 @@ impl ClientScenario for ClockClientScenario {
             body_count: self.state.body_count(),
             collider_count: self.state.collider_count(),
             floor: self.state.floor_mode(),
+            arena: Some(self.state.arena_state()),
+            digit_surfaces: Some(self.state.digit_surface_state()),
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
             crow: self.state.crow_state(),
+            spider: self.state.spider_state(),
             explosion: self.state.explosion_state(),
             player_duck: self.state.player_duck_state(),
             automatic_events_suspended: self.state.automatic_events_suspended(),
             marquee: self.state.marquee_state(),
             digit_slide: self.state.digit_slide_state(),
+            cell_swap: self.state.cell_swap_state(),
+            grass: Some(self.state.grass_state()),
             rain: self.state.rain_state(),
             aquarium: self.state.aquarium_state(),
+            slot_machine: self.state.slot_machine_state(),
             reading: self
                 .state
                 .reading()

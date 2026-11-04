@@ -9,6 +9,9 @@ ROM_DIR="$CONFIG_DIR/roms"
 COREDUMP_DIR="$DATA_DIR/coredumps"
 VAR_LIB_LINK="/var/lib/spacewars"
 
+# Privileged device metadata must never be in the kiosk-owned subtree below.
+install -d -m 0700 -o root -g root /data/spacewars-system
+
 mkdir -p "$CONFIG_DIR" "$ROM_DIR" "$COREDUMP_DIR"
 chown -R spacewars:spacewars "$DATA_DIR"
 chmod 755 "$DATA_DIR" "$CONFIG_DIR" "$ROM_DIR" "$COREDUMP_DIR"

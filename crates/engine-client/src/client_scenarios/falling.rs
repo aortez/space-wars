@@ -17,7 +17,7 @@ use super::nes::{create_audio_output, spawn_native_nes_client};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "falling",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Main(4),
     capabilities: ScenarioCapabilities {
         benchmark: false,
         headless_benchmark: false,

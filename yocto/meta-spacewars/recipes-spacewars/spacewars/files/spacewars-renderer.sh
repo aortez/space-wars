@@ -14,9 +14,7 @@ case "$1" in
 esac
 [[ $(id -u) == 0 ]] || fail "Run through sudo."
 
-# Share the application update lock: never restart while binaries are replaced.
-exec 9>/run/lock/spacewars-fast-update.lock
-flock -n 9 || fail "An application update or renderer switch is running."
+# The fixed engine-os-manager entry point retains the shared OTA lock.
 state_dir=/run/spacewars-renderer
 [[ ! -L $state_dir ]] || fail "Unsafe renderer state directory."
 install -d -o root -g root -m 0755 "$state_dir"

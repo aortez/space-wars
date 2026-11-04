@@ -1,16 +1,26 @@
 //! Deterministic low-resolution clock scenario.
 
+mod arena;
+#[cfg(test)]
+mod arena_contract;
+pub mod arena_fixture;
 #[cfg(test)]
 mod autonomous_tests;
 mod calendar;
 #[cfg(test)]
 mod calendar_tests;
+pub mod ceiling;
+#[cfg(test)]
+mod cell_swap_tests;
 mod crow;
 #[cfg(test)]
 mod crow_tests;
 pub use calendar::ClockDate;
 #[cfg(test)]
 mod digit_slide_tests;
+#[cfg(test)]
+mod digit_surface_tests;
+pub mod digit_surfaces;
 mod digits;
 #[cfg(test)]
 mod event_tests;
@@ -23,9 +33,11 @@ mod floor_tests;
 #[cfg(test)]
 mod font_tests;
 mod fonts;
+pub mod grass;
 #[cfg(test)]
 mod input_tests;
 mod layout;
+pub mod lighting_fixture;
 #[cfg(test)]
 mod live_tests;
 mod meridiem;
@@ -36,14 +48,30 @@ mod player_tests;
 mod presentation;
 mod rain;
 mod render;
+pub mod spider;
 pub mod water_fixture;
 
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
+pub use arena::{
+    ARENA_CAPACITY, ArenaAccounting, MAX_ARENA_CLAIMS, MAX_RESIDENT_CLAIMS, Population, Remap,
+    Unavailable,
+};
+/// The switch bitfield's high byte may only carry bits the catalog defines, so
+/// this is derived from the catalog rather than written out: a new event kind
+/// that widened the field without widening this check would make every
+/// `configure` fail to decode, and the dropped action would leave the client
+/// waiting on a request the host never applied.
+const MAX_EVENT_FLAGS_HIGH_BYTE: u8 = (((1u16 << ClockEventKind::ALL.len()) - 1) >> 8) as u8;
+
+pub use digit_surfaces::{
+    DigitSurface, Footprint, Retirement, SurfaceAccounting, SurfaceChange, SurfaceChangeKind,
+    SurfaceId, SurfaceSource,
+};
 pub use digits::{
-    DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, SegmentId, SegmentKind, SegmentRepresentation,
-    SegmentState,
+    DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
+    SegmentRepresentation, SegmentState,
 };
 
 use engine_common::{
@@ -51,6 +79,7 @@ use engine_common::{
     ClockFontPool, ClockFontSettings, ClockMarqueeMessage, ClockMarqueePreset, ClockRainAmount,
     ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult, TickModel,
 };
+pub use events::cell_swap::{CELL_SWAP_FADE_TICKS, CELL_SWAP_MAX_TICKS, CELL_SWAP_TICKS};
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
 pub use events::duck::DUCK_TICKS;
 pub use events::marquee::MARQUEE_TICKS;
@@ -63,8 +92,10 @@ pub use events::{
     EventLifecycle, EventPhase, FALLING_TICKS, FIXED_HZ, REFORMING_TICKS,
 };
 use layout::Layout;
+/// How long a spider's visit may go on past its budget on its way out.
+pub use spider::visit::EXIT_GRACE_TICKS as SPIDER_EXIT_GRACE_TICKS;
 
-pub const CLOCK_ACTION_VERSION: u16 = 12;
+pub const CLOCK_ACTION_VERSION: u16 = 13;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -233,7 +264,9 @@ impl ClockAction {
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
             (CLOCK_ACTION_CONFIGURE, 14..=MAX_CONFIGURE_BYTES)
-                if payload[5] <= 3 && payload[8] <= 1 && payload[10] <= 1 =>
+                if payload[5] <= MAX_EVENT_FLAGS_HIGH_BYTE
+                    && payload[8] <= 1
+                    && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
                     fonts: ClockFontSettings {
@@ -263,6 +296,10 @@ impl ClockAction {
                         crow: payload[4] & 128 != 0,
                         explosion: payload[5] & 1 != 0,
                         aquarium: payload[5] & 2 != 0,
+                        cell_swap: payload[5] & 4 != 0,
+                        grass: payload[5] & 8 != 0,
+                        slot_machine: payload[5] & 16 != 0,
+                        spider: payload[5] & 32 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
@@ -365,8 +402,22 @@ pub struct ClockConfig {
     pub fonts: ClockFontSettings,
     pub aspect_ratio: f32,
     pub duck_debug_overlay: bool,
+    /// Opt-in direct-landing experiment, independent of saved Clock settings.
+    pub duck_direct_flap_landing: bool,
     /// Development-only water fixtures using the Meltdown lifecycle.
     pub water_lab: ClockWaterLab,
+    /// Development-only arena fixtures, residents from the run's start.
+    pub arena_fixture: arena_fixture::FixtureStart,
+    /// Explicit reproducible full-sun fixture; ordinary Clock remains dim.
+    pub favorable_grass_fixture: bool,
+    /// Isolate the pre-existing zero-input physiology fixture from sunlight.
+    /// Ordinary Clock always enables aperture illumination.
+    pub ceiling_sunlight: bool,
+    /// Publish fresh per-tick sunlight optics in the grass state. Diagnostic
+    /// workflows only; ordinary Clock skips that per-frame geometry query.
+    pub ceiling_optics: bool,
+    /// Read-only material-coordinate cutaway below the Clock face.
+    pub grass_inspection: bool,
     /// None chooses a seeded personality once per Duck event.
     pub duck_jump_profile: Option<engine_common::ClockDuckJumpProfile>,
     /// None selects a seeded course pattern, independently of personality.
@@ -387,7 +438,13 @@ impl Default for ClockConfig {
             fonts: ClockFontSettings::default(),
             aspect_ratio: DEFAULT_ASPECT_RATIO,
             duck_debug_overlay: false,
+            duck_direct_flap_landing: false,
             water_lab: ClockWaterLab::Off,
+            arena_fixture: arena_fixture::FixtureStart::None,
+            favorable_grass_fixture: false,
+            ceiling_sunlight: true,
+            ceiling_optics: false,
+            grass_inspection: false,
             duck_jump_profile: None,
             duck_course_pattern: None,
             time_format: ClockTimeFormat::TwentyFourHour,
@@ -408,7 +465,13 @@ impl ClockConfig {
             fonts: self.fonts,
             aspect_ratio: normalize_aspect_ratio(self.aspect_ratio),
             duck_debug_overlay: self.duck_debug_overlay,
+            duck_direct_flap_landing: self.duck_direct_flap_landing,
             water_lab: self.water_lab,
+            arena_fixture: self.arena_fixture,
+            favorable_grass_fixture: self.favorable_grass_fixture,
+            ceiling_sunlight: self.ceiling_sunlight,
+            ceiling_optics: self.ceiling_optics,
+            grass_inspection: self.grass_inspection,
             duck_jump_profile: self.duck_jump_profile,
             duck_course_pattern: self.duck_course_pattern,
             time_format: self.time_format,
@@ -429,14 +492,39 @@ pub struct ClockState {
     date_label: Option<String>,
     display: DisplaySnapshot,
     segments: Vec<SegmentState>,
+    // Who the lit digit cells are and what has happened to them. The face
+    // and the active event say where they are.
+    surfaces: digit_surfaces::SurfaceLedger,
+    // Where they stood at the end of the last step, as the ledger observed
+    // them there.
+    published: Vec<DigitSurface>,
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
     floor: floor::FloorManager,
+    ceiling: ceiling::Ceiling,
+    soil: Option<grass::SoilHabitat>,
+    plants: grass::ClockPlants,
+    grass_refusal: Option<&'static str>,
+    grass_seeded: usize,
     last_started_event: Option<ClockEventKind>,
     event_notice: Option<(&'static str, u64)>,
     // One physical visit, independent of the event scheduler and command source.
     // Automatic ducks keep their own bounded lifetime; players may stay longer.
     duck_visit: Option<Box<events::duck::DuckEvent>>,
+    // The shared rigid world and who holds it. A visit builds it on its first
+    // step or when an event claims it, and it stays while that visit or an
+    // event leasing it needs it. Standalone events keep their own worlds.
+    arena: arena::ClockArena,
+    // Residents of the arena for checking its standard, admitted only on
+    // request.
+    arena_fixtures: Vec<arena_fixture::ArenaFixture>,
+    // The spider in the arena, admitted only on request, and what became of
+    // the spiders the run has had.
+    spider: Option<spider::SpiderFixture>,
+    // The brain of a spider admitted as a visit, which decides the spider's
+    // intent each tick. A spider admitted for a test has none.
+    spider_visit: Option<spider::visit::SpiderVisit>,
+    spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -446,6 +534,349 @@ pub struct ClockState {
 }
 
 impl ClockState {
+    pub fn grass_state(&self) -> engine_common::ClockGrassState {
+        let o = self.plants.plants.observe();
+        // The two organisms share one runtime, so every per-tissue count names
+        // which one it is about. Only the resource ledger below stays a runtime
+        // total, because intake and upkeep are pooled before they are spent.
+        let is_moss = |t: &&engine_core::plants::Tissue| t.role == engine_core::plants::Role::Moss;
+        let grass = o.tissues.iter().filter(move |t| !is_moss(t));
+        let moss = o.tissues.iter().filter(is_moss);
+        let soil = self
+            .soil
+            .as_ref()
+            .map(|s| s.accounting())
+            .unwrap_or_default();
+        engine_common::ClockGrassState {
+            ceiling_optics: render::ceiling::optical_evidence(self),
+            ceiling_phase: format!("{:?}", self.ceiling.phase).to_lowercase(),
+            ceiling_elapsed_ms: self.ceiling.elapsed.as_millis().min(u64::MAX as u128) as u64,
+            ceiling_opening_milli: (self.ceiling.fraction() * 1000.0).round() as u16,
+            ceiling_sequence: self.ceiling.sequence,
+            ceiling_deliveries: self.ceiling.deliveries,
+            ceiling_cancellations: self.ceiling.cancellations,
+            ceiling_pending_material: self.ceiling.material.len(),
+            ceiling_planned_material: self.ceiling.planned_material,
+            ceiling_committed_material: self.ceiling.committed_material,
+            ceiling_cancelled_material: self.ceiling.cancelled_material,
+            stressed_tissues: grass
+                .clone()
+                .filter(|t| t.health > 0 && (t.shade_ticks > 0 || t.shortage_ticks > 0))
+                .count(),
+            dead_tissues: grass.clone().filter(|t| t.health == 0).count(),
+            moss_tissues: moss.clone().filter(|t| t.health > 0).count(),
+            moss_stressed: moss
+                .clone()
+                .filter(|t| t.health > 0 && (t.shade_ticks > 0 || t.shortage_ticks > 0))
+                .count(),
+            moss_dead: moss.clone().filter(|t| t.health == 0).count(),
+            biology_tick: o.tick,
+            soil_added: soil.added,
+            soil_retained: soil.retained,
+            soil_exported: soil.exported,
+            living_tissues: grass.clone().filter(|t| t.health > 0).count(),
+            mature_blades: grass
+                .clone()
+                .filter(|t| {
+                    t.role == engine_core::plants::Role::Shoot && t.size >= 3 && t.health > 0
+                })
+                .count(),
+            shoots: grass
+                .clone()
+                .filter(|t| t.role == engine_core::plants::Role::Shoot && t.health > 0)
+                .count(),
+            organisms: o
+                .tissues
+                .iter()
+                .filter(|t| t.health > 0)
+                .map(|t| t.organism)
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+            reserves: std::array::from_fn(|i| o.tissues.iter().map(|t| t.stores[i]).sum()),
+            intake: o.ledger.intake,
+            maintenance: o.ledger.maintenance,
+            development: std::array::from_fn(|i| o.tissues.iter().map(|t| t.invested[i]).sum()),
+            seeded: self.grass_seeded,
+            refusal: self.grass_refusal.map(str::to_owned),
+            intensity: self.plants.intensity,
+            optical_refusals: self.plants.optical_refusals,
+            inspection: grass::inspection::snapshot(self),
+        }
+    }
+
+    fn introduce_grass(&mut self) {
+        self.grass_seeded = 0;
+        let refusal = if !self.config.events.grass {
+            Some("Future grass seeding is disabled")
+        } else if self.plants.grass_tissues() > 0 {
+            Some("Grass resident capacity is occupied")
+        } else {
+            None
+        };
+        self.grass_refusal = refusal;
+        if refusal.is_none() {
+            self.admit_soil_delivery(true);
+            let soil = self.soil.as_ref().unwrap();
+            let width = soil.terrain().width() as i32;
+            let layout = Layout::new(self.aspect_ratio());
+            // One lit window per opening. The fixture keeps its own fixed
+            // habitat, which no opening geometry decides.
+            let windows: Vec<(f32, f32)> = if self.config.favorable_grass_fixture {
+                vec![(f32::NEG_INFINITY, f32::INFINITY)]
+            } else {
+                self.ceiling
+                    .sources(layout)
+                    .iter()
+                    .map(|a| (a.left, a.right))
+                    .collect()
+            };
+            // Seeds are shared between the openings, so the resident budget is
+            // the same whether the ceiling broke once or several times. A lone
+            // opening keeps the original spaced batch.
+            let (sites, found_habitat) = {
+                let eligible = |x, window: (f32, f32)| {
+                    let cell = [x, grass::SOIL_DEPTH_CELLS as i32 - 1];
+                    soil.terrain()
+                        .cell(engine_terrain::CellCoord::new(cell[0], cell[1]))
+                        .is_some_and(|c| c.material == grass::CLOCK_DIRT)
+                        && soil
+                            .world_point(cell)
+                            .is_some_and(|p| p.x >= window.0 && p.x <= window.1)
+                };
+                let mut sites: Vec<i32> = Vec::new();
+                let mut found = false;
+                for (index, window) in windows.iter().enumerate() {
+                    let start = if self.config.favorable_grass_fixture {
+                        10
+                    } else {
+                        soil.column_at((window.0 + window.1) * 0.5)
+                    };
+                    let Some(center) = (0..width)
+                        .map(|i| (start + i).rem_euclid(width))
+                        .find(|x| eligible(*x, *window))
+                    else {
+                        continue;
+                    };
+                    found = true;
+                    let share = grass::SEED_BATCH / windows.len()
+                        + usize::from(index < grass::SEED_BATCH % windows.len());
+                    // Spacing follows the opening's own lit width. Fixed wide
+                    // spacing would place the side seeds outside a narrow
+                    // patch, where the light that has to feed them never
+                    // reaches. A roomy opening keeps the original spacing.
+                    let columns = soil
+                        .columns_within(window.0, window.1)
+                        .map_or(grass::SEED_SPACING_CELLS * 3, |(low, high)| {
+                            high.saturating_sub(low).saturating_add(1)
+                        });
+                    let step = (columns / 3).clamp(1, grass::SEED_SPACING_CELLS);
+                    let chosen: Vec<_> = [0, -step, step]
+                        .into_iter()
+                        .take(share)
+                        .map(|offset| center + offset)
+                        .filter(|x| eligible(*x, *window) && !sites.contains(x))
+                        .collect();
+                    sites.extend(chosen);
+                }
+                (sites, found)
+            };
+            for x in sites {
+                if self.plant_grass(x).is_ok() {
+                    self.grass_seeded += 1;
+                }
+            }
+            if !found_habitat {
+                self.grass_refusal = Some("No safe dirt habitat fits a seed");
+            } else if self.grass_seeded == 0 {
+                self.grass_refusal = Some("No seed capacity or safe dirt contact");
+            }
+        }
+        self.event_notice = Some((
+            self.grass_refusal.unwrap_or("Grass seeds planted"),
+            self.schedule.tick + grass::INTRODUCTION_TICKS,
+        ));
+    }
+    pub fn plants(&self) -> &grass::ClockPlants {
+        &self.plants
+    }
+    pub fn set_plant_playback(&mut self, playback: grass::PlantPlayback) {
+        self.plants.playback = playback;
+    }
+    pub fn set_plant_conditions(&mut self, intensity: u16, availability: [u16; 2]) -> bool {
+        if intensity > 1000 || availability.into_iter().any(|x| x > 1000) {
+            return false;
+        }
+        self.plants.intensity = intensity;
+        self.plants.availability = availability;
+        true
+    }
+    /// Explicit seed-admission seam; the periodic introduction will call this.
+    pub fn plant_grass(&mut self, column: i32) -> Result<u64, engine_core::plants::Rejection> {
+        self.synchronize_soil();
+        self.plants.plant(
+            self.soil
+                .as_ref()
+                .ok_or(engine_core::plants::Rejection::Space)?,
+            column,
+        )
+    }
+
+    fn advance_plants(&mut self, dt: Duration) {
+        if dt.is_zero() {
+            return;
+        }
+        let Some(soil) = self.soil.as_ref() else {
+            return;
+        };
+        let world =
+            arena::canonical_world(&self.active_event, self.duck_visit.is_some(), &self.arena);
+        if let Some(world) = world {
+            self.plants.crush(soil, world);
+        }
+        let transparent: Vec<_> = world
+            .into_iter()
+            .flat_map(|w| w.collider_ids())
+            .filter(|id| id.entity.value() == grass::SOIL_PHYSICS_ID)
+            .collect();
+        let geometry = world.map(|w| w.query_snapshot());
+        let crow = render::plant_actor_polygons(self);
+        let soil = self.soil.as_ref().unwrap();
+        self.plants.crush_polygons(soil, &crow);
+        if self.plants.biology_due(dt) {
+            self.plants.host_polygons = render::plant_face_polygons(self);
+            self.plants.host_polygons.extend(crow);
+        }
+        self.plants
+            .advance(dt, soil, geometry.as_ref(), &transparent, Vec::new());
+    }
+    pub fn soil(&self) -> Option<&grass::SoilHabitat> {
+        self.soil.as_ref()
+    }
+
+    /// Material commitment seam for the forthcoming seeding introduction.
+    /// Admission alone does not introduce seeds or modify the event schedule.
+    pub fn admit_soil(&mut self) -> grass::SoilAdmissionPlan {
+        self.admit_soil_delivery(false)
+    }
+    /// The layer covers every actual horizontal support, not a lit region: an
+    /// aperture decides where plants can live, never where material may rest.
+    /// `planned_only` commits just the sites the ceiling planned at its start.
+    fn admit_soil_delivery(&mut self, planned_only: bool) -> grass::SoilAdmissionPlan {
+        use engine_rapier::world::{CollisionGroups, PhysicsId};
+        let layout = Layout::new(self.aspect_ratio());
+        self.synchronize_soil();
+        let (surfaces, _) = self.soil_surfaces();
+        let supports: Vec<_> = surfaces
+            .iter()
+            .map(|s| (s.left, s.right))
+            .filter(|(a, b)| a < b)
+            .collect();
+        let world =
+            arena::canonical_world(&self.active_event, self.duck_visit.is_some(), &self.arena);
+        let soil = self
+            .soil
+            .get_or_insert_with(|| grass::SoilHabitat::new(layout));
+        let allowed = planned_only.then(|| {
+            self.ceiling
+                .material
+                .iter()
+                .map(|s| (s.column, s.row))
+                .collect::<std::collections::BTreeSet<_>>()
+        });
+        let plan = soil.admit(&supports, |site| {
+            if allowed
+                .as_ref()
+                .is_some_and(|sites| !sites.contains(&(site.column, site.row)))
+            {
+                return true;
+            }
+            let Some(surface) = surfaces.iter().find(|s| s.covers(site.min.x, site.max.x)) else {
+                return true;
+            };
+            if site.inside_support(layout.floor_y) {
+                return false;
+            }
+            world.is_some_and(|w| {
+                !w.current_cuboid_is_clear(
+                    surface.map((site.min + site.max) * 0.5),
+                    surface.angle,
+                    (site.max - site.min) * 0.5 - engine_core::Vec2::new(0.001, 0.001),
+                    CollisionGroups::ALL,
+                    &[PhysicsId::new(grass::SOIL_PHYSICS_ID)],
+                )
+            })
+        });
+        self.synchronize_soil();
+        plan
+    }
+
+    fn soil_surfaces(&self) -> (Vec<grass::surfaces::Surface>, grass::SoilSupportState) {
+        use grass::{SoilSupportState, surfaces};
+        let layout = Layout::new(self.aspect_ratio());
+        let terrain = self
+            .duck_visit
+            .as_deref()
+            .map(|visit| &visit.terrain)
+            .or(self.arena.vacant.as_ref());
+        if let Some(terrain) = terrain {
+            let authoritative = match &self.active_event {
+                Some(ActiveEvent::Rain(e)) => e.responsive_floor(),
+                Some(ActiveEvent::Meltdown(e)) => e.floor.as_ref(),
+                Some(ActiveEvent::Aquarium(e)) if terrain.responsive_floor().is_some() => {
+                    Some(&e.floor)
+                }
+                _ => None,
+            };
+            if let Some(floor) = authoritative {
+                return (
+                    surfaces::responsive(layout, floor),
+                    SoilSupportState::Responsive,
+                );
+            }
+            return (surfaces::terrain(terrain), terrain.support_state());
+        }
+        let floor = match &self.active_event {
+            Some(ActiveEvent::Rain(e)) => {
+                if let Some(course) = e.course() {
+                    return (surfaces::course(course), SoilSupportState::Course);
+                }
+                e.responsive_floor()
+            }
+            Some(ActiveEvent::Meltdown(e)) => e.floor.as_ref(),
+            Some(ActiveEvent::Aquarium(e)) => Some(&e.floor),
+            _ => None,
+        };
+        if let Some(floor) = floor {
+            (
+                surfaces::responsive(layout, floor),
+                SoilSupportState::Responsive,
+            )
+        } else {
+            (
+                surfaces::ordinary(self.floor.geometry(layout)),
+                if self.floor.mode() == engine_common::ClockFloorMode::DrainOpen {
+                    SoilSupportState::Drain
+                } else {
+                    SoilSupportState::Ordinary
+                },
+            )
+        }
+    }
+
+    /// Where the soil rests now, and which plants it still holds. Its body
+    /// follows at the next tick that moves time, in `ClockArena::bind_soil`,
+    /// so a paused clock never changes the arena for it.
+    fn synchronize_soil(&mut self) {
+        if self.soil.is_none() {
+            return;
+        }
+        let (surfaces, kind) = self.soil_surfaces();
+        let soil = self.soil.as_mut().unwrap();
+        soil.set_surfaces(surfaces, kind);
+        self.plants.revalidate(soil);
+    }
+
     pub fn settings(&self) -> ClockSettings {
         ClockSettings {
             fonts: self.config.fonts,
@@ -469,6 +900,9 @@ impl ClockState {
         self.config.time_format = settings.time_format;
         self.config.show_date = settings.show_date;
         self.config.event_profile = settings.event_profile;
+        if !settings.events.grass {
+            self.ceiling.disable_delivery();
+        }
         self.config.events = settings.events;
         self.config.marquee_preset = settings.marquee_preset;
         self.config.marquee_message = settings.marquee_message;
@@ -530,6 +964,42 @@ impl ClockState {
         &self.segments
     }
 
+    /// Every lit digit cell as a surface something can attach to, where it
+    /// stood at the end of the last step: the face's slots in order, then the
+    /// pieces of whatever event holds the rest.
+    pub fn digit_surfaces(&self) -> Vec<DigitSurface> {
+        self.published.clone()
+    }
+
+    /// The lifecycle changes the ledger still retains, oldest first. A
+    /// consumer that finds a gap in their sequence numbers has missed some,
+    /// and catches up from `digit_surfaces`: a surface it holds that is not
+    /// published there has been retired.
+    pub fn surface_changes(&self) -> impl ExactSizeIterator<Item = &SurfaceChange> + Clone {
+        self.surfaces.changes()
+    }
+
+    pub fn surface_accounting(&self) -> SurfaceAccounting {
+        self.surfaces.accounting()
+    }
+
+    /// The digit surfaces as Clock's state publishes them.
+    pub fn digit_surface_state(&self) -> engine_common::ClockDigitSurfaceState {
+        digit_surfaces::diagnostics(self)
+    }
+
+    /// Brings the face's surfaces up to what it draws, publishes them and
+    /// records what the publication shows, before anything reads the step.
+    fn settle_surfaces(&mut self) {
+        let source = self
+            .active_event
+            .as_ref()
+            .map_or(SurfaceSource::Anchored, ActiveEvent::face_source);
+        self.surfaces.reconcile(&self.segments, source);
+        self.published = digit_surfaces::publish(self);
+        self.surfaces.observe(&self.published);
+    }
+
     pub fn time_format(&self) -> ClockTimeFormat {
         self.config.time_format
     }
@@ -547,14 +1017,26 @@ impl ClockState {
         if self.config.aspect_ratio == aspect_ratio {
             return;
         }
+        let previous = Layout::new(self.config.aspect_ratio);
+        self.cancel_ceiling();
+        self.cancel_spider();
         self.config.aspect_ratio = aspect_ratio;
-        // A resize changes both anchors and floor geometry. Recover immediately
-        // instead of leaving bodies in the old arena or teleporting colliders.
+        // A resize changes both anchors and floor geometry. Visits and events
+        // finish at once instead of leaving bodies in the old arena or
+        // teleporting colliders. The run's residents stay, brought within the
+        // new view if they can come in as they are.
         self.finish_duck_visit();
         self.finish_crow_visit();
         if self.active_event.is_some() {
             self.finish_event();
         }
+        let layout = Layout::new(aspect_ratio);
+        self.arena.remap(self.floor.geometry(layout), previous);
+        self.sync_event_schedule();
+        self.synchronize_soil();
+        // A resize lands between steps, and whatever reads next must find the
+        // event's pieces already given back to the face.
+        self.settle_surfaces();
     }
 
     pub fn lifecycle(&self) -> EventLifecycle {
@@ -598,19 +1080,234 @@ impl ClockState {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().0)
-            + self
-                .duck_visit
-                .as_ref()
-                .map_or(0, |duck| duck.physics_counts().0)
+            + self.arena.world().map_or(0, |world| world.body_count())
     }
     pub fn collider_count(&self) -> usize {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().1)
-            + self
-                .duck_visit
-                .as_ref()
-                .map_or(0, |duck| duck.physics_counts().1)
+            + self.arena.world().map_or(0, |world| world.collider_count())
+    }
+
+    /// The run's arena alone: its claims and population now, and its steps
+    /// over the run.
+    pub fn arena_accounting(&self) -> ArenaAccounting {
+        self.arena.accounting()
+    }
+
+    /// The run's arena as Clock's state publishes it.
+    pub fn arena_state(&self) -> engine_common::ClockArenaState {
+        self.arena.state()
+    }
+
+    /// Timings and populations from the arena's last step.
+    pub fn last_arena_step_metrics(&self) -> engine_rapier::world::PhysicsStepMetrics {
+        self.arena.metrics()
+    }
+
+    /// The arena fixture's ordinary balls at this layout: one to each side of
+    /// the face and one over the drain.
+    pub fn default_arena_fixture(&self) -> Vec<arena_fixture::FixtureBall> {
+        arena_fixture::ArenaFixture::default_balls(Layout::new(self.aspect_ratio()))
+    }
+
+    /// Admits an arena fixture with `balls`, a resident that keeps the arena
+    /// until it is removed or the last of them falls out of the view. Returns
+    /// its index, or why the arena cannot take it, changing nothing.
+    pub fn admit_arena_fixture(
+        &mut self,
+        balls: &[arena_fixture::FixtureBall],
+    ) -> Result<usize, Unavailable> {
+        let index = (0..arena_fixture::MAX_FIXTURES as u8)
+            .find(|index| !self.arena.holds(arena::Owner::Fixture(*index)))
+            .expect("the arena holds fewer residents than there are fixtures");
+        let mut owners = self.arena_owners();
+        owners.push(arena::Owner::Fixture(index));
+        self.arena.admit(&owners)?;
+        let layout = Layout::new(self.aspect_ratio());
+        let fixture = arena_fixture::ArenaFixture::admit(&mut self.arena, layout, index, balls);
+        self.arena_fixtures.push(fixture);
+        self.sync_event_schedule();
+        Ok(usize::from(index))
+    }
+
+    /// Takes arena fixture `index` out of the arena with its balls, leaving
+    /// every other owner as it is. Returns false when there is no such
+    /// fixture.
+    pub fn remove_arena_fixture(&mut self, index: usize) -> bool {
+        let Some(position) = self
+            .arena_fixtures
+            .iter()
+            .position(|fixture| fixture.index() == index)
+        else {
+            return false;
+        };
+        self.arena_fixtures.remove(position).remove(&mut self.arena);
+        self.sync_event_schedule();
+        true
+    }
+
+    /// Arena fixture `index`'s balls, while it has any.
+    pub fn arena_fixture(&self, index: usize) -> Option<arena_fixture::ArenaFixtureState> {
+        self.arena_fixtures
+            .iter()
+            .find(|fixture| fixture.index() == index)
+            .map(|fixture| fixture.state(&self.arena))
+    }
+
+    /// Every arena fixture's balls, in the order they were admitted.
+    pub fn arena_fixtures(&self) -> Vec<arena_fixture::ArenaFixtureState> {
+        self.arena_fixtures
+            .iter()
+            .map(|fixture| fixture.state(&self.arena))
+            .collect()
+    }
+
+    /// Admits a spider at `position`, free and at rest, with its frame and a
+    /// proxy for every digit surface the face publishes. It stays until it is
+    /// removed or a resize cancels it. Refused, changing nothing, while there
+    /// is one, when the arena cannot take it, or when the start is inside
+    /// something solid or outside the room.
+    pub fn admit_spider(
+        &mut self,
+        position: engine_core::Vec2,
+    ) -> Result<(), spider::SpiderRefusal> {
+        let refused = |accounting: &mut spider::SpiderAccounting, refusal| {
+            accounting.refused += 1;
+            Err(refusal)
+        };
+        if self.spider.is_some() {
+            return refused(&mut self.spider_accounting, spider::SpiderRefusal::Present);
+        }
+        let mut owners = self.arena_owners();
+        owners.push(arena::Owner::Spider);
+        if let Err(unavailable) = self.arena.admit(&owners) {
+            return refused(
+                &mut self.spider_accounting,
+                spider::SpiderRefusal::Arena(unavailable),
+            );
+        }
+        let layout = Layout::new(self.aspect_ratio());
+        let slabs: Vec<_> = self.floor.geometry(layout).support().collect();
+        match spider::SpiderFixture::admit(
+            &mut self.arena,
+            layout,
+            &slabs,
+            &self.published,
+            position,
+        ) {
+            Ok(fixture) => {
+                self.spider = Some(fixture);
+                self.spider_accounting.admitted += 1;
+                self.sync_event_schedule();
+                Ok(())
+            }
+            Err(refusal) => refused(&mut self.spider_accounting, refusal),
+        }
+    }
+
+    /// What the spider is asked to do on the next moving tick. False when
+    /// there is no spider.
+    pub fn set_spider_intent(&mut self, intent: engine_rapier::spider::SpiderIntent) -> bool {
+        match &mut self.spider {
+            Some(spider) if self.spider_visit.is_none() => {
+                spider.set_intent(intent);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// The spider as Clock has it now, while there is one.
+    pub fn spider_fixture_state(&self) -> Option<spider::SpiderFixtureState> {
+        self.spider
+            .as_ref()
+            .map(|spider| spider.state(&self.arena, &self.published))
+    }
+
+    pub fn spider_accounting(&self) -> spider::SpiderAccounting {
+        self.spider_accounting
+    }
+
+    /// Takes the spider out of the arena with its line, its frame and its
+    /// proxies, leaving every other owner as it is, and ends its visit if it
+    /// was on one. False when there is none.
+    pub fn remove_spider(&mut self) -> bool {
+        let Some(spider) = self.spider.take() else {
+            return false;
+        };
+        spider.remove(&mut self.arena);
+        self.spider_accounting.removed += 1;
+        if self.spider_visit.take().is_some() {
+            self.schedule.retire(ClockEventKind::Spider);
+        }
+        self.sync_event_schedule();
+        true
+    }
+
+    /// A resize ends the spider's stay, because its frame is the old view's.
+    fn cancel_spider(&mut self) {
+        let visiting = self.spider_visit.take().is_some();
+        if let Some(spider) = self.spider.take() {
+            spider.remove(&mut self.arena);
+            self.spider_accounting.cancelled += 1;
+        }
+        if visiting {
+            self.schedule.retire(ClockEventKind::Spider);
+        }
+    }
+
+    /// The owners holding the arena, and a visit, which claims it at its
+    /// first step and so counts from the moment it starts.
+    fn arena_owners(&self) -> Vec<arena::Owner> {
+        let mut owners = self.arena.owners().to_vec();
+        if self.duck_visit.is_some() && !owners.contains(&arena::Owner::Visit) {
+            owners.push(arena::Owner::Visit);
+        }
+        owners
+    }
+
+    /// The owners that would hold the arena once `kind` started, if it needs
+    /// the arena at all. A visit claims it, and so does an event that shares
+    /// a visit's arena. Starting an event finishes the one it replaces first,
+    /// which takes a vacant arena's terrain with it.
+    fn arena_owners_for_event(&self, kind: ClockEventKind) -> Option<Vec<arena::Owner>> {
+        let adding = match kind {
+            ClockEventKind::Duck => vec![arena::Owner::Visit],
+            ClockEventKind::Spider => vec![arena::Owner::Spider],
+            ClockEventKind::Aquarium
+            | ClockEventKind::Explosion
+            | ClockEventKind::Falling
+            | ClockEventKind::Meltdown
+                if self.duck_visit.is_some() =>
+            {
+                vec![arena::Owner::Visit, arena::Owner::Event(kind)]
+            }
+            _ => return None,
+        };
+        let mut owners: Vec<_> = self
+            .arena_owners()
+            .into_iter()
+            .filter(|owner| match owner {
+                arena::Owner::Event(_) => false,
+                arena::Owner::Visit => self.duck_visit.is_some(),
+                _ => true,
+            })
+            .collect();
+        owners.extend(adding);
+        Some(owners)
+    }
+
+    /// Why the arena would refuse to start `kind`, if it would: it has no
+    /// room for what `kind` adds, or `kind` uses the floor while the resting
+    /// residents do not fit the view, so that its floor would be one they do
+    /// not stand on.
+    pub fn event_blocked_by_arena(&self, kind: ClockEventKind) -> Option<Unavailable> {
+        if self.arena.layout_incompatible() && EVENT_CATALOG[kind as usize].uses_floor() {
+            return Some(Unavailable::LayoutIncompatible);
+        }
+        let owners = self.arena_owners_for_event(kind)?;
+        self.arena.admissible(&owners).err()
     }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
@@ -620,7 +1317,7 @@ impl ClockState {
     }
 
     pub fn duck_state(&self) -> Option<engine_common::ClockDuckState> {
-        let duck = self.duck_visit.as_ref()?;
+        let duck = self.duck_scene()?;
         duck.player_session().is_none().then(|| duck.diagnostics())
     }
     pub fn marquee_state(&self) -> Option<engine_common::ClockMarqueeState> {
@@ -644,8 +1341,51 @@ impl ClockState {
         kind == ClockEventKind::Crow && self.crow_visit.is_some()
     }
 
+    /// The spider visit as Clock's state publishes it, while there is one.
+    pub fn spider_state(&self) -> Option<engine_common::ClockSpiderState> {
+        let (visit, spider) = (self.spider_visit.as_ref()?, self.spider.as_ref()?);
+        Some(visit.diagnostics(&spider.state(&self.arena, &self.published)))
+    }
+
+    /// The spider rule, both ways: while the spider visits, every event the
+    /// visit does not keep live waits for it, and another spider does; and
+    /// the spider itself waits for a duck, a crow and any event it would not
+    /// keep live.
+    pub fn event_blocked_by_spider(&self, kind: ClockEventKind) -> bool {
+        if self.spider_visit.is_some() {
+            return !spider::visit::compatible_event(kind);
+        }
+        kind == ClockEventKind::Spider
+            && (self.duck_visit.is_some()
+                || self.crow_visit.is_some()
+                || self
+                    .active_event
+                    .as_ref()
+                    .is_some_and(|event| !spider::visit::compatible_event(event.kind())))
+    }
+
+    fn finish_spider_visit(&mut self) {
+        let Some(visit) = self.spider_visit.take() else {
+            return;
+        };
+        if visit.failed_exit() {
+            self.spider_accounting.failed_exits += 1;
+        } else {
+            self.spider_accounting.departed += 1;
+        }
+        if let Some(spider) = self.spider.take() {
+            spider.remove(&mut self.arena);
+        }
+        self.schedule.retire(ClockEventKind::Spider);
+        self.sync_event_schedule();
+    }
+
     fn event_blocked(&self, kind: ClockEventKind) -> bool {
-        self.event_blocked_by_duck(kind) || self.event_blocked_by_crow(kind)
+        self.event_blocked_by_duck(kind)
+            || self.event_blocked_by_crow(kind)
+            || self.event_blocked_by_spider(kind)
+            || self.event_blocked_by_arena(kind).is_some()
+            || kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed
     }
 
     fn finish_crow_visit(&mut self) {
@@ -654,9 +1394,21 @@ impl ClockState {
             self.sync_event_schedule();
         }
     }
+    pub fn cell_swap_state(&self) -> Option<engine_common::ClockCellSwapState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::CellSwap(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
     pub fn digit_slide_state(&self) -> Option<engine_common::ClockDigitSlideState> {
         match self.active_event.as_ref()? {
             ActiveEvent::DigitSlide(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
+    pub fn slot_machine_state(&self) -> Option<engine_common::ClockSlotMachineState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::SlotMachine(event) => Some(event.diagnostics()),
             _ => None,
         }
     }
@@ -686,8 +1438,27 @@ impl ClockState {
 
     fn preview_event(&mut self, kind: ClockEventKind) {
         if self.reading.is_some() {
+            if kind == ClockEventKind::Grass && !self.config.events.grass {
+                self.grass_refusal = Some("Future grass seeding is disabled");
+                return;
+            }
+            if kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed {
+                self.grass_refusal = Some("Ceiling opening is already active");
+                return;
+            }
             if self.event_blocked_by_crow(kind) {
                 self.event_notice = Some(("Crow is already visiting", self.schedule.tick + 120));
+                return;
+            }
+            if self.event_blocked_by_spider(kind) {
+                let notice = if self.spider_visit.is_none() {
+                    "The spider waits for the visitor or event to finish"
+                } else if kind == ClockEventKind::Spider {
+                    "Spider is already visiting"
+                } else {
+                    "Spider is visiting"
+                };
+                self.event_notice = Some((notice, self.schedule.tick + 2 * u64::from(FIXED_HZ)));
                 return;
             }
             if self.event_blocked_by_duck(kind) {
@@ -701,16 +1472,28 @@ impl ClockState {
                 ));
                 return;
             }
+            // The arena refuses before anything changes, the event this one
+            // would replace included.
+            if let Some(unavailable) = self.event_blocked_by_arena(kind) {
+                self.arena.count_refusal();
+                self.event_notice = Some((
+                    unavailable.notice(),
+                    self.schedule.tick + 2 * u64::from(FIXED_HZ),
+                ));
+                return;
+            }
             // A deliberate preview replaces an event, including its temporary
             // physics/appearance, but keeps the instance, clock and event IDs.
-            if kind != ClockEventKind::Crow {
+            // A visitor comes in beside whatever is running.
+            if !matches!(kind, ClockEventKind::Crow | ClockEventKind::Spider) {
                 self.finish_event();
             }
-            self.start_event(kind);
+            self.start_preview(kind);
         }
     }
 
     fn next_event(&mut self) {
+        self.cancel_ceiling();
         if self.reading.is_none() {
             return;
         }
@@ -732,6 +1515,18 @@ impl ClockState {
             "Waiting for the duck to leave"
         } else if self.crow_visit.is_some() && self.config.events.crow {
             "Crow is already visiting"
+        } else if self.spider_visit.is_some()
+            && ClockEventKind::ALL
+                .into_iter()
+                .any(|kind| self.config.events.enabled(kind))
+        {
+            "Spider is visiting"
+        } else if let Some(unavailable) = ClockEventKind::ALL
+            .into_iter()
+            .filter(|kind| self.config.events.enabled(*kind))
+            .find_map(|kind| self.event_blocked_by_arena(kind))
+        {
+            unavailable.notice()
         } else {
             "No events enabled"
         };
@@ -739,13 +1534,20 @@ impl ClockState {
     }
 
     fn start_event(&mut self, kind: ClockEventKind) {
-        self.start_event_from(kind, None);
+        self.start_event_from(kind, None, false);
+    }
+
+    /// A person asked for this one. Only the admission knows that, so events
+    /// that report it cannot infer it from the absence of a previous reading.
+    fn start_preview(&mut self, kind: ClockEventKind) {
+        self.start_event_from(kind, None, true);
     }
 
     fn start_event_from(
         &mut self,
         kind: ClockEventKind,
         previous_display: Option<DisplaySnapshot>,
+        preview: bool,
     ) {
         debug_assert!(!self.event_blocked(kind));
         self.last_started_event = Some(kind);
@@ -763,12 +1565,48 @@ impl ClockState {
             self.sync_event_schedule();
             return;
         }
+        if kind == ClockEventKind::Spider {
+            let seed = self.schedule.admit_resident(kind);
+            let layout = Layout::new(self.aspect_ratio());
+            match self.admit_spider(spider::SpiderFixture::visit_start(layout)) {
+                Ok(()) => {
+                    self.spider_visit = Some(spider::visit::SpiderVisit::new(
+                        layout,
+                        seed,
+                        self.schedule.event_id,
+                    ));
+                }
+                Err(refusal) => {
+                    // Nothing of the spider stays, and the reuse delay runs
+                    // as after a visit.
+                    self.event_notice = Some((
+                        refusal.notice(),
+                        self.schedule.tick + 2 * u64::from(FIXED_HZ),
+                    ));
+                }
+            }
+            self.sync_event_schedule();
+            return;
+        }
+        if !ceiling::compatible_event(kind) {
+            self.cancel_ceiling();
+        }
         let seed = self.schedule.start(kind);
+        if kind == ClockEventKind::Grass && self.config.events.grass && self.ceiling.start(seed) {
+            self.plan_ceiling_material();
+            // Delivery belongs to the aperture, not the short notice event.
+            self.event_notice = Some(("Ceiling opening", self.schedule.tick + 360));
+        }
         let layout = Layout::new(self.aspect_ratio());
         if kind == ClockEventKind::Duck {
             let mut duck =
                 events::duck::DuckEvent::new_course(layout, seed, self.config.duck_course_pattern);
             duck.select_jump_profile(self.config.duck_jump_profile);
+            duck.select_direct_flap_landing(self.config.duck_direct_flap_landing);
+            assert!(
+                !self.arena.holds(arena::Owner::Visit),
+                "one visit holds the arena at a time"
+            );
             self.floor.acquire_visit();
             self.duck_visit = Some(Box::new(duck));
             // Admission uses the ordinary cadence/cooldown, but does not hold
@@ -781,7 +1619,7 @@ impl ClockState {
             && let Some(duck) = &self.duck_visit
         {
             self.floor.acquire_visit_event(kind);
-            let rain = if let Some(floor) = duck.responsive_floor() {
+            let rain = if let Some(floor) = duck.terrain.responsive_floor() {
                 rain::RainEvent::on_responsive_floor(
                     layout,
                     seed,
@@ -791,7 +1629,7 @@ impl ClockState {
                 )
             } else {
                 rain::RainEvent::on_course(
-                    events::duck::arena::CourseGeometry::from_duck(duck),
+                    events::duck::arena::CourseGeometry::from_terrain(&duck.terrain),
                     seed,
                     self.config.rain_amount,
                     self.display,
@@ -811,22 +1649,24 @@ impl ClockState {
             self.floor.acquire_visit_event(kind);
             let context = EventContext {
                 segments: &mut self.segments,
+                surfaces: &mut self.surfaces,
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
             };
+            let arena = &mut self.arena;
             self.active_event = Some(match kind {
                 ClockEventKind::Aquarium => ActiveEvent::Aquarium(Box::new(
-                    events::aquarium::AquariumEvent::with_visit(context, seed, duck),
+                    events::aquarium::AquariumEvent::with_visit(context, seed, duck, arena),
                 )),
                 ClockEventKind::Falling => ActiveEvent::Falling(
-                    events::falling::FallingEvent::with_visit(context, seed, duck),
+                    events::falling::FallingEvent::with_visit(context, seed, duck, arena),
                 ),
                 ClockEventKind::Explosion => ActiveEvent::Explosion(
-                    events::explosion::ExplosionEvent::with_visit(context, seed, duck),
+                    events::explosion::ExplosionEvent::with_visit(context, seed, duck, arena),
                 ),
                 ClockEventKind::Meltdown => ActiveEvent::Meltdown(Box::new(
-                    events::meltdown::MeltdownEvent::with_visit(context, seed, duck),
+                    events::meltdown::MeltdownEvent::with_visit(context, seed, duck, arena),
                 )),
                 _ => unreachable!(),
             });
@@ -837,6 +1677,7 @@ impl ClockState {
             kind,
             EventContext {
                 segments: &mut self.segments,
+                surfaces: &mut self.surfaces,
                 display: self.display,
                 layout,
                 floor: self.floor.geometry(layout),
@@ -844,20 +1685,34 @@ impl ClockState {
             seed,
             self.config,
             previous_display,
+            preview,
         ));
     }
 
     fn finish_event(&mut self) {
         if let Some(mut event) = self.active_event.take() {
             let kind = event.kind();
-            event.release_arena(self.duck_visit.as_deref_mut());
+            if kind == ClockEventKind::Grass {
+                self.event_notice = None;
+            }
+            event.release_arena(self.duck_visit.as_deref_mut(), &mut self.arena);
             if let ActiveEvent::Rain(rain) = &event
                 && let Some(floor) = rain.responsive_floor()
                 && let Some(duck) = &mut self.duck_visit
             {
-                duck.sync_responsive_floor(floor);
+                duck.terrain.sync_responsive_floor(floor);
+            }
+            event.release_surfaces(&self.segments, &mut self.surfaces);
+            for slot in 0..DIGIT_SLOT_COUNT {
+                if self.surfaces.held(slot) {
+                    self.surfaces.release(slot);
+                }
             }
             drop(event);
+            debug_assert!(
+                self.duck_visit.is_some() || !self.arena.holds(arena::Owner::Visit),
+                "the terrain the event kept after its visit left went with its lease"
+            );
             self.schedule.finish(kind);
             self.floor.release(kind);
         }
@@ -871,6 +1726,7 @@ impl ClockState {
 
     fn advance_tick(&mut self) {
         self.schedule.advance_tick();
+        self.surfaces.set_tick(self.schedule.tick);
         if self
             .event_notice
             .is_some_and(|(_, until)| self.schedule.tick >= until)
@@ -878,12 +1734,12 @@ impl ClockState {
             self.event_notice = None;
         }
         let layout = Layout::new(self.aspect_ratio());
-        let panels_advanced = matches!(&self.active_event, Some(ActiveEvent::Rain(rain)) if rain.responsive_floor().is_some());
+        let hull = self.duck_scene().and_then(|duck| duck.clearance_hull());
         if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event {
-            rain.set_duck_hull(self.duck_visit.as_ref().and_then(|d| d.clearance_hull()));
+            rain.set_duck_hull(hull);
         }
-        let visit_advanced = if self.active_event.is_some() {
-            self.step_active_event(layout)
+        let stepping = if self.active_event.is_some() {
+            true
         } else {
             if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
                 self.trigger_event(kind);
@@ -891,16 +1747,29 @@ impl ClockState {
             // A newly inserted shared batch must be advanced/read back with
             // the character this tick too; otherwise the rendered bars lag
             // their colliders until the first regular event step.
-            if self
-                .active_event
+            self.active_event
                 .as_ref()
                 .is_some_and(ActiveEvent::shares_visit_arena)
-            {
-                self.step_active_event(layout)
-            } else {
-                false
-            }
         };
+        let panels = arena::PanelAuthority::of(self.active_event.as_ref());
+        let shared = if stepping {
+            self.step_active_event(layout)
+        } else {
+            None
+        };
+        // The spider's part of the tick before the step: the face is
+        // published early, where the event has put it for this step, so the
+        // spider's proxies take the poses the step ends at, and the spider
+        // acts on its intent.
+        if self.spider.is_some() {
+            self.settle_surfaces();
+            let spider = self.spider.as_mut().expect("a spider");
+            if let Some(visit) = &mut self.spider_visit {
+                let state = spider.state(&self.arena, &self.published);
+                spider.set_intent(visit.decide(&state, &self.published));
+            }
+            spider.drive(&mut self.arena, &self.published, events::duck::DT);
+        }
         // Water advances once, then the one duck mechanics world samples it.
         // No second character world or frame-rate dependent force application.
         let water = match &self.active_event {
@@ -908,20 +1777,65 @@ impl ClockState {
                 if let Some(duck) = &mut self.duck_visit
                     && let Some(floor) = rain.responsive_floor()
                 {
-                    duck.sync_responsive_floor(floor);
+                    duck.terrain.sync_responsive_floor(floor);
                 }
                 Some(&rain.water)
             }
+            Some(ActiveEvent::Aquarium(event)) if shared.is_some() => Some(&event.water),
+            Some(ActiveEvent::Meltdown(event)) if shared.is_some() => Some(&event.water),
             _ => None,
         };
-        if let Some(duck) = &mut self.duck_visit
-            && if visit_advanced {
-                duck.visit_finished()
-            } else {
-                duck.step_with_environment(water, panels_advanced || water.is_some())
+        let visit = match &mut self.duck_visit {
+            Some(duck) => Some(duck.pre_step(&mut self.arena, water, panels, self.soil.as_mut())),
+            None => {
+                if self.arena.vacant.is_some() {
+                    events::duck::prepare_vacant(&mut self.arena, panels, self.soil.as_mut());
+                }
+                None
             }
+        };
+        // Soil with material is a resident of the arena, which it keeps for
+        // the rest of the run, and its body takes its shape only here.
+        if let Some(soil) = &mut self.soil {
+            self.arena.bind_soil(soil, layout);
+        }
+        // So does the floor under resting residents, which keeps the layout
+        // they last fitted while they do not fit the view, and so do the
+        // world's settings once a visit has gone.
+        let fitted = self.arena.floor_layout(layout);
+        self.arena
+            .bind_floor(self.active_event.as_ref(), self.floor.geometry(fitted));
+        self.arena.bind_settings(fitted);
+        // The arena's one rigid step this tick, whoever holds it.
+        self.arena.step(events::duck::DT);
+        if let Some(spider) = &mut self.spider {
+            spider.observe();
+        }
+        // Fixture balls that fell out of the view leave the arena, and a
+        // fixture with none left lets it go.
+        let fixtures = self.arena_fixtures.len();
+        self.arena_fixtures
+            .retain_mut(|fixture| !fixture.observe(&mut self.arena, layout));
+        let fixture_left = self.arena_fixtures.len() < fixtures;
+        let visit_finished = match (&mut self.duck_visit, visit) {
+            (Some(duck), Some(step)) => duck.post_step(&mut self.arena, water, step),
+            _ => false,
+        };
+        if let Some(finished) = shared
+            && (self.observe_active_event(layout) || finished)
         {
+            self.finish_event();
+        }
+        if visit_finished {
             self.finish_duck_visit();
+        }
+        // A spider visit that got out, or ran out of time getting out,
+        // leaves the arena with its spider.
+        if self.spider_visit.as_ref().is_some_and(|visit| visit.done()) {
+            self.finish_spider_visit();
+        }
+        if fixture_left {
+            self.sync_event_schedule();
         }
         self.update_crow(true);
     }
@@ -936,7 +1850,7 @@ impl ClockState {
                 _ => self
                     .duck_visit
                     .as_ref()
-                    .and_then(|duck| duck.responsive_floor()),
+                    .and_then(|duck| duck.terrain.responsive_floor()),
             },
             water: match &self.active_event {
                 Some(ActiveEvent::Aquarium(event)) => Some(&event.water),
@@ -963,32 +1877,43 @@ impl ClockState {
         }
     }
 
-    /// Reports whether the event already stepped the visit's mechanics world.
-    /// This remains true on its final tick, after cleanup removes the event.
-    fn step_active_event(&mut self, layout: Layout) -> bool {
+    /// The active event's part of the tick before the arena's step. Any event
+    /// but one sharing the arena finishes its tick here. One sharing it reads
+    /// the arena back after the step, so this returns whether it has finished
+    /// so far.
+    fn step_active_event(&mut self, layout: Layout) -> Option<bool> {
+        self.synchronize_soil();
         let event = self.active_event.as_mut().expect("active event");
-        let visit_advanced = event.shares_visit_arena();
+        let shared = event.shares_visit_arena();
         let context = EventContext {
             segments: &mut self.segments,
+            surfaces: &mut self.surfaces,
             display: self.display,
             layout,
             floor: self.floor.geometry(layout),
         };
-        let finished = match event {
-            ActiveEvent::Aquarium(event) => event.step(context, self.duck_visit.as_deref_mut()),
-            ActiveEvent::Falling(falling) => falling.step(context, self.duck_visit.as_deref_mut()),
-            ActiveEvent::Explosion(explosion) => {
-                explosion.step(context, self.duck_visit.as_deref_mut())
-            }
-            ActiveEvent::Meltdown(meltdown) => {
-                meltdown.step_with_visit(context, self.duck_visit.as_deref_mut())
-            }
-            _ => event.step(context),
-        };
+        let finished = event.step(context, self.duck_visit.as_deref_mut(), &mut self.arena);
+        if shared {
+            return Some(finished);
+        }
         if finished {
             self.finish_event();
         }
-        visit_advanced
+        None
+    }
+
+    /// What the event sharing the arena reads back after the arena's step.
+    /// Returns true when it has finished.
+    fn observe_active_event(&mut self, layout: Layout) -> bool {
+        let event = self.active_event.as_mut().expect("active event");
+        let context = EventContext {
+            segments: &mut self.segments,
+            surfaces: &mut self.surfaces,
+            display: self.display,
+            layout,
+            floor: self.floor.geometry(layout),
+        };
+        event.observe(context, self.duck_visit.as_deref(), &mut self.arena)
     }
 
     fn apply_reading(&mut self, reading: ClockReading, animate: bool) {
@@ -1031,6 +1956,13 @@ impl ClockState {
         if matches!(self.active_event, Some(ActiveEvent::DigitSlide(_))) && minute_changed {
             self.finish_event();
         }
+        if let Some(ActiveEvent::CellSwap(event)) = &mut self.active_event {
+            event.synchronize(self.display, &mut self.surfaces);
+        }
+        if let Some(ActiveEvent::SlotMachine(event)) = &mut self.active_event {
+            event.synchronize(self.display);
+            event.carry_surfaces(&mut self.surfaces);
+        }
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);
         }
@@ -1049,8 +1981,11 @@ impl ClockState {
         {
             digits::apply_snapshot(&mut self.segments, self.display);
         }
+        if let Some(ActiveEvent::Meltdown(event)) = &mut self.active_event {
+            event.synchronize(&self.segments, &mut self.surfaces);
+        }
         if slide && let Some(kind) = self.schedule.time_change_event() {
-            self.start_event_from(kind, Some(previous));
+            self.start_event_from(kind, Some(previous), false);
         }
     }
 }
@@ -1084,28 +2019,54 @@ impl Scenario for ClockScenario {
     type Config = ClockConfig;
 
     fn init(config: Self::Config, seed: u64) -> Self::State {
-        ClockState {
+        let mut plants = grass::ClockPlants::new(seed);
+        if config.favorable_grass_fixture {
+            plants.intensity = 1000;
+            // Full-sun ambient feeds the whole habitat, so no opening gates it.
+            plants.light_bounded = false;
+        }
+        let mut state = ClockState {
             config: config.normalized(),
             reading: None,
             date_label: None,
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),
+            surfaces: digit_surfaces::SurfaceLedger::new(),
+            published: Vec::new(),
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
             floor: floor::FloorManager::default(),
+            soil: None,
+            plants,
+            ceiling: ceiling::Ceiling::default(),
+            grass_refusal: None,
+            grass_seeded: 0,
             last_started_event: None,
             event_notice: None,
             duck_visit: None,
+            arena: arena::ClockArena::default(),
+            arena_fixtures: Vec::new(),
+            spider: None,
+            spider_visit: None,
+            spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,
             font_rng: StdRng::seed_from_u64(seed ^ 0x464f_4e54),
             font_change_pending: true,
             font_rotation_pending: false,
+        };
+        let layout = Layout::new(state.aspect_ratio());
+        for balls in state.config.arena_fixture.owners(layout) {
+            state
+                .admit_arena_fixture(&balls)
+                .expect("an empty arena takes the fixtures a run starts with");
         }
+        state
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
+        state.surfaces.set_tick(state.schedule.tick);
         for action in actions.iter().filter_map(ClockAction::decode) {
             match action {
                 ClockAction::SetReading(reading) => state.apply_reading(reading, !dt.is_zero()),
@@ -1117,6 +2078,31 @@ impl Scenario for ClockScenario {
                 ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
         }
+        let closing = state.ceiling.phase == ceiling::Phase::Closing;
+        if state.ceiling.advance(dt) {
+            let before = state
+                .soil
+                .as_ref()
+                .map(|s| s.accounting().added)
+                .unwrap_or(0);
+            state.introduce_grass();
+            let added = state
+                .soil
+                .as_ref()
+                .map(|s| s.accounting().added)
+                .unwrap_or(0)
+                - before;
+            state.ceiling.committed_material += added;
+            state.ceiling.cancelled_material +=
+                (state.ceiling.material.len() as u64).saturating_sub(added);
+            state.ceiling.material.clear();
+        }
+        // Succession runs at the natural end of the hold. A cancelled ceiling
+        // is already Closed before this point, so it never seeds a mat.
+        if closing && state.ceiling.phase == ceiling::Phase::Closed {
+            state.introduce_moss();
+        }
+        state.synchronize_soil();
         // The fixed-timestep host supplies one tick per call. Zero duration is
         // used to synchronize inputs/control actions without advancing physics.
         if dt.is_zero() {
@@ -1125,6 +2111,17 @@ impl Scenario for ClockScenario {
             // The visitor revalidates support after the timed event updates it.
             state.advance_tick();
         }
+        if let Some(soil) = state.soil.as_mut() {
+            soil.advance_loss(dt);
+        }
+        state.synchronize_soil();
+        state.plants.apertures = if state.config.ceiling_sunlight {
+            state.ceiling.sources(Layout::new(state.aspect_ratio()))
+        } else {
+            Vec::new()
+        };
+        state.advance_plants(dt);
+        state.settle_surfaces();
         StepResult::default()
     }
 

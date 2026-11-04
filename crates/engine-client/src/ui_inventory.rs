@@ -4,6 +4,7 @@ use spacewars_control::{UiAction, UiControl, UiScreen};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct ScreenVisibility {
+    pub(crate) updates: bool,
     pub(crate) autostart: bool,
     pub(crate) launcher_busy: bool,
     pub(crate) sound: bool,
@@ -24,7 +25,13 @@ pub(crate) struct ScreenVisibility {
 }
 
 pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
-    if visibility.launcher_busy {
+    if visibility.updates {
+        if visibility.launcher {
+            UiScreen::LauncherUpdates
+        } else {
+            UiScreen::PauseUpdates
+        }
+    } else if visibility.launcher_busy {
         UiScreen::LauncherBusy
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
@@ -79,6 +86,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) updates_controls: Vec<UiControl>,
+    pub(crate) updates_focus: i32,
+    pub(crate) updates_message: String,
     pub(crate) genome_controls: Vec<UiControl>,
     pub(crate) genome_selected: String,
     pub(crate) genome_error: Option<String>,
@@ -108,6 +118,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) selected_scenario: String,
     pub(crate) world_seed: String,
     pub(crate) launcher_focus_index: i32,
+    pub(crate) launcher_show_all: bool,
     pub(crate) launcher_settings_focus_index: i32,
     pub(crate) launcher_controls_focus_index: i32,
     pub(crate) ingame_menu_focus_index: i32,
@@ -139,7 +150,12 @@ pub(crate) struct UiInventoryContext {
     pub(crate) spacewars_player_1: String,
     pub(crate) spacewars_player_2: String,
     pub(crate) pizza_desired_balls: String,
+    pub(crate) pizza_live_ball_limit: String,
     pub(crate) pizza_spawn_rate: String,
+    pub(crate) pizza_automatic_events: bool,
+    pub(crate) pizza_event_available: bool,
+    pub(crate) pizza_event_can_trigger: bool,
+    pub(crate) pizza_event_status: String,
     pub(crate) clock_time_format: String,
     pub(crate) clock_show_date: bool,
     pub(crate) clock_event_profile: String,
@@ -152,6 +168,10 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_aquarium_enabled: bool,
     pub(crate) clock_marquee_enabled: bool,
     pub(crate) clock_digit_slide_enabled: bool,
+    pub(crate) clock_cell_swap_enabled: bool,
+    pub(crate) clock_grass_enabled: bool,
+    pub(crate) clock_slot_machine_enabled: bool,
+    pub(crate) clock_spider_enabled: bool,
     pub(crate) clock_rain: String,
     pub(crate) clock_marquee_preset: String,
     pub(crate) nes_cartridge_name: String,
@@ -167,6 +187,27 @@ pub(crate) struct UiInventory {
 
 pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContext) -> UiInventory {
     let mut inventory = match screen {
+        UiScreen::LauncherUpdates | UiScreen::PauseUpdates => UiInventory {
+            selected_control: context
+                .updates_controls
+                .get(context.updates_focus as usize)
+                .map(|c| c.id.clone()),
+            controls: {
+                let mut c = context.updates_controls.clone();
+                c.push(
+                    UiControl::new("updates.status", "Status", false)
+                        .with_value(context.updates_message.clone()),
+                );
+                c
+            },
+            actions: vec![
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Confirm,
+                UiAction::Back,
+            ],
+            error: None,
+        },
         UiScreen::LauncherBusy => UiInventory {
             selected_control: None,
             controls: vec![
@@ -409,6 +450,13 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
                 .with_value(context.selected_scenario.clone()),
             UiControl::new("launcher.scenario.next", "›", true)
                 .with_value(context.selected_scenario.clone()),
+            UiControl::new("launcher.scenarios.show_all", "Show all", true).with_value(
+                if context.launcher_show_all {
+                    "On"
+                } else {
+                    "Off"
+                },
+            ),
             if material_match {
                 world_control("launcher.start", "Play", "Play", context)
             } else {
@@ -438,7 +486,10 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             UiAction::Start,
             UiAction::Controls,
         ],
-        error: context.launcher_error.clone(),
+        error: context
+            .launcher_error
+            .clone()
+            .or_else(|| context.settings_save_error.clone()),
     };
     if material_match {
         inventory
@@ -447,6 +498,9 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
         if context.launcher_focus_index == 6 {
             inventory.selected_control = Some("launcher.new-match".into());
         }
+    }
+    if context.launcher_focus_index == 9 {
+        inventory.selected_control = Some("launcher.scenarios.show_all".into());
     }
     if context.launcher_focus_index == 8 {
         inventory.selected_control = Some("launcher.genomes".into());
@@ -688,11 +742,27 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.pizza.spawn-rate",
                 &context.pizza_spawn_rate,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.pizza.automatic-events",
+                if context.pizza_automatic_events {
+                    "On"
+                } else {
+                    "Off"
+                },
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.pizza.live-ball-limit",
+                &context.pizza_live_ball_limit,
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.pizza.desired-balls",
                 "launcher.settings.pizza.spawn-rate",
+                "launcher.settings.pizza.automatic-events",
+                "launcher.settings.pizza.live-ball-limit",
                 "launcher.settings.back",
             ]
         }
@@ -744,9 +814,22 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     "launcher.settings.clock.marquee",
                     context.clock_marquee_enabled,
                 ),
+                ("launcher.settings.clock.grass", context.clock_grass_enabled),
+                (
+                    "launcher.settings.clock.cell-swap",
+                    context.clock_cell_swap_enabled,
+                ),
                 (
                     "launcher.settings.clock.digit-slide",
                     context.clock_digit_slide_enabled,
+                ),
+                (
+                    "launcher.settings.clock.slot-machine",
+                    context.clock_slot_machine_enabled,
+                ),
+                (
+                    "launcher.settings.clock.spider",
+                    context.clock_spider_enabled,
                 ),
             ] {
                 push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
@@ -789,6 +872,10 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.explosion",
                 "launcher.settings.clock.fonts",
                 "launcher.settings.clock.aquarium",
+                "launcher.settings.clock.cell-swap",
+                "launcher.settings.clock.grass",
+                "launcher.settings.clock.slot-machine",
+                "launcher.settings.clock.spider",
                 "launcher.settings.back",
             ]
         }
@@ -926,6 +1013,17 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
 
     ids.push("pause.sound");
     controls.push(UiControl::new("pause.sound", "App Settings", true));
+    if context.selected_scenario == "pizza" && context.pizza_event_available {
+        ids.push("pause.pizza.gravity");
+        controls.push(
+            UiControl::new(
+                "pause.pizza.gravity",
+                "Run gravity & resume",
+                context.pizza_event_can_trigger,
+            )
+            .with_value(&context.pizza_event_status),
+        );
+    }
 
     UiInventory {
         selected_control: selected_from_index(&ids, context.ingame_menu_focus_index),
@@ -968,6 +1066,7 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     controls.push(UiControl::new("settings.autostart", "Auto-start", true));
     controls.push(UiControl::new("settings.controllers", "Controllers", true));
     controls.push(UiControl::new("settings.network", "Network", true));
+    controls.push(UiControl::new("settings.updates", "Updates", true));
     controls.push(UiControl::new("sound.back", "Back", true));
     let mut ids = vec![
         "sound.volume",
@@ -993,7 +1092,9 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
         ),
     );
     UiInventory {
-        selected_control: if context.sound_focus_index == 7 {
+        selected_control: if context.sound_focus_index == 9 {
+            Some("settings.updates".into())
+        } else if context.sound_focus_index == 7 {
             Some("settings.controllers".into())
         } else if context.sound_focus_index == 8 {
             Some("settings.network".into())
@@ -1086,6 +1187,42 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
             },
         ),
     );
+    controls.push(
+        UiControl::new("pause.clock.cell-swap", "Cell Swap", true).with_value(
+            if context.clock_cell_swap_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    controls.push(
+        UiControl::new("pause.clock.slot-machine", "Slot Machine", true).with_value(
+            if context.clock_slot_machine_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    controls.push(
+        UiControl::new("pause.clock.spider", "Spider", true).with_value(
+            if context.clock_spider_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    controls.push(
+        UiControl::new("pause.clock.grass", "Grass", true).with_value(
+            if context.clock_grass_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
     push_choice(&mut controls, "pause.clock.rain", &context.clock_rain);
     controls.push(
         UiControl::new("pause.clock.crow", "Crow water tolerance", true)
@@ -1138,6 +1275,10 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.explosion",
                 "pause.clock.fonts",
                 "pause.clock.aquarium",
+                "pause.clock.cell-swap",
+                "pause.clock.grass",
+                "pause.clock.slot-machine",
+                "pause.clock.spider",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -1181,7 +1322,12 @@ mod tests {
             spacewars_player_1: "human".into(),
             spacewars_player_2: "rule bot".into(),
             pizza_desired_balls: "75".into(),
+            pizza_live_ball_limit: "500".into(),
             pizza_spawn_rate: "0.10".into(),
+            pizza_automatic_events: true,
+            pizza_event_available: false,
+            pizza_event_can_trigger: false,
+            pizza_event_status: String::new(),
             clock_time_format: "24-hour".into(),
             clock_show_date: false,
             clock_event_profile: "Calm".into(),
@@ -1194,6 +1340,10 @@ mod tests {
             clock_aquarium_enabled: true,
             clock_marquee_enabled: true,
             clock_digit_slide_enabled: true,
+            clock_cell_swap_enabled: true,
+            clock_grass_enabled: true,
+            clock_slot_machine_enabled: true,
+            clock_spider_enabled: true,
             clock_rain: "Varied".into(),
             clock_marquee_preset: engine_common::ClockMarqueePreset::default().label().into(),
             nes_cartridge_name: "Demo Cartridge".into(),
@@ -1347,6 +1497,7 @@ mod tests {
         assert_eq!(
             classify_screen(ScreenVisibility {
                 launcher_busy: false,
+                updates: false,
                 sound: false,
                 device_info: false,
                 controllers: false,
@@ -1409,6 +1560,7 @@ mod tests {
         context.launcher_focus_index = 0;
         context.launch_available = false;
         context.launcher_error = Some("No cartridge selected".into());
+        context.settings_save_error = Some("Storage is not writable".into());
 
         let inventory = inventory_for_screen(UiScreen::LauncherMain, &context);
 
@@ -1421,6 +1573,7 @@ mod tests {
             [
                 "launcher.scenario.previous",
                 "launcher.scenario.next",
+                "launcher.scenarios.show_all",
                 "launcher.start",
                 "launcher.settings",
                 "launcher.controls",
@@ -1430,9 +1583,23 @@ mod tests {
                 "launcher.training",
             ]
         );
-        assert!(!inventory.controls[2].enabled);
+        assert!(!inventory.controls[3].enabled);
         assert_eq!(inventory.controls[0].value.as_deref(), Some("nes"));
         assert_eq!(inventory.error.as_deref(), Some("No cartridge selected"));
+
+        context.launcher_error = None;
+        assert_eq!(
+            inventory_for_screen(UiScreen::LauncherMain, &context)
+                .error
+                .as_deref(),
+            Some("Storage is not writable"),
+        );
+        context.settings_save_error = None;
+        assert!(
+            inventory_for_screen(UiScreen::LauncherMain, &context)
+                .error
+                .is_none()
+        );
     }
 
     #[test]
@@ -1444,8 +1611,8 @@ mod tests {
                 16,
                 "launcher.settings.spacewars.player-2",
             ),
-            ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 35, "launcher.settings.clock.duck"),
+            ("pizza", 14, "launcher.settings.pizza.live-ball-limit"),
+            ("clock", 43, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
                 "spacewars-surface-blocks",
@@ -1481,7 +1648,7 @@ mod tests {
                 | "spacewars-surface-round" => 2,
                 "spacewars" => 3,
                 "spacewars-classic" => 6,
-                "pizza" => 3,
+                "pizza" => 5,
                 "clock" => 8,
                 "rover-lab" => 1,
                 "falling" => 0,
@@ -1496,6 +1663,85 @@ mod tests {
                 control_ids(&inventory)[control_count - 2..],
                 ["launcher.settings.back", "launcher.settings.start"]
             );
+        }
+    }
+
+    /// Every index the Clock page's navigation can reach must name one control,
+    /// or a focused row reports nothing and the page cannot say where it is.
+    #[test]
+    fn pause_clock_focus_order_names_every_reachable_index() {
+        let mut reachable = vec![0];
+        let mut visited = 0;
+        while visited < reachable.len() {
+            let current = reachable[visited];
+            for action in [
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Left,
+                UiAction::Right,
+            ] {
+                let next = crate::ui_navigation::moved_clock_selection(current, action);
+                if !reachable.contains(&next) {
+                    reachable.push(next);
+                }
+            }
+            visited += 1;
+        }
+        let mut context = context("clock");
+        let mut named = Vec::new();
+        for focus in &reachable {
+            context.ingame_clock_focus_index = *focus;
+            named.push(
+                pause_clock_inventory(&context)
+                    .selected_control
+                    .unwrap_or_else(|| panic!("clock focus {focus} names no control")),
+            );
+        }
+        let mut unique = named.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(
+            unique.len(),
+            reachable.len(),
+            "two reachable indices share one control"
+        );
+    }
+
+    /// Confirm leaves the settings page only on its final index, so the focus
+    /// order must name one control for every index the launcher can reach and
+    /// end on Back. A missing entry slides Back onto a switch, which then both
+    /// reports and toggles the wrong control.
+    #[test]
+    fn launcher_settings_focus_order_names_every_index_and_ends_on_back() {
+        for scenario in [
+            "clock",
+            "nes",
+            "pizza",
+            "spacewars",
+            "spacewars-classic",
+            "spacewars-terrain-combat",
+            "spacewars-terrain-travel",
+            "surface-expedition",
+        ] {
+            let mut context = context(scenario);
+            let mut named = Vec::new();
+            for focus in 0..crate::launcher_settings_item_count_for(scenario) {
+                context.launcher_settings_focus_index = focus;
+                named.push(
+                    launcher_settings_inventory(&context)
+                        .selected_control
+                        .unwrap_or_else(|| panic!("{scenario} index {focus} names no control")),
+                );
+            }
+            assert_eq!(
+                named.last().map(String::as_str),
+                Some("launcher.settings.back"),
+                "{scenario} must end on Back"
+            );
+            let mut unique = named.clone();
+            unique.sort();
+            unique.dedup();
+            assert_eq!(unique.len(), named.len(), "{scenario} repeats a control");
         }
     }
 
@@ -1689,7 +1935,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 23);
+        assert_eq!(inventory.controls.len(), 27);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

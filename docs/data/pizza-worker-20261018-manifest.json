@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "scope": "Pizza normal play with fixed updates on the UI thread (direct) and on the simulation worker, and the worker presenting every tick against presenting only newly published frames.",
+  "switch": "On by default; SPACEWARS_PIZZA_SIMULATION_WORKER=0 returns updates to the UI thread. tools/pizza-live-capture.sh sets it from its ninth argument, worker (default) or direct.",
+  "builds": {
+    "worker": {
+      "purpose": "worker against direct; this intermediate state defaulted to direct and presented every tick",
+      "base": "bf1dc4e1d58009177e30fac04fafbc252771097e",
+      "files_sha256": {
+        "crates/engine-client/src/client_scenarios/mod.rs": "607ec677dbbf44ef95fece42dba47ee3d2379e461024d6662424a47bd89b48f7",
+        "crates/engine-client/src/client_scenarios/pizza.rs": "87e28692af9f026845c5eec066b10f09b5ef2251a601a9c395649f3a91b7e18b",
+        "crates/engine-client/src/client_scenarios/pizza_worker.rs": "08057ea3ae712d09df47faaaa9cbfc6add822bfed3c715ff24fa94d98c0b6961",
+        "crates/engine-client/src/host.rs": "14069d93ad86e96dbf729fc8db404483bebed31bc19cff4540c6280b3211a0d0",
+        "tools/pizza-live-capture.sh": "81b2c0f88eae31672b5083e2b7e543ba6c384552e4aee5009ad54dec16123aac"
+      },
+      "engine_client_sha256": "41f3cd2295d69d054f49b993d7e31e01f901cdadd235b8554be38204a11386ad",
+      "spacewars_cli_sha256": "ab02df8fb49f1570e29397aabc89d2a5e0a7fc634caf5de6ba7edf5280c96b1d",
+      "build": {
+        "kiosk_feature": "pi-kiosk-gpu",
+        "profile": "release",
+        "rust_target": "aarch64-unknown-linux-gnu",
+        "schema": 1,
+        "source": {
+          "commit": "bf1dc4e1d58009177e30fac04fafbc252771097e",
+          "dirty": true,
+          "revision": "bf1dc4e1d580-dirty",
+          "schema": 1
+        },
+        "tools": {
+          "cargo": {
+            "details": "cargo 1.94.0 (85eff7c80 2026-01-15)\nrelease: 1.94.0\ncommit-hash: 85eff7c80277b57f78b11e28d14154ab12fcf643\ncommit-date: 2026-01-15\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.3 vendored)\nlibcurl: 8.17.0-DEV (sys:0.4.84+curl-8.17.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 [64-bit]",
+            "version": "1.94.0"
+          },
+          "cc": {
+            "details": "aarch64-poky-linux-gcc (GCC) 13.5.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+          },
+          "rustc": {
+            "details": "rustc 1.94.0 (4a4ef493e 2026-03-02)\nbinary: rustc\ncommit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db\ncommit-date: 2026-03-02\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.0\nLLVM version: 21.1.8",
+            "version": "1.94.0"
+          }
+        }
+      },
+      "bundle": {
+        "format": 1,
+        "machine": "raspberrypi-spacewars",
+        "target_arch": "aarch64",
+        "compatibility": "2d6025509c8ce4f50160f28a38d977bae561473d6c0677ad92f749026bbbc69d",
+        "binaries": {
+          "engine-client": {
+            "sha256": "41f3cd2295d69d054f49b993d7e31e01f901cdadd235b8554be38204a11386ad",
+            "size": 27002104
+          },
+          "spacewars-cli": {
+            "sha256": "ab02df8fb49f1570e29397aabc89d2a5e0a7fc634caf5de6ba7edf5280c96b1d",
+            "size": 1814544
+          }
+        }
+      }
+    },
+    "fresh": {
+      "purpose": "final source: worker by default, presenting only newly published frames",
+      "base": "bf1dc4e1d58009177e30fac04fafbc252771097e",
+      "files_sha256": {
+        "crates/engine-client/src/client_scenarios/mod.rs": "938cda9cd02d94cf948b0e4494e396c7027ebfafbe505440d4616210b05d64d7",
+        "crates/engine-client/src/client_scenarios/pizza.rs": "bbe2b0d570d37b1d3273f9aac6b446370ab4063ca473cfbab3764ec714a655e4",
+        "crates/engine-client/src/client_scenarios/pizza_worker.rs": "c407cde9575960a7fc6dad50ee70a7b97509a126026725addd3d87608a96799c",
+        "crates/engine-client/src/host.rs": "200de3452e1e63c8882e275eaea6a48f0a2d46f9ac532a16f05f47fb9fa95dc0",
+        "tools/pizza-live-capture.sh": "a033c5eae04a0380da634ffa0f7555f8253276367af638566fe07d1a3b93f5b5"
+      },
+      "engine_client_sha256": "eb2f342c7538951d141af1cc3a0cf6a9cecd7afabf7b7348a74ad149066a1f9a",
+      "spacewars_cli_sha256": "ab02df8fb49f1570e29397aabc89d2a5e0a7fc634caf5de6ba7edf5280c96b1d",
+      "build": {
+        "kiosk_feature": "pi-kiosk-gpu",
+        "profile": "release",
+        "rust_target": "aarch64-unknown-linux-gnu",
+        "schema": 1,
+        "source": {
+          "commit": "bf1dc4e1d58009177e30fac04fafbc252771097e",
+          "dirty": true,
+          "revision": "bf1dc4e1d580-dirty",
+          "schema": 1
+        },
+        "tools": {
+          "cargo": {
+            "details": "cargo 1.94.0 (85eff7c80 2026-01-15)\nrelease: 1.94.0\ncommit-hash: 85eff7c80277b57f78b11e28d14154ab12fcf643\ncommit-date: 2026-01-15\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.3 vendored)\nlibcurl: 8.17.0-DEV (sys:0.4.84+curl-8.17.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 [64-bit]",
+            "version": "1.94.0"
+          },
+          "cc": {
+            "details": "aarch64-poky-linux-gcc (GCC) 13.5.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+          },
+          "rustc": {
+            "details": "rustc 1.94.0 (4a4ef493e 2026-03-02)\nbinary: rustc\ncommit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db\ncommit-date: 2026-03-02\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.0\nLLVM version: 21.1.8",
+            "version": "1.94.0"
+          }
+        }
+      },
+      "bundle": {
+        "format": 1,
+        "machine": "raspberrypi-spacewars",
+        "target_arch": "aarch64",
+        "compatibility": "2d6025509c8ce4f50160f28a38d977bae561473d6c0677ad92f749026bbbc69d",
+        "binaries": {
+          "engine-client": {
+            "sha256": "eb2f342c7538951d141af1cc3a0cf6a9cecd7afabf7b7348a74ad149066a1f9a",
+            "size": 27003128
+          },
+          "spacewars-cli": {
+            "sha256": "ab02df8fb49f1570e29397aabc89d2a5e0a7fc634caf5de6ba7edf5280c96b1d",
+            "size": 1814544
+          }
+        }
+      },
+      "commits": {
+        "code": "2e52466423e5242be3292202e239a74f515800df",
+        "tools": "6403bb5",
+        "note": "The committed files match files_sha256, the source of the fresh build."
+      }
+    },
+    "command": "node yocto/scripts/build.mjs --target spacewars",
+    "note": "No code changed during or after either build."
+  },
+  "device": {
+    "model": "Raspberry Pi 4 Model B Rev 1.4 (Picade), Linux 6.6.63-v8, ondemand governor",
+    "host": "sw-picade.local",
+    "installed_image": "5b420c95b87b, untouched; the kiosk was restored after every capture and the lab service was inactive afterwards",
+    "arguments": "500 balls, limit 500, 1,200 ordinary updates and 30 one-second intervals; the script fixes seed 7; one capture at a time with a 30 s pause between captures"
+  },
+  "experiments": {
+    "worker_against_direct": {
+      "archive_directory": "pi",
+      "binary": "worker build in both modes",
+      "capture_script_sha256": "81b2c0f88eae31672b5083e2b7e543ba6c384552e4aee5009ad54dec16123aac",
+      "sequence": [
+        "direct on-r1",
+        "worker on-r1",
+        "direct on-r2",
+        "worker on-r2",
+        "direct off-r1",
+        "worker off-r1"
+      ],
+      "temperature_c": "capture boundaries 65.2 to 71.1; pre-export samples at most 72.5; firmware throttling flags zero in every sample",
+      "summary": "pizza-worker-20261018-summary.json",
+      "summary_sha256": "a000deedd0c03601316e7b2d0a26bd2e8690e1a6b028462cfb8960f3868642c5",
+      "command": "python3 tools/pizza-worker-summary.py WORKER_ARCHIVE/pi --desktop GRAVITY_ARCHIVE/extracts"
+    },
+    "presentation": {
+      "archive_directory": "pi-present",
+      "binary": "every: worker build; fresh: fresh build; both run the worker",
+      "capture_script_sha256": "a033c5eae04a0380da634ffa0f7555f8253276367af638566fe07d1a3b93f5b5",
+      "sequence": [
+        "every on-r1",
+        "fresh on-r1",
+        "every on-r2",
+        "fresh on-r2",
+        "every off-r1",
+        "fresh off-r1"
+      ],
+      "temperature_c": "capture boundaries 61.8 to 68.7; pre-export samples at most 70.6; firmware throttling flags zero in every sample",
+      "summary": "pizza-worker-20261018-present-summary.json",
+      "summary_sha256": "f6e017c16f61f262d4aeb4f7543ab074beaa18023bb3551857f2b33d8eaae092",
+      "command": "python3 tools/pizza-worker-summary.py WORKER_ARCHIVE/pi-present --pair every fresh --desktop GRAVITY_ARCHIVE/extracts"
+    }
+  },
+  "matching": {
+    "replay_key": "ordered state fingerprint after every update",
+    "pi_pairs": "each pair in both experiments produces identical fingerprints at all 1,200 updates",
+    "pi_against_desktop": "all twelve runs replay the bounded-gravity desktop seed-7 extracts in pizza-gravity-20261018-raw.tar.gz",
+    "desktop_end_to_end": "the same desktop ci-profile client under Xvfb, default window, produces identical fingerprints at all 1,200 lab updates with and without the worker; only the worker run has a pizza-simulation thread",
+    "mode_check": "the summary confirms each run's requested mode from the client's status report"
+  },
+  "validation": {
+    "worker_tests": "seven worker unit tests (direct-stepping equivalence with queued pointer and event input over 240 updates, paused commands, frame publication, pause at an update boundary, catch-up and backlog drop, failure reporting) and two host tests (input, trigger, pause and restart through the host; presenting each frame once per viewport)",
+    "client_suite": "740 passed, 15 ignored under Xvfb",
+    "pizza_ui_flows": "launcher, event-controls and event-completion flows pass with the worker by default and with SPACEWARS_PIZZA_SIMULATION_WORKER=0",
+    "tool_tests": "1058 passed, including three worker-summary tests",
+    "clippy": "no findings in touched code; the engine-client crate has pre-existing findings elsewhere",
+    "format": "pass",
+    "capture_script": "shellcheck reports only its pre-existing SC2024 note"
+  },
+  "archive": {
+    "file": "pizza-worker-20261018-raw.tar.gz",
+    "sha256": "e4f6bf02cb5fc0c0386e8ad1ae4724ec09b1c636b834fce9bba6957661d50016",
+    "contents": "Both Pi 4 experiments (pi/ and pi-present/, six production captures each, with boundary readings and device file hashes), the desktop end-to-end reports, statuses and thread lists under desktop/, and SHA256SUMS. Binaries, per-run temporary config directories and control sockets are excluded.",
+    "reproducible": "tar --sort=name --mtime='2026-10-18 00:00:00Z' --owner=0 --group=0 --numeric-owner, gzip -n -9"
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-17T00:51:11.149102+00:00",
+  "source_commit": "30a3ef9b53955c91db9d3dfe8b62a662eeb0b569",
+  "branch": "feat/ota-updates-254",
+  "scope": "Host-only offline verification and mock GitHub delivery; no signing credentials, production feed publication, Pi state change or installation.",
+  "source_files": {
+    ".github/ci/ota_delivery.py": "58a829ff868548201352b5d12747a8d6599fdf1688cf740d501504ab5de2eae5",
+    ".github/ci/test_ota_delivery.py": "77511818ca6da649f708a2b332ba0533d9e6448f8419a01029706c0182be01e6",
+    "crates/engine-ota/examples/feed_inventory.rs": "ca8ae30ded52a35a0e9d8057e98c94c9de199f39e6ed97b6fede994cbcd02f05",
+    "crates/engine-ota/src/lib.rs": "bf97da4b450cb23af2055a561e0c40c7bf53b63275bc961f4e5061b822c47a6f",
+    "crates/engine-ota/src/publication.rs": "84cdac79d9c21c9eba35b3e4bc88ef64313c8a16ad42c5bfffa30673f0dc91d6",
+    "crates/engine-ota/src/publication_tests.rs": "b78c625c2531163273c421d2fbe922495008b831a1ec8644aba3811897948120",
+    "crates/engine-ota/src/repository.rs": "c45d1b8ac6914f948ccdafaf2bacb58c8743ed189ed815d68d4f6b1a5d7744c8",
+    "crates/engine-ota/tests/support/mod.rs": "95e887fe6ff8d45128a13fbb72e65ff358cd7e72636a1168a15b4ced7d357239",
+    "docs/ota-updates.md": "dcb4f383e833a443ad8972bdeb13f3b1e78b9a9bc9cd72afe411a62448fd33f2"
+  },
+  "tools": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+    "powershell": {
+      "version": "7.6.6",
+      "source": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.6/powershell-7.6.6-linux-x64.tar.gz",
+      "archive": {
+        "path": "target/ota-powershell-7.6.6.tar.gz",
+        "bytes": 75876271,
+        "sha256": "ddbc4a2d113bbd46d283cfedcbcd117a70caefd7673f41f2b4e0000badf103bc"
+      },
+      "verification": "SHA-256 matched the official GitHub release asset digest before extraction. Unpacked only inside ignored target directory."
+    }
+  },
+  "checks": [
+    {
+      "name": "full-ota-suite",
+      "command": "cargo test -p engine-ota -- --test-threads=1",
+      "result": "passed",
+      "unit_passed": 297,
+      "unit_ignored": 8,
+      "integration_passed": 22,
+      "duration_seconds": 180.35,
+      "log": {
+        "path": "target/ota-publication-suite.log",
+        "bytes": 36094,
+        "sha256": "0a08a8c9a3e9cd732d95a2dccadebb5d90ed8a058dc33b98121ddad9fe468561"
+      },
+      "scope": "Before only shared-fixture dead-code annotations and an additional Python response-error test; no runtime behavior changed afterward."
+    },
+    {
+      "name": "final-publication-cases",
+      "command": "cargo test -p engine-ota publication::tests -- --test-threads=1",
+      "result": "passed",
+      "passed": 10,
+      "duration_seconds": 0.17,
+      "log": {
+        "path": "target/ota-publication-focused-final.log",
+        "bytes": 1517,
+        "sha256": "a377e4279030fed4c6b8c520c83ed4b7c871e41e1bc22cc82262ffdfc5453b84"
+      },
+      "scope": "Final Rust verifier and signed-package handoff into the Python mock delivery transaction."
+    },
+    {
+      "name": "all-ci-python-helpers",
+      "command": "python3 -m unittest discover -s .github/ci -p 'test_*.py' -v",
+      "result": "passed",
+      "passed": 87,
+      "new_delivery_cases": 19,
+      "duration_seconds": 9.786,
+      "log": {
+        "path": "target/ota-publication-ci-python-final.log",
+        "bytes": 13066,
+        "sha256": "4115a6ccac9391aa11bb1df6addff1344f09e87ec301f5245fe8a422aec2b81b"
+      },
+      "scope": "Includes existing Windows packaging and nightly publisher regressions; uses the local PowerShell archive on PATH, telemetry disabled."
+    },
+    {
+      "name": "clippy",
+      "command": "cargo clippy -p engine-ota --all-targets -- -D warnings",
+      "result": "passed",
+      "log": {
+        "path": "target/ota-publication-clippy-final.log",
+        "bytes": 369,
+        "sha256": "70450e817e717b3743d72941e9e7ca4fbc1f0cb2be60c19281d7138a67a701e8"
+      }
+    },
+    {
+      "name": "minimum-rust-version",
+      "command": "cargo +1.89.0 check -p engine-ota --all-targets",
+      "result": "passed",
+      "log": {
+        "path": "target/ota-publication-msrv-final.log",
+        "bytes": 315,
+        "sha256": "9bed0fc583cdcbd5b12c2e9e2ecdd03d1e47dd194a4ffeb4e3ecd3e72eef99e7"
+      }
+    },
+    {
+      "name": "rust-format",
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": {
+        "path": "target/ota-publication-fmt.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "earlier_diagnostics": [
+    {
+      "kind": "environment-prerequisite",
+      "result": "PowerShell absent; 19 subtest failures in existing Windows packaging checks. Resolved by verified local binary archive; final complete helper suite passes.",
+      "log": {
+        "path": "target/ota-publication-ci-python.log",
+        "bytes": 34859,
+        "sha256": "23ab87f39f8e3f1f988da5f1a80d2e6eb74669ac75cf758364a2acb22c70f27c"
+      }
+    },
+    {
+      "kind": "lint",
+      "result": "Two publisher-only shared fixture variants were unused in the separately compiled integration suite. Narrow dead-code annotations document this; final Clippy passes.",
+      "log": {
+        "path": "target/ota-publication-clippy.log",
+        "bytes": 959,
+        "sha256": "4e027186418401d9c91dffc6c366d70aec0a60863e88c1c6bcd8ef010f55c4e1"
+      }
+    }
+  ],
+  "delivery_fault_coverage": [
+    "Failures before and after every initial-publication and replacement API boundary, including lost successful responses",
+    "Empty failed uploads, timestamp delete/upload gaps, and exact-plan resume",
+    "Immutable-name conflicts, corrupt readbacks, local file substitution, and unknown current timestamps",
+    "Stale/same-version conflicting plans and changed reservations; no claim of cross-writer atomic locking",
+    "Capacity preflight preserves all history; no retention deletion is implemented",
+    "Credential-free public readback, bounded HTTPS redirects/streams, partial and encoded response rejection, redirect-query redaction",
+    "Actual TUF signatures, channel-key separation, thresholds, supported root rotation, expiry, exact metadata references and compressed payload identity"
+  ],
+  "remote_read_only": {
+    "repository": "aortez/space-wars",
+    "releases": [
+      {
+        "createdAt": "2026-10-12T02:42:24Z",
+        "isPrerelease": true,
+        "publishedAt": "2026-10-12T03:01:48Z",
+        "tagName": "nightly"
+      }
+    ],
+    "release_listing": {
+      "path": "target/ota-publication-remote-releases.json",
+      "bytes": 116,
+      "sha256": "e5cd1df65094d2ec5810999b7ee101c4ec1c84a58ac4bfe9ffbe6353e8725d1b"
+    },
+    "public_probe": {
+      "url": "https://github.com/aortez/space-wars/releases/download/nightly/windows-client.zip",
+      "method": "HEAD, credential-free, follow HTTPS redirects",
+      "result": {
+        "http_status": 200,
+        "redirects": 1,
+        "content_type": "application/octet-stream"
+      },
+      "log": {
+        "path": "target/ota-publication-public-head.json",
+        "bytes": 76,
+        "sha256": "bafb0a88ea554534dc9423e2b088477201ddee278d55ecc51ee2247b3a3def32"
+      }
+    },
+    "mutations": false
+  },
+  "unchanged_windows_source": {
+    ".github/workflows/windows-nightly.yml": "68df2e81a5d39ab7633eb97042981504f41ea7bd1bcc961074e84a6c76d8c49b",
+    ".github/ci/publish_nightly.py": "643aa3bb209a39b8023a701e9be4b0cafb0c0996fb2bc9ac9cd9757158c2b769"
+  },
+  "remaining": [
+    "Protected, pinned build/signing/promotion workflows and a shared cross-channel publisher concurrency lock",
+    "Offline root custody and isolated Release/Nightly signing credentials; rotation and emergency revocation operations",
+    "Same-source CI, pinned Yocto provenance, actual expanded image/protocol/data validation and explicit Release rollout approval",
+    "Durable image generation history, exact-byte promotion, compatibility candidate retention and daily metadata renewal",
+    "History retention planning preserving 30 days of Nightly plus all referenced, Release and supported rotation assets",
+    "Production OTA root/feed creation and embedding, actual supervised bootstrap and installed updater qualification on both Pis"
+  ]
+}

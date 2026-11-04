@@ -1,0 +1,259 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "purpose": "Physical SSH admission comparison with one continuously open control connection",
+  "host": "spacewars.local",
+  "boot_id": "44771fa5-7e78-450f-8ee6-261ec35715da",
+  "installed_source": "5f3eafc80e0b6589696b55e321b4493fdb5cdcb3",
+  "candidate": {
+    "source": "b455bc0c155c5a67d7e21dffda2b57765243bc1f",
+    "dirty": false,
+    "utc": "2026-10-17T07:36:44.794025+00:00",
+    "binary": {
+      "path": "target/ota-ssh-live-b455bc0/engine-os-manager",
+      "bytes": 13694944,
+      "sha256": "74b83de202be78663002ee2499ac0a4ae31d202ce758da63024d7100b5b39e0e"
+    },
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "compiler": "aarch64-linux-gnu-gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+  },
+  "cases": [
+    {
+      "phase": "before",
+      "successful_logins": 32,
+      "failed_login": 33,
+      "sequence": "16 separate logins, 130 seconds with the control connection kept open, then up to 20 more separate logins",
+      "snapshots": {
+        "initial": {
+          "utc": "2026-10-17T07:35:43.572797+00:00",
+          "hold_count": 0,
+          "expired_holds": 0,
+          "ssh_sessions": true,
+          "wireless_enabled": true,
+          "policy": {
+            "partial_offline": false,
+            "stay_connected": false
+          },
+          "intent": "unmanaged"
+        },
+        "first-16": {
+          "utc": "2026-10-17T07:35:47.852513+00:00",
+          "hold_count": 16,
+          "expired_holds": 0,
+          "ssh_sessions": true,
+          "wireless_enabled": true,
+          "policy": {
+            "partial_offline": false,
+            "stay_connected": false
+          },
+          "intent": "unmanaged"
+        },
+        "expired-16": {
+          "utc": "2026-10-17T07:37:58.250987+00:00",
+          "hold_count": 16,
+          "expired_holds": 16,
+          "ssh_sessions": true,
+          "wireless_enabled": true,
+          "policy": {
+            "partial_offline": false,
+            "stay_connected": false
+          },
+          "intent": "unmanaged"
+        },
+        "final": {
+          "utc": "2026-10-17T07:38:07.793723+00:00",
+          "hold_count": 32,
+          "expired_holds": 16,
+          "ssh_sessions": true,
+          "wireless_enabled": true,
+          "policy": {
+            "partial_offline": false,
+            "stay_connected": false
+          },
+          "intent": "unmanaged"
+        }
+      }
+    },
+    {
+      "phase": "fixed",
+      "successful_logins": 36,
+      "failed_login": null,
+      "sequence": "16 separate logins, 130 seconds with the control connection kept open, then up to 20 more separate logins",
+      "snapshots": {
+        "initial": {
+          "utc": "2026-10-17T07:39:03.298114+00:00",
+          "hold_count": 0,
+          "expired_holds": 0,
+          "ssh_sessions": true,
+          "wireless_enabled": true,
+          "policy": {
+            "partial_offline": false,
+            "stay_connected": false
+          },
+          "intent": "unmanaged"
+        },
+        "first-16": {
+          "utc": "2026-10-17T07:39:07.491023+00:00",
+          "hold_count": 16,
+          "expired_holds": 0,
+          "ssh_sessions": true,
+          "wireless_enabled": true,
+          "policy": {
+            "partial_offline": false,
+            "stay_connected": false
+          },
+          "intent": "unmanaged"
+        },
+        "expired-16": {
+          "utc": "2026-10-17T07:41:18.064417+00:00",
+          "hold_count": 16,
+          "expired_holds": 16,
+          "ssh_sessions": true,
+          "wireless_enabled": true,
+          "policy": {
+            "partial_offline": false,
+            "stay_connected": false
+          },
+          "intent": "unmanaged"
+        },
+        "final": {
+          "utc": "2026-10-17T07:41:23.673006+00:00",
+          "hold_count": 20,
+          "expired_holds": 0,
+          "ssh_sessions": true,
+          "wireless_enabled": true,
+          "policy": {
+            "partial_offline": false,
+            "stay_connected": false
+          },
+          "intent": "unmanaged"
+        }
+      }
+    }
+  ],
+  "artifacts": {
+    "baseline-reset.json": {
+      "bytes": 146,
+      "sha256": "92a0bf8a3765873d4802c70846116d6b7e96be8dd78e79351a02e46d24e65e9a"
+    },
+    "baseline-reset.sh": {
+      "bytes": 486,
+      "sha256": "1f082519df1e7fcd5baa72e7fd9536ebce87e9111d323a9fc860cce5d449097c"
+    },
+    "before/expired-16.json": {
+      "bytes": 3978,
+      "sha256": "b7236d9dd680ced6c7fddfa58ac8785876c80790afb692e83c93eefa3e4105e4"
+    },
+    "before/final.json": {
+      "bytes": 6698,
+      "sha256": "e68bee43b629c76033dc542eef06670c242aac4deadc9a3efbe27f4cef2ee3fb"
+    },
+    "before/first-16.json": {
+      "bytes": 4055,
+      "sha256": "b8ee77ea6c87fc8075c4d629ecb1fa3fb04499f37be9f5749df3e8d99cd70b1b"
+    },
+    "before/initial.json": {
+      "bytes": 1329,
+      "sha256": "f57031743496d18a8b3249da0eb45ed907a8a8adc08aba01d5dff81598bed816"
+    },
+    "before/logins.json": {
+      "bytes": 5332,
+      "sha256": "ee40ceca57058a9e47b1682da4cab9c0439ccc968006f19b3c4042c9b37c1ec5"
+    },
+    "before.log": {
+      "bytes": 488,
+      "sha256": "0351a8519991815efb314082122c78a362a7e8b8536b5888a004c9e7c1f9920c"
+    },
+    "build.json": {
+      "bytes": 428,
+      "sha256": "ec03d86e659003b05aecea2273044775ed6a8a5147379bb5fadf157e150017ed"
+    },
+    "final-services.txt": {
+      "bytes": 334,
+      "sha256": "631137d6a739252b4ee266e1db16d351bfee236edefc918ea43b92b44914443c"
+    },
+    "fixed/expired-16.json": {
+      "bytes": 3979,
+      "sha256": "be36c5c4b4882004cf7943fed57def1b315b4e2e1c6171ec2dd28a7390d772db"
+    },
+    "fixed/final.json": {
+      "bytes": 4739,
+      "sha256": "1a3919fef442231062ec3d744fd72f7f502c8298833edf6e68316b4af29e22a2"
+    },
+    "fixed/first-16.json": {
+      "bytes": 4056,
+      "sha256": "baa65396fe9d8711eb48799ed093b42d280230160464093d66f89f4bbd52062c"
+    },
+    "fixed/initial.json": {
+      "bytes": 1329,
+      "sha256": "e850606a3bf9a967813993db3ddf142d4d1839f55ac6a438c31640a6fa4295a6"
+    },
+    "fixed/logins.json": {
+      "bytes": 5716,
+      "sha256": "ee55934613381c60e85097e5d4cc01b36d13021ad2688b585d554c5407060581"
+    },
+    "fixed.log": {
+      "bytes": 338,
+      "sha256": "246e5b610f842fbb6bcfb9b9cc8d952dc7908c47d62dff39bb2e4464169b033d"
+    },
+    "probe.py": {
+      "bytes": 3036,
+      "sha256": "93f16bc151c67013f412a7d95fd1fc72eb74b0e0c0f1f51d49665c8a0e00d95c"
+    },
+    "restore.json": {
+      "bytes": 172,
+      "sha256": "a4dce6fe951005eb5a9c108b07bee08e8dbeb89151da70c2aae5d327cf60288b"
+    },
+    "restore.sh": {
+      "bytes": 920,
+      "sha256": "44ea200247827488c95eb4b48f37cea440b7605f5c40079d69e356469a4698db"
+    },
+    "run-fixed.log": {
+      "bytes": 764,
+      "sha256": "452676f84be2d548aa4107c6d281a22f8fdd97081fcf18cda4bea8857983b67a"
+    },
+    "run-fixed.py": {
+      "bytes": 1384,
+      "sha256": "9a6125a82f78a71b5dbf1ece67d41a100d534c729c8b1480551ffe4b2e35b329"
+    },
+    "stage.json": {
+      "bytes": 612,
+      "sha256": "12f9bad83b9947c8683e545f7d7a116ed043fc9340070a27eea18e1d1445e111"
+    },
+    "stage.sh": {
+      "bytes": 1735,
+      "sha256": "da9e9aec456ee84c8cf062298c30797738b0e0165a6c62d621c2241f68322311"
+    }
+  },
+  "local_archive": "target/ota-ssh-live-b455bc0",
+  "baseline-reset": {
+    "utc": "2026-10-17T07:35:43.505723+00:00",
+    "exit_code": 0,
+    "stdout": "/usr/bin/engine-os-manager: OK\nactive\nactive\n",
+    "stderr": ""
+  },
+  "stage": {
+    "utc": "2026-10-17T07:39:03.234795+00:00",
+    "exit_code": 0,
+    "stdout": "/home/swadmin/ota-ssh-admission-b455bc0: OK\n/data/spacewars-ssh-admission-b455bc0/engine-os-manager: OK\nactive\nactive\nMainPID=3082\nExecStart={ path=/data/spacewars-ssh-admission-b455bc0/engine-os-manager ; argv[]=/data/spacewars-ssh-admission-b455bc0/engine-os-manager serve ; ignore_errors=no ; start_time=[Sat 2026-10-17 00:39:03 PDT] ; stop_time=[n/a] ; pid=3082 ; code=(null) ; status=0/0 }\nDropInPaths=/run/systemd/system/spacewars-system.service.d/90-ssh-admission-diagnostic.conf\n/proc/3082/exe: OK\n",
+    "stderr": ""
+  },
+  "restore": {
+    "utc": "2026-10-17T07:41:23.996965+00:00",
+    "exit_code": 0,
+    "stdout": "active\nactive\n/proc/3791/exe: OK\n44771fa5-7e78-450f-8ee6-261ec35715da\n",
+    "stderr": ""
+  },
+  "game_continuity": {
+    "pid": 896,
+    "active_enter_boottime_us": 5358761,
+    "observation": "The same kiosk process remained active across both tests; its start preceded either service restart."
+  },
+  "limits": [
+    "Only expired SSH holds are replaced. The bound on 32 unexpired holds remains.",
+    "This comparison used a reversible runtime service override on Pi 5, not a new flashed image. The original installed executable was restored and its hash verified.",
+    "No radio policy, update setting, boot selector, recovery state or user data was changed by the comparison.",
+    "Unit tests cover other hold types, authorization, idempotence and interrupted commits; these were not injected into the live device.",
+    "The primary Picade remains inaccessible before login; its local reservation count has not been observed."
+  ]
+}

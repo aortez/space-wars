@@ -1,0 +1,402 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.24.0] - 2026-07-10
+### Fixes
+- Match `chrono`'s behavior when serializing the metadata expiration timestamp with `jiff` types to ensure repos published before the migration to `jiff` can be safely re-serialized without changing signed content [#952]
+
+### Changes
+- Dependency updates
+
+[#952]: https://github.com/awslabs/tough/pull/952
+
+## [0.23.0] - 2026-06-18
+### Breaking Changes
+- Migrated from `chrono` to `jiff`. Public API: `DateTime<Utc>` types replaced with `jiff::Timestamp` on `Role::expires`, `Root`/`Snapshot`/`Targets`/`Timestamp` `expires` fields, `RepositoryEditor::*_expires` setters, and the `SystemTimeSteppedBackward` error variant. Wire format unchanged (RFC 3339, `Z` suffix). [#948]
+- `HttpTransport` and `HttpTransportBuilder` no longer implement `Copy` [#940]
+
+### Added
+- Add support for a custom `CryptoProvider` in `HttpTransportBuilder` [#940]
+
+### Changes
+- Update to `reqwest` 0.13 [#938]
+- Dependency updates
+
+[#938]: https://github.com/awslabs/tough/pull/938
+[#940]: https://github.com/awslabs/tough/pull/940
+[#948]: https://github.com/awslabs/tough/pull/948
+
+## [0.22.0] - 2026-04-24
+### Fixes
+- Update delegations code [#933]
+- Fix rust clippy [#932]
+- Update file writing [#932]
+- Re-export `TransportStream` type alias [#909]
+- Fix `max_targets_size` in `load_targets` [#884]
+
+### Changes
+- Require `TransportStream` is `Sync` (thanks @iliana) [#917]
+
+[#884]: https://github.com/awslabs/tough/pull/884
+[#909]: https://github.com/awslabs/tough/pull/909
+[#917]: https://github.com/awslabs/tough/pull/917
+[#932]: https://github.com/awslabs/tough/pull/932
+[#933]: https://github.com/awslabs/tough/pull/933
+
+
+## [0.21.0] - 2025-04-22
+### Fixes
+- Flush cache files after writing to ensure they are closed at `drop()` time [#874]
+
+### Changes
+- Dependency updates [#868]
+
+[#868]: https://github.com/awslabs/tough/pull/868
+[#874]: https://github.com/awslabs/tough/pull/874
+
+## [0.20.0] - 2025-03-27
+### Fixes
+- Apply fixes for [GHSA-5vmp-m5v2-hx47], [GHSA-v4wr-j3w6-mxqc], [GHSA-j8x2-777p-23fc], [GHSA-76g3-38jv-wxh4], [GHSA-q6r9-r9pw-4cf7]
+- Detect duplicate `keyids` when verifying roles ([094f0877])
+- Use the update start time when checking for signature expiry, rather than the current time ([0eeb60ae])
+- Always store root.json in the datastore (thanks @AdamKorcz, @jku!) ([7573eb97])
+
+### Changes
+- Add a `permissive` argument to `find_target()`, allowing the caller to cease a search when a
+  terminating delegation is encountered ([c5ee1718])
+- Add `terminating` argument to `RepositoryEditor::delegate_role()` and
+  `RepositoryEditor::add_role()` to enable adding terminating delegations ([598111f8])
+- Dependency updates
+
+[094f0877]: https://github.com/awslabs/tough/commit/094f0877e86f172ab910125b325a8e0dfaea6cc0
+[0eeb60ae]: https://github.com/awslabs/tough/commit/0eeb60aefe27f00b65730634b788a1aafb8bf3c6
+[7573eb97]: https://github.com/awslabs/tough/commit/7573eb97b689887a6a63fe4e4b51b40198380a19
+[c5ee1718]: https://github.com/awslabs/tough/commit/c5ee1718e630fdedc5676bf71b5bef10e4c7f91c
+[598111f8]: https://github.com/awslabs/tough/commit/598111f88105a707ee68b0fa06c52da7176ea96a
+[GHSA-5vmp-m5v2-hx47]: https://github.com/awslabs/tough/security/advisories/GHSA-5vmp-m5v2-hx47
+[GHSA-v4wr-j3w6-mxqc]: https://github.com/awslabs/tough/security/advisories/GHSA-v4wr-j3w6-mxqc
+[GHSA-j8x2-777p-23fc]: https://github.com/awslabs/tough/security/advisories/GHSA-j8x2-777p-23fc
+[GHSA-76g3-38jv-wxh4]: https://github.com/awslabs/tough/security/advisories/GHSA-76g3-38jv-wxh4
+[GHSA-q6r9-r9pw-4cf7]: https://github.com/awslabs/tough/security/advisories/GHSA-q6r9-r9pw-4cf7
+
+## [0.19.0] - 2024-10-10
+### Changes
+- Add FIPS support [#828]
+- Dependency updates [#825]
+
+[#825]: https://github.com/awslabs/tough/pull/825
+[#828]: https://github.com/awslabs/tough/pull/828
+
+## [0.18.0] - 2024-09-04
+### Changes
+- timestamp.json meta can has optional fields (thanks @flavio) [#778]
+- Dependency updates [#763], [#765], [#780], [#802]
+
+[#763]: https://github.com/awslabs/tough/pull/763
+[#765]: https://github.com/awslabs/tough/pull/765
+[#778]: https://github.com/awslabs/tough/pull/778
+[#780]: https://github.com/awslabs/tough/pull/780
+[#802]: https://github.com/awslabs/tough/pull/802
+
+## [0.17.1] - 2024-03-22
+### Changes
+- Adds support for "ecdsa" key type (thanks @jku) [#754]
+- Dependency updates [#759]
+
+[#754]: https://github.com/awslabs/tough/issues/754
+[#759]: https://github.com/awslabs/tough/pull/759
+
+## [0.17.0] - 2024-03-15
+### Fixes
+- Fix a bug in ECDSA parsing (thanks @Xynnn007) [#737]
+
+### Changes
+- Dependency updates
+
+[#737]: https://github.com/awslabs/tough/pull/737
+
+## [0.16.0] - 2023-12-06
+### Changes
+- Dependency updates
+
+## [0.15.0] - 2023-11-07
+### Changes
+- ❗Breaking Change❗: Most public functions and traits have been changed to async, thanks @phu-cinemo  [#687]
+
+[#687]: https://github.com/awslabs/tough/pull/687
+
+## [0.14.0] - 2023-08-22
+### Security Fixes
+- Bump openssl from 0.10.45 to 0.10.55 [#596], [#610], [#644]
+
+### Changes
+- Fix race condition in system_time [#591], [#609]
+- Bump AWS SDK for Rust [#610]
+- Addressed new clippy lints [#644]
+- Fix up path prefix check for Windows, thanks @jon-zu [#656]
+- Various dependency updates
+
+[#591]: https://github.com/awslabs/tough/pull/591
+[#596]: https://github.com/awslabs/tough/pull/596
+[#609]: https://github.com/awslabs/tough/pull/609
+[#610]: https://github.com/awslabs/tough/pull/610
+[#644]: https://github.com/awslabs/tough/pull/644
+[#656]: https://github.com/awslabs/tough/pull/656
+
+## [0.13.0] - 2023-03-02
+### Breaking Changes
+- Add a lifetime parameter to Transport::fetch and Repository::read_target, thanks @sunshowers [#563]
+- Add Send and Sync to Repository transport [#578]
+
+### Changes
+- Fix all_targets iterator type [#562]
+- Addressed clippy warnings [#544], [#556]
+- Remove minor/patch versions from Cargo.tomls [#573]
+- Bump tokio from 1.18.x LTS to 1.25.0 [#555], [#568]
+- Various dependency updates
+
+[#544]: https://github.com/awslabs/tough/pull/544
+[#555]: https://github.com/awslabs/tough/pull/555
+[#556]: https://github.com/awslabs/tough/pull/556
+[#562]: https://github.com/awslabs/tough/pull/562
+[#563]: https://github.com/awslabs/tough/pull/563
+[#568]: https://github.com/awslabs/tough/pull/568
+[#573]: https://github.com/awslabs/tough/pull/573
+[#578]: https://github.com/awslabs/tough/pull/578
+
+## [0.12.5] - 2022-10-03
+### Security Fixes
+- Update `chrono` and enable only necessary features to address RUSTSEC-2020-0071, thanks @flavio [#506]
+
+### Changes
+- Various dependency updates [#501], [#502], [#503], [#508], [#509], [#514]
+
+[#501]: https://github.com/awslabs/tough/pull/501
+[#502]: https://github.com/awslabs/tough/pull/502
+[#503]: https://github.com/awslabs/tough/pull/503
+[#506]: https://github.com/awslabs/tough/pull/506
+[#508]: https://github.com/awslabs/tough/pull/508
+[#509]: https://github.com/awslabs/tough/pull/509
+[#514]: https://github.com/awslabs/tough/pull/514
+
+## [0.12.4] - 2022-08-12
+### Changes
+- Various dependency updates
+
+## [0.12.3] - 2022-07-26
+- Various dependency updates
+
+## [0.12.2] - 2022-04-26
+### Changes
+- Blanket impl sign for references [#448]
+- Fix clippy warnings [#455]
+- Various other dependency updates
+
+[#448]: https://github.com/awslabs/tough/pull/448
+[#455]: https://github.com/awslabs/tough/pull/455
+
+## [0.12.1] - 2022-01-28
+### Fixes
+- ECDSA keys now use the correct keytype name, thanks @flavio [#425]
+
+### Changes
+- Added support for hex-encoded ECDSA keys, thanks @flavio [#426]
+- Updated to snafu 0.7, thanks @shepmaster [#435]
+- Various other dependency updates
+
+[#425]: https://github.com/awslabs/tough/pull/425
+[#426]: https://github.com/awslabs/tough/pull/426
+[#435]: https://github.com/awslabs/tough/pull/435
+
+## [0.12.0] - 2021-10-19
+### Breaking Changes
+- Target names are now specified with a struct, `TargetName`, instead of `String`.
+
+### Changes
+- Update dependencies.
+- Fix an issue where delegated role names with path traversal constructs could cause files to be written in unexpected locations.
+- Fix a similar issue with path traversal constructs in target names.
+
+## [0.11.3] - 2021-09-15
+### Changes
+- Update dependencies.
+
+## [0.11.2] - 2021-08-24
+### Changes
+- Add `Repository.cache_metadata` method.  [#403]
+
+[#403]: https://github.com/awslabs/tough/pull/403
+
+## [0.11.1] - 2021-07-30
+### Changes
+- Update dependencies.  [#363], [#364], [#365], [#366], [#367], [#379], [#381], [#382], [#384], [#391], [#393], [#396], [#398]
+- Fix clippy warnings.  [#372], [#378], [#383], [#399]
+- Add license check to CI.  [#385]
+
+[#363]: https://github.com/awslabs/tough/pull/363
+[#364]: https://github.com/awslabs/tough/pull/364
+[#365]: https://github.com/awslabs/tough/pull/365
+[#366]: https://github.com/awslabs/tough/pull/366
+[#367]: https://github.com/awslabs/tough/pull/367
+[#372]: https://github.com/awslabs/tough/pull/372
+[#378]: https://github.com/awslabs/tough/pull/378
+[#379]: https://github.com/awslabs/tough/pull/379
+[#381]: https://github.com/awslabs/tough/pull/381
+[#382]: https://github.com/awslabs/tough/pull/382
+[#383]: https://github.com/awslabs/tough/pull/383
+[#384]: https://github.com/awslabs/tough/pull/384
+[#385]: https://github.com/awslabs/tough/pull/385
+[#391]: https://github.com/awslabs/tough/pull/391
+[#393]: https://github.com/awslabs/tough/pull/393
+[#396]: https://github.com/awslabs/tough/pull/396
+[#398]: https://github.com/awslabs/tough/pull/398
+[#399]: https://github.com/awslabs/tough/pull/399
+
+## [0.11.0] - 2021-03-01
+### Breaking Changes
+- Update tokio to v1, hyper to v0.14 and reqwest to v0.11 [#330]
+
+## Added
+- `tough` now compiles and works on Windows. Thanks @Cytro54! [#342]
+
+[#308]: https://github.com/awslabs/tough/pull/342
+[#330]: https://github.com/awslabs/tough/pull/330
+
+## [0.10.0] - 2020-01-14
+### Breaking Changes
+
+- Repositories are now loaded with the `RepositoryLoader`. `Repository::load` is no longer available. [#256]
+- The `Repository` and `RepositoryEditor` objects no longer have type and lifetime parameters.
+- Modifying `HttpTransport` behavior now uses `HttpTransportBuilder` instead of `ClientSettings`. [#308]
+
+### Added
+- A `DefaultTransport` that supports both file and http transport. [#256]
+
+[#256]: https://github.com/awslabs/tough/pull/256
+[#308]: https://github.com/awslabs/tough/pull/308
+
+## [0.9.0] - 2020-07-20
+### Breaking Changes
+- `RepositoryEditor` requires lifetime and `Transport` type parameters
+- Minor breaking changes across the `editor` module to support delegated targets
+
+### Added
+- The `editor` module now supports delegated targets
+
+### Changed
+- `RepositoryEditor` ensures the root has enough keys to fulfill the signing threshold
+- `RepositoryEditor` allows adding multiple signatures at once
+- Added a `add_old_signatures` method to `SignedRole` to enable cross-signing from an old root role
+
+## [0.8.0] - 2020-07-20
+### Breaking Changes
+- The `HttpTransport` type and the `Read` and `Error` types that it uses have changed.
+- Remove `root.json` from Snapshot metadata per [theupdateframework/specification#40](https://github.com/theupdateframework/specification/pull/40)
+
+### Added
+- Added HTTP retry logic.
+- Added early support for delegations.
+- Added logging.
+- Added documentation to all remaining items.
+- Allow control of link/copy behavior for existing paths.
+
+### Changed
+- Dependency updates.
+- Fix new clippy lints in Rust 1.45.
+
+## [0.7.1] - 2020-07-09
+
+### Security
+- Fixed uniqueness verification of signature threshold. ([CVE-2020-15093](https://github.com/awslabs/tough/security/advisories/GHSA-5q2r-92f9-4m49))
+
+## [0.7.0] - 2020-06-26
+
+### Added
+- Added `#[non_exhaustive]` to `tough::Error` and `tough::schema::Error`
+- `editor::signed::SignedRepository`:
+  - Added `copy_targets`, which does the same as `link_targets` except copies rather than symlinks
+  - Added `link_target` and `copy_target`, which are used by the above functions and allow for handling single files with custom filenames
+
+## [0.6.0] - 2020-06-11
+
+### Added
+- Added `Target::from_path()` method.
+- Added the `KeySource` trait, which allows users to fetch signing keys.
+- Added `RepositoryEditor`, which allow users to update a `tough::Repository`'s metadata and optionally add targets.
+
+### Changed
+- Dependency updates.
+
+## [0.5.0] - 2020-05-18
+
+For changes that require modification of calling code see #120 and #121.
+
+### Added
+- Add optional ability to load an expired repository.
+
+### Changed
+- Rename `target_base_url` to `targets_base_url`.
+- Dependency updates.
+
+## [0.4.0] - 2020-02-11
+- Updated `reqwest` to `0.10.1` to fix an issue with https failures. Note this requires use of `reqwest::blocking::*` instead of `reqwest::*` in code that is using HttpTransport.
+- Update all dependencies with `cargo update`.
+
+## [0.3.0] - 2019-12-16
+### Added
+- Added the `Sign` trait to `tough`, which allows users to sign data.
+- Added the `canonical_form` method to the `Role` trait, which serializes the role into canonical JSON.
+
+## [0.2.0] - 2019-12-04
+### Added
+- New methods `root`, `snapshot`, and `timestamp` on `Repository` to access the signed roles.
+
+### Changed
+- Changed the return type of `Repository::targets` to the signed role (`Signed<Targets>`). The top-level `Target` type is no longer necessary. **This is a breaking change.**
+- Updated snafu to v0.6. **This is a breaking change** to the `snafu::ErrorCompat` implementation on library error types.
+- Updated pem to v0.7.
+- Switched to using `ring::digest` for SHA-256 digest calculation.
+- Added `Debug`, `Clone`, and `Copy` implementations to structs when appropriate.
+
+## [0.1.0] - 2019-11-08
+### Added
+- Everything!
+
+[Unreleased]: https://github.com/awslabs/tough/compare/tough-v0.24.0...develop
+[0.24.0]: https://github.com/awslabs/tough/compare/tough-v0.23.0...tough-v0.24.0
+[0.23.0]: https://github.com/awslabs/tough/compare/tough-v0.22.0...tough-v0.23.0
+[0.22.0]: https://github.com/awslabs/tough/compare/tough-v0.21.0...tough-v0.22.0
+[0.21.0]: https://github.com/awslabs/tough/compare/tough-v0.20.0...tough-v0.21.0
+[0.20.0]: https://github.com/awslabs/tough/compare/tough-v0.19.0...tough-v0.20.0
+[0.19.0]: https://github.com/awslabs/tough/compare/tough-v0.18.0...tough-v0.19.0
+[0.18.0]: https://github.com/awslabs/tough/compare/tough-v0.17.1...tough-v0.18.0
+[0.17.1]: https://github.com/awslabs/tough/compare/tough-v0.17.0...tough-v0.17.1
+[0.17.0]: https://github.com/awslabs/tough/compare/tough-v0.16.0...tough-v0.17.0
+[0.16.0]: https://github.com/awslabs/tough/compare/tough-v0.15.0...tough-v0.16.0
+[0.15.0]: https://github.com/awslabs/tough/compare/tough-v0.14.0...tough-v0.15.0
+[0.14.0]: https://github.com/awslabs/tough/compare/tough-v0.13.0...tough-v0.14.0
+[0.13.0]: https://github.com/awslabs/tough/compare/tough-v0.12.5...tough-v0.13.0
+[0.12.5]: https://github.com/awslabs/tough/compare/tough-v0.12.4...tough-v0.12.5
+[0.12.4]: https://github.com/awslabs/tough/compare/tough-v0.12.3...tough-v0.12.4
+[0.12.3]: https://github.com/awslabs/tough/compare/tough-v0.12.2...tough-v0.12.3
+[0.12.2]: https://github.com/awslabs/tough/compare/tough-v0.12.1...tough-v0.12.2
+[0.12.1]: https://github.com/awslabs/tough/compare/tough-v0.12.0...tough-v0.12.1
+[0.12.0]: https://github.com/awslabs/tough/compare/tough-v0.11.3...tough-v0.12.0
+[0.11.3]: https://github.com/awslabs/tough/compare/tough-v0.11.2...tough-v0.11.3
+[0.11.2]: https://github.com/awslabs/tough/compare/tough-v0.11.1...tough-v0.11.2
+[0.11.1]: https://github.com/awslabs/tough/compare/tough-v0.11.0...tough-v0.11.1
+[0.11.0]: https://github.com/awslabs/tough/compare/tough-v0.10.0...tough-v0.11.0
+[0.10.0]: https://github.com/awslabs/tough/compare/tough-v0.9.0...tough-v0.10.0
+[0.9.0]: https://github.com/awslabs/tough/compare/tough-v0.8.0...tough-v0.9.0
+[0.8.0]: https://github.com/awslabs/tough/compare/tough-v0.7.1...tough-v0.8.0
+[0.7.1]: https://github.com/awslabs/tough/compare/tough-v0.7.0...tough-v0.7.1
+[0.7.0]: https://github.com/awslabs/tough/compare/tough-v0.6.0...tough-v0.7.0
+[0.6.0]: https://github.com/awslabs/tough/compare/tough-v0.5.0...tough-v0.6.0
+[0.5.0]: https://github.com/awslabs/tough/compare/tough-v0.4.0...tough-v0.5.0
+[0.4.0]: https://github.com/awslabs/tough/compare/tough-v0.3.0...tough-v0.4.0
+[0.3.0]: https://github.com/awslabs/tough/compare/tough-v0.2.0...tough-v0.3.0
+[0.2.0]: https://github.com/awslabs/tough/compare/tough-v0.1.0...tough-v0.2.0
+[0.1.0]: https://github.com/awslabs/tough/releases/tag/tough-v0.1.0

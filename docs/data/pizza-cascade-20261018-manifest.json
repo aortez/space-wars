@@ -1,0 +1,142 @@
+{
+  "files": 1792,
+  "archive": "pizza-cascade-20261018-raw.tar.gz",
+  "archive_sha256": "170c066e1677e0c0524760de2882952d9cf54744189076b77729e36c469b76d0",
+  "archive_bytes": 18932317,
+  "summary": "pizza-cascade-20261018-summary.json",
+  "summary_sha256": "773623cf3980d7889eb1445c84e2746e946aa3a52e4d394766bb0ac8eb04a403",
+  "source": {
+    "date": "2026-10-18",
+    "device": "Pi 4 Model B Rev 1.4, Picade 1024x768",
+    "baseline": "66cac7e35778f32434913d9e0deebf8a30a00cb9",
+    "index_only": "a9b50b8",
+    "final_runtime": "ff2158126d0c8b2ebe96eb8d0eb9e69e3a877c33",
+    "headless": "Rust 1.89 AArch64 release, fat LTO/codegen-units=1",
+    "gpu": "Yocto Rust 1.94 pi-kiosk-gpu release, direct geometry, 60 Hz target",
+    "qualification": "Incomplete: Pi 5 offline; ordinary field-On CPU/frame budget misses remain. Exact update/frame join and cold GPU-cache coverage unavailable."
+  },
+  "verification": {
+    "index_only_matched_runs": [
+      {
+        "run": "field-1000-run1.json",
+        "updates": 240
+      },
+      {
+        "run": "field-1000-run2.json",
+        "updates": 240
+      },
+      {
+        "run": "field-2500-run1.json",
+        "updates": 240
+      },
+      {
+        "run": "field-2500-run2.json",
+        "updates": 240
+      },
+      {
+        "run": "field-500-run1.json",
+        "updates": 240
+      },
+      {
+        "run": "field-500-run2.json",
+        "updates": 240
+      },
+      {
+        "run": "field-5000-run1.json",
+        "updates": 240
+      },
+      {
+        "run": "field-5000-run2.json",
+        "updates": 240
+      },
+      {
+        "run": "growth-run1.json",
+        "updates": 1200
+      },
+      {
+        "run": "growth-run2.json",
+        "updates": 1200
+      },
+      {
+        "run": "mixed-1000-run1.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-1000-run2.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-1000-run3.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-2500-run1.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-2500-run2.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-2500-run3.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-500-run1.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-500-run2.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-500-run3.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-5000-run1.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-5000-run2.json",
+        "updates": 240
+      },
+      {
+        "run": "mixed-5000-run3.json",
+        "updates": 240
+      },
+      {
+        "run": "ordinary-off-run1.json",
+        "updates": 1200
+      },
+      {
+        "run": "ordinary-off-run2.json",
+        "updates": 1200
+      },
+      {
+        "run": "ordinary-on-run1.json",
+        "updates": 1200
+      },
+      {
+        "run": "ordinary-on-run2.json",
+        "updates": 1200
+      }
+    ],
+    "compared_updates": 12000,
+    "final_gpu_replays": [
+      {
+        "field": "off",
+        "updates": 1200,
+        "matching": true,
+        "first_mismatch": null
+      },
+      {
+        "field": "on",
+        "updates": 1200,
+        "matching": true,
+        "first_mismatch": null
+      }
+    ],
+    "final_device_escaped_walls": 0
+  }
+}

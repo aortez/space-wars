@@ -1,19 +1,19 @@
 #!/bin/bash
-# Restricted application-only installer. Never installs services, libraries,
-# arbitrary paths, or boot assets. A/B updates remain the OS upgrade mechanism.
+# Root/operator worker, invoked only by engine-os-manager under the OTA lock.
+# Never installs services, libraries, arbitrary paths or boot assets.
 set -euo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 umask 077
 
 fail() { echo "Fast update: $*" >&2; exit 1; }
-[[ $(id -u) == 0 ]] || fail "Run through sudo."
+[[ $(id -u) == 0 ]] || fail "Separate root operator access is required."
 compat_file=/usr/share/spacewars/fast-update-compat
 [[ -f $compat_file ]] || fail "Missing compatibility identity; perform a full update."
 compat=$(<"$compat_file")
 [[ $compat =~ ^[a-f0-9]{64}$ ]] || fail "Invalid installed compatibility identity."
 
 if [[ $# == 1 && $1 == --check ]]; then
-    echo "spacewars-fast-update-v1 $compat"
+    echo "spacewars-fast-update-v2 $compat"
     exit 0
 fi
 [[ $# == 4 ]] || fail "Expected staging directory, compatibility ID and two SHA-256 hashes."
@@ -25,13 +25,19 @@ expected=("$3" "$4")
 names=(engine-client spacewars-cli)
 service=spacewars-kiosk.service
 
-exec 9>/run/lock/spacewars-fast-update.lock
-flock -n 9 || fail "Another fast update is running."
 [[ $(uname -m) == aarch64 ]] || fail "Only aarch64 targets are supported."
-systemctl is-active --quiet "$service" || fail "Kiosk must be running before a fast update."
+service_command() {
+    env -i PATH="$PATH" timeout 15 systemctl --no-pager "$@" "$service"
+}
+service_command is-active --quiet || fail "Kiosk must be running before a fast update."
 
-# Keep new files and backups on the destination filesystem. Read untrusted
-# staging paths as the kiosk user, never as root (including symlink targets).
+# SCP is performed by the separately authenticated root operator. A private
+# stage and regular, single-link files prevent following user-controlled links.
+[[ -d $stage && ! -L $stage && $(stat -c '%u:%a' -- "$stage") == 0:700 ]] \
+    || fail "Staging must be a private root-owned directory."
+
+# Keep new files and backups on the destination filesystem. Operator staging
+# remains root-owned and must not be shared with the kiosk account.
 storage=/usr/lib/spacewars-fast-update
 install -d -m 0700 "$storage"
 transaction=$(mktemp -d "$storage/transaction.XXXXXXXXXX")
@@ -42,7 +48,7 @@ cleanup() {
     if [[ $rollback == true ]]; then
         echo "Fast update failed; restoring the previous client and CLI." >&2
         # If stopping fails, retain both backups rather than modifying a live app.
-        if ! systemctl stop "$service"; then
+        if ! service_command stop; then
             echo "Could not stop kiosk; recovery files retained at $transaction" >&2
             exit 1
         fi
@@ -53,7 +59,7 @@ cleanup() {
             fi
         done
         sync
-        if ! systemctl start "$service"; then
+        if ! service_command start; then
             echo "Previous binaries restored, but kiosk restart failed." >&2
             result=1
         fi
@@ -69,8 +75,10 @@ trap 'exit 1' HUP INT TERM
 
 for index in 0 1; do
     name=${names[$index]}
-    setpriv --reuid=spacewars --regid=spacewars --init-groups --no-new-privs \
-        cat -- "$stage/$name" > "$transaction/$name"
+    [[ -f $stage/$name && ! -L $stage/$name \
+        && $(stat -c '%u:%h:%a' -- "$stage/$name") =~ ^0:1:(600|644|700|755)$ ]] \
+        || fail "$name must be a root-owned regular staging file."
+    cat -- "$stage/$name" > "$transaction/$name"
     actual=$(sha256sum "$transaction/$name")
     [[ ${actual%% *} == "${expected[$index]}" ]] || fail "$name checksum mismatch."
     header=$(od -An -tx1 -N7 "$transaction/$name" | tr -d ' \n')
@@ -83,12 +91,12 @@ sync
 
 rollback=true
 echo "Restarting the kiosk with the new client and CLI (no reboot)."
-systemctl stop "$service"
+service_command stop
 for name in "${names[@]}"; do
     mv -f -- "$transaction/$name" "/usr/bin/$name"
 done
 sync
-systemctl start "$service"
+service_command start
 
 # A live control socket verifies application startup, not just systemd's PID.
 # Require three consecutive responses from the same process; a crash loop is
@@ -97,8 +105,8 @@ healthy=0
 previous_pid=
 for ((attempt = 0; attempt < 20; attempt++)); do
     sleep 1
-    pid=$(systemctl show "$service" --property=MainPID --value)
-    if [[ $pid != 0 ]] && systemctl is-active --quiet "$service" \
+    pid=$(service_command show --property=MainPID --value)
+    if [[ $pid != 0 ]] && service_command is-active --quiet \
         && setpriv --reuid=spacewars --regid=spacewars --init-groups --no-new-privs \
             timeout 2 /usr/bin/spacewars-cli status >/dev/null 2>&1; then
         if [[ $pid == "$previous_pid" ]]; then

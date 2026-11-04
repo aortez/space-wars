@@ -1,0 +1,234 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T02:14:16.831761+00:00",
+  "implementation_commit": "113033df88dde762a03314d960e29e6081d2e57b",
+  "scope": "Read-only follow-up for a completed fixed-file replacement, effective sudo/SSH configuration and selected loaded service dependencies. Live migration, independent logins, full privilege closure and boot qualification have not run.",
+  "host_validation": {
+    "ota_tests_passed": 191,
+    "manager_tests_passed": 38,
+    "ordinary_suite_ignored": 7,
+    "runner": "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "format": "passed",
+    "aarch64_tests_and_example": "built",
+    "final_test_binary": {
+      "path": "target/debug/deps/engine_ota-6f09450237c0bb77",
+      "sha256": "d31532fd35d9afa468d0cd8704c2a92965a397183254a7b97ad61b170404c3b1"
+    },
+    "parallel_runner_observation": {
+      "result": "Unrestricted multithreaded cargo test intermittently returned Busy when a test reopened a just-released flock lock. Other tests fork in the same process and can retain those descriptors. Final qualification uses the existing documented serial command; CI uses nextest. No test-isolation workaround or production lock change is included.",
+      "development_failures": [
+        {
+          "path": "target/ota-access-check-full-tests.log",
+          "sha256": "2a109fb63de713d4e6608bb3d49c7eb37e7b73423eeaefc4731dee7740a9175d",
+          "test_results": [
+            "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.09s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+            "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.04s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: FAILED. 166 passed; 1 failed; 7 ignored; 0 measured; 0 filtered out; finished in 21.55s"
+          ]
+        },
+        {
+          "path": "target/ota-access-check-host-final.log",
+          "sha256": "249a5a15ca761c34627e360eb6878ea6e56e81a664e5be746c1bd7c1d3a30354",
+          "test_results": [
+            "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.09s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+            "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.12s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 175 filtered out; finished in 0.00s",
+            "test result: FAILED. 168 passed; 1 failed; 7 ignored; 0 measured; 0 filtered out; finished in 21.70s"
+          ]
+        },
+        {
+          "path": "target/ota-access-check-host-final-2.log",
+          "sha256": "331037c8d8d2432b59a2a1f936ca7314ed72170a23ebbaa09e1c7916d83ae081",
+          "test_results": [
+            "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.11s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+            "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.06s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 175 filtered out; finished in 0.00s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 175 filtered out; finished in 0.00s",
+            "test result: FAILED. 168 passed; 1 failed; 7 ignored; 0 measured; 0 filtered out; finished in 21.50s"
+          ]
+        }
+      ],
+      "development_scope": "These logs include earlier in-progress versions and are not final-source qualification."
+    }
+  },
+  "pi5_validation": {
+    "remote_directory": "/tmp/spacewars-access-check.WbS7vU",
+    "artifacts": {
+      "access-check-tests": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-bfa87321f5ceb7b8",
+        "sha256": "d748ef1063dcafb1f9b98d2af4961258df27266c7eed4bf9401158acadf46624"
+      },
+      "bootstrap_check_legacy_access": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/examples/bootstrap_check_legacy_access",
+        "sha256": "c81ddfea4934885cda00bc06d22c1ab43e710af29153bd5941b134cc56aa0558"
+      }
+    },
+    "remote_hashes": {
+      "access-check-tests": "d748ef1063dcafb1f9b98d2af4961258df27266c7eed4bf9401158acadf46624",
+      "bootstrap_check_legacy_access": "c81ddfea4934885cda00bc06d22c1ab43e710af29153bd5941b134cc56aa0558"
+    },
+    "uid": 1000,
+    "boot_id_before": "de606400-dc75-446e-b26b-385592b0f562",
+    "entry_point_refused_uid_1000": true,
+    "entry_point_exit_status": 1,
+    "boot_id_after": "de606400-dc75-446e-b26b-385592b0f562",
+    "tests_passed": 14,
+    "elapsed_seconds": 0.5,
+    "scope": "UID 1000 tests use temporary regular-file fixtures. The actual root-operator entry point rejects this UID before installed paths are opened. The complete installed access check did not execute.",
+    "configuration_parse": {
+      "command": "/usr/sbin/sshd -G -f /tmp/spacewars-legacy-replace.HOBWJP/sshd-check.conf",
+      "temporary_config": "AuthorizedKeysFile /data/spacewars-access/%u\nPermitRootLogin prohibit-password\nInclude /etc/ssh/sshd_config\n",
+      "authorized_keys_file": "/data/spacewars-access/%u",
+      "permit_root_login": "without-password",
+      "scope": "Static parser acceptance only. No -T host-key check, -C connection-specific Match validation or real login occurred."
+    },
+    "loaded_services_before": {
+      "ssh": "Socket-activated sshd@ template; no spacewars-access dependency yet. Optional /etc/default/ssh is absent; loaded SSHD_OPTS is empty.",
+      "network": "Legacy bind service still has mkdir/chmod setup and NetworkManager has After without Requires on the bind service.",
+      "sudo": "Legacy unsigned-update, fast-update and reboot grants are still present. They must not pass the new checker."
+    },
+    "packaged_manager": {
+      "artifact": {
+        "path": "target/ota-bootstrap-c14c53f-pi5-v2/engine-os-manager",
+        "sha256": "2e9124f58fb0ccc24557ef99e986fb2008752188df597d9fbf8e6c728560d87f"
+      },
+      "help_executed": true,
+      "maintenance_renderer_denied_uid_1000": true,
+      "scope": "Temporary copy from the existing c14c53f package; loader/startup and UID guard only, no service execution qualification."
+    }
+  },
+  "fixtures": {
+    "sshd_overlay": {
+      "path": "crates/engine-ota/tests/fixtures/pi5-sshd-access-overlay.txt",
+      "sha256": "e79b14a42198e29e68e91641201a73b54180fec544166abc1c259dac5f08a84b"
+    },
+    "ssh_loaded_before": {
+      "path": "crates/engine-ota/tests/fixtures/pi5-sshd-service-before.txt",
+      "sha256": "ab1b61216cb311fd7f7aa07768eae4eb2bcffc69054b810697329c36e228d815"
+    },
+    "normalization": "The SSH parser fixture strips trailing whitespace from the captured subsystem line. Original command output remains hashed in logs."
+  },
+  "report_authority": {
+    "independent_logins_verified": false,
+    "equivalent_privilege_audit_complete": false,
+    "ready_for_trial": false
+  },
+  "device_mutations": {
+    "temporary_uid_1000_fixtures_and_config": true,
+    "installed_root_files": false,
+    "root_preparation": false,
+    "service_or_radio_changes": false,
+    "boot_remount": false,
+    "partition_writes": false,
+    "watchdog_open": false,
+    "reboot": false,
+    "credential_contents_read": false
+  },
+  "artifact_scope": {
+    "new_runtime_image_built": false,
+    "latest_validated_runtime_image_source": "c14c53f53012722e653c303834499906393fe2cb",
+    "operator_example_built_separately": true,
+    "schema_2_kits_unchanged": true
+  },
+  "remaining": [
+    "Root connection details for both Pis; selected approach is root-shell bootstrap preserving data.",
+    "Supervised backup/export/restore rehearsal, preservation and fixed-file replacement on each installed Pi.",
+    "Run effective access check as root, verify separate fresh root/runtime logins, exercise actual runtime UID denial cases, and audit equivalent D-Bus/Polkit/service-control permissions.",
+    "Inactive-root installation, staged/canonical boot confirmation and watchdog/failure qualification on both boards.",
+    "End-to-end feed, updater, policy and UI integration; auto update is not complete."
+  ],
+  "logs": {
+    "host-serial": {
+      "path": "target/ota-access-check-host-serial.log",
+      "sha256": "1053cf25625d96df5c13903de85f3730ba9b0774765c304939ee144e43d09f7c",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.50s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.78s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 169 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 46.08s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "pi5-tests": {
+      "path": "target/ota-access-check-pi5-tests-serial.log",
+      "sha256": "1cc740de41212acdf2f35c708d332147491e89408184c80359ba3f64fadf3e4c",
+      "test_results": [
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 162 filtered out; finished in 0.50s"
+      ]
+    },
+    "pi5-denial": {
+      "path": "target/ota-access-check-pi5-denial-final.log",
+      "sha256": "a2fe1c8b5f69df030c1d6dd5858052d8d438e27556269cf87252ee0fcbd79517"
+    },
+    "clippy": {
+      "path": "target/ota-access-check-clippy-final.log",
+      "sha256": "44e47a78fcd8bef9bd6faf8364231f9f2a8f998ea9d107f482db9ee9000a89ae"
+    },
+    "msrv": {
+      "path": "target/ota-access-check-msrv.log",
+      "sha256": "4d997e8c36050fd02759614a16c7ed512f15c0a64c9802fa9ea0fbf7085ea8c1"
+    },
+    "fmt": {
+      "path": "target/ota-access-check-fmt-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "aarch64": {
+      "path": "target/ota-access-check-aarch64.log",
+      "sha256": "2a17b09728fa75b511958b51b5f15e95661433f211c3ec6c6a7c90c40ce5bd38"
+    },
+    "aarch64-artifacts": {
+      "path": "target/ota-access-check-aarch64-artifacts.jsonl",
+      "sha256": "96f4245477cb4ba206e813bdba2c4476bbf1491ebd134db28bbdbefcd03b3b0c"
+    },
+    "pi5-sudo-before": {
+      "path": "target/ota-access-check-pi5-policy-before.log",
+      "sha256": "ec4f39eedcef9453901a41573913aad9397c769fec355cf67503299bca34e75f"
+    },
+    "pi5-sshd-before": {
+      "path": "target/ota-access-check-pi5-ssh-effective-before.log",
+      "sha256": "35dc1e984f0d35bb06d68a61263debed78977a903f07ee47003684e346887c36"
+    },
+    "pi5-sshd-temporary-overlay": {
+      "path": "target/ota-access-check-pi5-ssh-overlay.log",
+      "sha256": "d4421451670887a59b91279c3083bd2c890c63934374907eb09e942bee4bbe53"
+    },
+    "pi5-ssh-loaded-before": {
+      "path": "target/ota-access-check-pi5-service-all-before.log",
+      "sha256": "ab1b61216cb311fd7f7aa07768eae4eb2bcffc69054b810697329c36e228d815"
+    },
+    "pi5-persistence-loaded-before": {
+      "path": "target/ota-access-check-pi5-persistence-before.log",
+      "sha256": "4316d2466f6d9b2f243694f8919065b3fc1ca6391275a0481ff12e16679b8933"
+    },
+    "pi5-packaged-manager-help": {
+      "path": "target/ota-access-check-pi5-manager-help.log",
+      "sha256": "4745d0e3d684d8a5dad164ca787884ce8bcbd602a5afff56b51b78a9452015b0"
+    },
+    "pi5-packaged-manager-denial": {
+      "path": "target/ota-access-check-pi5-manager-denial.log",
+      "sha256": "cbb636dbe6bd411350aa2b979a5dcd1ae62a0b47d7c961c274988834016e147c"
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "cargo build --locked -p engine-ota --tests --example bootstrap_check_legacy_access --target aarch64-unknown-linux-gnu --message-format=json",
+    "On Pi 5 as UID 1000, select the exact Cargo test executable: access-check-tests bootstrap::access_check bootstrap::legacy_replace::tests::completed_verification install_lock::tests --test-threads=1 --nocapture"
+  ]
+}

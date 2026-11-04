@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T03:12:18.932094+00:00",
+  "implementation_commit": "9454d6a3aaa93d9861e11fe86c08af3c84bc4804",
+  "scope": "Local persistent-store structure is now required by the existing bounded kiosk health worker. Startup helpers refuse missing stores during bootstrap or after recovery provisioning. No bootstrap coordinator, watchdog handoff or boot selector has been added.",
+  "host_validation": {
+    "ota_tests_passed": 202,
+    "manager_tests_passed": 38,
+    "ordinary_suite_ignored": 8,
+    "yocto_tests_passed": 71,
+    "yocto_sandbox_required": true,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "format": "passed",
+    "private_mount_namespace": {
+      "tests_passed": 1,
+      "binary": "target/debug/deps/engine_ota-d94cb44ff75a39c4",
+      "sha256": "8aad3478988059c5bd083e92d408f2405adf3e2f0fd7b1e6fd6ab54be55be611",
+      "command": "cargo test --locked -p engine-ota --lib persistence_linux::tests::live_bind_mounts_rechecks_and_sandbox_read_only_views -- --ignored --exact --nocapture",
+      "scope": "Actual bind mounts beneath throwaway directories in a new user/mount namespace; internal store capture/check only. No block device, live /data store or production health worker. Lazy detach exercises a removed mount while observation handles remain pinned."
+    }
+  },
+  "pi5_validation": {
+    "remote_directory": "/tmp/spacewars-persistence.AFkgZ0",
+    "artifact": {
+      "target": "engine_ota",
+      "test": true,
+      "kind": [
+        "lib"
+      ],
+      "path": "/home/data/workspace/space-wars-ota/target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f7c7f1697874a6b9",
+      "sha256": "1b810a572f89c1ac2c19434645db7d9b8d8c227f33c4e393af079713464a0d5a"
+    },
+    "remote_sha256": "1b810a572f89c1ac2c19434645db7d9b8d8c227f33c4e393af079713464a0d5a",
+    "uid": 1000,
+    "boot_id_observed": "de606400-dc75-446e-b26b-385592b0f562",
+    "tests_passed": 3,
+    "ignored_namespace_test": 1,
+    "elapsed_test_seconds": 0.01,
+    "scope": "New metadata/object fixtures only, in temporary files as the ordinary account. No root API admission or live store observation."
+  },
+  "covered_cases": [
+    "Missing files, wrong modes/owners, symlink ancestors, symlink/hardlink/FIFO keys, empty host keys and oversized files are rejected without repair.",
+    "Empty login files, empty network profiles and empty Bluetooth pairings are allowed; health does not require connectivity or credentials to authenticate.",
+    "Actual directory binds are accepted; same-filesystem copies, missing/wrong binds, a replaced mount, changed host key and an over-mounted source reject observation.",
+    "Read-only service-style bind views remain valid. Daemon additions do not fail solely because a directory timestamp changes.",
+    "Missing SSH/Bluetooth stores are not reimported during active or provisioned states, including corrupt/dangling state markers. Existing data and revoked/forgotten entries remain authoritative.",
+    "The new probe is inside the existing five-second process worker. Errors feed the existing continuity/deadline policy; no network reachability condition is added."
+  ],
+  "limits": [
+    "The structural check reads no credential contents and is not a login, key-pair validity, complete data-integrity or service-configuration audit.",
+    "No new runtime image or bootstrap package was built. The current c14c53f runtime and schema-2 kits lack this code.",
+    "No installed root, boot asset, service, radio state, data store or watchdog was changed on either Pi; only UID-1000 temporary fixtures/binary were copied to Pi 5.",
+    "Bootstrap still needs its separate health coordinator, durable boot promotion and authorized watchdog handoff; the existing production service remains unprovisioned without a recovery journal.",
+    "The next package protocol must require the implemented bootstrap runtime and include these SSH/Bluetooth helpers and the key-generation dependency in fixed fallback-root replacements. Existing packages/reservations must not be relabeled.",
+    "Root connection details, live preservation/access qualification, physical trial and failure tests on both boards, and end-to-end feed/service/scheduling/UI integration remain outstanding."
+  ],
+  "logs": {
+    "host": {
+      "path": "target/ota-persistence-health-host.log",
+      "sha256": "220d640ff537ab751ca0befab4fb065027fd9b52ef14950ec3449918c1c88651",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.57s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.66s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 180 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 77.88s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-persistence-health-clippy.log",
+      "sha256": "4cb8244b899fef462ff5d73e214e1cef9e2e9905049c9e4bc800c985383e0410"
+    },
+    "yocto": {
+      "path": "target/ota-persistence-health-yocto.log",
+      "sha256": "f39433ff562ba27ba39a9a41e4b74d0ac8f7e0949c3a04348f8c0576554fa562",
+      "test_results": [
+        "Ran 71 tests in 28.717s"
+      ]
+    },
+    "msrv": {
+      "path": "target/ota-persistence-health-msrv.log",
+      "sha256": "8a8fc5c3cc426bef42f17f2e5b783e9a5ba1456d8e4aad8bb8af0878b9fd93dc"
+    },
+    "fmt": {
+      "path": "target/ota-persistence-health-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "aarch64": {
+      "path": "target/ota-persistence-health-aarch64.log",
+      "sha256": "bfba09d75d12104d71752de29f729754bea4ab593cc66982bfa4938b8d2aa27f"
+    },
+    "aarch64-artifacts": {
+      "path": "target/ota-persistence-health-aarch64-artifacts.jsonl",
+      "sha256": "c8669a98bfdfae44ee28f8afebcafb367d4db3202bb2247311e5f6d69aaee5af"
+    },
+    "pi5": {
+      "path": "target/ota-persistence-health-pi5.log",
+      "sha256": "08d988f02e17ba17d899df8697e21757df8b0f50d0ff0431f72330b3010e53e8",
+      "test_results": [
+        "test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 184 filtered out; finished in 0.01s"
+      ]
+    }
+  },
+  "reproduction": [
+    "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+    "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets -- -D warnings",
+    "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+    "SPACEWARS_REQUIRE_UPDATE_SANDBOX=1 python3 -m unittest discover -s yocto/tests -p '*_test.py'",
+    "cargo build --locked -p engine-ota -p engine-os-manager --tests --target aarch64-unknown-linux-gnu --message-format=json",
+    "Run the exact Cargo-selected AArch64 engine_ota test executable on Pi 5: persistence_linux --test-threads=1 --nocapture."
+  ]
+}

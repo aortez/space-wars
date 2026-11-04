@@ -81,13 +81,27 @@ and [NetworkManager 1.46 secret-preserving update implementation](https://github
 
 ## Safety and ownership
 
-The Linux client talks directly to NetworkManager's D-Bus API, not a shell or a
-new privileged helper. NetworkManager remains the authorization and credential
+The Linux client performs connection and profile operations directly through
+NetworkManager's D-Bus API. NetworkManager remains the authorization and credential
 storage boundary. The app checks the caller's `network-control`,
 `settings.modify.system`, `checkpoint-rollback` and `wifi.scan` permissions.
 It does not grant them, use sudo, or try to bypass a desktop authorization prompt.
 Missing permissions, service, adapter, or a blocked radio leave Back/Rescan
 available. Other operating systems display an unsupported message.
+
+Kiosk builds first acquire temporary Wi-Fi protection from the device service,
+before scanning or changing a connection. Protection stays active while Network
+is open and through any pending rollback after Back. If the service cannot keep
+that protection active, setup stops accepting new work and finishes recovery
+before releasing it. Back and retry remain available. With partial offline mode
+Off, an independently disabled radio stays disabled and saved profiles remain
+manageable. Ordinary desktop builds continue to use OS-managed networking.
+
+This requires the matching kiosk image/service, not only a new client binary.
+The hold integration has not yet been deployed or physically qualified on either
+Pi. Profile changes currently leave automatic offline policy suspended until
+explicit resume, including changes made by setup; expected-profile coordination
+is still being integrated. See [OTA status](ota-updates.md).
 
 The protocol targets the kiosk's NetworkManager 1.46 API:
 
@@ -172,6 +186,12 @@ typing (including CLI redaction), hide-on-focus-loss, Start/Select shortcuts,
 parent navigation, cleanup, and 800×480 / 1024×768 / 480×800 layouts. The
 real-process workflow verifies missing-service behavior and paused
 session preservation, with the host system bus isolated.
+
+Setup-protection fixtures additionally cover denied admission before scanning,
+renewal during panel-close rollback, renewal failure cancelling a trial before
+release, disabled-radio profile management, bounded replies and root peer
+authentication. The shared setup client also has an explicit integration test
+against the real coordinator with a fake radio inside a root user namespace.
 
 Saved-profile tests use a second stateful private D-Bus fixture, including
 duplicate names/SSIDs, an out-of-range profile, and disabled radio. They verify

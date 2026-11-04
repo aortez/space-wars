@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+
+spacewarsrun_enabled() {
+    return 0
+}
+
+spacewarsrun_move() {
+    if [ "$1" = pre ] && [ "$2" = finish ]; then
+        mkdir -p "$ROOTFS_DIR/run" || fatal "Cannot prepare root runtime directory"
+        mount --move /run "$ROOTFS_DIR/run" || fatal "Cannot retain early recovery evidence"
+    fi
+}
+
+spacewarsrun_run() {
+    # Register after udev's shutdown hook. Moving /run earlier would hide its
+    # control socket before that hook could stop the initramfs udev daemon.
+    add_module_pre_hook spacewarsrun_move
+}

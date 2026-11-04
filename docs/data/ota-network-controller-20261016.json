@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T19:27:01.488865+00:00",
+  "implementation_head": "3255f30dd40c02517b30434e4e0ef98dcf483bca",
+  "controller_commit": "c1730d51a89762d8ab4a703bf3b6e70a32277672",
+  "scope": "Serialized radio controller, durable transition ownership and Wi-Fi-only D-Bus adapter, with read-only native probes. No runtime radio control, session admission or installation service integration is enabled.",
+  "validation": {
+    "host_manager_tests": 70,
+    "host_temporary_filesystem": "ext4 under target/ota-bootstrap-finish-tmp",
+    "pi5_selected_tests": 30,
+    "pi5_selected_seconds": 2.83,
+    "rust_msrv": "1.89.0",
+    "clippy_warnings_denied": true,
+    "format_checked": true,
+    "aarch64_compiled": true,
+    "artifact_source": "ARM debug binaries built from the clean implementation_head; host tests used the identical source before its commit. Not a packaged runtime image."
+  },
+  "contracts": {
+    "policy_record_schema": 3,
+    "radio_reply_deadline_seconds": 5,
+    "maximum_profiles": 64,
+    "profile_path_limit_bytes": 128,
+    "profile_property_reply_limit_bytes": 16384,
+    "profile_credentials_read": false,
+    "hold_admission_requires_fresh_availability": true,
+    "only_wireless_enabled_written": true,
+    "unsent_commands_retryable": true,
+    "ambiguous_dispatched_commands_persist_across_service_restart": true
+  },
+  "properties_exercised": [
+    "Default Off leaves independently disabled Wi-Fi alone. Policy-owned off state persists and is restored on disabling the mode; Stay connected survives service restart and a clean reboot can rebase profile revision counters.",
+    "Time-check and download holds use existing Ethernet without waking Wi-Fi. Setup requires wireless availability; no response asserts Internet access or Wi-Fi association.",
+    "A concurrent hold queues behind a blocked off command and is acknowledged only after restoration. Failed restoration, missing readback and expiry during restoration cannot acknowledge availability.",
+    "Unknown or live activity, hardware/startup/checkpoint conditions and unavailable guards prevent shutdown. Activity introduced during guard acquisition is rechecked.",
+    "Observed external radio/profile/manager changes persist suspension until explicit reconciliation. A known unsent command may retry; an ambiguous dispatched command cannot be cleared in the same boot.",
+    "Flush failures before dispatch never send a command; a record published before the failure remains uncertain after reopen. A returned command can complete from later matching readback, but a mismatching reply cannot claim ownership.",
+    "An actual private D-Bus server verifies the Wi-Fi-only property write, unique-owner/profile checks, permission denial and a command that applies after the caller times out.",
+    "The probe compares bounded sorted per-connection VersionId inventories around coherent radio reads. Missing/malformed properties, profile inventory/revision changes, duplicates, invalid paths and oversized inventories cannot imply stable state.",
+    "Read-only probes succeeded on both installed root-owned NetworkManager instances from UID 1000. Pi fixtures used temporary files and a private D-Bus daemon."
+  ],
+  "device_api_discovery": {
+    "installed_networkmanager_version_on_both_devices": "1.46.6",
+    "initial_probe_commit": "c1730d51a89762d8ab4a703bf3b6e70a32277672",
+    "initial_probe_result": "Failed because the top-level Settings object has no VersionId property. Read-only busctl checks on both devices confirmed the missing property.",
+    "generated_documentation": "https://networkmanager.dev/docs/api/1.46.0/gdbus-org.freedesktop.NetworkManager.Settings.html",
+    "runtime_implementation": "https://github.com/NetworkManager/NetworkManager/blob/1.46.6/src/core/settings/nm-settings-connection.c#L2894",
+    "correction": "Read Connections on Settings, then VersionId on each Settings.Connection. Hash sorted paths and counters; never read settings or secrets. Fixtures now model the actual runtime interface."
+  },
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "temporary_directory": "/tmp/spacewars-network-controller.BUmkrp",
+      "binaries": {
+        "engine-os-manager": "d46888ec8701718e75a3c3c12955ef25a8b4566bc956d1d4948113b7ca4e011d",
+        "engine_os_manager-27536c227643c67f": "d54e30f463b1b7406dbaca171236bc477b394923ba09cb5917a478c24c14c0e3"
+      },
+      "probe": {
+        "schema": 1,
+        "bus_owner": ":1.8",
+        "pid": 476,
+        "networking_enabled": true,
+        "wireless_enabled": true,
+        "wireless_hardware_enabled": true,
+        "startup": false,
+        "checkpoint_count": 0,
+        "state": 70,
+        "profile_revision": "48c969157b1cc8e9199587eef73a3642a65bf0dad470a584b85e85c81a795fe2",
+        "profile_count": 3,
+        "ethernet_available": false
+      },
+      "fixture_tests": 30,
+      "live_radio_writes": false,
+      "installed_state_changes": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "temporary_directory": "/tmp/spacewars-network-controller.4lzYoR",
+      "binaries": {
+        "engine-os-manager": "d46888ec8701718e75a3c3c12955ef25a8b4566bc956d1d4948113b7ca4e011d"
+      },
+      "probe": {
+        "schema": 1,
+        "bus_owner": ":1.6",
+        "pid": 412,
+        "networking_enabled": true,
+        "wireless_enabled": true,
+        "wireless_hardware_enabled": true,
+        "startup": false,
+        "checkpoint_count": 0,
+        "state": 70,
+        "profile_revision": "48c969157b1cc8e9199587eef73a3642a65bf0dad470a584b85e85c81a795fe2",
+        "profile_count": 3,
+        "ethernet_available": false
+      },
+      "fixture_tests": 0,
+      "live_radio_writes": false,
+      "installed_state_changes": false
+    }
+  ],
+  "limits": [
+    "serve does not yet instantiate this controller or expose network control/hold requests. No runtime off path is enabled.",
+    "Native SSH/session admission, install guards, continuous external radio-change monitoring and expected setup-profile changes still require integration. Fixture activity/guards do not qualify real SSH races.",
+    "A new-boot profile counter baseline does not prove profiles stayed unchanged while the service was absent. Radio changes reversed between polling snapshots still need the continuous observer.",
+    "Setup/deployment lease hooks, offline scheduling, the downloader, install policy, production signing/feed and physical Pi recovery qualification remain outstanding.",
+    "No installed services, radio settings, credentials, data partitions, root/boot files or watchdog were modified. Neither probe rebooted its target; each recorded boot ID stayed unchanged during its run.",
+    "Earlier bootstrap runtime/kits do not contain this networking implementation. Root connection details and supervised device bootstrap remain pending.",
+    "The overall auto-update goal is incomplete."
+  ],
+  "logs": {
+    "host_full_ext4": {
+      "path": "target/ota-network-controller-tests.log",
+      "bytes": 7957,
+      "sha256": "91566e105938245766f573bdbb0c3f64e82b1c3fa3d42f683f789e3cab15f1ca",
+      "test_results": [
+        "test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.46s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.50s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-network-controller-clippy.log",
+      "bytes": 367,
+      "sha256": "93c5e6047623569e5b970b866f25187ff28391411d8ab580e1992b8a8643a669"
+    },
+    "msrv": {
+      "path": "target/ota-network-controller-msrv.log",
+      "bytes": 173,
+      "sha256": "067f7c771c2636637f7737c81225a3e730e0c3f12e960ac658330613e0d7d878"
+    },
+    "format": {
+      "path": "target/ota-network-controller-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "aarch64": {
+      "path": "target/ota-network-controller-aarch64.log",
+      "bytes": 174,
+      "sha256": "e966c1377d090135ce78f85c97e7bac311edb24cf4365f0a30a97d2e70cbd91a"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-network-controller-aarch64.jsonl",
+      "bytes": 208478,
+      "sha256": "2e86d81b1f8d7b92ce6534e0b92f5eb1f8f99ff598d69ab7fec4a20c9f697a49"
+    },
+    "pi_run": {
+      "path": "target/ota-network-controller-pis.log",
+      "bytes": 1617,
+      "sha256": "894b7f0061b0f7b9b0a0250eee71967b7b471dce2879eea52baaee31c4acd19a"
+    },
+    "pi5_tests": {
+      "path": "target/ota-network-controller-pi5-tests.log",
+      "bytes": 3279,
+      "sha256": "58d100a1c7d2d40ac9915ac218416df10ed76ecd1ae78ecdc2c3c764d3900da2",
+      "test_results": [
+        "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 2.83s"
+      ]
+    },
+    "pi5_probe": {
+      "path": "target/ota-network-controller-pi5-probe.log",
+      "bytes": 353,
+      "sha256": "df1a45df872a601a82692472bb5b13cc7f11b045553ac53d0c39b343d9f1fba3"
+    },
+    "pi4_probe": {
+      "path": "target/ota-network-controller-pi4-probe.log",
+      "bytes": 353,
+      "sha256": "f2467130b25dce63bf197dc707ff936980082fa7656fb3e0187591876d61f49f"
+    },
+    "pi_script": {
+      "path": "target/ota-network-controller-pis.py",
+      "bytes": 3096,
+      "sha256": "7bc898b9210344ace75d599ec2032c04a794a840a623edd0e1e72ec43707c104"
+    },
+    "initial_version_failure": {
+      "path": "target/ota-network-controller-initial-version-failure.log",
+      "bytes": 287,
+      "sha256": "04f00c23e68d06eed9cde2fed663e1727188abf74070a53618ad040b181a0fba"
+    },
+    "nm_settings_source": {
+      "path": "target/nm-1.46.6-settings.c",
+      "bytes": 183946,
+      "sha256": "3503a9b8ae460bd94b0f5bbccbcba8dbd0087ebe861a4e25490046ba4ff0c1dc"
+    },
+    "nm_connection_source": {
+      "path": "target/nm-1.46.6-settings-connection.c",
+      "bytes": 117082,
+      "sha256": "786f96ce0416fa576eb2bb7c0dda6e4be9e01f4fafa601f34ed1c356c7b74e93"
+    },
+    "nm_settings_xml": {
+      "path": "target/nm-1.46.6-settings.xml",
+      "bytes": 9352,
+      "sha256": "63148f415615768c5ef7f2e97da211b2983311bb52d88e66e8f21922af89189a"
+    }
+  }
+}

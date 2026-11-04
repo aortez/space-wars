@@ -29,6 +29,9 @@ mod ipc;
 #[cfg(test)]
 mod keyboard_tests;
 mod launcher;
+mod launcher_catalog;
+#[cfg(test)]
+mod lighting_presentation_contract;
 mod match_world;
 mod native_video;
 mod nes_audio;
@@ -36,6 +39,7 @@ mod nes_realtime;
 mod nes_roms;
 mod network;
 mod network_controls;
+mod pizza_lab;
 mod presentation_probe;
 mod raster;
 mod render;
@@ -44,6 +48,8 @@ mod scoreboard;
 mod settings;
 mod settings_writer;
 mod sound_controls;
+#[cfg(test)]
+mod spider_visual_tests;
 #[cfg(test)]
 mod thruster_visual_tests;
 mod training_controls;
@@ -54,6 +60,7 @@ mod ui_inventory;
 mod ui_navigation;
 #[cfg(test)]
 mod ui_render_tests;
+mod updates;
 #[cfg(test)]
 mod water_visual_tests;
 
@@ -101,7 +108,13 @@ type SharedNesRomCatalog = Rc<RefCell<nes_roms::NesRomCatalog>>;
 #[command(name = "engine-client", about = "Spacewars scenario host")]
 struct Args {
     #[command(flatten)]
+    pizza_lab: pizza_lab::Options,
+    #[command(flatten)]
     presentation: presentation_probe::Options,
+
+    /// Ignore physical controllers for isolated automation; public API input stays active.
+    #[arg(long)]
+    ignore_physical_controllers: bool,
 
     /// Scenario to load.
     #[arg(long)]
@@ -338,6 +351,11 @@ struct EffectiveLaunch {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+    let pizza_lab = args.pizza_lab.config(
+        args.scenario.as_deref(),
+        args.uses_benchmark(),
+        args.config_dir.is_some(),
+    )?;
 
     // This experiment must not load/write settings, open a control socket,
     // initialize audio/input, or create a desktop/KMS display connection. The
@@ -450,12 +468,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Headless conversion returned above and never opens a graphics device.
     let raster_only = select_slint_backend(&args)?;
     let window = MainWindow::new()?;
+    let startup_required = updates::startup_required();
+    window.set_install_fenced(startup_required);
+    if startup_required {
+        window.set_launcher_visible(true);
+    }
     renderer_policy::initialize(&window)?;
     needs_writeback |= renderer_policy::normalize_settings(&mut loaded, raster_only);
     effective_launch.renderer =
         renderer_policy::resolve(effective_launch.renderer, raster_only, "startup_options");
     let settings = Arc::new(RwLock::new(loaded));
-    save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)?;
+    if !startup_required {
+        save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)?;
+    }
 
     window.set_raster_only(raster_only);
     let settings_writer = settings_writer::SettingsWriter::new(settings_path.clone())?;
@@ -504,6 +529,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings_writer.clone(),
     );
     network_controls::install(&window);
+    let _updates = updates::install(
+        &window,
+        Arc::clone(&settings),
+        settings_writer.clone(),
+        Rc::clone(&input),
+    );
     let _training = training_controls::install(&window, config_directory.join("training"))?;
     let _genomes = genome_controls::install(&window, config_directory.join("training"))?;
     device_info::install(
@@ -528,62 +559,103 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings_writer.clone(),
         Rc::clone(&gamepad_input),
     );
-    let _gamepad_timer =
-        gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input, controllers);
+    let _gamepad_timer = gamepad::start_gamepad_pump(
+        &window,
+        Rc::clone(&input),
+        gamepad_input,
+        controllers,
+        args.ignore_physical_controllers,
+    );
 
-    if args.touch_test {
-        show_launcher(
-            &window,
-            &effective_launch,
-            &settings.read().unwrap(),
-            &rom_catalog,
-        );
-        window.set_touch_test_visible(true);
-    } else if args.uses_debug_render() {
-        *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
-            &window,
-            args.debug_triangles,
-            effective_launch.renderer,
-        ));
-    } else if launch_directly {
-        let scenario_settings = settings.read().unwrap().clone();
-        let launch_result = resolve_launch_asset(
-            &effective_launch,
-            args.rom.as_deref(),
-            &scenario_settings,
-            &rom_catalog.borrow(),
-        )
-        .and_then(|asset| {
-            start_scenario_from_launch(
-                &window,
-                &effective_launch,
-                args.benchmark,
-                args.benchmark_configuration(),
-                Rc::clone(&scenario_controls),
-                Rc::clone(&input),
-                scenario_settings.clone(),
-                asset,
-            )
-            .map_err(|error| error.to_string())
-        });
-        match launch_result {
-            Ok(timer) => *render_timer.borrow_mut() = Some(timer),
-            Err(error) => {
-                tracing::error!(%error, "direct scenario launch failed; showing launcher.");
-                show_launcher(&window, &effective_launch, &scenario_settings, &rom_catalog);
-                window.set_launcher_error_text(SharedString::from(error));
+    let startup_error = Rc::new(RefCell::new(None::<String>));
+    let _initial_launch = {
+        let settings = Arc::clone(&settings);
+        let settings_writer = settings_writer.clone();
+        let render_timer = Rc::clone(&render_timer);
+        let scenario_controls = Rc::clone(&scenario_controls);
+        let input = Rc::clone(&input);
+        let rom_catalog = Rc::clone(&rom_catalog);
+        let startup_error = startup_error.clone();
+        updates::after_startup(&window, move |window| {
+            if startup_required
+                && let Err(error) =
+                    save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)
+            {
+                *startup_error.borrow_mut() = Some(error.to_string());
+                let _ = slint::quit_event_loop();
+                return;
             }
-        }
-    } else {
-        show_launcher(
-            &window,
-            &effective_launch,
-            &settings.read().unwrap(),
-            &rom_catalog,
-        );
-    }
+            if args.touch_test {
+                show_launcher(
+                    window,
+                    &effective_launch,
+                    &settings,
+                    &settings_writer,
+                    &rom_catalog,
+                );
+                window.set_touch_test_visible(true);
+            } else if args.uses_debug_render() {
+                *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
+                    window,
+                    args.debug_triangles,
+                    effective_launch.renderer,
+                ));
+            } else if launch_directly {
+                let scenario_settings = settings.read().unwrap().clone();
+                let launch_result = resolve_launch_asset(
+                    &effective_launch,
+                    args.rom.as_deref(),
+                    &scenario_settings,
+                    &rom_catalog.borrow(),
+                    settings_path.parent(),
+                )
+                .and_then(|asset| {
+                    let asset = pizza_lab
+                        .clone()
+                        .map(client_scenarios::ScenarioAsset::PizzaLab)
+                        .unwrap_or(asset);
+                    start_scenario_from_launch(
+                        window,
+                        &effective_launch,
+                        args.benchmark,
+                        args.benchmark_configuration(),
+                        Rc::clone(&scenario_controls),
+                        Rc::clone(&input),
+                        scenario_settings.clone(),
+                        asset,
+                    )
+                    .map_err(|error| error.to_string())
+                });
+                match launch_result {
+                    Ok(timer) => *render_timer.borrow_mut() = Some(timer),
+                    Err(error) => {
+                        tracing::error!(%error, "direct scenario launch failed; showing launcher.");
+                        show_launcher(
+                            window,
+                            &effective_launch,
+                            &settings,
+                            &settings_writer,
+                            &rom_catalog,
+                        );
+                        window.set_launcher_error_text(SharedString::from(error));
+                    }
+                }
+            } else {
+                show_launcher(
+                    window,
+                    &effective_launch,
+                    &settings,
+                    &settings_writer,
+                    &rom_catalog,
+                );
+            }
+        })
+    };
 
     window.run()?;
+    if let Some(error) = startup_error.borrow_mut().take() {
+        return Err(error.into());
+    }
     // The window is closed: finish queued preference changes before a normal
     // application exit, without making the visible UI wait on storage.
     if settings_writer.status().pending {
@@ -630,9 +702,12 @@ fn normalize_launch_settings(settings: &mut Settings) -> bool {
         changed = true;
     }
 
-    let saved_scenario_is_launchable =
-        host::scenario_registration(settings.launch.scenario.as_str())
-            .is_some_and(|registration| registration.launcher_visible);
+    let saved_scenario_is_launchable = host::scenario_registration(
+        settings.launch.scenario.as_str(),
+    )
+    .is_some_and(|registration| {
+        registration.launcher_category != client_scenarios::LauncherCategory::Hidden
+    });
     if settings.launch.scenario.trim().is_empty() || !saved_scenario_is_launchable {
         tracing::warn!(
             scenario = %settings.launch.scenario,
@@ -710,9 +785,12 @@ fn should_launch_directly(args: &Args) -> bool {
 fn show_launcher(
     window: &MainWindow,
     launch: &EffectiveLaunch,
-    settings: &Settings,
+    shared_settings: &Arc<RwLock<Settings>>,
+    settings_writer: &settings_writer::SettingsWriter,
     rom_catalog: &SharedNesRomCatalog,
 ) {
+    launcher_catalog::restore(window, &launch.scenario, shared_settings, settings_writer);
+    let settings = shared_settings.read().unwrap().clone();
     window.set_sound_visible(false);
     // Release any scenario-specific native-video presenter retained by the
     // generated callback before exposing the launcher again.
@@ -731,13 +809,6 @@ fn show_launcher(
     window.set_scoreboard_visible(false);
     window.set_scenario_error_text(SharedString::from(""));
     clear_runtime_diagnostics(window);
-    let scenario_names = host::launcher_scenario_names()
-        .into_iter()
-        .map(SharedString::from)
-        .collect::<Vec<_>>();
-    window.set_launcher_scenarios(ModelRc::new(VecModel::from(scenario_names)));
-    window.set_launcher_scenario(SharedString::from(launch.scenario.clone()));
-    apply_scenario_metadata(window, launch.scenario.as_str());
     window.set_launcher_seed_text(SharedString::from(launch.seed.to_string()));
     let renderer =
         renderer_policy::resolve(launch.renderer, window.get_raster_only(), "show_launcher");
@@ -803,6 +874,8 @@ fn show_launcher(
         setup.player_2_controller,
     )));
     let pizza = settings.pizza.normalized();
+    window.set_launcher_pizza_automatic_events(pizza.automatic_events);
+    window.set_launcher_pizza_live_ball_limit_text(pizza.live_ball_limit.to_string().into());
     window
         .set_launcher_pizza_desired_balls_text(SharedString::from(pizza.desired_balls.to_string()));
     window.set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(
@@ -828,11 +901,15 @@ fn show_launcher(
     window.set_launcher_clock_aquarium_enabled(settings.clock.events.aquarium);
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
+    window.set_launcher_clock_cell_swap_enabled(settings.clock.events.cell_swap);
+    window.set_launcher_clock_slot_machine_enabled(settings.clock.events.slot_machine);
+    window.set_launcher_clock_spider_enabled(settings.clock.events.spider);
+    window.set_launcher_clock_grass_enabled(settings.clock.events.grass);
     window.set_launcher_clock_rain_enabled(settings.clock.events.rain);
     window.set_launcher_clock_rain_amount(settings.clock.rain_amount.label().into());
     window.set_launcher_clock_marquee_preset(settings.clock.marquee_preset.label().into());
     window.set_launcher_clock_marquee_message(settings.clock.marquee_message.as_str().into());
-    refresh_nes_rom_library(window, settings, rom_catalog);
+    refresh_nes_rom_library(window, &settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
     window.set_launcher_settings_focus_index(0);
@@ -908,7 +985,14 @@ fn resolve_launch_asset(
     explicit_rom: Option<&Path>,
     settings: &Settings,
     catalog: &nes_roms::NesRomCatalog,
+    config_directory: Option<&Path>,
 ) -> Result<client_scenarios::ScenarioAsset, String> {
+    if launch.scenario == "material-lab" {
+        let directory = config_directory.ok_or("Material Lab save directory is unavailable")?;
+        return Ok(client_scenarios::ScenarioAsset::MaterialLab(
+            directory.join("material-lab.bin"),
+        ));
+    }
     if launch.scenario != "nes" {
         return Ok(client_scenarios::ScenarioAsset::None);
     }
@@ -995,6 +1079,7 @@ fn install_launcher_callbacks(
     rom_catalog: SharedNesRomCatalog,
     settings_writer: settings_writer::SettingsWriter,
 ) -> Rc<launcher::Launcher> {
+    launcher_catalog::install(window, Arc::clone(&settings), settings_writer.clone());
     let launcher = launcher::Launcher::new(
         window,
         render_timer,
@@ -1078,22 +1163,44 @@ fn install_ingame_menu_callbacks(
     rom_catalog: SharedNesRomCatalog,
 ) {
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
+    window.on_ingame_pizza_gravity(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
+        controls.borrow_mut().request_pizza_gravity();
+    });
+
+    let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_resume(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_resume();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_restart(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_restart();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_new_match(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_new_match();
     });
 
     let weak = window.as_weak();
     let world_settings = Arc::clone(&settings);
+    let world_writer = settings_writer.clone();
     window.on_match_world_changed(move || {
         let Some(window) = weak.upgrade() else {
             return;
@@ -1110,31 +1217,51 @@ fn install_ingame_menu_callbacks(
         settings.launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
         let snapshot = settings.clone();
         drop(settings);
-        let _ = settings_writer.save(snapshot);
+        let _ = world_writer.save(snapshot);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_start_benchmark(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_benchmark();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p1_zoom_in(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_in(0);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p1_zoom_out(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_out(0);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p2_zoom_in(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_in(1);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p2_zoom_out(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_out(1);
     });
 
@@ -1146,6 +1273,7 @@ fn install_ingame_menu_callbacks(
             &scenario_controls,
             &input,
             &settings,
+            &settings_writer,
             &rom_catalog,
         );
     });
@@ -1166,7 +1294,14 @@ fn install_ui_navigation(window: &MainWindow) {
 
 fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
     let clock_input = Rc::clone(&input);
+    let input_window = window.as_weak();
     window.on_clock_input_key(move |code, pressed| {
+        if input_window
+            .upgrade()
+            .is_none_or(|w| w.get_install_fenced() || w.get_updates_visible())
+        {
+            return;
+        }
         let key = match code {
             0 => input::GameKey::NesLeft,
             1 => input::GameKey::NesRight,
@@ -1186,6 +1321,12 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
     let weak = window.as_weak();
     window.on_keyboard_action(move |code, repeat| {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_updates_visible() || window.get_install_fenced() {
+            if !repeat && let Some(action) = UiAction::from_code(code) {
+                updates::handle_action(&window, action);
+            }
+            return;
+        }
         if window.get_launcher_busy() {
             return;
         }
@@ -1238,6 +1379,10 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
 }
 
 fn handle_ui_action(window: &MainWindow, action: UiAction) {
+    if window.get_updates_visible() || window.get_install_fenced() {
+        updates::handle_action(window, action);
+        return;
+    }
     if window.global::<UserActivity>().invoke_notify() {
         return;
     }
@@ -1373,6 +1518,7 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             5 => window.invoke_sound_open(),
             7 => window.invoke_training_open(),
             8 => window.invoke_genomes_open(),
+            9 => window.invoke_launcher_toggle_show_all(),
             6 if window.get_launcher_scenario() == "spacewars" => {
                 window.invoke_launcher_new_match()
             }
@@ -1429,6 +1575,13 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
     let benchmark_offset = i32::from(window.get_scenario_benchmark_available());
     match action {
         UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
+            if window.get_pizza_event_available() {
+                window.set_ingame_menu_focus_index(ui_navigation::moved_pizza_selection(
+                    window.get_ingame_menu_focus_index(),
+                    action,
+                ));
+                return;
+            }
             window.set_ingame_menu_focus_index(ui_navigation::moved_ingame_selection(
                 window.get_ingame_menu_focus_index(),
                 benchmark_offset == 1
@@ -1441,7 +1594,11 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
         }
         UiAction::Confirm => {
             let selected = window.get_ingame_menu_focus_index();
-            if selected == 0 {
+            if selected == 6 && window.get_pizza_event_available() {
+                if window.get_pizza_event_can_trigger() {
+                    window.invoke_ingame_pizza_gravity();
+                }
+            } else if selected == 0 {
                 window.invoke_ingame_resume();
             } else if selected == 1 {
                 window.invoke_ingame_restart();
@@ -1495,16 +1652,22 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 }
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
-    match window.get_launcher_scenario().as_str() {
+    launcher_settings_item_count_for(window.get_launcher_scenario().as_str())
+}
+
+/// Confirm leaves the settings page on the final index, so this count decides
+/// where Back sits. The focus order in `ui_inventory` has to agree with it.
+pub(crate) fn launcher_settings_item_count_for(scenario: &str) -> i32 {
+    match scenario {
         "spacewars" => 11,
         "spacewars-classic" => 8,
-        "pizza" => 5,
+        "pizza" => 7,
         "spacewars-terrain-combat" | "spacewars-terrain-duel" => 9,
         "spacewars-terrain-travel"
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 6,
-        "clock" => 18,
+        "clock" => 22,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1764,14 +1927,47 @@ fn adjust_spacewars_launcher_setting(window: &MainWindow, focus: i32, delta: i32
     }
 }
 
+fn pizza_limit_from_window(window: &MainWindow) -> u32 {
+    window
+        .get_launcher_pizza_live_ball_limit_text()
+        .parse::<u32>()
+        .unwrap_or(engine_common::DEFAULT_PIZZA_LIVE_BALL_LIMIT)
+        .clamp(1, engine_common::MAX_PIZZA_LIVE_BALLS)
+}
+
 fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
     match focus {
+        5 => {
+            let current = pizza_limit_from_window(window);
+            let choices = [100, 250, 500, 1_000, 2_500, 5_000];
+            let next = if delta > 0 {
+                choices
+                    .into_iter()
+                    .find(|value| *value > current)
+                    .unwrap_or(current)
+            } else {
+                choices
+                    .into_iter()
+                    .rev()
+                    .find(|value| *value < current)
+                    .unwrap_or(current)
+            };
+            window.set_launcher_pizza_live_ball_limit_text(next.to_string().into());
+            let desired = window
+                .get_launcher_pizza_desired_balls_text()
+                .parse::<u32>()
+                .unwrap_or(24);
+            window.set_launcher_pizza_desired_balls_text(desired.min(next).to_string().into());
+        }
+        4 => window
+            .set_launcher_pizza_automatic_events(!window.get_launcher_pizza_automatic_events()),
         2 => {
             let current = window
                 .get_launcher_pizza_desired_balls_text()
                 .parse::<i32>()
                 .unwrap_or(24);
-            let next = (current + delta.signum() * 25).clamp(1, MAX_PIZZA_DESIRED_BALLS as i32);
+            let next =
+                (current + delta.signum() * 25).clamp(0, pizza_limit_from_window(window) as i32);
             window.set_launcher_pizza_desired_balls_text(SharedString::from(next.to_string()));
         }
         3 => {
@@ -1791,6 +1987,24 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
     if focus == 15 {
         window.invoke_clock_fonts_open();
+        return;
+    }
+    if focus == 19 {
+        window.set_launcher_clock_slot_machine_enabled(
+            !window.get_launcher_clock_slot_machine_enabled(),
+        );
+        return;
+    }
+    if focus == 20 {
+        window.set_launcher_clock_spider_enabled(!window.get_launcher_clock_spider_enabled());
+        return;
+    }
+    if focus == 18 {
+        window.set_launcher_clock_grass_enabled(!window.get_launcher_clock_grass_enabled());
+        return;
+    }
+    if focus == 17 {
+        window.set_launcher_clock_cell_swap_enabled(!window.get_launcher_clock_cell_swap_enabled());
         return;
     }
     if focus == 16 {
@@ -1907,12 +2121,16 @@ fn handle_return_to_launcher(
     scenario_controls: &host::SharedScenarioControls,
     input: &input::SharedInput,
     settings: &Arc<RwLock<Settings>>,
+    settings_writer: &settings_writer::SettingsWriter,
     rom_catalog: &SharedNesRomCatalog,
 ) {
     let Some(window) = weak_window.upgrade() else {
         return;
     };
 
+    if window.get_install_fenced() {
+        return;
+    }
     if window.get_autostart_running() {
         window.invoke_autostart_return();
         return;
@@ -1923,15 +2141,14 @@ fn handle_return_to_launcher(
     scenario_controls.borrow_mut().clear();
     input.borrow_mut().clear();
     input.borrow_mut().reset_spacewars_controls();
-    let settings = settings.read().unwrap();
-    let mut launch = launch_from_settings(&settings);
-    if window.get_launcher_scenario() == "spacewars" {
-        launch.scenario = "spacewars".into();
-        launch.seed = window.get_launcher_seed_text().parse().unwrap();
-        launch.renderer = renderer_from_label(window.get_launcher_renderer().as_str()).unwrap();
-        launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
-    }
-    show_launcher(&window, &launch, &settings, rom_catalog);
+    let mut launch = launch_from_settings(&settings.read().unwrap());
+    // Direct launches may differ from the saved scenario. Return to the exact
+    // running selection; the catalog resolves hidden scenarios to Space-Wars.
+    launch.scenario = window.get_launcher_scenario().to_string();
+    launch.seed = window.get_launcher_seed_text().parse().unwrap();
+    launch.renderer = renderer_from_label(window.get_launcher_renderer().as_str()).unwrap();
+    launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
+    show_launcher(&window, &launch, settings, settings_writer, rom_catalog);
 }
 
 fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {
@@ -2012,6 +2229,8 @@ fn handle_launcher_zoom(weak_window: &slint::Weak<MainWindow>, player: usize, zo
 }
 
 fn clear_runtime_diagnostics(window: &MainWindow) {
+    window.set_pizza_event_available(false);
+    window.set_pizza_event_can_trigger(false);
     camera_probe::end_session();
     gpu_scene::end_session();
     window.set_runtime_diagnostics(SharedString::from(NO_ACTIVE_SCENARIO_DIAGNOSTICS));
@@ -2416,6 +2635,8 @@ fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String>
     pizza_setup_from_values(
         window.get_launcher_pizza_desired_balls_text().as_str(),
         window.get_launcher_pizza_spawn_rate_text().as_str(),
+        window.get_launcher_pizza_automatic_events(),
+        window.get_launcher_pizza_live_ball_limit_text().as_str(),
     )
 }
 
@@ -2437,9 +2658,13 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             crow: window.get_launcher_clock_crow_enabled(),
             explosion: window.get_launcher_clock_explosion_enabled(),
             aquarium: window.get_launcher_clock_aquarium_enabled(),
+            cell_swap: window.get_launcher_clock_cell_swap_enabled(),
+            grass: window.get_launcher_clock_grass_enabled(),
             marquee: window.get_launcher_clock_marquee_enabled(),
             digit_slide: window.get_launcher_clock_digit_slide_enabled(),
             rain: window.get_launcher_clock_rain_enabled(),
+            slot_machine: window.get_launcher_clock_slot_machine_enabled(),
+            spider: window.get_launcher_clock_spider_enabled(),
         },
         marquee_preset: engine_common::ClockMarqueePreset::ALL
             .into_iter()
@@ -2602,8 +2827,17 @@ fn clock_time_format_from_label(label: &str) -> Result<ClockTimeFormat, String> 
 fn pizza_setup_from_values(
     desired_balls: &str,
     ball_spawn_rate: &str,
+    automatic_events: bool,
+    live_ball_limit: &str,
 ) -> Result<PizzaSettings, String> {
     Ok(PizzaSettings {
+        live_ball_limit: parse_u32_setting(
+            live_ball_limit,
+            "Live ball limit",
+            1,
+            engine_common::MAX_PIZZA_LIVE_BALLS,
+        )?,
+        automatic_events,
         desired_balls: parse_u32_setting(
             desired_balls,
             "Desired balls",
@@ -2616,7 +2850,8 @@ fn pizza_setup_from_values(
             MIN_PIZZA_BALL_SPAWN_RATE,
             MAX_PIZZA_BALL_SPAWN_RATE,
         )?,
-    })
+    }
+    .normalized())
 }
 
 fn parse_u32_setting(value: &str, label: &str, min: u32, max: u32) -> Result<u32, String> {
@@ -3060,6 +3295,8 @@ mod tests {
 
     fn base_args() -> Args {
         Args {
+            pizza_lab: pizza_lab::Options::default(),
+            ignore_physical_controllers: false,
             presentation: presentation_probe::Options::default(),
             scenario: None,
             rom: None,
@@ -3847,7 +4084,8 @@ mod tests {
             raster_scale: 1.0,
         };
 
-        let asset = resolve_launch_asset(&launch, None, &settings, &catalog).unwrap();
+        let asset =
+            resolve_launch_asset(&launch, None, &settings, &catalog, Some(config.path())).unwrap();
 
         let client_scenarios::ScenarioAsset::NesRom(asset) = asset else {
             panic!("NES launch did not resolve a cartridge asset");
@@ -4221,6 +4459,10 @@ mod tests {
                     crow: false,
                     explosion: false,
                     aquarium: false,
+                    cell_swap: false,
+                    grass: false,
+                    slot_machine: false,
+                    spider: false,
                 },
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),
@@ -4239,6 +4481,8 @@ mod tests {
                 player_2_controller: SpacewarsController::RuleBot,
             },
             pizza: PizzaSettings {
+                live_ball_limit: 500,
+                automatic_events: true,
                 desired_balls: 321,
                 ball_spawn_rate: 0.42,
             },
@@ -4387,6 +4631,7 @@ mod tests {
     #[test]
     fn pizza_settings_normalization_clamps_saved_values() {
         let mut settings = Settings::default();
+        settings.pizza.live_ball_limit = MAX_PIZZA_DESIRED_BALLS + 1;
         settings.pizza.desired_balls = MAX_PIZZA_DESIRED_BALLS + 1;
         settings.pizza.ball_spawn_rate = f32::NAN;
 
@@ -4402,21 +4647,35 @@ mod tests {
     #[test]
     fn pizza_setup_values_parse_and_validate_caps() {
         assert_eq!(
-            pizza_setup_from_values("321", "0.42").unwrap(),
+            pizza_setup_from_values("321", "0.42", true, "500").unwrap(),
             PizzaSettings {
+                live_ball_limit: 500,
+                automatic_events: true,
                 desired_balls: 321,
                 ball_spawn_rate: 0.42,
             }
         );
         assert_eq!(
-            pizza_setup_from_values("501", "1.0").unwrap(),
+            pizza_setup_from_values("5001", "1.0", true, "5001").unwrap(),
             PizzaSettings {
+                live_ball_limit: 5_000,
+                automatic_events: true,
                 desired_balls: MAX_PIZZA_DESIRED_BALLS,
                 ball_spawn_rate: MAX_PIZZA_BALL_SPAWN_RATE,
             }
         );
-        assert!(pizza_setup_from_values("many", "0.42").is_err());
-        assert!(pizza_setup_from_values("24", "often").is_err());
+        let limited = pizza_setup_from_values("5000", "0.1", false, "250").unwrap();
+        assert_eq!(limited.desired_balls, 250);
+        assert_eq!(limited.live_ball_limit, 250);
+        assert_eq!(
+            pizza_setup_from_values("0", "0.1", false, "0")
+                .unwrap()
+                .live_ball_limit,
+            1
+        );
+        assert!(pizza_setup_from_values("24", "0.1", true, "many").is_err());
+        assert!(pizza_setup_from_values("many", "0.42", true, "500").is_err());
+        assert!(pizza_setup_from_values("24", "often", true, "500").is_err());
     }
 
     #[test]

@@ -24,6 +24,8 @@ pub(crate) struct MeltCell {
     pub angle: f32,
     pub(super) spin: f32,
     pub(super) release_tick: u64,
+    /// The face cell a digit block left and the surface it carries.
+    pub(super) piece: Option<Piece>,
 }
 
 impl MeltCell {

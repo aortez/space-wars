@@ -92,10 +92,8 @@ printf 'scenario=clock\\nkms_renderer=%s\\n' "$mode"
         target.write_text("#!/bin/bash\nset -eu\n" + body + "\n")
         target.chmod(0o755)
 
-    def run_helper(self, *args, locked=False):
+    def run_helper(self, *args):
         command = ["/bin/bash", "/helper.sh", *args]
-        if locked:
-            command = ["/usr/bin/flock", "/run/lock/spacewars-fast-update.lock", *command]
         result = subprocess.run([
             "bwrap", "--ro-bind", "/usr", "/host/usr",
             "--ro-bind", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64",
@@ -152,12 +150,6 @@ printf 'scenario=clock\\nkms_renderer=%s\\n' "$mode"
         result = self.run_helper("gpu")
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(self.override.exists())
-
-    def test_fast_update_lock_blocks_switch_before_service_mutation(self):
-        result = self.run_helper("gpu", locked=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("update or renderer switch", result.stderr)
-        self.assertFalse((self.control / "calls").exists())
 
     def test_recovery_from_stopped_service_and_symlink_rejection(self):
         (self.control / "state").write_text("stopped\n")

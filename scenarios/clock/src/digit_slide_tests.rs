@@ -140,7 +140,10 @@ fn off_disabled_and_busy_events_skip_transitions_without_a_backlog() {
     for kind in ClockEventKind::ALL.into_iter().filter(|kind| {
         !matches!(
             kind,
-            ClockEventKind::DigitSlide | ClockEventKind::Duck | ClockEventKind::Crow
+            ClockEventKind::DigitSlide
+                | ClockEventKind::Duck
+                | ClockEventKind::Crow
+                | ClockEventKind::Spider
         )
     }) {
         let mut state = ready(from, ClockTimeFormat::TwentyFourHour);

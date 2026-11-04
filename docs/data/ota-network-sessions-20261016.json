@@ -1,0 +1,323 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T20:25:16.805302+00:00",
+  "implementation_commit": "2a13aa7e8a66113c9695279fecaae1077217344b",
+  "scope": "Native read-only SSH/TCP observer, root SSH admission helper, recovery fallback and image drop-in. The runtime service still does not instantiate a native radio coordinator.",
+  "validation": {
+    "host_manager_tests": 87,
+    "host_final_network_tests": 47,
+    "bootstrap_access_tests": 10,
+    "namespace_root_network_tests": 47,
+    "namespace_root_final_timeout_tests": 1,
+    "host_temporary_filesystem": "ext4 under target/ota-bootstrap-finish-tmp",
+    "selected_tests_per_pi": 47,
+    "selected_behavioral_parent_cases": 46,
+    "subprocess_helper_entrypoints": 1,
+    "rust_msrv": "1.89.0",
+    "clippy_warnings_denied": true,
+    "format_checked": true,
+    "aarch64_compiled": true,
+    "source_note": "The full 87-test host suite preceded test-only root-success/fallback assertions and the deterministic late-write rendezvous. Final selected host and Pi runs include those changes. The 47-test namespace-root suite includes root-success assertions; its late-write case was also rerun after the rendezvous change. No production source changed after these checks. ARM artifacts were built from the implementation source before its commit, then stripped for transfer; no packaged image was built.",
+    "static_systemd": {
+      "root": "/home/data/workspace/space-wars-ota/target/ota-ssh-units-hsxhlw33",
+      "exit_code": 0,
+      "purpose": "Static unit dependency/command verification only; copied extracted image plus the SSH drop-in, with the unreadable and unused sudo executable omitted. No unit jobs run."
+    }
+  },
+  "contracts": {
+    "observation_deadline_seconds": 5,
+    "tcp_table_bytes_each": 524288,
+    "tcp_entries_each": 2048,
+    "systemd_reply_bytes": 1048576,
+    "systemd_unit_limit": 4096,
+    "root_only_ssh_hold": true,
+    "ssh_hold_seconds": 120,
+    "helper_socket_retry_deadline_seconds": 45,
+    "unit_start_timeout_seconds": 60,
+    "fallback_creates_state": false,
+    "fallback_changes_radio": false,
+    "fallback_requires_no_pending_or_owned_off": true,
+    "root_admission_result": "session-protected",
+    "recipe_hook_ignores_failure": false
+  },
+  "properties_exercised": [
+    "IPv4/IPv6, loopback/mapped loopback, listeners, authenticating/established/closing TCP and malformed/oversized inputs; no endpoint addresses in probe output.",
+    "Private systemd D-Bus requires the expected unique owner UID/PID, stable unit inventory, socket/template properties and a non-ignored admission hook; unsupported/unknown state cannot prove idle and no SSH job is started.",
+    "Accepted TCP socket validation rejects listeners, wrong ports, UDP and Unix sockets without consuming queued SSH bytes.",
+    "Only authenticated root can reserve SSH protection; kiosk identity cannot forge it, renew it or release another process hold. Root success is exercised with real Unix IPC inside a user namespace, not host root access.",
+    "SSH admission queued during shutdown waits for restoration; failed/uncertain writes and lost readback cannot acknowledge it. Live sessions retain expired protection until a complete quiet observation.",
+    "The stopped-service fallback takes the exclusive policy lock and preserves saved bytes, generation and deployments. It rejects a live owner, corrupt/missing records, pending commands and policy-owned off state.",
+    "Bootstrap accepts only the exact non-ignored helper for per-connection sshd; daemon-mode hooks, alternate commands, extra arguments and ignored failures are rejected.",
+    "Both Pis ran fake-radio/private-bus fixtures as UID 1000. Final read-only native probes observed the real SSH connection, and the helper CLI refused the ordinary runtime account before privileged work."
+  ],
+  "initial_device_runs": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "temporary_directory": "/tmp/spacewars-network-ssh.1989VD",
+      "binary_sha256": "6785a10a73084958963ed2c78d3087dc43c33525239cbcf64d36c220d4303ec0",
+      "passed": 47,
+      "failed": 0,
+      "seconds": 9.23,
+      "log": "target/ota-network-sessions-pi5-initial-tests.log",
+      "log_sha256": "dfd0c7e64b10297d970766f588a7111eaf5ac03c74a983b4ed1c3566f983bb5a"
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "temporary_directory": "/tmp/spacewars-network-ssh.1S3yzg",
+      "binary_sha256": "6785a10a73084958963ed2c78d3087dc43c33525239cbcf64d36c220d4303ec0",
+      "passed": 46,
+      "failed": 1,
+      "seconds": 10.25,
+      "log": "target/ota-network-sessions-pi4-initial-tests.log",
+      "log_sha256": "6be1144b002c5a88d643469109543fa39ad031f943df7edfd3a408757b4cc67c"
+    }
+  ],
+  "fixture_correction": {
+    "failure": "Pi 4 initially passed 46/47 cases; the late-write fixture read Wi-Fi as still enabled after timing out the entire preflight in 30 ms.",
+    "cause": "That fixture did not establish that Set had reached the fake provider before cancellation. The failure does not establish a live radio or SSH defect.",
+    "change": "The fake setter now signals receipt and waits for explicit release. The client future is cancelled after that receipt; the test verifies no mutation before release and a late applied write afterward. Production radio logic is unchanged."
+  },
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "temporary_directory": "/tmp/spacewars-network-ssh-final.hLY7WQ",
+      "artifacts": {
+        "tests": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-network-ssh-final-tests",
+          "sha256": "da6034d6b3e28582a2fb2268c2ab98f08f18aa7d7e355facb9955bec797dc071",
+          "bytes": 8921072
+        },
+        "manager": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-network-ssh-final-manager",
+          "sha256": "39ace9a880c95555ee551ea62eda6c93da11685abe8c572d947b9940235ae893",
+          "bytes": 13837512
+        }
+      },
+      "test_exit_code": 0,
+      "probe_exit_code": 0,
+      "probe": {
+        "schema": 1,
+        "active_tcp_connections": 1,
+        "active_ssh_connections": 1,
+        "other_tcp_listeners": 4,
+        "active_ssh_units": 1,
+        "socket_active": true,
+        "admission_hook_loaded": false,
+        "configuration_supported": true,
+        "host_namespace_confirmed": false,
+        "observation_complete": false,
+        "ssh_activity": true
+      },
+      "helper_refused_runtime_uid": true,
+      "tests": 47,
+      "seconds": 7.48,
+      "real_radio_changes": false,
+      "installed_service_changes": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "temporary_directory": "/tmp/spacewars-network-ssh-final.yjG9Rt",
+      "artifacts": {
+        "tests": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-network-ssh-final-tests",
+          "sha256": "da6034d6b3e28582a2fb2268c2ab98f08f18aa7d7e355facb9955bec797dc071",
+          "bytes": 8921072
+        },
+        "manager": {
+          "path": "/home/data/workspace/space-wars-ota/target/ota-network-ssh-final-manager",
+          "sha256": "39ace9a880c95555ee551ea62eda6c93da11685abe8c572d947b9940235ae893",
+          "bytes": 13837512
+        }
+      },
+      "test_exit_code": 0,
+      "probe_exit_code": 0,
+      "probe": {
+        "schema": 1,
+        "active_tcp_connections": 1,
+        "active_ssh_connections": 1,
+        "other_tcp_listeners": 4,
+        "active_ssh_units": 1,
+        "socket_active": true,
+        "admission_hook_loaded": false,
+        "configuration_supported": true,
+        "host_namespace_confirmed": false,
+        "observation_complete": false,
+        "ssh_activity": true
+      },
+      "helper_refused_runtime_uid": true,
+      "tests": 47,
+      "seconds": 10.01,
+      "real_radio_changes": false,
+      "installed_service_changes": false
+    }
+  ],
+  "limits": [
+    "serve still does not bind the network socket or instantiate a native backend; automatic Wi-Fi policy and automatic update are not enabled.",
+    "The SSH drop-in is included in the image recipe but has not been built into a new packaged image or installed on either Pi. Older prepared bootstrap kits do not contain these changes.",
+    "Both native probes reported busy SSH but incomplete idle qualification: no installed hook, no permission for UID 1000 to inspect PID 1 network namespace, and four other TCP listeners on ports 53/111. Classifying supported listeners and confirming namespace under service hardening remain required.",
+    "Native install exclusion, continuous NetworkManager changes, expected setup profile changes, runtime/CLI binding, setup/deployment holds and physical interactive/SCP/SFTP admission still require integration or qualification.",
+    "Static systemd verification used a copied extracted image plus the drop-in, not a booted image; the unreadable unused sudo binary was omitted. The host verifier reported only existing vendor !! modifier warnings on timesyncd/resolved.",
+    "No installed services, live radio settings, credentials, data/root/boot partitions, reboot state or watchdog changed. Device boot IDs were unchanged within each run.",
+    "Root connection details and supervised bootstrap remain pending; signing/feed, downloader/install policy and complete hardware OTA qualification also remain outstanding."
+  ],
+  "logs": {
+    "host_full": {
+      "path": "target/ota-network-sessions-full.log",
+      "bytes": 9656,
+      "sha256": "edc02539660f76d93b8287b9736fbff312229fa0f18dcb0d3bbc93846bf6fdfe",
+      "test_results": [
+        "test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.36s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.06s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "host_final_network": {
+      "path": "target/ota-network-sessions-final-selected.log",
+      "bytes": 5242,
+      "sha256": "39df8debdedbe7d50e980c46560aacf1736dc693933377e711fbb8f19993933a",
+      "test_results": [
+        "test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 16.20s"
+      ]
+    },
+    "namespace_root_network": {
+      "path": "target/ota-network-sessions-root-fixtures.log",
+      "bytes": 4979,
+      "sha256": "3a074322c239a2ab3fe8dd213c2f7600efdc1d3185db41b9ad0a0465768e9cb1",
+      "test_results": [
+        "test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 29.29s"
+      ]
+    },
+    "namespace_root_final_timeout": {
+      "path": "target/ota-network-sessions-final-root-timeout.log",
+      "bytes": 215,
+      "sha256": "093b63e8226e41dd7eb7e96979b2099e0cd976b60e864a7e8f54802dc96dc6f2",
+      "test_results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 64 filtered out; finished in 0.04s"
+      ]
+    },
+    "bootstrap_access": {
+      "path": "target/ota-network-sessions-access-check.log",
+      "bytes": 1450,
+      "sha256": "9ba53103e94ce8f97a8cdafb41e079d4fd394c4df5ee9509e738c30212e7c98d",
+      "test_results": [
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 233 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy_manager_and_ota": {
+      "path": "target/ota-network-sessions-clippy.log",
+      "bytes": 454,
+      "sha256": "34ce2cceeb7353546a180f1648948a83fdb6688c70c6f45844ad9e2f466d7ac0"
+    },
+    "clippy_final_manager": {
+      "path": "target/ota-network-sessions-final-clippy.log",
+      "bytes": 367,
+      "sha256": "f4d4cd0741dcd4022cd9ed0656f338f419c075cdbb1472cfb6f060c75e611ae1"
+    },
+    "msrv": {
+      "path": "target/ota-network-sessions-msrv.log",
+      "bytes": 173,
+      "sha256": "a7b380744830c720fc395fff093800d0ed8c62f1f66dd004142360c8e6cc238f"
+    },
+    "format": {
+      "path": "target/ota-network-sessions-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "aarch64": {
+      "path": "target/ota-network-sessions-final-aarch64.log",
+      "bytes": 174,
+      "sha256": "32048010bc09f9b4e7b75b9be3f62975f93f7c5bb215b6b1f4f8be69b2c51e8b"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-network-sessions-final-aarch64.jsonl",
+      "bytes": 208472,
+      "sha256": "28b881f74cbda304a710c16a490c29fda11a294c9ecef0aeb3af2fb3ae206cb9"
+    },
+    "static_systemd": {
+      "path": "target/ota-network-sessions-systemd.log",
+      "bytes": 507,
+      "sha256": "65df299cb16890324ad5945e5b2398a3ff0c0a97a88c85879f5f4af99eefb166"
+    },
+    "device_runner": {
+      "path": "target/ota-network-sessions-pis.py",
+      "bytes": 4000,
+      "sha256": "46a47ed03700b17ae141f28ee079ace8b0b3f1a331f859bef915270cb3fde4e9"
+    },
+    "device_run": {
+      "path": "target/ota-network-sessions-pis.log",
+      "bytes": 2223,
+      "sha256": "9d61814bdc46ea9adf95d3b97a63f990b47b9528cd75144b78e23a87e42e69c8"
+    },
+    "pi5_tests": {
+      "path": "target/ota-network-sessions-pi5-tests.log",
+      "bytes": 4978,
+      "sha256": "804ce6b8c7c8d39bce9fe3c4fa81c9ee41ca7baa03e6a93f70d5b9623f9dfab6",
+      "test_results": [
+        "test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 7.48s"
+      ]
+    },
+    "pi5_initial-tests": {
+      "path": "target/ota-network-sessions-pi5-initial-tests.log",
+      "bytes": 4978,
+      "sha256": "dfd0c7e64b10297d970766f588a7111eaf5ac03c74a983b4ed1c3566f983bb5a",
+      "test_results": [
+        "test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 9.23s"
+      ]
+    },
+    "pi5_final-probe": {
+      "path": "target/ota-network-sessions-pi5-final-probe.log",
+      "bytes": 321,
+      "sha256": "18dbe1a8e5fc3b80e00224db239dfc8295c3b1658937445056253d7c7da958d6"
+    },
+    "pi5_refusal": {
+      "path": "target/ota-network-sessions-pi5-refusal.log",
+      "bytes": 48,
+      "sha256": "cbb636dbe6bd411350aa2b979a5dcd1ae62a0b47d7c961c274988834016e147c"
+    },
+    "pi4_tests": {
+      "path": "target/ota-network-sessions-pi4-tests.log",
+      "bytes": 4979,
+      "sha256": "df8a62692c26679adcac0be7aeab5fa91fec7012d6a905dc26983462889b30fc",
+      "test_results": [
+        "test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 10.01s"
+      ]
+    },
+    "pi4_initial-tests": {
+      "path": "target/ota-network-sessions-pi4-initial-tests.log",
+      "bytes": 5515,
+      "sha256": "6be1144b002c5a88d643469109543fa39ad031f943df7edfd3a408757b4cc67c",
+      "test_results": [
+        "test result: FAILED. 46 passed; 1 failed; 0 ignored; 0 measured; 18 filtered out; finished in 10.25s"
+      ]
+    },
+    "pi4_final-probe": {
+      "path": "target/ota-network-sessions-pi4-final-probe.log",
+      "bytes": 321,
+      "sha256": "18dbe1a8e5fc3b80e00224db239dfc8295c3b1658937445056253d7c7da958d6"
+    },
+    "pi4_refusal": {
+      "path": "target/ota-network-sessions-pi4-refusal.log",
+      "bytes": 48,
+      "sha256": "cbb636dbe6bd411350aa2b979a5dcd1ae62a0b47d7c961c274988834016e147c"
+    }
+  }
+}
