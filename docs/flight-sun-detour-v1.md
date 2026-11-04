@@ -19,7 +19,8 @@ settings its seats hand off 7.25 times per ten minutes against the LF-093
 network's 6.61 and the native-only seats' 6.72, 9 of its legs run past
 2,000 ticks against 22 and 8, and it makes 6 budget replans against 12 and
 3, with identical first legs 32 faster, 40 within five percent and 23
-slower of 95.
+slower of 95. [LF-096](flight-transfer-confirmation-v2.md) confirms the
+committed stack on fresh seeds and the crowded conditions.
 
 ## The crawl
 
