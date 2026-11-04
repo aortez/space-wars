@@ -130,7 +130,7 @@ impl DevelopmentImage {
         }
         if self.boot_identity != device.boot_identity {
             return Err(invalid(
-                "image boot files differ from this unit's; they change only by USB flash",
+                "image boot files differ from this unit's; they change only by a full flash",
             ));
         }
         if self.min_updater_protocol > device.updater_protocol {
@@ -138,7 +138,7 @@ impl DevelopmentImage {
         }
         if self.min_recovery_protocol != device.recovery_protocol {
             return Err(invalid(
-                "image recovery protocol differs from this unit's; it changes only by USB flash",
+                "image recovery protocol differs from this unit's; it changes only by a full flash",
             ));
         }
         if self.expanded.bytes > device.inactive_slot_bytes {

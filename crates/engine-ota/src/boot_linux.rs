@@ -22,6 +22,8 @@ pub struct PhysicalIdentity {
     pub serial: String,
     pub bootloader_revision: String,
     pub medium_sectors: u64,
+    /// A USB disk keeps udev's `ID_*` descriptor record. An SD card keeps the
+    /// kernel's `MMC_TYPE` and `MMC_CID` attributes.
     pub medium: BTreeMap<String, String>,
 }
 
@@ -39,14 +41,17 @@ impl PhysicalIdentity {
             "/sys/firmware/devicetree/base/chosen/bootloader/version",
             64,
         )?;
-        let medium = text(
-            &format!(
-                "/run/udev/data/b{}:{}",
-                layout.disk_device.major, layout.disk_device.minor
-            ),
-            64 * 1024,
-        )?;
-        Self::parse(model, serial, firmware, layout.disk_sectors, &medium)
+        let number = format!("{}:{}", layout.disk_device.major, layout.disk_device.minor);
+        let medium = if sd_slot(&layout.disk_name, &number)? {
+            let card = format!("/sys/dev/block/{number}/device");
+            sd_medium(
+                &text(&format!("{card}/type"), 16)?,
+                &text(&format!("{card}/cid"), 64)?,
+            )?
+        } else {
+            usb_medium(&text(&format!("/run/udev/data/b{number}"), 64 * 1024)?)?
+        };
+        Self::parse(model, serial, firmware, layout.disk_sectors, medium)
     }
 
     fn parse(
@@ -54,7 +59,7 @@ impl PhysicalIdentity {
         serial: String,
         bootloader_revision: String,
         medium_sectors: u64,
-        record: &str,
+        medium: BTreeMap<String, String>,
     ) -> Result<Self> {
         if !(model.starts_with("Raspberry Pi 4 Model B Rev ")
             || model.starts_with("Raspberry Pi 5 Model B Rev "))
@@ -65,45 +70,6 @@ impl PhysicalIdentity {
         {
             return Err(invalid("missing or unsupported board/firmware identity"));
         }
-        let mut medium = BTreeMap::new();
-        for line in record.lines() {
-            let Some((key, value)) = line
-                .strip_prefix("E:")
-                .and_then(|line| line.split_once('='))
-            else {
-                continue;
-            };
-            if !matches!(
-                key,
-                "ID_BUS"
-                    | "ID_TYPE"
-                    | "ID_SERIAL"
-                    | "ID_VENDOR"
-                    | "ID_VENDOR_ID"
-                    | "ID_MODEL"
-                    | "ID_MODEL_ID"
-                    | "ID_REVISION"
-                    | "ID_WWN"
-                    | "ID_WWN_WITH_EXTENSION"
-            ) {
-                continue;
-            }
-            if value.is_empty()
-                || value.len() > 512
-                || !value.bytes().all(|b| b.is_ascii_graphic())
-                || medium.insert(key.into(), value.into()).is_some()
-            {
-                return Err(invalid("ambiguous or invalid USB medium identity"));
-            }
-        }
-        if medium.get("ID_BUS").map(String::as_str) != Some("usb")
-            || medium.get("ID_TYPE").map(String::as_str) != Some("disk")
-            || ["ID_SERIAL", "ID_VENDOR", "ID_MODEL", "ID_REVISION"]
-                .iter()
-                .any(|key| !medium.contains_key(*key))
-        {
-            return Err(invalid("root medium has no supported stable USB identity"));
-        }
         Ok(Self {
             model,
             serial,
@@ -112,6 +78,80 @@ impl PhysicalIdentity {
             medium,
         })
     }
+}
+
+/// The kernel names every MMC block disk `mmcblk<N>`. Only a card on the MMC
+/// bus takes the SD path; every other root keeps the USB identity check.
+fn sd_slot(disk: &str, number: &str) -> Result<bool> {
+    let Some(index) = disk.strip_prefix("mmcblk") else {
+        return Ok(false);
+    };
+    if index.is_empty() || !index.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(invalid("unsupported MMC disk name"));
+    }
+    let bus = std::fs::canonicalize(format!("/sys/dev/block/{number}/device/subsystem"))?;
+    if bus != Path::new("/sys/bus/mmc") {
+        return Err(invalid("root MMC disk is not a card on the MMC bus"));
+    }
+    Ok(true)
+}
+
+fn usb_medium(record: &str) -> Result<BTreeMap<String, String>> {
+    let mut medium = BTreeMap::new();
+    for line in record.lines() {
+        let Some((key, value)) = line
+            .strip_prefix("E:")
+            .and_then(|line| line.split_once('='))
+        else {
+            continue;
+        };
+        if !matches!(
+            key,
+            "ID_BUS"
+                | "ID_TYPE"
+                | "ID_SERIAL"
+                | "ID_VENDOR"
+                | "ID_VENDOR_ID"
+                | "ID_MODEL"
+                | "ID_MODEL_ID"
+                | "ID_REVISION"
+                | "ID_WWN"
+                | "ID_WWN_WITH_EXTENSION"
+        ) {
+            continue;
+        }
+        if value.is_empty()
+            || value.len() > 512
+            || !value.bytes().all(|b| b.is_ascii_graphic())
+            || medium.insert(key.into(), value.into()).is_some()
+        {
+            return Err(invalid("ambiguous or invalid USB medium identity"));
+        }
+    }
+    if medium.get("ID_BUS").map(String::as_str) != Some("usb")
+        || medium.get("ID_TYPE").map(String::as_str) != Some("disk")
+        || ["ID_SERIAL", "ID_VENDOR", "ID_MODEL", "ID_REVISION"]
+            .iter()
+            .any(|key| !medium.contains_key(*key))
+    {
+        return Err(invalid("root medium has no supported stable USB identity"));
+    }
+    Ok(medium)
+}
+
+/// An SD card's CID register holds its manufacturer, product, revision, serial
+/// number and date. The kernel prints it as 32 hex digits read from the card.
+fn sd_medium(card_type: &str, cid: &str) -> Result<BTreeMap<String, String>> {
+    let cid = cid.strip_suffix('\n').unwrap_or_default();
+    if card_type != "SD\n" || !hex(cid, 32) || cid.bytes().all(|b| b == b'0') {
+        return Err(invalid(
+            "root medium has no supported stable SD card identity",
+        ));
+    }
+    Ok(BTreeMap::from([
+        ("MMC_CID".to_owned(), cid.to_owned()),
+        ("MMC_TYPE".to_owned(), "SD".to_owned()),
+    ]))
 }
 
 #[derive(Clone, Debug, Serialize)]

@@ -474,6 +474,30 @@ special files or treat an active socket as disposable. The native archive helper
 still rejects unsupported special files; early reporting and a single resumable
 rollout runner remain follow-up improvements.
 
+## SD card boot media
+
+Recovery binds each journal and native-install approval to a device ID made
+from the board serial, bootloader version, medium size and medium identity.
+A USB root keeps udev's descriptor record, and existing USB device IDs are
+unchanged. A root on the Pi's SD slot uses the kernel's card type, which must be
+`SD`, and the card's CID register: its manufacturer, product, revision, serial
+number and date.
+
+A unit moved to another medium, whether a new USB disk or an SD card, is a
+new device. Flash the card with `--boot-medium sd`, restore only the data it
+needs, then run the supervised bootstrap below and provision trust. Its old
+journal and approval are not copied; the flash utility refuses a `/data` holding
+recovery state. Remove the old medium before the first boot. Both disks carry the
+same labels and, from current images, the same partition UUIDs, so the kernel
+could select either root and layout inspection refuses the duplicates.
+
+Flash a card only from an image built with `--no-fstab-update`. Earlier full
+disk images name `/dev/sda1` and `/dev/sda4` in the flashed root's `fstab`. A
+card has no `/dev/sda4`, so its first boot waited 90 seconds for that device
+and entered emergency mode, without network or a console login.
+
+No physical recovery case, including power loss, has run on an SD card yet.
+
 ## Read the existing device
 
 Build `bootstrap_probe` for AArch64, copy it to an ordinary account's temporary

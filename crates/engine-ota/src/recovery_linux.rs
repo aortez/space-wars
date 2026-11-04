@@ -64,7 +64,7 @@ pub struct DiskLayout {
     pub disk_sectors: u64,
     pub active: Slot,
     pub partitions: [Partition; 4],
-    /// Stable across /dev/sdX enumeration changes, but not a claim that the USB
+    /// Stable across /dev/sdX enumeration changes, but not a claim that the boot
     /// medium has passed power-loss testing. Cloned media may share UUIDs.
     pub layout_id: Sha256,
 }

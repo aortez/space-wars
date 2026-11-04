@@ -4,12 +4,31 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 export const HARDWARE_PROFILES = ['hdmi', 'hyperpixel', 'picade'];
+// Fresh images name USB slot A by its kernel name, and the fresh bootstrap
+// reads that default as the factory selection. A card names its own slot A.
+export const BOOT_MEDIA = Object.freeze({ usb: '/dev/sda2', sd: '/dev/mmcblk0p2' });
 
 export function validateProfile(profile) {
   if (!HARDWARE_PROFILES.includes(profile)) {
     throw new Error(`Select --profile ${HARDWARE_PROFILES.join('|')}; hardware selection is required for flashing.`);
   }
   return profile;
+}
+
+export function validateBootMedium(medium) {
+  if (!Object.hasOwn(BOOT_MEDIA, medium)) {
+    throw new Error(`Select --boot-medium ${Object.keys(BOOT_MEDIA).join('|')}; it names the Pi's root device.`);
+  }
+  return medium;
+}
+
+export function bootMediumCommandLine(text, medium) {
+  validateBootMedium(medium);
+  const roots = text.split(/\s+/).filter(word => word.startsWith('root='));
+  if (text.indexOf('\n') !== text.length - 1 || roots.length !== 1 || roots[0] !== `root=${BOOT_MEDIA.usb}`) {
+    throw new Error('The flashed command line is not a fresh image default; its root cannot be selected.');
+  }
+  return text.replace(/(^|\s)root=\S+/, `$1root=${BOOT_MEDIA[medium]}`);
 }
 
 export function deviceProfileText(profile) {
@@ -39,6 +58,43 @@ export function assertBootCompatibility(expected, actual) {
   }
 }
 
+function withBootPartition(partition, run, work) {
+  const mountPoint = mkdtempSync(join(tmpdir(), 'spacewars-hardware-'));
+  let mounted = false;
+  try {
+    run('sudo', ['mount', '-t', 'vfat', '-o', 'rw,nosuid,nodev,noexec', partition, mountPoint], { stdio: 'pipe' });
+    mounted = true;
+    return work(mountPoint);
+  } finally {
+    // If unmount fails, leave the mount point intact. Never recursively remove it.
+    if (mounted) {
+      run('sudo', ['umount', mountPoint], { stdio: 'pipe' });
+    }
+    rmdirSync(mountPoint);
+  }
+}
+
+export function setBootMedium(utils, device, medium, dryRun, { run = execFileSync } = {}) {
+  validateBootMedium(medium);
+  if (medium === 'usb') return;
+  const partition = utils.getPartitionDevice(device, 1);
+  if (dryRun) {
+    utils.info(`Would select root ${BOOT_MEDIA[medium]} in ${partition}:/cmdline.txt`);
+    return;
+  }
+  withBootPartition(partition, run, mountPoint => {
+    // Read and write through sudo, as for the profile: the FAT mount is private.
+    const path = join(mountPoint, 'cmdline.txt');
+    const contents = bootMediumCommandLine(run('sudo', ['cat', path], { encoding: 'utf8', stdio: 'pipe' }), medium);
+    run('sudo', ['tee', path], { input: contents, stdio: ['pipe', 'ignore', 'pipe'] });
+    run('sudo', ['sync', '-f', path], { stdio: 'pipe' });
+    if (run('sudo', ['cat', path], { encoding: 'utf8', stdio: 'pipe' }) !== contents) {
+      throw new Error('Boot medium readback differs from the selected root.');
+    }
+    utils.success(`Selected root: ${BOOT_MEDIA[medium]}`);
+  });
+}
+
 export function setHardwareProfile(utils, device, profile, bootIdentity, dryRun, { run = execFileSync } = {}) {
   const contents = deviceProfileText(profile);
   const partition = utils.getPartitionDevice(device, 1);
@@ -47,11 +103,7 @@ export function setHardwareProfile(utils, device, profile, bootIdentity, dryRun,
     return;
   }
 
-  const mountPoint = mkdtempSync(join(tmpdir(), 'spacewars-hardware-'));
-  let mounted = false;
-  try {
-    run('sudo', ['mount', '-t', 'vfat', '-o', 'rw,nosuid,nodev,noexec', partition, mountPoint], { stdio: 'pipe' });
-    mounted = true;
+  withBootPartition(partition, run, mountPoint => {
     // FAT inherits the mounting process's umask. Keep these reads privileged:
     // existsSync would report a root-only mount as if the files were missing.
     const bootIdPath = join(mountPoint, 'spacewars-boot-id');
@@ -73,11 +125,5 @@ export function setHardwareProfile(utils, device, profile, bootIdentity, dryRun,
       throw new Error('Hardware profile readback differs from the selected profile.');
     }
     utils.success(`Selected hardware profile: ${profile}`);
-  } finally {
-    // If unmount fails, leave the mount point intact. Never recursively remove it.
-    if (mounted) {
-      run('sudo', ['umount', mountPoint], { stdio: 'pipe' });
-    }
-    rmdirSync(mountPoint);
-  }
+  });
 }

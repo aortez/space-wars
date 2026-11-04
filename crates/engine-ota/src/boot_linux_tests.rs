@@ -12,7 +12,7 @@ fn physical(record: &str) -> Result<PhysicalIdentity> {
         "abcdef0123456789".into(),
         "b".repeat(40),
         100_000_000,
-        record,
+        usb_medium(record)?,
     )
 }
 
@@ -61,6 +61,16 @@ fn runtime(fixture: &Fixture, files: &BootFiles) -> Runtime {
 }
 
 #[test]
+fn usb_device_ids_stay_stable() {
+    // Installed USB units bind their journals and qualification approvals to
+    // this fingerprint. Supporting another medium must not change it.
+    assert_eq!(
+        physical(MEDIUM).unwrap().fingerprint().to_string(),
+        "674228191c1d12c0558f6e97344aeacbd10ff87fb57e938278a8ad0b77d4b306"
+    );
+}
+
+#[test]
 fn qualification_identity_changes_with_board_firmware_or_usb_medium() {
     let original = physical(MEDIUM).unwrap();
     let expected = original.fingerprint();
@@ -101,10 +111,47 @@ fn qualification_identity_changes_with_board_firmware_or_usb_medium() {
             "0".repeat(16),
             original.bootloader_revision,
             100_000_000,
-            MEDIUM
+            usb_medium(MEDIUM).unwrap()
         )
         .is_err()
     );
+}
+
+#[test]
+fn sd_cards_are_identified_by_their_card_register() {
+    // Manufacturer 03, OEM "SD", product "SN64G", serial a1b2c3d4, 2022-03.
+    const CID: &str = "035344534e36344780a1b2c3d40163ab\n";
+    let card = |card_type: &str, cid: &str| {
+        PhysicalIdentity::parse(
+            "Raspberry Pi 4 Model B Rev 1.2".into(),
+            "abcdef0123456789".into(),
+            "b".repeat(40),
+            124_735_488,
+            sd_medium(card_type, cid)?,
+        )
+    };
+    let original = card("SD\n", CID).unwrap();
+    assert_eq!(
+        original.medium,
+        BTreeMap::from([
+            ("MMC_CID".into(), CID.trim_end().into()),
+            ("MMC_TYPE".into(), "SD".into()),
+        ])
+    );
+    let replacement = card("SD\n", &CID.replace("a1b2c3d4", "a1b2c3d5")).unwrap();
+    assert_ne!(replacement.fingerprint(), original.fingerprint());
+    for (card_type, cid) in [
+        ("MMC\n", CID.to_owned()),
+        ("SDIO\n", CID.to_owned()),
+        ("SD", CID.to_owned()),
+        ("SD\n", CID.trim_end().to_owned()),
+        ("SD\n", CID.to_uppercase()),
+        ("SD\n", CID[2..].to_owned()),
+        ("SD\n", format!("{CID}{CID}")),
+        ("SD\n", format!("{}\n", "0".repeat(32))),
+    ] {
+        assert!(card(card_type, &cid).is_err(), "{card_type:?} {cid:?}");
+    }
 }
 
 #[test]
