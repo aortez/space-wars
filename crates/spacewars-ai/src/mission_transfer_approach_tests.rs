@@ -314,8 +314,9 @@ fn the_launch_band_yields_only_while_the_stack_flies_the_leg() {
         bot.transfer_leg().map(|l| l.selected_tick),
         Some(leg.selected_tick)
     );
-    // Handed back low in the same selection, whether refused, pursued away
-    // or landed: the climb comes first and no leg is published.
+    // Handed back low in the same selection, whether refused, touched down
+    // or returned from a solar escape (a recovery or a pursuit starts a new
+    // selection): the climb comes first and no leg is published.
     let p = &mut o.local.combat.recovery.flight.pilot;
     p.tick += 1;
     p.learned_control = false;
