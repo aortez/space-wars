@@ -578,6 +578,7 @@ fn expanded_curriculum_retains_regressions_and_reserves_new_worlds() {
 }
 
 #[test]
+#[ignore = "replays a match case recorded on the experiment machine; another C math library flies the match elsewhere"]
 fn approach_trace_switch_preserves_known_outcomes() {
     let plan: Value = serde_json::from_slice(PLAN).unwrap();
     let case: Case = serde_json::from_value(plan["cases"][0].clone()).unwrap();
