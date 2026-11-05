@@ -116,6 +116,11 @@ local_conf_header:
     PREFERRED_VERSION_rust-bin-cross-aarch64 = "1.94.0"
     PREFERRED_VERSION_cargo-bin-cross-aarch64 = "1.94.0"
 
+    # Scarthgap's BSP still defaults to 6.6.63, whose SD shutdown races the card
+    # poll and can hang a reboot from the Pi 4's SD slot. Upstream fixed it in
+    # 87a0d90f, which 6.12 carries.
+    PREFERRED_VERSION_linux-raspberrypi = "6.12.%"
+
   graphics: |
     SPACEWARS_GPU = "1"
     DISTRO_FEATURES:append = " opengl"
