@@ -65,7 +65,12 @@ fn fresh(h: &mut FunctionalHarness, s: &mut UiState, c: &mut usize) -> Value {
 }
 fn until(h: &mut FunctionalHarness, s: &mut UiState, c: &mut usize, target: u64) -> Value {
     let v = snapshot(h, |v| v["paused"] == true);
-    assert!(tick(&v) < target, "fixture exceeded target: {v}");
+    assert!(tick(&v) <= target, "fixture exceeded target: {v}");
+    // Reset resumes playback until the pause input arrives. It can already
+    // be at the first checkpoint; do not step past that valid observation.
+    if tick(&v) == target {
+        return v;
+    }
     choose(h, s, c, 1);
     for _ in tick(&v) + 1..target {
         press(h, s, InputButton::South);
