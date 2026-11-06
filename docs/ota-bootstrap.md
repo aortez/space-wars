@@ -1256,9 +1256,10 @@ engine-os-manager bootstrap-activate \
 ```
 
 `REQUEST_BOOT_ID` is the `request_boot_id` that `bootstrap_inspect_trial`
-reports. The retry requires that the journal still names that request, that the
-current boot is neither that boot nor the staging boot, and every admission
-check of the first request. It records the interrupted request, which is then
+reports. The power cycle clears runtime masks, so mask and stop the runtime
+services again first, as for the first request. The retry requires that the
+journal still names that request, that the current boot is neither that boot
+nor the staging boot, and every admission check of the first request. It records the interrupted request, which is then
 refused as a trial or normal boot, and consumes a new request from the current
 boot. An attempt allows three retries. A journal in any other phase, including a
 trial that recorded its boot, is never retried this way. A trial kernel that
