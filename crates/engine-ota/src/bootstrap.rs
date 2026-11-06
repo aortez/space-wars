@@ -59,6 +59,9 @@ mod legacy_replace;
 mod legacy_state;
 #[path = "bootstrap_quiesce.rs"]
 mod quiesce;
+#[path = "bootstrap_retire.rs"]
+mod retire;
+pub use retire::{Retirement, RetirementReport, retire_production_records};
 #[path = "bootstrap_root_install.rs"]
 mod root_install;
 #[path = "bootstrap_stage_files.rs"]
@@ -124,6 +127,8 @@ pub use root_install::{RootInstallProgress, RootInstallReport};
 pub use trial_linux::BootstrapBoot;
 
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
+/// Identical recovery initramfs bytes are shared with the trial, not staged.
+pub(crate) const INITRAMFS: &str = "spacewars-recovery.cpio.gz";
 /// Boot-bound activation, canonical health and explicit retirement/recovery handoff.
 pub const BOOTSTRAP_PROTOCOL: u32 = 5;
 
@@ -181,6 +186,27 @@ pub struct BootPlan {
 }
 
 impl BootPlan {
+    /// True when `expected` is what these checked inputs produce. A package
+    /// may share the boot partition's initramfs when its bytes are identical,
+    /// or stage its own as earlier packages did; nothing else may differ.
+    pub(crate) fn derives(
+        expected: &Self,
+        image: &ImageIdentity,
+        manifest: &BootManifest,
+        config: &str,
+        profile_text: &str,
+        template: &BootCommandLine,
+        mut request: PlanRequest,
+    ) -> Result<bool> {
+        let derive = |request: &PlanRequest| {
+            Self::create(image, manifest, config, profile_text, template, request)
+        };
+        if &derive(&request)? == expected {
+            return Ok(true);
+        }
+        Ok(request.retained_initramfs.take().is_some() && &derive(&request)? == expected)
+    }
+
     /// The strings must come from hash-checked manifest assets. The artifact
     /// builder below does that before calling this pure renderer. Device apply
     /// must derive board/profile/roots/target from live evidence under its lock.
@@ -206,12 +232,19 @@ impl BootPlan {
                 "unsupported board/profile or missing trial identity",
             ));
         }
+        // The canonical file is never rewritten when its bytes are unchanged,
+        // so the trial and staged normal boots can load it in place.
+        let shared_initramfs = request.retained_initramfs.is_some()
+            && manifest.files().get(INITRAMFS) == request.retained_initramfs.as_ref();
         let mut staged_assets = BTreeMap::new();
         let mut unchanged_firmware = BTreeMap::new();
         for (path, blob) in manifest.files() {
+            if path == INITRAMFS && shared_initramfs {
+                continue;
+            }
             if path == "kernel8.img"
                 || path == request.board.device_tree()
-                || path == "spacewars-recovery.cpio.gz"
+                || path == INITRAMFS
                 || path.starts_with("overlays/")
             {
                 staged_assets.insert(path.clone(), blob.clone());
@@ -233,12 +266,9 @@ impl BootPlan {
                 return Err(invalid("unsupported boot asset in bootstrap bundle"));
             }
         }
-        for required in [
-            "kernel8.img",
-            request.board.device_tree(),
-            "spacewars-recovery.cpio.gz",
-        ] {
-            if !staged_assets.contains_key(required) {
+        for required in ["kernel8.img", request.board.device_tree(), INITRAMFS] {
+            let shared = required == INITRAMFS && shared_initramfs;
+            if !staged_assets.contains_key(required) && !shared {
                 return Err(invalid("missing staged kernel, DTB or initramfs"));
             }
         }
@@ -286,11 +316,15 @@ impl BootPlan {
                     "bootstrap root configuration must apply to both boards",
                 ));
             }
-            if line == "initramfs spacewars-recovery.cpio.gz followkernel" {
+            if line == format!("initramfs {INITRAMFS} followkernel") {
                 initramfs += 1;
-                rendered.push_str(&format!(
-                    "initramfs /{STAGE_DIRECTORY}/spacewars-recovery.cpio.gz followkernel\n"
-                ));
+                if shared_initramfs {
+                    rendered.push_str(&format!("initramfs {INITRAMFS} followkernel\n"));
+                } else {
+                    rendered.push_str(&format!(
+                        "initramfs /{STAGE_DIRECTORY}/{INITRAMFS} followkernel\n"
+                    ));
+                }
             } else if line == "include spacewars-device.txt" {
                 include += 1;
                 rendered.push_str(&profile.join("\n"));
@@ -354,6 +388,9 @@ pub struct PlanRequest {
     pub roots: SlotRoots,
     pub target: Slot,
     pub trial_id: Sha256,
+    /// The boot partition's existing initramfs, when it has one. Device steps
+    /// derive it from the observed or bound original boot files.
+    pub retained_initramfs: Option<Blob>,
 }
 
 fn active_lines(text: &str) -> Result<Vec<String>> {

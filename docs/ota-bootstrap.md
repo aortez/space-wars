@@ -520,7 +520,11 @@ unprepared flashed recovery image, and requires its default root arguments to
 match the running root. Fresh-image inspection verifies the original image
 identity, complete boot manifest, loaded kernel, factory `/dev/...` default and
 `spacewars.trial=unprepared` selector. A canonical PARTUUID default, used trial
-selector, unknown boot file or mismatched image is not a fresh installation.
+selector, unknown boot file or mismatched image is not a fresh installation,
+unless a published retirement records exactly those boot files (see
+[Upgrade a provisioned unit's boot set](#upgrade-a-provisioned-units-boot-set)).
+The unprivileged probe cannot read that private record, so it fails on a retired
+unit; root's `bootstrap_check` performs the full inspection.
 An unfamiliar configuration or interrupted bootstrap needs explicit review.
 The report includes its `origin` and always says
 `root_preflight_complete: false`: unprivileged inspection does not establish
@@ -534,7 +538,8 @@ through selector changes. The old `boot_slot` file is only a legacy breadcrumb;
 it must be archived and removed after canonical confirmation, never used to choose
 the writable partition. Reobserve the selected device before preparing an
 attempt. A completed bootstrap with a production recovery baseline uses the
-ordinary OTA path; it must not be prepared again as a fresh device.
+ordinary OTA path; it must not be prepared again as a fresh device. A new boot
+set, which that path refuses, first retires the production records.
 
 ## Build the workstation package
 
@@ -551,6 +556,10 @@ cargo run --locked -p engine-ota --example bootstrap_package -- \
 
 The final argument is the inactive target slot: `b` when this example's current
 root is `a`. For the Picade, use `pi4 picade` and the slots/UUIDs from a fresh probe.
+Add `--retained-initramfs BYTES:SHA256` when the device's
+`spacewars-recovery.cpio.gz` has exactly the package's bytes. The trial then
+loads that existing file instead of a staged copy; see
+[Share an identical initramfs](#share-an-identical-initramfs).
 These command arguments are planning inputs; the eventual root apply command
 must derive them again from live evidence under the installation lock.
 
@@ -576,7 +585,7 @@ Files include:
 | `engine-os-manager` | Exact manager extracted from that filesystem, not executed by the builder |
 | `legacy-root/` | Fixed fallback-root replacement files extracted from that same filesystem |
 | `boot/` | Complete canonical boot assets and generated normal selectors |
-| `sw-bootstrap/` | One common kernel, selected board DTB, initramfs, overlays and staged command lines |
+| `sw-bootstrap/` | One common kernel, selected board DTB, overlays, staged command lines and, unless shared, the initramfs |
 | `trial-config.txt`, `normal-config.txt` | Explicit staged boot paths for the supervised migration |
 
 No device hostname, login key, host key, Wi-Fi credential or production signing
@@ -669,6 +678,8 @@ explicit reconciliation, and is never deleted or silently reinitialized.
 The existing `time`, `network`, `time-check` and `update-check` service stores
 are preserved, including scheduling history. Recovery, trust, staged updates,
 unknown entries and unsafe directory ownership or links still stop preparation.
+A provisioned unit retires those records first; see
+[Upgrade a provisioned unit's boot set](#upgrade-a-provisioned-units-boot-set).
 
 An active reservation blocks mutations through the **new** maintenance tools.
 New-image SSH initialization retains an existing access store and refuses to
@@ -796,13 +807,16 @@ verified export during explicit reconciliation; never overwrite its receipt.
 
 The fixed selection includes all `/data` children except
 `/data/spacewars-bootstrap` (the package and backups), `/data/logs` and
-`/data/spacewars/coredumps` (disposable diagnostics). This includes unknown new
+`/data/spacewars/coredumps` (disposable diagnostics), and each retirement's
+`bootstrap` directory, which holds an earlier attempt's package and exported
+backups. The retired production records are included. This includes unknown new
 user-data directories, settings, ROMs, network profiles, Bluetooth pairing,
 SSH host/login keys and device-service state. It also captures `/etc`, the
 root/runtime/administrator `.ssh` directories, `/var/lib/NetworkManager`, and the fixed legacy
 update helpers and units needed for migration recovery. An actual NetworkManager
 bind alias is captured once at its `/data` location; an unbound rootfs profile
-directory is retained separately. This selection is versioned in the receipt.
+directory is retained separately. This selection is versioned in the receipt;
+version 3 added the retirement exclusion, and version 2 receipts are refused.
 
 The result is a standard uncompressed tar archive, retaining numeric owners,
 modes, hard links, symlink targets, nanosecond modification times and extended
@@ -1213,14 +1227,44 @@ record or cleanup, leaving a consumed request and a volatile tryboot argument.
 An accepted job reply also does not prove reboot occurred. In any uncertain
 case, use the independent root/recovery connection to inspect the journal,
 current boot and pending reboot state before deciding how to recover. Do not
-delete the record, rerun activation, issue another tryboot or clear another
-operator's reboot request to manufacture a retry. No automatic reconciliation
-or retry is implemented for this supervised handoff.
+delete the record, rerun activation outside the retry below, issue another
+tryboot or clear another operator's reboot request to manufacture a retry. No
+automatic reconciliation or retry is implemented for this supervised handoff;
+the one explicit retry is described in
+[Retry after a hung first reboot](#retry-after-a-hung-first-reboot).
 
 Success reports only `reboot_job_accepted: true`; it does not establish trial
 health, normal-boot confirmation or physical qualification. Automatic updates
 remain disabled. The replacement Pi 5's failed and successful trials, and the
 primary Picade's successful trial, are recorded above.
+
+### Retry after a hung first reboot
+
+The 6.6 kernel's SD shutdown can hang the reboot into the trial (fixed upstream
+in 87a0d90f, which 6.12 carries). The watchdog is stopped by then, so only a
+power cycle recovers the unit. The firmware's tryboot flag does not survive it,
+and the unit starts its original system with the journal still
+`trial-requested`. Only in that state can the operator request the trial again:
+
+```sh
+engine-os-manager bootstrap-activate \
+  --package BUNDLE_SHA256 \
+  --written-root ROOT_INSTALL_SHA256 \
+  --trial TRIAL_ID \
+  --ssh-connection 'CLIENT_IP CLIENT_PORT SERVER_IP SERVER_PORT' \
+  --retry-interrupted-request REQUEST_BOOT_ID
+```
+
+`REQUEST_BOOT_ID` is the `request_boot_id` that `bootstrap_inspect_trial`
+reports. The power cycle clears runtime masks, so mask and stop the runtime
+services again first, as for the first request. The retry requires that the
+journal still names that request, that the current boot is neither that boot
+nor the staging boot, and every admission check of the first request. It records the interrupted request, which is then
+refused as a trial or normal boot, and consumes a new request from the current
+boot. An attempt allows three retries. A journal in any other phase, including a
+trial that recorded its boot, is never retried this way. A trial kernel that
+failed before recording its boot leaves the same state, so check the hang
+evidence before retrying; either way the unit returns to its original system.
 
 ## First-boot recovery runtime
 
@@ -1528,6 +1572,116 @@ archived `cd66877` image and schema-3 kits contain protocol 4 and the expanded
 fallback-root inventory, but predate the current network/download and provisioning
 code. Rebuild from current source for a new OTA preparation. Existing packages
 and reservations must never be relabeled to bypass protocol checks.
+
+## Upgrade a provisioned unit's boot set
+
+**Status 2026-11-05:** implemented and covered by workstation tests only. No
+unit has run it yet.
+
+An image whose boot identity differs from a unit's installed boot set is
+`ManualBootUpgrade`. A rootfs install cannot replace the kernel, device trees or
+initramfs, so the Updates panel and automatic installs refuse it. The move to
+the 6.12 kernel is the first such change. A provisioned unit takes it through
+the supervised bootstrap above after retiring its production records;
+re-flashing is the alternative.
+
+### Retire the production records
+
+Build `bootstrap_retire` from the same commit as the package's image:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_retire \
+  --target aarch64-unknown-linux-gnu
+```
+
+Run it as root from a normal boot of the unit's confirmed good image, with the
+kiosk and device-state service runtime-masked and stopped, as for the data
+backup:
+
+```sh
+bootstrap_retire GOOD_BUILD_ID
+```
+
+The argument confirms the good image that the recovery journal names; any other
+build stops the command before anything changes. It takes the install lock,
+refuses a tryboot, an active bootstrap or running writers, and opens the journal
+under the same authorization as other maintenance commands. It then moves, and
+never copies or deletes:
+
+- every `/data/spacewars-system` entry except the `network`, `time`,
+  `time-check` and `update-check` stores, which bootstrap preserves;
+- `completed` and `package` from `/data/spacewars-bootstrap`.
+
+They go into one private directory, `/data/spacewars-retired/ID`, beside a
+`retirement.json` record. It holds the boot ID and binding, the complete boot
+inventory, the journal fingerprint with its good slot and build, and the moved
+names. The record is published as `.ID.pending` before the first move. Each move
+is a no-replace rename with both directories flushed, and the lock, masked
+writers and boot are rechecked before each one. `completed` and `package` move
+first and the journal next, so a completed bootstrap never outlives its journal.
+A power loss clears the runtime masks, and kiosk startup then recreates a
+missing `install-handoff` store while the journal remains; once the journal has
+moved, no startup service recreates a moved entry. Links, hard-linked or group-
+or world-writable files, other filesystems, hidden names and an `active`
+reservation stop the command before it creates anything.
+
+Repeating the command finishes an interrupted retirement for the same boot set
+and journal, and reports a completed one with `resumed: true`. After a power
+loss, mask and stop the runtime services again first. If power failed just
+after the journal moved, the kiosk meanwhile holds the Updates screen at
+"Installation recovery needs attention" instead of the game. A `.ID.creating`
+directory is discarded only while it holds the command's own empty scratch.
+With no journal and no matching retirement the command refuses: lost production
+state is never treated as retired. Nothing restores retired records
+automatically; they remain for inspection.
+
+Afterwards bootstrap accepts the unit's canonical selectors, a PARTUUID default
+for the running slot and an unprepared or used trial selector, only while a
+published retirement records exactly the current boot files. A pending one
+authorizes nothing, and every other fresh-image check still applies. The earlier
+attempt's raw copies stay on `/data` inside the retirement, and the new attempt
+needs as much space again; `bootstrap_check` reports it as `data_required_bytes`
+(about 3.9 GB on the Picade card).
+
+### Share an identical initramfs
+
+A 150 MB boot partition can be too small for the staged trial set plus the
+canonical move. When the unit's `spacewars-recovery.cpio.gz` has the package's
+bytes, pass its size and SHA-256 from the device inventory to the package
+builder as `--retained-initramfs BYTES:SHA256`. The trial and staged normal
+configurations then load the existing file instead of a staged copy, and
+canonical migration leaves it in place. Device steps derive the plan again from
+the observed or bound original initramfs. They accept a shared plan only when
+those bytes match, and still accept a package that stages its own copy.
+
+The 6.12 build's initramfs is byte-identical to 6.6's (7,980,209 bytes).
+Estimated from the 6.12 test build, sharing it lowers sw-picade-2's boot
+requirement from about 75.5 MB to 67.6 MB, against 71.4 MB free.
+
+### Run order
+
+1. Build the image and the AArch64 tools from one clean commit. Its boot
+   identity and kernel build ID must match the Nightly that follows, or the
+   unit's first update after the upgrade is again a manual boot upgrade.
+2. Build the package for the unit's inactive slot, with `--retained-initramfs`
+   when it applies.
+3. Mask and stop the writers, run `bootstrap_retire`, then copy the package to
+   `/data/spacewars-bootstrap/package`.
+4. Continue with the ordinary sequence: check, prepare, raw copies, data backup,
+   fallback-root preservation and replacement, access check, root installation,
+   boot staging and activation. If the first reboot hangs, power-cycle the unit
+   and follow [Retry after a hung first reboot](#retry-after-a-hung-first-reboot).
+5. Complete the trial, staged normal boot, canonical preparation, activation and
+   normal boot, and finalization.
+6. Provision updates again as in
+   [Supervised OTA state provisioning](ota-updates.md#supervised-ota-state-provisioning);
+   the earlier `ota-bootstrap.json` was retired with the other records. Then
+   build the unit's install approval again, since the earlier one binds the old
+   kernel build ID.
+
+The original root is the fallback until canonical migration. It has the old
+boot set's kernel modules, so the new baseline never names it as a retained
+image.
 
 ## Validation
 

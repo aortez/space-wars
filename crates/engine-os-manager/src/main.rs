@@ -36,6 +36,10 @@ enum Command {
         /// The four original SSH_CONNECTION fields, quoted as one argument.
         #[arg(long)]
         ssh_connection: String,
+        /// Boot ID of an earlier request that came back to the original default
+        /// without a trial, such as a hung reboot that was power-cycled.
+        #[arg(long)]
+        retry_interrupted_request: Option<String>,
     },
     /// Run the root-owned device service (normally started by systemd).
     Serve,
@@ -282,6 +286,7 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             written_root,
             trial,
             ssh_connection,
+            retry_interrupted_request,
         } => {
             daemon::require_root()?;
             let digest = |value: String| {
@@ -293,6 +298,7 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                 digest(written_root)?,
                 digest(trial)?,
                 &ssh_connection,
+                retry_interrupted_request.as_deref(),
             )?;
             println!("{}", serde_json::to_string(&report)?);
         }

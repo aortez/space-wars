@@ -11,6 +11,7 @@ pub(super) fn request(board: Board, profile: &str, target: Slot) -> PlanRequest 
         target,
         roots: SlotRoots::new("076c4a2a-02".into(), "076c4a2a-03".into()).unwrap(),
         trial_id: Sha256::digest(b"supervised attempt"),
+        retained_initramfs: None,
     }
 }
 
@@ -77,13 +78,29 @@ impl Assets {
             &self.image,
             &self.manifest,
             CONFIG,
-            std::str::from_utf8(
-                &self.contents[&format!("spacewars-profiles/{}.txt", request.profile)],
-            )
-            .unwrap(),
+            self.profile(request),
             &BootCommandLine::parse(TEMPLATE).unwrap(),
             request,
         )
+    }
+
+    fn profile(&self, request: &PlanRequest) -> &str {
+        std::str::from_utf8(&self.contents[&format!("spacewars-profiles/{}.txt", request.profile)])
+            .unwrap()
+    }
+
+    fn derives(&self, expected: &BootPlan, request: PlanRequest) -> bool {
+        let profile = self.profile(&request).to_owned();
+        BootPlan::derives(
+            expected,
+            &self.image,
+            &self.manifest,
+            CONFIG,
+            &profile,
+            &BootCommandLine::parse(TEMPLATE).unwrap(),
+            request,
+        )
+        .unwrap()
     }
 }
 
@@ -645,5 +662,70 @@ pub(crate) mod linux {
             assert!(fixture.build().is_err(), "{commands}");
             assert!(!fixture.output().exists());
         }
+    }
+}
+
+#[test]
+fn an_identical_initramfs_is_shared_with_the_trial_instead_of_staged() {
+    let assets = Assets::new();
+    let bytes = &assets.contents[INITRAMFS];
+    let initramfs = Blob {
+        bytes: bytes.len() as u64,
+        sha256: Sha256::digest(bytes),
+    };
+    for board in [Board::Pi4, Board::Pi5] {
+        let mut planned = request(board, "hdmi", Slot::A);
+        let staged = assets.plan(&planned).unwrap();
+        planned.retained_initramfs = Some(initramfs.clone());
+        let shared = assets.plan(&planned).unwrap();
+        assert!(staged.staged_assets.contains_key(INITRAMFS));
+        assert!(!shared.staged_assets.contains_key(INITRAMFS));
+        assert_eq!(
+            shared.staged_asset_bytes + initramfs.bytes,
+            staged.staged_asset_bytes
+        );
+        for config in [&shared.trial_config, &shared.normal_config] {
+            assert!(config.contains("\ninitramfs spacewars-recovery.cpio.gz followkernel\n"));
+            assert!(!config.contains("/sw-bootstrap/spacewars-recovery"));
+        }
+        assert_eq!(
+            shared.trial_config.replace(
+                "initramfs spacewars-recovery.cpio.gz",
+                "initramfs /sw-bootstrap/spacewars-recovery.cpio.gz"
+            ),
+            staged.trial_config
+        );
+        // A device with the same bytes accepts either package; a device with
+        // different bytes, or none, accepts only the staged one.
+        assert!(assets.derives(
+            &shared,
+            request(board, "hdmi", Slot::A).with(Some(&initramfs))
+        ));
+        assert!(assets.derives(
+            &staged,
+            request(board, "hdmi", Slot::A).with(Some(&initramfs))
+        ));
+        let older = Blob {
+            bytes: initramfs.bytes,
+            sha256: Sha256::digest(b"an older initramfs"),
+        };
+        for device in [Some(&older), None] {
+            assert!(!assets.derives(&shared, request(board, "hdmi", Slot::A).with(device)));
+            assert!(assets.derives(&staged, request(board, "hdmi", Slot::A).with(device)));
+        }
+        planned.retained_initramfs = Some(older);
+        assert_eq!(assets.plan(&planned).unwrap(), staged);
+        // Sharing never excuses any other difference.
+        assert!(!assets.derives(
+            &shared,
+            request(board, "hdmi", Slot::B).with(Some(&initramfs))
+        ));
+    }
+}
+
+impl PlanRequest {
+    fn with(mut self, initramfs: Option<&Blob>) -> Self {
+        self.retained_initramfs = initramfs.cloned();
+        self
     }
 }
