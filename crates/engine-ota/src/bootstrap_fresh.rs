@@ -1,10 +1,13 @@
 //! Recognize an unprepared flashed image, not a provisioned device whose state
 //! was lost. The original manifest and image identity remain bound across staging.
+//! A provisioned image's canonical selectors qualify only after its production
+//! records were explicitly retired with this exact boot inventory.
 use super::{BootstrapOrigin, active_lines, inspect::running_selection, invalid};
 use crate::boot::{
     BootCommandLine, BootManifest, MAX_BOOT_MANIFEST_BYTES, MUTABLE_BOOT_FILES,
-    OPTIONAL_BOOT_FILES, UNPREPARED_TRIAL,
+    OPTIONAL_BOOT_FILES, SlotRoots, UNPREPARED_TRIAL,
 };
+use crate::recovery::Slot;
 use crate::{Blob, ImageIdentity, Result, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -23,6 +26,8 @@ pub(super) fn check_image(image: &ImageIdentity) -> Result<()> {
 
 /// `files` is the retained inventory, reconstructed only under a durable stage
 /// intent. Reads must be bounded and checked against that inventory by the caller.
+/// `retired` carries the root pair and running slot when a published retirement
+/// describes `files`; the default must then be the canonical running root.
 pub(super) fn inspect(
     image: ImageIdentity,
     files: &BTreeMap<String, Blob>,
@@ -30,6 +35,7 @@ pub(super) fn inspect(
     kernel: &str,
     running: &str,
     read: &impl Fn(&str, u64) -> Result<Vec<u8>>,
+    retired: Option<(&SlotRoots, Slot)>,
 ) -> Result<BootstrapOrigin> {
     check_image(&image)?;
     let manifest = BootManifest::parse(
@@ -56,8 +62,17 @@ pub(super) fn inspect(
             "fresh boot assets differ from the installed image manifest",
         ));
     }
+    let template = read("spacewars-cmdline.txt", 4096)?;
+    let parsed = BootCommandLine::parse(&template)?;
+    let trial = read("spacewars-trial.txt", 8192)?;
+    // A retired unit's last production trial selector is inert: bootstrap
+    // replaces the factory tryboot before any trial and resets it canonically.
+    let trial_accepted = match retired {
+        Some((roots, _)) => parsed.trial(roots, &trial).is_ok(),
+        None => trial == UNPREPARED_TRIAL.as_bytes(),
+    };
     if read("spacewars-boot-id", 65)? != format!("{}\n", image.boot_identity).as_bytes()
-        || read("spacewars-trial.txt", 8192)? != UNPREPARED_TRIAL.as_bytes()
+        || !trial_accepted
         || read("spacewars-kernel-build-id", 41)? != format!("{kernel}\n").as_bytes()
     {
         return Err(invalid(
@@ -88,17 +103,17 @@ pub(super) fn inspect(
     {
         return Err(invalid("fresh image has an unsupported trial selector"));
     }
-    let template = read("spacewars-cmdline.txt", 4096)?;
-    BootCommandLine::parse(&template)?;
     let template =
         std::str::from_utf8(&template).map_err(|_| invalid("invalid fresh command line"))?;
     let default = read("cmdline.txt", 4096)?;
     let default = std::str::from_utf8(&default).map_err(|_| invalid("invalid fresh default"))?;
-    let expected = template.replace("@SPACEWARS_ROOT@", &format!("/dev/{active}"));
-    if default
-        .split_ascii_whitespace()
-        .ne(expected.split_ascii_whitespace())
-    {
+    let selects_running = match retired {
+        Some((roots, slot)) => parsed.default_slot(roots, default.as_bytes()).ok() == Some(slot),
+        None => default.split_ascii_whitespace().eq(template
+            .replace("@SPACEWARS_ROOT@", &format!("/dev/{active}"))
+            .split_ascii_whitespace()),
+    };
+    if !selects_running {
         return Err(invalid(
             "fresh default is already provisioned or selects another root",
         ));

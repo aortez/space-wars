@@ -67,10 +67,13 @@ pub fn stage_bootstrap_boot(
 
 /// Activate only an already completed stage. All claims and locks stay held
 /// while the trusted root-operator caller requests the fixed systemd reboot.
+/// `retry` names the boot of an earlier request that came back to the original
+/// default without a trial, for example after a hung reboot was power-cycled.
 pub fn activate_bootstrap_boot(
     expected: Sha256,
     written_root: Sha256,
     trial_id: Sha256,
+    retry: Option<&str>,
     connection: bootstrap::SshCheckConnection,
     mut report: impl FnMut(BootStageProgress),
     request: impl FnOnce(&mut bootstrap::TrialActivation<'_>) -> Result<()>,
@@ -80,10 +83,13 @@ pub fn activate_bootstrap_boot(
         Selection::Activate {
             written_root,
             trial_id,
+            retry: retry.map(str::to_owned),
         },
         connection,
         &mut report,
-        |store, _, boot_id, guard| bootstrap::activation::run(store, boot_id, guard, request),
+        |store, _, boot_id, guard| {
+            bootstrap::activation::run(store, boot_id, retry, guard, request)
+        },
     )
 }
 
@@ -97,6 +103,7 @@ enum Selection {
     Activate {
         written_root: Sha256,
         trial_id: Sha256,
+        retry: Option<String>,
     },
 }
 
@@ -121,9 +128,13 @@ fn operate<T>(
         bootstrap::quiesce::QuietRuntime::for_activation()?
     };
     let mut store = TrialStore::for_staging(&lock)?;
+    let retry = match &selection {
+        Selection::Activate { retry, .. } => retry.clone(),
+        Selection::Stage { .. } => None,
+    };
     let previous = store
         .as_ref()
-        .map(|store| staging_inputs(store).cloned())
+        .map(|store| staging_inputs(store, retry.as_deref()).cloned())
         .transpose()?;
     let (raw_copies, data_copy, originals, written_root) = match selection {
         Selection::Stage {
@@ -135,12 +146,20 @@ fn operate<T>(
         Selection::Activate {
             written_root,
             trial_id,
+            retry,
         } => {
             let store = store
                 .as_ref()
                 .ok_or_else(|| invalid("activation requires an existing ready stage"))?;
             let inputs = store.durable()?;
-            if inputs.phase != TrialPhase::TrialReady
+            let admitted = match &retry {
+                None => inputs.phase == TrialPhase::TrialReady,
+                Some(interrupted) => {
+                    inputs.phase == TrialPhase::TrialRequested
+                        && inputs.request_boot_id() == Some(interrupted.as_str())
+                }
+            };
+            if !admitted
                 || inputs.inputs.binding.package_sha256 != expected
                 || inputs.inputs.root_install_sha256 != written_root
                 || inputs.inputs.plan.trial_id != trial_id
@@ -343,10 +362,11 @@ fn operate<T>(
     let store = store
         .as_mut()
         .ok_or_else(|| invalid("staging journal disappeared"))?;
-    if staging_inputs(store)? != &inputs {
+    if staging_inputs(store, retry.as_deref())? != &inputs {
         return Err(invalid("staging inputs changed"));
     }
-    if store.phase() == TrialPhase::TrialReady {
+    // A named interrupted request was staged completely before it was consumed.
+    if store.phase() == TrialPhase::TrialReady || retry.is_some() {
         bootstrap::trial_files::TrialBootFiles::open(boot.try_clone()?, 0, inputs.clone())?;
     } else {
         if !staging {
@@ -366,7 +386,7 @@ fn operate<T>(
             },
             |point| {
                 guard()?;
-                if staging_inputs(store)? != &inputs {
+                if staging_inputs(store, None)? != &inputs {
                     return Err(invalid("staging journal changed"));
                 }
                 report(BootStageProgress::Preparing(point.into()));
@@ -399,9 +419,17 @@ fn operate<T>(
     })
 }
 
-fn staging_inputs(store: &TrialStore) -> Result<&bootstrap::trial::TrialInputs> {
+/// A named interrupted request is the only requested attempt staging inputs
+/// may come from; its staged files must still be exactly the ready set.
+fn staging_inputs<'a>(
+    store: &'a TrialStore,
+    retry: Option<&str>,
+) -> Result<&'a bootstrap::trial::TrialInputs> {
     let record = store.durable()?;
-    if !matches!(record.phase, TrialPhase::Staging | TrialPhase::TrialReady) {
+    let interrupted = retry.is_some_and(|retry| {
+        record.phase == TrialPhase::TrialRequested && record.request_boot_id() == Some(retry)
+    });
+    if !matches!(record.phase, TrialPhase::Staging | TrialPhase::TrialReady) && !interrupted {
         return Err(invalid(
             "bootstrap has already requested or observed a trial",
         ));

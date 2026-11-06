@@ -177,6 +177,10 @@ impl TrialStore {
     pub fn failure(&self) -> Option<super::TrialFailure> {
         self.record.failure
     }
+    /// The boot that consumed the current request, needed to name a retry.
+    pub fn request_boot_id(&self) -> Option<&str> {
+        self.record.request_boot_id()
+    }
 
     pub fn canonical_phase(&self) -> Option<super::CanonicalPhase> {
         self.record.canonical.as_ref().map(|c| c.phase)
