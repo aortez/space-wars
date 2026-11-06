@@ -88,6 +88,23 @@ impl Fixture {
     fn retired_boot(&self, files: &BTreeMap<String, Blob>) -> Result<bool> {
         retired_boot(&self.data(), self.owner, files)
     }
+
+    /// A boot drops the runtime masks. Kiosk startup reconciliation
+    /// (`install_reconcile::native_locked`, unchanged since Release generation
+    /// 20) then creates an absent handoff store whenever the recovery journal
+    /// exists and no bootstrap is active.
+    fn reboot(&self) {
+        let journal = self.path("spacewars-system/recovery").exists();
+        let unguarded =
+            super::super::state::require_no_active_under(&self.data(), self.owner).is_ok();
+        if journal && unguarded && !self.path("spacewars-system/install-handoff").exists() {
+            self.directory("spacewars-system/install-handoff");
+            self.file(
+                "spacewars-system/install-handoff/state.json",
+                b"startup journal",
+            );
+        }
+    }
 }
 
 fn boot_files(default: &[u8]) -> BTreeMap<String, Blob> {
@@ -130,6 +147,10 @@ const GOOD: &str = "rootfs-good";
 
 // Seven moves, plus the guard before planning and the one before publication.
 const GUARD_CALLS: usize = 9;
+
+// The guard call before the journal's move, which follows the two bootstrap
+// entries'.
+const JOURNAL_MOVE: usize = 4;
 
 #[test]
 fn a_mistaken_good_image_confirmation_stops_before_anything_changes() {
@@ -211,9 +232,9 @@ fn an_interrupted_retirement_finishes_from_every_checkpoint() {
         if stop > 1 {
             assert!(fixture.retired_boot(&evidence(true).boot_files).is_err());
         }
-        // The journal moves last, so it stays until every other entry moved.
+        // The journal moves right after the bootstrap entries.
         let journal = fixture.path("spacewars-system/recovery").exists();
-        assert_eq!(journal, stop < GUARD_CALLS, "{stop}");
+        assert_eq!(journal, stop <= JOURNAL_MOVE, "{stop}");
         assert_eq!(
             fixture.path("spacewars-bootstrap/completed").exists(),
             stop < 3,
@@ -231,6 +252,22 @@ fn an_interrupted_retirement_finishes_from_every_checkpoint() {
                 .exists()
         );
         assert!(fixture.retired_boot(&evidence(true).boot_files).unwrap());
+    }
+}
+
+#[test]
+fn a_reboot_at_any_checkpoint_leaves_the_retirement_resumable() {
+    for stop in 1..=GUARD_CALLS {
+        let fixture = Fixture::new();
+        assert!(fixture.interrupt(&evidence(true), stop).is_err(), "{stop}");
+        fixture.reboot();
+        let mut later = evidence(fixture.path("spacewars-system/recovery").exists());
+        later.boot_id = "7c1f0a52-5b7e-4d83-a2f4-0e9c6d1b3a57".into();
+        let (record, _, _) = fixture
+            .retire(&later)
+            .unwrap_or_else(|error| panic!("{stop}: {error:?}"));
+        assert_eq!(record.system.len(), 5, "{stop}");
+        assert_eq!(fixture.names("spacewars-system"), PRESERVED, "{stop}");
     }
 }
 

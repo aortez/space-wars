@@ -31,8 +31,9 @@ const MAX_ENTRIES: usize = 64;
 const MAX_RETIREMENTS: usize = 64;
 const ID_LENGTH: usize = 16;
 
-/// What was retired and the boot set it described. The production journal is
-/// the last entry moved, so a completed bootstrap never outlives its journal.
+/// What was retired and the boot set it described. The production journal
+/// moves right after the bootstrap entries, so a completed bootstrap never
+/// outlives it and kiosk startup never recreates a store that already moved.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Retirement {
@@ -126,20 +127,23 @@ impl Retirement {
         Ok(Sha256::digest(&serde_json::to_vec(self)?).to_string()[..ID_LENGTH].to_owned())
     }
 
-    /// Bootstrap state first and the production journal last.
+    /// Bootstrap state, then the production journal, then the rest. A reboot
+    /// drops the runtime masks, and kiosk startup recreates a moved install
+    /// handoff store while the journal remains; once it moves, startup creates
+    /// nothing.
     fn moves(&self) -> Vec<(&'static str, &'static str, &str)> {
         let mut moves: Vec<_> = self
             .bootstrap
             .iter()
             .map(|entry| (super::device::DIRECTORY, BOOTSTRAP, entry.as_str()))
             .collect();
+        moves.push((SYSTEM_DIRECTORY, SYSTEM, RECOVERY));
         moves.extend(
             self.system
                 .iter()
                 .filter(|entry| *entry != RECOVERY)
                 .map(|entry| (SYSTEM_DIRECTORY, SYSTEM, entry.as_str())),
         );
-        moves.push((SYSTEM_DIRECTORY, SYSTEM, RECOVERY));
         moves
     }
 

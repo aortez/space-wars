@@ -1617,13 +1617,19 @@ They go into one private directory, `/data/spacewars-retired/ID`, beside a
 inventory, the journal fingerprint with its good slot and build, and the moved
 names. The record is published as `.ID.pending` before the first move. Each move
 is a no-replace rename with both directories flushed, and the lock, masked
-writers and boot are rechecked before each one. The journal moves last, so a
-completed bootstrap never outlives its journal. Links, hard-linked or group- or
-world-writable files, other filesystems, hidden names and an `active`
+writers and boot are rechecked before each one. `completed` and `package` move
+first and the journal next, so a completed bootstrap never outlives its journal.
+A power loss clears the runtime masks, and kiosk startup then recreates a
+missing `install-handoff` store while the journal remains; once the journal has
+moved, no startup service recreates a moved entry. Links, hard-linked or group-
+or world-writable files, other filesystems, hidden names and an `active`
 reservation stop the command before it creates anything.
 
 Repeating the command finishes an interrupted retirement for the same boot set
-and journal, and reports a completed one with `resumed: true`. A `.ID.creating`
+and journal, and reports a completed one with `resumed: true`. After a power
+loss, mask and stop the runtime services again first. If power failed just
+after the journal moved, the kiosk meanwhile holds the Updates screen at
+"Installation recovery needs attention" instead of the game. A `.ID.creating`
 directory is discarded only while it holds the command's own empty scratch.
 With no journal and no matching retirement the command refuses: lost production
 state is never treated as retired. Nothing restores retired records
