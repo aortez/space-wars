@@ -90,9 +90,13 @@ and its laser requests as the fallback and the weapons.
 `LearnedTransferHost` flies either kind: a leg's identity is its kind,
 start and planet, so the climb and the transfer of one launch are two
 attempts of the stack, and the telemetry counts climb legs and the ticks
-flown on them beside the transfer legs. The HUD line reads "climb" instead
-of "stack" while a climb is flown, and the seat trace carries the leg's
-kind.
+flown on them beside the transfer legs. Each kind keeps its own last leg,
+so a transfer withdrawn at a touchdown and published again after the
+launch's climb is a resumption, not a second leg; the host counted it as a
+second leg until 2026-11-07, so the resumption counts in the archived
+summaries of this report and LF-099's are low by those cases, which no
+reported figure uses. The HUD line reads "climb" instead of "stack" while a
+climb is flown, and the seat trace carries the leg's kind.
 
 A diagnostic switch on the host, `set_contact_handback` (the match
 harness's `SPACEWARS_MATCH_CONTACT_HANDBACK`), leaves to the pilot's own

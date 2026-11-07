@@ -46,7 +46,8 @@ pub struct LearnedTransferTelemetry {
     /// Climb legs published, out of the launch band or for a firing pass;
     /// a climb interrupted and taken up again is another.
     pub climbs: u32,
-    /// Times a withdrawn leg was published again for the same destination.
+    /// Times a withdrawn leg was published again for the same destination,
+    /// whether or not a climb came between.
     pub resumptions: u32,
     /// Attempts the stack started: one per leg, and another when a withdrawn
     /// leg resumes, an attempt ends at its goal or deadline, or the stack
@@ -83,8 +84,11 @@ struct ActiveLeg {
 struct Seat {
     driver: FlightStackDriver,
     active: Option<ActiveLeg>,
-    /// The last leg's identity, for counting legs across withdrawals.
-    last_leg: Option<(LegKind, u64, usize)>,
+    /// The last transfer leg's start tick and destination, for counting legs
+    /// across withdrawals and the climbs between them.
+    last_transfer: Option<(u64, usize)>,
+    /// The last climb leg's start tick and planet, as above.
+    last_climb: Option<(u64, usize)>,
     telemetry: LearnedTransferTelemetry,
 }
 
@@ -112,7 +116,8 @@ impl LearnedTransferHost {
                     Ok(Seat {
                         driver: FlightStackDriver::new(seat)?,
                         active: None,
-                        last_leg: None,
+                        last_transfer: None,
+                        last_climb: None,
                         telemetry: LearnedTransferTelemetry::default(),
                     })
                 })
@@ -200,13 +205,20 @@ impl LearnedTransferHost {
         }
         let entry = &mut self.seats[seat];
         let identity = (leg.kind, leg.started_tick, leg.target);
-        if entry.last_leg != Some(identity) {
-            match leg.kind {
-                LegKind::Transfer => entry.telemetry.legs += 1,
-                LegKind::Climb => entry.telemetry.climbs += 1,
-            }
-            entry.last_leg = Some(identity);
-        } else if entry.active.is_none() {
+        // Each kind keeps its own last leg, so a climb between a transfer's
+        // withdrawal and its return leaves the return a resumption.
+        let (last, published) = match leg.kind {
+            LegKind::Transfer => (&mut entry.last_transfer, &mut entry.telemetry.legs),
+            LegKind::Climb => (&mut entry.last_climb, &mut entry.telemetry.climbs),
+        };
+        if *last != Some((leg.started_tick, leg.target)) {
+            *published += 1;
+            *last = Some((leg.started_tick, leg.target));
+        } else if entry
+            .active
+            .as_ref()
+            .is_none_or(|a| (a.kind, a.started_tick, a.target) != identity)
+        {
             entry.telemetry.resumptions += 1;
         }
         let continuing = entry.active.as_ref().is_some_and(|a| {
@@ -319,6 +331,7 @@ mod tests {
     use crate::mission_pilot::MissionGoal;
     use crate::mission_policy::{MissionBot, MissionPolicy};
     use engine_common::Scenario;
+    use engine_core::Vec2;
     use scenario_spacewars::surface_sortie::SurfaceSortieScenario;
     use std::time::Duration;
 
@@ -441,6 +454,63 @@ mod tests {
                 .events
                 .iter()
                 .any(|e| e.kind == "arrived" && e.tick as usize <= handoff + 1)
+        );
+    }
+
+    /// The leg bookkeeping across a climb: a transfer withdrawn, a climb out
+    /// of the band, then the same transfer again is one leg resumed, not two
+    /// legs. The legs are synthetic, flown from the match's first ticks.
+    #[test]
+    fn a_climb_between_a_transfers_withdrawal_and_its_return_leaves_one_leg_resumed() {
+        let seat = 0;
+        let mut state = SurfaceSortieScenario::init_material_match(42);
+        let mut host = LearnedTransferHost::new(1).unwrap();
+        // The first step synchronizes the flight geometry the stack reads.
+        for _ in 0..2 {
+            let actions = host.actions(seat, &mut state, None, CombatIntent::default());
+            SurfaceSortieScenario::step(&mut state, &actions, STEP);
+        }
+        let start = state.tick();
+        let goal =
+            state.free_flight_observation(seat).unwrap().ship.position + Vec2::new(0.0, 200.0);
+        let leg = |kind, tick, started_tick| FlightLeg {
+            kind,
+            tick,
+            started_tick,
+            target: 0,
+            goal,
+            goal_velocity: Vec2::ZERO,
+            distance: 200.0,
+        };
+        // The transfer selected on the first tick flies three ticks and is
+        // withdrawn for two; a climb begun on the sixth flies three; the
+        // transfer returns on the tick after the climb's last.
+        for offset in 0..11u64 {
+            let tick = start + offset;
+            let published = match offset {
+                0..=2 | 8..=10 => Some(leg(LegKind::Transfer, tick, start)),
+                3 | 4 => None,
+                _ => Some(leg(LegKind::Climb, tick, start + 5)),
+            };
+            let actions = host.actions(seat, &mut state, published, CombatIntent::default());
+            assert_eq!(
+                host.flying(seat),
+                published.is_some(),
+                "tick {tick}: {:?}",
+                host.telemetry(seat)
+            );
+            SurfaceSortieScenario::step(&mut state, &actions, STEP);
+        }
+        let telemetry = host.telemetry(seat);
+        assert_eq!(
+            (
+                telemetry.legs,
+                telemetry.climbs,
+                telemetry.resumptions,
+                telemetry.attempts
+            ),
+            (1, 1, 1, 3),
+            "{telemetry:?}"
         );
     }
 }
