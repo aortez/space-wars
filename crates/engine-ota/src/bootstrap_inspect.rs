@@ -128,6 +128,15 @@ pub(super) fn inspect_staging(
         Ok(bytes)
     };
     let origin = if files.contains_key("spacewars-boot-manifest.json") {
+        // Canonical selectors are accepted only with an explicit retirement.
+        let roots = if super::retire::retired_boot(&data, 0, &files)? {
+            Some(crate::boot::SlotRoots::new(
+                layout.partitions[1].partuuid.clone(),
+                layout.partitions[2].partuuid.clone(),
+            )?)
+        } else {
+            None
+        };
         super::fresh::inspect(
             crate::ImageIdentity::read_installed()?,
             &files,
@@ -135,6 +144,7 @@ pub(super) fn inspect_staging(
             &kernel,
             &text("/proc/cmdline", 16 * 1024)?,
             &contents,
+            roots.as_ref().map(|roots| (roots, layout.active)),
         )?
     } else {
         if files.contains_key("tryboot.txt") {
@@ -215,6 +225,16 @@ pub(super) fn inspect_staging(
         },
         credit,
     ))
+}
+
+/// The complete inventory of the checked boot mount, for retirement records.
+pub(super) fn boot_inventory(layout: &DiskLayout) -> Result<BTreeMap<String, Blob>> {
+    let root = open_directory(Path::new("/"), 0)?;
+    let boot = open_at(&root, "boot", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+    check_mount(&boot, layout, false)?;
+    let mut files = BTreeMap::new();
+    inventory(&boot, "", boot.metadata()?.dev(), 0, &mut files, &mut 0)?;
+    Ok(files)
 }
 
 fn legacy_selection(config: &str, default: &[u8], running: &str, active: &str) -> Result<()> {

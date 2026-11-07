@@ -79,6 +79,9 @@ impl TrialInputs {
     }
 }
 
+/// Each retry needs a power cycle beside the unit; a few are enough.
+const MAX_INTERRUPTED_REQUESTS: usize = 3;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TrialPhase {
@@ -109,6 +112,10 @@ pub(super) struct TrialRecord {
     pub inputs: TrialInputs,
     pub phase: TrialPhase,
     request_boot_id: Option<String>,
+    /// Earlier requests that came back to the original default without a
+    /// trial, such as a reboot that hung and was power-cycled.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    interrupted_requests: Vec<String>,
     trial_boot_id: Option<String>,
     trial_health: Option<HealthProof>,
     normal_boot_id: Option<String>,
@@ -135,6 +142,7 @@ impl TrialRecord {
             inputs,
             phase: TrialPhase::Staging,
             request_boot_id: None,
+            interrupted_requests: Vec::new(),
             trial_boot_id: None,
             trial_health: None,
             normal_boot_id: None,
@@ -162,8 +170,12 @@ impl TrialRecord {
                 crate::recovery::boot_id(id)
                     && id != &self.inputs.origin_boot_id
                     && Some(id) != self.request_boot_id.as_ref()
+                    && !self.interrupted_requests.contains(id)
             })
         };
+        let mut interrupted = self.interrupted_requests.clone();
+        interrupted.sort();
+        interrupted.dedup();
         let valid_health = |normal, id: &Option<String>, proof: &Option<HealthProof>| {
             proof.as_ref().is_none_or(|proof| {
                 id.as_ref()
@@ -190,6 +202,12 @@ impl TrialRecord {
         };
         if self.schema != 4
             || !shape
+            || interrupted.len() != self.interrupted_requests.len()
+            || self.interrupted_requests.len() > MAX_INTERRUPTED_REQUESTS
+            || (!self.interrupted_requests.is_empty() && !requested)
+            || self.interrupted_requests.iter().any(|id| {
+                !crate::recovery::boot_id(id) || Some(id) == self.request_boot_id.as_ref()
+            })
             || (!matches!(self.phase, TrialPhase::Staging | TrialPhase::TrialReady) && !requested)
             || self
                 .request_boot_id
@@ -256,6 +274,31 @@ impl TrialRecord {
         self.validate()
     }
 
+    /// Request again after an earlier request returned to the original default
+    /// without starting a trial. The caller has rechecked the device from this
+    /// later normal boot of the original root; the old request stays recorded.
+    pub(super) fn retry_request(&mut self, interrupted: &str, boot_id: &str) -> Result<()> {
+        self.validate()?;
+        if self.phase != TrialPhase::TrialRequested
+            || self.request_boot_id.as_deref() != Some(interrupted)
+            || interrupted == boot_id
+            || boot_id == self.inputs.origin_boot_id
+            || !crate::recovery::boot_id(boot_id)
+            || self.interrupted_requests.len() >= MAX_INTERRUPTED_REQUESTS
+        {
+            return Err(invalid(
+                "bootstrap retry requires an interrupted request from an earlier boot",
+            ));
+        }
+        self.interrupted_requests.push(interrupted.into());
+        self.request_boot_id = Some(boot_id.into());
+        self.validate()
+    }
+
+    pub(super) fn request_boot_id(&self) -> Option<&str> {
+        self.request_boot_id.as_deref()
+    }
+
     pub(super) fn authorize_request(&self, boot_id: &str) -> Result<()> {
         self.validate()?;
         if self.phase != TrialPhase::TrialRequested
@@ -287,6 +330,7 @@ impl TrialRecord {
             || !crate::recovery::boot_id(&boot.boot_id)
             || boot.boot_id == self.inputs.origin_boot_id
             || self.request_boot_id.as_ref() == Some(&boot.boot_id)
+            || self.interrupted_requests.contains(&boot.boot_id)
             || boot.actual_slot != Some(self.inputs.plan.target)
             || boot.actual_build_id.as_deref() != Some(self.inputs.image.build_id.as_str())
             || boot.recovery_protocol != self.inputs.image.recovery_protocol

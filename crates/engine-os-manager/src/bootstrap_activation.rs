@@ -11,6 +11,7 @@ pub fn activate(
     written_root: Sha256,
     trial: Sha256,
     ssh_connection: &str,
+    retry: Option<&str>,
 ) -> Result<BootActivationReport> {
     // Also enforced by the library install lock, before opening installed paths.
     if unsafe { libc::geteuid() } != 0 {
@@ -21,6 +22,7 @@ pub fn activate(
         package,
         written_root,
         trial,
+        retry,
         connection,
         |stage| {
             eprintln!(

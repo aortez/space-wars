@@ -28,6 +28,16 @@ pub(super) const DATA_EXCLUSIONS: &[&str] = &[
     "data/logs",
     "data/spacewars/coredumps",
 ];
+/// A retirement's bootstrap state holds the earlier attempt's raw recovery
+/// copies, exported when that attempt ran. Its production records stay included.
+fn excluded(path: &str) -> bool {
+    DATA_EXCLUSIONS.contains(&path)
+        || path
+            .strip_prefix(&format!("data/{}/", super::retire::DIRECTORY))
+            .and_then(|rest| rest.strip_suffix("/bootstrap"))
+            .is_some_and(|retirement| !retirement.contains('/'))
+}
+
 const ROOT_PATHS: &[&str] = &[
     "etc",
     "root/.ssh",
@@ -271,7 +281,7 @@ impl Walk<'_> {
             }
             for component in names {
                 let child_path = format!("{path}/{component}");
-                if DATA_EXCLUSIONS.contains(&child_path.as_str()) {
+                if excluded(&child_path) {
                     continue;
                 }
                 let child = open_at(&file, &component, libc::O_PATH, 0)?;

@@ -58,6 +58,15 @@ impl Fixture {
     }
 
     fn inspect_on(&self, active: &str, running: Option<&str>) -> Result<BootstrapOrigin> {
+        self.inspect_with(active, running, None)
+    }
+
+    fn inspect_with(
+        &self,
+        active: &str,
+        running: Option<&str>,
+        retired: Option<(&SlotRoots, Slot)>,
+    ) -> Result<BootstrapOrigin> {
         let files = self
             .contents
             .iter()
@@ -88,6 +97,7 @@ impl Fixture {
                 }
                 Ok(bytes.clone())
             },
+            retired,
         )
     }
 }
@@ -225,4 +235,75 @@ fn manifest_identity_alone_does_not_authorize_different_firmware_selectors() {
         );
         assert!(fixture.inspect(None).is_err(), "{path}");
     }
+}
+
+/// A provisioned card after a production install: canonical default on B and
+/// the last update's selector for A, as on sw-picade-2.
+fn provisioned(trial: Option<&[u8]>) -> (Fixture, SlotRoots) {
+    let roots = SlotRoots::new("076c4a2a-02".into(), "076c4a2a-03".into()).unwrap();
+    let mut fixture = Fixture::new();
+    let template = BootCommandLine::parse(&fixture.contents["spacewars-cmdline.txt"]).unwrap();
+    fixture.contents.insert(
+        "cmdline.txt".into(),
+        template.render(&roots, Slot::B, None).into_bytes(),
+    );
+    let last_update = template.render(&roots, Slot::A, Some(Sha256::digest(b"last update")));
+    fixture.contents.insert(
+        "spacewars-trial.txt".into(),
+        trial.map_or(last_update.into_bytes(), <[u8]>::to_vec),
+    );
+    (fixture, roots)
+}
+
+#[test]
+fn a_provisioned_boot_set_qualifies_only_after_its_records_are_retired() {
+    let (fixture, roots) = provisioned(None);
+    // Without a published retirement these files are a unit that lost its state.
+    assert!(fixture.inspect_with("mmcblk0p3", None, None).is_err());
+    assert_eq!(
+        fixture
+            .inspect_with("mmcblk0p3", None, Some((&roots, Slot::B)))
+            .unwrap(),
+        BootstrapOrigin::FreshImage {
+            image: Box::new(fixture.image.clone())
+        }
+    );
+    // The canonical default must select the running root.
+    assert!(
+        fixture
+            .inspect_with("mmcblk0p2", None, Some((&roots, Slot::A)))
+            .is_err()
+    );
+    let (unprepared, roots) = provisioned(Some(UNPREPARED_TRIAL.as_bytes()));
+    unprepared
+        .inspect_with("mmcblk0p3", None, Some((&roots, Slot::B)))
+        .unwrap();
+    // Any other trial selector, or a factory default, still needs review.
+    for trial in [
+        b"spacewars.trial=other\n".as_slice(),
+        b"root=PARTUUID=076c4a2a-02 spacewars.trial=unprepared\n",
+    ] {
+        let (changed, roots) = provisioned(Some(trial));
+        assert!(
+            changed
+                .inspect_with("mmcblk0p3", None, Some((&roots, Slot::B)))
+                .is_err()
+        );
+    }
+    let fresh = Fixture::new();
+    assert!(
+        fresh
+            .inspect_with("sda3", None, Some((&roots, Slot::B)))
+            .is_err()
+    );
+    // Retirement never relaxes the image, manifest or kernel checks.
+    let (mut changed, roots) = provisioned(None);
+    changed
+        .contents
+        .insert("kernel8.img".into(), b"changed".to_vec());
+    assert!(
+        changed
+            .inspect_with("mmcblk0p3", None, Some((&roots, Slot::B)))
+            .is_err()
+    );
 }

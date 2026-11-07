@@ -247,7 +247,7 @@ pub fn export_installed_data(
         .ok_or_else(|| invalid("bootstrap reservation disappeared during export"))?;
     Ok(super::DataExportReport {
         schema: 1,
-        selection_version: 2,
+        selection_version: 3,
         scope: "direct off-device recovery archive; no on-device data receipt or install authority",
         package_sha256: expected,
         binding_sha256: Sha256::digest(&serde_json::to_vec(binding)?),
@@ -520,7 +520,7 @@ fn require_stopped_writers(data: &File) -> Result<()> {
     require_writers(data, false)
 }
 
-fn require_masked_writers(data: &File) -> Result<()> {
+pub(super) fn require_masked_writers(data: &File) -> Result<()> {
     require_writers(data, true)
 }
 
@@ -709,7 +709,7 @@ fn reject_provisioned(data: &File, owner: u32) -> Result<()> {
         let name = name
             .to_str()
             .ok_or_else(|| invalid("invalid service store name"))?;
-        if !matches!(name, "time" | "time-check" | "network" | "update-check") {
+        if !super::retire::PRESERVED.contains(&name) {
             return Err(invalid(
                 "existing device-service state requires explicit reconciliation",
             ));
@@ -1039,16 +1039,17 @@ impl OperatorPackage {
             roots,
             target,
             trial_id: self.record.plan.trial_id,
+            retained_initramfs: legacy.boot_files.get(crate::bootstrap::INITRAMFS).cloned(),
         };
-        let plan = BootPlan::create(
+        if !BootPlan::derives(
+            &self.record.plan,
             &self.record.image,
             &manifest,
             &config,
             &profile,
             &template,
-            &request,
-        )?;
-        if plan != self.record.plan {
+            request,
+        )? {
             return Err(invalid(
                 "serialized bootstrap plan does not match checked assets and device",
             ));

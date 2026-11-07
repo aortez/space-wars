@@ -11,7 +11,8 @@ the same 15-second hardware heartbeat. Keep the requested virtual timeout
 unchanged so the core can provide the full userspace deadline.
 
 Confirmed on a Raspberry Pi 5 with the pinned 6.6.63 kernel: SETTIMEOUT and
-GETTIMEOUT report 210 while GETTIMELEFT immediately reports 2.
+GETTIMEOUT report 210 while GETTIMELEFT immediately reports 2. The 6.12.93
+driver is unchanged in these lines.
 
 Upstream-Status: Pending
 Signed-off-by: Allan Ortiz <aortez@gmail.com>

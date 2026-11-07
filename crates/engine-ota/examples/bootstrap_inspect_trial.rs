@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         serde_json::to_string(&serde_json::json!({
             "phase": store.phase(),
             "trial_id": store.trial_id(),
+            "request_boot_id": store.request_boot_id(),
             "failure": store.failure(),
             "journal_mutated": false,
             "watchdog_opened": false,
