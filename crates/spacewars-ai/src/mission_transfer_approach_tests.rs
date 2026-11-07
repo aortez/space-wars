@@ -232,15 +232,15 @@ fn learned_leg_takes_the_nearest_clear_entry_and_keeps_it() {
     bot.configure_learned_transfer(true);
     bot.intent(&o);
     let leg = bot
-        .transfer_leg()
+        .flight_leg()
         .expect("published though the pilot's entry is blocked");
     let ship = o.local.combat.recovery.flight.pilot.ship.position;
     let ordinary = (ship - o.planets[1].motion.position).normalized() * 125.0;
     assert!(!clear_entry(&o, 1, ordinary));
-    assert!(clear_entry(&o, 1, leg.entry));
-    assert!((leg.entry.length() - 125.0).abs() < 0.001);
-    assert!(leg.entry.distance_to(ordinary) > 10.0);
-    assert_eq!(leg.entry_velocity, o.planets[1].velocity_at(leg.entry));
+    assert!(clear_entry(&o, 1, leg.goal));
+    assert!((leg.goal.length() - 125.0).abs() < 0.001);
+    assert!(leg.goal.distance_to(ordinary) > 10.0);
+    assert_eq!(leg.goal_velocity, o.planets[1].velocity_at(leg.goal));
     assert_eq!(
         bot.telemetry.learned_entries,
         Some(LearnedEntries {
@@ -252,7 +252,7 @@ fn learned_leg_takes_the_nearest_clear_entry_and_keeps_it() {
     // The bearing is kept on the next tick while it stays clear.
     o.local.combat.recovery.flight.pilot.tick += 1;
     bot.intent(&o);
-    assert_eq!(bot.transfer_leg().unwrap().entry, leg.entry);
+    assert_eq!(bot.flight_leg().unwrap().goal, leg.goal);
     assert_eq!(bot.telemetry.learned_entries.unwrap().alternate_ticks, 2);
 }
 
@@ -265,7 +265,7 @@ fn learned_leg_keeps_a_clear_pilot_entry_and_flies_a_blocked_one_when_none_is_cl
     bot.intent(&o);
     let ship = o.local.combat.recovery.flight.pilot.ship.position;
     let ordinary = (ship - o.planets[1].motion.position).normalized() * 125.0;
-    assert!(bot.transfer_leg().unwrap().entry.distance_to(ordinary) < 0.001);
+    assert!(bot.flight_leg().unwrap().goal.distance_to(ordinary) < 0.001);
     assert_eq!(
         bot.telemetry.learned_entries,
         Some(LearnedEntries {
@@ -284,7 +284,7 @@ fn learned_leg_keeps_a_clear_pilot_entry_and_flies_a_blocked_one_when_none_is_cl
     );
     o.local.combat.recovery.flight.pilot.tick += 1;
     bot.intent(&o);
-    assert!(bot.transfer_leg().unwrap().entry.distance_to(ordinary) < 0.001);
+    assert!(bot.flight_leg().unwrap().goal.distance_to(ordinary) < 0.001);
     assert_eq!(
         bot.telemetry.learned_entries,
         Some(LearnedEntries {
@@ -299,9 +299,11 @@ fn learned_leg_keeps_a_clear_pilot_entry_and_flies_a_blocked_one_when_none_is_cl
 fn the_launch_band_yields_only_while_the_stack_flies_the_leg() {
     let (mut bot, mut o) = fixture(false);
     bot.configure_learned_transfer(true);
+    // The destination well outside the gap range, so a climb is radial.
+    o.planets[1].motion.position = Vec2::new(400.0, 0.0);
     bot.intent(&o);
     assert_eq!(bot.telemetry.goal, MissionGoal::Transfer);
-    let leg = bot.transfer_leg().expect("a leg above the band");
+    let leg = bot.flight_leg().expect("a leg above the band");
     // The stack's route dips into the band while the stack flies: the leg
     // goes on.
     let p = &mut o.local.combat.recovery.flight.pilot;
@@ -311,16 +313,90 @@ fn the_launch_band_yields_only_while_the_stack_flies_the_leg() {
     bot.intent(&o);
     assert_eq!(bot.telemetry.goal, MissionGoal::Transfer);
     assert_eq!(
-        bot.transfer_leg().map(|l| l.selected_tick),
-        Some(leg.selected_tick)
+        bot.flight_leg().map(|l| l.started_tick),
+        Some(leg.started_tick)
     );
     // Handed back low in the same selection, whether refused, touched down
     // or returned from a solar escape (a recovery or a pursuit starts a new
-    // selection): the climb comes first and no leg is published.
+    // selection): the climb comes first, as a leg of its own for the host,
+    // up the ship's radial to 60 above the band.
     let p = &mut o.local.combat.recovery.flight.pilot;
     p.tick += 1;
     p.learned_control = false;
     bot.intent(&o);
     assert_eq!(bot.telemetry.goal, MissionGoal::Launch);
-    assert_eq!(bot.transfer_leg(), None);
+    let climb = bot.flight_leg().expect("the climb is a leg of its own");
+    let p = &o.local.combat.recovery.flight.pilot;
+    assert_eq!(
+        (climb.kind, climb.target, climb.started_tick, climb.tick),
+        (LegKind::Climb, p.planet.index, p.tick, p.tick)
+    );
+    let radial = climb.goal - p.planet.motion.position;
+    assert!((radial.length() - (p.planet.radius + 130.0)).abs() < 0.001);
+    assert!(radial.normalized().dot(Vec2::Y) > 0.9999);
+    assert_eq!(climb.goal_velocity, p.planet.velocity_at(climb.goal));
+    assert!((climb.distance - 95.0).abs() < 0.001);
+}
+
+#[test]
+fn a_climb_leg_rides_the_ship_up_its_radial_until_the_band_releases_the_ship() {
+    let (mut bot, mut o) = fixture(false);
+    bot.configure_learned_transfer(true);
+    o.planets[1].motion.position = Vec2::new(400.0, 0.0);
+    // The planet spins, in the list the climb reads and in the frame copy.
+    o.planets[0].motion.spin = 0.6;
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.planet.motion.spin = 0.6;
+    p.ship.position = p.planet.motion.position + Vec2::Y * 50.0;
+    bot.intent(&o);
+    assert_eq!(bot.telemetry.goal, MissionGoal::Launch);
+    let first = bot.flight_leg().expect("a climb leg from the band");
+    assert_eq!(first.kind, LegKind::Climb);
+    let p = &o.local.combat.recovery.flight.pilot;
+    assert_eq!(first.goal, p.ship.position + Vec2::Y * (60.0 + 60.0));
+    assert_eq!(first.goal_velocity, p.planet.velocity_at(first.goal));
+    // The next tick's goal is ahead of the ship up its radial from where it
+    // has drifted, by the altitude still to climb plus the margin, under the
+    // same leg.
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick += 1;
+    p.learned_control = true;
+    p.ship.position += Vec2::new(3.0, 8.0);
+    bot.intent(&o);
+    assert_eq!(bot.telemetry.goal, MissionGoal::Launch);
+    let second = bot.flight_leg().unwrap();
+    assert_eq!(
+        (second.kind, second.started_tick),
+        (LegKind::Climb, first.started_tick)
+    );
+    let p = &o.local.combat.recovery.flight.pilot;
+    let radial = p.ship.position - p.planet.motion.position;
+    let reach = 70.0 - (radial.length() - p.planet.radius) + 60.0;
+    let goal = p.ship.position + radial.normalized() * reach;
+    assert!(second.goal.distance_to(goal) < 0.001);
+    assert!((second.distance - reach).abs() < 0.001);
+    assert_eq!(second.goal_velocity, p.planet.velocity_at(second.goal));
+    // Above the band the transfer leg takes over under the selection's
+    // identity.
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick += 1;
+    p.ship.position = p.planet.motion.position + Vec2::Y * 115.0;
+    bot.intent(&o);
+    assert_eq!(bot.telemetry.goal, MissionGoal::Transfer);
+    let transfer = bot.flight_leg().unwrap();
+    assert_eq!((transfer.kind, transfer.target), (LegKind::Transfer, 1));
+    assert_eq!(transfer.started_tick, bot.selected_tick);
+    // A climb taken up again after a tick without one is a new leg, with
+    // the goal the altitude still to climb plus the margin ahead.
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick += 1;
+    let tick = p.tick;
+    p.learned_control = false;
+    p.ship.position = p.planet.motion.position + Vec2::Y * 100.0;
+    bot.intent(&o);
+    assert_eq!(bot.telemetry.goal, MissionGoal::Launch);
+    let again = bot.flight_leg().unwrap();
+    assert_eq!((again.kind, again.started_tick), (LegKind::Climb, tick));
+    assert_ne!(again.started_tick, first.started_tick);
+    assert!((again.distance - 70.0).abs() < 0.001);
 }

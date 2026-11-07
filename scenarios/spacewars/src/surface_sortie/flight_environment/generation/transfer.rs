@@ -121,6 +121,7 @@ impl TransferCandidate {
                 start_planet,
                 goal_planet,
             }),
+            contact_allowed: false,
         };
         Self {
             generator_version: TRANSFER_GENERATOR_VERSION,

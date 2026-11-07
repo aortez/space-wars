@@ -8,6 +8,9 @@ pub const FLIGHT_TRANSFER_ENVIRONMENT_VERSION: u32 = 4;
 /// Practice tasks above a spinning planet: the goal rests in the spinning
 /// frame, so traces of the earlier world-fixed goals do not replay.
 pub const FLIGHT_SPINNING_ENVIRONMENT_VERSION: u32 = 5;
+/// Tasks on which surface contact is a state to fly out of instead of a
+/// collision, so traces of tasks that ended on contact do not replay.
+pub const FLIGHT_CONTACT_ENVIRONMENT_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct FlightStart {
@@ -102,6 +105,12 @@ pub struct FlightTask {
     /// A match-arena transfer; omitted for the practice-world task contract.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transfer: Option<TransferWorld>,
+    /// Surface contact does not end the task: a ship that touches or lies on
+    /// the ground has to fly out of it. Damage, loss and boundary escape
+    /// still end it. Omitted for the tasks on which any contact is a
+    /// collision.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub contact_allowed: bool,
 }
 
 impl Default for FlightTask {
@@ -116,13 +125,16 @@ impl Default for FlightTask {
             obstacles: Vec::new(),
             terrain_edits: Vec::new(),
             transfer: None,
+            contact_allowed: false,
         }
     }
 }
 
 impl FlightTask {
     pub(super) fn trace_version(&self) -> u32 {
-        if self.transfer.is_some() {
+        if self.contact_allowed {
+            FLIGHT_CONTACT_ENVIRONMENT_VERSION
+        } else if self.transfer.is_some() {
             FLIGHT_TRANSFER_ENVIRONMENT_VERSION
         } else if self.start.planet_spin != 0.0 {
             FLIGHT_SPINNING_ENVIRONMENT_VERSION
@@ -292,7 +304,7 @@ impl FlightProgress {
         };
         self.outcome = if evidence.ship_lost {
             Some(FlightOutcome::ShipLost)
-        } else if evidence.collision {
+        } else if evidence.collision && !task.contact_allowed {
             Some(FlightOutcome::Collision)
         } else if evidence.damage {
             Some(FlightOutcome::Damage)
