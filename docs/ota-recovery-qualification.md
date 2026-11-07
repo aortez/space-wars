@@ -1,34 +1,38 @@
 # Supervised recovery failure tests
 
+Run records named like `ota-<subject>-<date>` are private files kept outside
+the repository, on the owner's workstation; this document keeps their
+summaries.
+
 **Status reviewed 2026-10-18:** both primary Pis have passed supervised signed
 installation, application-health rollback/quarantine and subsequent normal boot
 ([physical trials](#physical-signed-trials-2026-10-17)). Interrupted promotion,
 physical power loss and the broader failure matrix remain outstanding. See the
 [active OTA plan](ota-updates.md#current-implementation) for current images,
 device-specific coverage and rollout order. The
-[second-Picade follow-up](data/ota-picade2-profile-image-20261018.json) adds its
+second-Picade follow-up (`ota-picade2-profile-image-20261018`) adds its
 successful signed trial/normal boot and installed radio/time/OTA qualification;
 it includes an explicitly reviewed additive settings migration, not a new
 deliberate-failure or power-loss trial.
-The [second-Picade kiosk-hang record](data/ota-picade2-kiosk-hang-20261024.json)
+The second-Picade kiosk-hang record (`ota-picade2-kiosk-hang-20261024`)
 adds an offline generation-13 hang, automatic return to generation 12, quarantine
 and a subsequent normal boot on 2026-10-24. Its original host observer failed;
 an explicitly authorized read-only diagnostic established the return. The
 [case details](#second-picade-kiosk-hang-2026-10-24) retain that observation gap and
 the corrected host assertions. Owner review and the remaining physical matrix
 are still required; no installation approval was created.
-Its [explicit repeated-failure record](data/ota-picade2-repeated-failure-20261024.json)
+Its explicit repeated-failure record (`ota-picade2-repeated-failure-20261024`)
 adds the second failed attempt, return within 191.705 seconds, preserved history
 through another normal boot and refusal of a third attempt. The trial observer
 completed; a close-out probe initially returned `Busy` and was repeated only after
 the updater became idle. Both results are retained.
-The [software-reset record](data/ota-picade2-trial-reset-20261025.json) and
-[kiosk-crash record](data/ota-picade2-kiosk-crash-20261025.json) add both offline
+The software-reset record (`ota-picade2-trial-reset-20261025`) and
+kiosk-crash record (`ota-picade2-kiosk-crash-20261025`) add both offline
 generation-14 attempts on 2026-10-25. The crash series observed five distinct
 process exits and automatic return to generation 12 within 189.919 seconds.
 Both generations 13 and 14 are now exhausted. Six of eleven physical cases have
 observations; the remaining five cases and owner review still precede approval.
-The [review-fix image record](data/ota-picade2-review-fixes-20261018.json) adds
+The review-fix image record (`ota-picade2-review-fixes-20261018`) adds
 its subsequent generation-7 trial, default boot and installed service/network
 checks. Exact pre-update settings bytes were retained before installation;
 selected durable stores remained unchanged. Its deliberate-failure matrix is
@@ -41,7 +45,7 @@ attempts and exports; never clear recovery/trust history to make an old test
 eligible. The later supervised signed-installer procedure has its own admission
 and evidence requirements.
 
-The [first primary-Picade run](data/ota-picade-missing-root-20261017.json) observed
+The first primary-Picade run (`ota-picade-missing-root-20261017`) observed
 return to the same normal image in 258.576 seconds after one accepted request.
 Operator cleanup restored recovery admission; all durable settings, ROMs,
 pairing records and keys matched. One regenerated local Bluetooth database is
@@ -466,7 +470,7 @@ do not perform a device trial or satisfy the physical matrix.
 
 ### Second Picade kiosk hang, 2026-10-24
 
-The [retained case record](data/ota-picade2-kiosk-hang-20261024.json) documents one
+The retained case record (`ota-picade2-kiosk-hang-20261024`) documents one
 owner-supervised fault on `sw-picade-2.local`, Pi 4 Model B Rev 1.2. The signed
 generation-13 candidate was built from `56a5972e5037`, whose tree matches merged
 main `8e2a3394b43c` and its successful push CI. The root-owner fault helper from
@@ -517,7 +521,7 @@ physical power-loss coverage remain separate.
 
 ### Second Picade repeated failure, 2026-10-24
 
-The [retained retry record](data/ota-picade2-repeated-failure-20261024.json) follows
+The retained retry record (`ota-picade2-repeated-failure-20261024`) follows
 the same failed generation-13 payload on the same board, firmware, USB medium,
 binding and kernel. Generation 12 remained the normal good/default image in B.
 The first failure's consumed intent, stop receipt and complete evidence were
@@ -564,7 +568,7 @@ eligible payload and its own reviewed procedure.
 
 ### Second Picade trial reset, 2026-10-25
 
-The [retained reset record](data/ota-picade2-trial-reset-20261025.json) documents
+The retained reset record (`ota-picade2-trial-reset-20261025`) documents
 one early **software reset** of signed generation 14, built from merged main
 `c68b21063f0bc062936285249a04b55d390acc4a` after its successful push CI.
 The image passed independent artifact verification and was published to Nightly
@@ -613,7 +617,7 @@ not needed or rehearsed.
 
 ### Second Picade kiosk crash, 2026-10-25
 
-The [retained crash record](data/ota-picade2-kiosk-crash-20261025.json) documents
+The retained crash record (`ota-picade2-kiosk-crash-20261025`) documents
 the sole explicit retry of the same signed generation-14 payload. Generation 12
 remained good and default in slot B; generation 13's exhausted failure record and
 generation 14's first `trial-reset` fault receipts were preserved. The separate
@@ -673,13 +677,14 @@ four inspected USB boot/root/data partitions.
 
 Use a new, private evidence directory for inspection. This example is for the
 primary Picade; select the actual device's reference record for another board.
-Run each operation separately and inspect its result before continuing.
+`RECORDS` is the local directory that holds the run records. Run each
+operation separately and inspect its result before continuing.
 
 ```sh
 python3 yocto/scripts/qualify-recovery.py inspect \
   --host sw-picade.local \
   --tool target/aarch64-unknown-linux-gnu/release/examples/recovery_qualify \
-  --reference docs/data/ota-picade-bootstrap-success-20261017.json \
+  --reference "$RECORDS"/ota-picade-bootstrap-success-20261017.json \
   --output target/picade-missing-root
 python3 yocto/scripts/qualify-recovery.py prepare --output target/picade-missing-root
 python3 yocto/scripts/qualify-recovery.py activate --output target/picade-missing-root
@@ -782,10 +787,10 @@ watchdog and app observations. It does not exercise native partition admission,
 boot selector writes, firmware, production feed provisioning or a physical
 rollback. No test keys are installed on a Pi.
 
-Live preflight found a [time-validation defect](data/ota-time-marker-20261017.json)
+Live preflight found a time-validation defect (`ota-time-marker-20261017`)
 on both installed images. The fix initially passed read-only native probes;
 the physical signed trials below subsequently installed it.
-[Owner trust and staging](data/ota-owner-feed-20261017.json) are now provisioned
+Owner trust and staging (`ota-owner-feed-20261017`) are now provisioned
 on both primary Pis, and both verified the empty Release/Nightly
 feed. A disposable test authority must not consume the production recovery
 generation floor: first provisioning correctly rejects prior signed attempts.
@@ -874,7 +879,7 @@ service (ten optional cases ignored), scoped Clippy with warnings denied,
 Rust 1.89 all-target checks, the AArch64 release helper build and formatting.
 The ordinary system-service build also remains feature-independent.
 
-The [2026-10-17 native preflight and candidate record](data/ota-signed-installer-20261017.json)
+The 2026-10-17 native preflight and candidate record (`ota-signed-installer-20261017`)
 captures both primary Pis refusing an installer selection from the empty owner
 feed. Their boot IDs, installed binaries/selectors, recovery records and selected
 persistent stores remained identical. Both games and recovery services stayed
@@ -893,7 +898,7 @@ retained live authority and real public feed.
 
 ## Physical signed trials, 2026-10-17
 
-The [signed-trial record](data/ota-signed-trials-20261017.json) now captures real
+The signed-trial record (`ota-signed-trials-20261017`) now captures real
 owner-signed Nightly publication, native HTTPS staging, inactive-root writes,
 firmware trial boots and application-health recovery on both primary Pis. These
 are explicitly selected branch images, not main/CI-admitted production releases.
@@ -953,7 +958,7 @@ This establishes physical signed installation, application-health rollback,
 quarantine, a bounded explicit retry and durable successful normal boots. It does
 not establish interrupted boot-selector promotion, physical power-loss safety,
 unattended installation, real Release promotion or download/gameplay performance.
-The [later installed-image record](data/ota-profile-image-20261018.json) adds
+The later installed-image record (`ota-profile-image-20261018`) adds
 Pi 5 startup/radio/time-wake feed checks and isolated Pi 4 controls. The rest of
 the installed download/network matrix, second-Picade failure matrix and production
 publisher/installer/overnight-policy integration remain rollout gates before

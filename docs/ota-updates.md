@@ -1,5 +1,9 @@
 # Device-managed OTA updates
 
+Run records named like `ota-<subject>-<date>` are private files kept outside
+the repository, on the owner's workstation; this document keeps their
+summaries.
+
 Implementation tracks [#254](https://github.com/aortez/space-wars/issues/254).
 The initial payload is a compressed ext4 root filesystem containing the app and
 OS packages. Kernel, firmware, shared boot assets and partition changes remain
@@ -30,9 +34,9 @@ reboot and arbitrary-command operations are not exposed. The freshly flashed
 kiosks run the device service; public OTA trust and signed staging have been
 verified on all three units, while automatic installation remains disabled. The
 failed Pi 5 USB drive was replaced with verified data restoration. The
-[replacement Pi 5](data/ota-pi5-bootstrap-success-20261017.json),
-[primary Picade](data/ota-picade-bootstrap-success-20261017.json) and
-[second Picade](data/ota-second-picade-rollout-20261018.json) have completed
+replacement Pi 5 (`ota-pi5-bootstrap-success-20261017`),
+primary Picade (`ota-picade-bootstrap-success-20261017`) and
+second Picade (`ota-second-picade-rollout-20261018`) have completed
 supervised bootstrap through the initial recovery baseline. All three passed trial,
 staged normal and canonical normal boots, independent archive verification and
 production recovery-service checks. See the [bootstrap status](ota-bootstrap.md)
@@ -42,22 +46,22 @@ for preservation, hardware evidence and the remaining rollout gates.
 
 The current installed image on the owner-selected second Picade is
 `ebf0081175545f0af723d6e320e5693886b81462`, signed generation 12, on normal slot B.
-The [offline kiosk-hang record](data/ota-picade2-kiosk-hang-20261024.json) observes
+The offline kiosk-hang record (`ota-picade2-kiosk-hang-20261024`) observes
 automatic fallback from generation 13, one quarantined attempt and preservation
 through a separate normal boot. The original host observer failed; an explicitly
 authorized read-only diagnostic established return within 249.329 seconds, and
 the record retains both host corrections and the observation gap. No physical
 installation approval was granted. The subsequent
-[repeated-failure record](data/ota-picade2-repeated-failure-20261024.json) consumed
+repeated-failure record (`ota-picade2-repeated-failure-20261024`) consumed
 the single explicit retry, observed return within 191.705 seconds and retained
 both attempts through another normal boot. Ordinary selection and a third retry
 were refused after the updater became idle. Generation 13 has no remaining
-attempt. The subsequent [software-reset record](data/ota-picade2-trial-reset-20261025.json)
+attempt. The subsequent software-reset record (`ota-picade2-trial-reset-20261025`)
 uses signed generation 14 from merged main `c68b21063f0b`. One early reset was
 acknowledged at 19.524 seconds of trial uptime; normal generation 12/B was observed
 29.475 seconds after invocation. The `trial-reset` quarantine survived a separate
 offline normal boot, and ordinary reselection was refused after WAN restoration.
-The subsequent [kiosk-crash record](data/ota-picade2-kiosk-crash-20261025.json)
+The subsequent kiosk-crash record (`ota-picade2-kiosk-crash-20261025`)
 consumed generation 14's sole explicit retry. Five verified process crashes
 prevented continuous trial health; automatic return to generation 12/B was
 observed 189.919 seconds after series invocation. The exact health-timeout
@@ -68,20 +72,20 @@ this binding; five cases and owner review remain before approval.
 
 The earlier generation-10 source
 `44c3647657964600fdd7e21195a5d9356466b8be` retains separate SSH coverage. The
-[SSH qualification record](data/ota-ssh-storage-qualification-20261023.json)
+SSH qualification record (`ota-ssh-storage-qualification-20261023`)
 binds its committed slot-B trial, installed binaries, 384 fresh logins over
 fifteen minutes, forty unauthenticated connections and installed refusal logs.
 Implementation #526 and evidence #529 are merged; #523 is closed. A normal
 generation-10 boot and automatic payload staging were not tested in that run.
 These remain supervised results, not unattended rollout qualification.
 
-The earlier [generation-7 review-fix record](data/ota-picade2-review-fixes-20261018.json)
+The earlier generation-7 review-fix record (`ota-picade2-review-fixes-20261018`)
 and the [generation-8 rfkill evidence PR #525](https://github.com/aortez/space-wars/pull/525)
 retain their exact sources and separate restart/radio/time/OTA scope. #511 is
 closed after the generation-8 qualification; #525 remains an open documentation
 PR at this checkpoint.
-The [generation-6 Pi 5 record](data/ota-profile-image-20261018.json) and
-[earlier second-Picade record](data/ota-picade2-profile-image-20261018.json) retain
+The generation-6 Pi 5 record (`ota-profile-image-20261018`) and
+earlier second-Picade record (`ota-picade2-profile-image-20261018`) retain
 their original source `0a32db2` and scope.
 
 | Device or feed | Latest recorded state | Next qualification |
@@ -359,7 +363,7 @@ rejected duplicates; the marker preceded the receipt by 3,213 microseconds on
 the Picade and 7,187 microseconds on the Pi 5. Both installed binaries, selectors,
 boot IDs and recovery records remained unchanged. The installed `e986718`
 services still contain the defect: this validates the code against live provider
-evidence, not deployment of the fix. The [retained evidence](data/ota-time-marker-20261017.json)
+evidence, not deployment of the fix. The retained evidence (`ota-time-marker-20261017`)
 records source/artifact identities and scope. The full service suite passed
 187 tests (two ignored), scoped Clippy, Rust 1.89 checks and the AArch64 probe
 build. Signed installation and recovery qualification remain separate work.
@@ -481,7 +485,7 @@ private UID-1000 state directories, private D-Bus providers and fake radio/clock
 observations. They did not restart the installed time provider, change a radio,
 open production schedule state or reboot. Clippy, Rust 1.89 compatibility,
 AArch64 test compilation and formatting passed.
-[Exact source, binary and validation identities](data/ota-time-schedule-20261016.json)
+Exact source, binary and validation identities (`ota-time-schedule-20261016`)
 retain the fixture scope and outstanding runtime work.
 
 ### Device worker and Sync now API
@@ -519,7 +523,7 @@ The 48 schedule/provider/runtime and related network cases passed on Pi 5 in
 not time synchronization performance. The board runs used private UID-1000
 directories, fake clocks/radios and private D-Bus services; they did not alter
 the installed services, system provider, clocks or radios. The
-[runtime validation evidence](data/ota-time-runtime-20261016.json) records exact
+runtime validation evidence (`ota-time-runtime-20261016`) records exact
 source and artifact identities.
 
 The time worker now offers an admitted connection to the updater before its
@@ -796,7 +800,7 @@ to idle after 288 seconds, about 104 seconds before the operator restarted the
 service; the earlier claim that it required a restart was incorrect. The native
 signed staging helper subsequently verified the payload. Slow-storage fixtures
 explain possible cancellation paths but do not identify the device's exact cause.
-[Follow-up evidence](data/ota-ssh-storage-followup-20261022.json) separates the
+Follow-up evidence (`ota-ssh-storage-followup-20261022`) separates the
 generation 9 installation from local tests.
 
 Generation 10 (`44c364765796`) includes the diagnostic correction and passed
@@ -826,7 +830,7 @@ temporary helper was removed, and final checks confirmed healthy idle Release,
 Wi-Fi enabled and partial offline disabled. The slow-store barriers described
 above remain local regression tests, and the unauthenticated workload was bounded
 to those forty sequential connections.
-[Generation 10 qualification evidence](data/ota-ssh-storage-qualification-20261023.json)
+Generation 10 qualification evidence (`ota-ssh-storage-qualification-20261023`)
 records the measurements, acceptance checks and hashes of the retained raw evidence.
 
 The earlier 120-second SSH reservation implementation could retain all 32 slots
@@ -848,7 +852,7 @@ kept one control connection active, and waited 130 seconds between their first
 The temporary service override was removed afterwards and the installed binary
 hash verified; that comparison did not permanently install the fix. The stalled primary
 Picade's hold count could not be read.
-[SSH admission comparison and restoration evidence](data/ota-ssh-admission-20261017.json).
+SSH admission comparison and restoration evidence (`ota-ssh-admission-20261017`).
 
 The original SSH fix did not reclaim those slots for setup. A regression using
 the kiosk's shared `SetupHold` client and the real Unix-socket coordinator
@@ -862,7 +866,7 @@ client integrations pass in an isolated user namespace with a fake radio.
 The primary Picade's reported setup error is consistent with this failure, but
 its previous boot's journal was unavailable after the user's reboot; the exact
 historical cause remains unconfirmed.
-[Setup admission reproduction](data/ota-setup-admission-20261017.json).
+Setup admission reproduction (`ota-setup-admission-20261017`).
 
 The correction at `a76ec32` also passed on the primary Picade using a temporary
 device-service override. After restarting that service, 32 separate SSH logins
@@ -905,7 +909,7 @@ on host ext4, Clippy, Rust 1.89, formatting and AArch64 compilation. Its 13 new
 policy/probe fixtures also passed on Pi 5 as UID 1000 in 0.14 seconds. The real
 probe read both Pis' root-owned NetworkManager instances: software and hardware
 Wi-Fi were enabled, with no pending checkpoints, and both boot IDs stayed
-unchanged. [Policy and radio-probe evidence](data/ota-network-policy-20261016.json)
+unchanged. Policy and radio-probe evidence (`ota-network-policy-20261016`)
 records artifact/log identities and separates these checks from the pending
 runtime integration and physical session/radio qualification.
 
@@ -915,7 +919,7 @@ compilation. All 30 network fixtures passed on Pi 5 as UID 1000 in 2.83 seconds,
 including private D-Bus writes and the late-command timeout case. Read-only probes
 on both installed Pis reported three saved profiles, enabled Wi-Fi and no pending
 checkpoints; each target's boot ID remained unchanged during its run.
-[Controller and device evidence](data/ota-network-controller-20261016.json)
+Controller and device evidence (`ota-network-controller-20261016`)
 also records the initial top-level `VersionId` failure and the corrected runtime
 API. These checks do not enable radio policy or qualify physical SSH protection.
 
@@ -925,7 +929,7 @@ passed on Pi 5 in 5.86 seconds and Pi 4 in 5.95 seconds as UID 1000. Six parent
 cases make the behavioral assertions; the seventh is the subprocess fixture
 entry point used for real process-ownership checks. These use actual Unix IPC and
 process credentials with a fake radio backend, not installed service or SSH
-admission. [Control-server evidence](data/ota-network-service-20261016.json)
+admission. Control-server evidence (`ota-network-service-20261016`)
 records source/artifact identities, bounds and those qualification limits.
 
 The SSH observation/admission work at `2a13aa7` passed the 87-test manager suite,
@@ -936,7 +940,7 @@ namespace, without host root access. An initial Pi 4 failure exposed a timeout
 fixture that could cancel during preflight; the corrected fixture explicitly
 waits for provider receipt before cancelling and verifies the subsequent late
 write. Static systemd verification accepts the new drop-in and its dependencies.
-[SSH protection evidence](data/ota-network-sessions-20261016.json) retains both
+SSH protection evidence (`ota-network-sessions-20261016`) retains both
 runs, exact artifact identities, native probe results and the pending physical
 qualification. No installed service, radio setting or boot identity changed.
 
@@ -946,7 +950,7 @@ including contention recovery and restart with saved policy. Clippy, Rust 1.89,
 formatting, canonical install-lock tests and static unit checks passed. All 55
 final network cases passed on Pi 5 in 8.34 seconds and Pi 4 in 12.30 seconds as
 UID 1000. Read-only continuous probes observed stable NetworkManager state on
-both boards. [Native runtime evidence](data/ota-network-runtime-20261016.json)
+both boards. Native runtime evidence (`ota-network-runtime-20261016`)
 records exact source, artifacts and logs. These fixture and read-only checks do
 not qualify a live root service, SSH idle shutdown or an end-to-end OTA update.
 
@@ -956,7 +960,7 @@ also passed a coordinator interoperability test inside a root user namespace.
 Both Pis passed the same 59 selected manager/client cases as UID 1000, with
 unchanged boot IDs. The kiosk feature configuration type-checks on the host;
 manager/control Clippy, Rust 1.89 and AArch64 checks pass. Existing unrelated
-client Clippy warnings remain. [Setup-hold evidence](data/ota-setup-holds-20261016.json)
+client Clippy warnings remain. Setup-hold evidence (`ota-setup-holds-20261016`)
 records exact artifacts and the distinction between fixtures, host kiosk checks
 and the still-pending physical UI/service rollout.
 
@@ -965,7 +969,7 @@ and each Pi (8.42 seconds on Pi 5, 12.10 seconds on Pi 4), plus malformed-input
 CLI checks. The final workstation suite passed 51 Node cases, including 21
 deployment/fast-update cases; the 71-test Python suite also passed before the
 final JS confirmation/reconnect refinements. Clippy, Rust 1.89, formatting and
-AArch64 compilation pass. [Deployment-hold evidence](data/ota-deployment-holds-20261016.json)
+AArch64 compilation pass. Deployment-hold evidence (`ota-deployment-holds-20261016`)
 separates mocked workstation transactions and private Pi fixtures from actual
 root installation, native lease admission and physical reboot qualification.
 
@@ -1028,7 +1032,7 @@ installation lock described below, also used by the operator maintenance guard.
 Twenty model/journal tests and 22 verifier/integration tests pass on the host
 and both Pis. They exercise private temporary files and injected observations;
 they do not qualify real boot, watchdog or power-loss behavior.
-[Exact binaries, sources and board output](data/ota-recovery-20261014.json)
+Exact binaries, sources and board output (`ota-recovery-20261014`)
 retain that distinction.
 
 The Linux root-layout reader correlates mount device numbers, block-node
@@ -1049,7 +1053,7 @@ cargo run --locked -p engine-ota --example recovery_probe
 Eight additional layout tests passed on both Pis; the real probe independently
 identified A on the Picade and B on the Pi 5, each with equal 3 GiB root slots
 and boot/data on the same USB disk.
-[Probe output and source/binary identities](data/ota-layout-20261014.json)
+Probe output and source/binary identities (`ota-layout-20261014`)
 record this separately from trial qualification.
 
 ### Live kiosk health evidence
@@ -1126,7 +1130,7 @@ separate test used actual private-namespace bind mounts, replacement/detach and
 read-only views. Three metadata/object fixture tests passed as UID 1000 on the
 Pi 5. Clippy, Rust 1.89 checks and AArch64 builds passed. These tests did not run
 the privileged health worker against installed Pi stores or certify the live
-service sandbox. [Persistence validation evidence](data/ota-persistence-health-20261015.json)
+service sandbox. Persistence validation evidence (`ota-persistence-health-20261015`)
 records source identities, artifact hashes and those limits.
 
 All 33 device-service tests pass on the host. Nine health-specific tests also
@@ -1136,7 +1140,7 @@ local Xvfb client passes the UI challenge test, both kiosk renderer configuratio
 compile, and the DRM counter regression passes. The Picade was unreachable for
 this pass. These checks do not qualify installed sandbox permissions, physical
 display progress, rootfs trial boot or watchdog recovery.
-[Source identities and validation output](data/ota-health-20261015.json)
+Source identities and validation output (`ota-health-20261015`)
 retain the exact scope.
 
 ### Packaged image identity
@@ -1186,12 +1190,12 @@ the record matches the final binary hashes, compiled revision and deploy
 sidecar, and that the boot partition contains the exact validated initramfs.
 The existing four-partition geometry is unchanged. The inspected image is
 explicitly marked as a dirty development build and has not been installed.
-[Source, build, artifact and Pi evidence](data/ota-image-identity-20261015.json)
+Source, build, artifact and Pi evidence (`ota-image-identity-20261015`)
 records these checks without claiming a successful trial boot.
 
 ### Boot capability inventory and bootstrap prerequisite
 
-The [read-only inventory](data/ota-boot-inventory-20261014.json) found:
+The read-only inventory (`ota-boot-inventory-20261014`) found:
 
 | Device | Current root | Bootloader revision | Watchdog open timeout |
 | --- | --- | --- | --- |
@@ -1245,7 +1249,7 @@ publishes the initial recovery baseline, then archives the bootstrap reservation
 The archived `cd66877` image and both schema-3 device kits contain this finalization path;
 they predate the current network/download worker and provisioning command.
 Rebuild from current source before a new OTA bootstrap. The
-[image and package evidence](data/ota-bootstrap-image-20261015.json) records actual
+image and package evidence (`ota-bootstrap-image-20261015`) records actual
 filesystem checks, current inventories and packaged command rejection as UID
 1000 on both Pis. Neither Pi has undergone this migration. These tools do not
 enable automatic updates. The [bootstrap preparation and remaining migration steps](ota-bootstrap.md)
@@ -1302,7 +1306,7 @@ tests pass, including 21 intercepted-syscall watchdog cases; those 21 cases also
 pass unprivileged on the Pi 5. No real watchdog was opened, reboot requested,
 boot file changed or data partition written during validation. The Picade was
 unavailable for this pass.
-[Archive, source and fixture evidence](data/ota-watchdog-20261015.json)
+Archive, source and fixture evidence (`ota-watchdog-20261015`)
 records the exact scope.
 
 On October 17, a supervised same-root tryboot request on the freshly flashed
@@ -1363,13 +1367,13 @@ control/render counters. Settings, ROMs, pairing records, Wi-Fi and keys matched
 BlueZ's generated local GATT database changed and is recorded separately. A
 repeat activation of the consumed diagnostic was refused. See the
 [runner and cleanup procedure](ota-recovery-qualification.md) and
-[physical observation record](data/ota-picade-missing-root-20261017.json).
+physical observation record (`ota-picade-missing-root-20261017`).
 At this early watchdog experiment, signed-candidate quarantine and ordinary
 OTA watchdog/promotion failure cases remained untested. Later signed trials
 established quarantine; the active plan lists the remaining cases. The corrected kernel changes the shared
 boot identity and therefore required boot-asset provisioning, not a rootfs-only
 OTA. See the [bootstrap results](ota-bootstrap.md#primary-picade-bootstrap).
-[Hardware probe and regression evidence](data/ota-watchdog-hardware-20261017.json).
+Hardware probe and regression evidence (`ota-watchdog-hardware-20261017`).
 
 The combined image at `ef44f5b` includes this kernel correction and the SSH
 reservation fix. All 6,768 Yocto tasks passed, with 6,738 reused, and the frozen
@@ -1383,7 +1387,7 @@ selector under the same backup and durable migration checks as legacy devices.
 Both the primary Picade and Pi 5 pass the new read-only inventory. The updated
 runtime must be built into a new image before using this path; the `ef44f5b`
 image still carries protocol 4. The
-[combined image evidence](data/ota-integrated-image-20261017.json) records the
+combined image evidence (`ota-integrated-image-20261017`) records the
 exact build, payload and outstanding device/runner qualification.
 
 ### Immutable boot assets and root selection
@@ -1428,7 +1432,7 @@ Yocto image builds successfully, and the extracted FAT/rootfs artifacts agree
 on the manifest and identity; every immutable FAT file matches its recorded
 hash. The image remains a dirty development build and has not been installed.
 These checks do not qualify firmware tryboot or physical watchdog recovery.
-[Build, artifact, source and fixture evidence](data/ota-boot-assets-20261015.json)
+Build, artifact, source and fixture evidence (`ota-boot-assets-20261015`)
 records the exact scope. The filesystem adapter and selector writes are
 described below; the running coordinator remains integration work.
 
@@ -1481,7 +1485,7 @@ six persistence stages. Scoped Clippy, Rust 1.89, AArch64 compilation and the 12
 device-service library tests pass. The live probe rejects the Pi 5's existing
 unprovisioned image instead of inventing recovery state, and its boot ID remains
 unchanged. No Pi boot files were edited, reboot requested or watchdog opened.
-[Source, test and probe evidence](data/ota-boot-linux-20261015.json) records these
+Source, test and probe evidence (`ota-boot-linux-20261015`) records these
 results. The adapter has no installation/reboot socket command. The recovery service below
 uses this adapter only to reconcile an existing transaction.
 
@@ -1517,7 +1521,7 @@ checks use temporary files and mocked watchdog calls; no physical watchdog was
 opened and the Pi boot ID is unchanged. The coordinator and supervised physical
 qualification were still outstanding at this checkpoint; service integration
 is described below.
-[Source and test evidence](data/ota-watchdog-completion-20261015.json)
+Source and test evidence (`ota-watchdog-completion-20261015`)
 
 ### Independent recovery service
 
@@ -1577,7 +1581,7 @@ immutable boot identity, shared-lock tmpfiles rule, and the service executable's
 recorded size/hash. The real packaged command runs on the Pi 5 and rejects
 `recover` from its unprivileged kiosk account. No physical watchdog, reboot or
 boot-file change was performed. The image remains a development build.
-[Source, artifact and execution evidence](data/ota-coordinator-20261015.json)
+Source, artifact and execution evidence (`ota-coordinator-20261015`)
 records the exact scope and limitations.
 
 ## Verified inactive-root writer
@@ -1638,7 +1642,7 @@ block-device write, boot change, watchdog operation or reboot has been tested
 in this pass. Final signature/time/channel revalidation, one-use UI handoff,
 maintenance holds, data preservation, legacy-helper restrictions and installed
 service/device qualification remain integration work.
-[Source, fixture and artifact evidence](data/ota-writer-20261015.json)
+Source, fixture and artifact evidence (`ota-writer-20261015`)
 records the exact scope.
 
 ## Operator maintenance and the runtime privilege boundary
@@ -1693,7 +1697,7 @@ cover those cases. Remaining physical maintenance races belong to #267.
 Fast changes deliberately alter the packaged client
 identity; automatic-install admission must account for that development state
 instead of treating the old image record as proof of the replacement binary.
-[Source and execution evidence](data/ota-maintenance-20261015.json) records
+Source and execution evidence (`ota-maintenance-20261015`) records
 this boundary without claiming completed bootstrap or automatic updates.
 
 ### Development image installs
@@ -1722,7 +1726,7 @@ maintenance from the real kiosk UID. This is source/artifact validation, not a
 signed release, a block-device installation or live sudo/boot qualification.
 Persistent operator-key migration and the remaining service integration are
 still required before bootstrap and rollout.
-[Clean image, writer and packaged-command evidence](data/ota-clean-image-20261015.json)
+Clean image, writer and packaged-command evidence (`ota-clean-image-20261015`)
 retains the exact artifacts and checks.
 
 ### Persistent network profiles
@@ -1793,7 +1797,7 @@ supervised bootstrap must initialize the store while the old homes still
 exist, migrate the SSH configuration in both slots, and verify separate live
 runtime and operator logins before any trial. Full A/B login preservation,
 service sandbox behavior and physical interruption tests remain required.
-[Key-preservation source and execution evidence](data/ota-access-20261015.json)
+Key-preservation source and execution evidence (`ota-access-20261015`)
 records this checkpoint.
 
 The subsequent clean image from `71826f0` passes packaging and artifact checks:
@@ -1806,7 +1810,7 @@ writing, read-only fsck, embedded identity checks and readback. Its packaged
 manager runs on the Pi 5 and rejects both access commands from UID 1000.
 The boot manifest, immutable boot identity and partition geometry remain
 unchanged. These are artifact checks, not an authenticated release or a physical
-installation. [Clean access-image evidence](data/ota-access-image-20261015.json)
+installation. Clean access-image evidence (`ota-access-image-20261015`)
 retains the exact build and results.
 
 ## Signed feed contract
@@ -1881,7 +1885,7 @@ device package or production feed. The existing Ubuntu 26.04 host warning
 remains; no reproducible container build is claimed.
 
 All 123 CI Python helper, 51 Yocto JavaScript and 79 Yocto Python tests pass.
-The [build evidence](data/ota-build-inputs-20261016.json) records source, layers,
+The build evidence (`ota-build-inputs-20261016`) records source, layers,
 logs, actual image checks and remaining workflow/image-validation work.
 
 ## Rootfs candidate qualification
@@ -1937,7 +1941,7 @@ embedded input record and passed both `pack` and a separate `verify` invocation.
 The payload is 131,792,120 bytes and expands to 528,482,304 bytes. All 337 Rust
 tests, 128 CI Python helpers, 51 Yocto JavaScript tests and 81 Yocto Python tests
 pass, along with Clippy and Rust 1.89 checks. The
-[candidate evidence](data/ota-image-candidate-20261016.json) records exact hashes,
+candidate evidence (`ota-image-candidate-20261016`) records exact hashes,
 compiler/input records and local logs. This is local image qualification; no
 production feed or device rollout is claimed.
 
@@ -2008,7 +2012,7 @@ concurrency for one, four and eight assigned cores. Actionlint 1.7.12 passes. A
 real Docker smoke test exercised source transfer, four-core/12 GiB limits,
 credential exclusion, output collection and container removal in 1.336 seconds;
 its synthetic payload was not an image qualification. The
-[runner preparation evidence](data/ota-standard-runner-20261016.json) records
+runner preparation evidence (`ota-standard-runner-20261016`) records
 component and log hashes. These preparation checks did not establish a successful
 cold build on the standard GitHub runner. The workflow was locally prepared at
 that checkpoint; publication, unchanged-source skipping and device qualification
@@ -2029,7 +2033,7 @@ cold build of `cfd20a1`, with four assigned CPUs and 12 GiB, subsequently failed
 the recipe's source-provenance check before compiling Space Wars. Its retained
 log does not establish the exact source mismatch, and it provides no capacity
 pass. Neither probe proves hosted free-space capacity. The
-[cold-container evidence](data/ota-cold-container-20261016.json) records source,
+cold-container evidence (`ota-cold-container-20261016`) records source,
 policy, exact payloads and resource limits. The next hosted probe uses a dedicated
 manual branch and a non-production artifact name, without signing keys or feed
 write access.
@@ -2039,7 +2043,7 @@ sample was 15,945,320 KiB, already above the workflow's 12 GiB container limit.
 This is not a continuous peak measurement or a constrained-runner failure.
 Source-provenance diagnosis and a successful constrained build remain required
 before claiming standard-runner fit; memory tuning may also be needed. The
-[combined build evidence](data/ota-integrated-image-20261017.json) retains both
+combined build evidence (`ota-integrated-image-20261017`) retains both
 the failed cold-build log identity and the workstation memory observation.
 
 ## GitHub candidate origin admission
@@ -2111,7 +2115,7 @@ jobs in main CI run `38964193098`, attempt 1, at
 its 246,622-byte timing artifact. This is API compatibility evidence, not an OTA
 candidate or validation of the unpushed OTA branch. The adapter follows GitHub's
 [artifact API](https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28).
-The [admission evidence](data/ota-admission-20261016.json) records exact source,
+The admission evidence (`ota-admission-20261016`) records exact source,
 test results, live run/artifact identities and remaining integration boundaries.
 
 ## Combined publisher candidate qualification
@@ -2177,7 +2181,7 @@ A combined check on the real `7673fa1` image passed in 57.360 seconds, using
 the actual Rust validator and three origin inspections around download and
 validation. Its GitHub records were fixtures, not live CI evidence; the saved
 test output explicitly does not identify an admitted publisher revision.
-The [combined-check evidence](data/ota-publisher-candidate-20261016.json) records
+The combined-check evidence (`ota-publisher-candidate-20261016`) records
 the image/tool/component hashes and test logs. Live hosted qualification,
 protected publication and physical Pi rollout remain unverified.
 
@@ -2293,7 +2297,7 @@ credential/threshold separation, approval before key access, unchanged-byte
 promotion, retained compatibility candidates, version/hash rollback checks and
 composition into a feed accepted by Release and Nightly consumers. Clippy,
 formatting, and Rust 1.89 checks for both publisher and default service builds
-pass. The [signing evidence](data/ota-signing-20261016.json) records the exact
+pass. The signing evidence (`ota-signing-20261016`) records the exact
 source, logs and remaining workflow/production prerequisites.
 
 ## Durable publisher checkpoints
@@ -2377,9 +2381,9 @@ GitHub responses; it does not prove live CI admission, device selection or a Pi
 boot. CI now requires the small disposable-key fixture. Local validation passed
 341 Rust cases (316 unit, 22 integration, three CLI; eight opt-in cases ignored),
 175 Python cases, Clippy, formatting, both workflow lint checks and Rust 1.89
-publisher/service checks. The [checkpoint evidence](data/ota-publisher-journal-20261016.json)
+publisher/service checks. The checkpoint evidence (`ota-publisher-journal-20261016`)
 records the exact files, logs and outstanding production integration.
-The subsequent [sealed-manifest evidence](data/ota-publication-sealing-20261016.json)
+The subsequent sealed-manifest evidence (`ota-publication-sealing-20261016`)
 adds expiry-safe reconciliation and abandonment checks: 181 Python cases and the
 signed-delivery Rust integration case pass, and both signed fixtures pass again.
 The subsequent four-core/12 GiB cold build failed source-provenance validation
@@ -2477,7 +2481,7 @@ Validation passed 297 OTA unit tests, 22 signed-feed integration tests, the fina
 packaging/publication checks. Clippy, formatting and Rust 1.89 checks pass.
 The initial helper run lacked PowerShell; a checksum-verified copy was unpacked
 only under the ignored build directory before the successful complete rerun.
-The [publication evidence](data/ota-publication-20261016.json) records source and
+The publication evidence (`ota-publication-20261016`) records source and
 log hashes, exact validation scope and the read-only public asset probe. These
 checks authenticate and preserve selected bytes; a compromised authorized build
 or signer can still produce a validly signed malicious image.
@@ -2622,12 +2626,12 @@ connections encountered a banner timeout before trust provisioning, and the
 subsequent run completed without a service restart or reboot.
 
 Those initial native checks used the corrected in-memory time validator and
-left the installed service unchanged. The [live trust record](data/ota-owner-feed-20261017.json)
+left the installed service unchanged. The live trust record (`ota-owner-feed-20261017`)
 retains their public pins, helper hashes and evidence. The
 [owner-selected signed installer](ota-recovery-qualification.md#owner-selected-signed-trial)
 then passed empty-feed refusal checks and independent image qualification.
 
-The subsequent [physical signed trials](data/ota-signed-trials-20261017.json)
+The subsequent physical signed trials (`ota-signed-trials-20261017`)
 published real Nightly images, staged them through native HTTPS/signature checks
 and installed them on both primary Pis. Both returned to their prior good root
 after a deliberately stopped kiosk, quarantined the failed payload, and later
@@ -2695,7 +2699,7 @@ Checks cover every reported persistence boundary, abrupt process exit after
 directory publication, changed selection/device/data identity, missing/corrupt
 state, unsafe links/permissions, and retention of rotated trust and time/replay
 floors. Clippy, Rust 1.89 and AArch64 compilation also passed. The
-[provisioning evidence](data/ota-provision-20261016.json) records exact source,
+provisioning evidence (`ota-provision-20261016`) records exact source,
 test scope and build-configuration checks. Pi tests use private UID-1000
 directories and injected runtime observations; they do not provision the installed
 service or prove physical power-loss recovery.
@@ -2771,7 +2775,7 @@ compilation and formatting passed. These runs exercise ordinary filesystem
 operations on the boards, not the production root-owned staging opener, a live
 download, actual disk exhaustion or installation. The default parallel harness
 limitations and the isolated rerun are retained in the
-[source and validation evidence](data/ota-staging-20261016.json).
+source and validation evidence (`ota-staging-20261016`).
 
 ## Bounded HTTPS check and download session (#265)
 
@@ -2847,7 +2851,7 @@ open production staging, change the installed service, write a root partition or
 reboot. All 71 Yocto helper tests, Clippy, the Rust 1.89 compatibility check,
 AArch64 test compilation and formatting also passed. Exact source/artifact
 identities and outputs are recorded in the
-[download validation evidence](data/ota-download-20261016.json).
+download validation evidence (`ota-download-20261016`).
 
 The production service integration is described below. Initial owner-helper
 checks verified an empty signed feed after provisioning both primary Pis.
@@ -2901,7 +2905,7 @@ ignored, plus Clippy, Rust 1.89 compatibility, formatting and AArch64 compilatio
 The 45 update-schedule, time-schedule and time-runtime cases passed on both Pis
 (3.52 seconds on Pi 5; 3.25 seconds on Pi 4). Tests used isolated UID-1000 state
 and fake provider/network/time observations, with no installed service changes
-or reboot. The [schedule evidence](data/ota-update-schedule-20261016.json) records
+or reboot. The schedule evidence (`ota-update-schedule-20261016`) records
 the exact source, binaries and results.
 
 ### Dedicated download worker and network handoff
@@ -2972,7 +2976,7 @@ the explicit native preparation probe passed: the real held lock reported busy,
 and releasing it allowed the production preparation path to open the installed
 boot, recovery, trust and staging context. The installed images, services, boot
 selectors, update schedule and trust/recovery records stayed unchanged.
-[Source and test evidence](data/ota-startup-check-20261018.json) distinguishes
+Source and test evidence (`ota-startup-check-20261018`) distinguishes
 these probes from live startup qualification. Historical startup errors omitted
 their cause; the controlled reproduction does not recover that missing evidence.
 The subsequent signed canary and its remaining failures are recorded below;
@@ -2991,7 +2995,7 @@ for the empty Release feed.
 Both checks preserved the running image, boot and selected durable stores, and
 the same kiosk processes kept presenting frames. The Pi 5 was returned to Release
 through the ordinary channel API. No image was installed and no reboot was
-requested. The [retained report](data/ota-installed-worker-20261017.json) pins the
+requested. The retained report (`ota-installed-worker-20261017`) pins the
 installed images, runner and observations. Frame-time performance, partial-offline
 operation and restart/resume were not tested.
 
@@ -3008,7 +3012,7 @@ After its signed generation-two update and normal reboot, the second Picade's
 installed worker also passed an explicit Release check (`no-candidate` in 6.1
 seconds), with the same image, boot, kiosk instance and durable stores. Its
 initial automatic check had also reported `preparation-unavailable`. The
-[second Picade report](data/ota-second-picade-rollout-20261018.json) retains both.
+second Picade report (`ota-second-picade-rollout-20261018`) retains both.
 
 ### Signed startup canary and observation ordering (2026-10-18)
 
@@ -3064,7 +3068,7 @@ scoped Clippy, formatting and AArch64 compilation. On each of Pi 5 and Pi 4,
 the installed services. A signed deployment of it, successful normal
 startup and verified resumed-download checks, and frame-time qualification
 remain before unattended rollout. Exact identities, observed outcomes and
-validation are in the [canary and observation evidence](data/ota-network-observation-20261018.json).
+validation are in the canary and observation evidence (`ota-network-observation-20261018`).
 
 ### Network-idle sandbox qualification (2026-10-18)
 
@@ -3129,7 +3133,7 @@ check recorded `network-unavailable`; an explicit retry then completed with
 accepts the repaired record and the controller admits SSH without issuing a
 radio command. No image was installed. This is not a passing idle-cycle qualification,
 nor proof that the earlier Picade delay has the same cause. The
-[idle qualification evidence](data/ota-network-idle-20261018.json) retains exact
+idle qualification evidence (`ota-network-idle-20261018`) retains exact
 source, binary, image, probe, collected-trace and recovery identities. Diagnose
 native radio notifications, then correct the skipped-sync
 and restoration harness before repeating qualification or attempting unattended
@@ -3193,7 +3197,7 @@ SSH admission hook, kiosk and fresh SSH access. Selected durable stores survived
 only the adapter-local BlueZ GATT database regenerated across boots. Automatic
 publication and installation remain disabled; this is a supervised branch image,
 not an admitted main-branch nightly. Exact identities and receipts are in the
-[radio recovery evidence](data/ota-radio-recovery-20261018.json).
+radio recovery evidence (`ota-radio-recovery-20261018`).
 
 Normal boot did **not** pass automatic update qualification: its startup check
 ended with `network-unavailable`. A later explicit Release check completed
@@ -3254,7 +3258,7 @@ before NetworkManager startup completed at 11.034 seconds. Restarting the device
 service preserved the completed check, next daily deadline and running kiosk.
 Selected durable stores survived both boots; only the adapter-local BlueZ GATT
 database regenerated. Exact identities, receipts and artifact hashes are in the
-[startup and radio evidence](data/ota-startup-radio-20261018.json).
+startup and radio evidence (`ota-startup-radio-20261018`).
 
 A detached radio-only diagnostic then left SSH disconnected for 430 seconds,
 with independent bounded restoration. Wi-Fi turned off after 121 seconds. On
@@ -3312,7 +3316,7 @@ reads, correcting a cache-related assertion in its first run. Both runs retained
 the same production NetworkManager, boot, image, kiosk and selected store bytes.
 The final candidate test completed in 0.06 seconds. Formatting, Clippy with
 warnings denied, shell syntax and AArch64 test compilation passed.
-[Provider evidence](data/ota-profile-refresh-20261018.json) records the source
+Provider evidence (`ota-profile-refresh-20261018`) records the source
 archive, patch, executable and retained native test identities.
 
 This test is ignored in ordinary CI. Its
@@ -3362,7 +3366,7 @@ notification followed by true was also accepted. The diagnostic never called
 `GetSecrets` or exported real profile values. A fresh SSH login succeeded;
 boot, image, kiosk, selected saved-data bytes and original logging were preserved.
 
-[Installed image and radio evidence](data/ota-profile-image-20261018.json)
+Installed image and radio evidence (`ota-profile-image-20261018`)
 records the source, image/provider identities, signed publication, boot checks,
 radio trace summary and hashes of the retained private evidence.
 
@@ -3443,7 +3447,7 @@ remained responsive. Fresh access succeeded after staging. Its cause is not
 established; retain fresh-login latency in the payload/gameplay performance
 matrix rather than claiming this corrected image fixed that observation.
 
-[Second-Picade evidence](data/ota-picade2-profile-image-20261018.json) retains the
+Second-Picade evidence (`ota-picade2-profile-image-20261018`) retains the
 source, image, trial/review results, normal boot, both cycles and private-artifact
 hashes. This run did not access or update the primary Picade. Automatic publishing
 and installation remain disabled; PR review and the remaining #267 gates still
@@ -3483,7 +3487,7 @@ passed on each Pi (4.14 seconds on Pi 5; 5.36 seconds on Pi 4). The OTA suite pa
 276 unit and 22 signed-feed tests before the final service time-floor adjustment;
 the signed-feed and relevant downloader cases were rerun after that adjustment.
 Clippy, Rust 1.89, AArch64 compilation and 71 Yocto helper tests also passed.
-[Download runtime evidence](data/ota-update-runtime-20261016.json) records source
+Download runtime evidence (`ota-update-runtime-20261016`) records source
 identity, exact checks and fixture limits. The physical tests use injected
 network/provider observations and private UID-1000 directories; they do not
 qualify the installed native HTTP/boot path or its effect on game frame time.
@@ -3534,7 +3538,7 @@ The same AArch64 fixture binary passed all 21 tests on `sw-picade.local`
 durations, not update performance benchmarks. Tests ran as the kiosk account
 against private temporary directories and in-memory feeds.
 
-[Raw outputs and source/binary hashes](data/ota-verifier-20261014.json) record
+Raw outputs and source/binary hashes (`ota-verifier-20261014`) record
 the exact qualification. The library also passed host tests, scoped Clippy,
 Rust 1.89 compilation, and AArch64 cross-compilation. This establishes execution
 of the verification library on the two boards; it does not qualify trial boot,
