@@ -1,0 +1,30 @@
+From 2a6968b40378dca5650e18e03ad0407738c47be5 Mon Sep 17 00:00:00 2001
+From: Luiz Augusto von Dentz <luiz.von.dentz@intel.com>
+Subject: [PATCH] advertising: Fix sending extra bytes with MGMT_OP_ADD_EXT_ADV_DATA
+
+The extended advertising data command was sized with struct
+mgmt_cp_add_advertising, which is 8 bytes larger than struct
+mgmt_cp_add_ext_adv_data, so bluetoothd sent 8 trailing bytes after the
+scan response. Kernels since d3f7d17960ed ("Bluetooth: MGMT: validate
+Add Extended Advertising Data length") reject the command with Invalid
+Parameters, and every LEAdvertisingManager1.RegisterAdvertisement fails
+with org.bluez.Error.Failed. The pinned 6.12.93 Raspberry Pi kernel has
+that check and the Improv Wi-Fi provisioner restarted every five seconds.
+
+Upstream-Status: Backport [https://github.com/bluez/bluez/commit/2a6968b40378dca5650e18e03ad0407738c47be5]
+---
+ src/advertising.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+--- a/src/advertising.c
++++ b/src/advertising.c
+@@ -1364,8 +1364,7 @@
+ 		}
+ 	}
+ 
+-	param_len = sizeof(struct mgmt_cp_add_advertising) + adv_data_len +
+-							scan_rsp_len;
++	param_len = sizeof(*cp) + adv_data_len + scan_rsp_len;
+ 
+ 	cp = malloc0(param_len);
+ 	if (!cp) {
