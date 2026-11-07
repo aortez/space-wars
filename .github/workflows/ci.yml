@@ -220,7 +220,15 @@ jobs:
           python3 -m unittest discover -s .github/ci -p 'test_*.py'
           python3 -m unittest discover -s tools -p 'test_picade_input.py'
       - name: Check docs for private data and raw results
-        run: python3 .github/ci/check_docs_data.py
+        env:
+          BASE_REF: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git fetch --quiet --depth=1 origin "$BASE_REF"
+            python3 .github/ci/check_docs_data.py --baseline FETCH_HEAD
+          else
+            python3 .github/ci/check_docs_data.py
+          fi
       - name: Test recorded bot-trip analysis
         run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
       - name: Install pinned Rust compiler cache

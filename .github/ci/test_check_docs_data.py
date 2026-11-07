@@ -1,14 +1,18 @@
+import os
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
-from check_docs_data import LIMIT, check, identifier_findings, names
+from check_docs_data import LIMIT, check, identifier_findings, is_placeholder, names, referenced_names
 
 BIG = LIMIT + 1
 SMALL = LIMIT
 
 
-def run(files, texts=None, referenced=(), grandfathered=()):
+def run(files, texts=None, referenced=(), grandfathered=(), baseline=None):
     texts = texts or {}
-    return check(files, lambda path: texts.get(path, ""), set(referenced), list(grandfathered))
+    return check(files, lambda path: texts.get(path, ""), set(referenced), list(grandfathered), baseline)
 
 
 class SizeTests(unittest.TestCase):
@@ -17,10 +21,10 @@ class SizeTests(unittest.TestCase):
                  ("docs/screenshots/panel.png", BIG), ("docs/screenshots/flow.GIF", BIG)]
         self.assertIn("4 files", run(files))
 
-    def test_oversized_data_that_no_code_reads_fails(self):
+    def test_oversized_data_that_no_source_names_fails(self):
         for path in ["docs/data/raw-v1.json", "docs/data/raw-v1.json.gz", "docs/notes/dump.txt",
                      "docs/screenshots/manifest.json"]:
-            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "no code reads"):
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "no source file names"):
                 run([(path, BIG)])
 
     def test_oversized_data_that_code_reads_passes(self):
@@ -31,6 +35,8 @@ class SizeTests(unittest.TestCase):
         self.assertEqual(names("docs/data/trace-v1.json.gz"), {"trace-v1.json.gz", "trace-v1.json"})
         run([("docs/data/trace-v1.json.gz", BIG)], referenced={"trace-v1.json"})
 
+
+class GrandfatheredTests(unittest.TestCase):
     def test_grandfathered_file_passes_while_it_stays_oversized(self):
         files = [("docs/data/old-v1.json", BIG)]
         self.assertIn("1 grandfathered", run(files, grandfathered=["docs/data/old-v1.json"]))
@@ -38,6 +44,40 @@ class SizeTests(unittest.TestCase):
             run([], grandfathered=["docs/data/old-v1.json"])
         with self.assertRaisesRegex(ValueError, "no longer needs grandfathering"):
             run([("docs/data/old-v1.json", SMALL)], grandfathered=["docs/data/old-v1.json"])
+
+    def test_list_may_only_shrink_against_the_baseline(self):
+        files = [("docs/data/old-v1.json", BIG), ("docs/data/new-v1.json", BIG)]
+        both = ["docs/data/new-v1.json", "docs/data/old-v1.json"]
+        run(files, grandfathered=both, baseline=both)
+        run([files[0]], grandfathered=both[1:], baseline=both)
+        with self.assertRaisesRegex(ValueError, "new-v1.json: added to .*only shrinks"):
+            run(files, grandfathered=both, baseline=both[1:])
+
+    def test_without_a_baseline_additions_are_not_compared(self):
+        run([("docs/data/new-v1.json", BIG)], grandfathered=["docs/data/new-v1.json"])
+
+
+class ReferenceTests(unittest.TestCase):
+    def test_only_source_files_count_as_readers(self):
+        files = [("docs/data/big-results-v1.json", BIG)]
+        with tempfile.TemporaryDirectory() as directory:
+            cwd = os.getcwd()
+            os.chdir(directory)
+            try:
+                subprocess.run(["git", "init", "-q"], check=True)
+                Path("notes").mkdir()
+                Path("notes/results-index.txt").write_text("big-results-v1.json\n")
+                Path("README.md").write_text("See big-results-v1.json.\n")
+                Path("docs").mkdir()
+                Path("docs/index.py").write_text("'big-results-v1.json'\n")
+                subprocess.run(["git", "add", "."], check=True)
+                self.assertEqual(referenced_names(files), set())
+                Path("tools").mkdir()
+                Path("tools/read.py").write_text("load('docs/data/big-results-v1.json')\n")
+                subprocess.run(["git", "add", "."], check=True)
+                self.assertEqual(referenced_names(files), {"big-results-v1.json"})
+            finally:
+                os.chdir(cwd)
 
 
 class IdentifierTests(unittest.TestCase):
@@ -59,12 +99,29 @@ class IdentifierTests(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertEqual(identifier_findings("docs/x.md", line), ["docs/x.md:1: serial number"])
 
+    def test_real_credentials_with_placeholder_fragments_fail(self):
+        for line in ['"psk": "P9!m$T7qR2"', "password=Secret-7hR2xQ", 'wpa_passphrase="changeme-but-not-really"',
+                     "psk: my$ecretkey42"]:
+            with self.subTest(line=line):
+                self.assertEqual(identifier_findings("docs/x.md", line), ["docs/x.md:1: credential"])
+
+    def test_whole_placeholders_pass(self):
+        for value in ["MySecretPassword", "<the owner's passphrase>", "$WIFI_PSK", "${WIFI_PSK}", "%PSK%",
+                      "{{ wifi_psk }}", "...", "xxxxxxxx", "********", "changeme", "your-password-here",
+                      "REDACTED", "none"]:
+            with self.subTest(value=value):
+                self.assertTrue(is_placeholder(value))
+        for value in ["P9!m$T7qR2", "hunter2", "secret7", "my-secret-$value", "s3cret"]:
+            with self.subTest(value=value):
+                self.assertFalse(is_placeholder(value))
+
     def test_placeholders_and_prose_pass(self):
         lines = [
             "aa:bb:cc:dd:ee:ff and 00:00:00:00:00:00 stand in for a controller",
             '"password": "MySecretPassword"',
             "password=<the owner's passphrase>",
-            "psk=$WIFI_PSK",
+            "psk=$WIFI_PSK  # set by the owner",
+            "password: '...'",
             "The serialized receipts and serial match results are identical.",
             "Serialization: the records keep their original shape.",
             "The run took 01:02:03 and the next 04:05:06.",

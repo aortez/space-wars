@@ -10,9 +10,9 @@ workstation, and documents summarize them in prose. Private data is local only;
 there is no private repository for it.
 
 - Under `docs/`, a data file (JSON, CSV, text, HTML, a compressed archive and
-  the like) stays under 256 KiB unless code reads it. Markdown pages and
-  screenshots are not data files. CI runs `.github/ci/check_docs_data.py` on
-  every change.
+  the like) stays under 256 KiB unless code reads it, and the check looks for
+  the file's name in source files only. Markdown pages and screenshots are
+  not data files. CI runs `.github/ci/check_docs_data.py` on every change.
 - Nothing under `docs/` names a device: no serial numbers, MAC addresses, SSH
   keys or Wi-Fi credentials. Hostnames such as `sw-picade-2` are fine.
 - A file that code reads is the one exception, and its pull request says which
