@@ -5,8 +5,8 @@ one remaining ground stall is a turn the ground blocks: the motor holds a
 saturated turn one way against a surface that stops it, for thousands of
 ticks, because nothing in its eighteen inputs tells a blocked turn from a
 slow one. This stage gives the command between the navigation network and
-the motor a third element, a turn sense, which navigation sets from its view
-of the ground and the motor obeys. It began with a measurement: the 8-second
+the motor an advisory vector whose first element is a turn sense, which
+navigation sets from its view of the ground and the motor obeys. It began with a measurement: the 8-second
 asteroid stream, where [LF-099](flight-motor-contact-v1.md) found its one
 significant loss on 12 seeds, is level over 48, so the stage's case is the
 stall itself and the channel the lift-off will need, not a rate.
@@ -68,19 +68,25 @@ fails to move.
 
 ## The channel
 
-The command the navigation network issues gains a third element beside
-its heading and speed: the turn sense, left, right or free. The host holds
-it with the command for the same six ticks, carries it in `MotorCommand`,
-and gives it to the motor as a nineteenth input under a new motor contract,
-`planet-frame-heading-speed-sense-v3`, whose other eighteen inputs are the
-v2 ones. The navigation network produces it as a fourth head beside the
-direction pair and the speed, under `navigation-command-v3` and a new
-export format, so neither loader can misread the other's files, as the
-format rule has kept so far; the host thresholds the head at a half either
-way into the three values, so the motor trains and flies on a clean signal.
-Free is the whole of today's behaviour: a free sense leaves the motor's law
-as it is, and the v2 fixtures' flights are reproduced with a sense of zero
-before anything is fitted.
+The command the navigation network issues gains an advisory vector of
+four elements beside its heading and speed. The first is the turn sense,
+left, right or free; the other three are zero until a rule needs them, the
+lift-off's thrust permission the likely next. The host holds the vector with
+the command for the same six ticks, carries it in `MotorCommand`, and gives
+it to the motor as inputs nineteen to twenty-two under a new motor contract,
+`planet-frame-heading-speed-sense-v3`, whose first eighteen inputs are the
+v2 ones; the motor trains with the spare elements at zero, under a fixed
+scale rather than a measured one, and ignores them, so a later stage that
+uses one refits the networks but changes no contract, loader, fixture format
+or parity plumbing, which is most of what a stage costs. The navigation
+network produces the sense as a fourth head beside the direction pair and
+the speed, under `navigation-command-v3` and a new export format, so neither
+loader can misread the other's files, as the format rule has kept so far;
+the host thresholds the head at a half either way into the three values, so
+the motor trains and flies on a clean signal, and fills the spare elements
+with zero. Free is the whole of today's behaviour: a free sense leaves the
+motor's law as it is, and the v2 fixtures' flights are reproduced with a
+zero vector before anything is fitted.
 
 The alternative was a contact input in the motor. The ground is already in
 navigation's view, the decision needs the sweep rather than the tick, and

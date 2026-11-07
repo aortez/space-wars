@@ -131,9 +131,11 @@ transfer law handles both through gravity and target-velocity feedforward.
 5. **The command carries a turn sense.** Navigation, which sees the
    ground, decides which way the motor turns when the short way is
    blocked; the motor, which cannot see it, obeys and otherwise flies as
-   before. The sense is a third element of the command, left, right or
-   free, held with it for six ticks, a fourth head of the navigation
-   network and a nineteenth motor input. Navigation's law keeps a rotation
+   before. The sense is the first element of a four-element advisory
+   vector in the command, left, right or free, held with it for six ticks,
+   a fourth head of the navigation network and the motor's inputs nineteen
+   to twenty-two; the spare elements stay zero until a rule needs them, so
+   the next advisory changes no contract. Navigation's law keeps a rotation
    that makes progress, reverses a saturated one that makes none, and
    otherwise turns the nose away from the nearest surface, freeing the
    sense once the nose is within the thrust gate or the ship is clear of
