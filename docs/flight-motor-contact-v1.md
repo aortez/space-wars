@@ -1,7 +1,8 @@
 # The motor in ground contact and at the half turn (LF-099)
 
 **Status: done, 2026-11-06; the LF-099 motor and navigation networks replace
-the LF-095 pair in the v2 fixtures, and the climb legs fly with them.** The
+the LF-095 pair in the v2 fixtures, and the climb legs fly with them and are
+retained.** The
 motor now trains on climbs that start on the ground, come down onto it or
 begin with the goal behind the nose, under a teacher whose thrust waits for
 the nose and whose turn near the half turn keeps its direction. The ground
@@ -376,6 +377,23 @@ past 600 ticks is seed 48 seat 0's. It flies 37 percent of the ticks aboard
 on the default seeds against 41.6 for the LF-095 stack, which flew 25,865 of
 them in stuck climbs.
 
+## Retention
+
+The climb legs join the retained flight with the LF-099 networks
+(2026-11-06). LF-098 kept them out until the motor handled contact and the
+half turn, and the two stalls it found are gone from the default seeds'
+traces. Against the transfer legs alone, the flight on main, the LF-099
+stack is level under the default settings (-0.32, -1.08 to +0.46) and loose
+dirt (-0.74, -3.04 to +1.61), ahead under the 3-second stream (+2.15, +0.15
+to +4.18) and behind under the 8-second stream, though within the variation
+of its seats (-1.42, -3.28 to +0.56). Under the default settings it also
+runs 13 legs past 2,000 ticks against 23, spins on 16 percent of its flown
+ticks against 29 and wins 95 decided matches to 72 against 81 to 87. The
+8-second stream takes the place of the 3-second one as the weak spot: there
+the learned seats hand off 5.95 times per ten minutes against the
+native-only seats' 7.00, a gap about the size of the one the transfer legs
+alone leave under the 3-second stream, 6.11 against 7.01.
+
 ## What is left
 
 - **A turn the ground blocks.** Seed 48 seat 0 under the 8-second stream sat
@@ -397,13 +415,6 @@ them in stuck climbs.
   run of that condition would tell match flow from flight.
 - **The navigation network's held-out imitation**, 66 of 84 against its
   law's 79, chosen over a closer fit by the matches.
-- **Retention.** LF-098 kept the climb legs out of the retained flight until
-  the motor handled contact and the half turn. Against the transfer legs
-  alone, the flight on main, the LF-099 stack is level under the default
-  settings (-0.32, -1.08 to +0.46) and loose dirt (-0.74, -3.04 to +1.61),
-  ahead under the 3-second stream (+2.15, +0.15 to +4.18) and behind under
-  the 8-second stream, though within the variation of its seats (-1.42,
-  -3.28 to +0.56).
 
 ## Evidence
 
