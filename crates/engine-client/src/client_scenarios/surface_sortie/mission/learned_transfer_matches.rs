@@ -14,12 +14,15 @@
 //! prefixes under the default settings; `SPACEWARS_MATCH_SECONDS=<seconds>`
 //! plays longer, `SPACEWARS_MATCH_ASTEROIDS=<seconds>` adds an asteroid
 //! stream at that mean interval and `SPACEWARS_MATCH_DIRT=<mode>` turns on
-//! loose dirt of that mode, such as `round`.
+//! loose dirt of that mode, such as `round`. With
+//! `SPACEWARS_MATCH_CONTACT_HANDBACK` set, the learned host leaves the leg
+//! ticks on which the ship touches a surface to the pilot's own controls, a
+//! diagnostic of what the stack's flying there costs.
 use super::*;
 use engine_common::SpacewarsController::{self, LearnedFlightBot, RecoveryBot};
 use serde::Serialize;
 use spacewars_ai::mission_learned_transfer::LearnedTransferTelemetry;
-use spacewars_ai::mission_pilot::MissionGoal;
+use spacewars_ai::mission_pilot::{LegKind, MissionGoal};
 
 const STEP: Duration = Duration::from_nanos(16_666_667);
 const SEEDS: [u64; 6] = [1, 2, 3, 4, 5, 6];
@@ -123,6 +126,15 @@ fn candidate_host() -> Option<spacewars_ai::mission_learned_transfer::LearnedTra
     Some(spacewars_ai::mission_learned_transfer::LearnedTransferHost::with_stack(stack, 2).unwrap())
 }
 
+/// The contact handback the environment asks for, on the host the match flies.
+fn contact_handback(host: &mut MaterialMissionClientScenario) {
+    if std::env::var_os("SPACEWARS_MATCH_CONTACT_HANDBACK").is_some()
+        && let Some(learned) = host.learned.as_mut()
+    {
+        learned.set_contact_handback(true);
+    }
+}
+
 fn run(seed: u64, controllers: [SpacewarsController; 2]) -> MatchReport {
     let mut client = create_match(
         seed,
@@ -141,6 +153,12 @@ fn run(seed: u64, controllers: [SpacewarsController; 2]) -> MatchReport {
             host.learned = Some(candidate);
         }
     }
+    contact_handback(
+        client
+            .as_any_mut()
+            .downcast_mut::<MaterialMissionClientScenario>()
+            .unwrap(),
+    );
     for _ in 0..seconds() * 60 {
         client.step(&[], STEP);
         if client.is_game_over() {
@@ -298,6 +316,12 @@ fn trace_learned_transfer_seat() {
             .unwrap();
         host.learned = Some(candidate);
     }
+    contact_handback(
+        client
+            .as_any_mut()
+            .downcast_mut::<MaterialMissionClientScenario>()
+            .unwrap(),
+    );
     let directory =
         std::path::PathBuf::from(std::env::var_os("SPACEWARS_MATCH_ARTIFACTS").unwrap());
     std::fs::create_dir_all(&directory).unwrap();
@@ -334,7 +358,7 @@ fn trace_learned_transfer_seat() {
         .unwrap();
         file
     });
-    writeln!(out, "tick\tgoal\treason\ttarget\tframe\taltitude\tleg\tflying\tattempt\telapsed\tdistance\tspeed_error\tship_speed\toutcome\tcommand_speed\tcommand_heading\theat_clearance\tsurface_clearance\tsteering\tthrust\tbrake\tspin\theading_error\tnavigation_tick\tlocation\tship_form\tship_health\tpilot_health\topponent_distance\twithheld\tentry").unwrap();
+    writeln!(out, "tick\tgoal\treason\ttarget\tframe\taltitude\tleg\tflying\tattempt\telapsed\tdistance\tspeed_error\tship_speed\toutcome\tcommand_speed\tcommand_heading\theat_clearance\tsurface_clearance\tsteering\tthrust\tbrake\tspin\theading_error\tnavigation_tick\tlocation\tship_form\tship_health\tpilot_health\topponent_distance\twithheld\tentry\tkind").unwrap();
     for _ in 0..seconds() * 60 {
         client.step(&[], STEP);
         let host = client
@@ -345,7 +369,7 @@ fn trace_learned_transfer_seat() {
         let o = host.sortie.state.mission_observation(seat, None);
         let p = &o.local.combat.recovery.flight.pilot;
         let altitude = p.ship.position.distance_to(p.planet.motion.position) - p.planet.radius;
-        let leg = host.pilots[seat].transfer_leg();
+        let leg = host.pilots[seat].flight_leg();
         let learned = host.learned.as_ref().unwrap();
         let status = learned.telemetry(seat).last;
         let decision = learned.last_decision(seat);
@@ -412,10 +436,11 @@ fn trace_learned_transfer_seat() {
         // The entry a published leg flies to: the ordinary one, a clear
         // alternate bearing, or the ordinary one though blocked.
         let entry = match (leg, ordinary) {
+            (Some(leg), _) if leg.kind == LegKind::Climb => "climb",
             (Some(leg), Some((target, entry))) => {
-                if leg.entry.distance_to(entry) > 0.5 {
+                if leg.goal.distance_to(entry) > 0.5 {
                     "alternate"
-                } else if inside(leg.entry, target).is_some() {
+                } else if inside(leg.goal, target).is_some() {
                     "blocked"
                 } else {
                     "ordinary"
@@ -426,7 +451,7 @@ fn trace_learned_transfer_seat() {
         };
         writeln!(
             out,
-            "{}\t{:?}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{:.2}\t{}\t{}\t{:?}\t{:?}\t{:.0}\t{:.0}\t{}\t{}\t{}",
+            "{}\t{:?}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.1}\t{}\t{}\t{}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{:.2}\t{}\t{}\t{:?}\t{:?}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{}",
             host.sortie.state.tick(),
             telemetry.goal,
             telemetry.reason.unwrap_or(""),
@@ -463,6 +488,10 @@ fn trace_learned_transfer_seat() {
             )),
             withheld,
             entry,
+            leg.map_or("-", |l| match l.kind {
+                LegKind::Transfer => "transfer",
+                LegKind::Climb => "climb",
+            }),
         )
         .unwrap();
         if let Some(file) = &mut dumped
@@ -503,7 +532,7 @@ fn trace_learned_transfer_seat() {
                 serde_json::json!({
                     "tick": state.tick(),
                     "inputs": observation,
-                    "goal": {"position": leg.entry, "velocity": leg.entry_velocity},
+                    "goal": {"position": leg.goal, "velocity": leg.goal_velocity},
                     "ship": {"position": own.ship.position, "velocity": own.ship.velocity, "angle": own.ship.angle, "spin": own.ship.spin,
                              "frame_velocity": own.frame_velocity, "planet": own.planet, "planet_velocity": own.planet_motion.velocity,
                              "gravity": own.gravity, "applied": own.applied, "forward_speed": own.flight.forward_speed,

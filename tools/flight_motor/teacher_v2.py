@@ -1,4 +1,4 @@
-"""Planet-frame motor teacher v6: the v5 attitude law with the brake's share taken out of it.
+"""Planet-frame motor teacher v7: the v6 law with a thrust that waits for the nose and a committed half turn.
 
 The v2 motor contract commands heading and speed relative to the pilot's planet
 frame, the frame the physical brake decelerates toward, with gravity and planet
@@ -8,8 +8,12 @@ gravity component along the nose, and at zero command a turn of the nose
 against gravity so the ship hovers on thrust instead of sinking at the brake's
 terminal rate. The v6 law (LF-091) leaves the overspeed the brake sheds, down
 to crawling speeds, and a speed the nose already exceeds out of the attitude
-error, so the nose no longer reverses for them; `GAINS_V5` keeps the v5 law.
-It is a training target only; the exported network owns every control.
+error, so the nose no longer reverses for them. The v7 law (LF-099) holds the
+thrust until the nose comes around to its attitude vector, so a ship on the
+ground does not pin itself against the ground while it turns, and keeps a
+turn near the half turn in the direction it started; `GAINS_V6` and
+`GAINS_V5` keep the earlier laws. It is a training target only; the exported
+network owns every control.
 """
 import argparse
 import json
@@ -71,16 +75,45 @@ TURN_SPEED = teacher.TURN_SPEED
 # goal does not overshoot its command by the thrust's first tick. stop_hold:
 # when set, a stop in free space keeps the nose where it is instead of
 # turning it to the commanded heading, which near the goal points anywhere;
-# under gravity the nose still turns against it. brake_share,
-# brake_share_speed and attitude_forward make the v6 law; the rest are
-# inert at their defaults.
+# under gravity the nose still turns against it. thrust_gate: the angles
+# between the nose and the attitude vector, (open, closed) in radians, over
+# which the moving thrust fades from full to none, so the thrust waits for
+# the nose: a ship lying on its side that thrusts while it turns pushes into
+# the ground and the contact holds the turn (LF-099). thrust_lift: (up_open,
+# up_closed, speed_full, speed_none), which reopens that gate under gravity
+# while the nose lies within up_open to up_closed radians of gravity's
+# opposite and the relative speed is under speed_full to speed_none, since
+# there the thrust lifts the ship instead of pinning it: a climb at the
+# launch band's edge whose nose is still turning, or a ship on its feet,
+# otherwise waits on a turn that is slow or blocked (LF-099). half_turn: the width
+# in radians of the band short of a half turn, of the heading error or of
+# the attitude vector's angle from the nose, in which a saturated turn
+# keeps the direction its previous steering gave it, half_turn_gain times
+# that steering plus half_turn_bias toward the shorter turn, so a target
+# behind the nose has one turn direction the fit can follow instead of a
+# jump from full one way to full the other where the attitude vector
+# crosses behind the nose, at which the fit passes through zero; gravity
+# and the brake's share put that crossing short of the heading error's
+# half turn (LF-098's seed 66 held a heading error of 2.7). brake_floor: the relative
+# speeds (low, high) over which the moving brake fades in, so a ship at rest
+# does not brake on the direction of its jitter: on the ground the brake
+# holds the hull against the pivot that turns it upright. brake_share,
+# brake_share_speed and attitude_forward make the v6 law, and thrust_gate and
+# half_turn added to it the v7 law; LF-099 tried thrust_lift and brake_floor
+# and left them out (docs/flight-motor-contact-v1.md). The rest are inert at
+# their defaults.
 GAINS_V5 = {'thrust': .1, 'attitude': .04, 'hold': 2., 'brake': .1, 'lateral': .2, 'lateral_deadband': .5, 'spin': 2.,
             'hover_start': .5, 'hover_full': 1.5}
 # The v6 law: the v5 gains with the brake's share of the error left out of the
 # attitude vector down to 2.5 units per second and no reversal for a speed the
 # nose already exceeds. Judged with the navigation law flying it on the
 # practice and transfer families (docs/flight-motor-steering-v1.md).
-GAINS = dict(GAINS_V5, brake_share=1., brake_share_speed=2.5, attitude_forward=0.)
+GAINS_V6 = dict(GAINS_V5, brake_share=1., brake_share_speed=2.5, attitude_forward=0.)
+# The v7 law: the v6 gains with the thrust faded out as the nose turns from
+# 0.35 to 0.7 radians off its attitude vector and the half-turn band 0.7
+# radians wide. Judged on the contact sets and with the navigation law flying
+# it (docs/flight-motor-contact-v1.md).
+GAINS = dict(GAINS_V6, thrust_gate=(.35, .7), half_turn=.7)
 DEFAULT_BRIDGE = 'target/ci/examples/flight_motor_bridge'
 GRAVITY_ALTITUDES = (150., 100., 60., 30.)
 # A deterministic matrix: gravity off or on at four altitudes, planet spin, the
@@ -152,12 +185,37 @@ def teacher_v2(x, gains=GAINS):
     floor = gains.get('attitude_floor', 0.)
     magnitude = torch.ones_like(pursued) if floor <= 0. else (torch.hypot(tx, ty) / floor).clamp(0., 1.)
     spin_moving = (gains['spin'] * pursued * magnitude).clamp(-TURN_SPEED, TURN_SPEED)
+    band = gains.get('half_turn', 0.)
+    if band > 0.:
+        # With the command short of a half turn behind the nose, a turn the
+        # ordinary law saturates keeps the direction the previous steering
+        # gave it, and only a ship that was not turning takes the shorter
+        # turn. The band's outer half blends from the ordinary law into it,
+        # and an attitude vector near the nose, a hover with a slow command
+        # behind it, keeps the ordinary law.
+        ramp = lambda angle: ((angle.abs() - (math.pi - band)) / (band / 2.)).clamp(0., 1.)
+        behind = torch.maximum(ramp(delta), ramp(pursued))
+        saturated = ((pursued.abs() - TURN_SPEED / gains['spin']) / .3).clamp(0., 1.)
+        committed = (-gains.get('half_turn_gain', 3.) * x[:, 15]
+                     + gains.get('half_turn_bias', .5) * torch.sign(pursued)).clamp(-1., 1.) * TURN_SPEED
+        spin_moving = spin_moving + behind * saturated * (committed * magnitude - spin_moving)
     # Thrust is the projection of the required acceleration onto the nose: the
     # proportional term plus the gravity feedforward.
     soft = gains.get('thrust_soft', 0.)
     softness = torch.ones_like(ey) if soft <= 0. else (ey.abs() / soft).clamp(0., 1.)
     thrust_moving = (gains['thrust'] * softness * ey - gy / GRAVITY_SCALE).clamp(0., 1.)
     against = torch.atan2(gx, -gy)
+    gate = gains.get('thrust_gate')
+    if gate is not None:
+        opened, closed = gate
+        held = ((closed - pursued.abs()) / (closed - opened)).clamp(0., 1.)
+        lift = gains.get('thrust_lift')
+        if lift is not None:
+            up_open, up_closed, speed_full, speed_none = lift
+            upright = ((up_closed - against.abs()) / (up_closed - up_open)).clamp(0., 1.)
+            slow = ((speed_none - torch.hypot(vx, vy)) / (speed_none - speed_full)).clamp(0., 1.)
+            held = torch.maximum(held, upright * slow * hover)
+        thrust_moving = thrust_moving * held
     reversed_ = (-x[:, 0] * vx + x[:, 1] * vy) < 0.
     # The v4 lateral damping: brake on relative velocity across the commanded
     # course beyond a deadband, which thrust along the course then restores.
@@ -168,6 +226,10 @@ def teacher_v2(x, gains=GAINS):
     lateral = (gains['lateral'] * (1. - hover) * (across - gains['lateral_deadband']).clamp_min(0.)).clamp(0., 1.)
     brake_moving = torch.where(reversed_, torch.ones_like(vy),
                                torch.maximum((gains['brake'] * overspeed).clamp(0., 1.), lateral))
+    floor_speeds = gains.get('brake_floor')
+    if floor_speeds is not None:
+        low, high = floor_speeds
+        brake_moving = brake_moving * ((torch.hypot(vx, vy) - low) / (high - low)).clamp(0., 1.)
     # Stopping: face the commanded heading or, under gravity, turn against it and hover.
     hovered = delta + hover * torch.atan2((against - delta).sin(), (against - delta).cos())
     hovered = torch.atan2(hovered.sin(), hovered.cos())
@@ -325,6 +387,199 @@ def cruise_tasks(seed, bridge=None):
     return rows
 
 
+def world_start(rng, bearing, offset, altitude, planet_spin, up, tangent, delta):
+    """A gravity start whose velocity relative to the frame is given along the local up and its tangent instead of the command's axes."""
+    s = start(rng, bearing, offset, altitude, True, planet_spin, 0., 0., 0., 0., delta)
+    ux, uy = -math.sin(bearing), math.cos(bearing)
+    s['relative_velocity'] = {'x': ux * up + uy * tangent, 'y': uy * up - ux * tangent}
+    return s
+
+
+def wrap(angle):
+    return math.atan2(math.sin(angle), math.cos(angle))
+
+
+def admitted(bridge, rng, make):
+    """A task row from make(rng), drawn again while the bridge rejects its start, as an arena start can meet terrain or the other seat."""
+    for _ in range(100):
+        row = make(rng)
+        if bridge is None:
+            return row
+        try:
+            bridge.call('reset', tasks=[row['task']])
+            return row
+        except RuntimeError as error:
+            if 'initial' not in str(error) and 'transfer' not in str(error):
+                raise
+    raise RuntimeError('no admitted start')
+
+
+def contact_task(rng, world, attitude, tilt, speed, altitude, up=0., tangent=0., heading=None):
+    """A contact-allowed v2 task under gravity: the ship's nose `attitude` radians from the local up, the command `tilt` from it, or `heading` from the up when given."""
+    bearing = rng.uniform(-math.pi, math.pi)
+    offset = tilt if heading is None else heading
+    arena = world == 'arena'
+    planet_spin = 0. if arena else rng.choice([-.015, 0., .015])
+    task = {'start': world_start(rng, bearing, offset, altitude, planet_spin, up, tangent, wrap(offset - attitude)),
+            'heading_delta': wrap(offset - attitude), 'speed': speed, 'deadline_ticks': 600, 'contract': CONTRACT,
+            'contact_allowed': True}
+    if arena:
+        planet = rng.randrange(3)
+        task['transfer'] = {'layout': ARENA_LAYOUT, 'start_planet': planet, 'goal_planet': (planet + 1) % 3}
+    return task
+
+
+GROUND_ATTITUDES = (0., 1., -1., math.pi / 2, -math.pi / 2, 2.4, -2.4, math.pi)
+CLIMB_SPEEDS = (20., 40., 57.)
+
+
+def ground_tasks(seed, bridge=None):
+    """Climbs from the ground, 96 tasks: the ship falls from altitude 15 with its nose at one of eight attitudes and the controls neutral until it rests, then a command up within 0.4 radians at a climb speed.
+
+    The launch climb begins on the ship's feet and a climb that came down
+    begins on its side or nose; the motor's other tasks end on contact.
+    """
+    rng = random.Random(seed); rows = []
+    for world in ('practice', 'arena'):
+        for attitude in GROUND_ATTITUDES:
+            for speed in CLIMB_SPEEDS:
+                for _ in range(2):
+                    row = admitted(bridge, rng, lambda r: {'task': contact_task(r, world, attitude, r.uniform(-.4, .4), speed, 15.)})
+                    rows.append({'index': len(rows), 'family': 'ground_' + world, 'mode': 'attitude%+.1f' % attitude,
+                                 'level': 'speed%d' % speed, 'direction': 'up', 'settle': True, 'task': row['task']})
+    return rows
+
+
+def falling_tasks(seed, bridge=None):
+    """Climbs begun low and falling with the nose turned away, 80 tasks: altitude 18 or 30, the nose 1.6 to 3.14 radians from the local up, falling at 5 or 12, a command up within 0.4 radians."""
+    rng = random.Random(seed); rows = []
+    for world in ('practice', 'arena'):
+        for altitude in (18., 30.):
+            for attitude in (1.6, -1.6, 2.4, -2.4, math.pi):
+                for fall in (5., 12.):
+                    for speed in (20., 57.):
+                        row = admitted(bridge, rng, lambda r: {'task': contact_task(r, world, attitude, r.uniform(-.4, .4), speed, altitude, up=-fall)})
+                        rows.append({'index': len(rows), 'family': 'falling_' + world, 'mode': 'attitude%+.1f' % attitude,
+                                     'level': 'speed%d' % speed, 'direction': 'altitude%d_fall%d' % (altitude, fall), 'task': row['task']})
+    return rows
+
+
+def half_turn_tasks(seed, bridge=None):
+    """Commands behind the nose, 80 tasks: the command 2.6, 2.9 or 3.14 radians off the nose, up or along the tangent, at 20 or 57, from rest or falling at 10, at altitude 80 above the practice planet or 40 above an arena planet."""
+    rng = random.Random(seed); rows = []
+    for world, altitude in (('practice', 80.), ('arena', 40.)):
+        for delta in (2.6, -2.6, 2.9, -2.9, math.pi):
+            for direction in ('up', 'tangent'):
+                for speed in (20., 57.):
+                    for fall in (0., 10.):
+                        def make(r):
+                            heading = 0. if direction == 'up' else r.choice([-1., 1.]) * math.pi / 2
+                            return {'task': contact_task(r, world, wrap(heading - delta), 0., speed, altitude, up=-fall, heading=heading)}
+                        row = admitted(bridge, rng, make)
+                        rows.append({'index': len(rows), 'family': 'half_turn_' + world, 'mode': 'delta%+.1f' % delta,
+                                     'level': 'speed%d' % speed, 'direction': '%s_fall%d' % (direction, fall), 'task': row['task']})
+    return rows
+
+
+def drifting_turn_tasks(seed, bridge=None):
+    """Climb commands behind a drifting nose, 64 tasks: a command up at 57 with the nose 2.4 to 3.0 radians off it, drifting along the tangent at 20 or 40 either way, level or falling at 5, at altitude 90 above the practice planet.
+
+    The match's dead spot (LF-098, seed 66 seat 0) held a heading error of
+    2.7 with the ship drifting sideways, where gravity and the brake's share
+    put the teacher's attitude vector behind the nose; the half-turn set
+    starts at rest or falling only.
+    """
+    rng = random.Random(seed); rows = []
+    for delta in (2.4, 2.6, 2.8, 3.0):
+        for side in (-1., 1.):
+            for drift in (20., 40.):
+                for direction in (-1., 1.):
+                    for fall in (0., 5.):
+                        row = admitted(bridge, rng, lambda r: {'task': contact_task(r, 'practice', wrap(-side * delta), 0., 57., 90., up=-fall,
+                                                                                    tangent=direction * drift, heading=0.)})
+                        rows.append({'index': len(rows), 'family': 'drifting_turn', 'mode': 'delta%+.1f' % (side * delta),
+                                     'level': 'drift%+d' % (direction * drift), 'direction': 'fall%d' % fall, 'task': row['task']})
+    return rows
+
+
+def tilted_climb_tasks(seed, bridge=None):
+    """Climbs begun hovering with the nose tilted, 48 tasks: at rest 70 units above the practice planet or an arena planet, the nose 0.5, 0.7 or 0.9 radians either side of the local up, a command up within 0.2 radians at 40 or 57.
+
+    A pursuit climb at the launch band's edge with the opponent far away
+    releases as soon as the ship rises above 70 and starts again below it,
+    so each attempt lasts a few ticks with the nose still turning: a thrust
+    that waits for the nose leaves the ship hovering at the edge (LF-099,
+    seed 41 seat 0). The recovered tick measures how soon the climb starts.
+    """
+    rng = random.Random(seed); rows = []
+    for world in ('practice', 'arena'):
+        for attitude in (.5, -.5, .7, -.7, .9, -.9):
+            for speed in (40., 57.):
+                for _ in range(2):
+                    row = admitted(bridge, rng, lambda r: {'task': contact_task(r, world, attitude, r.uniform(-.2, .2), speed, 70.)})
+                    rows.append({'index': len(rows), 'family': 'tilted_climb_' + world, 'mode': 'attitude%+.1f' % attitude,
+                                 'level': 'speed%d' % speed, 'direction': 'up', 'task': row['task']})
+    return rows
+
+
+def random_contact_task(rng):
+    """A rollout row from the contact families: a climb from the ground, a low falling climb or a command behind the nose, with random parameters."""
+    kind = rng.choice(('ground', 'falling', 'half_turn'))
+    world = 'arena' if rng.random() < .5 else 'practice'
+    speed = rng.uniform(10., MAX_SPEED)
+    if kind == 'ground':
+        attitude = rng.uniform(-math.pi, math.pi)
+        return {'task': contact_task(rng, world, attitude, rng.uniform(-.6, .6), speed, 15.), 'settle': True}
+    if kind == 'falling':
+        attitude = rng.choice([-1., 1.]) * rng.uniform(1., math.pi)
+        altitude = rng.uniform(16., 40.)
+        return {'task': contact_task(rng, world, attitude, rng.uniform(-.6, .6), speed, altitude, up=-rng.uniform(2., 15.))}
+    delta = rng.choice([-1., 1.]) * rng.uniform(2.2, math.pi)
+    altitude = rng.uniform(20., 60.) if world == 'arena' else rng.uniform(30., 150.)
+    heading = rng.uniform(-2 * math.pi / 3, 2 * math.pi / 3)
+    return {'task': contact_task(rng, world, wrap(heading - delta), 0., speed, altitude, up=-rng.uniform(0., 12.), heading=heading)}
+
+
+SETTLE_LIMIT = 150
+SETTLE_REST = 10
+
+
+def settle(bridge, item):
+    """Neutral controls until the ship has rested in contact for ten ticks, at most 150 ticks; returns the item and the ticks spent."""
+    ticks = 0; resting = 0
+    while item['progress']['outcome'] is None and resting < SETTLE_REST and ticks < SETTLE_LIMIT:
+        item = bridge.call('step', actions=[{'steering': 0., 'thrust': 0., 'brake': 0.}])['items'][0]; ticks += 1
+        speed = math.hypot(item['inputs'][3], item['inputs'][4]) * SCALE
+        resting = resting + 1 if item['evidence']['collision'] and speed < 1. else 0
+    return item, ticks
+
+
+RECOVERY_AIRBORNE = 30
+
+
+class Recovery:
+    """The tick a contact task recovers: thirty ticks out of contact with half the commanded speed along the command, the climb under way.
+
+    The motor's own success needs the velocity within one unit for thirty
+    ticks, which a fast climb above an arena planet can miss after it has
+    left the ground, as the gravity and the frame change under it.
+    """
+    def __init__(self):
+        self.airborne = 0; self.tick = None; self.ticks = 0
+
+    def update(self, item):
+        self.ticks += 1
+        x = item['inputs']
+        along = (-x[0] * x[3] + x[1] * x[4]) * SCALE
+        self.airborne = 0 if item['evidence']['collision'] else self.airborne + 1
+        if self.tick is None and self.airborne >= RECOVERY_AIRBORNE and along >= .5 * x[2] * SCALE:
+            self.tick = self.ticks
+
+
+def contact_sets(seed, bridge=None):
+    return {'ground': ground_tasks(seed, bridge), 'falling': falling_tasks(seed, bridge), 'half_turn': half_turn_tasks(seed, bridge)}
+
+
 def v1_sets_as_v2():
     """The LF-078 motor development sets, zero gravity and speeds to 20, judged under the v2 contract."""
     rows = []
@@ -338,23 +593,29 @@ def v1_sets_as_v2():
     return rows
 
 
-def collect_rollouts(bridge, rng, episodes, driver='teacher', perturb=True, gains=GAINS):
+def collect_rollouts(bridge, rng, episodes, driver='teacher', perturb=True, gains=GAINS, contact_share=0.):
     """Observed v2 inputs from closed-loop episodes driven by the teacher or the loaded network.
 
     Random held actions spread the visited states; the recorded rows are still
     labelled by the teacher afterwards, so perturbation never changes a target.
+    A contact_share of the episodes come from the contact families, whose
+    settling ticks are not recorded; at zero the draws are the LF-091 ones.
     """
     rows = []; outcomes = {}
     for _ in range(episodes):
+        contact = contact_share > 0. and rng.random() < contact_share
         while True:
             # An arena start can meet terrain or the other seat; the sampler draws again, as the admission screens do.
+            row = random_contact_task(rng) if contact else {'task': random_task_v2(rng)}
             try:
-                item = bridge.call('reset', tasks=[random_task_v2(rng)])['items'][0]
+                item = bridge.call('reset', tasks=[row['task']])['items'][0]
                 break
             except RuntimeError as error:
                 if 'initial' not in str(error) and 'transfer' not in str(error):
                     raise
                 outcomes['rejected_start'] = outcomes.get('rejected_start', 0) + 1
+        if row.get('settle'):
+            item, _ = settle(bridge, item)
         hold = 0; action = None
         while item['progress']['outcome'] is None:
             rows.append(item['inputs'])
@@ -378,12 +639,15 @@ def collect_rollouts(bridge, rng, episodes, driver='teacher', perturb=True, gain
 
 def run_law(bridge, row, gains):
     item = bridge.call('reset', tasks=[row['task']])['items'][0]
-    post_error = 0.; ticks = 0; saturated = 0; spinning = 0; velocity_error = 0.
+    settled = 0
+    if row.get('settle'):
+        item, settled = settle(bridge, item)
+    post_error = 0.; ticks = 0; saturated = 0; spinning = 0; velocity_error = 0.; contact = 0; recovery = Recovery()
     while item['progress']['outcome'] is None:
         action = scalar_teacher_v2(item['inputs'], gains)
         ticks += 1; saturated += abs(action['steering']) > .95; spinning += abs(item['inputs'][7] * 2.) > 1.5
         item = bridge.call('step', actions=[action])['items'][0]
-        velocity_error += item['errors']['velocity']
+        velocity_error += item['errors']['velocity']; contact += item['evidence']['collision']; recovery.update(item)
         retention = item.get('retention') or {}
         if retention.get('first_success_tick') is not None:
             post_error = max(post_error, item['errors']['velocity'])
@@ -394,7 +658,8 @@ def run_law(bridge, row, gains):
             'first_exit_tick': retention.get('first_exit_tick'), 'final_errors': item['errors'],
             'max_post_acquisition_velocity_error': post_error,
             'steering_saturation': saturated / max(1, ticks), 'spin_saturation': spinning / max(1, ticks),
-            'mean_velocity_error': velocity_error / max(1, ticks)}
+            'mean_velocity_error': velocity_error / max(1, ticks), 'settle_ticks': settled, 'law_ticks': ticks,
+            'contact_ticks': contact, 'recovered_tick': recovery.tick}
 
 
 def _reference_shard(job):
@@ -426,6 +691,17 @@ def summarize(results):
         values = [r[key] for r in results if key in r]
         if values:
             summary[key] = sum(values) / len(values)
+    # The contact families: the ticks flown to success after any settling,
+    # and the share of flown ticks in contact.
+    flown = [r['law_ticks'] for r in results if r['outcome'] == 'success' and 'law_ticks' in r]
+    if flown:
+        summary['mean_success_ticks'] = sum(flown) / len(flown)
+    if any('contact_ticks' in r for r in results):
+        summary['contact_share'] = sum(r.get('contact_ticks', 0) for r in results) / max(1, sum(r.get('law_ticks', 0) for r in results))
+    recovered = [r['recovered_tick'] for r in results if r.get('recovered_tick') is not None]
+    if any('recovered_tick' in r for r in results):
+        summary['recovered'] = len(recovered)
+        summary['mean_recovered_tick'] = sum(recovered) / max(1, len(recovered))
     return summary
 
 
@@ -450,14 +726,57 @@ def fit_actor(model, x, y, steps, batch, learning_rate, generator, log=print, st
         return teacher.action_error(model(x)[0], y).tolist()
 
 
-def evaluate_sets(bridge, model, out, hold=1):
-    """Closed-loop evaluation of the loaded policy on the development matrix, a held-out matrix and the v1 sets."""
+def evaluate_sets(bridge, model, out, hold=1, contact=False):
+    """Closed-loop evaluation of the loaded policy on the development matrix, a held-out matrix and the v1 sets, and with contact the three contact sets on seed 1."""
     summaries = {}
-    for name, rows in (('matrix-development', matrix_tasks(1)), ('matrix-held-out', matrix_tasks(2)), ('v1-sets', v1_sets_as_v2())):
-        results = teacher.evaluate(bridge, model, rows, out / f'evaluation-{name}', hold)
+    sets = [('matrix-development', matrix_tasks(1)), ('matrix-held-out', matrix_tasks(2)), ('v1-sets', v1_sets_as_v2())]
+    if contact:
+        sets += [(name, rows) for name, rows in contact_sets(1, bridge).items()]
+    for name, rows in sets:
+        results = teacher.evaluate(bridge, model, rows, out / f'evaluation-{name}', hold, prepare=settle,
+                                   recovered=(lambda item: Recovery()) if name in ('ground', 'falling', 'half_turn') else None)
         summaries[name] = summarize(results)
         summaries[name]['max_parity'] = max(r['parity'] for r in results)
     return summaries
+
+
+def load_export(path, schema):
+    """A motor export's actor and critic in a MotorModel, for evaluating an export the run did not fit."""
+    data = json.loads(Path(path).read_text())
+    model = MotorModel(schema, 64 if data['format_version'] == 4 else 32)
+    model.load_state_dict({k: torch.tensor(v['values'], dtype=torch.float32).reshape(v['shape']) for k, v in data['weights'].items()})
+    return model
+
+
+EVALUATION_SETS = ('matrix-development', 'matrix-held-out', 'v1-sets', 'ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb')
+
+
+def evaluate_export(args):
+    """Closed-loop evaluation of a motor export on the named sets, the contact sets on seed 1 as the fit evaluates them."""
+    names = args.sets.split(',')
+    if not set(names) <= set(EVALUATION_SETS):
+        raise ValueError('unknown evaluation set')
+    started = time.monotonic(); summaries = {}
+    with Bridge(args.bridge) as bridge:
+        model = load_export(args.policy, bridge.contract['schema_v2'])
+        bridge.call('load_policy', path=str(Path(args.policy).resolve()))
+        contact = contact_sets(1, bridge)
+        contact['drifting_turn'] = drifting_turn_tasks(1, bridge)
+        contact['tilted_climb'] = tilted_climb_tasks(1, bridge)
+        for name in names:
+            rows = {'matrix-development': lambda: matrix_tasks(1), 'matrix-held-out': lambda: matrix_tasks(2),
+                    'v1-sets': v1_sets_as_v2}.get(name, lambda: contact[name])()
+            results = teacher.evaluate(bridge, model, rows, args.out / f'evaluation-{name}', prepare=settle,
+                                       recovered=(lambda item: Recovery()) if name in contact else None)
+            summaries[name] = summarize(results)
+            line = '%s: %d/%d passed' % (name, summaries[name]['passed'], summaries[name]['cases'])
+            if 'recovered' in summaries[name]:
+                line += ', recovered %d (%.0f ticks), contact share %.2f' % (summaries[name]['recovered'], summaries[name]['mean_recovered_tick'],
+                                                                           summaries[name]['contact_share'])
+            print(line, flush=True)
+    atomic_json(args.out / 'summary.json', {'kind': 'motor-export-evaluation-v2', 'policy': str(args.policy), 'policy_sha256': sha(args.policy),
+                                            'bridge_sha256': sha(args.bridge), 'evaluations': summaries,
+                                            'seconds': time.monotonic() - started})
 
 
 def reference(args):
@@ -466,6 +785,10 @@ def reference(args):
     if args.set == 'cruise':
         with Bridge(args.bridge) as bridge:
             rows = cruise_tasks(args.seed, bridge)
+    elif args.set in ('ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb'):
+        with Bridge(args.bridge) as bridge:
+            rows = {'ground': ground_tasks, 'falling': falling_tasks, 'half_turn': half_turn_tasks,
+                    'drifting_turn': drifting_turn_tasks, 'tilted_climb': tilted_climb_tasks}[args.set](args.seed, bridge)
     else:
         rows = matrix_tasks(args.seed) if args.set == 'matrix' else v1_sets_as_v2()
     atomic_json(args.out / 'plan.json', {'kind': 'motor-teacher-v2-reference', 'set': args.set, 'gains': gains, 'contract': CONTRACT,
@@ -476,6 +799,8 @@ def reference(args):
     summary = summarize(results); summary['seconds'] = time.monotonic() - started
     atomic_json(args.out / 'summary.json', summary)
     print(json.dumps({'passed': summary['passed'], 'cases': summary['cases'], 'by_family': summary['by_family'],
+                      'mean_success_ticks': summary.get('mean_success_ticks'), 'contact_share': summary.get('contact_share'),
+                      'recovered': summary.get('recovered'), 'mean_recovered_tick': summary.get('mean_recovered_tick'),
                       'seconds': round(summary['seconds'], 1)}, indent=1))
 
 
@@ -495,7 +820,7 @@ def fit(args):
     with Bridge(args.bridge) as bridge:
         model = MotorModel(bridge.contract['schema_v2'], args.width)
         x = synthetic_inputs_v2(generator, args.synthetic)
-        rollouts, outcomes = collect_rollouts(bridge, rng, args.episodes, gains=gains)
+        rollouts, outcomes = collect_rollouts(bridge, rng, args.episodes, gains=gains, contact_share=args.contact_share)
         log('teacher rollouts: %d rows from %d episodes, outcomes %s' % (len(rollouts), args.episodes, outcomes))
         x = torch.cat((x, rollouts)); y = teacher_v2(x, gains)
         log('round 0: fitting %d rows' % len(x))
@@ -504,14 +829,15 @@ def fit(args):
         for round_index in range(1, args.rounds + 1):
             export = args.out / f'policy-round-{round_index - 1}.json'; model.export(export)
             bridge.call('load_policy', path=str(export.resolve()))
-            visited, outcomes = collect_rollouts(bridge, rng, args.round_episodes, driver='policy', gains=gains)
+            visited, outcomes = collect_rollouts(bridge, rng, args.round_episodes, driver='policy', gains=gains,
+                                                 contact_share=args.contact_share)
             log('round %d: network rollouts %d rows, outcomes %s' % (round_index, len(visited), outcomes))
             x = torch.cat((x, visited)); y = teacher_v2(x, gains)
             errors.append(fit_actor(model, x, y, args.round_steps, args.batch, args.learning_rate / 2, generator, log, args.steering_weight))
             rounds.append({'rows': len(x), 'network_outcomes': outcomes, 'mean_absolute_error': errors[-1]})
         export = args.out / 'policy-final.json'; model.export(export)
         bridge.call('load_policy', path=str(export.resolve()))
-        summaries = evaluate_sets(bridge, model, args.out)
+        summaries = evaluate_sets(bridge, model, args.out, contact=args.contact_share > 0.)
     for name, summary in summaries.items():
         log('%s: %d/%d passed, parity %.2e' % (name, summary['passed'], summary['cases'], summary['max_parity']))
         for family, group in summary['by_family'].items():
@@ -524,10 +850,10 @@ def fit(args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('mode', choices=('reference', 'fit'))
+    p.add_argument('mode', choices=('reference', 'fit', 'evaluate'))
     p.add_argument('--bridge', default=DEFAULT_BRIDGE); p.add_argument('--out', type=Path, required=True)
     p.add_argument('--seed', type=int, default=1); p.add_argument('--workers', type=int, default=8)
-    p.add_argument('--set', choices=('matrix', 'v1', 'cruise'), default='matrix')
+    p.add_argument('--set', choices=('matrix', 'v1', 'cruise', 'ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb'), default='matrix')
     p.add_argument('--gains', type=json.loads, default=None, help='JSON overrides of the law gains')
     p.add_argument('--synthetic', type=int, default=400_000); p.add_argument('--episodes', type=int, default=300)
     p.add_argument('--steps', type=int, default=40_000); p.add_argument('--batch', type=int, default=4096)
@@ -536,10 +862,16 @@ def main():
     p.add_argument('--threads', type=int, default=8)
     p.add_argument('--width', type=int, default=32, help='actor hidden width, 32 or 64')
     p.add_argument('--steering-weight', type=float, default=1., help='weight of the steering term in the fit loss')
+    p.add_argument('--contact-share', type=float, default=0.,
+                   help='share of rollout episodes from the contact families, which the evaluation then adds')
+    p.add_argument('--policy', type=Path, help='the motor export the evaluate mode flies')
+    p.add_argument('--sets', default='ground,falling,half_turn', help='comma-separated evaluation sets for the evaluate mode')
     args = p.parse_args()
     args.out.mkdir(parents=False)
     if args.mode == 'reference':
         reference(args)
+    elif args.mode == 'evaluate':
+        evaluate_export(args)
     else:
         fit(args)
 

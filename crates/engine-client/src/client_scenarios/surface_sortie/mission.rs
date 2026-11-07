@@ -93,7 +93,8 @@ struct MaterialMissionClientScenario {
     surveys: LiveObjectivePlanner,
     flag_surveys: Option<FlagSurveyPlanner>,
     flag_value_shadow: FlagValueShadow,
-    /// Present when a seat's transfer legs are flown by the learned stack.
+    /// Present when a seat's transfer and climb legs are flown by the
+    /// learned stack.
     learned: Option<LearnedTransferHost>,
 }
 impl MaterialMissionClientScenario {
@@ -205,8 +206,9 @@ fn with_seats(
             MissionRecoveryProfile::Standard
         }
     });
-    // The learned flight bot is the recovery bot with its transfer legs
-    // flown by the retained v2 stack; the stack loads only when a seat uses it.
+    // The learned flight bot is the recovery bot with its transfer and climb
+    // legs flown by the retained v2 stack; the stack loads only when a seat
+    // uses it.
     let learned_seats = controllers.map(|controller| {
         registration.id == MATCH_REGISTRATION.id
             && controller == engine_common::SpacewarsController::LearnedFlightBot
@@ -366,7 +368,7 @@ impl ClientScenario for MaterialMissionClientScenario {
                 && self.pilots[seat].learned_transfer()
             {
                 let clock = Instant::now();
-                let leg = self.pilots[seat].transfer_leg();
+                let leg = self.pilots[seat].flight_leg();
                 actions.extend(learned.actions(seat, &mut self.sortie.state, leg, intent));
                 sample.policies[seat] += clock.elapsed();
             } else {
@@ -752,8 +754,13 @@ mod tests {
                     host.sortie.state.flight_control_mode(1),
                     Some(FlightControlMode::Learned)
                 );
-                assert_eq!(host.pilots[1].telemetry().goal, MissionGoal::Transfer);
-                labelled += usize::from(learned.label(1).is_some_and(|l| l.starts_with("stack ")));
+                // The climb out of the launch band is the stack's too.
+                let prefix = match host.pilots[1].telemetry().goal {
+                    MissionGoal::Launch | MissionGoal::Hunt => "climb ",
+                    MissionGoal::Transfer => "stack ",
+                    goal => panic!("the stack flew under {goal:?}"),
+                };
+                labelled += usize::from(learned.label(1).is_some_and(|l| l.starts_with(prefix)));
             } else {
                 assert_eq!(
                     host.sortie.state.flight_control_mode(1),
@@ -770,6 +777,10 @@ mod tests {
         assert!(handoff);
         let telemetry = host.learned.as_ref().unwrap().telemetry(1);
         assert_eq!(telemetry.legs, 1);
+        assert!(
+            telemetry.climbs >= 1 && telemetry.climb_ticks > 0,
+            "{telemetry:?}"
+        );
         assert_eq!(telemetry.flown_ticks, flown as u64);
         assert!(
             telemetry.native_ticks * 10 < telemetry.flown_ticks,
