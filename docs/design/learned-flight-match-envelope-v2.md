@@ -52,7 +52,11 @@ are retained: over 84 default-settings seeds the learned seats hand off as
 often as with the transfer legs alone and as the native-only seats, with
 fewer long legs and less spinning, and the asteroid gap moves from the
 3-second stream to the 8-second one, where a turn the ground blocks is the
-next deficiency (2026-11-06).** The goal is a stack a
+next deficiency (2026-11-06). A 48-seed run under the 8-second stream
+finds the learned seats level there too, so that gap was its sample;
+[LF-100](../flight-turn-sense-v1.md) gives the command a turn sense, set by
+navigation from its view of the ground and obeyed by the motor, for the
+turn the ground blocks (started 2026-11-07).** The goal is a stack a
 match bot can switch on for a flight leg: fly from above one planet to the
 mission's transfer entry point above another, moving with that planet, under
 gravity, with the sun and the boundary present, and stop there under the
@@ -124,6 +128,20 @@ transfer law handles both through gravity and target-velocity feedforward.
    flight control, and takes control back at the handoff or whenever a
    higher priority (recovery, pursuit, sun avoidance) claims it. The stack
    stays switchable per leg, which is the match use the plan is for.
+5. **The command carries a turn sense.** Navigation, which sees the
+   ground, decides which way the motor turns when the short way is
+   blocked; the motor, which cannot see it, obeys and otherwise flies as
+   before. The sense is a third element of the command, left, right or
+   free, held with it for six ticks, a fourth head of the navigation
+   network and a nineteenth motor input. Navigation's law keeps a rotation
+   that makes progress, reverses a saturated one that makes none, and
+   otherwise turns the nose away from the nearest surface, freeing the
+   sense once the nose is within the thrust gate or the ship is clear of
+   the ground; the motor's law turns the way it is told at the turn-speed
+   limit, slowing into the attitude vector, with its thrust gated as before
+   and its brake off. Chosen over a contact input in the motor because the
+   ground is already in navigation's view, the decision needs the sweep
+   rather than the tick, and the channel serves the lift-off next.
 
 ## Sequence
 
@@ -138,6 +156,7 @@ transfer law handles both through gravity and target-velocity feedforward.
 | Launch band | the band yields only while the stack flies the leg; a refused or handed-back leg climbs first | done (2026-11-03): the pilot reads the seat's learned control from its observation instead of a per-selection marker; re-checked in 144 release matches (seeds 61 to 84 under the default settings, 37 to 48 under the 3-second stream and loose dirt): main reproduces the LF-096 records byte for byte and so does the change, so every handback there came above the band and the LF-096 evidence stands |
 | Climb band | the stack flies the launch band's climb and the hunt's pursuit climb as legs | done ([LF-098](../flight-climb-band-v1.md)), retained with [LF-099](../flight-motor-contact-v1.md)'s networks: a climb leg's goal rides the ship's radial along the pilot's own climb direction, 60 units past the altitude that releases it, and the mission's climb rules are unchanged; over 252 matches on seeds 1 to 84 under the default settings the learned seats hand off 6.90 times per ten minutes against 7.12 with the transfer legs alone (paired by seed and seat, -0.21 with a 95 percent interval of -0.92 to +0.50) and the native-only seats' 6.83, with first legs 106 faster, 28 within five percent and 32 slower of 166, 15 legs over 2,000 ticks against 23, 94 decided matches won to 73 against 81 to 87, and the stack flying 42 percent of the ticks aboard against 31; 8.5 handoffs against 6.1 under the 3-second stream, 7.4 against 7.4 under the 8-second stream and 7.1 against 8.0 under loose dirt; the climbs take the stack into ground contact, outside the motor's training envelope, where a ship on its side jams because the teacher's thrust, the command's projection on the nose, pins the hull before the turn completes, and a goal behind the ship meets a steering dead spot at the half turn, 52 attempts at their deadline against 30; the motor in contact and at the half turn is the next stage |
 | Motor in contact | the motor flies out of ground contact and through the half turn; the climbs played again | done ([LF-099](../flight-motor-contact-v1.md)), the climb legs retained: motor tasks may allow surface contact, with climbs from the ground, low and falling, and with the command behind the nose; the v7 teacher fades its thrust out as the nose turns from 0.35 to 0.7 radians off its attitude vector and keeps a saturated turn's direction within 0.7 radians of the half turn, recovering 81 of 96 grounded climbs against the v6 law's 45, and its second of four fits (269 and 268 of 320 on the matrix, 79 grounded recoveries against the LF-091 fit's 43) with the first of two navigation refits over it replaces the LF-095 pair in the v2 fixtures; a learned pursuit climb holds against the opponent's range until it is 20 units above the band, since a stack that turns its nose before it thrusts otherwise flies legs of a few ticks at the band's edge; over 252 matches on seeds 1 to 84 under the default settings the learned seats hand off 6.79 times per ten minutes against 6.90 for the climb legs over the LF-095 stack (paired by seed and seat, -0.11 with a 95 percent interval of -0.80 to +0.60) and the native-only seats' 6.83, with 13 legs over 2,000 ticks against 15, 34 attempts at their deadline against 52, 19 budget replans against 28, 16 percent of the flown ticks spinning against 26 and 95 decided matches won to 72; no climb in the traces of seeds 61 to 72 runs past 600 ticks, against 16 attempts; against the LF-095 stack with the same hold, 8.26 handoffs against 8.29 under the 3-second stream, 7.30 against 6.80 under loose dirt, and 5.95 against 8.01 under the 8-second stream (-2.05, -3.64 to -0.40), in longer matches the learned seats win 16 to 7; against the transfer legs alone, the flight on main, level under the default settings (-0.32, -1.08 to +0.46) and loose dirt (-0.74, -3.04 to +1.61), ahead under the 3-second stream (+2.15, +0.15 to +4.18) and behind within noise under the 8-second one (-1.42, -3.28 to +0.56); a turn the ground blocks, which the motor cannot tell from a slow one without a contact input, is the next deficiency |
+| Turn sense | the command carries which way to turn when the ground blocks the short way; the blocked starts and the two recorded stalls recovered; the climbs played again | started ([LF-100](../flight-turn-sense-v1.md), 2026-11-07): a 48-seed run under the 8-second stream first finds LF-099's gap was its sample of 12, the learned seats level with the native-only seats (6.73 handoffs per ten minutes against 6.48, +0.25 with a 95 percent interval of -0.84 to +1.33) and with the transfer legs alone (+0.27, -0.78 to +1.35 over 96 seat pairs), so the stage's case is the stall itself, seed 48 seat 0's 17,221 ticks on the ground, and the channel the lift-off will need; the design is written, no code yet |
 
 ## Risks
 
