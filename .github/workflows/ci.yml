@@ -219,6 +219,8 @@ jobs:
         run: |
           python3 -m unittest discover -s .github/ci -p 'test_*.py'
           python3 -m unittest discover -s tools -p 'test_picade_input.py'
+      - name: Check docs for private data and raw results
+        run: python3 .github/ci/check_docs_data.py
       - name: Test recorded bot-trip analysis
         run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
       - name: Install pinned Rust compiler cache
