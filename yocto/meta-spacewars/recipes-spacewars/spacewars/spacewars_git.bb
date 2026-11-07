@@ -8,6 +8,10 @@ inherit externalsrc cargo_bin systemd deploy
 
 SPACEWARS_SRCROOT = "${@os.path.realpath('${THISDIR}/../../../..')}"
 EXTERNALSRC = "${SPACEWARS_SRCROOT}"
+# Keep the source clean through configure and worker-side reparsing. The OTA
+# clone has no Git templates/info/exclude, so externalsrc's default oe-workdir
+# and oe-logs links would remain untracked and invalidate its source identity.
+EXTERNALSRC_SYMLINKS = ""
 CARGO_MANIFEST_PATH = "${SPACEWARS_SRCROOT}/Cargo.toml"
 SPACEWARS_GPU ?= "0"
 SPACEWARS_KIOSK_FEATURE = "${@'pi-kiosk-gpu' if d.getVar('SPACEWARS_GPU') == '1' else 'pi-kiosk'}"

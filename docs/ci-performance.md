@@ -432,3 +432,51 @@ The complete 65-case UI regression is tracked separately in
 [the full-suite validation run](https://github.com/aortez/space-wars/actions/runs/39086548049).
 Local Xvfb execution also passed all 43 smoke workflows in 253.703 seconds, and
 the unchanged complete tank-fixture sequence passed after its helper extraction.
+
+## Nightly failure corrections (2026-11-04)
+
+[Nightly run 41866604461](https://github.com/aortez/space-wars/actions/runs/41866604461)
+failed four UI cases at `e5d6a89b`. Their assertions disagreed with the intended
+behavior in three ways:
+
+- Both normal-speed grass cases still required three mature blades at 180–300
+  biological seconds. #559 corrected each seed's growth origin and changed the
+  headless contract to 120–200 seconds, but left the UI expectation behind. The
+  nightly artifact records 144 seconds. The UI cases now use the same window;
+  their five-minute runs, emergence checks, paid growth and persistence checks
+  remain intact.
+- Garden Lab's reset resumes until the pause input arrives, so it may already
+  be at biological tick 2. The stepping helper now returns that checkpoint
+  unchanged instead of requiring a strictly earlier tick and failing. It still
+  rejects overshoots and verifies exact single steps.
+- Digit Slide began at 16:43:59 and was superseded by 16:44. Its 58 outgoing
+  surfaces changed owner and were replaced; its 58 incoming surfaces retired
+  as interrupted instead of returning home. The UI accounting now accepts
+  either completed handoffs or that explicit interruption, requires a changed
+  reading for interruptions, and checks that the final face is anchored. A
+  deterministic scenario test reproduces this exact minute boundary.
+
+The separate [OTA candidate run](https://github.com/aortez/space-wars/actions/runs/41807160431)
+failed during worker-side recipe reparsing before compilation. The isolated
+clone deliberately uses `init.templateDir=` and therefore has no
+`.git/info/exclude`. The pinned Poky `externalsrc` configure hook creates
+`oe-workdir` and `oe-logs`, but only hides them when that exclude file already
+exists. The new untracked links made the previously clean source fail the OTA
+input check. The Spacewars recipe now disables these convenience links with
+`EXTERNALSRC_SYMLINKS = ""`; source identity and input verification stay strict.
+
+Executing the actual configure hook from pinned Poky
+`4fb7016a07507683359ebd620f1951fd5ea44bfa` against a template-free temporary Git
+repository reproduces the original error. Applying the recipe setting keeps
+the source identity unchanged through two configure calls and accepts the
+same input record; adding a real untracked source file still rejects it. This
+isolates the failure without claiming a new complete Pi image build.
+
+Local validation on the corrected checkout passed all 81 ignored UI workflows
+from the coverage manifest, run serially within four independent Xvfb displays
+using the `ci`-profile test executable. Both normal-speed grass artifacts record
+first emergence at 1 second and three mature blades at 144 seconds. The three
+ordinary harness tests also pass. Clock's full ordinary unit suite passes
+596 tests (10 opt-in stress tests remain ignored), and the OTA automation plus
+image-identity/build-provenance suites pass 150 Python tests. `cargo fmt --all
+-- --check` and `git diff --check` pass. The complete Pi image build was not rerun.

@@ -197,7 +197,12 @@ fn grass_progress(name: &'static str, renderer: &'static str) {
             &serde_json::json!({"fixture":"favorable-v1","seed":4242,"renderer":renderer,"playback":1,"first_visible":first_shoot,"three_mature":established,"sequence":sequence}),
         );
         assert!(first_shoot.is_some_and(|s| s <= 5));
-        assert!(established.is_some_and(|s| (180..=300).contains(&s)));
+        // Each seed now grows from its own origin (#559), matching the
+        // headless favorable-establishment contract's 120–200 second window.
+        assert!(
+            established.is_some_and(|s| (120..=200).contains(&s)),
+            "three mature blades at biological second {established:?}"
+        );
         let final_state = h.clock_state();
         let view = final_state
             .grass
@@ -788,10 +793,19 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
         // process to catch it: exact phases/pause/rendering are core tests.
         let recovered = harness.clock_wait(&initial, "idle", initial.event_id + 1, 0);
         assert!(recovered.digit_slide.is_none());
-        // The slide carried the face out and handed a new one back.
+        // The live minute can change before or during this preview. Outgoing
+        // cells change owner once; incoming cells either settle (another
+        // handoff) or retire as interrupted when a newer reading supersedes
+        // them. Neither outcome may leave surfaces owned by the slide.
         let slid = digit_surfaces_at_rest(&recovered);
-        assert!(slid.retired.replaced >= face.retired.replaced + face.live as u64);
-        assert!(slid.handed_off >= face.handed_off + 2 * face.live as u64);
+        let outgoing = slid.departed - face.departed;
+        let interrupted = slid.retired.interrupted - face.retired.interrupted;
+        assert!(outgoing > 0);
+        assert!(slid.retired.replaced >= face.retired.replaced + outgoing);
+        assert!(slid.handed_off - face.handed_off + interrupted >= 2 * outgoing);
+        if interrupted > 0 {
+            assert_ne!(initial.display_digits, recovered.display_digits);
+        }
         assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
         assert_eq!(recovered.next_event_tick, None);
         harness.activate_guarded("gameplay.clock-controls", &gameplay);

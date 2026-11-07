@@ -785,6 +785,36 @@ fn surface_contract_a_previewed_slide_carries_the_face_out_and_brings_a_new_one_
     assert_eq!(markers.attached().count(), 0);
 }
 
+#[test]
+fn surface_contract_preview_at_minute_boundary_accounts_for_interrupted_incoming_cells() {
+    let mut state = clock(
+        800.0 / 480.0,
+        ClockFont::Classic,
+        ClockTimeFormat::TwentyFourHour,
+        reading(16, 43, 59),
+    );
+    let before = state.surface_accounting();
+    sync(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::DigitSlide)],
+    );
+    for _ in 0..20 {
+        tick(&mut state, &[]);
+    }
+    tick(&mut state, &[ClockAction::set_reading(reading(16, 44, 0))]);
+    assert_eq!(state.event_kind(), None);
+    let surfaces = assert_face_agreement(&state, "preview superseded by the current minute");
+    assert!(surfaces.iter().all(|s| s.source == SurfaceSource::Anchored));
+    let after = state.surface_accounting();
+    let cells = before.live as u64;
+    assert_eq!(after.departed - before.departed, cells);
+    assert_eq!(after.handed_off - before.handed_off, cells);
+    for reason in [Retirement::Interrupted, Retirement::Replaced] {
+        assert_eq!(after.retired(reason) - before.retired(reason), cells);
+    }
+    assert!(surfaces.iter().all(|s| !s.departing));
+}
+
 /// Where the canonical world has a body this step.
 pub(crate) fn body_pose(
     state: &ClockState,
