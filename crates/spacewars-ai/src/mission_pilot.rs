@@ -120,6 +120,9 @@ const PURSUIT_CLIMB_CLEARANCE: f32 = 140.0;
 /// How far above the altitude that releases a climb its leg's goal lies,
 /// so the learned host is still climbing when the pilot takes the ship on.
 const CLIMB_GOAL_MARGIN: f32 = 60.0;
+/// How far above the launch band a learned host's pursuit climb holds
+/// against the opponent's range, so its leg clears the band's edge.
+const PURSUIT_CLIMB_EDGE_HOLD: f32 = 20.0;
 pub const HUNT_CLEARANCE_HANDOFF_PROFILE: &str = "material_hunt_clearance_handoff_v1";
 
 #[cfg(test)]
@@ -1490,7 +1493,15 @@ impl MaterialMissionPilot {
                             > other.radius + PURSUIT_CLIMB_CLEARANCE
                     })
             });
-            if cleared || opponent.motion.position.distance_to(p.ship.position) > 300.0 {
+            // The opponent's range releases the climb as the ship crosses the
+            // band and the band starts it again the next tick the ship sinks
+            // back. The pilot's own climb carries the ship over the edge, but
+            // a learned host turns its nose before it thrusts, so its leg
+            // would end every few ticks at the edge with the pilot's own ticks
+            // between. Its leg holds until the ship is clear of the edge.
+            let edge = p.learned_control
+                && altitude < 70.0 + falling * falling / 50.0 + PURSUIT_CLIMB_EDGE_HOLD;
+            if cleared || (opponent.motion.position.distance_to(p.ship.position) > 300.0 && !edge) {
                 self.pursuit_climb = None;
             }
         }

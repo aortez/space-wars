@@ -112,6 +112,11 @@ pub struct MotorTask {
     /// cruising ship's command; zero, the fixed command of every other task.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub heading_rate: f32,
+    /// A v2 task on which surface contact does not end the task, for the
+    /// starts that come down onto the ground or begin on it; omitted for
+    /// the tasks on which any contact is a collision.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub contact_allowed: bool,
 }
 
 fn is_zero(value: &f32) -> bool {
@@ -120,7 +125,9 @@ fn is_zero(value: &f32) -> bool {
 
 impl MotorTask {
     fn trace_version(&self) -> u32 {
-        if self.heading_rate != 0.0 {
+        if self.contact_allowed {
+            5
+        } else if self.heading_rate != 0.0 {
             4
         } else if self.contract == CONTRACT_V2 {
             3
@@ -384,6 +391,7 @@ impl MotorEnvironment {
             || !task.heading_rate.is_finite()
             || task.heading_rate.abs() > 1.0
             || (stationary && task.heading_rate != 0.0)
+            || (stationary && task.contact_allowed)
         {
             return Err(if stationary {
                 "unsupported motor task; stationary zero-gravity frame required"
@@ -409,6 +417,7 @@ impl MotorEnvironment {
                 goal_planet: (t.start_planet + 1) % t.layout.planets.max(2),
                 ..t
             }),
+            contact_allowed: task.contact_allowed,
             ..Default::default()
         })?;
         let command = MotorCommand {
@@ -585,6 +594,7 @@ mod tests {
             contract: CONTRACT_V1,
             transfer: None,
             heading_rate: 0.0,
+            contact_allowed: false,
         }
     }
 
@@ -824,6 +834,67 @@ mod tests {
     }
 
     #[test]
+    fn a_contact_task_flies_on_after_touching_down_and_replays() {
+        // The ship falls onto its side from the lowest start under a command
+        // up; with the controls neutral it lands and lies there.
+        let mut grounded = task_v2(-std::f32::consts::FRAC_PI_2, 20.0);
+        grounded.start.gravity = true;
+        grounded.start.altitude = 15.0;
+        grounded.start.heading_offset = std::f32::consts::FRAC_PI_2;
+        grounded.deadline_ticks = 300;
+        let mut collision = MotorEnvironment::new(grounded.clone()).unwrap();
+        while collision.item().progress.outcome.is_none() {
+            collision.step(FlightAction::default()).unwrap();
+        }
+        assert_eq!(
+            collision.item().progress.outcome,
+            Some(FlightOutcome::Collision)
+        );
+        let touchdown = collision.item().progress.elapsed_ticks;
+        grounded.contact_allowed = true;
+        let mut env = MotorEnvironment::new(grounded.clone()).unwrap();
+        assert_eq!(env.trace().version, 5);
+        assert_eq!(
+            env.flight.trace().version,
+            FLIGHT_CONTACT_ENVIRONMENT_VERSION
+        );
+        let mut contact_ticks = 0;
+        while env.item().progress.outcome.is_none() {
+            contact_ticks += env
+                .step(FlightAction::default())
+                .unwrap()
+                .evidence
+                .collision as u32;
+        }
+        assert_eq!(env.item().progress.outcome, Some(FlightOutcome::Deadline));
+        assert_eq!(env.item().progress.elapsed_ticks, 300);
+        assert!(
+            contact_ticks > 300 - touchdown - 30,
+            "the ship lies on the ground: {contact_ticks} contact ticks after touching down at {touchdown}"
+        );
+        let replay = MotorEnvironment::replay(env.trace()).unwrap();
+        assert_eq!(replay.item(), env.item());
+        let value = serde_json::to_value(&grounded).unwrap();
+        assert_eq!(value["contact_allowed"], true);
+        assert!(
+            serde_json::to_value(task_v2(0.0, 0.0))
+                .unwrap()
+                .get("contact_allowed")
+                .is_none()
+        );
+        assert!(
+            MotorEnvironment::new(MotorTask {
+                contract: CONTRACT_V1,
+                start: FlightStart::default(),
+                speed: 0.0,
+                ..grounded
+            })
+            .is_err(),
+            "the stationary contract has no ground to touch"
+        );
+    }
+
+    #[test]
     fn a_turning_command_rotates_with_the_clock_and_keeps_its_own_trace_version() {
         let mut task = MotorTask {
             start: FlightStart {
@@ -839,6 +910,7 @@ mod tests {
             contract: CONTRACT_V2,
             transfer: None,
             heading_rate: 0.3,
+            contact_allowed: false,
         };
         let mut env = MotorEnvironment::new(task.clone()).unwrap();
         let initial = env.trace().command.heading;

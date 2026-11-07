@@ -11,8 +11,10 @@
 //! the whole trace exactly; any other host must still fly the task to the
 //! same success within a few ticks of the archive, with every action and
 //! position within a small tolerance of it. Under glibc 2.36 the archived
-//! cases stray by at most 4e-5 in action and 3e-5 in position and arrive on
-//! the archived tick (measured 2026-11-03).
+//! cases stray by at most 5e-5 in action and 3e-5 in position and arrive on
+//! the archived tick (measured 2026-11-03, the LF-099 case 2026-11-06). A
+//! closed loop can amplify that difference, so an archived case is one that
+//! holds to the tolerances under glibc 2.36.
 use scenario_spacewars::surface_sortie::flight_environment::{
     FlightAction, FlightEnvironment, FlightOutcome, FlightTrace,
 };

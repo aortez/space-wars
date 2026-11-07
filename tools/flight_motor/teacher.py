@@ -225,11 +225,14 @@ def probe_forces(bridge, speeds=(0, 8, 12, 15, 16, 17, 20, 24), command=16.):
     return {'rows': rows, 'slope_at_16': (by_speed[17] - by_speed[15]) / 2, 'bias_at_16': by_speed[16]}
 
 
-def evaluate(bridge, model, rows, directory, hold=1):
+def evaluate(bridge, model, rows, directory, hold=1, prepare=None, recovered=None):
     """Closed-loop development evaluation of the loaded policy with native/Python parity on first inputs.
 
     With hold above one, each native decision is applied for that many ticks,
     matching a training recipe that decides at a lower rate than the physics.
+    A row marked to settle is first brought to rest by `prepare`, which
+    returns the item and the ticks it spent; `recovered`, given the first
+    item, makes a tracker of the tick the flight recovers.
     """
     directory.mkdir(); results = []
     for row in rows:
@@ -240,7 +243,11 @@ def evaluate(bridge, model, rows, directory, hold=1):
         parity = max(abs(a - b) for a, b in zip(actor.tolist(), [native['steering_latent'], native['thrust_logit'], native['brake_logit']]))
         if parity > 1e-4:
             raise ValueError('native and Python inference disagree')
-        start = item['frame']['center_of_mass']; post_error = 0.
+        settled = 0
+        if row.get('settle'):
+            item, settled = prepare(bridge, item)
+        start = item['frame']['center_of_mass']; post_error = 0.; contact = 0; flown = 0
+        recovery = recovered(item) if recovered is not None else None
         while item['progress']['outcome'] is None:
             if hold == 1:
                 items = [bridge.call('step_policy')['items'][0]]
@@ -252,6 +259,9 @@ def evaluate(bridge, model, rows, directory, hold=1):
                     if items[-1]['progress']['outcome'] is not None:
                         break
             for item in items:
+                flown += 1; contact += item['evidence']['collision']
+                if recovery is not None:
+                    recovery.update(item)
                 retention = item.get('retention') or {}
                 if retention.get('first_success_tick') is not None:
                     post_error = max(post_error, item['errors']['velocity'])
@@ -261,7 +271,9 @@ def evaluate(bridge, model, rows, directory, hold=1):
                         'direction': row.get('direction'), 'outcome': item['progress']['outcome'], 'ticks': item['progress']['elapsed_ticks'],
                         'first_success_tick': retention.get('first_success_tick'), 'first_exit_tick': retention.get('first_exit_tick'),
                         'final_errors': item['errors'], 'max_post_acquisition_velocity_error': post_error,
-                        'displacement': math.hypot(end['x'] - start['x'], end['y'] - start['y']), 'parity': parity})
+                        'displacement': math.hypot(end['x'] - start['x'], end['y'] - start['y']), 'parity': parity,
+                        'settle_ticks': settled, 'law_ticks': flown, 'contact_ticks': contact,
+                        'recovered_tick': recovery.tick if recovery is not None else None})
     atomic_json(directory / 'results.json', results)
     return results
 

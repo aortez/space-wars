@@ -4,41 +4,43 @@
     "hold_ticks": 6,
     "motor_hz": 60,
     "command_contract": "navigation-command-v2",
-    "envelope": "match worlds: gravity, orbiting and spinning planets, the sun's heat and the boundary, speeds to 60 units per second, goals resting in a planet's spinning frame, the four practice families with seeded gravity and spin, and transfers between the planets of a generated arena, starting up to 3,000 units from their entry"
+    "envelope": "match worlds: gravity, orbiting and spinning planets, the sun's heat and the boundary, speeds to 60 units per second, goals resting in a planet's spinning frame, the four practice families with seeded gravity and spin, transfers between the planets of a generated arena, starting up to 3,000 units from their entry, and climbs from the ground and through contact with it"
   },
   "navigation": {
     "file": "navigation.json",
-    "sha256": "f532061c03ab0b231ea5cdd419a6765bf6f8dbd9c05a4a97733a42827daa6268",
+    "sha256": "2452a7db46c9fe724af1fe032a904aec4984dc8ed02d511df0e5b158429937b2",
     "format_version": 5,
     "architecture": "polar-conv8x8-coordinates-set-attention32-mlp64x64-v1",
-    "experiment": "LF-095",
-    "report": "docs/flight-sun-detour-v1.md",
-    "source": "data/training-experiments/learned-flight-mission-polish-v1-20261029/nav-fit-sun-r2/policy-final.json",
+    "experiment": "LF-099",
+    "report": "docs/flight-motor-contact-v1.md",
+    "source": "data/training-experiments/learned-flight-mission-polish-v1-20261029/nav-fit-lf099-m2-s1/policy-final.json",
     "qualification": {
-      "development": "69 of 84 tasks: 24 transfers and 12 long transfers at seed 7700101 and 12 of each practice family at seed 7700002, 66 of the 72 standard tasks and 3 of the 12 long ones",
-      "held_out": "73 of 84 tasks: 24 transfers and 12 long transfers at seed 7700102 and 12 of each practice family at seed 7700003, 68 of the 72 standard tasks and 5 of the 12 long ones",
-      "law_held_out": "74 of 84 for the law the network imitates, the LF-093 law with the sun's waypoint lead and the heat-free momentum brake, 69 of the 72 standard tasks and 5 of the 12 long ones, flying the LF-091 motor network",
-      "native_parity": "2.4e-6 maximum head difference against the Python fit",
-      "matches": "whole ten-minute matches against the recovery bot in both seat orders under the default settings with every transfer leg published: on seeds 1 to 24 7.53 handoffs per ten minutes against the LF-093 network's 6.68 and the native-only seats' 6.74, 5 legs over 2,000 ticks against 8 and 2, 3 budget replans against 4 and 1, identical first legs 14 faster, 19 within five percent and 15 slower of 48; selected over the first seed of the same recipe by those matches and validated on seeds 49 to 60: 7.51 handoffs against 7.16 and 6.53, 1 leg over 2,000 ticks against 3 and 2, 1 budget replan against 5 and 1; on seeds 37 to 48 6.58 handoffs against 7.71 and 6.87 with 3 legs over 2,000 ticks against 1 and 4, and under the 8-second asteroid stream 7.38 against 6.97 and 7.00 with 6 against 1 and 3",
-      "predecessor": "LF-093 fit 57b9546e4d64e7669a969029bc9697e276593c48068ff17012922f693767cb53 on the law without the sun's lead and with the brake reading the heat: with every leg published, on 48 seeds 6.61 handoffs per ten minutes against the native-only seats' 6.72 and 22 legs over 2,000 ticks against 8"
+      "development": "70 of 84 tasks: 24 transfers and 12 long transfers at seed 7700101 and 12 of each practice family at seed 7700002, 65 of the 72 standard tasks and 5 of the 12 long ones",
+      "held_out": "66 of 84 tasks: 24 transfers and 12 long transfers at seed 7700102 and 12 of each practice family at seed 7700003, 62 of the 72 standard tasks and 4 of the 12 long ones",
+      "law_held_out": "79 of 84 for the LF-095 law the network imitates, 72 of the 72 standard tasks and 7 of the 12 long ones, flying the LF-099 motor network, against 74 flying the LF-091 motor",
+      "native_parity": "2.9e-6 maximum head difference against the Python fit",
+      "selection": "the first of two fits of the LF-095 recipe with the LF-099 motor in the loop, chosen on whole ten-minute matches on seeds 1 to 24 with the climb legs: identical first legs 31 faster, 12 within five percent and 5 slower of 48 against the second fit's 29, 7 and 12, no leg over 2,000 ticks against 3, 7 deadlines against 9 and 65 refused ticks against 152; in the stack harness 20 and 19 of 24 transfers and 91 and 90 of 96 practice tasks, against 18, 19, 86 and 89 for the LF-095 network over the same motor",
+      "matches": "with the climb legs and the learned pursuit climb's band-edge hold, whole ten-minute matches against the recovery bot in both seat orders on seeds 1 to 84 under the default settings: 6.79 handoffs per ten minutes against 6.90 for the climb legs over the LF-095 stack (paired by seed and seat, -0.11 with a 95 percent interval of -0.80 to +0.60), 7.12 for the transfer legs alone and the native-only seats' 6.83; identical first legs 104 faster, 36 within five percent and 26 slower of 166; 13 legs over 2,000 ticks against 15 and 23; 34 attempts at their deadline against 52 and 30; decided matches 95 won to 72; under the 8-second asteroid stream on seeds 37 to 48 5.95 handoffs against 7.38 and 7.38 and against 8.01 for the LF-095 stack with the same hold (paired, -2.05 with a 95 percent interval of -3.64 to -0.40), in longer matches the learned seats win 16 to 7, under the 3-second stream 8.26 against 8.54 and 6.11, under loose dirt 7.30 against 7.08 and 8.04",
+      "predecessor": "LF-095 fit f532061c03ab0b231ea5cdd419a6765bf6f8dbd9c05a4a97733a42827daa6268: development 69 and held out 73 of 84 over the LF-091 motor"
     }
   },
   "motor": {
     "file": "motor.json",
-    "sha256": "b7e541402f9732766e515d25215f08d52a9fb94e23fd1cc9da3737d89cf0203b",
+    "sha256": "8d6d39cf2dfa30a908d9ac592dd7ba988157d0ee2a431716e70b80f8e8934fcd",
     "format_version": 4,
     "architecture": "motor18-actor64x64-critic32x32-v4",
-    "experiment": "LF-091",
-    "report": "docs/flight-motor-steering-v1.md",
-    "source": "data/training-experiments/learned-flight-mission-polish-v1-20261029/motor/fit-bss25-seed2/policy-final.json",
+    "experiment": "LF-099",
+    "report": "docs/flight-motor-contact-v1.md",
+    "source": "data/training-experiments/learned-flight-mission-polish-v1-20261029/motor/fit-lf099-g35ht07-seed2/policy-final.json",
     "qualification": {
-      "teacher": "the v6 law, the v5 gains with brake_share 1, brake_share_speed 2.5 and attitude_forward 0: 316 of 320 on the matrix and 312 of 312 on the v1 sets",
-      "matrix_development": "263 of 320",
-      "matrix_held_out": "260 of 320",
+      "teacher": "the v7 law, the v6 gains with thrust_gate 0.35 to 0.7 and half_turn 0.7: 313 of 320 on the matrix, 312 of 312 on the v1 sets, 81 of 96 grounded climbs recovered against the v6 law's 45",
+      "matrix_development": "269 of 320",
+      "matrix_held_out": "268 of 320",
       "v1_sets_under_v2_gate": "312 of 312",
-      "native_parity": "1.1e-5 maximum action difference against the Python fit",
-      "selection": "the second of four fits of the v6 law, chosen on the stack families under the LF-090 navigation network: transfers 18 and 21 of 24, practice 89 and 92 of 96, spinning share 0.14 to 0.20 against 0.34 to 0.38 for the LF-087 fit; in matches the share of flown ticks spinning above 1.5 radians per second falls from 45 and 43 percent to 29",
-      "predecessor": "LF-087 fit 5b7d0a8633d8d640586f1a84af3927da590a3aec641c01cbe1dfebf701bd77c8: 287 and 299 of 320"
+      "contact_sets": "recovered: 79 of 96 grounded climbs, 79 of 80 low falling climbs, 80 of 80 half turns, 64 of 64 drifting half turns and 48 of 48 tilted climbs, against 43, 72, 79, 64 and 48 for the LF-091 fit",
+      "native_parity": "9.5e-6 maximum action difference against the Python fit",
+      "selection": "the second of four fits of the v7 law with three in ten of its teacher episodes on the contact tasks, chosen on the matrix and the navigation law flying it: 21 and 24 of 24 transfers and 96 and 96 of 96 practice tasks at spinning shares of 0.07 to 0.09, against 22, 21, 96 and 96 at 0.12 to 0.18 for the LF-091 fit, with the transfers both fits passed 16 and 10 percent shorter",
+      "predecessor": "LF-091 fit b7e541402f9732766e515d25215f08d52a9fb94e23fd1cc9da3737d89cf0203b: 263 and 260 of 320"
     }
   }
 }
