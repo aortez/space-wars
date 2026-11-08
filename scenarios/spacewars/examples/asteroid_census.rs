@@ -34,6 +34,31 @@ fn histogram(radii: &[f32]) -> String {
     out
 }
 
+/// The quantiles, the shares over the ship's size and the histogram of a
+/// sample of radii, or a note that nothing arrived.
+fn distribution(radii: &[f32]) -> String {
+    if radii.is_empty() {
+        return "  no arrivals\n".to_owned();
+    }
+    let mut sorted = radii.to_vec();
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    let q = |f: f32| sorted[((sorted.len() - 1) as f32 * f) as usize];
+    let share = |limit: f32| {
+        100.0 * sorted.iter().filter(|&&r| r > limit).count() as f32 / sorted.len() as f32
+    };
+    format!(
+        "  radius min {:.2}, median {:.2}, q90 {:.2}, q99 {:.2}, max {:.2}; over 4: {:.1}%, over 6: {:.1}%\n{}",
+        sorted[0],
+        q(0.5),
+        q(0.9),
+        q(0.99),
+        sorted[sorted.len() - 1],
+        share(4.0),
+        share(6.0),
+        histogram(radii)
+    )
+}
+
 fn main() {
     let seconds: u64 = std::env::args()
         .nth(1)
@@ -83,9 +108,6 @@ fn main() {
     }
     let elapsed = started.elapsed();
     println!("  {games} games (a fresh game after each win)");
-    let mut sorted = radii.clone();
-    sorted.sort_by(|a, b| a.total_cmp(b));
-    let q = |f: f32| sorted[((sorted.len() - 1) as f32 * f) as usize];
     println!(
         "ordinary spacewars, radius 1200, {probability}/s, {seconds} s: {} spawned, {:.1} per second, step time {:.1} us",
         radii.len(),
@@ -93,16 +115,7 @@ fn main() {
         elapsed.as_secs_f64() * 1e6 / (seconds * 60) as f64
     );
     println!("  live asteroids every 10 s: {:?}", live);
-    println!(
-        "  radius median {:.2}, q90 {:.2}, q99 {:.2}, max {:.2}; over 4: {:.1}%, over 6: {:.1}%",
-        q(0.5),
-        q(0.9),
-        q(0.99),
-        sorted[sorted.len() - 1],
-        100.0 * sorted.iter().filter(|&&r| r > 4.0).count() as f32 / sorted.len() as f32,
-        100.0 * sorted.iter().filter(|&&r| r > 6.0).count() as f32 / sorted.len() as f32
-    );
-    print!("{}", histogram(&radii));
+    print!("{}", distribution(&radii));
     for (severity, name) in [
         (MaterialAsteroidSeverity::Light, "light"),
         (MaterialAsteroidSeverity::Mixed, "mixed"),
@@ -124,17 +137,12 @@ fn main() {
             }
         }
         let elapsed = started.elapsed();
-        let mut sorted = radii.clone();
-        sorted.sort_by(|a, b| a.total_cmp(b));
         println!(
-            "material match, every 3 s, {name}: {} arrivals, radius min {:.2} median {:.2} max {:.2}, step time {:.1} us",
+            "material match, every 3 s, {name}: {} arrivals, step time {:.1} us",
             radii.len(),
-            sorted[0],
-            sorted[sorted.len() / 2],
-            sorted[sorted.len() - 1],
             elapsed.as_secs_f64() * 1e6 / (seconds * 60) as f64
         );
         println!("  live every 10 s: {:?}", live);
-        print!("{}", histogram(&radii));
+        print!("{}", distribution(&radii));
     }
 }
