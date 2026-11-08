@@ -780,6 +780,7 @@ fn start(
         if let Some(recovery) = &mut recovery {
             recovery.tick(&w, host.borrow_mut().as_mut(), &mut p, &commands);
         }
+        super::settle_focus(&w);
         if w.get_updates_visible()
             && !p.busy
             && p.awaiting

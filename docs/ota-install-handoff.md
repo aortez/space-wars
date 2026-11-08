@@ -140,7 +140,11 @@ a currently verified candidate on a device with qualified recovery admission.
 Updates is reachable from launcher and paused-game App Settings using touch,
 keyboard, gamepad or the existing guarded UI control interface. It displays the
 exact channel, generation, build and image identity, with an explicit
-**Install & restart** or **End game, install & restart** confirmation. Desktop
+**Install & restart** or **End game, install & restart** confirmation. The
+cursor opens on Back and reaches Install only while an offer stands: it stays on
+Back during the availability check, does not move when the offer arrives, and
+returns to Back once the offer is consumed, withdrawn or expired, so a button
+that turns live under a resting cursor cannot take the next press. Desktop
 installation remains unavailable. While the service reports an installation
 phase, the panel shows an activity bar under the phase message: the native
 writer's byte counts fill it during the write and flush stages, and it sweeps in
