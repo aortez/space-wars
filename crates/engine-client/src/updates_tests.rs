@@ -1515,3 +1515,146 @@ fn writing_status_fills_the_activity_bar_and_reports_the_percentage() {
     );
     assert!(!h.window.get_updates_can_confirm());
 }
+
+/// A service whose availability check lasts until the test releases it, so the
+/// cursor can be driven while the check is still running.
+fn held_offer_exchange(
+    release: Arc<AtomicUsize>,
+    confirmations: Arc<AtomicUsize>,
+    cancellations: Arc<AtomicUsize>,
+    offer_ms: u64,
+) -> Exchange {
+    Arc::new(move |request: &ServiceRequest| match request {
+        ServiceRequest::Offer { .. } => {
+            let end = Instant::now() + Duration::from_secs(5);
+            while release.load(Ordering::SeqCst) == 0 && Instant::now() < end {
+                thread::sleep(Duration::from_millis(5));
+            }
+            let mut reply = response(Phase::Offered);
+            reply.offer = Some(Offer {
+                schema: SCHEMA,
+                ticket: ticket(),
+                candidate: Candidate {
+                    id: ticket().candidate,
+                    channel: Channel::Nightly,
+                    generation: 26,
+                    build_id: "rootfs-focus".into(),
+                },
+                ends_game: false,
+                expires_ms: transport::boot_ms().unwrap() + offer_ms,
+            });
+            Ok(reply)
+        }
+        ServiceRequest::Confirm { .. } => {
+            confirmations.fetch_add(1, Ordering::SeqCst);
+            Ok(response(Phase::Preparing))
+        }
+        ServiceRequest::Cancel { .. } => {
+            cancellations.fetch_add(1, Ordering::SeqCst);
+            Ok(response(Phase::Idle))
+        }
+        ServiceRequest::Status { .. } => Ok(response(Phase::Preparing)),
+    })
+}
+
+#[test]
+fn the_cursor_reaches_install_only_after_the_offer_arrives_and_only_by_hand() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let release = Arc::new(AtomicUsize::new(0));
+    let confirmations = Arc::new(AtomicUsize::new(0));
+    let cancellations = Arc::new(AtomicUsize::new(0));
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        dir.path().join("host.sock"),
+        held_offer_exchange(
+            release.clone(),
+            confirmations.clone(),
+            cancellations.clone(),
+            300_000,
+        ),
+        Rc::new(|| Some(0)),
+        uid(),
+        None,
+    );
+    h.window.invoke_updates_open();
+    for _ in 0..5 {
+        h.pump(false);
+    }
+    assert!(
+        h.window
+            .get_updates_message()
+            .contains("Checking installation availability")
+    );
+    assert!(!h.window.get_updates_can_confirm());
+    assert_eq!(h.window.get_updates_focus(), 1);
+    // Up, Down and Up again: the cursor stays on Back while the check runs.
+    for code in [0, 1, 0] {
+        h.window.invoke_keyboard_action(code, false);
+        h.pump(false);
+        assert_eq!(h.window.get_updates_focus(), 1, "key code {code}");
+    }
+    release.store(1, Ordering::SeqCst);
+    h.until(false, |w| w.get_updates_can_confirm());
+    for _ in 0..3 {
+        h.pump(false);
+    }
+    // The offer's arrival does not move the cursor onto the live button.
+    assert_eq!(h.window.get_updates_focus(), 1);
+    h.window.invoke_keyboard_action(0, false);
+    assert_eq!(h.window.get_updates_focus(), 0);
+    h.window.invoke_keyboard_action(4, false);
+    h.until(false, |_| confirmations.load(Ordering::SeqCst) == 1);
+    // The press disables Install, so the cursor returns to Cancel.
+    h.until(false, |w| w.get_updates_focus() == 1);
+    assert!(!h.window.get_updates_can_confirm());
+    assert_eq!(cancellations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn an_expired_offer_returns_the_cursor_to_back_and_keeps_it_there() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let confirmations = Arc::new(AtomicUsize::new(0));
+    let cancellations = Arc::new(AtomicUsize::new(0));
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        dir.path().join("host.sock"),
+        held_offer_exchange(
+            Arc::new(AtomicUsize::new(1)),
+            confirmations.clone(),
+            cancellations.clone(),
+            400,
+        ),
+        Rc::new(|| Some(0)),
+        uid(),
+        None,
+    );
+    h.window.invoke_updates_open();
+    h.until(false, |w| w.get_updates_can_confirm());
+    h.window.invoke_keyboard_action(1, false);
+    assert_eq!(h.window.get_updates_focus(), 0);
+    h.until(false, |w| !w.get_updates_can_confirm());
+    assert!(
+        h.window
+            .get_updates_message()
+            .contains("expired or changed")
+    );
+    assert_eq!(h.window.get_updates_focus(), 1);
+    // A press meant for the withdrawn Install button cannot confirm anything.
+    h.window.invoke_keyboard_action(4, false);
+    h.window.invoke_keyboard_action(0, false);
+    for _ in 0..3 {
+        h.pump(false);
+    }
+    assert_eq!(h.window.get_updates_focus(), 1);
+    assert_eq!(confirmations.load(Ordering::SeqCst), 0);
+}

@@ -66,20 +66,38 @@ pub(crate) fn install(
     });
 }
 
+/// Install is focus 0 and Back (or Cancel) is focus 1. The cursor reaches
+/// Install only while an offer stands, and never by itself: a button that
+/// turned live under a resting cursor could otherwise take the next press.
 pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
+    let can_confirm = window.get_updates_can_confirm();
     match action {
         UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
-            window.set_updates_focus(1 - window.get_updates_focus());
+            window.set_updates_focus(if can_confirm {
+                1 - window.get_updates_focus()
+            } else {
+                1
+            });
         }
-        UiAction::Confirm
-            if window.get_updates_focus() == 0 && window.get_updates_can_confirm() =>
-        {
-            window.invoke_updates_confirm()
+        UiAction::Confirm if window.get_updates_focus() == 0 => {
+            // A press on a disabled Install button does nothing; it must not
+            // fall through to Back.
+            if can_confirm {
+                window.invoke_updates_confirm();
+            }
         }
         UiAction::Confirm | UiAction::Back if window.get_updates_can_cancel() => {
             window.invoke_updates_cancel()
         }
         _ => {}
+    }
+}
+
+/// Returns the cursor to Back once the Install button is disabled, whatever
+/// withdrew the offer: a press, an outcome, an abort or its expiry.
+pub(crate) fn settle_focus(window: &MainWindow) {
+    if window.get_updates_focus() == 0 && !window.get_updates_can_confirm() {
+        window.set_updates_focus(1);
     }
 }
 
