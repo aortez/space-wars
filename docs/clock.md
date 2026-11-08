@@ -565,11 +565,17 @@ below it:
 ![The pile under the face in the 480×800 view](screenshots/clock/coins-480x800-piled.png)
 
 The switch ends the pause page's preview row after Crow and Explosion, and
-the launcher's Events row, which became five columns like the two below it:
+the launcher's Events row, which became five columns like the two below it.
+Left and Right walk the row's switches, as they do on every switch, and
+adjust the selector. On a portrait panel the preview and recipe selectors
+take rows of their own above their switches, so their names keep their room,
+and the panel grows by two rows; `tools/audit-clock-control-layout.py`
+measures both arrangements and holds every selector on the page to the room
+its value needs:
 
-| Clock Controls | Scenario Settings |
-| --- | --- |
-| ![Coins On at the end of the pause page's preview row](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On at the end of the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) |
+| Clock Controls | Scenario Settings | Portrait |
+| --- | --- | --- |
+| ![Coins On at the end of the pause page's preview row](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On at the end of the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) | ![The preview and recipe selectors on rows of their own in the 480×800 view](screenshots/clock/coins-480x800-live-controls.png) |
 
 `coins_tests` cover the cap and the batch's own identities, seeded replay at
 six aspect ratios in both formats, the settle measurement below, the return

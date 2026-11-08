@@ -1159,10 +1159,14 @@ export component MainWindow inherits Window {
         background: #050514cc;
 
         Rectangle {
+            // The Clock grid stacks its selectors over their switches on a
+            // portrait panel and needs two more rows. clock-grid.stacked below
+            // applies the same threshold to the grid's own width.
+            private property <length> clock-extra: root.ingame-clock-visible && self.width - 48px < 500px ? 112px : 0px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: root.width < 632px ? root.width - 32px : 600px;
-            height: root.ingame-controls-visible || root.ingame-clock-visible ? (root.height < 456px ? root.height - 24px : 432px) : root.pizza-event-available ? 390px : 326px;
+            height: root.ingame-controls-visible || root.ingame-clock-visible ? (root.height < 456px + self.clock-extra ? root.height - 24px : 432px + self.clock-extra) : root.pizza-event-available ? 390px : 326px;
             background: #080a12f7;
             border-color: #596273;
             border-width: 1px;
@@ -1404,7 +1408,11 @@ export component MainWindow inherits Window {
 
             // A conditional item tree keeps these controls out of the large
             // root initializer. Values/focus remain in MainWindow across opens.
-            if root.ingame-clock-visible: Rectangle {
+            if root.ingame-clock-visible: clock-grid := Rectangle {
+                // Under 500px the preview and recipe selectors take rows of
+                // their own above their switches, so their names keep their
+                // room; the panel grows by clock-extra above to hold them.
+                private property <bool> stacked: self.width < 500px;
                 x: 24px;
                 y: 62px;
                 width: parent.width - 48px;
@@ -1543,13 +1551,17 @@ export component MainWindow inherits Window {
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(11, 1); }
                 }
+                // Landscape: the selector, then Crow, Explosion and Coins at
+                // 76, 86 and 76px, which leaves "Preview" and the longest
+                // event name their room. Stacked: the selector has the row
+                // and the three switches share the next.
                 ChoiceRow {
                     y: 168px;
                     x: 0px;
-                    width: parent.width - 294px;
+                    width: clock-grid.stacked ? parent.width : parent.width - 262px;
                     height: 48px;
-                    label: parent.width < 480px ? "" : "Preview";
-                    label-fraction: parent.width < 480px ? 0 : 0.22;
+                    label: "Preview";
+                    label-fraction: 0.24;
                     value: root.clock-event-labels[root.clock-preview-index];
                     selected: root.ingame-clock-focus-index == 4;
                     enabled: !root.clock-controls-pending;
@@ -1557,9 +1569,9 @@ export component MainWindow inherits Window {
                     next => { root.ingame-clock-adjust(4, 1); }
                 }
                 MenuButton {
-                    x: parent.width - 286px;
-                    y: 168px;
-                    width: 90px;
+                    x: clock-grid.stacked ? 0px : parent.width - 254px;
+                    y: clock-grid.stacked ? 224px : 168px;
+                    width: clock-grid.stacked ? (parent.width - 16px) / 3 : 76px;
                     height: 48px;
                     text: "Crow\n" + (root.launcher-clock-crow-enabled ? root.launcher-clock-crow-water-tolerance : "Off");
                     selected: root.ingame-clock-focus-index == 14;
@@ -1567,9 +1579,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(14, 1); }
                 }
                 MenuButton {
-                    x: parent.width - 188px;
-                    y: 168px;
-                    width: 90px;
+                    x: clock-grid.stacked ? (parent.width - 16px) / 3 + 8px : parent.width - 170px;
+                    y: clock-grid.stacked ? 224px : 168px;
+                    width: clock-grid.stacked ? (parent.width - 16px) / 3 : 86px;
                     height: 48px;
                     text: "Explosion\n" + (root.launcher-clock-explosion-enabled ? "On" : "Off");
                     text-padding: 6px;
@@ -1578,9 +1590,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(15, 1); }
                 }
                 MenuButton {
-                    x: parent.width - 90px;
-                    y: 168px;
-                    width: 90px;
+                    x: clock-grid.stacked ? 2 * (parent.width - 16px) / 3 + 16px : parent.width - 76px;
+                    y: clock-grid.stacked ? 224px : 168px;
+                    width: clock-grid.stacked ? (parent.width - 16px) / 3 : 76px;
                     height: 48px;
                     text: "Coins\n" + (root.launcher-clock-coins-enabled ? "On" : "Off");
                     text-padding: 6px;
@@ -1589,11 +1601,13 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(22, 1); }
                 }
                 // Three switches at a fifth of the row each and the recipe at
-                // two fifths, so the recipe keeps its room on a portrait panel.
+                // two fifths. Stacked, the switches share a row and the recipe
+                // takes the next, since two fifths of a portrait row is less
+                // than its arrows need.
                 MenuButton {
                     x: 0px;
-                    y: 224px;
-                    width: (parent.width - 24px) / 5;
+                    y: clock-grid.stacked ? 280px : 224px;
+                    width: clock-grid.stacked ? (parent.width - 16px) / 3 : (parent.width - 24px) / 5;
                     height: 48px;
                     text: "Marquee\n" + (root.launcher-clock-marquee-enabled ? "On" : "Off");
                     text-padding: 6px;
@@ -1602,9 +1616,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(9, 1); }
                 }
                 MenuButton {
-                    x: (parent.width - 24px) / 5 + 8px;
-                    y: 224px;
-                    width: (parent.width - 24px) / 5;
+                    x: clock-grid.stacked ? (parent.width - 16px) / 3 + 8px : (parent.width - 24px) / 5 + 8px;
+                    y: clock-grid.stacked ? 280px : 224px;
+                    width: clock-grid.stacked ? (parent.width - 16px) / 3 : (parent.width - 24px) / 5;
                     height: 48px;
                     text: "Aquarium\n" + (root.launcher-clock-aquarium-enabled ? "On" : "Off");
                     text-padding: 6px;
@@ -1613,9 +1627,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(17, 1); }
                 }
                 MenuButton {
-                    x: 2 * (parent.width - 24px) / 5 + 16px;
-                    y: 224px;
-                    width: (parent.width - 24px) / 5;
+                    x: clock-grid.stacked ? 2 * (parent.width - 16px) / 3 + 16px : 2 * (parent.width - 24px) / 5 + 16px;
+                    y: clock-grid.stacked ? 280px : 224px;
+                    width: clock-grid.stacked ? (parent.width - 16px) / 3 : (parent.width - 24px) / 5;
                     height: 48px;
                     text: "Spider\n" + (root.launcher-clock-spider-enabled ? "On" : "Off");
                     text-padding: 6px;
@@ -1624,9 +1638,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(21, 1); }
                 }
                 ChoiceRow {
-                    x: 3 * (parent.width - 24px) / 5 + 24px;
-                    y: 224px;
-                    width: 2 * (parent.width - 24px) / 5;
+                    x: clock-grid.stacked ? 0px : 3 * (parent.width - 24px) / 5 + 24px;
+                    y: clock-grid.stacked ? 336px : 224px;
+                    width: clock-grid.stacked ? parent.width : 2 * (parent.width - 24px) / 5;
                     height: 48px;
                     label: "Recipe";
                     label-fraction: 0.25;
@@ -1637,7 +1651,7 @@ export component MainWindow inherits Window {
                     next => { root.ingame-clock-adjust(10, 1); }
                 }
                 Text {
-                    y: 276px;
+                    y: clock-grid.stacked ? 388px : 276px;
                     width: parent.width;
                     height: 20px;
                     text: root.clock-controls-pending ? "Applying…" : root.settings-save-pending ? "Saving settings…" : root.clock-settings-error != "" ? root.clock-settings-error : "Saved. Preview runs now, even if Off.";

@@ -1086,6 +1086,20 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), Some((15, 1)));
     click(&window, 439.0, 278.0);
     assert_eq!(adjusted.get(), Some((14, 1)));
+    // Arrows walk the row's switches rather than flipping them: Explosion to
+    // Coins and back, then off the end to the selector, which they adjust.
+    adjusted.set(None);
+    window.set_ingame_clock_focus_index(15);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 22);
+    key(&window, Key::LeftArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 15);
+    key(&window, Key::RightArrow);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 4);
+    assert_eq!(adjusted.get(), None);
+    key(&window, Key::RightArrow);
+    assert_eq!(adjusted.get(), Some((4, 1)));
     click(&window, 287.0, 166.0);
     assert_eq!(adjusted.get(), Some((13, 1)));
     click(&window, 175.0, 166.0);
