@@ -68,6 +68,8 @@ pub enum EventPhase {
     Exploding,
     Filling,
     Swimming,
+    Minting,
+    Cascading,
 }
 
 impl EventPhase {
@@ -93,6 +95,8 @@ impl EventPhase {
             Self::Exploding => "exploding",
             Self::Filling => "filling",
             Self::Swimming => "swimming",
+            Self::Minting => "minting",
+            Self::Cascading => "cascading",
         }
     }
 }
@@ -137,6 +141,7 @@ impl EventDefinition {
                 | ClockEventKind::Rain
                 | ClockEventKind::Explosion
                 | ClockEventKind::Aquarium
+                | ClockEventKind::Coins
         )
     }
 }
@@ -240,6 +245,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: crate::spider::visit::SPIDER_TICKS,
         cooldown_ticks: 30 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::Coins,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::DigitGeometry,
+        duration_ticks: explosion::COINS_TICKS,
+        cooldown_ticks: 45 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -262,6 +274,8 @@ pub(super) enum ActiveEvent {
     CellSwap(Box<cell_swap::CellSwapEvent>),
     Rain(Box<crate::rain::RainEvent>),
     Explosion(ExplosionEvent),
+    /// Explosion's batch as round pieces that drop; see `explosion::Debris`.
+    Coins(ExplosionEvent),
     Aquarium(Box<aquarium::AquariumEvent>),
     Grass(crate::grass::Introduction),
 }
@@ -296,6 +310,7 @@ impl ActiveEvent {
             }
             ClockEventKind::Falling => Self::Falling(FallingEvent::new(context, seed)),
             ClockEventKind::Explosion => Self::Explosion(ExplosionEvent::new(context, seed)),
+            ClockEventKind::Coins => Self::Coins(ExplosionEvent::coins(context, seed)),
             ClockEventKind::ColorCycle => Self::ColorCycle(ColorCycle::default()),
             ClockEventKind::Meltdown => Self::Meltdown(Box::new(MeltdownEvent::new(
                 context,
@@ -342,6 +357,7 @@ impl ActiveEvent {
             Self::Grass(_) => ClockEventKind::Grass,
             Self::Falling(_) => ClockEventKind::Falling,
             Self::Explosion(_) => ClockEventKind::Explosion,
+            Self::Coins(_) => ClockEventKind::Coins,
             Self::ColorCycle(_) => ClockEventKind::ColorCycle,
             Self::Meltdown(_) => ClockEventKind::Meltdown,
             Self::Marquee(_) => ClockEventKind::Marquee,
@@ -356,7 +372,7 @@ impl ActiveEvent {
         match self {
             Self::Aquarium(event) => event.shares_visit_arena(),
             Self::Falling(event) => event.shares_visit_arena(),
-            Self::Explosion(event) => event.shares_visit_arena(),
+            Self::Explosion(event) | Self::Coins(event) => event.shares_visit_arena(),
             Self::Meltdown(event) => event.shares_visit_arena(),
             _ => false,
         }
@@ -364,14 +380,16 @@ impl ActiveEvent {
 
     /// Whether a player who joins this event brings it into the arena, so
     /// the arena takes the event's claim with the visit's. Joining a
-    /// standalone Falling, Explosion, Meltdown or Aquarium does, except
+    /// standalone Falling, Explosion, Coins, Meltdown or Aquarium does, except
     /// Meltdown's water lab, which a player never joins.
     pub fn joins_into_arena(&self) -> bool {
         match self {
             Self::Meltdown(event) if event.lab => false,
-            Self::Aquarium(_) | Self::Falling(_) | Self::Explosion(_) | Self::Meltdown(_) => {
-                !self.shares_visit_arena()
-            }
+            Self::Aquarium(_)
+            | Self::Falling(_)
+            | Self::Explosion(_)
+            | Self::Coins(_)
+            | Self::Meltdown(_) => !self.shares_visit_arena(),
             _ => false,
         }
     }
@@ -381,7 +399,7 @@ impl ActiveEvent {
     pub fn arena_opacity(&self) -> f32 {
         match self {
             Self::Falling(event) => event.arena_opacity(),
-            Self::Explosion(event) => event.arena_opacity(),
+            Self::Explosion(event) | Self::Coins(event) => event.arena_opacity(),
             Self::Meltdown(event) => event.arena_opacity(),
             _ => 1.0,
         }
@@ -393,9 +411,11 @@ impl ActiveEvent {
     /// step has built the arena.
     pub fn simulates_apart(&self, visit: bool) -> bool {
         match self {
-            Self::Falling(_) | Self::Explosion(_) | Self::Meltdown(_) | Self::Aquarium(_) => {
-                !self.shares_visit_arena()
-            }
+            Self::Falling(_)
+            | Self::Explosion(_)
+            | Self::Coins(_)
+            | Self::Meltdown(_)
+            | Self::Aquarium(_) => !self.shares_visit_arena(),
             Self::Rain(_) => !visit,
             _ => false,
         }
@@ -405,7 +425,7 @@ impl ActiveEvent {
     pub fn own_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
         match self {
             Self::Falling(event) => event.own_world(),
-            Self::Explosion(event) => event.own_world(),
+            Self::Explosion(event) | Self::Coins(event) => event.own_world(),
             Self::Meltdown(event) => event.own_world(),
             Self::Rain(event) => event.own_world(),
             _ => None,
@@ -431,7 +451,9 @@ impl ActiveEvent {
         match self {
             Self::Aquarium(event) => event.join_player(arena, seed, session, seat),
             Self::Falling(event) => event.join_player(arena, seed, session, seat),
-            Self::Explosion(event) => event.join_player(arena, seed, session, seat),
+            Self::Explosion(event) | Self::Coins(event) => {
+                event.join_player(arena, seed, session, seat)
+            }
             Self::Meltdown(event) => event.join_player(arena, layout, seed, session, seat),
             _ => None,
         }
@@ -441,7 +463,7 @@ impl ActiveEvent {
         match self {
             Self::Aquarium(event) => event.release(player, arena),
             Self::Falling(event) => event.release(player, arena),
-            Self::Explosion(event) => event.release(player, arena),
+            Self::Explosion(event) | Self::Coins(event) => event.release(player, arena),
             Self::Meltdown(event) => event.release(player, arena),
             _ => (),
         }
@@ -461,7 +483,7 @@ impl ActiveEvent {
             Self::Grass(event) => event.step(),
             Self::Aquarium(event) => event.step(context, visit, arena),
             Self::Falling(event) => event.step(context),
-            Self::Explosion(event) => event.step(context, arena),
+            Self::Explosion(event) | Self::Coins(event) => event.step(context, arena),
             Self::ColorCycle(event) => event.step(),
             Self::Meltdown(event) => event.step_with_visit(context, visit, arena),
             Self::Marquee(event) => event.step(),
@@ -491,7 +513,7 @@ impl ActiveEvent {
         match self {
             Self::Aquarium(event) => event.observe(visit, arena),
             Self::Falling(event) => event.observe(context, arena),
-            Self::Explosion(event) => {
+            Self::Explosion(event) | Self::Coins(event) => {
                 event.observe(context, arena);
                 false
             }
@@ -505,7 +527,7 @@ impl ActiveEvent {
             Self::Grass(_) => EventPhase::Presenting,
             Self::Aquarium(event) => event.phase(),
             Self::Falling(event) => event.phase(),
-            Self::Explosion(event) => event.phase(),
+            Self::Explosion(event) | Self::Coins(event) => event.phase(),
             Self::ColorCycle(_) => EventPhase::Cycling,
             Self::Meltdown(event) => event.phase(),
             Self::Marquee(_) => EventPhase::Presenting,
@@ -527,7 +549,7 @@ impl ActiveEvent {
             Self::Grass(event) => event.tick,
             Self::Aquarium(event) => event.phase_tick(),
             Self::Falling(event) => event.phase_tick(),
-            Self::Explosion(event) => event.phase_tick(),
+            Self::Explosion(event) | Self::Coins(event) => event.phase_tick(),
             Self::ColorCycle(event) => event.tick,
             Self::Meltdown(event) => event.phase_tick(),
             Self::Marquee(event) => event.tick,
@@ -552,7 +574,7 @@ impl ActiveEvent {
         match self {
             Self::Grass(_) | Self::Aquarium(_) => (0, 0),
             Self::Falling(event) => event.physics_counts(),
-            Self::Explosion(event) => event.physics_counts(),
+            Self::Explosion(event) | Self::Coins(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),
             Self::ColorCycle(_)
             | Self::Marquee(_)
@@ -602,7 +624,7 @@ impl ActiveEvent {
         match self {
             Self::CellSwap(event) => event.surfaces(layout, out),
             Self::DigitSlide(event) => event.surfaces(layout, out),
-            Self::Explosion(event) => event.surfaces(layout, out),
+            Self::Explosion(event) | Self::Coins(event) => event.surfaces(layout, out),
             Self::Falling(event) => event.surfaces(layout, segments, out),
             Self::Meltdown(event) => event.surfaces(layout, out),
             Self::SlotMachine(event) => event.surfaces(layout, out),
@@ -620,7 +642,9 @@ impl ActiveEvent {
         match self {
             Self::CellSwap(event) => event.release_surfaces(surfaces),
             Self::DigitSlide(event) => event.release_surfaces(surfaces),
-            Self::Explosion(event) => event.release_surfaces(segments, surfaces),
+            Self::Explosion(event) | Self::Coins(event) => {
+                event.release_surfaces(segments, surfaces)
+            }
             Self::Falling(event) => event.release_surfaces(segments, surfaces),
             Self::Marquee(event) => event.release_surfaces(surfaces),
             Self::Meltdown(event) => event.release_surfaces(segments, surfaces),
@@ -638,6 +662,8 @@ impl ActiveEvent {
                     | EventPhase::Draining
                     | EventPhase::Warning
                     | EventPhase::Exploding
+                    | EventPhase::Minting
+                    | EventPhase::Cascading
             )
     }
 }

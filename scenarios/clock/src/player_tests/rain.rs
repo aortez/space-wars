@@ -243,6 +243,7 @@ fn automatic_rain_and_wet_digit_changes_preserve_the_visit_settings_and_volume()
         grass: false,
         slot_machine: false,
         spider: false,
+        coins: false,
     };
     state.configure(settings);
     let session = state.player_duck_session();

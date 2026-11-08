@@ -12,6 +12,8 @@ mod calendar_tests;
 pub mod ceiling;
 #[cfg(test)]
 mod cell_swap_tests;
+#[cfg(test)]
+mod coins_tests;
 mod crow;
 #[cfg(test)]
 mod crow_tests;
@@ -300,6 +302,7 @@ impl ClockAction {
                         grass: payload[5] & 8 != 0,
                         slot_machine: payload[5] & 16 != 0,
                         spider: payload[5] & 32 != 0,
+                        coins: payload[5] & 64 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
@@ -1277,6 +1280,7 @@ impl ClockState {
             ClockEventKind::Spider => vec![arena::Owner::Spider],
             ClockEventKind::Aquarium
             | ClockEventKind::Explosion
+            | ClockEventKind::Coins
             | ClockEventKind::Falling
             | ClockEventKind::Meltdown
                 if self.duck_visit.is_some() =>
@@ -1333,6 +1337,13 @@ impl ClockState {
     pub fn explosion_state(&self) -> Option<engine_common::ClockExplosionState> {
         match self.active_event.as_ref()? {
             ActiveEvent::Explosion(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
+
+    pub fn coins_state(&self) -> Option<engine_common::ClockCoinsState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Coins(event) => Some(event.coins_diagnostics()),
             _ => None,
         }
     }
@@ -1643,6 +1654,7 @@ impl ClockState {
             ClockEventKind::Falling
                 | ClockEventKind::Meltdown
                 | ClockEventKind::Explosion
+                | ClockEventKind::Coins
                 | ClockEventKind::Aquarium
         ) && let Some(duck) = &mut self.duck_visit
         {
@@ -1664,6 +1676,9 @@ impl ClockState {
                 ),
                 ClockEventKind::Explosion => ActiveEvent::Explosion(
                     events::explosion::ExplosionEvent::with_visit(context, seed, duck, arena),
+                ),
+                ClockEventKind::Coins => ActiveEvent::Coins(
+                    events::explosion::ExplosionEvent::coins_with_visit(context, seed, duck, arena),
                 ),
                 ClockEventKind::Meltdown => ActiveEvent::Meltdown(Box::new(
                     events::meltdown::MeltdownEvent::with_visit(context, seed, duck, arena),

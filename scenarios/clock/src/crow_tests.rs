@@ -219,6 +219,7 @@ fn crow_only_schedule_blocks_duplicates_then_obeys_departure_cooldown() {
         rain: false,
         slot_machine: false,
         spider: false,
+        coins: false,
     };
     state.configure(settings);
     assert!(state.automatic_events_suspended());
@@ -330,6 +331,7 @@ fn transformed_or_destroyed_perches_make_crow_depart_without_interrupting_the_ev
         ClockEventKind::DigitSlide,
         ClockEventKind::CellSwap,
         ClockEventKind::Explosion,
+        ClockEventKind::Coins,
     ] {
         let mut state = fixture(1.6, 42);
         for _ in 0..110 {

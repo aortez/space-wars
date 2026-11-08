@@ -65,6 +65,7 @@ fn perches(
                 | ClockEventKind::CellSwap
                 | ClockEventKind::Marquee
                 | ClockEventKind::Explosion
+                | ClockEventKind::Coins
         )
     ) {
         return result;

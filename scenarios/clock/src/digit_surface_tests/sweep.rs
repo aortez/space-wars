@@ -14,7 +14,7 @@ use crate::events::EVENT_CATALOG;
 use engine_common::{ClockSurfaceChangeKind, ClockSurfaceLimits, ClockSurfaceSourceCount};
 
 /// The timed events, each of which ends by itself.
-const TIMED: [ClockEventKind; 10] = [
+const TIMED: [ClockEventKind; 11] = [
     ClockEventKind::Falling,
     ClockEventKind::ColorCycle,
     ClockEventKind::Meltdown,
@@ -25,6 +25,7 @@ const TIMED: [ClockEventKind; 10] = [
     ClockEventKind::Aquarium,
     ClockEventKind::CellSwap,
     ClockEventKind::SlotMachine,
+    ClockEventKind::Coins,
 ];
 
 /// Reads every change step by step, as a consumer that never misses one, and
@@ -347,6 +348,7 @@ fn surface_contract_a_resize_ends_an_event_before_anything_reads_it() {
         (ClockEventKind::Marquee, 100),
         (ClockEventKind::CellSwap, 20),
         (ClockEventKind::SlotMachine, 100),
+        (ClockEventKind::Coins, 100),
     ];
     for (kind, run) in events {
         for (index, aspect) in ASPECTS.into_iter().enumerate() {

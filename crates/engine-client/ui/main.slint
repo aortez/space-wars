@@ -745,6 +745,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-grass-enabled: true;
     in-out property <bool> launcher-clock-slot-machine-enabled: true;
     in-out property <bool> launcher-clock-spider-enabled: true;
+    in-out property <bool> launcher-clock-coins-enabled: true;
     in-out property <bool> launcher-clock-rain-enabled: true;
     in-out property <string> launcher-clock-rain-amount: "Varied";
     in-out property <string> launcher-clock-marquee-preset: "Random";
@@ -1545,7 +1546,7 @@ export component MainWindow inherits Window {
                 ChoiceRow {
                     y: 168px;
                     x: 0px;
-                    width: parent.width - 196px;
+                    width: parent.width - 294px;
                     height: 48px;
                     label: parent.width < 480px ? "" : "Preview";
                     label-fraction: parent.width < 480px ? 0 : 0.22;
@@ -1556,7 +1557,7 @@ export component MainWindow inherits Window {
                     next => { root.ingame-clock-adjust(4, 1); }
                 }
                 MenuButton {
-                    x: parent.width - 188px;
+                    x: parent.width - 286px;
                     y: 168px;
                     width: 90px;
                     height: 48px;
@@ -1566,7 +1567,7 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(14, 1); }
                 }
                 MenuButton {
-                    x: parent.width - 90px;
+                    x: parent.width - 188px;
                     y: 168px;
                     width: 90px;
                     height: 48px;
@@ -1575,6 +1576,17 @@ export component MainWindow inherits Window {
                     selected: root.ingame-clock-focus-index == 15;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(15, 1); }
+                }
+                MenuButton {
+                    x: parent.width - 90px;
+                    y: 168px;
+                    width: 90px;
+                    height: 48px;
+                    text: "Coins\n" + (root.launcher-clock-coins-enabled ? "On" : "Off");
+                    text-padding: 6px;
+                    selected: root.ingame-clock-focus-index == 22;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(22, 1); }
                 }
                 // Three switches at a fifth of the row each and the recipe at
                 // two fifths, so the recipe keeps its room on a portrait panel.
@@ -2415,7 +2427,7 @@ export component MainWindow inherits Window {
                         MenuButton {
                             x: 0px;
                             y: 104px;
-                            width: (parent.width - 24px) / 4;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text: "Events\n" + root.launcher-clock-event-profile;
                             selected: root.launcher-settings-focus-index == 4;
@@ -2425,31 +2437,40 @@ export component MainWindow inherits Window {
                             }
                         }
                         MenuButton {
-                            x: (parent.width + 8px) / 4;
+                            x: (parent.width + 8px) / 5;
                             y: 104px;
-                            width: (parent.width - 24px) / 4;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text: "Rain\n" + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
                             selected: root.launcher-settings-focus-index == 11;
                             activated => { root.launcher-settings-focus-index = 11; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: 2 * (parent.width + 8px) / 4;
+                            x: 2 * (parent.width + 8px) / 5;
                             y: 104px;
-                            width: (parent.width - 24px) / 4;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text: "Digit Slide\n" + (root.launcher-clock-digit-slide-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 3;
                             activated => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: 3 * (parent.width + 8px) / 4;
+                            x: 3 * (parent.width + 8px) / 5;
                             y: 104px;
-                            width: (parent.width - 24px) / 4;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text: "Spider\n" + (root.launcher-clock-spider-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 20;
                             activated => { root.launcher-settings-focus-index = 20; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: 4 * (parent.width + 8px) / 5;
+                            y: 104px;
+                            width: (parent.width - 32px) / 5;
+                            height: 48px;
+                            text: "Coins\n" + (root.launcher-clock-coins-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 21;
+                            activated => { root.launcher-settings-focus-index = 21; root.ui-action(3); }
                         }
 
                         MenuButton {

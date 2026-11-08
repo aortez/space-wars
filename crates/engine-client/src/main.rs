@@ -904,6 +904,7 @@ fn show_launcher(
     window.set_launcher_clock_cell_swap_enabled(settings.clock.events.cell_swap);
     window.set_launcher_clock_slot_machine_enabled(settings.clock.events.slot_machine);
     window.set_launcher_clock_spider_enabled(settings.clock.events.spider);
+    window.set_launcher_clock_coins_enabled(settings.clock.events.coins);
     window.set_launcher_clock_grass_enabled(settings.clock.events.grass);
     window.set_launcher_clock_rain_enabled(settings.clock.events.rain);
     window.set_launcher_clock_rain_amount(settings.clock.rain_amount.label().into());
@@ -1667,7 +1668,7 @@ pub(crate) fn launcher_settings_item_count_for(scenario: &str) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 6,
-        "clock" => 22,
+        "clock" => 23,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1993,6 +1994,10 @@ fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
         window.set_launcher_clock_slot_machine_enabled(
             !window.get_launcher_clock_slot_machine_enabled(),
         );
+        return;
+    }
+    if focus == 21 {
+        window.set_launcher_clock_coins_enabled(!window.get_launcher_clock_coins_enabled());
         return;
     }
     if focus == 20 {
@@ -2665,6 +2670,7 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             rain: window.get_launcher_clock_rain_enabled(),
             slot_machine: window.get_launcher_clock_slot_machine_enabled(),
             spider: window.get_launcher_clock_spider_enabled(),
+            coins: window.get_launcher_clock_coins_enabled(),
         },
         marquee_preset: engine_common::ClockMarqueePreset::ALL
             .into_iter()
@@ -4463,6 +4469,7 @@ mod tests {
                     grass: false,
                     slot_machine: false,
                     spider: false,
+                    coins: false,
                 },
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),

@@ -99,6 +99,7 @@ fn config(aspect: f32, font: ClockFont, fixture: FixtureStart) -> ClockConfig {
             grass: false,
             slot_machine: false,
             spider: false,
+            coins: false,
         },
         time_format: ClockTimeFormat::TwentyFourHour,
         fonts: ClockFontSettings {
@@ -887,6 +888,7 @@ fn proxies_follow_every_event_and_rigid_pieces_keep_their_own_bodies() {
         ClockEventKind::Marquee,
         ClockEventKind::Rain,
         ClockEventKind::Explosion,
+        ClockEventKind::Coins,
         ClockEventKind::Aquarium,
         ClockEventKind::CellSwap,
         ClockEventKind::SlotMachine,
@@ -942,7 +944,10 @@ fn proxies_follow_every_event_and_rigid_pieces_keep_their_own_bodies() {
             }
         }
         assert!(!running(&state), "{context}: the event ends");
-        if matches!(kind, ClockEventKind::Falling | ClockEventKind::Explosion) {
+        if matches!(
+            kind,
+            ClockEventKind::Falling | ClockEventKind::Explosion | ClockEventKind::Coins
+        ) {
             // Standalone, their pieces move in a world of their own, so the
             // proxies stand for them in the arena.
             assert!(rigid_seen > 0, "{context}: rigid pieces carried the face");

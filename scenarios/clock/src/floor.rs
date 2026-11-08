@@ -40,7 +40,9 @@ impl FloorManager {
         );
         self.owner = Some(FloorOwner::Event(kind));
         self.mode = match kind {
-            ClockEventKind::Falling | ClockEventKind::Explosion => ClockFloorMode::DrainOpen,
+            ClockEventKind::Falling | ClockEventKind::Explosion | ClockEventKind::Coins => {
+                ClockFloorMode::DrainOpen
+            }
             ClockEventKind::Meltdown
             | ClockEventKind::Duck
             | ClockEventKind::Rain
@@ -75,6 +77,7 @@ impl FloorManager {
             | ClockEventKind::Falling
             | ClockEventKind::Meltdown
             | ClockEventKind::Explosion
+            | ClockEventKind::Coins
             | ClockEventKind::Aquarium),
         )) = self.owner
         {
@@ -120,6 +123,7 @@ impl FloorManager {
                 | ClockEventKind::Falling
                 | ClockEventKind::Meltdown
                 | ClockEventKind::Explosion
+                | ClockEventKind::Coins
                 | ClockEventKind::Aquarium
         ));
         let Some(FloorOwner::VisitArena { event, .. }) = &mut self.owner else {

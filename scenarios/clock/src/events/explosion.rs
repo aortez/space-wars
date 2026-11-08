@@ -4,6 +4,10 @@
 //! again. A block the return sends to another cell keeps its surface; a block
 //! split off for a denser reading is a new one, and a surplus block's surface
 //! departs as it shrinks and is retired as merged away.
+//!
+//! Coins is the same batch made of round pieces: the cells turn into coins
+//! where they stand, drop with a little jitter, roll and pile, and come home
+//! by the same return. `Debris` says which of the two a batch is.
 use engine_common::ClockEventKind;
 use engine_core::Vec2;
 use engine_rapier::world::{
@@ -34,8 +38,49 @@ use reassembly::{Destination, Reassembly};
 
 pub const WARNING_TICKS: u64 = 36;
 pub const BURST_TICKS: u64 = 210;
+/// How long the coins are live bodies: time to drop from the face, which in a
+/// portrait layout is 28 pitches up, land and come to rest, measured in
+/// `coins_tests`.
+pub const CASCADE_TICKS: u64 = 240;
 pub const EXPLOSION_TICKS: u64 = WARNING_TICKS + BURST_TICKS + REFORMING_TICKS;
+pub const COINS_TICKS: u64 = WARNING_TICKS + CASCADE_TICKS + REFORMING_TICKS;
 pub const MAX_EXPLOSION_CELLS: usize = crate::fonts::MAX_DIGIT_CELLS + meridiem::MAX_CELLS;
+
+/// What the batch is made of. Explosion blasts square blocks outward; Coins
+/// turns the same cells into round pieces that drop where they stand. The two
+/// never run at once, and Coins keeps Explosion's budget, so the arena's
+/// capacity does not move.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Debris {
+    Blast,
+    Coins,
+}
+
+impl Debris {
+    /// The event this batch is, which is the owner it claims the arena as.
+    pub(crate) const fn kind(self) -> ClockEventKind {
+        match self {
+            Self::Blast => ClockEventKind::Explosion,
+            Self::Coins => ClockEventKind::Coins,
+        }
+    }
+
+    /// How long the pieces are live bodies before the return.
+    const fn live_ticks(self) -> u64 {
+        match self {
+            Self::Blast => BURST_TICKS,
+            Self::Coins => CASCADE_TICKS,
+        }
+    }
+
+    /// The first of this batch's body identities in the arena.
+    const fn first_id(self) -> u64 {
+        match self {
+            Self::Blast => crate::arena::ids::canonical::EXPLOSION_CELLS.start,
+            Self::Coins => crate::arena::ids::canonical::COIN_CELLS.start,
+        }
+    }
+}
 
 /// A digit cell: its slot and its place in the slot's grid.
 pub(crate) type Home = (u8, GridCell);
@@ -66,6 +111,7 @@ enum Mechanics {
 }
 
 pub(crate) struct ExplosionEvent {
+    debris: Debris,
     phase: EventPhase,
     tick: u64,
     gravity: f32,
@@ -78,10 +124,11 @@ pub(crate) struct ExplosionEvent {
     reassembly: Option<Reassembly>,
 }
 
-fn body_id(index: usize) -> BodyId {
-    // Disjoint from duck, course, Falling bars and Meltdown cells.
+fn body_id(debris: Debris, index: usize) -> BodyId {
+    // Disjoint from duck, course, Falling bars and Meltdown cells, and the two
+    // batches from each other.
     BodyId::new(
-        PhysicsId::new(crate::arena::ids::canonical::EXPLOSION_CELLS.start + index as u64),
+        PhysicsId::new(debris.first_id() + index as u64),
         BodyRole::PRIMARY,
     )
 }
@@ -97,12 +144,22 @@ impl ExplosionEvent {
     }
 
     pub fn new(context: EventContext<'_>, seed: u64) -> Self {
-        let drain = context.floor.drain().expect("Explosion owns the drain");
+        Self::standalone(context, seed, Debris::Blast)
+    }
+
+    /// The Coins event, standalone.
+    pub fn coins(context: EventContext<'_>, seed: u64) -> Self {
+        Self::standalone(context, seed, Debris::Coins)
+    }
+
+    fn standalone(context: EventContext<'_>, seed: u64, debris: Debris) -> Self {
+        let drain = context.floor.drain().expect("the batch owns the drain");
         Self::build(
             context,
             seed,
             Mechanics::Standalone(Some(Box::new(FallingWorld::arena(drain)))),
             Some(drain),
+            debris,
         )
     }
 
@@ -112,8 +169,28 @@ impl ExplosionEvent {
         duck: &mut DuckEvent,
         arena: &mut ClockArena,
     ) -> Self {
-        duck.claim_arena(arena, ClockEventKind::Explosion);
-        Self::build(context, seed, Mechanics::Shared, None)
+        Self::shared(context, seed, duck, arena, Debris::Blast)
+    }
+
+    /// The Coins event beside a visit, in the run's arena.
+    pub fn coins_with_visit(
+        context: EventContext<'_>,
+        seed: u64,
+        duck: &mut DuckEvent,
+        arena: &mut ClockArena,
+    ) -> Self {
+        Self::shared(context, seed, duck, arena, Debris::Coins)
+    }
+
+    fn shared(
+        context: EventContext<'_>,
+        seed: u64,
+        duck: &mut DuckEvent,
+        arena: &mut ClockArena,
+        debris: Debris,
+    ) -> Self {
+        duck.claim_arena(arena, debris.kind());
+        Self::build(context, seed, Mechanics::Shared, None, debris)
     }
 
     fn build(
@@ -121,6 +198,7 @@ impl ExplosionEvent {
         seed: u64,
         mechanics: Mechanics,
         drain: Option<DrainGeometry>,
+        debris: Debris,
     ) -> Self {
         let layout = context.layout;
         let gravity = layout.pitch * 14.0;
@@ -135,15 +213,28 @@ impl ExplosionEvent {
         });
         let mut pieces = Vec::with_capacity(MAX_EXPLOSION_CELLS);
         let mut add = |origin: Vec2, center: Vec2, side: f32, home: Option<Home>| {
-            let delta = origin - center;
-            let direction = delta.normalized();
-            let mut velocity = direction.rotate_radians(rng.random_range(-0.18..0.18))
-                * (layout.pitch * rng.random_range(5.0..9.0))
-                + Vec2::new(0.0, layout.pitch * 2.0);
-            // Leave headroom for the warning/clock band without an invisible
-            // ceiling collider. Actual collisions can still redirect debris.
-            let rise = (layout.canopy_y - origin.y - side).max(0.0);
-            velocity.y = velocity.y.min((2.0 * gravity * rise).sqrt() * 0.9);
+            let (velocity, spin) = match debris {
+                Debris::Blast => {
+                    let delta = origin - center;
+                    let direction = delta.normalized();
+                    let mut velocity = direction.rotate_radians(rng.random_range(-0.18..0.18))
+                        * (layout.pitch * rng.random_range(5.0..9.0))
+                        + Vec2::new(0.0, layout.pitch * 2.0);
+                    // Leave headroom for the warning/clock band without an
+                    // invisible ceiling collider. Actual collisions can still
+                    // redirect debris.
+                    let rise = (layout.canopy_y - origin.y - side).max(0.0);
+                    velocity.y = velocity.y.min((2.0 * gravity * rise).sqrt() * 0.9);
+                    (velocity, rng.random_range(-7.0..7.0))
+                }
+                // A coin drops where it stands. The jitter keeps a column of
+                // cells from landing as one stack, and the spin is a flipped
+                // coin's rather than a blast's.
+                Debris::Coins => (
+                    Vec2::new(layout.pitch * rng.random_range(-0.8..0.8), 0.0),
+                    rng.random_range(-4.0..4.0),
+                ),
+            };
             cells.push(Cell {
                 origin,
                 position: origin,
@@ -152,7 +243,7 @@ impl ExplosionEvent {
                 label: home.is_none(),
                 home,
                 velocity,
-                spin: rng.random_range(-7.0..7.0),
+                spin,
             });
             pieces.push(home.map(|(slot, cell)| Piece {
                 id: faces[usize::from(slot)][bit(cell)].expect("every lit cell has a surface"),
@@ -188,6 +279,7 @@ impl ExplosionEvent {
         }
         assert!(cells.len() <= MAX_EXPLOSION_CELLS);
         Self {
+            debris,
             phase: EventPhase::Warning,
             tick: 0,
             gravity,
@@ -200,11 +292,38 @@ impl ExplosionEvent {
         }
     }
 
+    /// The phase as the event publishes it. Coins names its first two phases
+    /// for what they are; the state machine behind them is Explosion's.
     pub fn phase(&self) -> EventPhase {
-        self.phase
+        match (self.debris, self.phase) {
+            (Debris::Coins, EventPhase::Warning) => EventPhase::Minting,
+            (Debris::Coins, EventPhase::Exploding) => EventPhase::Cascading,
+            (_, phase) => phase,
+        }
     }
     pub fn phase_tick(&self) -> u64 {
         self.tick
+    }
+
+    /// The shape of every piece at this tick, which the drawing and the
+    /// published footprints both follow: `width` of its own width across,
+    /// since a minting coin turns about its vertical axis and is foreshortened
+    /// until it comes round the other side, and `roundness` of the way from
+    /// the square cell to the disc inscribed in it. A blast's blocks are
+    /// always whole squares.
+    pub(crate) fn piece_shape(&self) -> (f32, f32) {
+        match (self.debris, self.phase) {
+            (Debris::Blast, _) => (1.0, 0.0),
+            (Debris::Coins, EventPhase::Warning) => {
+                let width = (std::f32::consts::PI * self.tick as f32 / WARNING_TICKS as f32).cos();
+                (width.abs().max(0.04), if width >= 0.0 { 0.0 } else { 1.0 })
+            }
+            (Debris::Coins, EventPhase::Exploding) => (1.0, 1.0),
+            (Debris::Coins, _) => {
+                let t = (self.tick as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
+                (1.0, 1.0 - t * t * (3.0 - 2.0 * t))
+            }
+        }
     }
     pub fn live_cell_count(&self) -> usize {
         if self.live_bodies {
@@ -216,6 +335,15 @@ impl ExplosionEvent {
 
     pub fn diagnostics(&self) -> engine_common::ClockExplosionState {
         engine_common::ClockExplosionState {
+            cells: self.cells.len() as u32,
+            live_cells: self.live_cell_count() as u32,
+            max_cells: MAX_EXPLOSION_CELLS as u32,
+            shared_arena: self.shares_visit_arena(),
+        }
+    }
+
+    pub fn coins_diagnostics(&self) -> engine_common::ClockCoinsState {
+        engine_common::ClockCoinsState {
             cells: self.cells.len() as u32,
             live_cells: self.live_cell_count() as u32,
             max_cells: MAX_EXPLOSION_CELLS as u32,
@@ -257,10 +385,10 @@ impl ExplosionEvent {
             let world = arena.world_mut().unwrap();
             let scale = self.gravity / -world.gravity().y;
             for i in 0..self.cells.len() {
-                assert!(world.set_gravity_scale(body_id(i), scale, false));
+                assert!(world.set_gravity_scale(body_id(self.debris, i), scale, false));
             }
         }
-        duck.claim_arena(arena, ClockEventKind::Explosion);
+        duck.claim_arena(arena, self.debris.kind());
         self.mechanics = Mechanics::Shared;
         Some(duck)
     }
@@ -275,7 +403,7 @@ impl ExplosionEvent {
     ) -> bool {
         self.tick += 1;
         let burst = self.phase == EventPhase::Warning && self.tick >= WARNING_TICKS;
-        let reform = self.phase == EventPhase::Exploding && self.tick >= BURST_TICKS;
+        let reform = self.phase == EventPhase::Exploding && self.tick >= self.debris.live_ticks();
         let world = match &mut self.mechanics {
             Mechanics::Standalone(world) => world.as_deref_mut(),
             Mechanics::Shared => Some(arena.world_mut().expect("leased arena")),
@@ -284,15 +412,27 @@ impl ExplosionEvent {
             if burst {
                 world.reserve(self.cells.len(), self.cells.len(), 0);
                 for (i, cell) in self.cells.iter().enumerate() {
-                    let id = body_id(i);
-                    let mut collider = ColliderSpec::cuboid(
-                        ColliderId::new(id.entity, ColliderRole::PRIMARY, 0),
-                        cell.side * 0.5,
-                        cell.side * 0.5,
-                    );
-                    collider.friction = 0.5;
-                    collider.restitution = 0.5;
-                    collider.density = 0.25;
+                    let id = body_id(self.debris, i);
+                    let collider_id = ColliderId::new(id.entity, ColliderRole::PRIMARY, 0);
+                    let mut collider = match self.debris {
+                        Debris::Blast => {
+                            ColliderSpec::cuboid(collider_id, cell.side * 0.5, cell.side * 0.5)
+                        }
+                        Debris::Coins => ColliderSpec::ball(collider_id, cell.side * 0.5),
+                    };
+                    // A block bounces. A coin lands dead and stays put: discs
+                    // that bounced or kept their spin would roll off each other
+                    // and off to the drain instead of piling, so the spin is
+                    // damped away within a few ticks of landing and the
+                    // contact takes all the sliding it can.
+                    let (friction, restitution, density, linear_damping, angular_damping) =
+                        match self.debris {
+                            Debris::Blast => (0.5, 0.5, 0.25, 0.08, 0.15),
+                            Debris::Coins => (1.0, 0.05, 0.5, 0.5, 6.0),
+                        };
+                    collider.friction = friction;
+                    collider.restitution = restitution;
+                    collider.density = density;
                     assert!(world.insert_body(
                         id,
                         BodySpec {
@@ -300,8 +440,8 @@ impl ExplosionEvent {
                             linear_velocity: cell.velocity,
                             angular_velocity: cell.spin,
                             gravity_scale: self.gravity / -world.gravity().y,
-                            linear_damping: 0.08,
-                            angular_damping: 0.15,
+                            linear_damping,
+                            angular_damping,
                             ccd_enabled: true,
                             ..BodySpec::default()
                         },
@@ -311,7 +451,7 @@ impl ExplosionEvent {
                 self.live_bodies = true;
             }
             if reform {
-                Self::remove_bodies(world, &self.cells);
+                Self::remove_bodies(self.debris, world, &self.cells);
                 self.live_bodies = false;
             }
         }
@@ -356,7 +496,7 @@ impl ExplosionEvent {
                 world.step(1.0 / 60.0);
                 &*world
             });
-            Self::read_back(&mut self.cells, self.live_bodies, world);
+            Self::read_back(self.debris, &mut self.cells, self.live_bodies, world);
             self.sample_reassembly(display, layout, surfaces);
         }
         finished
@@ -364,15 +504,25 @@ impl ExplosionEvent {
 
     /// The shared cells after the arena's step.
     pub fn observe(&mut self, context: EventContext<'_>, arena: &ClockArena) {
-        Self::read_back(&mut self.cells, self.live_bodies, arena.world());
+        Self::read_back(
+            self.debris,
+            &mut self.cells,
+            self.live_bodies,
+            arena.world(),
+        );
         self.sample_reassembly(context.display, context.layout, context.surfaces);
     }
 
     /// Live cells take their bodies' poses.
-    fn read_back(cells: &mut [Cell], live_bodies: bool, world: Option<&PhysicsWorld>) {
+    fn read_back(
+        debris: Debris,
+        cells: &mut [Cell],
+        live_bodies: bool,
+        world: Option<&PhysicsWorld>,
+    ) {
         if live_bodies && let Some(world) = world {
             for (i, cell) in cells.iter_mut().enumerate() {
-                let motion = world.motion(body_id(i)).expect("live Explosion cell");
+                let motion = world.motion(body_id(debris, i)).expect("live batch cell");
                 cell.position = motion.position;
                 cell.angle = motion.angle;
             }
@@ -439,19 +589,28 @@ impl ExplosionEvent {
             EventPhase::Reforming => SurfaceSource::Return,
             _ => SurfaceSource::Rigid,
         };
+        // A round piece supports the square inside its disc, and a turning
+        // piece only as much as it is drawn, so the footprint follows the
+        // shape the piece is drawn with.
+        let (width, roundness) = self.piece_shape();
+        let inner = 1.0 + (std::f32::consts::FRAC_1_SQRT_2 - 1.0) * roundness;
         for (index, (cell, piece)) in self.cells.iter().zip(&self.pieces).enumerate() {
             let Some(piece) = piece else {
                 continue;
             };
+            let half = cell.side * 0.5 / layout.pitch * inner;
             out.push((
                 piece.id,
                 SurfacePose {
                     origin: cell.position,
                     angle: cell.angle,
                     scale: layout.pitch,
-                    footprint: Footprint::square(cell.side * 0.5 / layout.pitch),
+                    footprint: Footprint {
+                        min: Vec2::new(-half * width, -half),
+                        max: Vec2::new(half * width, half),
+                    },
                     source,
-                    body: self.live_bodies.then(|| body_id(index)),
+                    body: self.live_bodies.then(|| body_id(self.debris, index)),
                     departing: piece.departing,
                     opacity: 1.0,
                     clip: None,
@@ -509,21 +668,22 @@ impl ExplosionEvent {
         }
     }
 
-    fn remove_bodies(world: &mut PhysicsWorld, cells: &[Cell]) {
+    fn remove_bodies(debris: Debris, world: &mut PhysicsWorld, cells: &[Cell]) {
         for i in 0..cells.len() {
-            assert!(
-                world.remove_entity(body_id(i).entity),
-                "live Explosion batch"
-            );
+            assert!(world.remove_entity(body_id(debris, i).entity), "live batch");
         }
     }
     pub fn release(&mut self, player: Option<&mut DuckEvent>, arena: &mut ClockArena) {
         if let Mechanics::Shared = self.mechanics {
             if self.live_bodies {
-                Self::remove_bodies(arena.world_mut().expect("leased arena"), &self.cells);
+                Self::remove_bodies(
+                    self.debris,
+                    arena.world_mut().expect("leased arena"),
+                    &self.cells,
+                );
                 self.live_bodies = false;
             }
-            duck::end_lease(player, arena, ClockEventKind::Explosion);
+            duck::end_lease(player, arena, self.debris.kind());
         }
     }
     pub fn physics_counts(&self) -> (usize, usize) {

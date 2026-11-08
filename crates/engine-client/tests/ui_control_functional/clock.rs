@@ -974,6 +974,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             "pause.clock.preview-event",
             "pause.clock.crow",
             "pause.clock.explosion",
+            "pause.clock.coins",
             "pause.clock.aquarium",
             "pause.clock.marquee",
         ] {
@@ -1316,6 +1317,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.grass", "Off", &page);
         page = harness.change_clock_setting("pause.clock.slot-machine", "Off", &page);
         page = harness.change_clock_setting("pause.clock.spider", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.coins", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -1680,6 +1682,12 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
                     assert!(active.body_count <= explosion.max_cells as usize + 5);
                     assert!(active.collider_count <= explosion.max_cells as usize + 34);
                 }
+                ClockEventKind::Coins => {
+                    let coins = active.coins.as_ref().unwrap();
+                    assert!(coins.live_cells <= coins.max_cells);
+                    assert!(active.body_count <= coins.max_cells as usize + 5);
+                    assert!(active.collider_count <= coins.max_cells as usize + 34);
+                }
                 ClockEventKind::Rain | ClockEventKind::Meltdown | ClockEventKind::Aquarium => {
                     // Two panels plus the one bounded retained-soil body;
                     // its derived geometry uses at most 30 compound colliders.
@@ -1741,6 +1749,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.digit-slide.next",
             "launcher.settings.clock.slot-machine.next",
             "launcher.settings.clock.spider.next",
+            "launcher.settings.clock.coins.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);
@@ -2448,6 +2457,7 @@ fn arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run() 
                 event.kind,
                 ClockEventKind::Aquarium
                     | ClockEventKind::Explosion
+                    | ClockEventKind::Coins
                     | ClockEventKind::Meltdown
                     | ClockEventKind::Spider
             );

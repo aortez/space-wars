@@ -68,6 +68,7 @@ fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anythin
     settings.events.aquarium = true;
     settings.events.cell_swap = true;
     settings.events.grass = true;
+    settings.events.coins = true;
     state.configure(settings);
     let session = state.player_duck_state();
     for cycle in 0..3 {
@@ -149,6 +150,7 @@ fn filtered_schedule_has_no_backlog_and_reconfigures_without_changing_saved_enab
     settings.events.digit_slide = false;
     settings.events.slot_machine = false;
     settings.events.spider = false;
+    settings.events.coins = false;
     state.configure(settings);
     assert!(state.automatic_events_suspended());
     ticks(&mut state, 6000);

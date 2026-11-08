@@ -72,6 +72,8 @@ pub struct ClockState {
     pub spider: Option<engine_common::ClockSpiderState>,
     #[serde(default)]
     pub explosion: Option<engine_common::ClockExplosionState>,
+    #[serde(default)]
+    pub coins: Option<engine_common::ClockCoinsState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
     /// Visitor compatibility leaves no enabled automatic event kinds. Profile
     /// Off is distinct; per-event restrictions also apply to manual requests.
@@ -456,6 +458,7 @@ mod tests {
             crow: None,
             spider: None,
             explosion: None,
+            coins: None,
             player_duck: None,
             automatic_events_suspended: false,
             marquee: None,
@@ -1024,6 +1027,49 @@ mod tests {
         assert_eq!(material.floor_open_milli, 0);
         assert_eq!(material.floor_load_milli, 0);
         assert_eq!(material.floor_motion_deferrals, 0);
+    }
+
+    #[test]
+    fn coins_diagnostics_and_phase_waits_round_trip() {
+        let mut state = clock_state();
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::Coins);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+        assert!(!request.started_predicate().matches(&state));
+        state.event_id += 1;
+        state.lifecycle = "active".into();
+        state.event_kind = Some(ClockEventKind::Coins);
+        state.coins = Some(engine_common::ClockCoinsState {
+            cells: 88,
+            live_cells: 88,
+            max_cells: 239,
+            shared_arena: false,
+        });
+        for phase in ["minting", "cascading", "reforming"] {
+            state.phase = Some(phase.into());
+            state.phase_tick = 12;
+            let predicate = ClockStatePredicate {
+                phase: Some(phase.into()),
+                min_phase_tick: 12,
+                ..request.started_predicate()
+            };
+            assert!(predicate.matches(&state));
+            assert_eq!(
+                ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+                state
+            );
+        }
+        assert_eq!(ClockEventKind::Coins as u8, 14);
+        let mut value = serde_json::to_value(&state).unwrap();
+        value.as_object_mut().unwrap().remove("coins");
+        assert!(
+            ClockState::from_json(&value.to_string())
+                .unwrap()
+                .coins
+                .is_none()
+        );
     }
 
     #[test]

@@ -143,6 +143,7 @@ fn arena_contract_steps_once_per_tick_whoever_holds_it() {
     for kind in [
         ClockEventKind::Aquarium,
         ClockEventKind::Explosion,
+        ClockEventKind::Coins,
         ClockEventKind::Falling,
         ClockEventKind::Meltdown,
     ] {
@@ -789,6 +790,7 @@ fn arena_contract_refuses_an_event_it_has_no_room_for_before_anything_changes() 
     for kind in [
         ClockEventKind::Aquarium,
         ClockEventKind::Explosion,
+        ClockEventKind::Coins,
         ClockEventKind::Meltdown,
     ] {
         assert_eq!(
@@ -1187,6 +1189,7 @@ fn arena_contract_schedule_starts_nothing_that_uses_the_floor_while_residents_do
             grass: false,
             slot_machine: false,
             spider: false,
+            coins: false,
         },
         ..ClockConfig::default()
     });
@@ -1349,6 +1352,7 @@ fn arena_contract_a_run_can_start_with_its_fixtures() {
             kind,
             ClockEventKind::Aquarium
                 | ClockEventKind::Explosion
+                | ClockEventKind::Coins
                 | ClockEventKind::Meltdown
                 | ClockEventKind::Spider
         );

@@ -32,6 +32,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_cell_swap_enabled(settings.events.cell_swap);
     window.set_launcher_clock_slot_machine_enabled(settings.events.slot_machine);
     window.set_launcher_clock_spider_enabled(settings.events.spider);
+    window.set_launcher_clock_coins_enabled(settings.events.coins);
     window.set_launcher_clock_grass_enabled(settings.events.grass);
     window.set_launcher_clock_rain_enabled(settings.events.rain);
     window.set_launcher_clock_rain_amount(settings.rain_amount.label().into());
@@ -182,6 +183,7 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         19 => settings.events.grass = !settings.events.grass,
         20 => settings.events.slot_machine = !settings.events.slot_machine,
         21 => settings.events.spider = !settings.events.spider,
+        22 => settings.events.coins = !settings.events.coins,
         0 => {
             settings.time_format = match settings.time_format {
                 ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
@@ -270,7 +272,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=21) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=22) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),

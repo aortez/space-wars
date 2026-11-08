@@ -15,6 +15,8 @@ Player and automatic duck visits can already share one timed event's scene.
 Crow (#84) adds a lightweight, independent visitor to the digit face.
 Explosion (#76) scatters individual lit cells as bouncing rigid-body debris;
 its reassembly (#135) brings the blocks back into the latest clock face.
+Coins (#581) turns the lit cells into coins that drop, pile and fly home by
+the same reassembly; the guest that gathers them is still to come.
 
 ## Layout
 
@@ -286,7 +288,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, **Slot Machine**, and **Spider** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, **Slot Machine**, **Spider**, and **Coins** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -323,6 +325,7 @@ the Off profile still disables every automatic event.
 | `crow` | One visitor with wingbeat flight, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 | `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
+| `coins` | Lit cells turn into coins that drop, roll and pile, then fly home | 0.6 s minting + 4 s cascade + 1.5 s reform | 45 s |
 
 ### Cell swaps
 
@@ -468,6 +471,116 @@ Additional actual-device frames: [warning](screenshots/clock/picade-explosion-wa
 [reforming](screenshots/clock/picade-explosion-reforming-device.png) and
 [recovered](screenshots/clock/picade-explosion-recovered-device.png).
 
+### Coins
+
+Enable **Coins** in scenario settings, select it in **Clock Controls →
+Preview & Resume**, or use Next Event. It joins the periodic mix like
+Explosion, with the same 45-second reuse delay, and it is Explosion's batch
+made of round pieces (`events::explosion::Debris`): the same cells, the same
+cap of **239** (Classic at most 119), the same room in the run's arena and the
+same return. Only the launch, the shape and the drawing differ, so the arena's
+capacity and its capacity demonstrations do not move.
+
+| Phase | Ticks | What happens |
+| --- | --- | --- |
+| `minting` | 36 | Each lit cell and AM/PM pixel turns about its vertical axis where it stands: the cell's face until it is edge-on, a gold coin from then on. The dim anchors stay put. |
+| `cascading` | 240 | The coins drop as round rigid bodies with a little seeded sideways jitter, so a column does not land as one stack, land dead and pile on the floor. |
+| `reforming` | 90 | The pieces fly home by Explosion's reassembly, squaring up from discs into cells on the way, and the ordinary face takes over once they have arrived. |
+
+The drain stays open, as it does for Falling and Explosion: a coin that rolls
+into it drops out of view and flies home from below at the return. Closing it
+would need a second standalone world and a second way for a duck to join,
+because a player joins a standalone batch through the drain banks. Standalone,
+the event steps a world of its own; beside a duck visit the coins enter the
+run's arena, can hit the duck and any residents, and departure and rejoining
+leave them in the same world without duplicating bodies. The crow leaves when
+its perches turn to coins, and the spider never shares the arena with the
+batch, exactly as for Explosion.
+
+A coin is a disc, and discs do not pile the way blocks do: pieces that bounced
+or kept their spin rolled off each other and off to the drain. So a coin lands
+dead, with no bounce to speak of, all the sliding friction a contact can take,
+and its spin damped away within a few ticks of landing, and the cascade is as
+long as the slowest real layout needs. Measured with seeds 1 to 5 at 78 coins,
+nine in ten coins still in view are below half a pitch a second (under half a
+pixel a frame at the largest pitch) by tick **149** at 4:3, **180** at 800x480,
+**191** at the 480x800 portrait, where the face is 28 pitches up and the fall
+alone takes two seconds, and **150** at 4:1; between 3 and 8 coins roll into
+the drain. The 0.25 strip is the exception: its face is 73 pitches up, and
+its coins are still falling when the return begins, exactly as Explosion's
+debris is there. `coins_tests::coins_come_to_rest_before_they_fly_home` holds
+these with half a second to spare.
+
+The pieces carry the cells' surfaces out and home as Explosion's blocks do.
+The published footprint follows the drawn shape, which the surface contract
+checks frame by frame: a round piece supports the square inside its disc, and a
+turning piece only as much of its width as is drawn. A reading that changes
+mid-return retargets without restarting trajectories, and a coin the drain took
+is brought home like any other piece.
+
+The drawing costs least while the pile is largest: a resting coin is one
+circle primitive, and only the 36 minting ticks and the 90 return ticks draw
+24-point outlines, which blend the square's radius into the disc's so that a
+piece arriving home is already the cell it has become. The worst frame of the
+whole event measures **330 draw primitives** across wide, 4:3, portrait and
+the 0.25 strip, and it is the first minting frame, the face itself with its
+glow; Explosion's bursts are held under 1000 and the clock's ceiling is 1800.
+
+`clock state` exposes `coins.cells`, `live_cells`, `max_cells` and
+`shared_arena`, alongside the ordinary event/phase/tick diagnostics. From idle:
+
+```sh
+spacewars-cli clock trigger coins
+spacewars-cli clock wait --event coins --phase cascading --min-phase-tick 60
+spacewars-cli screenshot /tmp/clock-coins.png
+spacewars-cli clock wait --lifecycle idle
+```
+
+The pictures come from the production raster adapter through the real UI, by
+a capture test that always runs a sample at 800×480, 1024×768 and 480×800 and
+checks that the face a second after the return is pixel-identical to the
+ordinary face with the same reading. Given a directory, it also writes the
+stills, the control pages and every other frame of the 800×480 film:
+
+```sh
+SPACEWARS_COINS_ARTIFACTS=/tmp/clock-coins \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client ui_render_tests::coins
+cd /tmp/clock-coins/film
+ffmpeg -framerate 30 -i frame-%04d.png -vf "scale=400:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../coins-800x480.gif
+```
+
+| Edge-on, half-way through the turn | Half a second into the cascade |
+| --- | --- |
+| ![Every lit cell of 12:39 edge-on, a sliver of gold where each cell was](screenshots/clock/coins-800x480-minting.png) | ![The coins have left the digits and fall in the shapes they were lit in](screenshots/clock/coins-800x480-cascading.png) |
+
+| The pile | Half-way home |
+| --- | --- |
+| ![Sixty-three coins piled on the floor either side of the drain, one going down it](screenshots/clock/coins-800x480-piled.png) | ![The pieces fly home from where they lay, square again before they arrive](screenshots/clock/coins-800x480-reforming.png) |
+
+![The whole event at 800×480, every other frame](screenshots/clock/coins-800x480.gif)
+
+In the portrait view the face is 28 pitches up, and the pile gathers far
+below it:
+
+![The pile under the face in the 480×800 view](screenshots/clock/coins-480x800-piled.png)
+
+The switch ends the pause page's preview row after Crow and Explosion, and
+the launcher's Events row, which became five columns like the two below it:
+
+| Clock Controls | Scenario Settings |
+| --- | --- |
+| ![Coins On at the end of the pause page's preview row](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On at the end of the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) |
+
+`coins_tests` cover the cap and the batch's own identities, seeded replay at
+six aspect ratios in both formats, the settle measurement below, the return
+from where the pieces lie at full opacity, the shared arena's lifecycle and a
+real coin-duck contact. The reassembly they share keeps its tests under
+Explosion.
+
+A special guest that gathers the coins is the second half of
+[#581](https://github.com/aortez/space-wars/issues/581) and is not in this
+version; every coin comes home.
+
 ### Crow visitor
 
 Set **Crow** to **Varied**, **Shy**, or **Hardy** in Clock settings, or select **Crow → Preview & Resume** in
@@ -485,7 +598,7 @@ The crow flies in above the face, lands on an exposed lit block, pauses, and
 occasionally hops along its row or flies to another digit. Only the topmost lit
 block in each digit column is a perch; feet use the rendered block's actual top.
 Time/format changes revalidate the target even while paused, without advancing
-its position or age. Falling, Meltdown, Explosion, Digit Slide and Marquee withdraw the
+its position or age. Falling, Meltdown, Explosion, Coins, Digit Slide and Marquee withdraw the
 perches and make it depart. Rain and Color Cycle can coexist, as can a player or
 automatic duck. Resize/restart clears the visit. A hard 22-second envelope and
 one-resident admission limit prevent lingering or accumulating birds.
@@ -2247,6 +2360,7 @@ Conformance, measured rather than read:
 | Cell swaps | Per-cell quadratic bezier with opposing bow; the 15-tick fade only corrects a reading that changed mid-swap | Met |
 | Digit Slide | The old glyph slides out and the new one slides in, clipped per cell | Met |
 | Slot Machine | Every reel opens on the glyph the face was showing and turns, clipped to its own slot, onto a whole stop; nothing is faded on | Met |
+| Coins | Explosion's flights, with the pieces squaring up from discs into cells over the return; a coin the drain took comes home from below the floor | Met |
 | Meltdown | Cells liquefy on real floor contact, and the face refills bottom-up and row-staggered as the puddle drains | Met by refill |
 | Aquarium | The face stays anchored and solid throughout; nothing comes apart | Not applicable |
 | Marquee, clock recipes | The reading dissolves into its own animation, which opens on the anchored pose | Met |
@@ -2334,6 +2448,7 @@ What each event does with the face's surfaces:
 | Digit Slide | A changed slot's old glyph, or every slot's in a preview, slides out departing, and each cell is retired once it is clipped out. The new glyph is admitted sliding in and handed back at the end. Unchanged slots keep their ids |
 | Falling | Each cell rides its segment's body, then returns. Cells the new reading still lights come home as themselves, the rest fade out departing and new ones fade in |
 | Exploding digits | Blocks carry the cells' surfaces through the burst and the flight home. A surplus block departs and is merged away when it has shrunk to nothing. A block split off the debris is a new surface that grows from zero |
+| Coins | As Exploding digits: the pieces carry the surfaces out and home. A round piece's footprint is the square inside its disc, and a turning piece's is as wide as it is drawn |
 | Meltdown | Solid blocks carry their surfaces until they melt, leave the view or are reclaimed. The refill is a new face that grows upward. Water is never a surface |
 | Marquee, clock recipes | The face's surfaces ride the recipe's transform, at the opacity the recipe draws. The fading anchored copy is presentation and owns nothing |
 | Marquee, text recipes | The face's surfaces are carried clear of the frame and brought back as themselves |
@@ -2393,8 +2508,8 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   that moves time steps it exactly once, whoever holds it. A tick that does not
   move time steps nothing.
 - **Owners claim it.** A visit claims it for its terrain and character, and
-  one event at a time shares it beside a visit: Aquarium, Explosion, Falling or
-  Meltdown. The spider claims it for its stay, with its body, its line, the
+  one event at a time shares it beside a visit: Aquarium, Explosion, Coins,
+  Falling or Meltdown. The spider claims it for its stay, with its body, its line, the
   frame it climbs and a proxy for each digit cell
   ([below](#the-spider-on-the-digits)). Residents keep it for the rest of the
   run: retained soil, and the development arena fixtures. The first claim
@@ -2437,7 +2552,7 @@ An event that needs rigid bodies in the shared world declares an `Owner` with
 its identity ranges and budget, asks `arena::admits` before it changes
 anything, claims the arena rather than building a world of its own, and lets
 go of only its own claim. If its budget raises `ARENA_CAPACITY`, record the new
-caps here. Standalone Falling and Explosion still step worlds of their own, so
+caps here. Standalone Falling, Explosion and Coins still step worlds of their own, so
 their bodies meet residents only once a player joins and the arena adopts that
 world. Clock's state publishes all of this in its
 [`arena` object](#public-controls-and-synchronized-captures) and each event's
@@ -2481,7 +2596,7 @@ The duck's visit joins their world as a third claim, and its course takes the
 place of the floor the arena kept. Beside it the two owners leave no room for
 Meltdown, so `clock trigger meltdown` fails with `action-unavailable: The arena
 has no room for this`, and `clock events` shows `blocked by arena=capacity` for
-Meltdown, Explosion and Aquarium:
+Meltdown, Explosion, Coins and Aquarium:
 
 ```text
 Arena: 3 claims, 2 residents (at most 6 and 4); 10 bodies, 10 colliders, 0 joints (at most 255, 288, 1); floor 0 bodies
@@ -2508,9 +2623,9 @@ Known limits:
   open, can appear under a resident resting below its surface, and the solver
   lifts the resident out.
 - A declined resize lasts until a resize the residents fit, or until they leave.
-- Standalone Falling and Explosion meet residents only after a player joins.
+- Standalone Falling, Explosion and Coins meet residents only after a player joins.
 - While an event simulates apart from the arena (standalone Falling,
-  Explosion, Meltdown or Aquarium, or Rain's floats), plants, the ceiling's
+  Explosion, Coins, Meltdown or Aquarium, or Rain's floats), plants, the ceiling's
   light and soil delivery see only that event's world, if it has one. A
   fixture's balls neither crush plants nor block light or soil meanwhile. Soil,
   the one resident Clock ships, is unaffected, because those checks treat it
@@ -2949,7 +3064,7 @@ fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
 tick. A raw `clock trigger` request must include schema version 23, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, or `spider`), `expected_scenario_revision`, and
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, or `coins`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification

@@ -610,6 +610,7 @@ enabled = true
                 grass: false,
                 slot_machine: false,
                 spider: false,
+                coins: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -740,6 +741,7 @@ enabled = true
                         | engine_common::ClockEventKind::Grass
                         | engine_common::ClockEventKind::SlotMachine
                         | engine_common::ClockEventKind::Spider
+                        | engine_common::ClockEventKind::Coins
                 )
             );
         }
@@ -768,6 +770,7 @@ enabled = true
                         | engine_common::ClockEventKind::Grass
                         | engine_common::ClockEventKind::SlotMachine
                         | engine_common::ClockEventKind::Spider
+                        | engine_common::ClockEventKind::Coins
                 )
             );
         }
