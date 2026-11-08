@@ -6,13 +6,16 @@
 //! The archived actions are bound to the C math library of the host that
 //! recorded them. The networks are tanh layers, and a libm whose `tanhf`
 //! rounds differently (glibc 2.41 adopted the correctly rounded CORE-MATH
-//! functions) moves every action in its last digits from the first tick. A
-//! host that reproduces the first archived action bit for bit must reproduce
-//! the whole trace exactly; any other host must still fly the task to the
-//! same success within a few ticks of the archive, with every action and
-//! position within a small tolerance of it. Under glibc 2.36 the archived
-//! cases stray by at most 5e-5 in action and 3e-5 in position and arrive on
-//! the archived tick (measured 2026-11-03, the LF-099 case 2026-11-06). A
+//! functions) moves actions in their last digits, usually from the first
+//! tick, though not always: under glibc 2.39 the LF-100 grounded case
+//! reproduced its first action and parted from the archive two ticks later,
+//! by 4e-12 of thrust. The replay therefore holds the flight exactly for as
+//! long as this host reproduces the archived actions and steps, and from the
+//! first difference on it must still fly the task to the same success within
+//! a few ticks of the archive, with every action and position within a small
+//! tolerance of it. Under glibc 2.36 the archived cases stray by at most 5e-5
+//! in action and 3e-5 in position and arrive on the archived tick (measured
+//! 2026-11-03, the LF-099 case 2026-11-06, the LF-100 case 2026-11-07). A
 //! closed loop can amplify that difference, so an archived case is one that
 //! holds to the tolerances under glibc 2.36.
 use scenario_spacewars::surface_sortie::flight_environment::{
@@ -30,12 +33,12 @@ pub const POSITION_TOLERANCE: f32 = 1e-2;
 pub const TICK_TOLERANCE: usize = 4;
 
 /// Flies the archived task with the driver and holds it to the archive:
-/// exactly when this host reproduces the archived inference, within the
-/// tolerances otherwise. The archive's leading neutral steps, a settle the
-/// harness flew under neutral controls before the stack took the ship, are
-/// stepped as recorded and must reproduce exactly, since nothing in them is
-/// inferred. `goal` issues the goal for the environment's current state, as
-/// the host that flew the case issued it.
+/// exactly while this host reproduces the archived inference, within the
+/// tolerances from the first difference on. The archive's leading neutral
+/// steps, a settle the harness flew under neutral controls before the stack
+/// took the ship, are stepped as recorded and must reproduce exactly, since
+/// nothing in them is inferred. `goal` issues the goal for the environment's
+/// current state, as the host that flew the case issued it.
 pub fn drive_archived_trace(
     trace: &FlightTrace,
     stack: &FlightStack,
@@ -59,23 +62,25 @@ pub fn drive_archived_trace(
         let tick = flown;
         let decision = driver.decide(stack, env.state(), goal(&env)).unwrap();
         let archived = trace.steps.get(tick);
-        if tick == settle {
-            exact = archived.and_then(|step| step.action) == Some(decision.action);
-            if !exact {
-                eprintln!(
-                    "this host's math library does not reproduce the archived inference \
-                     ({:?} against the archived {:?}); holding the flight to the tolerances",
-                    decision.action,
-                    archived.and_then(|step| step.action)
-                );
-            }
-        }
         let step = env.step(decision.action).unwrap();
+        if exact
+            && archived
+                .is_none_or(|archived| archived.action != Some(decision.action) || archived != step)
+        {
+            // The first difference is this host's math library parting from
+            // the recording host's; from here the flight is held to the
+            // tolerances.
+            exact = false;
+            eprintln!(
+                "tick {tick}: this host's math library does not reproduce the archived \
+                 inference ({:?} against the archived {:?}); holding the flight to the \
+                 tolerances",
+                decision.action,
+                archived.and_then(|step| step.action)
+            );
+        }
         if exact {
-            let archived =
-                archived.unwrap_or_else(|| panic!("tick {tick}: the flight runs past the archive"));
-            assert_eq!(Some(decision.action), archived.action, "tick {tick}");
-            assert_eq!(step, archived, "tick {tick}");
+            // Equal to the archive, action and step alike.
         } else if let Some(archived) = archived {
             if let Some(action) = archived.action {
                 assert!(
