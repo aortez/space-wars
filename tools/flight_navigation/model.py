@@ -59,6 +59,12 @@ class NavigationModel(FlightModel):
     HEADING_NOISE_FLOOR = .1
 
     def distributions(self, actor):
+        if self.contract == 3:
+            # The fourth head is a threshold decision, not a squashed
+            # actuator: a Gaussian over its latent is not a likelihood of the
+            # sense the command carries. The v3 heads are fitted by imitation,
+            # and only the speed is sampled (sample_speed).
+            raise ValueError('the v3 contract samples its speed alone; the turn sense is not sampled')
         std = self.log_std.clamp(-5, 2).exp()
         scale = torch.sigmoid(actor[:, 2:3]).detach().clamp_min(self.HEADING_NOISE_FLOOR)
         return Normal(actor, torch.cat((std[:2] * scale, std[2:].expand(len(actor), 1)), dim=1))
@@ -80,6 +86,7 @@ class NavigationModel(FlightModel):
     # Speed-only exploration: the heading stays at its mean, as the motor stage
     # kept steering, so a stopping command never jitters the nose and the
     # likelihood keeps the speed deviation's moderate sensitivity everywhere.
+    # A fourth head, the turn sense, stays at its mean too.
     def speed_distribution(self, actor):
         return Normal(actor[:, 2], self.log_std.clamp(-5, 2).exp()[2])
 
@@ -89,7 +96,7 @@ class NavigationModel(FlightModel):
     def sample_speed(self, x):
         actor, value = self(x)
         speed = self.speed_distribution(actor).sample()
-        latent = torch.cat((actor[:, :2], speed[:, None]), dim=1)
+        latent = torch.cat((actor[:, :2], speed[:, None], actor[:, 3:]), dim=1)
         return latent, self.speed_log_prob(actor, latent), value
 
     def speed_entropy(self, actor):

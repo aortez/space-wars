@@ -108,6 +108,24 @@ class NativeTests(unittest.TestCase):
         self.assertNotIn('advisory', command_dicts(torch.tensor([[0., 1., 0.]]))[0])
         self.assertEqual(tuple(commands(torch.zeros((2, 4))).shape), (2, 4))
 
+    def test_a_v3_model_samples_its_speed_alone_and_refuses_the_full_sample(self):
+        with Bridge(reference.DEFAULT_BRIDGE) as bridge:
+            model = NavigationModel(bridge.contract['schema'], contract=3)
+        with torch.no_grad():
+            model.actor.bias[3] = 2.
+        x = tensor([{'inputs': observation()}, {'inputs': observation(goal=(50., 0.))}])
+        with torch.no_grad():
+            actor, _ = model(x)
+            latent, log_prob, value = model.sample_speed(x)
+        # The pair and the sense keep their means; only the speed is drawn.
+        self.assertEqual(tuple(latent.shape), (2, 4)); self.assertEqual(tuple(log_prob.shape), (2,)); self.assertEqual(tuple(value.shape), (2,))
+        self.assertTrue(torch.equal(latent[:, :2], actor[:, :2])); self.assertTrue(torch.equal(latent[:, 3], actor[:, 3]))
+        self.assertEqual([r['advisory'] for r in command_dicts(latent, max_speed=60.)], [[1., 0., 0., 0.]] * 2)
+        with self.assertRaises(ValueError):
+            model.sample(x)
+        with self.assertRaises(ValueError):
+            model.entropy(actor)
+
     def test_export_parity_and_policy_steps(self):
         torch.set_num_threads(1); torch.manual_seed(0)
         with Bridge(reference.DEFAULT_BRIDGE) as bridge:
