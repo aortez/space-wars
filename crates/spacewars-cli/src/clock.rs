@@ -37,7 +37,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap, grass, slot-machine, spider or coins.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap, grass, slot-machine, spider, coins or tanks.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -57,7 +57,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering", "minting", "cascading"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering", "minting", "cascading", "raising", "beam-down", "settling", "fighting", "finishing-shots", "crumbling", "beam-up", "withdrawing"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -108,7 +108,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={}, blocked by spider={}, blocked by arena={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={}, blocked by tanks={}, blocked by spider={}, blocked by arena={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -119,6 +119,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.automatic_ready_at_tick,
                         event.blocked_by_duck,
                         event.blocked_by_crow,
+                        event.blocked_by_tanks,
                         event.blocked_by_spider,
                         event
                             .blocked_by_arena
@@ -280,6 +281,22 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 "Explosion: {} cells, {} live (cap {}), shared arena={}",
                 explosion.cells, explosion.live_cells, explosion.max_cells, explosion.shared_arena
             );
+        }
+        if let Some(tanks) = &state.tanks {
+            println!(
+                "Tanks: tick={}, combat={}, health milli={:?}, shells={}, shots={}, result={}, converted={} cells ({:.2} area)",
+                tanks.tick,
+                tanks.combat_ticks,
+                tanks.health_milli,
+                tanks.shells,
+                tanks.shots,
+                tanks.result.as_deref().unwrap_or("pending"),
+                tanks.converted_cells,
+                tanks.conversion_area_milli as f32 / 1000.0,
+            );
+            if let Some(reason) = &tanks.entry_failure {
+                println!("Tanks entry: {reason}");
+            }
         }
         if let Some(coins) = &state.coins {
             println!(

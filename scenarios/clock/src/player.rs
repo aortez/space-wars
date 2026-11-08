@@ -79,7 +79,7 @@ impl ClockState {
 
     pub fn event_blocked_by_duck(&self, kind: ClockEventKind) -> bool {
         self.duck_visit.is_some()
-            && (kind == ClockEventKind::Duck
+            && (matches!(kind, ClockEventKind::Duck | ClockEventKind::Tanks)
                 || (kind == ClockEventKind::Meltdown
                     && self.config.water_lab != ClockWaterLab::Off))
     }
@@ -103,6 +103,7 @@ impl ClockState {
             slot_machine: enabled(ClockEventKind::SlotMachine),
             spider: enabled(ClockEventKind::Spider),
             coins: enabled(ClockEventKind::Coins),
+            tanks: enabled(ClockEventKind::Tanks),
         };
         self.schedule
             .configure(self.config.event_profile, effective);
@@ -116,6 +117,10 @@ impl ClockState {
 
     pub(super) fn toggle_player_duck(&mut self, player: u8) {
         if self.reading.is_none() {
+            return;
+        }
+        if self.event_kind() == Some(ClockEventKind::Tanks) {
+            self.event_notice = Some(("Tanks is using the arena", self.schedule.tick + 120));
             return;
         }
         let session = self.player_duck_sequence + 1;

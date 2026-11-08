@@ -81,6 +81,8 @@ pub enum ClockArenaUnavailable {
     /// The resting residents have not fitted the view since a resize, so
     /// the arena takes no visit or event that uses the floor.
     LayoutIncompatible,
+    /// No bounded entry fits the current physical residents and view.
+    Placement,
 }
 
 impl ClockArenaUnavailable {
@@ -89,6 +91,7 @@ impl ClockArenaUnavailable {
             Self::Residents => "residents",
             Self::Capacity => "capacity",
             Self::LayoutIncompatible => "layout-incompatible",
+            Self::Placement => "placement",
         }
     }
 
@@ -98,6 +101,7 @@ impl ClockArenaUnavailable {
             Self::Residents => "The arena holds all the residents it can",
             Self::Capacity => "The arena has no room for this",
             Self::LayoutIncompatible => "The arena's residents do not fit this view",
+            Self::Placement => "No safe space for this event",
         }
     }
 }

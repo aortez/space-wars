@@ -31,6 +31,7 @@ mod slot_machine;
 #[cfg(test)]
 mod slot_machine_contract;
 mod spider;
+mod tanks;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
@@ -271,6 +272,14 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     }
     if let Some(view) = crate::grass::inspection::snapshot(state) {
         grass_inspection::render(&mut frame, &view, layout);
+    }
+    if let Some(crate::events::ActiveEvent::Tanks(event)) = &state.active_event {
+        tanks::render(
+            &mut frame,
+            event,
+            state.arena.world().expect("Tanks arena"),
+            layout,
+        );
     }
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
         render_marquee_face(&mut frame, state, layout, event);

@@ -54,7 +54,8 @@ impl FloorManager {
             | ClockEventKind::Crow
             | ClockEventKind::Grass
             | ClockEventKind::SlotMachine
-            | ClockEventKind::Spider => ClockFloorMode::Closed,
+            | ClockEventKind::Spider
+            | ClockEventKind::Tanks => ClockFloorMode::Closed,
         };
     }
 

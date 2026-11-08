@@ -49,7 +49,7 @@ pub struct Ceiling {
 pub(crate) fn compatible_event(kind: engine_common::ClockEventKind) -> bool {
     use engine_common::ClockEventKind::*;
     match kind {
-        Meltdown | Aquarium => false,
+        Meltdown | Aquarium | Tanks => false,
         Falling | ColorCycle | Explosion | Duck | Marquee | DigitSlide | Rain | Crow | CellSwap
         | Grass | SlotMachine | Spider | Coins => true,
     }

@@ -1190,6 +1190,7 @@ fn arena_contract_schedule_starts_nothing_that_uses_the_floor_while_residents_do
             slot_machine: false,
             spider: false,
             coins: false,
+            tanks: false,
         },
         ..ClockConfig::default()
     });
@@ -1358,7 +1359,11 @@ fn arena_contract_a_run_can_start_with_its_fixtures() {
         );
         assert_eq!(
             state.event_blocked_by_arena(kind),
-            largest.then_some(Unavailable::Capacity),
+            if kind == ClockEventKind::Tanks {
+                Some(Unavailable::Placement)
+            } else {
+                largest.then_some(Unavailable::Capacity)
+            },
             "{kind:?}"
         );
     }

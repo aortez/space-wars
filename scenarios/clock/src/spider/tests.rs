@@ -100,6 +100,7 @@ fn config(aspect: f32, font: ClockFont, fixture: FixtureStart) -> ClockConfig {
             slot_machine: false,
             spider: false,
             coins: false,
+            tanks: false,
         },
         time_format: ClockTimeFormat::TwentyFourHour,
         fonts: ClockFontSettings {

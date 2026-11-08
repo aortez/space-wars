@@ -8,7 +8,7 @@ fn reference_destination(state: &ScorchedState, player: usize) -> Option<f32> {
     if !state.has_track_support(player) {
         return None;
     }
-    let geometry = Geometry::read(state, player);
+    let geometry = Geometry::read(state, &state.physics, player);
     let toward = (geometry.target.x - geometry.shooter.x).signum();
     let preferred = if (geometry.target.x - geometry.shooter.x).abs() > 29.0 {
         toward
@@ -29,7 +29,8 @@ fn ready_bot(state: &ScorchedState, player: usize) -> Option<Bot> {
         return None;
     }
     let mut bot = state.bots[player].clone();
-    bot.aim.refresh(Geometry::read(state, player));
+    bot.aim
+        .refresh(Geometry::read(state, &state.physics, player));
     bot.wants_relocation(state, player).then_some(bot)
 }
 
@@ -38,7 +39,12 @@ fn reference_step(state: &mut ScorchedState) {
     // tuned. No body, shell, timer, driver, or aim memory is reinitialized.
     for player in 0..2 {
         if let Some(mut bot) = ready_bot(state, player) {
-            bot.consider_relocation(state, player, reference_destination(state, player));
+            bot.consider_relocation(
+                state,
+                &state.physics,
+                player,
+                reference_destination(state, player),
+            );
             state.bots[player] = bot;
         }
     }
@@ -73,9 +79,9 @@ fn fork(checkpoint: &ScorchedState, player: usize, choice: Choice) -> ScorchedSt
                 Choice::Reference => reference_destination(&state, player),
                 _ => state.escape_destination(player, bot.aim.elevation),
             };
-            bot.consider_relocation(&state, player, destination);
+            bot.consider_relocation(&state, &state.physics, player, destination);
         }
-        Choice::Current => bot.react_to_hit(&state, player),
+        Choice::Current => bot.react_to_hit(&state, &state.physics, player),
     }
     state.bots[player] = bot;
     state
@@ -84,7 +90,7 @@ fn fork(checkpoint: &ScorchedState, player: usize, choice: Choice) -> ScorchedSt
 fn continuation(checkpoint: &ScorchedState, player: usize, choice: Choice, seconds: u32) -> Value {
     let initial_hash = checkpoint.observation_hash();
     let start = checkpoint.tick;
-    let origin = Geometry::read(checkpoint, player).shooter;
+    let origin = Geometry::read(checkpoint, &checkpoint.physics, player).shooter;
     let health = checkpoint.tanks.map(|tank| tank.health);
     let own_shots = checkpoint.tanks[player].shots;
     let mut trace = vec![sample(checkpoint)];
@@ -116,7 +122,7 @@ fn continuation(checkpoint: &ScorchedState, player: usize, choice: Choice, secon
                     .then(|| shot.tick - start)
             });
         }
-        let position = Geometry::read(&state, player).shooter;
+        let position = Geometry::read(&state, &state.physics, player).shooter;
         travel += position.distance_to(previous);
         max_displacement = max_displacement.max((position.x - origin.x).abs());
         previous = position;
@@ -336,7 +342,7 @@ mod tests {
         // must still expire; a stream of new hit notices cannot renew it.
         candidate.tanks[0].next_shot = u64::MAX;
         while candidate.tick <= deadline {
-            candidate.bots[0].hit(candidate.tick, 1.0);
+            candidate.duel.bots[0].hit(candidate.duel.tick, 1.0);
             candidate.advance(0.0);
             assert_eq!(
                 candidate.bots[0]
@@ -352,7 +358,7 @@ mod tests {
         assert_eq!(priority.ended, Some(deadline));
         assert!(priority.shot.is_none());
         assert_eq!(candidate.bots[0].aim.observations, observations);
-        candidate.bots[0].hit(candidate.tick, 1.0);
+        candidate.duel.bots[0].hit(candidate.duel.tick, 1.0);
         candidate.bot_drive(0);
         assert_eq!(
             candidate.bots[0].shot_priority.as_ref().unwrap().started,

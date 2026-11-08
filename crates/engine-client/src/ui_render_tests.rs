@@ -13,6 +13,7 @@ type MenuCase = (&'static str, fn(&MainWindow));
 mod cell_swap;
 mod coins;
 mod pizza;
+mod tanks;
 
 #[test]
 fn launcher_filter_keyboard_and_touch_share_selection_and_save_behavior() {

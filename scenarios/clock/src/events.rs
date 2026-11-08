@@ -8,6 +8,7 @@ pub(crate) mod falling;
 pub(crate) mod marquee;
 pub(crate) mod meltdown;
 pub(crate) mod slot_machine;
+pub(crate) mod tanks;
 #[cfg(test)]
 mod tests;
 
@@ -70,6 +71,14 @@ pub enum EventPhase {
     Swimming,
     Minting,
     Cascading,
+    Raising,
+    BeamDown,
+    Settling,
+    Fighting,
+    FinishingShots,
+    Crumbling,
+    BeamUp,
+    Withdrawing,
 }
 
 impl EventPhase {
@@ -97,6 +106,14 @@ impl EventPhase {
             Self::Swimming => "swimming",
             Self::Minting => "minting",
             Self::Cascading => "cascading",
+            Self::Raising => "raising",
+            Self::BeamDown => "beam-down",
+            Self::Settling => "settling",
+            Self::Fighting => "fighting",
+            Self::FinishingShots => "finishing-shots",
+            Self::Crumbling => "crumbling",
+            Self::BeamUp => "beam-up",
+            Self::Withdrawing => "withdrawing",
         }
     }
 }
@@ -142,6 +159,7 @@ impl EventDefinition {
                 | ClockEventKind::Explosion
                 | ClockEventKind::Aquarium
                 | ClockEventKind::Coins
+                | ClockEventKind::Tanks
         )
     }
 }
@@ -252,6 +270,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: explosion::COINS_TICKS,
         cooldown_ticks: 45 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::Tanks,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::Arena,
+        duration_ticks: tanks::MAX_TICKS,
+        cooldown_ticks: tanks::REUSE_TICKS,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -278,6 +303,7 @@ pub(super) enum ActiveEvent {
     Coins(ExplosionEvent),
     Aquarium(Box<aquarium::AquariumEvent>),
     Grass(crate::grass::Introduction),
+    Tanks(Box<tanks::TanksEvent>),
 }
 
 // Use the admission seed locally so recipe selection cannot advance the scheduler RNG.
@@ -304,6 +330,9 @@ impl ActiveEvent {
         preview: bool,
     ) -> Self {
         match kind {
+            ClockEventKind::Tanks => {
+                unreachable!("Tanks attaches to the canonical arena at admission")
+            }
             ClockEventKind::Grass => Self::Grass(crate::grass::Introduction::default()),
             ClockEventKind::Aquarium => {
                 Self::Aquarium(Box::new(aquarium::AquariumEvent::new(context, seed)))
@@ -355,6 +384,7 @@ impl ActiveEvent {
         match self {
             Self::Aquarium(_) => ClockEventKind::Aquarium,
             Self::Grass(_) => ClockEventKind::Grass,
+            Self::Tanks(_) => ClockEventKind::Tanks,
             Self::Falling(_) => ClockEventKind::Falling,
             Self::Explosion(_) => ClockEventKind::Explosion,
             Self::Coins(_) => ClockEventKind::Coins,
@@ -370,6 +400,7 @@ impl ActiveEvent {
 
     pub fn shares_visit_arena(&self) -> bool {
         match self {
+            Self::Tanks(_) => true,
             Self::Aquarium(event) => event.shares_visit_arena(),
             Self::Falling(event) => event.shares_visit_arena(),
             Self::Explosion(event) | Self::Coins(event) => event.shares_visit_arena(),
@@ -461,6 +492,7 @@ impl ActiveEvent {
 
     pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>, arena: &mut ClockArena) {
         match self {
+            Self::Tanks(event) => event.release(arena),
             Self::Aquarium(event) => event.release(player, arena),
             Self::Falling(event) => event.release(player, arena),
             Self::Explosion(event) | Self::Coins(event) => event.release(player, arena),
@@ -481,6 +513,7 @@ impl ActiveEvent {
     ) -> bool {
         match self {
             Self::Grass(event) => event.step(),
+            Self::Tanks(event) => event.step(arena, context.display),
             Self::Aquarium(event) => event.step(context, visit, arena),
             Self::Falling(event) => event.step(context),
             Self::Explosion(event) | Self::Coins(event) => event.step(context, arena),
@@ -512,6 +545,7 @@ impl ActiveEvent {
         debug_assert!(self.shares_visit_arena());
         match self {
             Self::Aquarium(event) => event.observe(visit, arena),
+            Self::Tanks(event) => event.observe(arena),
             Self::Falling(event) => event.observe(context, arena),
             Self::Explosion(event) | Self::Coins(event) => {
                 event.observe(context, arena);
@@ -525,6 +559,7 @@ impl ActiveEvent {
     pub fn phase(&self) -> EventPhase {
         match self {
             Self::Grass(_) => EventPhase::Presenting,
+            Self::Tanks(event) => event.phase,
             Self::Aquarium(event) => event.phase(),
             Self::Falling(event) => event.phase(),
             Self::Explosion(event) | Self::Coins(event) => event.phase(),
@@ -547,6 +582,7 @@ impl ActiveEvent {
     pub fn phase_tick(&self) -> u64 {
         match self {
             Self::Grass(event) => event.tick,
+            Self::Tanks(event) => event.phase_tick,
             Self::Aquarium(event) => event.phase_tick(),
             Self::Falling(event) => event.phase_tick(),
             Self::Explosion(event) | Self::Coins(event) => event.phase_tick(),
@@ -572,7 +608,7 @@ impl ActiveEvent {
     /// whoever is using it, and a standalone Aquarium has no rigid world.
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
-            Self::Grass(_) | Self::Aquarium(_) => (0, 0),
+            Self::Grass(_) | Self::Aquarium(_) | Self::Tanks(_) => (0, 0),
             Self::Falling(event) => event.physics_counts(),
             Self::Explosion(event) | Self::Coins(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),

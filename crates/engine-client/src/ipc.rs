@@ -1232,6 +1232,15 @@ fn validate_clock_trigger(
     } else if clock
         .events
         .iter()
+        .any(|event| event.kind == request.event && event.blocked_by_tanks)
+    {
+        Some((
+            ControlFailureCode::ActionUnavailable,
+            "Tanks is using the arena; wait for departure",
+        ))
+    } else if clock
+        .events
+        .iter()
         .any(|event| event.kind == request.event && event.blocked_by_crow)
     {
         Some((
@@ -1643,6 +1652,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_slot_machine_enabled: window.get_launcher_clock_slot_machine_enabled(),
             clock_spider_enabled: window.get_launcher_clock_spider_enabled(),
             clock_coins_enabled: window.get_launcher_clock_coins_enabled(),
+            clock_tanks_enabled: window.get_launcher_clock_tanks_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
                 window.get_launcher_clock_rain_amount().to_string()
             } else {

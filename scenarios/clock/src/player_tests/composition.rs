@@ -75,7 +75,12 @@ fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anythin
         // The spider waits for the player's duck.
         for event in ClockEventKind::ALL
             .into_iter()
-            .filter(|k| !matches!(k, ClockEventKind::Duck | ClockEventKind::Spider))
+            .filter(|k| {
+                !matches!(
+                    k,
+                    ClockEventKind::Duck | ClockEventKind::Spider | ClockEventKind::Tanks
+                )
+            })
             .filter(|k| cycle == 0 || *k != ClockEventKind::Crow)
         {
             state.next_event();
@@ -114,7 +119,11 @@ fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anythin
         assert_eq!(state.player_duck_state(), duck);
         assert_eq!(
             state.event_notice.unwrap().0,
-            "Dismiss your duck to preview this event"
+            if state.event_blocked_by_crow(event) {
+                "Crow is already visiting"
+            } else {
+                "Dismiss your duck to preview this event"
+            }
         );
     }
 }

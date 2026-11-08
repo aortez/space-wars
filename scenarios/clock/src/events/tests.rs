@@ -14,6 +14,7 @@ fn catalog_covers_every_kind_once_and_has_bounded_timing() {
         let max_duration = match definition.kind {
             ClockEventKind::Duck => 35 * 60,
             ClockEventKind::Crow => 22 * 60,
+            ClockEventKind::Tanks => tanks::MAX_TICKS,
             ClockEventKind::Rain => 42 * 60,
             ClockEventKind::Aquarium => 66 * 60,
             ClockEventKind::Spider => 30 * 60,
@@ -69,6 +70,7 @@ fn automatic_selection_respects_enablement_and_each_events_reuse_delay() {
             slot_machine: kind == ClockEventKind::SlotMachine,
             spider: kind == ClockEventKind::Spider,
             coins: kind == ClockEventKind::Coins,
+            tanks: kind == ClockEventKind::Tanks,
         };
         let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 2);
         let wait = schedule.next_event_tick.unwrap();
@@ -113,6 +115,7 @@ fn off_and_an_empty_enabled_set_never_schedule_automatic_events() {
                 slot_machine: false,
                 spider: false,
                 coins: false,
+                tanks: false,
             },
         ),
     ] {
@@ -165,6 +168,7 @@ fn slide_only_configuration_never_schedules_periodic_work() {
         slot_machine: false,
         spider: false,
         coins: false,
+        tanks: false,
     };
     let mut schedule = EventSchedule::new(ClockEventProfile::Calm, events, 4);
     assert_eq!(schedule.next_event_tick, None);
@@ -227,6 +231,7 @@ fn demo_smoke_seed_resident_id_does_not_imply_active_lifecycle() {
     enabled.digit_slide = false;
     enabled.spider = false;
     enabled.coins = false;
+    enabled.tanks = false;
     let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 4242);
     advance(&mut schedule, 420);
     assert_eq!(schedule.due_event(true), Some(ClockEventKind::ColorCycle));

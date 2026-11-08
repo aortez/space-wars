@@ -1512,6 +1512,20 @@ impl PhysicsWorld {
         Some(body.gravity_scale())
     }
 
+    /// Suspend an assembly's body during an authored entrance. Disabled
+    /// bodies keep their identity and pose but do not collide or simulate.
+    pub fn set_body_enabled(&mut self, id: BodyId, enabled: bool) -> bool {
+        let Some(body) = self.body_mut(id) else {
+            return false;
+        };
+        let changed = body.is_enabled() != enabled;
+        body.set_enabled(enabled);
+        if changed {
+            self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        }
+        true
+    }
+
     /// Carry a dynamic body's weight through the next step only. That step
     /// applies the body's whole weight as one impulse before it solves, and
     /// keeps gravity off the body while it does. Impulses that hold a body up
@@ -3761,6 +3775,41 @@ mod tests {
 
     const BALL_ROLE: BodyRole = BodyRole::new(1);
     const BALL_COLLIDER: ColliderRole = ColliderRole::new(1);
+
+    #[test]
+    fn disabled_body_keeps_its_identity_but_leaves_the_simulation_until_enabled() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::new(0.0, -20.0),
+            ..Default::default()
+        });
+        let body = insert_ball(&mut world, 1, Vec2::ZERO);
+        let initial = world.motion(body).unwrap();
+        assert!(world.set_body_enabled(body, false));
+        world.step(1.0 / 60.0);
+        assert_eq!(world.motion(body), Some(initial));
+        assert!(world.current_cuboid_is_clear(
+            Vec2::ZERO,
+            0.0,
+            Vec2::new(0.1, 0.1),
+            CollisionGroups::ALL,
+            &[]
+        ));
+        let mut checkpoint = world.clone();
+        for world in [&mut world, &mut checkpoint] {
+            assert!(world.set_body_enabled(body, true));
+            world.step(1.0 / 60.0);
+            assert!(world.motion(body).unwrap().position.y < 0.0);
+            assert!(!world.current_cuboid_is_clear(
+                Vec2::ZERO,
+                0.0,
+                Vec2::new(0.1, 0.1),
+                CollisionGroups::ALL,
+                &[]
+            ));
+            assert_eq!(world.identity_fault(), None);
+        }
+        assert_eq!(world.motion(body), checkpoint.motion(body));
+    }
 
     #[test]
     fn the_length_unit_is_retunable_and_rejects_what_construction_would_reject() {

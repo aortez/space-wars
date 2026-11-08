@@ -12,13 +12,18 @@ pub(super) struct RelocationSite {
     pub rejection: Option<&'static str>,
 }
 
-impl ScorchedState {
-    pub(super) fn relocation_sites(&self, player: usize, elevation: f32) -> Vec<RelocationSite> {
-        let geometry = Geometry::read(self, player);
+impl Duel {
+    pub(super) fn relocation_sites(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+        elevation: f32,
+    ) -> Vec<RelocationSite> {
+        let geometry = Geometry::read(self, physics, player);
         let toward = (geometry.target.x - geometry.shooter.x).signum();
         let mut sites = Vec::new();
         for direction in [toward, -toward] {
-            let ground = self.check_drive_direction(player, direction);
+            let ground = self.check_drive_direction(physics, player, direction);
             for distance in [2.5, 2.0] {
                 let x = geometry.shooter.x + direction * distance;
                 let mut site = RelocationSite {
@@ -29,14 +34,18 @@ impl ScorchedState {
                     score: None,
                     rejection: None,
                 };
-                site.rejection = if !self.has_track_support(player) {
+                site.rejection = if !self.has_track_support(physics, player) {
                     Some("no support")
-                } else if x.abs() > 44.0 || !(12.0..=40.0).contains(&site.range) {
+                } else if x.abs() > self.placement.drive_limit()
+                    || !(12.0..=40.0).contains(&site.range)
+                {
                     Some("firing range")
                 } else if ground.reason.is_some() {
                     ground.reason
                 } else {
-                    self.assess_relocation_site(player, &ground, distance, elevation, &mut site)
+                    self.assess_relocation_site(
+                        physics, player, &ground, distance, elevation, &mut site,
+                    )
                 };
                 sites.push(site);
             }
@@ -46,6 +55,7 @@ impl ScorchedState {
 
     fn assess_relocation_site(
         &self,
+        physics: &PhysicsWorld,
         player: usize,
         ground: &driving_lab::GroundCheck,
         distance: f32,
@@ -73,7 +83,8 @@ impl ScorchedState {
             return Some("uneven firing footing");
         }
         for point in &points {
-            let hit = self.physics.cast_ray(
+            let hit = self.cast_ray(
+                physics,
                 Vec2::new(point[0], point[1] + 0.1),
                 -Vec2::Y,
                 RayCastOptions {
@@ -85,7 +96,7 @@ impl ScorchedState {
             let fixed_terrain = hit.is_some_and(|hit| {
                 self.terrain.iter().any(|fragment| {
                     fragment.id == hit.collider.entity
-                        && self.physics.body_kind(fragment.assembly.body()) == Some(BodyKind::Fixed)
+                        && physics.body_kind(fragment.assembly.body()) == Some(BodyKind::Fixed)
                 })
             });
             if !fixed_terrain {
@@ -100,11 +111,11 @@ impl ScorchedState {
         let y = first[1] + grade * (site.x - first[0]);
         let pivot =
             Vec2::new(site.x, y + clearance * pitch.cos()) + Vec2::Y.rotate_radians(pitch) * 0.85;
-        let facing = (Geometry::read(self, player).target.x - site.x).signum();
+        let facing = (Geometry::read(self, physics, player).target.x - site.x).signum();
         let barrel = Vec2::new(facing * elevation.cos(), elevation.sin()) * 2.8;
         if self
-            .physics
             .cast_ray(
+                physics,
                 pivot,
                 barrel,
                 RayCastOptions {
@@ -127,5 +138,11 @@ impl ScorchedState {
                 + (2.5 - distance) * 0.15,
         );
         None
+    }
+}
+
+impl ScorchedState {
+    pub(super) fn relocation_sites(&self, player: usize, elevation: f32) -> Vec<RelocationSite> {
+        self.duel.relocation_sites(&self.physics, player, elevation)
     }
 }

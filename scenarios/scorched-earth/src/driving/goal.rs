@@ -55,7 +55,10 @@ impl TravelGoal {
     }
 
     pub fn new(destination_x: f32, cruise_speed: f32) -> Self {
-        assert!(destination_x.is_finite() && destination_x.abs() <= 44.0);
+        assert!(
+            destination_x.is_finite()
+                && destination_x.abs() <= host::MAX_TERRAIN_WIDTH as f32 * CELL_SIZE * 0.5
+        );
         assert!(cruise_speed.is_finite() && cruise_speed > 0.0 && cruise_speed <= MAX_SPEED);
         Self {
             destination_x,
@@ -73,40 +76,48 @@ impl TravelGoal {
 
     /// Inspect current terrain and motion without advancing or resetting the
     /// scenario. Keep this controller across ticks, including terrain changes.
-    pub fn decide(&mut self, state: &ScorchedState, player: usize) -> GoalDecision {
-        self.decide_with_support(state, player, SupportCheck::Current)
+    pub(crate) fn decide_in(
+        &mut self,
+        state: &Duel,
+        physics: &PhysicsWorld,
+        player: usize,
+    ) -> GoalDecision {
+        self.decide_with_support_in(state, physics, player, SupportCheck::Current)
     }
 
     /// Same goal history and speed policy with an explicitly selected support
     /// check. Used to continue a retained failure without resetting its goal.
-    pub fn decide_with_support(
+    pub(crate) fn decide_with_support_in(
         &mut self,
-        state: &ScorchedState,
+        state: &Duel,
+        physics: &PhysicsWorld,
         player: usize,
         support: SupportCheck,
     ) -> GoalDecision {
-        self.decide_policy(state, player, support, true)
+        self.decide_policy(state, physics, player, support, true)
     }
 
     /// Retained speed/retry policy for exact prefixes and controlled comparisons.
-    pub fn decide_reference(
+    pub(crate) fn decide_reference_in(
         &mut self,
-        state: &ScorchedState,
+        state: &Duel,
+        physics: &PhysicsWorld,
         player: usize,
         support: SupportCheck,
     ) -> GoalDecision {
-        self.decide_policy(state, player, support, false)
+        self.decide_policy(state, physics, player, support, false)
     }
 
     fn decide_policy(
         &mut self,
-        state: &ScorchedState,
+        state: &Duel,
+        physics: &PhysicsWorld,
         player: usize,
         support: SupportCheck,
         candidate: bool,
     ) -> GoalDecision {
         assert!(player < 2);
-        let motion = state.physics.motion(state.tanks[player].body).unwrap();
+        let motion = state.motion(physics, state.tanks[player].body).unwrap();
         let offset = self.destination_x - motion.position.x;
         let direction = if offset < 0.0 { -1.0 } else { 1.0 };
         let distance = offset.abs();
@@ -128,7 +139,7 @@ impl TravelGoal {
             return decision;
         }
         if distance <= ARRIVAL_DISTANCE {
-            if candidate && !support.supported(state, player) {
+            if candidate && !support.supported_in(state, physics, player) {
                 decision.mode = "no support";
                 return decision;
             }
@@ -155,13 +166,13 @@ impl TravelGoal {
             decision.mode = "retreat timeout";
             return decision;
         }
-        if !support.supported(state, player) {
+        if !support.supported_in(state, physics, player) {
             decision.mode = "no support";
             return decision;
         }
         if candidate && let Some(retreat) = &mut self.retreat {
             if state
-                .check_drive_direction(player, retreat.direction)
+                .check_drive_direction(physics, player, retreat.direction)
                 .reason
                 .is_some()
             {
@@ -196,7 +207,7 @@ impl TravelGoal {
             }
             return decision;
         }
-        let ground = state.check_drive_direction(player, direction);
+        let ground = state.check_drive_direction(physics, player, direction);
         if ground.reason.is_some() {
             decision.mode = "blocked ground";
             self.progress_window = None;
@@ -231,7 +242,7 @@ impl TravelGoal {
                         self.retry_at = state.tick + RETRY_TICKS;
                         if candidate
                             && state
-                                .check_drive_direction(player, -direction)
+                                .check_drive_direction(physics, player, -direction)
                                 .reason
                                 .is_none()
                         {
@@ -301,3 +312,25 @@ impl TravelGoal {
 
 #[cfg(test)]
 mod tests;
+
+impl TravelGoal {
+    pub fn decide(&mut self, state: &ScorchedState, player: usize) -> GoalDecision {
+        self.decide_in(&state.duel, &state.physics, player)
+    }
+    pub fn decide_with_support(
+        &mut self,
+        state: &ScorchedState,
+        player: usize,
+        support: SupportCheck,
+    ) -> GoalDecision {
+        self.decide_with_support_in(&state.duel, &state.physics, player, support)
+    }
+    pub fn decide_reference(
+        &mut self,
+        state: &ScorchedState,
+        player: usize,
+        support: SupportCheck,
+    ) -> GoalDecision {
+        self.decide_reference_in(&state.duel, &state.physics, player, support)
+    }
+}

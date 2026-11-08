@@ -17,7 +17,7 @@ fn wheeled_fixture(
             &mut state.physics,
             body.entity,
             position,
-            state.config.wheel_tuning,
+            state.duel.config.wheel_tuning,
         );
         state.tanks[i].body = gear.bodies()[0];
         state.running_gear[i] = Some(gear);
@@ -224,8 +224,8 @@ fn suspended_cpu_drives_and_fires_and_comparison_rebuilds_cleanly() {
     let mut state = wheeled_fixture(GrainShape::Hexagon, BankStrength::Weak, |_| -5.0);
     state.config.cpu_driving = true;
     state.config.demo = true;
-    for tank in &mut state.tanks {
-        tank.next_shot = state.tick + 240;
+    for tank in &mut state.duel.tanks {
+        tank.next_shot = state.duel.tick + 240;
     }
     let before = state
         .tanks
@@ -437,7 +437,7 @@ fn wheels_do_not_drive_on_a_steep_grade_or_upside_down() {
                 wheel_center: Vec2::new(-20.0, -5.0) + normal * 0.8,
                 up_angle: std::f32::consts::FRAC_PI_2 + slope.to_radians(),
             },
-            spec(state.config.wheel_tuning),
+            spec(state.duel.config.wheel_tuning),
         )
         .unwrap();
         state.tanks[0].body = gear.bodies()[0];

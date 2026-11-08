@@ -120,7 +120,7 @@ fn player_duck_is_observable_and_renders_through_both_production_adapters() {
                 .iter()
                 .filter(|event| event.blocked_by_player)
                 .count(),
-            1
+            2
         );
         assert!(current.body_count <= 9 && current.collider_count <= 9);
         let frames = scenario.render_frames(RenderBackend::Raster, viewport);

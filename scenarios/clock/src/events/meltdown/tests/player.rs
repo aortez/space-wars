@@ -219,6 +219,7 @@ fn scheduled_meltdown_starts_without_an_extra_player_tick() {
         slot_machine: false,
         spider: false,
         coins: false,
+        tanks: false,
     };
     state.configure(settings);
     ticks(&mut state, crate::events::COOLDOWN_TICKS as usize);

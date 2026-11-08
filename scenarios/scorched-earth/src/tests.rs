@@ -261,7 +261,7 @@ fn saturated_crater_still_pushes_existing_dirt_once_and_damages_tanks() {
                 },
                 42,
             );
-            let ground = &mut state.terrain[0];
+            let ground = &mut state.duel.terrain[0];
             let plan = PreparedRelease::new(
                 &ground.terrain,
                 &[TerrainEdit {
@@ -278,6 +278,7 @@ fn saturated_crater_still_pushes_existing_dirt_once_and_damages_tanks() {
             .unwrap();
             assert_eq!(plan.grain_count(), 5);
             let released = state
+                .duel
                 .loose
                 .commit(
                     &mut state.physics,
@@ -287,13 +288,18 @@ fn saturated_crater_still_pushes_existing_dirt_once_and_damages_tanks() {
                         assembly: &mut ground.assembly,
                     },
                     plan,
-                    &mut state.next_id,
+                    &mut state.duel.next_id,
                 )
                 .unwrap();
             assert!(released.fragments.is_empty());
             ground.hash = ground.terrain.hash();
             let point = Vec2::new(0.0, hill(0.0, 42));
-            let bodies = state.loose.iter().map(|g| g.body()).collect::<Vec<_>>();
+            let bodies = state
+                .duel
+                .loose
+                .iter()
+                .map(|g| g.body())
+                .collect::<Vec<_>>();
             for (i, &body) in bodies.iter().enumerate() {
                 // Four nearby grains and one outside the impulse radius.
                 let offset = if i == 4 { 10.0 } else { 0.5 + i as f32 * 0.6 };
@@ -307,8 +313,8 @@ fn saturated_crater_still_pushes_existing_dirt_once_and_damages_tanks() {
                 .physics
                 .set_pose(tank, point + Vec2::new(4.0, 2.0), 0.0, true);
             let initial = state.audit().unwrap();
-            let field = state.terrain[0].terrain.clone();
-            let next_id = state.next_id;
+            let field = state.duel.terrain[0].terrain.clone();
+            let next_id = state.duel.next_id;
             let before = bodies
                 .iter()
                 .map(|&b| state.physics.motion(b).unwrap())
@@ -320,8 +326,8 @@ fn saturated_crater_still_pushes_existing_dirt_once_and_damages_tanks() {
             let capacity = state.last_capacity_rejection.unwrap();
             assert_eq!(capacity.available, free_slots);
             assert!(!capacity.fits());
-            assert_eq!(state.terrain[0].terrain, field);
-            assert_eq!(state.next_id, next_id);
+            assert_eq!(state.duel.terrain[0].terrain, field);
+            assert_eq!(state.duel.next_id, next_id);
             assert_eq!(state.audit().unwrap(), initial);
             assert!(state.tanks[0].health < 100.0);
             for (i, &body) in bodies.iter().enumerate() {

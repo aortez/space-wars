@@ -73,7 +73,7 @@ fn a_hit_defers_a_ready_shot_before_the_hull_has_started_moving() {
         let deadline = state.bots[0].relocation.as_ref().unwrap().deadline;
         for _ in 0..540 {
             // Sustained incoming fire must not renew this attempt's deadline.
-            state.bots[0].hit(state.tick, 1.0);
+            state.duel.bots[0].hit(state.duel.tick, 1.0);
             step(&mut state);
             if let Some(goal) = &state.bots[0].relocation {
                 assert_eq!(goal.deadline, deadline);
@@ -101,9 +101,10 @@ fn a_hit_defers_a_ready_shot_before_the_hull_has_started_moving() {
 fn confident_or_cooldown_bots_do_not_restart_relocation_on_a_hit() {
     let mut state = flat(GrainShape::Round, CpuPolicy::Reactive);
     state.config.cpu_driving = true;
-    state.bots[0].aim.refresh(Geometry::read(&state, 0));
+    let geometry = Geometry::read(&state, &state.physics, 0);
+    state.bots[0].aim.refresh(geometry);
     state.bots[0].aim.confident = true;
-    state.bots[0].hit(state.tick, 10.0);
+    state.duel.bots[0].hit(state.duel.tick, 10.0);
     assert_eq!(state.bot_drive(0), None);
     assert!(state.bot_allows_fire(0));
     state.bots[0].aim.confident = false;
@@ -125,7 +126,7 @@ fn no_safe_destination_falls_back_to_aiming() {
     state.config.cpu_driving = true;
     state.config.cpu_policy = [CpuPolicy::Reactive; 2];
     state.tanks[0].next_shot = state.tick;
-    state.bots[0].hit(state.tick, 10.0);
+    state.duel.bots[0].hit(state.duel.tick, 10.0);
     step(&mut state);
     assert_eq!(state.bots[0].relocations, 0);
     assert_eq!(state.bots[0].relocation_refusals, 1);
@@ -146,7 +147,7 @@ fn firing_destination_prefers_level_ground_over_a_drivable_slope() {
         true,
     );
     state.aim_calibrated(0);
-    let x = Geometry::read(&state, 0).shooter.x;
+    let x = Geometry::read(&state, &state.physics, 0).shooter.x;
     assert!(state.safe_drive_direction(0, 1.0));
     assert!(state.safe_drive_direction(0, -1.0));
     let sites = state.relocation_sites(0, state.bots[0].aim.elevation);
@@ -260,7 +261,7 @@ fn learned_and_reactive_duels_clone_replay_and_conserve_both_shapes() {
 #[test]
 fn bot_comparison_button_restarts_same_seed_and_clears_learning() {
     let mut state = flat(GrainShape::Round, CpuPolicy::Sweep);
-    state.bots[0].hit(state.tick, 10.0);
+    state.duel.bots[0].hit(state.duel.tick, 10.0);
     state.command(Command::CpuAim);
     assert_eq!(state.config.cpu_policy, [CpuPolicy::Calibrated; 2]);
     assert_eq!(state.tick, 0);
@@ -309,7 +310,7 @@ fn height_and_ridge_cases_acquire_aim_instead_of_accepting_weak_splash() {
 fn disabling_driving_during_relocation_does_not_block_stationary_firing() {
     let mut state = flat(GrainShape::Round, CpuPolicy::Reactive);
     state.config.cpu_driving = true;
-    state.bots[0].hit(state.tick, 10.0);
+    state.duel.bots[0].hit(state.duel.tick, 10.0);
     state.bot_drive(0);
     assert!(state.bots[0].relocation.is_some());
     assert!(!state.bot_allows_fire(0));

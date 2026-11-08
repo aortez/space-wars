@@ -46,7 +46,7 @@ pub fn combat_tanks(state: &ScorchedState) -> [CombatTank; 2] {
                     },
                 )
                 .is_some(),
-            ready_to_shoot: state.ready_to_shoot(player, ScorchedState::has_track_support),
+            ready_to_shoot: state.ready_to_shoot(player, Duel::has_track_support),
             elevation_degrees: tank.elevation.to_degrees(),
             facing: tank.facing,
             controller: serde_json::to_value(&state.driving[player]).unwrap(),

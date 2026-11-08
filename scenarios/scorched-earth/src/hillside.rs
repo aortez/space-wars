@@ -41,12 +41,12 @@ impl ScorchedConfig {
     }
 }
 
-impl ScorchedState {
-    pub(super) fn aim_at_hillside(&mut self) {
+impl Duel {
+    pub(super) fn aim_at_hillside(&mut self, physics: &mut PhysicsWorld) {
         // Solve only the initial aim. Once fired, the ordinary swept shell can
         // hit any terrain, grain or actor along its actual trajectory.
         self.tanks[1].elevation = 34.0_f32.to_radians();
-        let (_, muzzle) = self.muzzle(1);
+        let (_, muzzle) = self.muzzle(physics, 1);
         let target = Vec2::new(4.0, 0.25);
         let dx = (muzzle.x - target.x).abs();
         let dy = target.y - muzzle.y;
@@ -56,10 +56,16 @@ impl ScorchedState {
             self.tanks[1].speed = (GRAVITY * dx * dx / denominator).sqrt().clamp(12.0, 48.0);
         }
     }
-    pub(super) fn advance_hillside(&mut self) {
+    pub(super) fn advance_hillside(&mut self, physics: &mut PhysicsWorld) {
         if self.config.demo && [120, 600, 1080].contains(&self.tick) {
-            self.aim_at_hillside();
-            self.fire(1);
+            self.aim_at_hillside(physics);
+            self.fire(physics, 1);
         }
+    }
+}
+
+impl ScorchedState {
+    pub(super) fn aim_at_hillside(&mut self) {
+        self.duel.aim_at_hillside(&mut self.physics)
     }
 }

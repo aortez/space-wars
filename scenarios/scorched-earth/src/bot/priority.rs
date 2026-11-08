@@ -19,7 +19,12 @@ pub(super) struct ShotPriority {
 }
 
 impl Bot {
-    pub(super) fn try_shot_priority(&mut self, state: &ScorchedState, player: usize) -> bool {
+    pub(super) fn try_shot_priority(
+        &mut self,
+        state: &Duel,
+        physics: &PhysicsWorld,
+        player: usize,
+    ) -> bool {
         let Some(observation) = self.last_shot else {
             return false;
         };
@@ -30,8 +35,8 @@ impl Bot {
             || state.tick.saturating_sub(observation.tick) > 180
             || (self.aim.power - observation.launch.power).abs() < 0.01
             || state.tanks[player].next_shot > state.tick + FIRE_WAIT
-            || !state.has_track_support(player)
-            || !state.correction_barrel_clear(player, self.aim.elevation)
+            || !state.has_track_support(physics, player)
+            || !state.correction_barrel_clear(physics, player, self.aim.elevation)
             || self.shot_priority.as_ref().is_some_and(|previous| {
                 previous.ended.is_none()
                     || previous.evidence == observation.launch.id
@@ -42,7 +47,7 @@ impl Bot {
         }
         self.shot_priority = Some(ShotPriority {
             evidence: observation.launch.id,
-            geometry: Geometry::read(state, player),
+            geometry: Geometry::read(state, physics, player),
             started: state.tick,
             fire_deadline: state.tick + FIRE_WAIT,
             deadline: state.tick + TOTAL_WAIT,
@@ -53,7 +58,12 @@ impl Bot {
         true
     }
 
-    pub(super) fn protect_correction(&mut self, state: &ScorchedState, player: usize) -> bool {
+    pub(super) fn protect_correction(
+        &mut self,
+        state: &Duel,
+        physics: &PhysicsWorld,
+        player: usize,
+    ) -> bool {
         let Some(priority) = self.shot_priority.as_mut().filter(|p| p.ended.is_none()) else {
             return false;
         };
@@ -64,11 +74,14 @@ impl Bot {
             Some("observation deadline")
         } else if priority.shot.is_none() && state.tick >= priority.fire_deadline {
             Some("firing deadline")
-        } else if !priority.geometry.matches(Geometry::read(state, player)) {
+        } else if !priority
+            .geometry
+            .matches(Geometry::read(state, physics, player))
+        {
             Some("geometry changed")
-        } else if !state.has_track_support(player) {
+        } else if !state.has_track_support(physics, player) {
             Some("no support")
-        } else if !state.correction_barrel_clear(player, self.aim.elevation) {
+        } else if !state.correction_barrel_clear(physics, player, self.aim.elevation) {
             Some("blocked barrel")
         } else if priority.shot.is_none() && !self.aim.has_power_correction() {
             Some("correction changed")
@@ -116,22 +129,27 @@ impl Bot {
     }
 }
 
-impl ScorchedState {
-    fn correction_barrel_clear(&self, player: usize, elevation: f32) -> bool {
-        let geometry = Geometry::read(self, player);
+impl Duel {
+    fn correction_barrel_clear(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+        elevation: f32,
+    ) -> bool {
+        let geometry = Geometry::read(self, physics, player);
         let pivot = geometry.shooter + Vec2::Y.rotate_radians(geometry.pitch) * 0.85;
         let facing = (geometry.target.x - geometry.shooter.x).signum();
         let barrel = Vec2::new(facing * elevation.cos(), elevation.sin()) * 2.8;
-        self.physics
-            .cast_ray(
-                pivot,
-                barrel,
-                RayCastOptions {
-                    max_distance: barrel.length(),
-                    exclude_entity: Some(self.tanks[player].body.entity),
-                    ..Default::default()
-                },
-            )
-            .is_none()
+        self.cast_ray(
+            physics,
+            pivot,
+            barrel,
+            RayCastOptions {
+                max_distance: barrel.length(),
+                exclude_entity: Some(self.tanks[player].body.entity),
+                ..Default::default()
+            },
+        )
+        .is_none()
     }
 }

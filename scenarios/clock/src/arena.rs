@@ -119,6 +119,7 @@ impl Owner {
                 Population::new(bodies, bodies)
             }
             // A fixed compound of its solid digit cells and two liner panels.
+            Self::Event(ClockEventKind::Tanks) => crate::events::tanks::POPULATION,
             Self::Event(ClockEventKind::Aquarium) => Population::new(
                 count(&ids::canonical::AQUARIUM_DIGITS) + count(&ids::canonical::AQUARIUM_LINER),
                 MAX_DIGIT_SOLIDS + count(&ids::canonical::AQUARIUM_LINER),
@@ -171,6 +172,7 @@ impl Owner {
             Self::Event(ClockEventKind::Aquarium) => &[AQUARIUM_LINER, AQUARIUM_DIGITS],
             Self::Event(ClockEventKind::Explosion) => &[EXPLOSION_CELLS],
             Self::Event(ClockEventKind::Coins) => &[COIN_CELLS],
+            Self::Event(ClockEventKind::Tanks) => &[TANKS],
             Self::Event(ClockEventKind::Falling) => &[FALLING_SEGMENTS, FALLING_LETTERS],
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
             Self::Event(_) => &[],
@@ -209,7 +211,9 @@ const LARGEST_EVENT: Population = {
     let mut largest = Population::NONE;
     let mut index = 0;
     while index < ClockEventKind::ALL.len() {
-        largest = largest.max(Owner::Event(ClockEventKind::ALL[index]).budget());
+        if !matches!(ClockEventKind::ALL[index], ClockEventKind::Tanks) {
+            largest = largest.max(Owner::Event(ClockEventKind::ALL[index]).budget());
+        }
         index += 1;
     }
     largest
@@ -232,6 +236,22 @@ pub const ARENA_CAPACITY: Population = Owner::Visit
         colliders: 0,
         joints: Owner::Spider.budget().joints,
     });
+
+// Tanks has a separate reservation for chunked terrain and cannot share a
+// visit or spider. Its larger collider allowance must not relax admissions
+// for the existing visitor/event combinations.
+const TANKS_CAPACITY: Population = crate::events::tanks::POPULATION
+    .plus(FLOOR_BUDGET)
+    .plus(Owner::Soil.budget())
+    .plus(Owner::Fixture(0).budget());
+
+fn capacity(owners: &[Owner]) -> Population {
+    if owners.contains(&Owner::Event(ClockEventKind::Tanks)) {
+        TANKS_CAPACITY
+    } else {
+        ARENA_CAPACITY
+    }
+}
 
 const _: () = assert!(
     Owner::Spider.budget().bodies <= LARGEST_EVENT.bodies
@@ -281,7 +301,12 @@ pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     let need = held
         .iter()
         .fold(floor, |need, owner| need.plus(owner.budget()));
-    if need.within(ARENA_CAPACITY) {
+    if held.contains(&Owner::Event(ClockEventKind::Tanks))
+        && (held.contains(&Owner::Visit) || held.contains(&Owner::Spider))
+    {
+        return Err(Unavailable::Capacity);
+    }
+    if need.within(capacity(&held)) {
         Ok(())
     } else {
         Err(Unavailable::Capacity)
@@ -414,6 +439,7 @@ pub(crate) struct ClockArena {
     fitted: Option<Layout>,
     /// What the last resize did to the resting residents.
     last_remap: Option<Remap>,
+    surface_drives: Vec<engine_rapier::world::SurfaceDrive>,
     /// The last step's timings and populations.
     metrics: PhysicsStepMetrics,
     granted: u64,
@@ -584,6 +610,8 @@ impl ClockArena {
             );
         }
         let held = self.holds(owner);
+        self.surface_drives
+            .retain(|drive| !owner.declares(drive.collider.entity.value()));
         self.owners.retain(|other| *other != owner);
         self.released += u64::from(held);
         if self.owners.is_empty() {
@@ -597,10 +625,12 @@ impl ClockArena {
             self.fitted = None;
         } else if held {
             let world = self.world.as_mut().expect("a held arena");
-            for range in owner.ranges() {
-                for id in range.clone() {
-                    world.remove_entity(PhysicsId::new(id));
-                }
+            let owned: Vec<_> = world
+                .entity_ids()
+                .filter(|id| owner.declares(id.value()))
+                .collect();
+            for id in owned {
+                world.remove_entity(id);
             }
             if owner.rests() && !self.owners.iter().any(|owner| owner.rests()) {
                 remove_floor(world);
@@ -809,6 +839,10 @@ impl ClockArena {
     /// brings its own gravity for as long as it holds the arena, so resting
     /// residents first rescale theirs whenever the world's has changed, and
     /// fall at Clock's own throughout.
+    pub fn queue_drives(&mut self, drives: Vec<engine_rapier::world::SurfaceDrive>) {
+        self.surface_drives.extend(drives);
+    }
+
     pub fn step(&mut self, dt: f32) {
         let scale = self.resident_gravity_scale();
         let Some(world) = &mut self.world else {
@@ -832,7 +866,8 @@ impl ClockArena {
         #[cfg(debug_assertions)]
         self.audit();
         let world = self.world.as_mut().expect("a held arena");
-        self.metrics = world.step(dt);
+        self.metrics = world.step_with_surface_drives(dt, &self.surface_drives);
+        self.surface_drives.clear();
         self.steps += 1;
     }
 
@@ -984,7 +1019,7 @@ impl ClockArena {
             limits: ClockArenaLimits {
                 claims: MAX_ARENA_CLAIMS,
                 residents: MAX_RESIDENT_CLAIMS,
-                capacity: ARENA_CAPACITY,
+                capacity: capacity(&self.owners),
             },
         }
     }
@@ -1017,6 +1052,17 @@ mod tests {
     #[test]
     fn the_arena_takes_everything_clock_ships_beside_soil_and_one_fixture() {
         for kind in ClockEventKind::ALL {
+            if kind == ClockEventKind::Tanks {
+                assert_eq!(
+                    admits(&[Owner::Event(kind), Owner::Soil, Owner::Fixture(0)]),
+                    Ok(())
+                );
+                assert_eq!(
+                    admits(&[Owner::Event(kind), Owner::Visit]),
+                    Err(Unavailable::Capacity)
+                );
+                continue;
+            }
             let owners = [
                 Owner::Visit,
                 Owner::Event(kind),
@@ -1257,6 +1303,8 @@ pub(crate) mod ids {
         /// index.
         pub(crate) const SPIDER_SURFACES: Range<u64> =
             8100..8100 + crate::spider::MAX_PROXIES as u64;
+        /// The duel, its monotonic material allocator and reserved conversion tail.
+        pub(crate) const TANKS: Range<u64> = 20_000..60_000;
         /// Retained soil, the one resident today that outlives its admitting
         /// event.
         pub(crate) const SOIL: Range<u64> = 900_001..900_002;
@@ -1322,6 +1370,7 @@ pub(crate) mod ids {
             ("MELTDOWN_CELLS", MELTDOWN_CELLS),
             ("EXPLOSION_CELLS", EXPLOSION_CELLS),
             ("COIN_CELLS", COIN_CELLS),
+            ("TANKS", TANKS),
             ("AQUARIUM_LINER", AQUARIUM_LINER),
             ("AQUARIUM_DIGITS", AQUARIUM_DIGITS),
             ("FIXTURE_BALLS", FIXTURE_BALLS),

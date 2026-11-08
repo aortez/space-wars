@@ -650,7 +650,7 @@ fn clock_stays_live_while_raining_or_draining_and_pause_resize_replace_clean_up(
                 &[ClockAction::preview_event(kind)],
                 Duration::ZERO,
             );
-            if kind == ClockEventKind::Spider {
+            if matches!(kind, ClockEventKind::Spider | ClockEventKind::Tanks) {
                 // The spider waits for the event before it rather than
                 // replacing it.
                 let before = ClockEventKind::ALL[kind as usize - 1];

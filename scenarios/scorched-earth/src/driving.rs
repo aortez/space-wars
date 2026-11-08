@@ -17,12 +17,10 @@ const ROUTE_SPACING: f32 = CELL_SIZE;
 const MAX_STEP: f32 = CELL_SIZE + 0.08;
 const PROFILE_TOLERANCE: f32 = 0.10;
 
-pub(super) type GroundCheckFn = fn(&ScorchedState, usize, f32) -> bool;
-pub(super) type SupportCheckFn = fn(&ScorchedState, usize) -> bool;
-pub(super) const CURRENT_GROUND_CHECKS: [GroundCheckFn; 2] =
-    [ScorchedState::safe_drive_direction; 2];
-pub(super) const CURRENT_SUPPORT_CHECKS: [SupportCheckFn; 2] =
-    [ScorchedState::has_track_support; 2];
+pub(super) type GroundCheckFn = fn(&Duel, &PhysicsWorld, usize, f32) -> bool;
+pub(super) type SupportCheckFn = fn(&Duel, &PhysicsWorld, usize) -> bool;
+pub(super) const CURRENT_GROUND_CHECKS: [GroundCheckFn; 2] = [Duel::safe_drive_direction; 2];
+pub(super) const CURRENT_SUPPORT_CHECKS: [SupportCheckFn; 2] = [Duel::has_track_support; 2];
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct DrivingDiagnostics {
@@ -82,7 +80,7 @@ impl TankDrive {
     }
 }
 
-impl ScorchedState {
+impl Duel {
     pub fn driving_diagnostics(&self) -> [DrivingDiagnostics; 2] {
         self.driving.each_ref().map(|drive| drive.diagnostics)
     }
@@ -102,14 +100,20 @@ impl ScorchedState {
         }
     }
 
-    pub(super) fn safe_drive_direction(&self, player: usize, direction: f32) -> bool {
-        self.check_drive_direction(player, direction)
+    pub(super) fn safe_drive_direction(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+        direction: f32,
+    ) -> bool {
+        self.check_drive_direction(physics, player, direction)
             .reason
             .is_none()
     }
 
     pub(super) fn check_drive_direction(
         &self,
+        physics: &PhysicsWorld,
         player: usize,
         direction: f32,
     ) -> driving_lab::GroundCheck {
@@ -120,7 +124,7 @@ impl ScorchedState {
             probes: [None; ROUTE_SAMPLES],
         };
         let tank = self.tanks[player];
-        let motion = self.physics.motion(tank.body).unwrap();
+        let motion = self.motion(physics, tank.body).unwrap();
         let clearance = if self.running_gear[player].is_some() {
             1.2 + (self.config.wheel_tuning.radius - WheelTuning::default().radius)
         } else {
@@ -145,7 +149,8 @@ impl ScorchedState {
                 result.reason = Some("world edge");
                 return result;
             }
-            let Some(hit) = self.physics.cast_ray(
+            let Some(hit) = self.cast_ray(
+                physics,
                 Vec2::new(x, foot.y + 4.0),
                 -Vec2::Y,
                 RayCastOptions {
@@ -205,13 +210,14 @@ impl ScorchedState {
 
     fn cpu_drive(
         &mut self,
+        physics: &mut PhysicsWorld,
         player: usize,
         ground_check: GroundCheckFn,
         support_check: SupportCheckFn,
     ) -> f32 {
         let tank = self.tanks[player];
-        let motion = self.physics.motion(tank.body).unwrap();
-        if !support_check(self, player) {
+        let motion = self.motion(physics, tank.body).unwrap();
+        if !support_check(self, physics, player) {
             self.driving[player].diagnostics.mode = "no support";
             self.driving[player].cpu_direction = 0.0;
             return 0.0;
@@ -249,8 +255,7 @@ impl ScorchedState {
                 return 0.0;
             }
             let target = self
-                .physics
-                .motion(self.tanks[1 - player].body)
+                .motion(physics, self.tanks[1 - player].body)
                 .unwrap()
                 .position;
             let toward = if target.x >= motion.position.x {
@@ -259,10 +264,10 @@ impl ScorchedState {
                 -1.0
             };
             let distance = (target.x - motion.position.x).abs();
-            let (pivot, muzzle) = self.muzzle(player);
+            let (pivot, muzzle) = self.muzzle(physics, player);
             let blocked_barrel = self
-                .physics
                 .cast_ray(
+                    physics,
                     pivot,
                     muzzle - pivot,
                     RayCastOptions {
@@ -287,7 +292,7 @@ impl ScorchedState {
         let direction = self.driving[player].cpu_direction;
         // Recheck live ground while moving: a crater can invalidate the plan
         // between its half-second decisions. A refusal brakes immediately.
-        if direction != 0.0 && !ground_check(self, player, direction) {
+        if direction != 0.0 && !ground_check(self, physics, player, direction) {
             self.driving[player].cpu_direction = 0.0;
             self.driving[player].diagnostics.mode = "blocked ground";
             self.driving[player].next_plan = self.tick + 60;
@@ -296,9 +301,14 @@ impl ScorchedState {
         direction
     }
 
-    pub(super) fn ready_to_shoot(&self, player: usize, support_check: SupportCheckFn) -> bool {
-        let motion = self.physics.motion(self.tanks[player].body).unwrap();
-        support_check(self, player)
+    pub(super) fn ready_to_shoot(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+        support_check: SupportCheckFn,
+    ) -> bool {
+        let motion = self.motion(physics, self.tanks[player].body).unwrap();
+        support_check(self, physics, player)
             && motion.linear_velocity.length() < 0.6
             && motion.angular_velocity.abs() < 0.35
             && self.driving[player].diagnostics.track_speed.abs() < 0.2
@@ -306,6 +316,7 @@ impl ScorchedState {
 
     pub(super) fn prepare_driving(
         &mut self,
+        physics: &mut PhysicsWorld,
         manual: f32,
         override_axis: Option<(usize, f32)>,
         ground_checks: [GroundCheckFn; 2],
@@ -319,6 +330,9 @@ impl ScorchedState {
             playable && self.config.cpu_driving && !self.config.hillside && !self.config.roof;
         let mut drives = Vec::new();
         for (player, ground_check) in ground_checks.into_iter().enumerate() {
+            if self.retired[player].is_some() {
+                continue;
+            }
             let is_cpu = self.config.demo || player != self.selected;
             let axis = if self.config.course.is_some() && player == 1 {
                 self.driving[player].diagnostics.mode = "parked";
@@ -326,13 +340,14 @@ impl ScorchedState {
             } else if let Some((_, axis)) = override_axis.filter(|(i, _)| *i == player) {
                 axis
             } else if is_cpu && cpu_enabled {
-                if let Some(axis) = self.bot_drive(player) {
+                if let Some(axis) = self.bot_drive(physics, player) {
                     self.driving[player].suspend_cpu_plan();
                     axis
                 } else {
-                    let axis = self.cpu_drive(player, ground_check, support_checks[player]);
+                    let axis =
+                        self.cpu_drive(physics, player, ground_check, support_checks[player]);
                     if self.config.cpu_footing[player] && self.config.course.is_none() {
-                        self.seek_firing_footing(player, axis)
+                        self.seek_firing_footing(physics, player, axis)
                     } else {
                         axis
                     }
@@ -346,8 +361,8 @@ impl ScorchedState {
             let supported = (axis != 0.0
                 || self.driving[player].diagnostics.track_speed != 0.0
                 || self.running_gear[player].is_some())
-                && support_checks[player](self, player);
-            let motion = self.physics.motion(self.tanks[player].body).unwrap();
+                && support_checks[player](self, physics, player);
+            let motion = self.motion(physics, self.tanks[player].body).unwrap();
             let drive = &mut self.driving[player];
             if drive.diagnostics.track_speed != 0.0 {
                 drive.diagnostics.distance_while_driven +=
@@ -367,7 +382,7 @@ impl ScorchedState {
                     drive.diagnostics.powered_ticks += 1;
                 }
                 gear.set_control(
-                    &mut self.physics,
+                    physics,
                     RoverControl {
                         throttle: drive.diagnostics.track_speed / DRIVE_SPEED,
                         brake: playable && supported && !moving,
@@ -383,7 +398,10 @@ impl ScorchedState {
                         ColliderRole::PRIMARY,
                         0,
                     ),
-                    local_velocity: Vec2::new(-drive.diagnostics.track_speed, 0.0),
+                    local_velocity: Vec2::new(
+                        -drive.diagnostics.track_speed * self.placement.scale,
+                        0.0,
+                    ),
                     local_normal: -Vec2::Y,
                     min_normal_dot: 0.5,
                     world_up: Vec2::Y,
@@ -400,3 +418,23 @@ impl ScorchedState {
 
 #[cfg(test)]
 pub(super) mod tests;
+
+impl ScorchedState {
+    pub(super) fn safe_drive_direction(&self, player: usize, direction: f32) -> bool {
+        self.duel
+            .safe_drive_direction(&self.physics, player, direction)
+    }
+    pub(super) fn check_drive_direction(
+        &self,
+        player: usize,
+        direction: f32,
+    ) -> driving_lab::GroundCheck {
+        self.duel
+            .check_drive_direction(&self.physics, player, direction)
+    }
+
+    pub(super) fn ready_to_shoot(&self, player: usize, support_check: SupportCheckFn) -> bool {
+        self.duel
+            .ready_to_shoot(&self.physics, player, support_check)
+    }
+}

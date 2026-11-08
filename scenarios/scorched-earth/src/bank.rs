@@ -28,8 +28,8 @@ pub(super) fn terrain() -> Terrain {
     .expect("bounded bank fixture")
 }
 
-impl ScorchedState {
-    pub(super) fn cut_bank_support(&mut self) {
+impl Duel {
+    pub(super) fn cut_bank_support(&mut self, physics: &mut PhysicsWorld) {
         let body = &mut self.terrain[0];
         let edits: Vec<_> = (-7..=3)
             .flat_map(|y| (4..=6).map(move |x| (x, y)))
@@ -55,7 +55,7 @@ impl ScorchedState {
         let release = self
             .loose
             .commit(
-                &mut self.physics,
+                physics,
                 TerrainBodyMut {
                     terrain: &mut body.terrain,
                     geometry: &mut body.geometry,
@@ -75,10 +75,7 @@ impl ScorchedState {
             radius: 12.0,
             speed: 12.0,
         }
-        .apply(
-            &mut self.physics,
-            self.loose.iter().skip(previous).map(|g| g.body()),
-        );
+        .apply(physics, self.loose.iter().skip(previous).map(|g| g.body()));
         self.impacts += 1;
     }
 }

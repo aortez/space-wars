@@ -1682,6 +1682,11 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
                     assert!(active.body_count <= explosion.max_cells as usize + 5);
                     assert!(active.collider_count <= explosion.max_cells as usize + 34);
                 }
+                ClockEventKind::Tanks => {
+                    let tanks = active.tanks.as_ref().unwrap();
+                    assert!(tanks.loose_cells + tanks.converted_cells <= 192);
+                    assert!(tanks.combat_ticks <= 60 * 60);
+                }
                 ClockEventKind::Coins => {
                     let coins = active.coins.as_ref().unwrap();
                     assert!(coins.live_cells <= coins.max_cells);

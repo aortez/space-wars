@@ -1052,13 +1052,13 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     window.set_ingame_menu_visible(true);
     window.set_ingame_clock_visible(true);
     // Pi-sized page: left-hand event switch and time-format row are hittable.
-    click(&window, 175.0, 222.0);
+    click(&window, 175.0, 200.0);
     assert_eq!(adjusted.get(), Some((2, 1)));
-    click(&window, 400.0, 222.0);
+    click(&window, 400.0, 200.0);
     assert_eq!(adjusted.get(), Some((7, 1)));
-    click(&window, 510.0, 222.0);
+    click(&window, 510.0, 200.0);
     assert_eq!(adjusted.get(), Some((8, 1)));
-    click(&window, 625.0, 222.0);
+    click(&window, 625.0, 200.0);
     assert_eq!(adjusted.get(), Some((11, 1)));
     adjusted.set(None);
     click(&window, 175.0, 110.0);
@@ -1078,28 +1078,28 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), Some((19, 1)));
     click(&window, 400.0, 166.0);
     assert_eq!(adjusted.get(), Some((18, 1)));
-    // The preview row ends in three switches of equal width: Crow, Explosion
-    // and Coins, right-aligned, so each is hittable beside the selector.
-    click(&window, 635.0, 278.0);
+    // Crow and Explosion flank preview; Coins and Tanks join the next row.
+    click(&window, 520.0, 292.0);
     assert_eq!(adjusted.get(), Some((22, 1)));
-    click(&window, 537.0, 278.0);
+    click(&window, 635.0, 246.0);
     assert_eq!(adjusted.get(), Some((15, 1)));
-    click(&window, 439.0, 278.0);
+    click(&window, 537.0, 246.0);
     assert_eq!(adjusted.get(), Some((14, 1)));
     click(&window, 287.0, 166.0);
     assert_eq!(adjusted.get(), Some((13, 1)));
     click(&window, 175.0, 166.0);
     assert_eq!(adjusted.get(), Some((12, 1)));
-    click(&window, 175.0, 334.0);
+    click(&window, 175.0, 292.0);
     assert_eq!(adjusted.get(), Some((9, 1)));
-    click(&window, 649.0, 334.0);
+    click(&window, 649.0, 338.0);
     assert_eq!(adjusted.get(), Some((10, 1)));
-    // Spider sits between Aquarium and the recipe in the Marquee row, each
-    // switch a fifth of the row wide.
-    click(&window, 404.0, 334.0);
+    // Each event switch in the lower row remains directly hittable.
+    click(&window, 404.0, 292.0);
     assert_eq!(adjusted.get(), Some((21, 1)));
-    click(&window, 285.0, 334.0);
+    click(&window, 285.0, 292.0);
     assert_eq!(adjusted.get(), Some((17, 1)));
+    click(&window, 625.0, 292.0);
+    assert_eq!(adjusted.get(), Some((23, 1)));
     // The extra launcher row must not overlap Back/Start at 800×480.
     window.set_ingame_menu_visible(false);
     window.set_launcher_visible(true);
@@ -1108,17 +1108,20 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 480.0, 168.0);
     assert!(window.get_launcher_clock_show_date());
     assert_eq!(window.get_launcher_settings_focus_index(), 12);
-    // The Events row has the same five columns as the two below it, with
-    // Coins at its far end, Spider beside it and Digit Slide before that.
+    // The six event choices keep their existing control identities.
+    assert!(window.get_launcher_clock_tanks_enabled());
+    click(&window, 660.0, 220.0);
+    assert!(!window.get_launcher_clock_tanks_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 22);
     assert!(window.get_launcher_clock_coins_enabled());
-    click(&window, 649.0, 220.0);
+    click(&window, 556.0, 220.0);
     assert!(!window.get_launcher_clock_coins_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 21);
     assert!(window.get_launcher_clock_spider_enabled());
-    click(&window, 525.0, 220.0);
+    click(&window, 452.0, 220.0);
     assert!(!window.get_launcher_clock_spider_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 20);
-    click(&window, 400.0, 220.0);
+    click(&window, 348.0, 220.0);
     assert!(!window.get_launcher_clock_digit_slide_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 3);
     key(&window, Key::DownArrow);

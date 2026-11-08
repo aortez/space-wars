@@ -220,6 +220,7 @@ fn crow_only_schedule_blocks_duplicates_then_obeys_departure_cooldown() {
         slot_machine: false,
         spider: false,
         coins: false,
+        tanks: false,
     };
     state.configure(settings);
     assert!(state.automatic_events_suspended());
