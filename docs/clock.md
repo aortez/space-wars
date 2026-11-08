@@ -522,14 +522,20 @@ times the controller's pace, since nothing between the frame and the pile is
 in its way, and it flies low, four and a half pitches over the floor. Each
 visit has a home side, chosen by its seed, that the bird comes from and
 carries its coins to. A trip goes: in from home to the floor beside the heap,
-on the drain-free side of the coin it has picked, which is one of the highest
-coins lying in view; a seeded look of a quarter to three quarters of a
-second; a hop up to stand next to the coin; forty ticks with its head down,
-the coin leaving the pile for its beak twenty-two ticks in; and out toward
-home with the coin, which is gone with it once the bird is out of view. A
-coin that is kicked, rolls off or goes down the drain between being chosen
-and being reached is given up for another, from wherever the bird is. The
-bird starts a trip only while the gathering has room for it, estimated from
+on the nearest level stretch of what holds a foot there, which is the batch's
+own floor clear of the drain, or beside a duck the course the coins fell
+onto, the top of a platform or the floor between, never over its pit; the
+coin it has picked is one of the highest lying in view with such a stretch
+beside it; a seeded look of a quarter to three quarters of a second; a hop
+up to stand next to the coin; forty ticks with its head down, the coin
+leaving the pile for its beak twenty-two ticks in; and out toward home with
+the coin, which is gone with it once the bird is out of view. A coin that is
+kicked, rolls off or goes down the drain between being chosen and being
+reached is given up for another, from wherever the bird is, and whatever is
+under the bird holds its feet up wherever they come down: a descent cut
+short that way keeps its momentum, but the floor, or the platform under it,
+catches the feet and the wings start again from there. The bird starts a
+trip only while the gathering has room for it, estimated from
 the crossing distances at its cruising speed plus a measured overhead, so it
 is away before the return begins and is never cut off in the air; inside
 the last two and a half seconds it leaves whatever it was doing, and it would
@@ -634,8 +640,11 @@ nothing, the shared arena's lifecycle and a real coin-duck contact. For the
 magpie they cover its trips at every device layout (three or four coins, no
 body, the coin in its beak drawn there, away before the return), a coin that
 leaves the pile being chosen again, a gathering cut short by a resize or a
-replacing preview with a coin in the beak, and coins taken out of the shared
-arena. The reassembly they share keeps its tests under Explosion.
+replacing preview with a coin in the beak, coins taken out of the shared
+arena, the bird never below the floor through a retarget on the way down, and
+its landings on a player's course set down on what is there, never over the
+pit or inside a platform. The reassembly they share keeps its tests under
+Explosion.
 
 The event and its return were the first half of
 [#581](https://github.com/aortez/space-wars/issues/581); the magpie is the

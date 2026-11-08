@@ -6,11 +6,12 @@
 //! tests there; one shared-arena pass and one duck contact here prove the
 //! batch reaches the run's arena as Coins.
 use super::*;
-use engine_common::{ClockFloorMode, ClockMagpiePhase};
+use engine_common::{ClockFloorMode, ClockFont, ClockFontSettings, ClockMagpiePhase};
 use engine_core::Vec2;
 use engine_rapier::world::{BodyId, BodyRole, ColliderId, ColliderRole, PhysicsId};
 use events::explosion::{
     CASCADE_TICKS, COINS_TICKS, GATHERING_TICKS, MAX_EXPLOSION_CELLS, WARNING_TICKS,
+    magpie::Support,
 };
 
 /// The gathering, from the first tick the coins lie for the magpie.
@@ -24,6 +25,29 @@ fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
             aspect_ratio: aspect,
             event_profile: ClockEventProfile::Off,
             time_format: format,
+            ..Default::default()
+        },
+        seed,
+    );
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::set_reading(
+            ClockReading::new(23, 58, 0).unwrap(),
+        )],
+        Duration::ZERO,
+    );
+    state
+}
+/// `ready`, in `font`.
+fn ready_in(aspect: f32, seed: u64, font: ClockFont) -> ClockState {
+    let mut state = ClockScenario::init(
+        ClockConfig {
+            aspect_ratio: aspect,
+            event_profile: ClockEventProfile::Off,
+            fonts: ClockFontSettings {
+                selected: font,
+                ..Default::default()
+            },
             ..Default::default()
         },
         seed,
@@ -419,6 +443,11 @@ fn magpie(state: &ClockState) -> engine_common::ClockMagpieState {
 }
 
 /// Layer 8 is the bird's, and the coin at its beak is the one circle there.
+/// The bird's feet, as the diagnostics give them.
+fn feet(state: &ClockState) -> Vec2 {
+    let [x, y] = magpie(state).position_milli;
+    Vec2::new(x as f32 / 1000.0, y as f32 / 1000.0)
+}
 fn bird_primitives(state: &ClockState) -> (usize, usize) {
     let frame = ClockScenario::render_frame(state);
     let bird: Vec<_> = frame
@@ -741,4 +770,101 @@ fn the_magpie_takes_coins_out_of_the_shared_arena() {
             .arena
             .holds(arena::Owner::Event(ClockEventKind::Coins))
     );
+}
+
+#[test]
+fn the_magpie_never_sinks_below_the_floor() {
+    // A descent cut short by a retarget kept its downward momentum, and the
+    // floor caught only feet that came down near the new destination: at
+    // 800x480 in Matrix with seed 9 the bird went 4.6 units into the floor on
+    // its way to the next coin.
+    for (aspect, font, seed) in [
+        (800.0 / 480.0, ClockFont::Matrix, 9),
+        (4.0 / 3.0, ClockFont::Matrix, 9),
+        (800.0 / 480.0, ClockFont::Classic, 3),
+    ] {
+        let layout = Layout::new(aspect);
+        let mut state = ready_in(aspect, seed, font);
+        state.preview_event(ClockEventKind::Coins);
+        ticks(&mut state, GATHERING_AT);
+        let mut lowest = f32::INFINITY;
+        while state.event_phase() == Some(EventPhase::Gathering) {
+            let bird = magpie(&state);
+            let feet = feet(&state);
+            if bird.phase != ClockMagpiePhase::Away
+                && feet.x > layout.bounds_min.x
+                && feet.x < layout.bounds_max.x
+            {
+                lowest = lowest.min(feet.y);
+                assert!(
+                    feet.y >= layout.floor_y - 0.01,
+                    "{font:?} at {aspect} seed {seed}: feet at {feet:?} are below the floor at {} while {:?}",
+                    layout.floor_y,
+                    bird.phase
+                );
+            }
+            ticks(&mut state, 1);
+        }
+        assert!(
+            lowest.is_finite(),
+            "{font:?} at {aspect} seed {seed}: the bird came"
+        );
+    }
+}
+
+#[test]
+fn the_magpie_lands_on_the_course_it_shares_with_a_duck() {
+    // Beside a player's duck the coins lie on its course, with platforms and
+    // a pit where the batch's own floor has its drain. The bird sets down on
+    // what is there: taking the floor for granted, at 4:3 seed 11 landed over
+    // the pit and seed 22 put its feet 16 units inside a platform.
+    let aspect = 4.0 / 3.0;
+    let layout = Layout::new(aspect);
+    for seed in [11, 22, 3, 7] {
+        let mut state = ready(aspect, seed, ClockTimeFormat::TwelveHour);
+        toggle(&mut state, 1);
+        ticks(&mut state, 90);
+        state.finish_event();
+        state.preview_event(ClockEventKind::Coins);
+        assert!(state.coins_state().unwrap().shared_arena);
+        ticks(&mut state, GATHERING_AT);
+        let mut landings = 0;
+        while state.event_phase() == Some(EventPhase::Gathering) {
+            let bird = magpie(&state);
+            let feet = feet(&state);
+            let terrain = state
+                .duck_visit
+                .as_ref()
+                .map(|duck| &duck.terrain)
+                .or(state.arena.vacant.as_ref())
+                .expect("the duck's course");
+            let support = Support::Terrain(terrain);
+            if bird.phase != ClockMagpiePhase::Away
+                && feet.x > layout.bounds_min.x
+                && feet.x < layout.bounds_max.x
+            {
+                if let Some(top) = support.at(feet.x) {
+                    assert!(
+                        feet.y >= top - 0.01,
+                        "seed {seed}: feet at {feet:?} are inside the course, whose top is {top} there, while {:?}",
+                        bird.phase
+                    );
+                }
+                if bird.phase == ClockMagpiePhase::Landed && bird.phase_tick == 0 {
+                    landings += 1;
+                    let top = support.at(feet.x);
+                    assert!(
+                        top.is_some_and(|top| (feet.y - top).abs() < 0.01),
+                        "seed {seed}: landed at {feet:?} with {top:?} under the feet"
+                    );
+                }
+            }
+            ticks(&mut state, 1);
+        }
+        assert!(landings >= 1, "seed {seed}: the bird landed");
+        assert!(
+            state.coins_state().unwrap().taken >= 1,
+            "seed {seed}: the bird took a coin off the course"
+        );
+    }
 }

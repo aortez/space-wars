@@ -38,7 +38,7 @@ use crate::{
 pub(crate) mod magpie;
 mod reassembly;
 pub use magpie::GATHERING_TICKS;
-use magpie::Magpie;
+use magpie::{Magpie, Support};
 use reassembly::{Destination, Reassembly};
 
 pub const WARNING_TICKS: u64 = 36;
@@ -427,6 +427,7 @@ impl ExplosionEvent {
         &mut self,
         segments: &mut [SegmentState],
         display: DisplaySnapshot,
+        visit: Option<&DuckEvent>,
         arena: &mut ClockArena,
     ) -> bool {
         self.tick += 1;
@@ -450,7 +451,19 @@ impl ExplosionEvent {
                 } else {
                     0
                 };
-                guest.step(&self.cells, remaining)
+                // What the bird sets down on: the batch's own floor with its
+                // drain, or the terrain of the visit whose arena the coins lie
+                // in, whether its character is still there or not.
+                let support = match self.drain {
+                    Some(drain) => Support::Drain(drain),
+                    None => Support::Terrain(
+                        visit
+                            .map(|duck| &duck.terrain)
+                            .or(arena.vacant.as_ref())
+                            .expect("one shared arena owner"),
+                    ),
+                };
+                guest.step(&self.cells, remaining, support)
             }
             _ => None,
         };
@@ -549,7 +562,14 @@ impl ExplosionEvent {
     /// The event's tick up to the arena's step. A standalone Explosion steps its
     /// own world and finishes its tick here; a shared one reads the arena back
     /// in `observe`. Returns true when the event has finished.
-    pub fn step(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+    /// A tick before the arena's step, beside `visit` when the batch shares
+    /// its arena.
+    pub fn step(
+        &mut self,
+        context: EventContext<'_>,
+        visit: Option<&DuckEvent>,
+        arena: &mut ClockArena,
+    ) -> bool {
         let EventContext {
             segments,
             surfaces,
@@ -563,7 +583,7 @@ impl ExplosionEvent {
             reassembly.synchronize(&mut self.cells, display, layout, self.tick);
             self.assign_pieces(surfaces);
         }
-        let finished = self.advance_phase(segments, display, arena);
+        let finished = self.advance_phase(segments, display, visit, arena);
         self.retire_taken(surfaces);
         if let Mechanics::Standalone(world) = &mut self.mechanics {
             let world = world.as_deref_mut().map(|world| {

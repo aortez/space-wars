@@ -10,7 +10,30 @@ use engine_core::Vec2;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::Cell;
-use crate::{crow::Flight, layout::Layout};
+use crate::{crow::Flight, events::duck::ArenaTerrain, floor::DrainGeometry, layout::Layout};
+
+/// What holds a foot on the floor the coins lie on: the batch's own floor
+/// with its drain, or the terrain of the visit whose arena the coins fell
+/// into, with its course, its pit or its panels.
+#[derive(Clone, Copy)]
+pub(crate) enum Support<'a> {
+    Drain(DrainGeometry),
+    Terrain(&'a ArenaTerrain),
+}
+
+impl Support<'_> {
+    /// The height of what would hold a foot at `x`, or nothing over the
+    /// drain, a pit or an opening, or beyond the view.
+    pub fn at(self, x: f32) -> Option<f32> {
+        match self {
+            Self::Drain(drain) => drain
+                .slabs()
+                .find(|(min, max)| min.x <= x && x <= max.x)
+                .map(|(_, max)| max.y),
+            Self::Terrain(terrain) => terrain.support_at(x),
+        }
+    }
+}
 
 /// How long the coins lie in the arena for the magpie. Its trips fit in
 /// here, and the return starts when it is up whether it came back or not.
@@ -39,9 +62,10 @@ const TAKE_AT: u64 = 22;
 struct Target {
     index: usize,
     position: Vec2,
-    /// Which side of the coin the bird approaches from: away from the
-    /// drain, so its feet are on the floor.
+    /// Which side of the coin the bird comes at it from.
     side: f32,
+    /// Where it sets down for it: on what holds a foot beside the heap.
+    landing: Vec2,
 }
 
 pub(crate) struct Magpie {
@@ -127,8 +151,9 @@ impl Magpie {
     }
 
     /// The top of a heap: one of the highest coins, chosen at random among
-    /// those within a coin of the highest.
-    fn choose(&mut self, cells: &[Cell]) -> Option<Target> {
+    /// those within a coin of the highest that have a floor to set down
+    /// beside.
+    fn choose(&mut self, cells: &[Cell], support: Support<'_>) -> Option<Target> {
         let top = cells
             .iter()
             .filter(|cell| self.available(cell))
@@ -143,42 +168,55 @@ impl Magpie {
             if !self.available(cell) || cell.position.y < top - self.layout.pitch * 0.75 {
                 continue;
             }
+            let Some((side, landing)) = self.approach(cell, support) else {
+                continue;
+            };
             count += 1;
             if self.rng.random_range(0..count) == 0 {
-                chosen = Some((index, cell.position));
+                chosen = Some(Target {
+                    index,
+                    position: cell.position,
+                    side,
+                    landing,
+                });
             }
         }
-        chosen.map(|(index, position)| Target {
-            index,
-            position,
-            side: if position.x >= 0.0 { 1.0 } else { -1.0 },
-        })
+        chosen
     }
 
-    /// The floor beside the heap, on the drain-free side of the coin and
-    /// inside the frame.
-    fn landing(&self, target: Target) -> Vec2 {
+    /// The side to come at `cell` from and where to set down there: the
+    /// nearest spot beside the heap with a level stretch of floor under it,
+    /// inside the frame, away from the middle of the view first. A coin with
+    /// the drain, a pit or an opening on both sides has none.
+    fn approach(&self, cell: &Cell, support: Support<'_>) -> Option<(f32, Vec2)> {
         let layout = self.layout;
         let margin = layout.frame_width + layout.pitch * 0.9;
-        let spot = |side: f32| {
-            (target.position.x + side * layout.pitch * 1.5)
-                .clamp(layout.bounds_min.x + margin, layout.bounds_max.x - margin)
-        };
-        let mut x = spot(target.side);
-        if x.abs() < layout.drain_half_width() + layout.pitch * 0.5 {
-            x = spot(-target.side);
+        let preferred = if cell.position.x >= 0.0 { 1.0 } else { -1.0 };
+        for side in [preferred, -preferred] {
+            for step in 0..=10 {
+                let x = (cell.position.x + side * layout.pitch * (1.5 + 0.25 * step as f32))
+                    .clamp(layout.bounds_min.x + margin, layout.bounds_max.x - margin);
+                // Level for half a pace either way, so that the last of the
+                // descent cannot drift off an edge.
+                let samples = [-0.5, 0.0, 0.5].map(|offset| support.at(x + offset * layout.pitch));
+                if let [Some(left), Some(height), Some(right)] = samples
+                    && (left - height).abs() <= layout.pitch * 0.15
+                    && (right - height).abs() <= layout.pitch * 0.15
+                {
+                    return Some((side, Vec2::new(x, height)));
+                }
+            }
         }
-        Vec2::new(x, layout.floor_y)
+        None
     }
 
-    /// Standing next to the coin, on the heap if the coin is up on one, with
-    /// the beak over it.
-    fn beside(&self, target: Target, cell: &Cell) -> Vec2 {
+    /// Standing next to the coin, with the beak over it: on the heap if the
+    /// coin is up on one, else on what is under the feet there.
+    fn beside(&self, target: Target, cell: &Cell, support: Support<'_>) -> Vec2 {
         let layout = self.layout;
-        Vec2::new(
-            cell.position.x + target.side * layout.pitch * 0.8,
-            (cell.position.y - cell.side * 0.5).max(layout.floor_y),
-        )
+        let x = cell.position.x + target.side * layout.pitch * 0.8;
+        let ground = support.at(x).unwrap_or(layout.floor_y);
+        Vec2::new(x, (cell.position.y - cell.side * 0.5).max(ground))
     }
 
     fn grounded(&self) -> bool {
@@ -237,15 +275,14 @@ impl Magpie {
 
     /// Goes for `target` from wherever the bird is: a hop if it is standing
     /// near, a flight otherwise.
-    fn pursue(&mut self, target: Target, cells: &[Cell]) {
+    fn pursue(&mut self, target: Target, cells: &[Cell], support: Support<'_>) {
         self.target = Some(target);
-        let beside = self.beside(target, &cells[target.index]);
+        let beside = self.beside(target, &cells[target.index], support);
         if self.grounded() && (beside - self.position).length() <= self.layout.pitch * 3.0 {
             self.travel(beside, Phase::Hopping);
         } else {
-            let landing = self.landing(target);
             self.travel(
-                landing,
+                target.landing,
                 if self.in_view() {
                     Phase::Flying
                 } else {
@@ -258,7 +295,7 @@ impl Magpie {
     /// What a trip for `target` takes, from entering to being gone, at the
     /// controller's cruising speed: a trip the budget cannot hold is not
     /// started, so the bird is away before the return and never cut off.
-    fn trip_ticks(&self, target: Target, cell: &Cell) -> u64 {
+    fn trip_ticks(&self, target: Target, cell: &Cell, support: Support<'_>) -> u64 {
         let layout = self.layout;
         let width = layout.bounds_max.x - layout.bounds_min.x;
         let speed = (width * 0.55).max(layout.pitch * 9.0) * HASTE;
@@ -267,8 +304,8 @@ impl Magpie {
         } else {
             layout.bounds_min.x
         };
-        let approach = (self.home().x - self.landing(target).x).abs();
-        let exit = (edge - self.beside(target, cell).x).abs() + layout.pitch * 1.5;
+        let approach = (self.home().x - target.landing.x).abs();
+        let exit = (edge - self.beside(target, cell, support).x).abs() + layout.pitch * 1.5;
         ((approach + exit) / speed * 60.0) as u64 + TRIP_OVERHEAD_TICKS
     }
 
@@ -282,19 +319,22 @@ impl Magpie {
         self.duration = self.rng.random_range(15..=45);
     }
 
-    /// One tick, given the batch's cells as they lie and how many ticks of
-    /// gathering remain. Returns the index of a coin the bird has just taken
-    /// in its beak, which the caller takes out of the world.
-    pub fn step(&mut self, cells: &[Cell], remaining: u64) -> Option<usize> {
+    /// One tick, given the batch's cells as they lie, how many ticks of
+    /// gathering remain and what holds a foot on the floor they lie on.
+    /// Returns the index of a coin the bird has just taken in its beak, which
+    /// the caller takes out of the world.
+    pub fn step(&mut self, cells: &[Cell], remaining: u64, support: Support<'_>) -> Option<usize> {
         if self.phase == Phase::Away {
             if self.done {
                 return None;
             }
             self.position = self.home();
             self.flight = Flight::hasty(HASTE);
-            match self.choose(cells) {
-                Some(target) if remaining >= self.trip_ticks(target, &cells[target.index]) => {
-                    self.pursue(target, cells);
+            match self.choose(cells, support) {
+                Some(target)
+                    if remaining >= self.trip_ticks(target, &cells[target.index], support) =>
+                {
+                    self.pursue(target, cells, support);
                 }
                 _ => self.done = true,
             }
@@ -316,8 +356,8 @@ impl Magpie {
             let cell = &cells[target.index];
             let moved = (cell.position - target.position).length() > self.layout.pitch * 0.6;
             if !self.available(cell) || moved {
-                match self.choose(cells) {
-                    Some(target) => self.pursue(target, cells),
+                match self.choose(cells, support) {
+                    Some(target) => self.pursue(target, cells, support),
                     None => self.abandon(),
                 }
             }
@@ -327,22 +367,32 @@ impl Magpie {
             Phase::Away => unreachable!("handled above"),
             Phase::Entering | Phase::Flying => {
                 let cruise = self.cruise();
-                let mut landed =
-                    self.flight
-                        .step(&mut self.position, self.to, cruise, layout, false);
-                // The floor is the destination, and it catches feet that come
-                // down a little off the mark too.
-                if self.position.y <= self.to.y
-                    && (self.position.x - self.to.x).abs() <= layout.pitch * 1.5
+                self.flight
+                    .step(&mut self.position, self.to, cruise, layout, false);
+                // What is under the feet decides the touchdown, not the
+                // controller: near the spot it is the landing, a little off
+                // the mark or not, and on a platform's edge or the floor
+                // below it as much as on the spot itself.
+                let mut landed = false;
+                if let Some(ground) = support.at(self.position.x)
+                    && self.position.y <= ground
                 {
-                    self.position.y = self.to.y;
-                    landed = true;
+                    if (self.position.x - self.to.x).abs() <= layout.pitch * 1.5 {
+                        self.to = Vec2::new(self.position.x, ground);
+                        landed = true;
+                    } else {
+                        // A descent cut short by a retarget keeps its
+                        // downward momentum. Whatever is under the feet holds
+                        // them up wherever they are, and the wings start
+                        // again from there.
+                        self.position.y = ground;
+                        self.flight.retarget(self.position, true, layout);
+                    }
                 }
                 if self.flight.velocity.x.abs() > layout.pitch * 0.2 {
                     self.facing_right = self.flight.velocity.x > 0.0;
                 }
                 if landed {
-                    self.to.x = self.position.x;
                     self.land();
                 } else if self.phase_tick >= self.duration {
                     self.abandon();
@@ -352,7 +402,7 @@ impl Magpie {
                 if self.phase_tick >= self.duration {
                     match self.target {
                         Some(target) => {
-                            let beside = self.beside(target, &cells[target.index]);
+                            let beside = self.beside(target, &cells[target.index], support);
                             self.travel(beside, Phase::Hopping);
                         }
                         None => self.abandon(),
@@ -375,8 +425,8 @@ impl Magpie {
                         }
                         _ => {
                             self.phase = Phase::Landed;
-                            match self.choose(cells) {
-                                Some(target) => self.pursue(target, cells),
+                            match self.choose(cells, support) {
+                                Some(target) => self.pursue(target, cells, support),
                                 None => self.abandon(),
                             }
                         }
@@ -402,6 +452,13 @@ impl Magpie {
                 let cruise = self.cruise();
                 self.flight
                     .step(&mut self.position, self.to, cruise, layout, true);
+                // Leaving from a descent, the feet are held up the same way.
+                if let Some(ground) = support.at(self.position.x)
+                    && self.position.y < ground
+                {
+                    self.position.y = ground;
+                    self.flight.retarget(self.position, true, layout);
+                }
                 if self.flight.velocity.x.abs() > layout.pitch * 0.2 {
                     self.facing_right = self.flight.velocity.x > 0.0;
                 }
