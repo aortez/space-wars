@@ -121,7 +121,13 @@ impl Client {
                         RecoveryDecision::Finished {
                             outcome: InstallOutcome::Committed,
                             ..
-                        } => "The update was installed successfully. You can return to the app.",
+                        } => {
+                            if confirming_restart_pending() {
+                                "The update was installed. The device restarts once more to confirm the new software."
+                            } else {
+                                "The update was installed successfully. You can return to the app."
+                            }
+                        }
                         _ => "The update was rolled back. The previous software is running.",
                     }
                     .into(),
@@ -172,4 +178,13 @@ impl Client {
             }
         }
     }
+}
+
+/// The firmware sets this flag on a trial boot. After a commit on such a boot
+/// the recovery service requests the confirming normal reboot by itself, so the
+/// outcome text says so instead of inviting the player back into the app.
+fn confirming_restart_pending() -> bool {
+    std::fs::read("/sys/firmware/devicetree/base/chosen/bootloader/tryboot")
+        .map(|bytes| bytes.iter().any(|byte| *byte != 0))
+        .unwrap_or(false)
 }

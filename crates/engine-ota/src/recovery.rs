@@ -999,6 +999,27 @@ impl RecoveryRecord {
         boot.trial_id.ok_or(RecoveryError::BootMismatch)
     }
 
+    /// A trial that committed on this boot still runs under the firmware's
+    /// tryboot flag, and installation admission accepts only a confirmed normal
+    /// boot. This authorizes the one normal reboot that confirms it, nothing else.
+    pub(crate) fn confirming_reboot(&self, boot: &BootObservation) -> Result<()> {
+        self.check_boot(boot)?;
+        let tx = self
+            .transaction
+            .as_ref()
+            .filter(|tx| tx.phase == Phase::Committed)
+            .ok_or(RecoveryError::StaleCommand)?;
+        if !boot.tryboot
+            || !self.is_trial(tx, boot)
+            || tx.trial_boot_id.as_ref() != Some(&boot.boot_id)
+            || !self.runs_good(boot)
+            || boot.default_slot != Some(self.good.slot)
+        {
+            return Err(RecoveryError::BootMismatch);
+        }
+        Ok(())
+    }
+
     #[cfg(any(target_os = "linux", test))]
     pub(crate) fn rollback_reboot(&self, id: Sha256, boot: &BootObservation) -> Result<()> {
         self.check_boot(boot)?;

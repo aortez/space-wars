@@ -707,6 +707,37 @@ fn subsequent_update_works_from_the_committed_trial_without_an_extra_normal_rebo
 }
 
 #[test]
+fn confirming_reboot_is_authorized_only_on_the_committing_trial_boot() {
+    let (record, mut boot) = promoting();
+    assert_eq!(
+        record.confirming_reboot(&boot),
+        Err(RecoveryError::StaleCommand)
+    );
+    boot.default_slot = Some(Slot::B);
+    let committed = record.finish_promotion(&boot).unwrap().record;
+    committed.confirming_reboot(&boot).unwrap();
+    let mut other = boot.clone();
+    other.boot_id = NEXT_BOOT.into();
+    assert_eq!(
+        committed.confirming_reboot(&other),
+        Err(RecoveryError::BootMismatch)
+    );
+    let mut normal = boot.clone();
+    normal.tryboot = false;
+    normal.trial_id = None;
+    assert_eq!(
+        committed.confirming_reboot(&normal),
+        Err(RecoveryError::BootMismatch)
+    );
+    let mut old_default = boot.clone();
+    old_default.default_slot = Some(Slot::A);
+    assert_eq!(
+        committed.confirming_reboot(&old_default),
+        Err(RecoveryError::BootMismatch)
+    );
+}
+
+#[test]
 fn committed_trial_context_cannot_transfer_to_another_boot_token_or_payload() {
     let (record, mut boot) = promoting();
     boot.default_slot = Some(Slot::B);
