@@ -1078,6 +1078,14 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), Some((19, 1)));
     click(&window, 400.0, 166.0);
     assert_eq!(adjusted.get(), Some((18, 1)));
+    // The preview row ends in three switches of equal width: Crow, Explosion
+    // and Coins, right-aligned, so each is hittable beside the selector.
+    click(&window, 635.0, 278.0);
+    assert_eq!(adjusted.get(), Some((22, 1)));
+    click(&window, 537.0, 278.0);
+    assert_eq!(adjusted.get(), Some((15, 1)));
+    click(&window, 439.0, 278.0);
+    assert_eq!(adjusted.get(), Some((14, 1)));
     click(&window, 287.0, 166.0);
     assert_eq!(adjusted.get(), Some((13, 1)));
     click(&window, 175.0, 166.0);
@@ -1100,13 +1108,17 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 480.0, 168.0);
     assert!(window.get_launcher_clock_show_date());
     assert_eq!(window.get_launcher_settings_focus_index(), 12);
-    // The Events row has four columns now, with Spider at its far end and
-    // Digit Slide beside it.
-    assert!(window.get_launcher_clock_spider_enabled());
+    // The Events row has the same five columns as the two below it, with
+    // Coins at its far end, Spider beside it and Digit Slide before that.
+    assert!(window.get_launcher_clock_coins_enabled());
     click(&window, 649.0, 220.0);
+    assert!(!window.get_launcher_clock_coins_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 21);
+    assert!(window.get_launcher_clock_spider_enabled());
+    click(&window, 525.0, 220.0);
     assert!(!window.get_launcher_clock_spider_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 20);
-    click(&window, 500.0, 220.0);
+    click(&window, 400.0, 220.0);
     assert!(!window.get_launcher_clock_digit_slide_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 3);
     key(&window, Key::DownArrow);

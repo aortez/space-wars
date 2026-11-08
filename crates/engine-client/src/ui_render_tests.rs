@@ -11,6 +11,7 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 mod cell_swap;
+mod coins;
 mod pizza;
 
 #[test]

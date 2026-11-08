@@ -102,6 +102,7 @@ impl ClockState {
             grass: enabled(ClockEventKind::Grass),
             slot_machine: enabled(ClockEventKind::SlotMachine),
             spider: enabled(ClockEventKind::Spider),
+            coins: enabled(ClockEventKind::Coins),
         };
         self.schedule
             .configure(self.config.event_profile, effective);

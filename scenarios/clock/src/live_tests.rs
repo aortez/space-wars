@@ -53,6 +53,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                             grass: bits & 2048 != 0,
                             slot_machine: bits & 4096 != 0,
                             spider: bits & 8192 != 0,
+                            coins: bits & 16384 != 0,
                         },
                     };
                     assert_eq!(
@@ -120,7 +121,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
     for (offset, invalid) in [
         (2, 13),
         (3, 3),
-        (5, 64),
+        (5, 128),
         (6, 255),
         (7, 4),
         (8, 2),
@@ -178,6 +179,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
             grass: false,
             slot_machine: false,
             spider: false,
+            coins: false,
         },
         marquee_preset: ClockMarqueePreset::default(),
         rain_amount: ClockRainAmount::Varied,
@@ -244,6 +246,7 @@ fn live_cadence_changes_reschedule_only_when_needed_and_preserve_cooldowns() {
     settings.events.crow = false;
     settings.events.explosion = false;
     settings.events.spider = false;
+    settings.events.coins = false;
     ClockScenario::step(
         &mut state,
         &[ClockAction::configure(settings)],

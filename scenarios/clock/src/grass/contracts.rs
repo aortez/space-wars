@@ -306,6 +306,7 @@ fn clock_grass_contract_all_floor_adapters_and_shared_arena_preserve_material_id
     for kind in [
         ClockEventKind::Falling,
         ClockEventKind::Explosion,
+        ClockEventKind::Coins,
         ClockEventKind::Rain,
         ClockEventKind::Meltdown,
         ClockEventKind::Aquarium,
@@ -793,6 +794,7 @@ fn clock_grass_contract_floor_transitions_cover_entire_events_and_lab_modes() {
     for kind in [
         ClockEventKind::Falling,
         ClockEventKind::Explosion,
+        ClockEventKind::Coins,
         ClockEventKind::Rain,
         ClockEventKind::Meltdown,
         ClockEventKind::Aquarium,

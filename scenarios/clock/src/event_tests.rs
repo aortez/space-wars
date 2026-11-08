@@ -21,6 +21,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 grass: false,
                 slot_machine: false,
                 spider: false,
+                coins: false,
             },
             ..ClockConfig::default()
         },
@@ -396,7 +397,21 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
     ClockScenario::step(&mut a, std::slice::from_ref(&reading), Duration::ZERO);
     ClockScenario::step(&mut b, &[reading], Duration::ZERO);
     let mut seen = [false; ClockEventKind::ALL.len()];
-    for _ in 0..600 * 60 {
+    // Every periodic kind turns up in a seeded Demo run well inside ten
+    // minutes; the loop runs on to twenty in case a draw is unlucky, and stops
+    // as soon as the catalog is covered.
+    let covered = |seen: &[bool]| {
+        EVENT_CATALOG.iter().all(|definition| {
+            !matches!(
+                definition.trigger,
+                engine_common::ClockEventTrigger::Periodic
+            ) || seen[definition.kind as usize]
+        })
+    };
+    for _ in 0..1200 * 60 {
+        if covered(&seen) {
+            break;
+        }
         ticks(&mut a, 1);
         ticks(&mut b, 1);
         assert_eq!(
@@ -836,6 +851,7 @@ fn slot_machine_reports_a_preview_only_when_a_person_asked_for_one() {
         grass: false,
         slot_machine: true,
         spider: true,
+        coins: false,
     };
     let mut state = ready(ClockEventProfile::Demo, 7);
     let mut settings = state.settings();

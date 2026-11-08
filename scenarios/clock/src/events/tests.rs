@@ -68,6 +68,7 @@ fn automatic_selection_respects_enablement_and_each_events_reuse_delay() {
             grass: kind == ClockEventKind::Grass,
             slot_machine: kind == ClockEventKind::SlotMachine,
             spider: kind == ClockEventKind::Spider,
+            coins: kind == ClockEventKind::Coins,
         };
         let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 2);
         let wait = schedule.next_event_tick.unwrap();
@@ -111,6 +112,7 @@ fn off_and_an_empty_enabled_set_never_schedule_automatic_events() {
                 grass: false,
                 slot_machine: false,
                 spider: false,
+                coins: false,
             },
         ),
     ] {
@@ -162,6 +164,7 @@ fn slide_only_configuration_never_schedules_periodic_work() {
         grass: false,
         slot_machine: false,
         spider: false,
+        coins: false,
     };
     let mut schedule = EventSchedule::new(ClockEventProfile::Calm, events, 4);
     assert_eq!(schedule.next_event_tick, None);
@@ -223,6 +226,7 @@ fn demo_smoke_seed_resident_id_does_not_imply_active_lifecycle() {
     enabled.duck = false;
     enabled.digit_slide = false;
     enabled.spider = false;
+    enabled.coins = false;
     let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 4242);
     advance(&mut schedule, 420);
     assert_eq!(schedule.due_event(true), Some(ClockEventKind::ColorCycle));

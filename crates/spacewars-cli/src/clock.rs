@@ -37,7 +37,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap, grass, slot-machine or spider.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap, grass, slot-machine, spider or coins.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -57,7 +57,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering", "minting", "cascading"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -279,6 +279,12 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             println!(
                 "Explosion: {} cells, {} live (cap {}), shared arena={}",
                 explosion.cells, explosion.live_cells, explosion.max_cells, explosion.shared_arena
+            );
+        }
+        if let Some(coins) = &state.coins {
+            println!(
+                "Coins: {} cells, {} live (cap {}), shared arena={}",
+                coins.cells, coins.live_cells, coins.max_cells, coins.shared_arena
             );
         }
         if let Some(crow) = &state.crow {

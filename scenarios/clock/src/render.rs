@@ -12,6 +12,7 @@ use engine_core::Vec2;
 mod aquarium;
 pub(crate) mod ceiling;
 mod cell_swap;
+mod coins;
 mod crow;
 mod digit_slide;
 mod duck;
@@ -526,7 +527,9 @@ pub(crate) fn digit_cell_polygons(state: &ClockState) -> Vec<(Vec<Vec2>, f32)> {
     filled_polygons_with_alpha(&frame, ACTIVE_CELL_LAYER)
 }
 
-/// Every filled polygon on one layer, with its fill alpha.
+/// Every filled polygon on one layer, with its fill alpha. A filled circle is
+/// ink too, as Coins draws its resting pieces, and stands as the 24-gon with
+/// its vertices on the circle.
 #[cfg(test)]
 pub(crate) fn filled_polygons_with_alpha(frame: &RenderFrame, z: i32) -> Vec<(Vec<Vec2>, f32)> {
     frame
@@ -534,17 +537,32 @@ pub(crate) fn filled_polygons_with_alpha(frame: &RenderFrame, z: i32) -> Vec<(Ve
         .iter()
         .filter(|layer| layer.z == z)
         .flat_map(|layer| &layer.primitives)
-        .filter_map(|primitive| {
-            let RenderPrimitive::Polygon(polygon) = primitive else {
-                return None;
-            };
-            let alpha = polygon.fill.as_ref()?.color.a;
-            (alpha > 0.0).then(|| {
-                (
-                    polygon.points.iter().map(|p| Vec2::new(p.x, p.y)).collect(),
-                    alpha,
-                )
-            })
+        .filter_map(|primitive| match primitive {
+            RenderPrimitive::Polygon(polygon) => {
+                let alpha = polygon.fill.as_ref()?.color.a;
+                (alpha > 0.0).then(|| {
+                    (
+                        polygon.points.iter().map(|p| Vec2::new(p.x, p.y)).collect(),
+                        alpha,
+                    )
+                })
+            }
+            RenderPrimitive::Circle(circle) => {
+                let alpha = circle.fill.as_ref()?.color.a;
+                (alpha > 0.0).then(|| {
+                    let points = (0..24)
+                        .map(|k| {
+                            let theta = std::f32::consts::TAU * k as f32 / 24.0;
+                            Vec2::new(
+                                circle.center.x + circle.radius * theta.cos(),
+                                circle.center.y + circle.radius * theta.sin(),
+                            )
+                        })
+                        .collect();
+                    (points, alpha)
+                })
+            }
+            _ => None,
         })
         .collect()
 }
@@ -662,6 +680,10 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
     }
     if let Some(crate::events::ActiveEvent::Explosion(event)) = &state.active_event {
         explosion::render(frame, state, event, layout);
+        return;
+    }
+    if let Some(crate::events::ActiveEvent::Coins(event)) = &state.active_event {
+        coins::render(frame, state, event, layout);
         return;
     }
     if let Some(crate::events::ActiveEvent::DigitSlide(event)) = &state.active_event {

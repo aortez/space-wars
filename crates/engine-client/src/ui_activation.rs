@@ -254,6 +254,7 @@ fn activation_target(
         "pause.clock.grass" => pause_clock(19, UiAction::Confirm),
         "pause.clock.slot-machine" => pause_clock(20, UiAction::Confirm),
         "pause.clock.spider" => pause_clock(21, UiAction::Confirm),
+        "pause.clock.coins" => pause_clock(22, UiAction::Confirm),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -330,6 +331,7 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.clock.grass" => 18,
         "launcher.settings.clock.slot-machine" => 19,
         "launcher.settings.clock.spider" => 20,
+        "launcher.settings.clock.coins" => 21,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

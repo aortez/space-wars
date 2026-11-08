@@ -74,7 +74,7 @@ pub(crate) fn compatible_event(kind: ClockEventKind) -> bool {
     match kind {
         DigitSlide | ColorCycle => true,
         Falling | Meltdown | Duck | Marquee | Rain | Crow | Explosion | Aquarium | CellSwap
-        | Grass | SlotMachine | Spider => false,
+        | Grass | SlotMachine | Spider | Coins => false,
     }
 }
 

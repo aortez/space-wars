@@ -45,7 +45,10 @@ pub(super) fn pixel(frame: &mut RenderFrame, center: Vec2, side: f32, angle: f32
 
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     let latest = state.display().meridiem.map(Glyph::for_label);
-    if matches!(&state.active_event, Some(ActiveEvent::Explosion(_))) {
+    if matches!(
+        &state.active_event,
+        Some(ActiveEvent::Explosion(_) | ActiveEvent::Coins(_))
+    ) {
         // The event's returning pixels form the latest AM/PM label themselves.
         return;
     }

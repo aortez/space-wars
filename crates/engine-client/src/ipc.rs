@@ -1642,6 +1642,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_grass_enabled: window.get_launcher_clock_grass_enabled(),
             clock_slot_machine_enabled: window.get_launcher_clock_slot_machine_enabled(),
             clock_spider_enabled: window.get_launcher_clock_spider_enabled(),
+            clock_coins_enabled: window.get_launcher_clock_coins_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
                 window.get_launcher_clock_rain_amount().to_string()
             } else {

@@ -161,7 +161,11 @@ mod tests {
 
     #[test]
     fn clock_grass_contract_drain_exports_actual_cells_preserves_banks_and_does_not_resurrect() {
-        for kind in [ClockEventKind::Falling, ClockEventKind::Explosion] {
+        for kind in [
+            ClockEventKind::Falling,
+            ClockEventKind::Explosion,
+            ClockEventKind::Coins,
+        ] {
             let mut s = state();
             s.admit_soil();
             let before = s.soil().unwrap().accounting();
@@ -199,7 +203,9 @@ mod tests {
             fn event_world(s: &crate::ClockState) -> &PhysicsWorld {
                 match s.active_event.as_ref().unwrap() {
                     crate::ActiveEvent::Falling(e) => e.own_world().unwrap(),
-                    crate::ActiveEvent::Explosion(e) => e.own_world().unwrap(),
+                    crate::ActiveEvent::Explosion(e) | crate::ActiveEvent::Coins(e) => {
+                        e.own_world().unwrap()
+                    }
                     _ => unreachable!(),
                 }
             }

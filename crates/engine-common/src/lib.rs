@@ -683,10 +683,11 @@ pub enum ClockEventKind {
     Grass = 11,
     SlotMachine = 12,
     Spider = 13,
+    Coins = 14,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -701,6 +702,7 @@ impl ClockEventKind {
         Self::Grass,
         Self::SlotMachine,
         Self::Spider,
+        Self::Coins,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -719,6 +721,7 @@ impl ClockEventKind {
             Self::Grass => "grass",
             Self::SlotMachine => "slot-machine",
             Self::Spider => "spider",
+            Self::Coins => "coins",
         }
     }
 
@@ -738,6 +741,7 @@ impl ClockEventKind {
             Self::Grass => "Grass",
             Self::SlotMachine => "Slot Machine",
             Self::Spider => "Spider",
+            Self::Coins => "Coins",
         }
     }
 }
@@ -760,6 +764,7 @@ pub struct ClockEvents {
     pub grass: bool,
     pub slot_machine: bool,
     pub spider: bool,
+    pub coins: bool,
 }
 
 impl Default for ClockEvents {
@@ -779,6 +784,7 @@ impl Default for ClockEvents {
             grass: true,
             slot_machine: true,
             spider: true,
+            coins: true,
         }
     }
 }
@@ -800,6 +806,7 @@ impl ClockEvents {
             ClockEventKind::Grass => self.grass,
             ClockEventKind::SlotMachine => self.slot_machine,
             ClockEventKind::Spider => self.spider,
+            ClockEventKind::Coins => self.coins,
         }
     }
 }
@@ -959,6 +966,16 @@ pub struct ClockAquariumState {
 /// Bounded physical debris diagnostics; phase/timing live on the timed event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockExplosionState {
+    pub cells: u32,
+    pub live_cells: u32,
+    pub max_cells: u32,
+    pub shared_arena: bool,
+}
+
+/// Bounded coin diagnostics; phase/timing live on the timed event. The
+/// batch is Explosion's, so the fields are its fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCoinsState {
     pub cells: u32,
     pub live_cells: u32,
     pub max_cells: u32,

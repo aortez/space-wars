@@ -96,6 +96,7 @@ fn no_enabled_events_is_a_bounded_noop_and_feedback_expires_only_while_running()
         grass: false,
         slot_machine: false,
         spider: false,
+        coins: false,
     };
     next(&mut state);
     assert_eq!(state.event_id(), 0);
@@ -147,6 +148,7 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
             grass: false,
             slot_machine: false,
             spider: false,
+            coins: false,
         };
         ClockScenario::step(
             &mut state,
@@ -220,6 +222,7 @@ fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
             grass: true,
             slot_machine: true,
             spider: true,
+            coins: true,
         };
         ClockScenario::step(
             &mut state,
@@ -227,10 +230,10 @@ fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
             Duration::ZERO,
         );
         next(&mut state);
-        // The spider waits for the Slot Machine before it in the catalog,
-        // and Falling waits for the spider.
+        // The spider waits for the Slot Machine before it in the catalog, so
+        // Next moves on to Coins, and Falling waits for the spider.
         let expected = match kind {
-            ClockEventKind::SlotMachine => ClockEventKind::Falling,
+            ClockEventKind::SlotMachine => ClockEventKind::Coins,
             ClockEventKind::Spider => ClockEventKind::ColorCycle,
             _ => ClockEventKind::ALL[(kind as usize + 1) % ClockEventKind::ALL.len()],
         };

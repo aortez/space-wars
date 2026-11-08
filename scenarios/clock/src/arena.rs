@@ -123,7 +123,8 @@ impl Owner {
                 count(&ids::canonical::AQUARIUM_DIGITS) + count(&ids::canonical::AQUARIUM_LINER),
                 MAX_DIGIT_SOLIDS + count(&ids::canonical::AQUARIUM_LINER),
             ),
-            Self::Event(ClockEventKind::Explosion) => {
+            // Coins is the same batch with round pieces, so it has the same room.
+            Self::Event(ClockEventKind::Explosion | ClockEventKind::Coins) => {
                 Population::new(MAX_EXPLOSION_CELLS, MAX_EXPLOSION_CELLS)
             }
             // A bar for each lit segment and one for each of the two meridiem
@@ -169,6 +170,7 @@ impl Owner {
             ],
             Self::Event(ClockEventKind::Aquarium) => &[AQUARIUM_LINER, AQUARIUM_DIGITS],
             Self::Event(ClockEventKind::Explosion) => &[EXPLOSION_CELLS],
+            Self::Event(ClockEventKind::Coins) => &[COIN_CELLS],
             Self::Event(ClockEventKind::Falling) => &[FALLING_SEGMENTS, FALLING_LETTERS],
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
             Self::Event(_) => &[],
@@ -1031,7 +1033,10 @@ mod tests {
             ];
             let largest = matches!(
                 kind,
-                ClockEventKind::Aquarium | ClockEventKind::Explosion | ClockEventKind::Meltdown
+                ClockEventKind::Aquarium
+                    | ClockEventKind::Explosion
+                    | ClockEventKind::Coins
+                    | ClockEventKind::Meltdown
             );
             let refused = largest.then_some(Unavailable::Capacity);
             assert_eq!(admits(&owners).err(), refused, "{kind:?}");
@@ -1222,6 +1227,8 @@ pub(crate) mod ids {
         pub(crate) const MELTDOWN_CELLS: Range<u64> = 4001..4001 + MAX_MELTDOWN_CELLS as u64;
         /// Explosion's scattered cells.
         pub(crate) const EXPLOSION_CELLS: Range<u64> = 5001..5001 + MAX_EXPLOSION_CELLS as u64;
+        /// Coins' pieces: Explosion's batch, round.
+        pub(crate) const COIN_CELLS: Range<u64> = 5501..5501 + MAX_EXPLOSION_CELLS as u64;
         /// Aquarium's lower liner, a second moving floor.
         pub(crate) const AQUARIUM_LINER: Range<u64> = 6001..6003;
         /// Aquarium's solid digit compound.
@@ -1314,6 +1321,7 @@ pub(crate) mod ids {
             ("FALLING_LETTERS", FALLING_LETTERS),
             ("MELTDOWN_CELLS", MELTDOWN_CELLS),
             ("EXPLOSION_CELLS", EXPLOSION_CELLS),
+            ("COIN_CELLS", COIN_CELLS),
             ("AQUARIUM_LINER", AQUARIUM_LINER),
             ("AQUARIUM_DIGITS", AQUARIUM_DIGITS),
             ("FIXTURE_BALLS", FIXTURE_BALLS),
