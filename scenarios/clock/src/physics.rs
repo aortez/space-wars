@@ -1,12 +1,13 @@
 use engine_core::Vec2;
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
-    PhysicsWorld, PhysicsWorldConfig,
+    PhysicsWorld,
 };
 use rand::{Rng, rngs::StdRng};
 
 use crate::{
-    SegmentId, SegmentRepresentation, SegmentState,
+    SegmentId, SegmentKind, SegmentRepresentation, SegmentState,
+    arena::ids::canonical,
     floor::DrainGeometry,
     layout::Layout,
     meridiem::{LetterState, PIXEL_SIZE},
@@ -18,20 +19,27 @@ pub(crate) struct FallingWorld {
 }
 
 /// One bounded batch, reusable in the standalone arena or a player's world.
-/// These IDs never overlap the duck (1), course/panels (1000s), or wall (2000).
+/// Its identities come from `arena::ids::canonical`, which is what keeps them
+/// clear of the duck, the course, the panels and the walls.
 pub(crate) struct FallingBodies {
     entities: Vec<PhysicsId>,
 }
 
 pub(crate) fn body_id(id: SegmentId) -> BodyId {
+    let stride = SegmentKind::ALL.len() as u64;
     BodyId::new(
-        PhysicsId::new(3001 + u64::from(id.digit_slot) * 7 + id.kind as u64),
+        PhysicsId::new(
+            canonical::FALLING_SEGMENTS.start + u64::from(id.digit_slot) * stride + id.kind as u64,
+        ),
         BodyRole::PRIMARY,
     )
 }
 
-fn letter_body_id(slot: usize) -> BodyId {
-    BodyId::new(PhysicsId::new(3032 + slot as u64), BodyRole::PRIMARY)
+pub(crate) fn letter_body_id(slot: usize) -> BodyId {
+    BodyId::new(
+        PhysicsId::new(canonical::FALLING_LETTERS.start + slot as u64),
+        BodyRole::PRIMARY,
+    )
 }
 
 impl FallingWorld {
@@ -50,9 +58,6 @@ impl FallingWorld {
     pub fn world(&self) -> &PhysicsWorld {
         &self.world
     }
-    pub fn world_mut(&mut self) -> &mut PhysicsWorld {
-        &mut self.world
-    }
 
     pub fn into_parts(self) -> (PhysicsWorld, FallingBodies) {
         (self.world, self.bodies)
@@ -60,13 +65,7 @@ impl FallingWorld {
 
     pub fn arena(drain: DrainGeometry) -> PhysicsWorld {
         let layout = drain.layout();
-        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
-            gravity: Vec2::new(0.0, -400.0),
-            length_unit: layout.pitch,
-            max_ccd_substeps: 2,
-            collect_events: false,
-            ..PhysicsWorldConfig::default()
-        });
+        let mut world = PhysicsWorld::new(crate::arena::mechanics_config(layout));
         world.reserve(4, 4, 0);
         for (index, (min, max)) in drain
             .slabs()
@@ -82,11 +81,12 @@ impl FallingWorld {
             ])
             .enumerate()
         {
-            // Shared arenas use 1000s for supporting terrain, 2000s for walls.
+            // The two banks are addressed as course surfaces by a drain-joined
+            // player, and the walls are the boundary such a player inherits.
             let entity = PhysicsId::new(if index < 2 {
-                1000 + index as u64
+                canonical::DRAIN_BANKS.start + index as u64
             } else {
-                2000 + (index - 2) as u64
+                canonical::FALLING_WALLS.start + (index - 2) as u64
             });
             assert!(world.insert_body(
                 BodyId::new(entity, BodyRole::PRIMARY),
@@ -284,9 +284,10 @@ mod handoff_tests {
                 .collect::<Vec<_>>();
             let collider_count = falling.world.collider_count();
             let (world, bodies) = falling.into_parts();
-            let mut duck = DuckEvent::new_drain_player(drain, 42, 1, 1, world);
-            bodies.match_gravity(duck.arena_world_mut());
-            let world = duck.arena_world();
+            let mut arena = crate::arena::ClockArena::default();
+            DuckEvent::new_drain_player(drain, 42, 1, 1, &mut arena, world);
+            bodies.match_gravity(arena.world_mut().unwrap());
+            let world = arena.world().unwrap();
             assert_eq!(world.motions().collect::<Vec<_>>(), motions);
             assert_eq!(world.collider_count(), collider_count);
             assert_eq!(

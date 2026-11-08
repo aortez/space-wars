@@ -32,21 +32,30 @@ pub(crate) fn glyph(font: ClockFont, digit: Option<u8>) -> CellMask {
             .into_iter()
             .filter(|kind| digits::digit_mask(digit) & (1 << *kind as u8) != 0)
             .fold(0, |mask, kind| mask | region(font, kind).0),
-        ClockFont::Matrix => {
-            let rows = crate::presentation::font::glyph(b'0' + digit).unwrap();
-            let mut mask = 0;
-            for y in 0..9 {
-                for x in 0..6 {
-                    if rows[(8 - y) * 7 / 9] & (1 << (4 - x * 5 / 6)) != 0 {
-                        mask |= 1 << (y * 6 + x);
-                    }
-                }
-            }
-            mask
-        }
+        ClockFont::Matrix => sampled(b'0' + digit).0,
         ClockFont::Sans => SANS[digit as usize],
         ClockFont::Serif => SERIF[digit as usize],
     })
+}
+
+/// Samples the code-native 5x7 text font into a digit slot's 6x9 grid. The
+/// Matrix face is built from this, and it is also the only route by which a
+/// glyph that is not a digit can appear in a slot: Classic composes itself from
+/// seven bar regions, and the Sans and Serif tables `build.rs` samples from the
+/// bundled outlines cover `'0'..='9'` alone.
+pub(crate) fn sampled(byte: u8) -> CellMask {
+    let Some(rows) = crate::presentation::font::glyph(byte) else {
+        return CellMask(0);
+    };
+    let mut mask = 0;
+    for y in 0..9 {
+        for x in 0..6 {
+            if rows[(8 - y) * 7 / 9] & (1 << (4 - x * 5 / 6)) != 0 {
+                mask |= 1 << (y * 6 + x);
+            }
+        }
+    }
+    CellMask(mask)
 }
 
 pub(crate) fn guides(font: ClockFont) -> CellMask {
@@ -74,19 +83,35 @@ pub(crate) fn region(font: ClockFont, kind: SegmentKind) -> CellMask {
     CellMask(
         (0..54)
             .filter(|bit| {
-                let x = bit % 6;
-                let y = bit / 6;
-                let owner = match y {
-                    8 => SegmentKind::Top,
-                    4 => SegmentKind::Middle,
-                    0 => SegmentKind::Bottom,
-                    5..=7 if x < 3 => SegmentKind::UpperLeft,
-                    5..=7 => SegmentKind::UpperRight,
-                    _ if x < 3 => SegmentKind::LowerLeft,
-                    _ => SegmentKind::LowerRight,
-                };
-                owner == kind
+                sampled_segment(GridCell {
+                    x: (bit % 6) as i8,
+                    y: (bit / 6) as i8,
+                }) == kind
             })
             .fold(0, |mask, bit| mask | (1 << bit)),
     )
+}
+
+/// The segment whose region holds a cell. A font's regions never overlap, and
+/// every lit cell lies in one.
+pub(crate) fn segment_at(font: ClockFont, cell: GridCell) -> Option<SegmentKind> {
+    if font == ClockFont::Classic {
+        return SegmentKind::ALL
+            .into_iter()
+            .find(|kind| digits::cells(*kind).contains(&cell));
+    }
+    Some(sampled_segment(cell))
+}
+
+/// The segment that owns a cell of a sampled font's grid.
+fn sampled_segment(cell: GridCell) -> SegmentKind {
+    match cell.y {
+        8 => SegmentKind::Top,
+        4 => SegmentKind::Middle,
+        0 => SegmentKind::Bottom,
+        5..=7 if cell.x < 3 => SegmentKind::UpperLeft,
+        5..=7 => SegmentKind::UpperRight,
+        _ if cell.x < 3 => SegmentKind::LowerLeft,
+        _ => SegmentKind::LowerRight,
+    }
 }

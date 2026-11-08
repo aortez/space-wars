@@ -15,8 +15,7 @@ pub(super) struct Edge {
 }
 
 impl Edge {
-    pub fn in_reach(self, duck: &DuckEvent) -> bool {
-        let world = duck.world.as_ref().unwrap();
+    pub fn in_reach(self, duck: &DuckEvent, world: &PhysicsWorld) -> bool {
         let motion = world.motion(DUCK_BODY).unwrap();
         self.in_reach_from(world, motion.position, motion.linear_velocity, duck.radius)
     }
@@ -48,8 +47,8 @@ impl Edge {
         Some(motion.linear_velocity + Vec2::new(-offset.y, offset.x) * motion.angular_velocity)
     }
 
-    pub fn valid(self, duck: &DuckEvent) -> bool {
-        edges(duck).into_iter().flatten().any(|edge| {
+    pub fn valid(self, duck: &DuckEvent, world: &PhysicsWorld) -> bool {
+        edges(duck, world).into_iter().flatten().any(|edge| {
             edge.body == self.body
                 && edge.flap == self.flap
                 && edge.outward == self.outward
@@ -59,18 +58,18 @@ impl Edge {
     }
 }
 
-pub(super) fn edges(duck: &DuckEvent) -> [Option<Edge>; MAX_EDGES] {
+pub(super) fn edges(duck: &DuckEvent, world: &PhysicsWorld) -> [Option<Edge>; MAX_EDGES] {
     let mut result = [None; MAX_EDGES];
-    let Some(world) = &duck.world else {
-        return result;
-    };
     let mut count = 0;
-    if duck.responsive_floor.is_none()
-        && duck.drain_floor.is_none()
-        && let Some(course) = &duck.course
+    if duck.terrain.responsive_floor.is_none()
+        && duck.terrain.drain_floor.is_none()
+        && let Some(course) = &duck.terrain.course
     {
         for index in 0..course.surfaces.len().min(planner::MAX_SURFACES) {
-            let body = BodyId::new(PhysicsId::new(1000 + index as u64), BodyRole::PRIMARY);
+            let body = BodyId::new(
+                crate::arena::ids::canonical::course_surface(index),
+                BodyRole::PRIMARY,
+            );
             let Some(motion) = world.motion(body) else {
                 continue;
             };

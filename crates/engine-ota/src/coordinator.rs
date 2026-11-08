@@ -44,6 +44,9 @@ pub struct RecoveryProgress {
     pub transaction: Option<Sha256>,
     pub good_build_id: Option<String>,
     pub candidate_build_id: Option<String>,
+    /// Generation 0 is unpublished: a development image or bootstrap baseline.
+    pub good_generation: Option<u64>,
+    pub candidate_generation: Option<u64>,
     pub detail: Option<String>,
 }
 
@@ -55,6 +58,8 @@ impl RecoveryProgress {
             transaction: None,
             good_build_id: None,
             candidate_build_id: None,
+            good_generation: None,
+            candidate_generation: None,
             detail: None,
         }
     }
@@ -67,6 +72,8 @@ impl RecoveryProgress {
             transaction: tx.map(|tx| tx.id),
             good_build_id: Some(store.record().good().build_id.clone()),
             candidate_build_id: tx.map(|tx| tx.candidate.build_id.clone()),
+            good_generation: Some(store.record().good().generation),
+            candidate_generation: tx.map(|tx| tx.candidate.generation),
             detail: detail.map(|text| text.chars().take(512).collect()),
         }
     }

@@ -1,0 +1,1709 @@
+{
+  "complete": true,
+  "cost": {
+    "mean_us": {
+      "bodies": 0.08842301562499999,
+      "child_inference": 0.7761384843750001,
+      "parent_inference": 0.088260375,
+      "sensing": 0.92153225
+    },
+    "repetitions": 2000,
+    "rows": [
+      {
+        "bodies_us": 0.1504845,
+        "case": "train-42-p1-d65",
+        "child_inference_us": 0.7663245000000001,
+        "parent_inference_us": 0.106822,
+        "sensing_us": 1.0607914999999999
+      },
+      {
+        "bodies_us": 0.082406,
+        "case": "train-42-p2-d65",
+        "child_inference_us": 0.8576875,
+        "parent_inference_us": 0.0853815,
+        "sensing_us": 1.044556
+      },
+      {
+        "bodies_us": 0.084009,
+        "case": "train-42-p2-d35",
+        "child_inference_us": 0.7627829999999999,
+        "parent_inference_us": 0.0849605,
+        "sensing_us": 0.918332
+      },
+      {
+        "bodies_us": 0.09521500000000001,
+        "case": "train-10101-p1-d65",
+        "child_inference_us": 0.7616455,
+        "parent_inference_us": 0.0873655,
+        "sensing_us": 0.9306804999999999
+      },
+      {
+        "bodies_us": 0.0944685,
+        "case": "train-10101-p1-d35",
+        "child_inference_us": 0.7645365,
+        "parent_inference_us": 0.087786,
+        "sensing_us": 0.9105525
+      },
+      {
+        "bodies_us": 0.09405799999999999,
+        "case": "train-10101-p2-d65",
+        "child_inference_us": 0.7671465,
+        "parent_inference_us": 0.08838199999999999,
+        "sensing_us": 0.9016504999999999
+      },
+      {
+        "bodies_us": 0.09441849999999999,
+        "case": "train-10101-p2-d35",
+        "child_inference_us": 0.768173,
+        "parent_inference_us": 0.08838700000000001,
+        "sensing_us": 0.905708
+      },
+      {
+        "bodies_us": 0.0857175,
+        "case": "train-inspected-17-WeakAngular-p1",
+        "child_inference_us": 0.8015065,
+        "parent_inference_us": 0.088357,
+        "sensing_us": 0.894597
+      },
+      {
+        "bodies_us": 0.084274,
+        "case": "train-inspected-17-WeakAngular-p2",
+        "child_inference_us": 0.7724059999999999,
+        "parent_inference_us": 0.08706,
+        "sensing_us": 0.929368
+      },
+      {
+        "bodies_us": 0.0817245,
+        "case": "train-inspected-113-WeakAngular-p1",
+        "child_inference_us": 0.7748655,
+        "parent_inference_us": 0.08838750000000001,
+        "sensing_us": 0.913513
+      },
+      {
+        "bodies_us": 0.0847,
+        "case": "train-inspected-113-WeakAngular-p2",
+        "child_inference_us": 0.7693154999999999,
+        "parent_inference_us": 0.08749549999999999,
+        "sensing_us": 0.8954390000000001
+      },
+      {
+        "bodies_us": 0.082306,
+        "case": "train-inspected-2027-WeakAngular-p1",
+        "child_inference_us": 0.774069,
+        "parent_inference_us": 0.08050750000000001,
+        "sensing_us": 0.916308
+      },
+      {
+        "bodies_us": 0.092189,
+        "case": "train-inspected-2027-WeakAngular-p2",
+        "child_inference_us": 0.7800205000000001,
+        "parent_inference_us": 0.08730500000000001,
+        "sensing_us": 0.90413
+      },
+      {
+        "bodies_us": 0.084119,
+        "case": "train-inspected-9001-WeakAngular-p2",
+        "child_inference_us": 0.769811,
+        "parent_inference_us": 0.0880465,
+        "sensing_us": 0.9252505
+      },
+      {
+        "bodies_us": 0.08564200000000001,
+        "case": "train-inspected-9001-WeakAngular-p1",
+        "child_inference_us": 0.775462,
+        "parent_inference_us": 0.08739050000000001,
+        "sensing_us": 0.907216
+      },
+      {
+        "bodies_us": 0.08420450000000002,
+        "case": "seed-42-weak-round-p1",
+        "child_inference_us": 0.7776259999999999,
+        "parent_inference_us": 0.08379849999999998,
+        "sensing_us": 0.919965
+      },
+      {
+        "bodies_us": 0.081574,
+        "case": "seed-42-weak-round-p2",
+        "child_inference_us": 0.771299,
+        "parent_inference_us": 0.081554,
+        "sensing_us": 0.9206769999999999
+      },
+      {
+        "bodies_us": 0.09256500000000001,
+        "case": "seed-10101-weak-round-p1",
+        "child_inference_us": 0.7694305,
+        "parent_inference_us": 0.079876,
+        "sensing_us": 0.913899
+      },
+      {
+        "bodies_us": 0.0938275,
+        "case": "seed-10101-weak-round-p2",
+        "child_inference_us": 0.770693,
+        "parent_inference_us": 0.08069749999999999,
+        "sensing_us": 0.9064
+      },
+      {
+        "bodies_us": 0.08167949999999999,
+        "case": "development-inspected-17-WeakRound-p1",
+        "child_inference_us": 0.7774555000000001,
+        "parent_inference_us": 0.08470050000000001,
+        "sensing_us": 0.8983895
+      },
+      {
+        "bodies_us": 0.0842595,
+        "case": "development-inspected-17-WeakRound-p2",
+        "child_inference_us": 0.7704275,
+        "parent_inference_us": 0.08894800000000001,
+        "sensing_us": 0.929298
+      },
+      {
+        "bodies_us": 0.082967,
+        "case": "development-inspected-113-WeakRound-p1",
+        "child_inference_us": 0.767642,
+        "parent_inference_us": 0.09420350000000001,
+        "sensing_us": 0.9137734999999999
+      },
+      {
+        "bodies_us": 0.08610799999999999,
+        "case": "development-inspected-113-WeakRound-p2",
+        "child_inference_us": 0.7730375,
+        "parent_inference_us": 0.08744,
+        "sensing_us": 0.897147
+      },
+      {
+        "bodies_us": 0.0817195,
+        "case": "development-inspected-2027-WeakRound-p1",
+        "child_inference_us": 0.8148565000000001,
+        "parent_inference_us": 0.09394300000000001,
+        "sensing_us": 0.9181615
+      },
+      {
+        "bodies_us": 0.09243,
+        "case": "development-inspected-2027-WeakRound-p2",
+        "child_inference_us": 0.7693854999999999,
+        "parent_inference_us": 0.087646,
+        "sensing_us": 0.9047715000000001
+      },
+      {
+        "bodies_us": 0.085752,
+        "case": "development-inspected-9001-WeakRound-p2",
+        "child_inference_us": 0.784674,
+        "parent_inference_us": 0.09452849999999999,
+        "sensing_us": 0.9490204999999999
+      },
+      {
+        "bodies_us": 0.08452,
+        "case": "development-inspected-9001-WeakRound-p1",
+        "child_inference_us": 0.7718904999999999,
+        "parent_inference_us": 0.0881365,
+        "sensing_us": 0.9190235
+      },
+      {
+        "bodies_us": 0.085747,
+        "case": "validation-73-WeakAngular-p1",
+        "child_inference_us": 0.7694855,
+        "parent_inference_us": 0.0874605,
+        "sensing_us": 0.9068405
+      },
+      {
+        "bodies_us": 0.0844145,
+        "case": "validation-73-WeakAngular-p2",
+        "child_inference_us": 0.770938,
+        "parent_inference_us": 0.088733,
+        "sensing_us": 0.90679
+      },
+      {
+        "bodies_us": 0.0852565,
+        "case": "validation-73-WeakRound-p1",
+        "child_inference_us": 0.769601,
+        "parent_inference_us": 0.0891285,
+        "sensing_us": 0.9128115
+      },
+      {
+        "bodies_us": 0.0843695,
+        "case": "validation-73-WeakRound-p2",
+        "child_inference_us": 0.7739440000000001,
+        "parent_inference_us": 0.094128,
+        "sensing_us": 0.9051725
+      },
+      {
+        "bodies_us": 0.08241099999999998,
+        "case": "validation-509-WeakAngular-p1",
+        "child_inference_us": 0.768293,
+        "parent_inference_us": 0.095776,
+        "sensing_us": 0.908799
+      }
+    ],
+    "sources": 32
+  },
+  "parents": {
+    "candidate": {
+      "child": "a2951655e72076252786a0ee8adbd93f28a14959c66a4790b5f916ed1162f6b6",
+      "child_parameters": 255,
+      "genome": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1",
+      "perception": {
+        "match": {
+          "arcs_by_nearest": {
+            "edge": {
+              "arcs": 189562,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.3995547890663147,
+                  "mean": -0.03343027771137961,
+                  "min": -0.44689902663230896
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.009823094281696629,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.020014158726110187,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.3397512137889862,
+                  "mean": 0.1410844629517388,
+                  "min": 0.05184395983815193
+                },
+                "edge": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.09250601736450054,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              }
+            },
+            "planet": {
+              "arcs": 134205,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.4358668923377991,
+                  "mean": 0.052284215347853845,
+                  "min": -0.4660511910915375
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.0644738289164136,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.038853090263031256,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.5707899928092957,
+                  "mean": 0.3787727717897415,
+                  "min": 0.07161948829889297
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.6069959629947433,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              }
+            },
+            "sun": {
+              "arcs": 64617,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.37918171286582947,
+                  "mean": -0.008871513426647144,
+                  "min": -0.3742583096027374
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.10509030860254838,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.13940928000345376,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.7102468609809875,
+                  "mean": 0.34952575856499524,
+                  "min": 0.10981959849596024
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.6548760565949667,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "sun": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                }
+              }
+            }
+          },
+          "channel_bounds": {
+            "max": 1.0,
+            "min": -1.0
+          },
+          "decisions": 24274,
+          "destination": {
+            "clearance": {
+              "max": 0.5707899928092957,
+              "mean": 0.4754545962146551,
+              "min": 0.3997249901294708
+            },
+            "closing_speed": {
+              "max": 0.42747578024864197,
+              "mean": 0.1913608435662906,
+              "min": -0.0827861949801445
+            },
+            "destination": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "direction_x": {
+              "max": 1.0,
+              "mean": 0.26067211748041885,
+              "min": -0.9999998211860657
+            },
+            "direction_y": {
+              "max": 0.9999997019767761,
+              "mean": 0.3445027148915774,
+              "min": -0.9999948740005493
+            },
+            "edge": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "planet": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "presence": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "sideways_speed": {
+              "max": 0.2919360101222992,
+              "mean": 0.0016977932570299958,
+              "min": -0.3171919286251068
+            },
+            "size": {
+              "max": 0.4567791819572449,
+              "mean": 0.28088498126865513,
+              "min": 0.07045436650514603
+            },
+            "sun": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "occupied_slots": {
+            "5": 24274
+          },
+          "records": {
+            "edge": {
+              "fields": {
+                "clearance": {
+                  "max": 0.3397512137889862,
+                  "mean": 0.16969343959576777,
+                  "min": 0.09211070835590363
+                },
+                "closing_speed": {
+                  "max": 0.3339645266532898,
+                  "mean": -0.002171015993567151,
+                  "min": -0.3329141438007355
+                },
+                "destination": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": 0.08350745767872224,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": 0.14581353128537805,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.4085039496421814,
+                  "mean": 0.0050840562140052736,
+                  "min": -0.43550974130630493
+                },
+                "size": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              },
+              "records": 24274
+            },
+            "planet": {
+              "fields": {
+                "clearance": {
+                  "max": 0.5707899928092957,
+                  "mean": 0.2903533546531663,
+                  "min": 0.06222382187843323
+                },
+                "closing_speed": {
+                  "max": 0.4872590899467468,
+                  "mean": 0.014722635918688725,
+                  "min": -0.4660511910915375
+                },
+                "destination": {
+                  "max": 1.0,
+                  "mean": 0.3333333333333333,
+                  "min": 0.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": 0.0019546114534203865,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": -0.021753681805866884,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.4794698655605316,
+                  "mean": -0.00028728735785421843,
+                  "min": -0.4555822014808655
+                },
+                "size": {
+                  "max": 0.4567791819572449,
+                  "mean": 0.16146815329534744,
+                  "min": 0.010318939574062824
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              },
+              "records": 72822
+            },
+            "sun": {
+              "fields": {
+                "clearance": {
+                  "max": 0.7102468609809875,
+                  "mean": 0.30887134316466125,
+                  "min": 0.12955868244171143
+                },
+                "closing_speed": {
+                  "max": 0.3329141438007355,
+                  "mean": 0.002171015993567151,
+                  "min": -0.3339645266532898
+                },
+                "destination": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": -0.08350745767872224,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": -0.14581353128537805,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.43550974130630493,
+                  "mean": -0.0050840562140052736,
+                  "min": -0.4085039496421814
+                },
+                "size": {
+                  "max": 0.6239797472953796,
+                  "mean": 0.3080047041256325,
+                  "min": 0.14735080301761627
+                },
+                "sun": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                }
+              },
+              "records": 24274
+            }
+          }
+        },
+        "precision": {
+          "arcs_by_nearest": {
+            "edge": {
+              "arcs": 1304491,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.21930557489395142,
+                  "mean": 0.0040167541044183255,
+                  "min": -0.21650783717632294
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.009509157301054286,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.004662371436370929,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.2790069878101349,
+                  "mean": 0.1952056847572664,
+                  "min": 0.12970314919948578
+                },
+                "edge": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.4164363818554714,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              }
+            },
+            "planet": {
+              "arcs": 286277,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.15980587899684906,
+                  "mean": -0.011235646418136602,
+                  "min": -0.21431399881839752
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.04333073330582553,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.02124532618662917,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.6242942214012146,
+                  "mean": 0.47631481925371355,
+                  "min": 0.3008899688720703
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.6528877134979116,
+                  "min": 4.06016806664411e-6
+                },
+                "planet": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              }
+            },
+            "sun": {
+              "arcs": 0,
+              "fields": {
+                "closing_speed": null,
+                "direction_x": null,
+                "direction_y": null,
+                "distance": null,
+                "edge": null,
+                "fill": null,
+                "planet": null,
+                "sun": null
+              }
+            }
+          },
+          "channel_bounds": {
+            "max": 1.0,
+            "min": -1.0
+          },
+          "decisions": 99423,
+          "destination": {
+            "clearance": {
+              "max": 0.6242942214012146,
+              "mean": 0.4856257912814638,
+              "min": 0.3543761372566223
+            },
+            "closing_speed": {
+              "max": 0.1258798986673355,
+              "mean": -0.012013413008064673,
+              "min": -0.21145839989185333
+            },
+            "destination": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "direction_x": {
+              "max": 1.0,
+              "mean": -0.04397485219310898,
+              "min": -1.0
+            },
+            "direction_y": {
+              "max": 1.0,
+              "mean": -0.018064275307690378,
+              "min": -1.0
+            },
+            "edge": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "planet": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "presence": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "sideways_speed": {
+              "max": 0.2124786525964737,
+              "mean": 0.004361846836996851,
+              "min": -0.1839439570903778
+            },
+            "size": {
+              "max": 0.3309357762336731,
+              "mean": 0.23498930784650077,
+              "min": 0.15815064311027527
+            },
+            "sun": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "occupied_slots": {
+            "2": 99423
+          },
+          "records": {
+            "edge": {
+              "fields": {
+                "clearance": {
+                  "max": 0.2790069878101349,
+                  "mean": 0.23157148543581652,
+                  "min": 0.20815157890319824
+                },
+                "closing_speed": {
+                  "max": 0.21145839989185333,
+                  "mean": 0.012013413008064673,
+                  "min": -0.1258798986673355
+                },
+                "destination": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": 0.04397485219310898,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": 0.018064275307690378,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.1839439570903778,
+                  "mean": -0.004361846836996851,
+                  "min": -0.2124786525964737
+                },
+                "size": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              },
+              "records": 99423
+            },
+            "planet": {
+              "fields": {
+                "clearance": {
+                  "max": 0.6242942214012146,
+                  "mean": 0.4856257912814638,
+                  "min": 0.3543761372566223
+                },
+                "closing_speed": {
+                  "max": 0.1258798986673355,
+                  "mean": -0.012013413008064673,
+                  "min": -0.21145839989185333
+                },
+                "destination": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": -0.04397485219310898,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": -0.018064275307690378,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.2124786525964737,
+                  "mean": 0.004361846836996851,
+                  "min": -0.1839439570903778
+                },
+                "size": {
+                  "max": 0.3309357762336731,
+                  "mean": 0.23498930784650077,
+                  "min": 0.15815064311027527
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              },
+              "records": 99423
+            },
+            "sun": {
+              "fields": {
+                "clearance": null,
+                "closing_speed": null,
+                "destination": null,
+                "direction_x": null,
+                "direction_y": null,
+                "edge": null,
+                "planet": null,
+                "presence": null,
+                "sideways_speed": null,
+                "size": null,
+                "sun": null
+              },
+              "records": 0
+            }
+          }
+        }
+      },
+      "sets": {
+        "excluded": {
+          "arrived": 0,
+          "child_decisions_identical": 18,
+          "child_reproduces_record": 18,
+          "decisions": 410,
+          "episodes": 18,
+          "passed": true,
+          "runner_reproduces_record": 18
+        },
+        "precision": {
+          "arrived": 157,
+          "child_decisions_identical": 157,
+          "child_reproduces_record": 157,
+          "decisions": 99423,
+          "episodes": 157,
+          "passed": true,
+          "runner_reproduces_record": 157
+        },
+        "training": {
+          "arrived": 464,
+          "child_decisions_identical": 464,
+          "child_reproduces_record": 464,
+          "decisions": 23864,
+          "episodes": 464,
+          "passed": true,
+          "runner_reproduces_record": 464
+        }
+      }
+    },
+    "time-final": {
+      "child": "2fb59897993886fbf6ddfd59c279b0465f77abcbc689c3ba7d049a1d22373def",
+      "child_parameters": 255,
+      "genome": "e03d3e2900722539e1a05838c4134a4b01bc33451582e795c37f53b502885b42",
+      "perception": {
+        "match": {
+          "arcs_by_nearest": {
+            "edge": {
+              "arcs": 183315,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.3995547890663147,
+                  "mean": -0.03582862551223687,
+                  "min": -0.44689902663230896
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.013661268736081022,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.017344488832078737,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.3397512137889862,
+                  "mean": 0.14068175332007885,
+                  "min": 0.05184395983815193
+                },
+                "edge": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.09026780793059856,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              }
+            },
+            "planet": {
+              "arcs": 130113,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.4358668923377991,
+                  "mean": 0.05394158783160084,
+                  "min": -0.4660511910915375
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.06523245041763423,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.046170258323470645,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.5683847665786743,
+                  "mean": 0.3782386574662134,
+                  "min": 0.07161948829889297
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.6060518440572458,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              }
+            },
+            "sun": {
+              "arcs": 62700,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.37918171286582947,
+                  "mean": -0.006710028155468566,
+                  "min": -0.37412306666374207
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.09542695596932985,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.14652092658422972,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.7087889909744263,
+                  "mean": 0.35083318323205914,
+                  "min": 0.10981959849596024
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.6569996634014929,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "sun": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                }
+              }
+            }
+          },
+          "channel_bounds": {
+            "max": 1.0,
+            "min": -1.0
+          },
+          "decisions": 23508,
+          "destination": {
+            "clearance": {
+              "max": 0.5683847665786743,
+              "mean": 0.47481467493445123,
+              "min": 0.3997249901294708
+            },
+            "closing_speed": {
+              "max": 0.42686939239501953,
+              "mean": 0.19425350736918903,
+              "min": -0.0827861949801445
+            },
+            "destination": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "direction_x": {
+              "max": 1.0,
+              "mean": 0.25914163173377097,
+              "min": -0.9999998807907104
+            },
+            "direction_y": {
+              "max": 1.0,
+              "mean": 0.36533655212089733,
+              "min": -0.9999999403953552
+            },
+            "edge": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "planet": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "presence": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "sideways_speed": {
+              "max": 0.29127123951911926,
+              "mean": -0.0021249926020224523,
+              "min": -0.3171919286251068
+            },
+            "size": {
+              "max": 0.45400384068489075,
+              "mean": 0.28070761848913633,
+              "min": 0.07045436650514603
+            },
+            "sun": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "occupied_slots": {
+            "5": 23508
+          },
+          "records": {
+            "edge": {
+              "fields": {
+                "clearance": {
+                  "max": 0.3397512137889862,
+                  "mean": 0.16918037152680052,
+                  "min": 0.09211070835590363
+                },
+                "closing_speed": {
+                  "max": 0.3339645266532898,
+                  "mean": -0.005235098899106773,
+                  "min": -0.3329141438007355
+                },
+                "destination": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": 0.07422024637725903,
+                  "min": -0.9999998807907104
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": 0.1501842934594123,
+                  "min": -0.9999999403953552
+                },
+                "edge": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.4085039496421814,
+                  "mean": 0.00493432733267417,
+                  "min": -0.43550974130630493
+                },
+                "size": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              },
+              "records": 23508
+            },
+            "planet": {
+              "fields": {
+                "clearance": {
+                  "max": 0.5683847665786743,
+                  "mean": 0.2902841629092489,
+                  "min": 0.06223186478018761
+                },
+                "closing_speed": {
+                  "max": 0.4872590899467468,
+                  "mean": 0.016602121965750956,
+                  "min": -0.4660511910915375
+                },
+                "destination": {
+                  "max": 1.0,
+                  "mean": 0.3333333333333333,
+                  "min": 0.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": 0.006677870550689227,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": -0.020665780524953714,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.4794698655605316,
+                  "mean": -0.0009695445685458392,
+                  "min": -0.4555822014808655
+                },
+                "size": {
+                  "max": 0.45400384068489075,
+                  "mean": 0.161491409846215,
+                  "min": 0.010322515852749348
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              },
+              "records": 70524
+            },
+            "sun": {
+              "fields": {
+                "clearance": {
+                  "max": 0.7087889909744263,
+                  "mean": 0.3096820731429101,
+                  "min": 0.12955868244171143
+                },
+                "closing_speed": {
+                  "max": 0.3329141438007355,
+                  "mean": 0.005235098899106773,
+                  "min": -0.3339645266532898
+                },
+                "destination": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "direction_x": {
+                  "max": 0.9999998807907104,
+                  "mean": -0.07422024637725903,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 0.9999999403953552,
+                  "mean": -0.1501842934594123,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.43550974130630493,
+                  "mean": -0.00493432733267417,
+                  "min": -0.4085039496421814
+                },
+                "size": {
+                  "max": 0.6228407025337219,
+                  "mean": 0.3086569736593938,
+                  "min": 0.14735080301761627
+                },
+                "sun": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                }
+              },
+              "records": 23508
+            }
+          }
+        },
+        "precision": {
+          "arcs_by_nearest": {
+            "edge": {
+              "arcs": 1214423,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.2184133678674698,
+                  "mean": 0.004202945363077925,
+                  "min": -0.21635593473911285
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.01063687176544553,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": 0.003722034798189964,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.27609363198280334,
+                  "mean": 0.19495429570097947,
+                  "min": 0.13013765215873718
+                },
+                "edge": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.4143733384774928,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              }
+            },
+            "planet": {
+              "arcs": 267753,
+              "fields": {
+                "closing_speed": {
+                  "max": 0.16096258163452148,
+                  "mean": -0.011682825043759818,
+                  "min": -0.2113344967365265
+                },
+                "direction_x": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.04824463276004391,
+                  "min": -0.9807853102684021
+                },
+                "direction_y": {
+                  "max": 0.9807853102684021,
+                  "mean": -0.016881788486529305,
+                  "min": -0.9807852506637573
+                },
+                "distance": {
+                  "max": 0.6247622966766357,
+                  "mean": 0.47851992919684627,
+                  "min": 0.304635614156723
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "fill": {
+                  "max": 1.0,
+                  "mean": 0.6545047874101002,
+                  "min": 2.2387841909221606e-6
+                },
+                "planet": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              }
+            },
+            "sun": {
+              "arcs": 0,
+              "fields": {
+                "closing_speed": null,
+                "direction_x": null,
+                "direction_y": null,
+                "distance": null,
+                "edge": null,
+                "fill": null,
+                "planet": null,
+                "sun": null
+              }
+            }
+          },
+          "channel_bounds": {
+            "max": 1.0,
+            "min": -1.0
+          },
+          "decisions": 92636,
+          "destination": {
+            "clearance": {
+              "max": 0.6247622966766357,
+              "mean": 0.4880008486761187,
+              "min": 0.3591901659965515
+            },
+            "closing_speed": {
+              "max": 0.1221417486667633,
+              "mean": -0.012541193112795649,
+              "min": -0.20492035150527954
+            },
+            "destination": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "direction_x": {
+              "max": 1.0,
+              "mean": -0.049082875840753305,
+              "min": -1.0
+            },
+            "direction_y": {
+              "max": 1.0,
+              "mean": -0.013496436774790847,
+              "min": -1.0
+            },
+            "edge": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "planet": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "presence": {
+              "max": 1.0,
+              "mean": 1.0,
+              "min": 1.0
+            },
+            "sideways_speed": {
+              "max": 0.20934826135635376,
+              "mean": 0.0048008234943274315,
+              "min": -0.18297933042049408
+            },
+            "size": {
+              "max": 0.33130180835723877,
+              "mean": 0.23647072943787825,
+              "min": 0.16072021424770355
+            },
+            "sun": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "occupied_slots": {
+            "2": 92636
+          },
+          "records": {
+            "edge": {
+              "fields": {
+                "clearance": {
+                  "max": 0.27609363198280334,
+                  "mean": 0.23097498069999364,
+                  "min": 0.2080996036529541
+                },
+                "closing_speed": {
+                  "max": 0.20492035150527954,
+                  "mean": 0.012541193112795649,
+                  "min": -0.1221417486667633
+                },
+                "destination": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": 0.049082875840753305,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": 0.013496436774790847,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "planet": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.18297933042049408,
+                  "mean": -0.0048008234943274315,
+                  "min": -0.20934826135635376
+                },
+                "size": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              },
+              "records": 92636
+            },
+            "planet": {
+              "fields": {
+                "clearance": {
+                  "max": 0.6247622966766357,
+                  "mean": 0.4880008486761187,
+                  "min": 0.3591901659965515
+                },
+                "closing_speed": {
+                  "max": 0.1221417486667633,
+                  "mean": -0.012541193112795649,
+                  "min": -0.20492035150527954
+                },
+                "destination": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "direction_x": {
+                  "max": 1.0,
+                  "mean": -0.049082875840753305,
+                  "min": -1.0
+                },
+                "direction_y": {
+                  "max": 1.0,
+                  "mean": -0.013496436774790847,
+                  "min": -1.0
+                },
+                "edge": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                },
+                "planet": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "presence": {
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "min": 1.0
+                },
+                "sideways_speed": {
+                  "max": 0.20934826135635376,
+                  "mean": 0.0048008234943274315,
+                  "min": -0.18297933042049408
+                },
+                "size": {
+                  "max": 0.33130180835723877,
+                  "mean": 0.23647072943787825,
+                  "min": 0.16072021424770355
+                },
+                "sun": {
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "min": 0.0
+                }
+              },
+              "records": 92636
+            },
+            "sun": {
+              "fields": {
+                "clearance": null,
+                "closing_speed": null,
+                "destination": null,
+                "direction_x": null,
+                "direction_y": null,
+                "edge": null,
+                "planet": null,
+                "presence": null,
+                "sideways_speed": null,
+                "size": null,
+                "sun": null
+              },
+              "records": 0
+            }
+          }
+        }
+      },
+      "sets": {
+        "excluded": {
+          "arrived": 2,
+          "child_decisions_identical": 18,
+          "child_reproduces_record": 18,
+          "decisions": 366,
+          "episodes": 18,
+          "passed": true,
+          "runner_reproduces_record": 18
+        },
+        "precision": {
+          "arrived": 157,
+          "child_decisions_identical": 157,
+          "child_reproduces_record": 157,
+          "decisions": 92636,
+          "episodes": 157,
+          "passed": true,
+          "runner_reproduces_record": 157
+        },
+        "training": {
+          "arrived": 464,
+          "child_decisions_identical": 464,
+          "child_reproduces_record": 464,
+          "decisions": 23142,
+          "episodes": 464,
+          "passed": true,
+          "runner_reproduces_record": 464
+        }
+      }
+    }
+  },
+  "passed": true,
+  "plan_sha256": "99e05fe5f405f1e4a9c8b2b3ae460d41d782a8ac77ff13f5970df3d30e45a2cb",
+  "runtime": "diagnostic_v1/linux/x86_64/d18b5ef06a9689e7b34c1b21b1aebe6e7a24a2e4462942f889eec56dd314ba0c",
+  "seconds": 21.448524524
+}

@@ -96,6 +96,8 @@ pub(super) fn render(frame: &mut RenderFrame, view: &ClockGrassInspection, layou
             match t.role.as_str() {
                 "root" => RenderColor::rgb(0.85, 0.9, 1.0),
                 "runner" => RenderColor::rgb(1.0, 0.7, 0.12),
+                // A mat reads as its own organism here, not as a stubby blade.
+                "moss" => RenderColor::rgb(0.3, 0.78, 0.62),
                 _ => RenderColor::rgb(0.25, 0.85, 0.25),
             }
         };
@@ -114,6 +116,11 @@ pub(super) fn render(frame: &mut RenderFrame, view: &ClockGrassInspection, layou
         RenderPrimitive::Text(RenderText {
             position: RenderPoint::new(0.0, bottom + height - 8.0),
             text: match view.organism {
+                // A focused organism is all of one kind, so a mat in focus
+                // needs its own legend rather than the root/runner key.
+                Some(id) if view.tissues.iter().all(|t| t.role == "moss") => {
+                    format!("Moss mat (teal) - {id}")
+                }
                 Some(id) => format!("Roots (white) / runners (gold) - {id}"),
                 None => "Grass cutaway - no living patch".into(),
             },

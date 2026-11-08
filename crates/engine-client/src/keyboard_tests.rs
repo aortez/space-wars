@@ -246,6 +246,12 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     }
     assert_eq!(window.get_training_population(), 8);
     assert_eq!(window.get_training_generations(), 8);
+    assert_eq!(window.get_training_worker_label(), "Auto 75%");
+    window.set_training_focus(9);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_training_worker_label(), "Auto 90%");
+    key(&window, Key::Return);
+    assert_eq!(window.get_training_worker_label(), "Fixed 1");
     assert!(ui_activation::activate(&window, "training.start"));
     pump_worker_until(&window, || window.get_training_can_pause());
     assert!(window.get_training_active());
@@ -257,6 +263,12 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     assert!(!window.get_training_active());
     let before: serde_json::Value = serde_json::from_str(&window.get_training_snapshot()).unwrap();
     assert_eq!(before["evaluated_candidates"], before["saved_candidates"]);
+    assert_eq!(before["workers"]["config"]["mode"], "fixed");
+    assert!(ui_activation::activate(
+        &window,
+        "training.workers.previous"
+    ));
+    assert_eq!(window.get_training_worker_label(), "Auto 90%");
     assert!(ui_activation::activate(&window, "training.resume"));
     key(&window, Key::Escape);
     assert!(!window.get_training_visible());
@@ -999,7 +1011,15 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(window.get_ingame_clock_focus_index(), 18);
     key(&window, Key::Return);
     assert_eq!(adjusted.get(), Some((18, 1)));
-    key(&window, Key::DownArrow);
+    // Grass and Slot Machine finish the switch row, so Right walks out to them
+    // and wraps back to Rain where the row starts.
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 19);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 20);
+    key(&window, Key::Return);
+    assert_eq!(adjusted.get(), Some((20, 1)));
+    key(&window, Key::RightArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 12);
     key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
@@ -1050,11 +1070,15 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     window.on_clock_fonts_open(move || opened.set(true));
     click(&window, 649.0, 110.0);
     assert!(fonts_opened.get());
-    click(&window, 649.0, 166.0);
+    // The switch row has the same five columns as the event row below it, so
+    // Slot Machine is hittable at the far end rather than buried under Falling.
+    click(&window, 625.0, 166.0);
+    assert_eq!(adjusted.get(), Some((20, 1)));
+    click(&window, 512.0, 166.0);
     assert_eq!(adjusted.get(), Some((19, 1)));
-    click(&window, 470.0, 166.0);
+    click(&window, 400.0, 166.0);
     assert_eq!(adjusted.get(), Some((18, 1)));
-    click(&window, 326.0, 166.0);
+    click(&window, 287.0, 166.0);
     assert_eq!(adjusted.get(), Some((13, 1)));
     click(&window, 175.0, 166.0);
     assert_eq!(adjusted.get(), Some((12, 1)));
@@ -1062,6 +1086,12 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), Some((9, 1)));
     click(&window, 649.0, 334.0);
     assert_eq!(adjusted.get(), Some((10, 1)));
+    // Spider sits between Aquarium and the recipe in the Marquee row, each
+    // switch a fifth of the row wide.
+    click(&window, 404.0, 334.0);
+    assert_eq!(adjusted.get(), Some((21, 1)));
+    click(&window, 285.0, 334.0);
+    assert_eq!(adjusted.get(), Some((17, 1)));
     // The extra launcher row must not overlap Back/Start at 800×480.
     window.set_ingame_menu_visible(false);
     window.set_launcher_visible(true);
@@ -1070,19 +1100,31 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 480.0, 168.0);
     assert!(window.get_launcher_clock_show_date());
     assert_eq!(window.get_launcher_settings_focus_index(), 12);
+    // The Events row has four columns now, with Spider at its far end and
+    // Digit Slide beside it.
+    assert!(window.get_launcher_clock_spider_enabled());
     click(&window, 649.0, 220.0);
+    assert!(!window.get_launcher_clock_spider_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 20);
+    click(&window, 500.0, 220.0);
     assert!(!window.get_launcher_clock_digit_slide_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 3);
     key(&window, Key::DownArrow);
     assert_eq!(window.get_launcher_settings_focus_index(), 4);
+    // This row now has the same five columns as the one below it, so its
+    // coordinates match, and its last column is Slot Machine.
     assert!(window.get_launcher_clock_cell_swap_enabled());
-    click(&window, 470.0, 272.0);
+    click(&window, 400.0, 272.0);
     assert!(!window.get_launcher_clock_cell_swap_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 17);
     assert!(window.get_launcher_clock_grass_enabled());
-    click(&window, 649.0, 272.0);
+    click(&window, 525.0, 272.0);
     assert!(!window.get_launcher_clock_grass_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 18);
+    assert!(window.get_launcher_clock_slot_machine_enabled());
+    click(&window, 649.0, 272.0);
+    assert!(!window.get_launcher_clock_slot_machine_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 19);
     assert!(window.get_launcher_clock_meltdown_enabled());
     click(&window, 175.0, 324.0);
     assert!(!window.get_launcher_clock_meltdown_enabled());
@@ -1561,6 +1603,7 @@ fn pump_worker_until(window: &MainWindow, predicate: impl Fn() -> bool) {
     }
 }
 
+#[track_caller]
 fn pump_until(predicate: impl Fn() -> bool) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     while !predicate() {

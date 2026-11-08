@@ -34,10 +34,10 @@ fn scene(aspect: f32, direction: f32, profile: ClockDuckJumpProfile, direct: boo
         // Select a reproducible visit that chooses the optional stunt itself.
         // No fixture poses or movement commands drive the duck.
         let duck = state.duck_visit.as_mut().unwrap();
-        if !flap_detour::selected(duck.seed) {
+        if !flap_detour::selected(duck.terrain.seed) {
             continue;
         }
-        duck.direction = direction;
+        duck.face(direction);
         return state;
     }
     panic!("no selected visit in seed fixture range");
@@ -74,7 +74,7 @@ fn capture_visit(direct: bool) {
                     let mut last_tick = 0;
                     for _ in 0..DUCK_TICKS {
                         ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
-                        let Some(duck) = state.duck_scene().map(DuckEvent::diagnostics) else {
+                        let Some(duck) = state.duck_scene().map(|duck| duck.diagnostics()) else {
                             break;
                         };
                         let nav = duck.navigation.unwrap();

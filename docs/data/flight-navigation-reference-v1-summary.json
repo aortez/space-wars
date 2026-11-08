@@ -1,0 +1,60 @@
+{
+  "law": {
+    "hold": 6,
+    "max_speed": 20.0,
+    "approach_gain": 0.6,
+    "approach_offset": 2.0,
+    "stop_radius": 3.0,
+    "hold_radius": 8.0,
+    "brake_acceleration": 20.0,
+    "margin": 8.0,
+    "half_width": 9.0,
+    "candidate_step": 0.1308996938995747,
+    "candidates": 24,
+    "lookahead": 60.0,
+    "blocked_weight": 30.0,
+    "route_margin": 9.0,
+    "route_lead": 12.0
+  },
+  "seed": 7700002,
+  "motor": "data/training-experiments/learned-flight-motor-teacher-fit-v4-20261025/policy-final.json",
+  "summary": {
+    "cases": 96,
+    "passed": 72,
+    "families": {
+      "clear": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 634.375
+      },
+      "obstructed": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 819.0833333333334
+      },
+      "altered": {
+        "cases": 24,
+        "passed": 24,
+        "outcomes": {
+          "success": 24
+        },
+        "mean_success_ticks": 730.9166666666666
+      },
+      "moving": {
+        "cases": 24,
+        "passed": 0,
+        "outcomes": {
+          "deadline": 24
+        },
+        "mean_success_ticks": null
+      }
+    }
+  },
+  "seconds": 154.33153435199984
+}

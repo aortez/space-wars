@@ -21,6 +21,7 @@ pub struct BootActivationReport {
 pub struct TrialActivation<'a> {
     store: &'a mut TrialStore,
     boot_id: &'a str,
+    retry: Option<&'a str>,
     guard: &'a mut dyn FnMut() -> Result<()>,
     began: bool,
     authorized: bool,
@@ -34,7 +35,10 @@ impl TrialActivation<'_> {
             return Err(invalid("bootstrap activation has already begun"));
         }
         (self.guard)()?;
-        self.store.advance(|record| record.request(self.boot_id))?;
+        self.store.advance(|record| match self.retry {
+            Some(interrupted) => record.retry_request(interrupted, self.boot_id),
+            None => record.request(self.boot_id),
+        })?;
         self.began = true;
         Ok(())
     }
@@ -78,17 +82,29 @@ impl TrialActivation<'_> {
     }
 }
 
+/// `retry` names an earlier request boot that returned to the original default
+/// without a trial; the device wrapper has rechecked this later normal boot.
 pub(super) fn run(
     store: &mut TrialStore,
     boot_id: &str,
+    retry: Option<&str>,
     guard: &mut dyn FnMut() -> Result<()>,
     request: impl FnOnce(&mut TrialActivation<'_>) -> Result<()>,
 ) -> Result<BootActivationReport> {
     let record = store.durable()?;
-    if record.phase != TrialPhase::TrialReady || !crate::recovery::boot_id(boot_id) {
-        return Err(invalid(
-            "bootstrap activation requires an unused ready attempt",
-        ));
+    let admitted = match retry {
+        None => record.phase == TrialPhase::TrialReady,
+        Some(interrupted) => {
+            record.phase == TrialPhase::TrialRequested
+                && record.request_boot_id() == Some(interrupted)
+                && interrupted != boot_id
+        }
+    };
+    if !admitted || !crate::recovery::boot_id(boot_id) {
+        return Err(invalid(match retry {
+            None => "bootstrap activation requires an unused ready attempt",
+            Some(_) => "bootstrap retry requires the interrupted request it names",
+        }));
     }
     let report = BootActivationReport {
         schema: 1,
@@ -103,6 +119,7 @@ pub(super) fn run(
     let mut permit = TrialActivation {
         store,
         boot_id,
+        retry,
         guard,
         began: false,
         authorized: false,

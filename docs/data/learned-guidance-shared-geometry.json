@@ -1,0 +1,212 @@
+{
+  "base_commit": "2f45de7d37780f44730ba64f001cd42e88e70936",
+  "baseline_binary_sha256": "aee00b94c2afbc7646415502a4da79d72f5bf0d8c67948ab1a45745a2fa44c6c",
+  "optimized_binary_sha256": "f14c4cc32551bb13a6df4b219be1bbfc75666d814aa5138f76b78b2b648e92e2",
+  "raw": "data/training-experiments/training-tail-optimization-20261017",
+  "hardware": "AMD Ryzen 7 9800X3D, 8 cores / 16 hardware threads",
+  "profile": "Rust 1.89.0, ci with assertions and overflow checks",
+  "change": "Share immutable TerrainGeometry and TerrainAssembly shape-cache vectors across clones; detach on rebuild. Same physics, host probes, candidate genomes and fitness.",
+  "method": "Instrumented baseline and optimized frozen binaries; profiling order baseline/optimized/baseline/optimized, same 172-episode finalist. Four precision workers and serial match cases for stage comparison. Parallel pool comparison uses three interleaved samples per Fixed worker count, baseline then optimized. Background machine load was not controlled.",
+  "serial_match_comparison": {
+    "before": {
+      "raw": [
+        "baseline-profile",
+        "baseline-profile-2"
+      ],
+      "samples": 8,
+      "candidate_seconds": 1.7642443669999999,
+      "match_seconds": 1.2185991905,
+      "precision_seconds": 0.5543723899999999,
+      "match_profile_mean_ms": 1092.2577195,
+      "match_stages": {
+        "match_clone": {
+          "mean_ms": 479.42296150000004,
+          "percent": 43.89284259025098
+        },
+        "match_drop": {
+          "mean_ms": 281.0078945,
+          "percent": 25.72725186402311
+        },
+        "host_step": {
+          "mean_ms": 191.28258449999993,
+          "percent": 17.512587101472985
+        },
+        "component_step": {
+          "mean_ms": 125.70868799999997,
+          "percent": 11.50906839619731
+        },
+        "match_network_decision": {
+          "mean_ms": 0.8150219999999997,
+          "percent": 0.07461810390070672
+        },
+        "other": {
+          "mean_ms": 14.020569000000023,
+          "percent": 1.2836319441549184
+        }
+      }
+    },
+    "after": {
+      "raw": [
+        "optimized-profile-1",
+        "optimized-profile-2"
+      ],
+      "samples": 8,
+      "candidate_seconds": 1.0323531735,
+      "match_seconds": 0.47793233850000005,
+      "precision_seconds": 0.5531138085,
+      "match_profile_mean_ms": 467.110547,
+      "match_stages": {
+        "match_clone": {
+          "mean_ms": 50.179000000000016,
+          "percent": 10.742424961772489
+        },
+        "match_drop": {
+          "mean_ms": 15.268478999999996,
+          "percent": 3.2687078247453907
+        },
+        "host_step": {
+          "mean_ms": 225.17094350000008,
+          "percent": 48.205065149171226
+        },
+        "component_step": {
+          "mean_ms": 159.48165450000005,
+          "percent": 34.142165173590065
+        },
+        "match_network_decision": {
+          "mean_ms": 0.9744995000000001,
+          "percent": 0.2086228851518525
+        },
+        "other": {
+          "mean_ms": 16.03597049999985,
+          "percent": 3.4330140055689746
+        }
+      }
+    },
+    "candidate_speedup": 1.7089542729051337,
+    "match_speedup": 2.5497316091323663
+  },
+  "parallel_comparison": {
+    "1": {
+      "before": {
+        "seconds": 2.435412606,
+        "match_seconds": 0.896389912,
+        "precision_seconds": 1.539022694,
+        "scored_ticks_per_second": 34188.04673790048,
+        "samples": 3
+      },
+      "after": {
+        "seconds": 1.8648884660000002,
+        "match_seconds": 0.291595411,
+        "precision_seconds": 1.572270499,
+        "scored_ticks_per_second": 44647.17409003482,
+        "samples": 3
+      },
+      "candidate_speedup": 1.305929362748281,
+      "wall_time_reduction_percent": 23.42617996615558
+    },
+    "2": {
+      "before": {
+        "seconds": 1.239593199,
+        "match_seconds": 0.477183812,
+        "precision_seconds": 0.7615211,
+        "scored_ticks_per_second": 67168.80995085227,
+        "samples": 3
+      },
+      "after": {
+        "seconds": 0.977471555,
+        "match_seconds": 0.170051006,
+        "precision_seconds": 0.820848374,
+        "scored_ticks_per_second": 85180.99536922073,
+        "samples": 3
+      },
+      "candidate_speedup": 1.268162937999766,
+      "wall_time_reduction_percent": 21.14577945502264
+    },
+    "4": {
+      "before": {
+        "seconds": 0.698427557,
+        "match_seconds": 0.276582911,
+        "precision_seconds": 0.411813171,
+        "scored_ticks_per_second": 119213.50921152155,
+        "samples": 3
+      },
+      "after": {
+        "seconds": 0.5654636639999999,
+        "match_seconds": 0.115125391,
+        "precision_seconds": 0.449545298,
+        "scored_ticks_per_second": 147245.53547971213,
+        "samples": 3
+      },
+      "candidate_speedup": 1.2351413564921832,
+      "wall_time_reduction_percent": 19.037606931079342
+    },
+    "8": {
+      "before": {
+        "seconds": 0.43773617,
+        "match_seconds": 0.204602172,
+        "precision_seconds": 0.236090263,
+        "scored_ticks_per_second": 190210.46398793138,
+        "samples": 3
+      },
+      "after": {
+        "seconds": 0.33486262,
+        "match_seconds": 0.079422218,
+        "precision_seconds": 0.258465687,
+        "scored_ticks_per_second": 248645.25040149302,
+        "samples": 3
+      },
+      "candidate_speedup": 1.3072112079873233,
+      "wall_time_reduction_percent": 23.50126789842384
+    }
+  },
+  "profiled_reduction_percent": {
+    "match_clone": 89.53345917287693,
+    "match_drop": 94.56653022963381
+  },
+  "historical_replay": {
+    "episodes": 276,
+    "ticks": 20479,
+    "trace_byte_parity": true,
+    "episode_result_parity": true,
+    "complete": true
+  },
+  "scope": "Retained-candidate benchmarks and historical replay, not a new full training run. Precision cases do not use per-tick match-world copies. No checkpoint resumed across binaries.",
+  "validation": {
+    "tests_passed": 1527,
+    "logs": {
+      "core-tests.log": [
+        "test result: ok. 164 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.49s",
+        "test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.36s",
+        "test result: ok. 61 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.23s"
+      ],
+      "gameplay-tests.log": [
+        "test result: ok. 97 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.24s",
+        "test result: ok. 619 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 15.10s",
+        "test result: ok. 451 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.54s"
+      ],
+      "guidance-fixtures.log": [
+        "test result: ok. 8 passed; 0 failed; 7 ignored; 0 measured; 710 filtered out; finished in 0.23s"
+      ]
+    },
+    "final_source_hashes_match": true,
+    "historical_artifacts_unchanged": {
+      "data/training-experiments/recovery-guidance-match-learning-v3-20261016/run/checkpoint.json": "f05d464f6f029cb044efadd433d0c10cd41492f3887a99d410ea26dc9d78bf21",
+      "data/training-experiments/recovery-guidance-match-learning-v3-20261016/run/finalist.json": "45790a33d6ebfcea1620b74e32c00d29ae27439f38c2c9b54ab5416256f7d04f"
+    }
+  },
+  "eight_worker_phase_percent": {
+    "baseline": {
+      "precision_seconds": 54.04411497423342,
+      "match_seconds": 45.95588502576658
+    },
+    "optimized": {
+      "precision_seconds": 77.1787954139653,
+      "match_seconds": 22.821204586034703
+    }
+  },
+  "worker_benchmark_peak_rss_mib": {
+    "baseline": 243.984375,
+    "optimized": 185.70703125
+  }
+}

@@ -6,9 +6,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use engine_ota::{Sha256, recovery::Slot};
     use std::io::Read;
     use std::path::Path;
+    let usage = "usage: bootstrap_package ROOTFS_EXT4 BOOT_DIRECTORY NEW_OUTPUT_DIRECTORY pi4|pi5 hdmi|hyperpixel|picade ROOT_A_PARTUUID ROOT_B_PARTUUID a|b [--retained-initramfs BYTES:SHA256]";
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
-    let [root, boot, output, board, profile, root_a, root_b, target] = arguments.as_slice() else {
-        return Err("usage: bootstrap_package ROOTFS_EXT4 BOOT_DIRECTORY NEW_OUTPUT_DIRECTORY pi4|pi5 hdmi|hyperpixel|picade ROOT_A_PARTUUID ROOT_B_PARTUUID a|b".into());
+    let (positional, retained) = match arguments.as_slice() {
+        [positional @ .., flag, value] if flag == "--retained-initramfs" => {
+            // The device's current spacewars-recovery.cpio.gz. The device check
+            // derives the same plan from its own boot files and refuses a mismatch.
+            let (bytes, sha256) = value
+                .to_str()
+                .and_then(|value| value.split_once(':'))
+                .ok_or("retained initramfs must be BYTES:SHA256")?;
+            (
+                positional,
+                Some(engine_ota::Blob {
+                    bytes: bytes.parse()?,
+                    sha256: Sha256::try_from(sha256.to_owned())?,
+                }),
+            )
+        }
+        positional => (positional, None),
+    };
+    let [root, boot, output, board, profile, root_a, root_b, target] = positional else {
+        return Err(usage.into());
     };
     let board = match board.to_str() {
         Some("pi4") => Board::Pi4,
@@ -31,6 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             root_b.to_str().ok_or("invalid root B PARTUUID")?.into(),
         )?,
         trial_id: Sha256::digest(&nonce),
+        retained_initramfs: retained,
     };
     let package = build_package(
         Path::new(root),

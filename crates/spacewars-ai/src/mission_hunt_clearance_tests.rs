@@ -95,6 +95,33 @@ fn pursuit_expiry_and_restart_keep_an_unfinished_hunt_climb() {
 }
 
 #[test]
+fn a_learned_pursuit_climb_holds_through_the_band_edge_against_the_range_release() {
+    // At the band's edge, not falling, with the opponent beyond the range
+    // release: the pilot's own climb ends, and a learned host's leg holds
+    // until the ship is clear of the edge.
+    for (altitude, learned, held) in [
+        (72.0, false, false),
+        (72.0, true, true),
+        (70.0 + PURSUIT_CLIMB_EDGE_HOLD + 1.0, true, false),
+    ] {
+        let (mut bot, mut o) = fixture(false);
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.ship.position = Vec2::new(0.0, 60.0 + altitude);
+        p.learned_control = learned;
+        let position = p.ship.position + Vec2::Y * 350.0;
+        o.opponent.as_mut().unwrap().motion.position = position;
+        o.local.combat.target.as_mut().unwrap().motion.position = position;
+        bot.intent(&o);
+        assert_eq!(bot.pursuit_climb.is_some(), held, "{altitude} {learned}");
+        assert_eq!(
+            bot.telemetry.reason == Some("climbing for a firing pass"),
+            held,
+            "{altitude} {learned}"
+        );
+    }
+}
+
+#[test]
 fn hunt_handoff_retains_normal_clearance_and_range_release() {
     for release_by_range in [false, true] {
         let (mut bot, mut o) = fixture(true);

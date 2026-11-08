@@ -1,0 +1,483 @@
+{
+  "experiment_id": "learned-flight-evaluation-integration-v1-20261023",
+  "kind": "implementation verification, not a new learning experiment",
+  "seeds": [
+    {
+      "seed": 17,
+      "seconds": 203.45250652500545,
+      "modes": {
+        "legacy": {
+          "attempts": 16,
+          "outcomes": {
+            "deadline": 16
+          },
+          "successes": 0,
+          "physical_failures": 0,
+          "by_repeat": {
+            "0": {
+              "attempts": 16,
+              "outcomes": {
+                "deadline": 16
+              },
+              "successes": 0,
+              "physical_failures": 0
+            }
+          },
+          "by_recipe": {
+            "aligned-approach-v1/stratum-0": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-1": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-2": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-3": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            }
+          },
+          "physics_ticks": 28800,
+          "all_physics_traces_exact": true,
+          "all_policy_rows_exact": false
+        },
+        "mixed": {
+          "attempts": 64,
+          "outcomes": {
+            "success": 56,
+            "deadline": 8
+          },
+          "successes": 56,
+          "physical_failures": 0,
+          "by_repeat": {
+            "0": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 14,
+                "deadline": 2
+              },
+              "successes": 14,
+              "physical_failures": 0
+            },
+            "1": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 14,
+                "deadline": 2
+              },
+              "successes": 14,
+              "physical_failures": 0
+            },
+            "2": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 14,
+                "deadline": 2
+              },
+              "successes": 14,
+              "physical_failures": 0
+            },
+            "3": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 14,
+                "deadline": 2
+              },
+              "successes": 14,
+              "physical_failures": 0
+            }
+          },
+          "by_recipe": {
+            "aligned-approach-v1/stratum-0": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 16
+              },
+              "successes": 16,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-1": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 16
+              },
+              "successes": 16,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-2": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 16
+              },
+              "successes": 16,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-3": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 8,
+                "deadline": 8
+              },
+              "successes": 8,
+              "physical_failures": 0
+            }
+          },
+          "physics_ticks": 53504,
+          "all_physics_traces_exact": true,
+          "all_policy_rows_exact": true
+        }
+      }
+    },
+    {
+      "seed": 29,
+      "seconds": 215.82219233799697,
+      "modes": {
+        "legacy": {
+          "attempts": 16,
+          "outcomes": {
+            "deadline": 16
+          },
+          "successes": 0,
+          "physical_failures": 0,
+          "by_repeat": {
+            "0": {
+              "attempts": 16,
+              "outcomes": {
+                "deadline": 16
+              },
+              "successes": 0,
+              "physical_failures": 0
+            }
+          },
+          "by_recipe": {
+            "aligned-approach-v1/stratum-0": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-1": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-2": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-3": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            }
+          },
+          "physics_ticks": 28800,
+          "all_physics_traces_exact": true,
+          "all_policy_rows_exact": false
+        },
+        "mixed": {
+          "attempts": 64,
+          "outcomes": {
+            "success": 43,
+            "deadline": 21
+          },
+          "successes": 43,
+          "physical_failures": 0,
+          "by_repeat": {
+            "0": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 10,
+                "deadline": 6
+              },
+              "successes": 10,
+              "physical_failures": 0
+            },
+            "1": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 11,
+                "deadline": 5
+              },
+              "successes": 11,
+              "physical_failures": 0
+            },
+            "2": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 11,
+                "deadline": 5
+              },
+              "successes": 11,
+              "physical_failures": 0
+            },
+            "3": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 11,
+                "deadline": 5
+              },
+              "successes": 11,
+              "physical_failures": 0
+            }
+          },
+          "by_recipe": {
+            "aligned-approach-v1/stratum-0": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 16
+              },
+              "successes": 16,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-1": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 12,
+                "deadline": 4
+              },
+              "successes": 12,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-2": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 9,
+                "deadline": 7
+              },
+              "successes": 9,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-3": {
+              "attempts": 16,
+              "outcomes": {
+                "deadline": 10,
+                "success": 6
+              },
+              "successes": 6,
+              "physical_failures": 0
+            }
+          },
+          "physics_ticks": 59016,
+          "all_physics_traces_exact": true,
+          "all_policy_rows_exact": true
+        }
+      }
+    },
+    {
+      "seed": 43,
+      "seconds": 232.06881755799986,
+      "modes": {
+        "legacy": {
+          "attempts": 16,
+          "outcomes": {
+            "deadline": 16
+          },
+          "successes": 0,
+          "physical_failures": 0,
+          "by_repeat": {
+            "0": {
+              "attempts": 16,
+              "outcomes": {
+                "deadline": 16
+              },
+              "successes": 0,
+              "physical_failures": 0
+            }
+          },
+          "by_recipe": {
+            "aligned-approach-v1/stratum-0": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-1": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-2": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-3": {
+              "attempts": 4,
+              "outcomes": {
+                "deadline": 4
+              },
+              "successes": 0,
+              "physical_failures": 0
+            }
+          },
+          "physics_ticks": 28800,
+          "all_physics_traces_exact": true,
+          "all_policy_rows_exact": false
+        },
+        "mixed": {
+          "attempts": 64,
+          "outcomes": {
+            "success": 38,
+            "deadline": 26
+          },
+          "successes": 38,
+          "physical_failures": 0,
+          "by_repeat": {
+            "0": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 9,
+                "deadline": 7
+              },
+              "successes": 9,
+              "physical_failures": 0
+            },
+            "1": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 9,
+                "deadline": 7
+              },
+              "successes": 9,
+              "physical_failures": 0
+            },
+            "2": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 10,
+                "deadline": 6
+              },
+              "successes": 10,
+              "physical_failures": 0
+            },
+            "3": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 10,
+                "deadline": 6
+              },
+              "successes": 10,
+              "physical_failures": 0
+            }
+          },
+          "by_recipe": {
+            "aligned-approach-v1/stratum-0": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 16
+              },
+              "successes": 16,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-1": {
+              "attempts": 16,
+              "outcomes": {
+                "success": 11,
+                "deadline": 5
+              },
+              "successes": 11,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-2": {
+              "attempts": 16,
+              "outcomes": {
+                "deadline": 15,
+                "success": 1
+              },
+              "successes": 1,
+              "physical_failures": 0
+            },
+            "aligned-approach-v1/stratum-3": {
+              "attempts": 16,
+              "outcomes": {
+                "deadline": 6,
+                "success": 10
+              },
+              "successes": 10,
+              "physical_failures": 0
+            }
+          },
+          "physics_ticks": 65397,
+          "all_physics_traces_exact": true,
+          "all_policy_rows_exact": true
+        }
+      }
+    }
+  ],
+  "outcomes": {
+    "legacy": {
+      "attempts": 48,
+      "successes": 0,
+      "physical_failures": 0,
+      "physics_ticks": 86400
+    },
+    "mixed": {
+      "attempts": 192,
+      "successes": 137,
+      "physical_failures": 0,
+      "physics_ticks": 177917
+    }
+  },
+  "full_replay_physics_ticks": 264317,
+  "substantive_training_updates": 0,
+  "validation": {
+    "production_tests": 52,
+    "new_integration_tests": 7,
+    "preliminary_integration_tests": 7,
+    "exact_legacy_trajectories": 48,
+    "exact_mixed_trajectory_probability_pairs": 192,
+    "caller_rng_preserved": true,
+    "task_order_independent": true,
+    "training_checkpoint_evaluation_and_resume_bitwise_equal": true,
+    "old_checkpoint_exact_resume_refused": true,
+    "source_file_count": 1526,
+    "copied_parent_inputs_unchanged": 441,
+    "prior_manifests_unchanged": 17,
+    "compile_whitespace": "passed"
+  },
+  "qualification_changed": false,
+  "confirmation_used": false,
+  "native_gameplay_integration": false,
+  "general_flight_claim": false
+}

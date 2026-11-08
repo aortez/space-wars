@@ -11,11 +11,16 @@
 pub mod combat_pilot;
 pub mod flight_pilot;
 mod flight_prediction;
+pub mod flight_stack;
 pub mod ground_task;
 pub mod guidance;
 pub mod jetpack_crossing;
 mod landing_safety;
+pub mod learned_flight;
+pub mod learned_motor;
+pub mod learned_navigation;
 pub mod mission_evaluation;
+pub mod mission_learned_transfer;
 pub mod mission_pilot;
 pub mod mission_policy;
 pub mod model;

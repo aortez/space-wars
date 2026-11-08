@@ -33,7 +33,9 @@ mod escape_travel;
 pub use escape_travel::{ESCAPE_TRAVEL_PROFILE, EscapeTravel, EscapeTravelAttempt};
 #[path = "mission_transfer_approach.rs"]
 mod transfer_approach;
-pub use transfer_approach::{TRANSFER_APPROACH_PROFILE, TransferApproach, TransferApproachSample};
+pub use transfer_approach::{
+    LearnedEntries, TRANSFER_APPROACH_PROFILE, TransferApproach, TransferApproachSample,
+};
 #[path = "mission_transfer_speed.rs"]
 mod transfer_speed;
 pub use transfer_speed::{
@@ -115,6 +117,12 @@ const PURSUIT_BUDGET_TICKS: u64 = 30 * 60;
 const PURSUIT_RETRY_TICKS: u64 = 12 * 60;
 const PURSUIT_LOST_SIGHT_TICKS: u64 = 6 * 60;
 const PURSUIT_CLIMB_CLEARANCE: f32 = 140.0;
+/// How far above the altitude that releases a climb its leg's goal lies,
+/// so the learned host is still climbing when the pilot takes the ship on.
+const CLIMB_GOAL_MARGIN: f32 = 60.0;
+/// How far above the launch band a learned host's pursuit climb holds
+/// against the opponent's range, so its leg clears the band's edge.
+const PURSUIT_CLIMB_EDGE_HOLD: f32 = 20.0;
 pub const HUNT_CLEARANCE_HANDOFF_PROFILE: &str = "material_hunt_clearance_handoff_v1";
 
 #[cfg(test)]
@@ -209,6 +217,12 @@ pub struct MissionTelemetry {
     pub transfer_approach: Option<TransferApproach>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transfer_speed: Option<TransferSpeed>,
+    /// The flight stack a host flies the transfer legs with.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learned_transfer: Option<&'static str>,
+    /// The entries the host was given for the legs, by tick.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learned_entries: Option<LearnedEntries>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -229,6 +243,48 @@ pub enum MissionObstacleId {
 pub struct MissionAvoidance {
     pub obstacle: MissionObstacleId,
     pub waypoint: Vec2,
+}
+
+/// What a published leg flies to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LegKind {
+    /// The destination's entry point.
+    Transfer,
+    /// A point up the ship's radial, above the launch band or the pursuit
+    /// climb's clearance.
+    Climb,
+}
+
+/// A leg of the mission's flight for a learned flight host: the goal in the
+/// world this tick and the identity the host starts an attempt on. Published
+/// only while the pilot's priorities leave the ship to the transfer or the
+/// climb; the handoff, a recovery, a pursuit or a solar escape withdraws it.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct FlightLeg {
+    pub kind: LegKind,
+    pub tick: u64,
+    /// The tick the leg began: the destination's selection for a transfer,
+    /// the climb's first tick for a climb. A new one is a new leg.
+    pub started_tick: u64,
+    /// The planet whose frame the goal rests in: a transfer's destination,
+    /// the planet a climb leaves.
+    pub target: usize,
+    pub goal: Vec2,
+    pub goal_velocity: Vec2,
+    /// From the ship to the goal.
+    pub distance: f32,
+}
+
+/// A climb leg under way, for the leg's identity: the planet it leaves,
+/// the altitude that releases it and its first tick. The goal itself is
+/// found again every tick.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Climb {
+    planet: usize,
+    release_altitude: f32,
+    started_tick: u64,
+    last_tick: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -269,6 +325,10 @@ pub struct MaterialMissionPilot {
     pub(crate) actual_route_recovery: bool,
     destination_switched: bool,
     landing_reference: Option<crate::mission_evaluation::CostedLandingReference>,
+    learned_transfer: bool,
+    leg: Option<FlightLeg>,
+    climb: Option<Climb>,
+    learned_bearing: Option<transfer_approach::LearnedBearing>,
 }
 
 impl MaterialMissionPilot {
@@ -322,6 +382,8 @@ impl MaterialMissionPilot {
                 escape_travel: None,
                 transfer_approach: None,
                 transfer_speed: None,
+                learned_transfer: None,
+                learned_entries: None,
             },
             capture: None,
             recovery: None,
@@ -354,6 +416,10 @@ impl MaterialMissionPilot {
             actual_route_recovery: false,
             destination_switched: false,
             landing_reference: None,
+            learned_transfer: false,
+            leg: None,
+            climb: None,
+            learned_bearing: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -379,6 +445,7 @@ impl MaterialMissionPilot {
         let escape_travel = self.telemetry.escape_travel.is_some();
         let transfer_approach = self.telemetry.transfer_approach.is_some();
         let transfer_speed = self.telemetry.transfer_speed.is_some();
+        let learned_transfer = self.learned_transfer;
         let powered_capture = self.telemetry.powered_capture;
         let live_claim_stopping = !self.telemetry.live_claim_stopping_disabled;
         let destination_retry = self.telemetry.destination_retry.is_some();
@@ -410,6 +477,7 @@ impl MaterialMissionPilot {
         self.configure_escape_travel(escape_travel);
         self.configure_transfer_approach(transfer_approach);
         self.configure_transfer_speed(transfer_speed);
+        self.configure_learned_transfer(learned_transfer);
         self.configure_powered_capture(powered_capture);
         self.configure_live_claim_stopping(live_claim_stopping);
         self.configure_active_flight_checks(active_flight_checks);
@@ -509,6 +577,93 @@ impl MaterialMissionPilot {
             site: self.site_request(),
             last_survey: self.last_survey,
         }
+    }
+    /// Publish transfer legs for a learned flight host instead of relying on
+    /// the pilot's own transfer controls. The pilot still computes those
+    /// controls every tick, so a host can fall back to them tick by tick.
+    pub(crate) fn configure_learned_transfer(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        self.learned_transfer = enabled;
+        self.telemetry.learned_transfer = enabled.then_some(crate::flight_stack::STACK_ID_V2);
+        self.telemetry.learned_entries = enabled.then_some(LearnedEntries::default());
+    }
+    pub fn learned_transfer(&self) -> bool {
+        self.learned_transfer
+    }
+    /// The leg published by the last intent, if that intent left the flying
+    /// to a learned host.
+    pub fn flight_leg(&self) -> Option<FlightLeg> {
+        self.leg
+    }
+    /// Whether a leg may be published this tick: the binding is on and the
+    /// pilot is aboard an armed, flyable ship with its feet off the ground.
+    fn leg_allowed(&self, o: &MissionObservationV1) -> bool {
+        let c = &o.local.combat;
+        let p = &c.recovery.flight.pilot;
+        self.learned_transfer
+            && p.controls_armed
+            && p.ship_available
+            && p.ship_form == ShipForm::Ship
+            && c.recovery.flight.flight.enabled
+            && matches!(p.location, PilotLocation::Aboard(_))
+            && p.landing.supported_feet == 0
+    }
+    /// Publish a climb leg for a learned host out of the planet `index`,
+    /// which the pilot's own rule releases `release_altitude` above its
+    /// radius. The goal lies ahead of the ship along the pilot's own climb
+    /// direction, up the radial or outward from both bodies in a gap, by the
+    /// altitude still to climb plus the goal margin, so it rides the ship's
+    /// radial as the pilot's own climb does and stays ahead of the ship until
+    /// the rule releases the climb; a climb that is interrupted, changes
+    /// planet or changes its release altitude is a new leg. The pilot's own
+    /// climb flies any tick the host refuses it.
+    fn publish_climb(&mut self, o: &MissionObservationV1, index: usize, release_altitude: f32) {
+        if !self.leg_allowed(o) {
+            return;
+        }
+        let p = &o.local.combat.recovery.flight.pilot;
+        let anchor = o
+            .planets
+            .iter()
+            .find(|planet| planet.index == index)
+            .unwrap_or(&p.planet);
+        let (velocity, direction, gap) = self.climb_direction(o, index);
+        let above = p.ship.position.distance_to(anchor.motion.position) - anchor.radius;
+        let reach = (release_altitude - above).max(0.0) + CLIMB_GOAL_MARGIN;
+        let goal = p.ship.position + direction * reach;
+        let mut climb = self
+            .climb
+            .filter(|climb| {
+                climb.planet == anchor.index
+                    && climb.release_altitude == release_altitude
+                    && climb.last_tick + 1 == p.tick
+            })
+            .unwrap_or(Climb {
+                planet: anchor.index,
+                release_altitude,
+                started_tick: p.tick,
+                last_tick: p.tick,
+            });
+        climb.last_tick = p.tick;
+        self.leg = Some(FlightLeg {
+            kind: LegKind::Climb,
+            tick: p.tick,
+            started_tick: climb.started_tick,
+            target: anchor.index,
+            goal,
+            // In a gap the goal rides the frame between the bodies, as the
+            // pilot's own climb does; otherwise its planet's spinning frame.
+            goal_velocity: if gap {
+                velocity
+            } else {
+                anchor.velocity_at(goal)
+            },
+            distance: reach,
+        });
+        self.climb = Some(climb);
     }
     pub(crate) fn configure_initial_cover(&mut self, enabled: bool) {
         assert!(
@@ -791,6 +946,7 @@ impl MaterialMissionPilot {
         self.telemetry.opponent = None;
         self.telemetry.combat = None;
         self.telemetry.reason = None;
+        self.leg = None;
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         self.update_capture_escape(o);
@@ -1128,13 +1284,40 @@ impl MaterialMissionPilot {
         let relative = p.ship.velocity - p.planet.motion.velocity;
         let falling = (-relative.dot(up)).max(0.0);
         let mut speed_brake = false;
-        let desired = if altitude < 70.0 + falling * falling / 50.0 {
+        // The launch climb clears the surface before a transfer. The band
+        // yields only while a learned host flies the transfer leg, which it
+        // does on exactly the ticks it leaves the seat in learned control
+        // after a transfer decision: the stack keeps its own clearances and
+        // the band must not take the ship back every time its route runs
+        // low. Any other low tick climbs first, and the host flies that
+        // climb as a leg of its own.
+        let flying_transfer = p.learned_control && self.telemetry.goal == MissionGoal::Transfer;
+        let launching = altitude < 70.0 + falling * falling / 50.0 && !flying_transfer;
+        let desired = if launching {
             self.goal(MissionGoal::Launch, p.tick);
             self.progress_tick = p.tick;
+            self.publish_climb(o, p.planet.index, 70.0);
             p.planet.motion.velocity + up * 18.0
         } else {
             self.goal(MissionGoal::Transfer, p.tick);
             self.record_transfer_approach_guidance(p.tick);
+            // The stack flies to the point it is given, so its leg takes a
+            // clear entry: one that another planet's orbit has carried into
+            // its margin would park the ship at that planet's surface, where
+            // the handoff cannot fire, and one inside the sun's margin would
+            // hold it at the heat. The pilot's own flight keeps its entry.
+            if self.leg_allowed(o) {
+                let entry = self.learned_entry(o, target, entry);
+                self.leg = Some(FlightLeg {
+                    kind: LegKind::Transfer,
+                    tick: p.tick,
+                    started_tick: self.selected_tick,
+                    target: target.index,
+                    goal: entry,
+                    goal_velocity: target.velocity_at(entry),
+                    distance: p.ship.position.distance_to(entry),
+                });
+            }
             let waypoint = self.route_waypoint(o, entry, Some(target.index));
             let delta = waypoint - p.ship.position;
             let ordinary = self.detour_velocity(o, target.motion.velocity)
@@ -1310,19 +1493,27 @@ impl MaterialMissionPilot {
                             > other.radius + PURSUIT_CLIMB_CLEARANCE
                     })
             });
-            if cleared || opponent.motion.position.distance_to(p.ship.position) > 300.0 {
+            // The opponent's range releases the climb as the ship crosses the
+            // band and the band starts it again the next tick the ship sinks
+            // back. The pilot's own climb carries the ship over the edge, but
+            // a learned host turns its nose before it thrusts, so its leg
+            // would end every few ticks at the edge with the pilot's own ticks
+            // between. Its leg holds until the ship is clear of the edge.
+            let edge = p.learned_control
+                && altitude < 70.0 + falling * falling / 50.0 + PURSUIT_CLIMB_EDGE_HOLD;
+            if cleared || (opponent.motion.position.distance_to(p.ship.position) > 300.0 && !edge) {
                 self.pursuit_climb = None;
             }
         }
+        if self.pursuit_climb.is_none() && altitude < 70.0 + falling * falling / 50.0 {
+            self.pursuit_climb = Some(p.planet.index);
+        }
         if let Some(index) = self.pursuit_climb {
             self.telemetry.reason = Some("climbing for a firing pass");
+            // A learned host climbs toward a goal past the clearance, so the
+            // ship is still rising when the rule above releases it.
+            self.publish_climb(o, index, PURSUIT_CLIMB_CLEARANCE);
             let intent = self.guide(o, self.pursuit_climb_velocity(o, index));
-            return self.pursuit_climb_laser_intent(o, intent, PursuitClimbLaserSource::Mission);
-        }
-        if altitude < 70.0 + falling * falling / 50.0 {
-            self.pursuit_climb = Some(p.planet.index);
-            self.telemetry.reason = Some("climbing for a firing pass");
-            let intent = self.guide(o, self.pursuit_climb_velocity(o, p.planet.index));
             return self.pursuit_climb_laser_intent(o, intent, PursuitClimbLaserSource::Mission);
         }
         if let Some(target) = c.target
@@ -1369,6 +1560,14 @@ impl MaterialMissionPilot {
         )
     }
     fn pursuit_climb_velocity(&self, o: &MissionObservationV1, index: usize) -> Vec2 {
+        let (velocity, direction, _) = self.climb_direction(o, index);
+        velocity + direction * 18.0
+    }
+    /// The pilot's own climb out of the planet `index`: the frame velocity
+    /// the climb rides, the direction it lifts along, and whether that is
+    /// the outward direction of a gap between two bodies rather than the
+    /// planet's radial.
+    fn climb_direction(&self, o: &MissionObservationV1, index: usize) -> (Vec2, Vec2, bool) {
         let p = &o.local.combat.recovery.flight.pilot;
         let anchor = o
             .planets
@@ -1389,7 +1588,7 @@ impl MaterialMissionPilot {
                     .total_cmp(&(p.ship.position.distance_to(b.motion.position) - b.radius))
             });
         let Some(other) = other else {
-            return anchor.motion.velocity + up * 18.0;
+            return (anchor.motion.velocity, up, false);
         };
         // Keep the climb's original frame across nearest-planet changes. In a
         // gap, lifting from just one body can push the ship toward the other.
@@ -1403,7 +1602,7 @@ impl MaterialMissionPilot {
         } else {
             tangent
         };
-        velocity + direction * 18.0
+        (velocity, direction, true)
     }
     fn detour_velocity(&self, o: &MissionObservationV1, destination_velocity: Vec2) -> Vec2 {
         // Transfers and pursuit can pass several moving obstacles. Follow
@@ -2004,14 +2203,31 @@ mod solar_route_tests {
             planet.radius = 60.0;
         }
         let position = Vec2::new(0.0, 20.0);
-        o.local.combat.recovery.flight.pilot.ship.position = position;
-        o.local.combat.recovery.flight.pilot.ship.velocity = Vec2::new(2.0, 3.0);
+        {
+            // A ship in flight between the planets, as a learned host's leg
+            // requires.
+            let f = &mut o.local.combat.recovery.flight;
+            f.flight.enabled = true;
+            let p = &mut f.pilot;
+            p.ship.position = position;
+            p.ship.velocity = Vec2::new(2.0, 3.0);
+            p.controls_armed = true;
+            p.ship_available = true;
+            p.ship_form = ShipForm::Ship;
+            p.landing.supported_feet = 0;
+        }
         o.opponent.as_mut().unwrap().motion.position = position + Vec2::Y * 100.0;
         let context = BrainReset {
             actor: PlayerId::PLAYER_1,
             episode_seed: 42,
         };
         let mut brain = MaterialMissionPilot::new(context, CombatBreakSettings::default());
+        brain.configure_learned_transfer(true);
+        assert!(matches!(
+            o.local.combat.recovery.flight.pilot.location,
+            PilotLocation::Aboard(_)
+        ));
+        let started = o.local.combat.recovery.flight.pilot.tick;
         for frame in [0, 1, 0, 1] {
             o.local.combat.recovery.flight.pilot.planet = o.planets[frame].clone();
             let before = o.clone();
@@ -2031,17 +2247,35 @@ mod solar_route_tests {
                         > 0.0
                 );
             }
+            // The climb is a leg for a learned host, one leg across the
+            // frame changes, anchored on the planet the climb began on and
+            // lifting out of the gap by the altitude still to climb from that
+            // planet plus 60, riding the frame between the bodies.
+            let leg = brain.flight_leg().expect("the climb is a leg");
+            assert_eq!(
+                (leg.kind, leg.target, leg.started_tick),
+                (LegKind::Climb, 0, started)
+            );
+            let above = position.distance_to(o.planets[0].motion.position) - 60.0;
+            let goal = position + Vec2::Y * (140.0 - above + 60.0);
+            assert!(leg.goal.distance_to(goal) < 0.001, "{:?}", leg.goal);
+            assert!((leg.distance - (140.0 - above + 60.0)).abs() < 0.001);
+            assert_eq!(leg.goal_velocity, Vec2::new(2.0, 3.0));
             o.local.combat.recovery.flight.pilot.tick += 1;
         }
-        // Once both bodies are clear, pursuit may resume without a new timer.
+        // Once both bodies are clear, pursuit may resume without a new timer,
+        // and the climb's leg is withdrawn.
         o.local.combat.recovery.flight.pilot.ship.position = Vec2::Y * 300.0;
         o.local.combat.recovery.flight.pilot.ship.velocity = Vec2::new(2.0, 21.0);
         o.opponent.as_mut().unwrap().motion.position = Vec2::Y * 400.0;
+        brain.leg = None;
         brain.hunt(&o);
         assert_eq!(brain.pursuit_climb, None);
+        assert_eq!(brain.flight_leg(), None);
         brain.pursuit_climb = Some(0);
         brain.reset(context);
         assert_eq!(brain.pursuit_climb, None);
+        assert_eq!(brain.flight_leg(), None);
     }
 
     #[test]

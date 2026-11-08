@@ -1,11 +1,16 @@
 //! Rootfs trial transitions. The device service must durably commit a plan's
 //! record before performing its action. This module never touches boot files,
 //! opens a watchdog, writes a partition, or authorizes installation by itself.
+use crate::development::DevelopmentImage;
 use crate::{DataCompatibility, ImageDescriptor, ImageHistory, Sha256, VerifiedCandidate};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub const RECOVERY_PROTOCOL: u32 = 2;
+/// Records with a development transaction use schema 3, which older images
+/// refuse instead of misreading. All other records stay schema 2.
+const SCHEMA: u32 = 2;
+const DEVELOPMENT_SCHEMA: u32 = 3;
 pub const TRIAL_DEADLINE_MS: u64 = 180_000;
 pub const HEALTH_WINDOW_MS: u64 = 60_000;
 pub const MAX_HEALTH_GAP_MS: u64 = 5_000;
@@ -44,8 +49,9 @@ pub struct BootBinding {
 pub struct SlotImage {
     pub slot: Slot,
     pub build_id: String,
-    /// Zero identifies an unpublished image confirmed by supervised bootstrap.
-    /// Signed OTA candidates always have a positive release generation.
+    /// Zero identifies an unpublished image, confirmed by supervised bootstrap
+    /// or installed as a development image. Signed OTA candidates always have
+    /// a positive release generation.
     pub generation: u64,
     pub payload: Sha256,
     pub expanded: Sha256,
@@ -58,6 +64,17 @@ impl SlotImage {
             slot,
             build_id: image.build_id.clone(),
             generation: image.generation,
+            payload: image.compressed.sha256,
+            expanded: image.expanded.sha256,
+            data: image.data,
+        }
+    }
+
+    fn from_development(slot: Slot, image: &DevelopmentImage) -> Self {
+        Self {
+            slot,
+            build_id: image.build_id.clone(),
+            generation: 0,
             payload: image.compressed.sha256,
             expanded: image.expanded.sha256,
             data: image.data,
@@ -166,6 +183,14 @@ pub struct Transaction {
     pub failure: Option<FailureReason>,
 }
 
+impl Transaction {
+    /// A development image never takes a generation, raises the floor or
+    /// enters the quarantine map. Its failure stays in the transaction.
+    pub fn development(&self) -> bool {
+        self.candidate.generation == 0
+    }
+}
+
 /// A successfully committed tryboot remains a tryboot in the running kernel
 /// until the next reset. Retain that exact good boot across a later transaction.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -209,6 +234,24 @@ pub struct Plan {
     pub(crate) action: Action,
 }
 
+impl Plan {
+    /// Read-only association for a separate durable handoff journal. This does
+    /// not publish the action or authorize writes: only RecoveryStore::advance
+    /// may return the action after committing this plan. Persist the association
+    /// first, while retaining the shared installation lock across both stores.
+    pub fn installation(&self) -> Option<(Sha256, &Transaction)> {
+        let transaction = self.record.transaction.as_ref()?;
+        match self.action {
+            Action::WriteInactive {
+                transaction: id, ..
+            } if id == transaction.id && transaction.phase == Phase::Writing => {
+                Some((self.previous, transaction))
+            }
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error, Eq, PartialEq)]
 pub enum RecoveryError {
     #[error("missing, inconsistent or unsupported recovery state")]
@@ -245,7 +288,7 @@ impl RecoveryRecord {
             return Err(RecoveryError::BootMismatch);
         }
         let record = Self {
-            schema: 2,
+            schema: SCHEMA,
             binding,
             highest_attempted_generation: good.generation,
             good,
@@ -261,7 +304,7 @@ impl RecoveryRecord {
 
     pub fn validate(&self) -> Result<()> {
         let invalid = RecoveryError::InvalidState;
-        if self.schema != 2
+        if self.schema != self.expected_schema()
             || !self.good.valid()
             || self.highest_attempted_generation < self.good.generation
             || self.failures.len() > MAX_FAILURES
@@ -297,14 +340,18 @@ impl RecoveryRecord {
                     return Err(invalid);
                 }
             }
+            let generation = if tx.development() {
+                tx.attempt == 1
+            } else {
+                tx.candidate.generation > tx.previous_good.generation
+                    && tx.candidate.generation == self.highest_attempted_generation
+                    && (1..=MAX_ATTEMPTS_PER_IMAGE).contains(&tx.attempt)
+            };
             if self.sequence == 0
                 || !tx.previous_good.valid()
                 || !tx.candidate.valid()
-                || tx.candidate.generation == 0
                 || tx.previous_good.slot == tx.candidate.slot
-                || tx.candidate.generation <= tx.previous_good.generation
-                || tx.candidate.generation != self.highest_attempted_generation
-                || !(1..=MAX_ATTEMPTS_PER_IMAGE).contains(&tx.attempt)
+                || !generation
                 || !boot_id(&tx.origin_boot_id)
                 || tx
                     .trial_boot_id
@@ -362,12 +409,18 @@ impl RecoveryRecord {
                 return Err(invalid);
             }
             if matches!(tx.phase, Phase::RollbackPending | Phase::RolledBack) {
-                let failed = self
-                    .failures
-                    .get(&tx.candidate.payload)
-                    .ok_or(RecoveryError::InvalidState)?;
-                if tx.failure != Some(failed.reason) || failed.attempts != tx.attempt {
-                    return Err(invalid);
+                if tx.development() {
+                    if tx.failure.is_none() {
+                        return Err(invalid);
+                    }
+                } else {
+                    let failed = self
+                        .failures
+                        .get(&tx.candidate.payload)
+                        .ok_or(RecoveryError::InvalidState)?;
+                    if tx.failure != Some(failed.reason) || failed.attempts != tx.attempt {
+                        return Err(invalid);
+                    }
                 }
             } else if tx.failure.is_some() {
                 return Err(invalid);
@@ -515,17 +568,65 @@ impl RecoveryRecord {
         {
             return Err(RecoveryError::Quarantined);
         }
+        self.start(
+            image.candidate_id(),
+            SlotImage::from_descriptor(self.good.slot.other(), image),
+            attempt,
+            boot,
+        )
+    }
+
+    /// Only the root operator's opt-in development command calls this, after
+    /// checking its approval, opened payload and the unit's compatibility.
+    /// The image takes no generation, so the floor and quarantine stay as
+    /// they are and the next official image still installs over it.
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn begin_development(
+        &self,
+        image: &DevelopmentImage,
+        boot: &BootObservation,
+    ) -> Result<Plan> {
+        self.check_boot(boot)?;
+        if !self.runs_good(boot) {
+            return Err(RecoveryError::BootMismatch);
+        }
+        if self
+            .transaction
+            .as_ref()
+            .is_some_and(|tx| !tx.phase.terminal())
+        {
+            return Err(RecoveryError::Busy);
+        }
+        if image.validate().is_err()
+            || image.boot_identity != self.binding.boot_identity
+            || image.min_recovery_protocol != RECOVERY_PROTOCOL
+            || image.compressed.sha256 == self.good.payload
+            || !self.good.data.reads.contains(image.data.writes)
+            || !image.data.reads.contains(self.good.data.writes)
+        {
+            return Err(RecoveryError::Ineligible);
+        }
+        self.start(
+            image.candidate_id(),
+            SlotImage::from_development(self.good.slot.other(), image),
+            1,
+            boot,
+        )
+    }
+
+    fn start(
+        &self,
+        candidate_id: Sha256,
+        candidate: SlotImage,
+        attempt: u8,
+        boot: &BootObservation,
+    ) -> Result<Plan> {
         let mut next = self.clone();
         next.sequence = next
             .sequence
             .checked_add(1)
             .ok_or(RecoveryError::InvalidState)?;
-        let id = transaction_id(
-            next.sequence,
-            image.candidate_id(),
-            &boot.boot_id,
-            &self.binding,
-        );
+        let id = transaction_id(next.sequence, candidate_id, &boot.boot_id, &self.binding);
         // The writer will overwrite this slot. Never continue advertising its
         // former content as a retained good image after granting write access.
         next.retained_good = None;
@@ -538,12 +639,14 @@ impl RecoveryRecord {
         } else {
             None
         };
-        next.highest_attempted_generation = next.highest_attempted_generation.max(image.generation);
+        next.highest_attempted_generation =
+            next.highest_attempted_generation.max(candidate.generation);
+        let slot = candidate.slot;
         next.transaction = Some(Transaction {
             id,
-            candidate_id: image.candidate_id(),
+            candidate_id,
             previous_good: self.good.clone(),
-            candidate: SlotImage::from_descriptor(self.good.slot.other(), image),
+            candidate,
             attempt,
             origin_boot_id: boot.boot_id.clone(),
             trial_boot_id: None,
@@ -554,7 +657,7 @@ impl RecoveryRecord {
         next.plan(
             self,
             Action::WriteInactive {
-                slot: self.good.slot.other(),
+                slot,
                 transaction: id,
             },
         )
@@ -602,8 +705,8 @@ impl RecoveryRecord {
         next.plan(self, Action::RebootTrial { transaction: id })
     }
 
-    #[cfg(all(target_os = "linux", any(test, feature = "recovery-qualification")))]
-    pub(crate) fn supervised_reboot(
+    #[cfg(target_os = "linux")]
+    pub(crate) fn trial_reboot(
         &self,
         id: Sha256,
         boot: &BootObservation,
@@ -620,6 +723,16 @@ impl RecoveryRecord {
             return Err(RecoveryError::BootMismatch);
         }
         Ok(tx.candidate.slot)
+    }
+
+    /// Settle an abandoned writer only on the confirmed normal root. Candidate
+    /// trial health and promotion remain owned by the recovery service.
+    #[cfg(target_os = "linux")]
+    pub(crate) fn interrupted_normal(&self, boot: &BootObservation) -> Result<Plan> {
+        if !boot.normal(&self.good) {
+            return Err(RecoveryError::BootMismatch);
+        }
+        self.reconcile(boot)
     }
 
     /// Reconcile after every service start. A fresh observer must establish a
@@ -773,14 +886,17 @@ impl RecoveryRecord {
         }
         let reason = tx.failure.unwrap_or(reason);
         let mut next = self.clone();
-        next.failures.insert(
-            tx.candidate.payload,
-            FailedImage {
-                generation: tx.candidate.generation,
-                attempts: tx.attempt,
-                reason,
-            },
-        );
+        // Development failures can't fill the bounded map or block official images.
+        if !tx.development() {
+            next.failures.insert(
+                tx.candidate.payload,
+                FailedImage {
+                    generation: tx.candidate.generation,
+                    attempts: tx.attempt,
+                    reason,
+                },
+            );
+        }
         let active = next.transaction.as_mut().unwrap();
         active.phase = if on_good {
             Phase::RolledBack
@@ -802,7 +918,8 @@ impl RecoveryRecord {
         next.plan(self, action)
     }
 
-    pub(crate) fn fingerprint(&self) -> Sha256 {
+    /// Correlates an exact journal revision; it is not installation authority.
+    pub fn fingerprint(&self) -> Sha256 {
         Sha256::digest(&serde_json::to_vec(self).expect("recovery state serializes"))
     }
 
@@ -937,6 +1054,30 @@ impl RecoveryRecord {
         Ok(tx.id)
     }
 
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn inactive_development_write(
+        &self,
+        image: &DevelopmentImage,
+        boot: &BootObservation,
+    ) -> Result<Sha256> {
+        self.check_boot(boot)?;
+        let tx = self
+            .transaction
+            .as_ref()
+            .ok_or(RecoveryError::StaleCommand)?;
+        if tx.phase != Phase::Writing
+            || !tx.development()
+            || image.validate().is_err()
+            || image.candidate_id() != tx.candidate_id
+            || SlotImage::from_development(tx.candidate.slot, image) != tx.candidate
+            || !self.runs_good(boot)
+            || boot.boot_id != tx.origin_boot_id
+        {
+            return Err(RecoveryError::StaleCommand);
+        }
+        Ok(tx.id)
+    }
+
     fn runs_good(&self, boot: &BootObservation) -> bool {
         if boot.normal(&self.good) {
             return true;
@@ -966,7 +1107,22 @@ impl RecoveryRecord {
             .ok_or(RecoveryError::StaleCommand)
     }
 
-    fn plan(self, previous: &Self, action: Action) -> Result<Plan> {
+    fn expected_schema(&self) -> u32 {
+        if self
+            .transaction
+            .as_ref()
+            .is_some_and(Transaction::development)
+        {
+            DEVELOPMENT_SCHEMA
+        } else {
+            SCHEMA
+        }
+    }
+
+    fn plan(mut self, previous: &Self, action: Action) -> Result<Plan> {
+        // A new official transaction returns the record to the schema that
+        // older images read, once no development transaction remains.
+        self.schema = self.expected_schema();
         self.validate()?;
         Ok(Plan {
             previous: previous.fingerprint(),

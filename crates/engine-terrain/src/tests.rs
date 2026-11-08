@@ -208,6 +208,45 @@ fn serialization_resumes_ordered_edits_and_preserves_two_byte_cells() {
 }
 
 #[test]
+fn cloned_geometry_shares_cache_until_terrain_changes() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        let original = field(96, 64);
+        let geometry = TerrainGeometry::with_surface(&original, surface);
+        let mut terrain = original.clone();
+        let mut fork = geometry.clone();
+        assert!(Arc::ptr_eq(&geometry.chunks, &fork.chunks));
+        assert!(fork.refresh(&terrain).is_empty());
+        assert!(Arc::ptr_eq(&geometry.chunks, &fork.chunks));
+
+        terrain.apply(circle(31, 31, 3, EditMode::Remove)).unwrap();
+        let changed = fork.refresh(&terrain);
+        assert!(!changed.is_empty());
+        assert!(!Arc::ptr_eq(&geometry.chunks, &fork.chunks));
+        assert!(geometry.is_current(&original));
+        assert!(fork.is_current(&terrain));
+        let rebuilt = TerrainGeometry::with_surface(&terrain, surface);
+        for ((before, after), expected) in geometry
+            .chunks()
+            .iter()
+            .zip(fork.chunks())
+            .zip(rebuilt.chunks())
+        {
+            assert_eq!(after.rectangles, expected.rectangles);
+            assert_eq!(after.polygons, expected.polygons);
+            assert_eq!(after.local_bounds(), expected.local_bounds());
+            assert_eq!(
+                Arc::ptr_eq(before.identity(), after.identity()),
+                !changed.contains(&before.id)
+            );
+        }
+    }
+}
+
+#[test]
 fn rectangle_cover_exactly_matches_material_after_cross_chunk_edits() {
     let mut terrain = field(71, 67);
     let mut geometry = TerrainGeometry::new(&terrain);

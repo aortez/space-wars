@@ -53,12 +53,7 @@ fn event_mut(state: &mut ClockState) -> &mut MeltdownEvent {
 }
 
 fn world(state: &ClockState) -> &PhysicsWorld {
-    state
-        .duck_visit
-        .as_deref()
-        .or_else(|| event(state).vacant_arena())
-        .unwrap()
-        .arena_world()
+    state.arena.world().expect("shared arena")
 }
 
 fn isolate_block(state: &mut ClockState, position: Vec2, velocity: Vec2) {
@@ -158,6 +153,7 @@ fn block_block_contacts_do_not_trigger_the_material_change() {
     );
     let second = MeltCell {
         position: event(&state).cells[0].position + Vec2::new(0.0, layout.pitch * 0.79),
+        piece: event(&state).cells[1].piece,
         ..event(&state).cells[0]
     };
     event_mut(&mut state).cells[1] = second;
@@ -190,7 +186,7 @@ fn shared_meltdown_final_owner_cleans_up_from_every_material_phase() {
             toggle(&mut state, 1);
             ticks(&mut state, 30);
             assert!(state.player_duck_session().is_none());
-            assert!(event(&state).vacant_arena().is_some());
+            assert!(state.arena.vacant.is_some());
             for _ in stop_at + 30..510 {
                 conserved(&state);
                 tick(&mut state);
@@ -220,6 +216,8 @@ fn scheduled_meltdown_starts_without_an_extra_player_tick() {
         aquarium: false,
         cell_swap: false,
         grass: false,
+        slot_machine: false,
+        spider: false,
     };
     state.configure(settings);
     ticks(&mut state, crate::events::COOLDOWN_TICKS as usize);
@@ -290,7 +288,7 @@ fn block_pushes_duck_without_melting_then_liquefies_on_the_actual_floor() {
     let duck = state.duck_visit.as_ref().unwrap();
     let layout = duck.layout;
     let radius = duck.radius;
-    let origin = duck.arena_world().motion(DUCK).unwrap().position;
+    let origin = world(&state).motion(DUCK).unwrap().position;
     // Land an ordinary square onto the actor, with a small sideways offset so
     // the same live solver contact pushes it. Other cells stay unreleased.
     isolate_block(
@@ -377,7 +375,7 @@ fn conversion_backpressure_keeps_the_whole_solid_then_retries_without_loss() {
     state.preview_event(ClockEventKind::Meltdown);
     let duck = state.duck_visit.as_ref().unwrap();
     let layout = duck.layout;
-    let x = duck.arena_world().motion(DUCK).unwrap().position.x * 0.85;
+    let x = world(&state).motion(DUCK).unwrap().position.x * 0.85;
     isolate_block(
         &mut state,
         Vec2::new(x, layout.floor_y + layout.pitch * 0.4 + 1.0),
@@ -468,7 +466,7 @@ fn shared_meltdown_survives_pause_dismiss_rejoin_reading_changes_and_replacement
         toggle(&mut state, 1);
         ticks(&mut state, 30);
         assert!(state.player_duck_session().is_none());
-        assert!(event(&state).vacant_arena().is_some());
+        assert!(state.arena.vacant.is_some());
         let cells = event(&state).cells.clone();
         let water = event(&state).diagnostics();
         toggle(&mut state, 2);

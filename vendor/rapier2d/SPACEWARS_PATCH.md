@@ -94,7 +94,81 @@ ground, impact, compound, snapshot and filtering regressions cover the remaining
 CCD paths. See `docs/pizza-reference-comparison.md` for measured work and replay
 equivalence; instrumentation timings are separate from uninstrumented runs.
 
-These ten Rust files and the diagnostic feature in `Cargo.toml` are the
+The #327 contact-batch experiment adds a default no-op
+`PhysicsHooks::modify_solver_contacts_batch` in `src/pipeline/physics_hooks.rs`,
+re-exported by `src/pipeline/mod.rs`. `physics_pipeline.rs` invokes it once per
+actual solver substep, after kinematic velocity interpolation and before island
+construction/velocity solving. The context reads the complete retained contact
+set and can set bounded restitution on an existing manifold through a private,
+generation-checked `NarrowPhase::contact_pair_mut` accessor. Existing local contact modifiers run first;
+their tangent commands are preserved. The default does no work and introduces
+no persistent state or snapshot changes. External forces are not yet integrated
+at this phase. See `docs/design/material-contact-batch.md` and the real-contact
+regressions in `crates/engine-material/tests/contact_batch.rs` for scope and
+remaining adapter work.
+
+The shared-energy follow-up adds the 2D-only `ContactImpulse` and checked
+`SolverContactBatchContext::apply_contact_impulses` in
+`src/pipeline/normal_response.rs`. The context now holds the mutable body set
+privately and exposes read-only `bodies()`. The operation stages bounded velocity
+records, rejects the whole request on invalid/stale/duplicate targets or
+remaining approach, then applies paired normal impulses and wakes dynamic bodies.
+It admits only touching frictionless contacts without tangent drives. It clears
+targeted restitution and warmstarts, including tracked contact data, to avoid
+reapplying the old response; contact topology and solver constraints stay active.
+Default hook behavior, global solver settings and snapshot schemas are unchanged.
+Injected impulses are not reported as part of the subsequent solver force events.
+The host must retain its own work records and prove complete contact/constraint
+admission. `tests/shared_response.rs` covers actual default-solver energy,
+momentum, reversed insertion, moving supports, timestep changes, stale warmstarts
+and atomic rejection. See `docs/design/material-shared-energy.md` for the pulse
+allocation hypothesis and remaining production limits.
+
+The native arrival follow-up accumulates each body's paired-impulse response in
+f64 and converts to backend velocity once, before combined-response validation.
+Repeated f32 updates made duplicate collider representations change low-energy
+rebound on moving supports. Limits, atomic rejection, contact tolerances and
+warmstart clearing are unchanged. The native arrival regressions compare exact
+velocities across one/two/four representations without loosening energy checks.
+
+`apply_contact_impulses_checked` additionally lets the host validate the final
+rounded dynamic-body velocities against its work budget before any velocity,
+wake state or contact-cache mutation. A false validation result is atomic.
+The native material adapter uses this callback to reject numerically
+unrepresentable energy responses. The original `apply_contact_impulses` remains
+the low-level operation without host energy validation; its caller owns that
+accounting. Shared-response tests serialize bodies and contacts around a host
+veto, and native regressions cover low relative speeds at large common velocity.
+
+The gravity/support qualification opts into corrected contact impulse accumulation in
+`contact_constraints_set.rs`, `contact_with_coulomb_friction.rs` and
+`generic_contact_constraint.rs`. Builders receive an accumulation flag selected
+using the integer internal-step index. At the first update, the impulse is still
+the previous frame's cache; it seeds warmstarting but must not be counted as an
+already completed substep.
+Later updates accumulate normal/tangent impulses as before. The shared,
+3D-only `contact_with_twist_friction.rs` builder follows the same signature and
+rule for normal/tangent/twist totals; this 2D package does not qualify 3D motion.
+Existing public signatures, snapshot schemas, solver impulse updates and
+warm-start writeback are unchanged. The default-false
+`PhysicsHooks::report_applied_contact_impulses` selects corrected reporting for
+one pipeline step, including all islands and CCD subdivisions. The pipeline
+resets reused island solvers for every step. Native gravity operations and
+their independent fixtures opt in; ordinary stepping and passive loading
+capture preserve existing behavior. Corrected reports change force-event
+thresholds and subsequent new-contact/restitution classification when a stale
+positive impulse becomes zero. Applying that change globally caused gameplay
+regressions, so a global migration is outside this patch.
+
+`crates/engine-rapier/src/world/tests/contact_impulses.rs` checks normal/friction
+reports against momentum for rigid and multibody contacts, varying gravity,
+duration, internal subdivision, insertion order and warm-start coefficients.
+It also checks unloading, a false force-event threshold crossing, and default
+report preservation when alternating corrected and ordinary steps. The
+gravity fixture independently checks resting force across equivalent plate
+representations. See `docs/design/material-gravity-loading.md` for scope.
+
+These Rust files and the diagnostic feature in `Cargo.toml` are the
 complete source/configuration differences from the published crate. See
 `docs/picade-late-match-physics.md` for the retained inputs and qualification.
 

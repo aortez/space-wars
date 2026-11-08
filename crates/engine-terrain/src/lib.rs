@@ -3,6 +3,7 @@
 
 use engine_core::Vec2;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::sync::Arc;
 
 mod surface;
 pub use surface::{SolidPolygon, TerrainSurface};
@@ -693,9 +694,10 @@ impl ChunkGeometry {
 /// Derived collision/drawing geometry from material and optional shape samples.
 /// Recreate this cache when replacing/restoring a field: revisions identify edits
 /// within one terrain instance, not global field identity.
+/// Clones share immutable geometry until a refresh actually rebuilds a chunk.
 #[derive(Debug, Clone)]
 pub struct TerrainGeometry {
-    chunks: Vec<ChunkGeometry>,
+    chunks: Arc<Vec<ChunkGeometry>>,
     surface: TerrainSurface,
 }
 
@@ -706,9 +708,11 @@ impl TerrainGeometry {
 
     pub fn with_surface(terrain: &Terrain, surface: TerrainSurface) -> Self {
         Self {
-            chunks: (0..terrain.chunk_count())
-                .map(|i| Self::build_chunk(terrain, ChunkId(i as u32), surface))
-                .collect(),
+            chunks: Arc::new(
+                (0..terrain.chunk_count())
+                    .map(|i| Self::build_chunk(terrain, ChunkId(i as u32), surface))
+                    .collect(),
+            ),
             surface,
         }
     }
@@ -812,14 +816,16 @@ impl TerrainGeometry {
             "cache belongs to a different terrain"
         );
         let mut changed = Vec::new();
-        for chunk in &mut self.chunks {
+        for index in 0..self.chunks.len() {
+            let chunk = &self.chunks[index];
             if chunk
                 .dependencies
                 .iter()
                 .any(|&(id, revision)| terrain.chunk_revision(id) != Some(revision))
             {
                 let id = chunk.id;
-                *chunk = Self::build_chunk(terrain, id, self.surface);
+                let rebuilt = Self::build_chunk(terrain, id, self.surface);
+                Arc::make_mut(&mut self.chunks)[index] = rebuilt;
                 changed.push(id);
             }
         }

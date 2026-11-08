@@ -4,6 +4,7 @@ members = [
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-gravity",
+    "crates/engine-material",
     "crates/engine-nes",
     "crates/engine-rapier",
     "crates/engine-soil",
@@ -20,6 +21,7 @@ members = [
     "scenarios/garden-lab",
     "scenarios/falling",
     "scenarios/line-mover",
+    "scenarios/material-lab",
     "scenarios/nes",
     "scenarios/null",
     "scenarios/pizza",
@@ -53,7 +55,9 @@ clap = { version = "4", features = ["derive"] }
 cpal = "0.18.2"
 directories = "6"
 gilrs = { version = "0.11.2", default-features = false, features = ["xinput"] }
+libm = "0.2"
 rand = { version = "0.9", features = ["std_rng"] }
+rayon = "1.12"
 png = "0.17"
 rapier2d = { version = "=0.34.0", default-features = false, features = [
     "dim2",
@@ -80,6 +84,7 @@ engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 engine-agent = { path = "crates/engine-agent" }
 engine-gravity = { path = "crates/engine-gravity" }
+engine-material = { path = "crates/engine-material" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
 engine-soil = { path = "crates/engine-soil" }
@@ -91,6 +96,7 @@ scenario-garden-lab = { path = "scenarios/garden-lab" }
 scenario-clock = { path = "scenarios/clock" }
 scenario-falling = { path = "scenarios/falling" }
 scenario-line-mover = { path = "scenarios/line-mover" }
+scenario-material-lab = { path = "scenarios/material-lab" }
 scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }

@@ -252,6 +252,12 @@ impl MissionBot {
         self.0.configure_transfer_speed(enabled);
         self
     }
+    /// Publish transfer legs for a learned flight host; the pilot's own
+    /// transfer controls remain its fallback tick by tick.
+    pub fn with_learned_transfer(mut self, enabled: bool) -> Self {
+        self.0.configure_learned_transfer(enabled);
+        self
+    }
     /// Opt-in capture-failure context for initial and switched destinations.
     pub fn with_destination_retry(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);

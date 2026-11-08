@@ -15,6 +15,7 @@ Options:
   --target <host>       Target host [default: spacewars.local]
   --user <user>         SSH user [legacy: spacewars; fast: swadmin]
   --fast                Build/copy client + CLI and restart (no rootfs flash/reboot)
+  --development         Install a full image as a trial on a unit that allows it
   --remote-tmp <path>   Remote staging directory [default: /tmp]
   --image <path>        Use a specific rootfs .ext4.gz image
   --ssh-key <path>      Public SSH key to inject into the updated slot
@@ -27,6 +28,7 @@ Examples:
   npm run update
   npm run update -- --skip-build
   npm run update -- --fast --target picade.local
+  npm run update -- --development --target sw-picade-2.local
   npm run update -- --target spacewars.local --dry-run
 `);
 }
@@ -52,8 +54,17 @@ async function main() {
     return;
   }
 
+  if (args.includes('--fast') && args.includes('--development')) {
+    throw new Error('Choose either --fast or --development, not both.');
+  }
+
   if (args.includes('--fast')) {
     await run(process.execPath, [join(YOCTO_DIR, 'scripts/fast-update.mjs'), ...args], { cwd: YOCTO_DIR });
+    return;
+  }
+
+  if (args.includes('--development')) {
+    await run(process.execPath, [join(YOCTO_DIR, 'scripts/development-update.mjs'), ...args], { cwd: YOCTO_DIR });
     return;
   }
 

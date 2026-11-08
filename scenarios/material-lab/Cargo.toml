@@ -1,0 +1,16 @@
+[package]
+name = "scenario-material-lab"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+engine-common = { workspace = true }
+engine-core = { workspace = true }
+engine-material = { workspace = true }
+engine-rapier = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+serde_json = { workspace = true }

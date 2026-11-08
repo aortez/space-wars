@@ -1,11 +1,11 @@
 use super::*;
 use crate::floor::responsive::FloorShape;
 
-fn player(opening: f64, direction: f32) -> DuckEvent {
+fn player(opening: f64, direction: f32) -> TestDuck {
     let layout = Layout::new(4.0 / 3.0);
     let mut floor = ResponsiveFloor::new(FloorShape::clock(layout), 0.0);
     floor.opening = opening;
-    DuckEvent::new_responsive_player(layout, 42, 1, 1, direction, floor, None)
+    TestDuck::new_responsive_player(layout, 42, 1, 1, direction, floor)
 }
 
 #[test]
@@ -16,7 +16,7 @@ fn moving_panel_grounding_and_single_edge_jump_work_in_both_directions() {
             duck.step();
         }
         assert!(duck.grounded());
-        let before = duck.responsive_floor().unwrap().opening;
+        let before = duck.terrain.responsive_floor().unwrap().opening;
         let start_x = duck.position().unwrap().x;
         let mut grounded = 0;
         for _ in 0..180 {
@@ -27,7 +27,7 @@ fn moving_panel_grounding_and_single_edge_jump_work_in_both_directions() {
             assert_eq!(duck.physics_counts(), (count, count));
             let p = duck.position().unwrap();
             let x = duck.render_position(p).x;
-            let floor = duck.responsive_floor().unwrap();
+            let floor = duck.terrain.responsive_floor().unwrap();
             let bed = floor.shape.surface_y(f64::from(x), floor.opening) as f32;
             assert!((p.y - bed - duck.radius).abs() < duck.radius * 0.1);
         }
@@ -36,13 +36,13 @@ fn moving_panel_grounding_and_single_edge_jump_work_in_both_directions() {
             duck.position().unwrap().x > start_x + 1.0,
             "neutral rides the closing panel"
         );
-        assert!(duck.responsive_floor().unwrap().opening < before);
+        assert!(duck.terrain.responsive_floor().unwrap().opening < before);
         duck.set_player_input(0, true, false, false);
         duck.step();
         assert_eq!(duck.jumps, 1);
         assert!(
-            duck.world
-                .as_ref()
+            duck.arena
+                .world()
                 .unwrap()
                 .motion(DUCK_BODY)
                 .unwrap()
@@ -75,7 +75,7 @@ fn a_player_standing_on_the_closed_seam_does_not_open_a_dry_floor() {
     for _ in 0..600 {
         duck.step();
     }
-    assert_eq!(duck.responsive_floor().unwrap().opening, 0.0);
+    assert_eq!(duck.terrain.responsive_floor().unwrap().opening, 0.0);
     assert!(duck.grounded());
 }
 
@@ -90,13 +90,13 @@ fn dry_recovery_holds_an_occupied_drain_until_the_character_leaves_the_view() {
     duck.enter(EventPhase::Exiting);
     for _ in 0..180 {
         duck.step();
-        assert!(duck.responsive_floor().unwrap().opening >= 0.75);
+        assert!(duck.terrain.responsive_floor().unwrap().opening >= 0.75);
         if duck.outcome.is_some() {
             break;
         }
     }
     assert_eq!(duck.outcome, Some(ClockDuckOutcome::Fell));
-    assert!(duck.responsive_floor().unwrap().clearance_holds > 0);
+    assert!(duck.terrain.responsive_floor().unwrap().clearance_holds > 0);
     assert!(duck.actor_body().is_none());
     for _ in 0..RESET_TICKS {
         duck.step();

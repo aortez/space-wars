@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-input-scaling-v1-20261024",
+  "kind": "paired fresh-model task-input scaling experiment",
+  "completed_at_utc": "2026-10-24T20:55:04.296106+00:00",
+  "source_file_count": 1539,
+  "source_archive_sha256": "834d1be87bbfc40c38bfd7d15380672ec14a304804e72f922b52bd4f548fc269",
+  "runtime_sha256": "e938d3a383c43a404715da851808b828afff036e9885c58f36c3d4842abc244a",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "arms": [
+    "schema",
+    "task"
+  ],
+  "updates_per_seed_arm": 128,
+  "checkpoint_count": 782,
+  "policy_export_count": 20,
+  "training_ticks": 786432,
+  "evaluation_ticks": 263969,
+  "preflight_training_ticks": 6144,
+  "response_comparisons": 74772,
+  "response_anchor_batches": 372,
+  "maximum_native_raw_error": 1.9073486328125e-06,
+  "maximum_fold_error": 4.76837158203125e-07,
+  "maximum_action_error": 1.7881393432617188e-07,
+  "gates": {
+    "schema": {
+      "learning_evidence": false,
+      "scoped_progression": false
+    },
+    "task": {
+      "learning_evidence": false,
+      "scoped_progression": false
+    }
+  },
+  "paired": [
+    {
+      "seed": 17,
+      "final_arrival_gain": 0,
+      "initial_arrival_gain": 0
+    },
+    {
+      "seed": 29,
+      "final_arrival_gain": 0,
+      "initial_arrival_gain": 0
+    },
+    {
+      "seed": 43,
+      "final_arrival_gain": 0,
+      "initial_arrival_gain": 0
+    }
+  ],
+  "scaling_arrival_improvement": false,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "general_flight_claim": false,
+  "validation": {
+    "synthetic_tests": 17,
+    "previous_manifests_unchanged": 24,
+    "parent_inputs_unchanged": 194,
+    "compile_whitespace": "passed",
+    "all_12_process_exits_zero": true
+  },
+  "retained_file_count": 2544,
+  "retained_bytes_excluding_manifest": 3342302831,
+  "archive_path": "data/training-experiments/learned-flight-input-scaling-v1-20261024",
+  "manifest_sha256": "536b1952f3c27ff075d9324c28bd4d42048920be21407db615c93d9f74fdf4a5",
+  "report_sha256": "87ed4cd487b3cd9e1b5c0ab086120bd3d7128f8701c8fcf6eca22e4734e2bc3b",
+  "results_sha256": "a553d6d978531ad698d2226d5402bcf881dc1b454f32a4603bb015db9eb15e9d"
+}

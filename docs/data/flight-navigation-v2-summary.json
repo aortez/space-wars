@@ -1,0 +1,1646 @@
+{
+ "experiment": "LF-088",
+ "date": "2026-10-28",
+ "fit": {
+  "kind": "navigation-teacher-fit-v2",
+  "contract": {
+   "name": "navigation-command-v2",
+   "format_version": 5,
+   "max_speed": 60.0,
+   "speed_deadband": 0.5
+  },
+  "input_scaling": "match-local-v1",
+  "policy_sha256": "ebc9868e1ef484bd4a74c47431c1117bbefb374d1b4f39c460b45126c36deffb",
+  "development": {
+   "cases": 72,
+   "passed": 65,
+   "families": {
+    "transfer": {
+     "cases": 24,
+     "passed": 19,
+     "outcomes": {
+      "success": 19,
+      "deadline": 5
+     },
+     "mean_success_ticks": 1116.3157894736842
+    },
+    "clear": {
+     "cases": 12,
+     "passed": 12,
+     "outcomes": {
+      "success": 12
+     },
+     "mean_success_ticks": 679.6666666666666
+    },
+    "obstructed": {
+     "cases": 12,
+     "passed": 10,
+     "outcomes": {
+      "success": 10,
+      "collision": 1,
+      "deadline": 1
+     },
+     "mean_success_ticks": 1021.0
+    },
+    "altered": {
+     "cases": 12,
+     "passed": 12,
+     "outcomes": {
+      "success": 12
+     },
+     "mean_success_ticks": 737.5833333333334
+    },
+    "moving": {
+     "cases": 12,
+     "passed": 12,
+     "outcomes": {
+      "success": 12
+     },
+     "mean_success_ticks": 803.75
+    }
+   },
+   "max_parity": 3.814697265625e-06
+  },
+  "held_out": {
+   "cases": 72,
+   "passed": 66,
+   "families": {
+    "transfer": {
+     "cases": 24,
+     "passed": 22,
+     "outcomes": {
+      "success": 22,
+      "deadline": 2
+     },
+     "mean_success_ticks": 1163.3636363636363
+    },
+    "clear": {
+     "cases": 12,
+     "passed": 11,
+     "outcomes": {
+      "success": 11,
+      "deadline": 1
+     },
+     "mean_success_ticks": 870.8181818181819
+    },
+    "moving": {
+     "cases": 12,
+     "passed": 11,
+     "outcomes": {
+      "success": 11,
+      "deadline": 1
+     },
+     "mean_success_ticks": 867.5454545454545
+    },
+    "obstructed": {
+     "cases": 12,
+     "passed": 11,
+     "outcomes": {
+      "success": 11,
+      "collision": 1
+     },
+     "mean_success_ticks": 1024.7272727272727
+    },
+    "altered": {
+     "cases": 12,
+     "passed": 11,
+     "outcomes": {
+      "success": 11,
+      "collision": 1
+     },
+     "mean_success_ticks": 698.8181818181819
+    }
+   },
+   "max_parity": 2.86102294921875e-06
+  },
+  "law_held_out": {
+   "cases": 72,
+   "passed": 71,
+   "families": {
+    "transfer": {
+     "cases": 24,
+     "passed": 23,
+     "outcomes": {
+      "success": 23,
+      "deadline": 1
+     },
+     "mean_success_ticks": 1108.5217391304348
+    },
+    "clear": {
+     "cases": 12,
+     "passed": 12,
+     "outcomes": {
+      "success": 12
+     },
+     "mean_success_ticks": 783.6666666666666
+    },
+    "moving": {
+     "cases": 12,
+     "passed": 12,
+     "outcomes": {
+      "success": 12
+     },
+     "mean_success_ticks": 682.4166666666666
+    },
+    "obstructed": {
+     "cases": 12,
+     "passed": 12,
+     "outcomes": {
+      "success": 12
+     },
+     "mean_success_ticks": 990.75
+    },
+    "altered": {
+     "cases": 12,
+     "passed": 12,
+     "outcomes": {
+      "success": 12
+     },
+     "mean_success_ticks": 729.25
+    }
+   }
+  },
+  "seconds": 707.3244277830017
+ },
+ "comparison": {
+  "transfer-7700101": {
+   "all": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 7,
+      "damage": 3,
+      "deadline": 14
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 19,
+     "outcomes": {
+      "deadline": 5,
+      "success": 19
+     },
+     "median_ticks_passed": 951.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 19,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 13,
+     "outcomes": {
+      "collision": 6,
+      "damage": 1,
+      "deadline": 4,
+      "success": 13
+     },
+     "median_ticks_passed": 1108.0,
+     "learned_minus_arm_ticks_mean": -10.636363636363637,
+     "shared_passes_with_learned": 11,
+     "learned_faster_on_shared": 8
+    },
+    "cases": 24
+   },
+   "transfer": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 7,
+      "damage": 3,
+      "deadline": 14
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 19,
+     "outcomes": {
+      "deadline": 5,
+      "success": 19
+     },
+     "median_ticks_passed": 951.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 19,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 13,
+     "outcomes": {
+      "collision": 6,
+      "damage": 1,
+      "deadline": 4,
+      "success": 13
+     },
+     "median_ticks_passed": 1108.0,
+     "learned_minus_arm_ticks_mean": -10.636363636363637,
+     "shared_passes_with_learned": 11,
+     "learned_faster_on_shared": 8
+    },
+    "cases": 24
+   }
+  },
+  "transfer-7700102": {
+   "all": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 6,
+      "damage": 2,
+      "deadline": 16
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 22,
+     "outcomes": {
+      "deadline": 2,
+      "success": 22
+     },
+     "median_ticks_passed": 1100.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 22,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 11,
+     "outcomes": {
+      "collision": 7,
+      "damage": 2,
+      "deadline": 4,
+      "success": 11
+     },
+     "median_ticks_passed": 1300.0,
+     "learned_minus_arm_ticks_mean": -362.8181818181818,
+     "shared_passes_with_learned": 11,
+     "learned_faster_on_shared": 11
+    },
+    "cases": 24
+   },
+   "transfer": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 6,
+      "damage": 2,
+      "deadline": 16
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 22,
+     "outcomes": {
+      "deadline": 2,
+      "success": 22
+     },
+     "median_ticks_passed": 1100.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 22,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 11,
+     "outcomes": {
+      "collision": 7,
+      "damage": 2,
+      "deadline": 4,
+      "success": 11
+     },
+     "median_ticks_passed": 1300.0,
+     "learned_minus_arm_ticks_mean": -362.8181818181818,
+     "shared_passes_with_learned": 11,
+     "learned_faster_on_shared": 11
+    },
+    "cases": 24
+   }
+  },
+  "generated-7700002": {
+   "all": {
+    "arrival_reference": {
+     "passed": 18,
+     "outcomes": {
+      "collision": 33,
+      "deadline": 45,
+      "success": 18
+     },
+     "median_ticks_passed": 1381.5,
+     "learned_minus_arm_ticks_mean": -638.2222222222222,
+     "shared_passes_with_learned": 18,
+     "learned_faster_on_shared": 17
+    },
+    "learned_stack": {
+     "passed": 91,
+     "outcomes": {
+      "collision": 3,
+      "deadline": 2,
+      "success": 91
+     },
+     "median_ticks_passed": 768.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 91,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 18,
+     "outcomes": {
+      "collision": 40,
+      "deadline": 38,
+      "success": 18
+     },
+     "median_ticks_passed": 795.0,
+     "learned_minus_arm_ticks_mean": -97.77777777777777,
+     "shared_passes_with_learned": 18,
+     "learned_faster_on_shared": 12
+    },
+    "cases": 96
+   },
+   "altered": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 9,
+      "deadline": 15
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 24,
+     "outcomes": {
+      "success": 24
+     },
+     "median_ticks_passed": 767.5,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 24,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 18,
+      "deadline": 6
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "clear": {
+    "arrival_reference": {
+     "passed": 8,
+     "outcomes": {
+      "deadline": 16,
+      "success": 8
+     },
+     "median_ticks_passed": 1027.0,
+     "learned_minus_arm_ticks_mean": -548.5,
+     "shared_passes_with_learned": 8,
+     "learned_faster_on_shared": 8
+    },
+    "learned_stack": {
+     "passed": 24,
+     "outcomes": {
+      "success": 24
+     },
+     "median_ticks_passed": 635.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 24,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "deadline": 24
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "goal_moving": {
+    "arrival_reference": {
+     "passed": 10,
+     "outcomes": {
+      "deadline": 14,
+      "success": 10
+     },
+     "median_ticks_passed": 1483.0,
+     "learned_minus_arm_ticks_mean": -710.0,
+     "shared_passes_with_learned": 10,
+     "learned_faster_on_shared": 9
+    },
+    "learned_stack": {
+     "passed": 24,
+     "outcomes": {
+      "success": 24
+     },
+     "median_ticks_passed": 652.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 24,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 18,
+     "outcomes": {
+      "deadline": 6,
+      "success": 18
+     },
+     "median_ticks_passed": 795.0,
+     "learned_minus_arm_ticks_mean": -97.77777777777777,
+     "shared_passes_with_learned": 18,
+     "learned_faster_on_shared": 12
+    },
+    "cases": 24
+   },
+   "goal_static": {
+    "arrival_reference": {
+     "passed": 8,
+     "outcomes": {
+      "collision": 33,
+      "deadline": 31,
+      "success": 8
+     },
+     "median_ticks_passed": 1027.0,
+     "learned_minus_arm_ticks_mean": -548.5,
+     "shared_passes_with_learned": 8,
+     "learned_faster_on_shared": 8
+    },
+    "learned_stack": {
+     "passed": 67,
+     "outcomes": {
+      "collision": 3,
+      "deadline": 2,
+      "success": 67
+     },
+     "median_ticks_passed": 789.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 67,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 40,
+      "deadline": 32
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 72
+   },
+   "gravity_off": {
+    "arrival_reference": {
+     "passed": 9,
+     "outcomes": {
+      "collision": 14,
+      "deadline": 21,
+      "success": 9
+     },
+     "median_ticks_passed": 1508.0,
+     "learned_minus_arm_ticks_mean": -826.8888888888889,
+     "shared_passes_with_learned": 9,
+     "learned_faster_on_shared": 9
+    },
+    "learned_stack": {
+     "passed": 40,
+     "outcomes": {
+      "collision": 2,
+      "deadline": 2,
+      "success": 40
+     },
+     "median_ticks_passed": 753.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 40,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 7,
+     "outcomes": {
+      "collision": 15,
+      "deadline": 22,
+      "success": 7
+     },
+     "median_ticks_passed": 602.0,
+     "learned_minus_arm_ticks_mean": -126.42857142857143,
+     "shared_passes_with_learned": 7,
+     "learned_faster_on_shared": 5
+    },
+    "cases": 44
+   },
+   "gravity_on": {
+    "arrival_reference": {
+     "passed": 9,
+     "outcomes": {
+      "collision": 19,
+      "deadline": 24,
+      "success": 9
+     },
+     "median_ticks_passed": 1114.0,
+     "learned_minus_arm_ticks_mean": -449.55555555555554,
+     "shared_passes_with_learned": 9,
+     "learned_faster_on_shared": 8
+    },
+    "learned_stack": {
+     "passed": 51,
+     "outcomes": {
+      "collision": 1,
+      "success": 51
+     },
+     "median_ticks_passed": 769.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 51,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 11,
+     "outcomes": {
+      "collision": 25,
+      "deadline": 16,
+      "success": 11
+     },
+     "median_ticks_passed": 862.0,
+     "learned_minus_arm_ticks_mean": -79.54545454545455,
+     "shared_passes_with_learned": 11,
+     "learned_faster_on_shared": 7
+    },
+    "cases": 52
+   },
+   "moving": {
+    "arrival_reference": {
+     "passed": 10,
+     "outcomes": {
+      "deadline": 14,
+      "success": 10
+     },
+     "median_ticks_passed": 1483.0,
+     "learned_minus_arm_ticks_mean": -710.0,
+     "shared_passes_with_learned": 10,
+     "learned_faster_on_shared": 9
+    },
+    "learned_stack": {
+     "passed": 24,
+     "outcomes": {
+      "success": 24
+     },
+     "median_ticks_passed": 652.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 24,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 18,
+     "outcomes": {
+      "deadline": 6,
+      "success": 18
+     },
+     "median_ticks_passed": 795.0,
+     "learned_minus_arm_ticks_mean": -97.77777777777777,
+     "shared_passes_with_learned": 18,
+     "learned_faster_on_shared": 12
+    },
+    "cases": 24
+   },
+   "obstructed": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 24
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 19,
+     "outcomes": {
+      "collision": 3,
+      "deadline": 2,
+      "success": 19
+     },
+     "median_ticks_passed": 999.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 19,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 22,
+      "deadline": 2
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "spin_off": {
+    "arrival_reference": {
+     "passed": 6,
+     "outcomes": {
+      "collision": 21,
+      "deadline": 30,
+      "success": 6
+     },
+     "median_ticks_passed": 1381.5,
+     "learned_minus_arm_ticks_mean": -516.8333333333334,
+     "shared_passes_with_learned": 6,
+     "learned_faster_on_shared": 5
+    },
+    "learned_stack": {
+     "passed": 55,
+     "outcomes": {
+      "collision": 2,
+      "success": 55
+     },
+     "median_ticks_passed": 767.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 55,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 9,
+     "outcomes": {
+      "collision": 28,
+      "deadline": 20,
+      "success": 9
+     },
+     "median_ticks_passed": 772.0,
+     "learned_minus_arm_ticks_mean": -2.5555555555555554,
+     "shared_passes_with_learned": 9,
+     "learned_faster_on_shared": 5
+    },
+    "cases": 57
+   },
+   "spin_on": {
+    "arrival_reference": {
+     "passed": 12,
+     "outcomes": {
+      "collision": 12,
+      "deadline": 15,
+      "success": 12
+     },
+     "median_ticks_passed": 1320.5,
+     "learned_minus_arm_ticks_mean": -698.9166666666666,
+     "shared_passes_with_learned": 12,
+     "learned_faster_on_shared": 12
+    },
+    "learned_stack": {
+     "passed": 36,
+     "outcomes": {
+      "collision": 1,
+      "deadline": 2,
+      "success": 36
+     },
+     "median_ticks_passed": 774.5,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 36,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 9,
+     "outcomes": {
+      "collision": 12,
+      "deadline": 18,
+      "success": 9
+     },
+     "median_ticks_passed": 862.0,
+     "learned_minus_arm_ticks_mean": -193.0,
+     "shared_passes_with_learned": 9,
+     "learned_faster_on_shared": 7
+    },
+    "cases": 39
+   }
+  },
+  "generated-7700003": {
+   "all": {
+    "arrival_reference": {
+     "passed": 15,
+     "outcomes": {
+      "collision": 34,
+      "deadline": 47,
+      "success": 15
+     },
+     "median_ticks_passed": 1230.0,
+     "learned_minus_arm_ticks_mean": -644.0,
+     "shared_passes_with_learned": 13,
+     "learned_faster_on_shared": 12
+    },
+    "learned_stack": {
+     "passed": 89,
+     "outcomes": {
+      "collision": 4,
+      "deadline": 3,
+      "success": 89
+     },
+     "median_ticks_passed": 754.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 89,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 13,
+     "outcomes": {
+      "collision": 38,
+      "deadline": 45,
+      "success": 13
+     },
+     "median_ticks_passed": 875.0,
+     "learned_minus_arm_ticks_mean": -128.5,
+     "shared_passes_with_learned": 12,
+     "learned_faster_on_shared": 8
+    },
+    "cases": 96
+   },
+   "altered": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 8,
+      "deadline": 16
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 23,
+     "outcomes": {
+      "collision": 1,
+      "success": 23
+     },
+     "median_ticks_passed": 737.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 23,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 17,
+      "deadline": 7
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "clear": {
+    "arrival_reference": {
+     "passed": 4,
+     "outcomes": {
+      "deadline": 20,
+      "success": 4
+     },
+     "median_ticks_passed": 1192.0,
+     "learned_minus_arm_ticks_mean": -685.3333333333334,
+     "shared_passes_with_learned": 3,
+     "learned_faster_on_shared": 3
+    },
+    "learned_stack": {
+     "passed": 23,
+     "outcomes": {
+      "deadline": 1,
+      "success": 23
+     },
+     "median_ticks_passed": 740.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 23,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 1,
+      "deadline": 23
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "goal_moving": {
+    "arrival_reference": {
+     "passed": 11,
+     "outcomes": {
+      "collision": 2,
+      "deadline": 11,
+      "success": 11
+     },
+     "median_ticks_passed": 1230.0,
+     "learned_minus_arm_ticks_mean": -631.6,
+     "shared_passes_with_learned": 10,
+     "learned_faster_on_shared": 9
+    },
+    "learned_stack": {
+     "passed": 22,
+     "outcomes": {
+      "deadline": 2,
+      "success": 22
+     },
+     "median_ticks_passed": 563.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 22,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 13,
+     "outcomes": {
+      "deadline": 11,
+      "success": 13
+     },
+     "median_ticks_passed": 875.0,
+     "learned_minus_arm_ticks_mean": -128.5,
+     "shared_passes_with_learned": 12,
+     "learned_faster_on_shared": 8
+    },
+    "cases": 24
+   },
+   "goal_static": {
+    "arrival_reference": {
+     "passed": 4,
+     "outcomes": {
+      "collision": 32,
+      "deadline": 36,
+      "success": 4
+     },
+     "median_ticks_passed": 1192.0,
+     "learned_minus_arm_ticks_mean": -685.3333333333334,
+     "shared_passes_with_learned": 3,
+     "learned_faster_on_shared": 3
+    },
+    "learned_stack": {
+     "passed": 67,
+     "outcomes": {
+      "collision": 4,
+      "deadline": 1,
+      "success": 67
+     },
+     "median_ticks_passed": 803.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 67,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 38,
+      "deadline": 34
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 72
+   },
+   "gravity_off": {
+    "arrival_reference": {
+     "passed": 10,
+     "outcomes": {
+      "collision": 16,
+      "deadline": 25,
+      "success": 10
+     },
+     "median_ticks_passed": 1239.5,
+     "learned_minus_arm_ticks_mean": -828.875,
+     "shared_passes_with_learned": 8,
+     "learned_faster_on_shared": 8
+    },
+    "learned_stack": {
+     "passed": 49,
+     "outcomes": {
+      "deadline": 2,
+      "success": 49
+     },
+     "median_ticks_passed": 773.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 49,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 6,
+     "outcomes": {
+      "collision": 15,
+      "deadline": 30,
+      "success": 6
+     },
+     "median_ticks_passed": 605.5,
+     "learned_minus_arm_ticks_mean": -58.5,
+     "shared_passes_with_learned": 6,
+     "learned_faster_on_shared": 3
+    },
+    "cases": 51
+   },
+   "gravity_on": {
+    "arrival_reference": {
+     "passed": 5,
+     "outcomes": {
+      "collision": 18,
+      "deadline": 22,
+      "success": 5
+     },
+     "median_ticks_passed": 1135.0,
+     "learned_minus_arm_ticks_mean": -348.2,
+     "shared_passes_with_learned": 5,
+     "learned_faster_on_shared": 4
+    },
+    "learned_stack": {
+     "passed": 40,
+     "outcomes": {
+      "collision": 4,
+      "deadline": 1,
+      "success": 40
+     },
+     "median_ticks_passed": 745.5,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 40,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 7,
+     "outcomes": {
+      "collision": 23,
+      "deadline": 15,
+      "success": 7
+     },
+     "median_ticks_passed": 1270.0,
+     "learned_minus_arm_ticks_mean": -198.5,
+     "shared_passes_with_learned": 6,
+     "learned_faster_on_shared": 5
+    },
+    "cases": 45
+   },
+   "moving": {
+    "arrival_reference": {
+     "passed": 11,
+     "outcomes": {
+      "collision": 2,
+      "deadline": 11,
+      "success": 11
+     },
+     "median_ticks_passed": 1230.0,
+     "learned_minus_arm_ticks_mean": -631.6,
+     "shared_passes_with_learned": 10,
+     "learned_faster_on_shared": 9
+    },
+    "learned_stack": {
+     "passed": 22,
+     "outcomes": {
+      "deadline": 2,
+      "success": 22
+     },
+     "median_ticks_passed": 563.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 22,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 13,
+     "outcomes": {
+      "deadline": 11,
+      "success": 13
+     },
+     "median_ticks_passed": 875.0,
+     "learned_minus_arm_ticks_mean": -128.5,
+     "shared_passes_with_learned": 12,
+     "learned_faster_on_shared": 8
+    },
+    "cases": 24
+   },
+   "obstructed": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 24
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 21,
+     "outcomes": {
+      "collision": 3,
+      "success": 21
+     },
+     "median_ticks_passed": 945.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 21,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 20,
+      "deadline": 4
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "spin_off": {
+    "arrival_reference": {
+     "passed": 7,
+     "outcomes": {
+      "collision": 14,
+      "deadline": 26,
+      "success": 7
+     },
+     "median_ticks_passed": 1237.0,
+     "learned_minus_arm_ticks_mean": -721.1428571428571,
+     "shared_passes_with_learned": 7,
+     "learned_faster_on_shared": 6
+    },
+    "learned_stack": {
+     "passed": 45,
+     "outcomes": {
+      "collision": 2,
+      "success": 45
+     },
+     "median_ticks_passed": 740.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 45,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 5,
+     "outcomes": {
+      "collision": 20,
+      "deadline": 22,
+      "success": 5
+     },
+     "median_ticks_passed": 624.0,
+     "learned_minus_arm_ticks_mean": -4.2,
+     "shared_passes_with_learned": 5,
+     "learned_faster_on_shared": 3
+    },
+    "cases": 47
+   },
+   "spin_on": {
+    "arrival_reference": {
+     "passed": 8,
+     "outcomes": {
+      "collision": 20,
+      "deadline": 21,
+      "success": 8
+     },
+     "median_ticks_passed": 1127.0,
+     "learned_minus_arm_ticks_mean": -554.0,
+     "shared_passes_with_learned": 6,
+     "learned_faster_on_shared": 6
+    },
+    "learned_stack": {
+     "passed": 44,
+     "outcomes": {
+      "collision": 2,
+      "deadline": 3,
+      "success": 44
+     },
+     "median_ticks_passed": 773.5,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 44,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 8,
+     "outcomes": {
+      "collision": 18,
+      "deadline": 23,
+      "success": 8
+     },
+     "median_ticks_passed": 1083.5,
+     "learned_minus_arm_ticks_mean": -217.28571428571428,
+     "shared_passes_with_learned": 7,
+     "learned_faster_on_shared": 5
+    },
+    "cases": 49
+   }
+  },
+  "v1-stack-generated-7700002": {
+   "all": {
+    "arrival_reference": {
+     "passed": 18,
+     "outcomes": {
+      "collision": 33,
+      "deadline": 45,
+      "success": 18
+     },
+     "median_ticks_passed": 1381.5,
+     "learned_minus_arm_ticks_mean": -426.8,
+     "shared_passes_with_learned": 5,
+     "learned_faster_on_shared": 3
+    },
+    "learned_stack": {
+     "passed": 34,
+     "outcomes": {
+      "collision": 1,
+      "controller_error": 1,
+      "deadline": 60,
+      "success": 34
+     },
+     "median_ticks_passed": 742.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 34,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 18,
+     "outcomes": {
+      "collision": 40,
+      "deadline": 38,
+      "success": 18
+     },
+     "median_ticks_passed": 795.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 96
+   },
+   "altered": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 9,
+      "deadline": 15
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 14,
+     "outcomes": {
+      "collision": 1,
+      "deadline": 9,
+      "success": 14
+     },
+     "median_ticks_passed": 742.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 14,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 18,
+      "deadline": 6
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "clear": {
+    "arrival_reference": {
+     "passed": 8,
+     "outcomes": {
+      "deadline": 16,
+      "success": 8
+     },
+     "median_ticks_passed": 1027.0,
+     "learned_minus_arm_ticks_mean": -426.8,
+     "shared_passes_with_learned": 5,
+     "learned_faster_on_shared": 3
+    },
+    "learned_stack": {
+     "passed": 9,
+     "outcomes": {
+      "deadline": 15,
+      "success": 9
+     },
+     "median_ticks_passed": 614.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 9,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "deadline": 24
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "goal_moving": {
+    "arrival_reference": {
+     "passed": 10,
+     "outcomes": {
+      "deadline": 14,
+      "success": 10
+     },
+     "median_ticks_passed": 1483.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 0,
+     "outcomes": {
+      "controller_error": 1,
+      "deadline": 23
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 18,
+     "outcomes": {
+      "deadline": 6,
+      "success": 18
+     },
+     "median_ticks_passed": 795.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "goal_static": {
+    "arrival_reference": {
+     "passed": 8,
+     "outcomes": {
+      "collision": 33,
+      "deadline": 31,
+      "success": 8
+     },
+     "median_ticks_passed": 1027.0,
+     "learned_minus_arm_ticks_mean": -426.8,
+     "shared_passes_with_learned": 5,
+     "learned_faster_on_shared": 3
+    },
+    "learned_stack": {
+     "passed": 34,
+     "outcomes": {
+      "collision": 1,
+      "deadline": 37,
+      "success": 34
+     },
+     "median_ticks_passed": 742.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 34,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 40,
+      "deadline": 32
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 72
+   },
+   "gravity_off": {
+    "arrival_reference": {
+     "passed": 9,
+     "outcomes": {
+      "collision": 14,
+      "deadline": 21,
+      "success": 9
+     },
+     "median_ticks_passed": 1508.0,
+     "learned_minus_arm_ticks_mean": -857.3333333333334,
+     "shared_passes_with_learned": 3,
+     "learned_faster_on_shared": 3
+    },
+    "learned_stack": {
+     "passed": 23,
+     "outcomes": {
+      "controller_error": 1,
+      "deadline": 20,
+      "success": 23
+     },
+     "median_ticks_passed": 714.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 23,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 7,
+     "outcomes": {
+      "collision": 15,
+      "deadline": 22,
+      "success": 7
+     },
+     "median_ticks_passed": 602.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 44
+   },
+   "gravity_on": {
+    "arrival_reference": {
+     "passed": 9,
+     "outcomes": {
+      "collision": 19,
+      "deadline": 24,
+      "success": 9
+     },
+     "median_ticks_passed": 1114.0,
+     "learned_minus_arm_ticks_mean": 219.0,
+     "shared_passes_with_learned": 2,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 11,
+     "outcomes": {
+      "collision": 1,
+      "deadline": 40,
+      "success": 11
+     },
+     "median_ticks_passed": 1036.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 11,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 11,
+     "outcomes": {
+      "collision": 25,
+      "deadline": 16,
+      "success": 11
+     },
+     "median_ticks_passed": 862.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 52
+   },
+   "moving": {
+    "arrival_reference": {
+     "passed": 10,
+     "outcomes": {
+      "deadline": 14,
+      "success": 10
+     },
+     "median_ticks_passed": 1483.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 0,
+     "outcomes": {
+      "controller_error": 1,
+      "deadline": 23
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 18,
+     "outcomes": {
+      "deadline": 6,
+      "success": 18
+     },
+     "median_ticks_passed": 795.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "obstructed": {
+    "arrival_reference": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 24
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "learned_stack": {
+     "passed": 11,
+     "outcomes": {
+      "deadline": 13,
+      "success": 11
+     },
+     "median_ticks_passed": 817.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 11,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 0,
+     "outcomes": {
+      "collision": 22,
+      "deadline": 2
+     },
+     "median_ticks_passed": null,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 24
+   },
+   "spin_off": {
+    "arrival_reference": {
+     "passed": 6,
+     "outcomes": {
+      "collision": 21,
+      "deadline": 30,
+      "success": 6
+     },
+     "median_ticks_passed": 1381.5,
+     "learned_minus_arm_ticks_mean": -662.5,
+     "shared_passes_with_learned": 2,
+     "learned_faster_on_shared": 2
+    },
+    "learned_stack": {
+     "passed": 27,
+     "outcomes": {
+      "collision": 1,
+      "deadline": 29,
+      "success": 27
+     },
+     "median_ticks_passed": 730.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 27,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 9,
+     "outcomes": {
+      "collision": 28,
+      "deadline": 20,
+      "success": 9
+     },
+     "median_ticks_passed": 772.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 57
+   },
+   "spin_on": {
+    "arrival_reference": {
+     "passed": 12,
+     "outcomes": {
+      "collision": 12,
+      "deadline": 15,
+      "success": 12
+     },
+     "median_ticks_passed": 1320.5,
+     "learned_minus_arm_ticks_mean": -269.6666666666667,
+     "shared_passes_with_learned": 3,
+     "learned_faster_on_shared": 1
+    },
+    "learned_stack": {
+     "passed": 7,
+     "outcomes": {
+      "controller_error": 1,
+      "deadline": 31,
+      "success": 7
+     },
+     "median_ticks_passed": 1585.0,
+     "learned_minus_arm_ticks_mean": 0.0,
+     "shared_passes_with_learned": 7,
+     "learned_faster_on_shared": 0
+    },
+    "mission_transfer": {
+     "passed": 9,
+     "outcomes": {
+      "collision": 12,
+      "deadline": 18,
+      "success": 9
+     },
+     "median_ticks_passed": 862.0,
+     "learned_minus_arm_ticks_mean": null,
+     "shared_passes_with_learned": 0,
+     "learned_faster_on_shared": 0
+    },
+    "cases": 39
+   }
+  }
+ },
+ "law": {
+  "transfer-7700101": {
+   "transfer": {
+    "cases": 24,
+    "passed": 22,
+    "outcomes": {
+     "success": 22,
+     "deadline": 2
+    }
+   }
+  },
+  "transfer-7700102": {
+   "transfer": {
+    "cases": 24,
+    "passed": 23,
+    "outcomes": {
+     "success": 23,
+     "deadline": 1
+    }
+   }
+  },
+  "generated-7700002": {
+   "clear": {
+    "cases": 24,
+    "passed": 24,
+    "outcomes": {
+     "success": 24
+    }
+   },
+   "obstructed": {
+    "cases": 24,
+    "passed": 24,
+    "outcomes": {
+     "success": 24
+    }
+   },
+   "altered": {
+    "cases": 24,
+    "passed": 24,
+    "outcomes": {
+     "success": 24
+    }
+   },
+   "moving": {
+    "cases": 24,
+    "passed": 24,
+    "outcomes": {
+     "success": 24
+    }
+   }
+  },
+  "generated-7700003": {
+   "clear": {
+    "cases": 24,
+    "passed": 24,
+    "outcomes": {
+     "success": 24
+    }
+   },
+   "moving": {
+    "cases": 24,
+    "passed": 24,
+    "outcomes": {
+     "success": 24
+    }
+   },
+   "obstructed": {
+    "cases": 24,
+    "passed": 24,
+    "outcomes": {
+     "success": 24
+    }
+   },
+   "altered": {
+    "cases": 24,
+    "passed": 24,
+    "outcomes": {
+     "success": 24
+    }
+   }
+  }
+ }
+}

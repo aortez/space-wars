@@ -11,11 +11,22 @@ use serde::{
 };
 
 mod activity_settings;
+mod clock_arena;
+mod clock_digit_surfaces;
 mod clock_font;
 mod clock_message;
 mod controller;
 mod dirt_settings;
 pub use activity_settings::{AutostartSettings, MatchSettings};
+pub use clock_arena::{
+    ClockArenaAccounting, ClockArenaClaim, ClockArenaLimits, ClockArenaOwner, ClockArenaPopulation,
+    ClockArenaRemap, ClockArenaState, ClockArenaStep, ClockArenaUnavailable,
+};
+pub use clock_digit_surfaces::{
+    ClockDigitSurface, ClockDigitSurfaceState, ClockSurfaceAccounting, ClockSurfaceChange,
+    ClockSurfaceChangeKind, ClockSurfaceLimits, ClockSurfaceRetirement, ClockSurfaceRetirements,
+    ClockSurfaceSource, ClockSurfaceSourceCount,
+};
 pub use clock_font::{ClockFont, ClockFontPool, ClockFontSettings};
 pub use controller::{ControllerBinding, ControllerControl, ControllerProfile, ControllerSource};
 pub use dirt_settings::DirtMode;
@@ -617,6 +628,43 @@ pub struct ClockDigitSlideState {
     pub preview: bool,
 }
 
+/// Reel phase and lock progress for the Slot Machine event. `retargets` counts
+/// the readings adopted mid-spin, which is how the event proves it lands on live
+/// time rather than on a snapshot taken when it started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockSlotMachineState {
+    pub phase: ClockSlotMachinePhase,
+    pub target_digits: [Option<u8>; 4],
+    pub locked_slots: [bool; 4],
+    /// Thousandths of a glyph each reel has travelled past its last whole stop.
+    pub reel_offset_milli: [u32; 4],
+    pub glyphs_passed: [u32; 4],
+    pub retargets: u32,
+    /// Manual previews spin the live reading, without fabricating a time.
+    pub preview: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSlotMachinePhase {
+    #[default]
+    SpinUp,
+    Spinning,
+    Settling,
+    Payout,
+}
+
+impl ClockSlotMachinePhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SpinUp => "spin-up",
+            Self::Spinning => "spinning",
+            Self::Settling => "settling",
+            Self::Payout => "payout",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[repr(u8)]
@@ -633,10 +681,12 @@ pub enum ClockEventKind {
     Aquarium = 9,
     CellSwap = 10,
     Grass = 11,
+    SlotMachine = 12,
+    Spider = 13,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 14] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -649,6 +699,8 @@ impl ClockEventKind {
         Self::Aquarium,
         Self::CellSwap,
         Self::Grass,
+        Self::SlotMachine,
+        Self::Spider,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -665,6 +717,8 @@ impl ClockEventKind {
             Self::Aquarium => "aquarium",
             Self::CellSwap => "cell-swap",
             Self::Grass => "grass",
+            Self::SlotMachine => "slot-machine",
+            Self::Spider => "spider",
         }
     }
 
@@ -682,6 +736,8 @@ impl ClockEventKind {
             Self::Aquarium => "Aquarium",
             Self::CellSwap => "Cell Swap",
             Self::Grass => "Grass",
+            Self::SlotMachine => "Slot Machine",
+            Self::Spider => "Spider",
         }
     }
 }
@@ -702,6 +758,8 @@ pub struct ClockEvents {
     pub aquarium: bool,
     pub cell_swap: bool,
     pub grass: bool,
+    pub slot_machine: bool,
+    pub spider: bool,
 }
 
 impl Default for ClockEvents {
@@ -719,6 +777,8 @@ impl Default for ClockEvents {
             aquarium: true,
             cell_swap: true,
             grass: true,
+            slot_machine: true,
+            spider: true,
         }
     }
 }
@@ -738,6 +798,8 @@ impl ClockEvents {
             ClockEventKind::Aquarium => self.aquarium,
             ClockEventKind::CellSwap => self.cell_swap,
             ClockEventKind::Grass => self.grass,
+            ClockEventKind::SlotMachine => self.slot_machine,
+            ClockEventKind::Spider => self.spider,
         }
     }
 }
@@ -767,10 +829,18 @@ pub struct ClockGrassState {
     pub ceiling_committed_material: u64,
     #[serde(default)]
     pub ceiling_cancelled_material: u64,
+    /// Grass tissue only. A retained moss mat outlives the patch it succeeded,
+    /// so it is counted on its own rather than folded into these totals.
     #[serde(default)]
     pub stressed_tissues: usize,
     #[serde(default)]
     pub dead_tissues: usize,
+    #[serde(default)]
+    pub moss_tissues: usize,
+    #[serde(default)]
+    pub moss_stressed: usize,
+    #[serde(default)]
+    pub moss_dead: usize,
     pub biology_tick: u64,
     pub soil_added: u64,
     pub soil_retained: usize,
@@ -797,12 +867,25 @@ pub struct ClockGrassState {
 pub struct ClockCeilingOptics {
     pub simulation_tick: u64,
     pub geometry_generation: u64,
+    /// First opening's identity and its left, right and ceiling coordinates.
+    /// Retained so a state written by the single-opening build still loads.
     pub source_id: [u64; 2],
     pub aperture_milli: [i32; 3],
+    /// Every live opening, left to right. Empty in a state written before the
+    /// ceiling could break in more than one place.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub apertures: Vec<ClockCeilingAperture>,
     pub collider_generations: Vec<[u64; 4]>,
     pub moving_blocker: Option<[u64; 2]>,
     pub silhouettes_milli: Vec<Vec<[i32; 2]>>,
     pub samples: Vec<ClockCeilingSample>,
+}
+
+/// One ceiling opening, in the same world mill units as the samples.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCeilingAperture {
+    pub source_id: [u64; 2],
+    pub aperture_milli: [i32; 3],
 }
 
 /// One fresh receiver: total and aperture-only intensity plus its first blocker.
@@ -914,6 +997,113 @@ pub struct ClockCrowState {
 
 fn shy_crow_water_tolerance() -> ClockCrowWaterTolerance {
     ClockCrowWaterTolerance::Shy
+}
+
+/// Bounded Spider visitor diagnostics, independent of the timed animation.
+/// The spider is the one visitor that moves in the run's physics arena.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockSpiderState {
+    pub visit_id: u64,
+    pub seed: u64,
+    pub phase: ClockSpiderPhase,
+    pub phase_tick: u64,
+    pub age_ticks: u64,
+    /// Ticks left before the visit must be leaving, by its budget.
+    pub remaining_ticks: u64,
+    pub position_milli: [i32; 2],
+    pub velocity_milli: [i32; 2],
+    /// The way the spider's back faces, in thousandths of a unit vector.
+    pub up_milli: [i32; 2],
+    pub mode: ClockSpiderMode,
+    /// What the legs hold, if anything.
+    pub support: Option<ClockSpiderHold>,
+    /// What the silk line is tied to, if it is tied.
+    pub anchor: Option<ClockSpiderHold>,
+    /// Whether a shot's line is on its way.
+    pub shooting: bool,
+    pub line_length_milli: Option<u32>,
+    pub climbs: u32,
+    pub swings: u32,
+    pub falls: u32,
+    pub recoveries: u32,
+    /// The visit ran out of time without getting out, and was retired where
+    /// it stood.
+    pub failed_exit: bool,
+    pub proxies: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderPhase {
+    Descending,
+    Crossing,
+    Climbing,
+    Crawling,
+    Swinging,
+    Recovering,
+    Leaving,
+}
+
+impl ClockSpiderPhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Descending => "descending",
+            Self::Crossing => "crossing",
+            Self::Climbing => "climbing",
+            Self::Crawling => "crawling",
+            Self::Swinging => "swinging",
+            Self::Recovering => "recovering",
+            Self::Leaving => "leaving",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderMode {
+    Free,
+    Crawling,
+    Hanging,
+}
+
+impl ClockSpiderMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Free => "free",
+            Self::Crawling => "crawling",
+            Self::Hanging => "hanging",
+        }
+    }
+}
+
+/// What the spider holds or is tied to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum ClockSpiderHold {
+    /// A lit digit cell, by its surface id.
+    Surface {
+        id: u32,
+        departing: bool,
+    },
+    /// A rigid body carrying digit cells, by its entity.
+    Rigid {
+        entity: u64,
+    },
+    /// A part of the frame: a rail, the ceiling beside the hatch, or the beam.
+    Frame {
+        part: ClockSpiderFramePart,
+    },
+    Floor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockSpiderFramePart {
+    LeftRail,
+    RightRail,
+    CeilingLeft,
+    CeilingRight,
+    Beam,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1799,6 +1989,8 @@ pub enum SpacewarsController {
     DestinationBot,
     ValueBot,
     RecoveryBot,
+    /// The recovery bot with its transfer legs flown by the learned flight stack.
+    LearnedFlightBot,
 }
 impl SpacewarsController {
     /// Automatic matches fill human seats but retain an explicitly chosen bot.

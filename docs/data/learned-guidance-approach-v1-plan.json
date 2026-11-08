@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "protocol": "recovery_guidance_approach_probe_v1",
+  "candidate": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb",
+  "candidate_file_sha256": "a1d127eb9eb96f190616d5d3ee377490d5a06ac2023302c9eaeb27a971945199",
+  "host": "recovery_v1_with_material_hunt_clearance_handoff_v1",
+  "controllers": [
+    "mission",
+    "reference",
+    "model"
+  ],
+  "selection": "first census free-direct-transfer tick with entry distance <= 35 for each seed/shape/seat; no candidate outcomes inspected",
+  "source_census_sha256": "bdafc62b2660a20078a3f1703ec37cd681603dbcd26fa3c8c37876a27bfc9e95",
+  "setup_neutral_ticks": 1,
+  "max_ticks": 300,
+  "entry_altitude": 85.0,
+  "region_altitude": [
+    40.0,
+    220.0
+  ],
+  "target": "fixed world-space bearing after neutral setup; position follows planet center; velocity is planet-center velocity",
+  "success": "native mission arrived event and capture handoff, without contact, assistance, damage, lost control, or other physical failure, within 300 steps including the handoff step",
+  "gate": {
+    "required_model_arrivals": 8,
+    "total_cases": 8,
+    "must_match_or_exceed_each_baseline": true,
+    "no_case_exclusions": true
+  },
+  "comparison": "same cloned physical state and host context; selected mission memory held for component trials; native host probes on disposable clones veto higher-priority tasks every tick; other seat retains Recovery v1",
+  "statistics": "development cases from two seeds, with correlated dirt variants; not a 99-percent reliability estimate or match-strength claim",
+  "cases": [
+    {
+      "name": "seed-42-weak-angular-p1",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 883,
+      "planet": 1,
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711
+    },
+    {
+      "name": "seed-42-weak-angular-p2",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 821,
+      "planet": 1,
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273
+    },
+    {
+      "name": "seed-42-weak-round-p1",
+      "seed": 42,
+      "shape": "weak-round",
+      "seat": 0,
+      "source_tick": 883,
+      "planet": 1,
+      "source_entry_distance": 17.57037925720215,
+      "source_relative_speed": 39.10799789428711
+    },
+    {
+      "name": "seed-42-weak-round-p2",
+      "seed": 42,
+      "shape": "weak-round",
+      "seat": 1,
+      "source_tick": 821,
+      "planet": 1,
+      "source_entry_distance": 34.97770309448242,
+      "source_relative_speed": 25.163427352905273
+    },
+    {
+      "name": "seed-10101-weak-angular-p1",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 0,
+      "source_tick": 1040,
+      "planet": 1,
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961
+    },
+    {
+      "name": "seed-10101-weak-angular-p2",
+      "seed": 10101,
+      "shape": "weak-angular",
+      "seat": 1,
+      "source_tick": 1290,
+      "planet": 1,
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367
+    },
+    {
+      "name": "seed-10101-weak-round-p1",
+      "seed": 10101,
+      "shape": "weak-round",
+      "seat": 0,
+      "source_tick": 1040,
+      "planet": 1,
+      "source_entry_distance": 34.937015533447266,
+      "source_relative_speed": 28.08272933959961
+    },
+    {
+      "name": "seed-10101-weak-round-p2",
+      "seed": 10101,
+      "shape": "weak-round",
+      "seat": 1,
+      "source_tick": 1290,
+      "planet": 1,
+      "source_entry_distance": 34.71364212036133,
+      "source_relative_speed": 28.092771530151367
+    }
+  ]
+}

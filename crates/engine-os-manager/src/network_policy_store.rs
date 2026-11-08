@@ -7,6 +7,13 @@ use std::io::{Read, Write};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+pub(super) struct SavePause {
+    pub point: &'static str,
+    pub entered: std::sync::mpsc::SyncSender<()>,
+    pub resume: std::sync::mpsc::Receiver<()>,
+}
+
 const LIMIT: u64 = 16 * 1024;
 
 #[derive(Serialize, Deserialize)]
@@ -17,6 +24,7 @@ struct Envelope {
 }
 
 pub(super) struct Store {
+    pub(super) access: Option<crate::network_access::Access>,
     path: PathBuf,
     directory: File,
     lock: File,
@@ -25,6 +33,8 @@ pub(super) struct Store {
     uncertain: bool,
     #[cfg(test)]
     pub(super) fail_at: Option<&'static str>,
+    #[cfg(test)]
+    pub(super) pause: std::sync::Mutex<Option<SavePause>>,
 }
 
 impl Store {
@@ -80,6 +90,7 @@ impl Store {
         lock.try_lock()
             .map_err(|_| invalid("network policy already has an owner"))?;
         let mut store = Self {
+            access: None,
             path: path.into(),
             directory,
             lock,
@@ -88,6 +99,8 @@ impl Store {
             uncertain: false,
             #[cfg(test)]
             fail_at: None,
+            #[cfg(test)]
+            pause: std::sync::Mutex::new(None),
         };
         let record = if created {
             let record = Record::initial();
@@ -117,6 +130,16 @@ impl Store {
     }
 
     pub fn check(&self) -> Result<()> {
+        let result = self.check_inner();
+        if result.is_err()
+            && let Some(access) = &self.access
+        {
+            access.fail();
+        }
+        result
+    }
+
+    fn check_inner(&self) -> Result<()> {
         if self.uncertain {
             return Err(invalid(
                 "network policy durability is uncertain; reopen before acting",
@@ -153,12 +176,29 @@ impl Store {
     }
 
     pub fn save(&mut self, record: &Record) -> Result<()> {
+        self.save_inner(record, false)
+    }
+
+    pub fn reserve_revisions(&mut self, record: &Record) -> Result<()> {
+        self.save_inner(record, true)
+    }
+
+    fn save_inner(&mut self, record: &Record, reserve: bool) -> Result<()> {
+        let result = self.write_record(record, reserve);
+        if result.is_err()
+            && let Some(access) = &self.access
+        {
+            access.fail();
+        }
+        result
+    }
+
+    fn write_record(&mut self, record: &Record, reserve: bool) -> Result<()> {
         self.check()?;
         record.validate()?;
-        if self
-            .generation
-            .is_some_and(|old| old.checked_add(1) != Some(record.generation))
-            || (self.generation.is_none() && *record != Record::initial())
+        if self.generation.is_some_and(|old| {
+            old.checked_add(if reserve { 1 << 32 } else { 1 }) != Some(record.generation)
+        }) || (self.generation.is_none() && *record != Record::initial())
         {
             return Err(invalid(
                 "network policy revision is not the next durable generation",
@@ -192,6 +232,22 @@ impl Store {
     }
 
     fn point(&self, _name: &str) -> Result<()> {
+        #[cfg(test)]
+        {
+            let mut pause = self.pause.lock().unwrap();
+            let pause = if pause.as_ref().is_some_and(|pause| pause.point == _name) {
+                pause.take()
+            } else {
+                None
+            };
+            if let Some(pause) = pause {
+                pause.entered.send(()).unwrap();
+                pause
+                    .resume
+                    .recv_timeout(std::time::Duration::from_secs(10))
+                    .unwrap();
+            }
+        }
         #[cfg(test)]
         if self.fail_at == Some(_name) {
             return Err(invalid("injected network policy flush failure"));

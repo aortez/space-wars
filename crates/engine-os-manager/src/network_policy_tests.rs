@@ -1,6 +1,6 @@
 use super::*;
 use std::fs;
-use std::os::unix::fs::{PermissionsExt, symlink};
+use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 
 const BOOT: &str = "11111111-2222-3333-4444-555555555555";
 const OTHER_BOOT: &str = "66666666-7777-8888-9999-aaaaaaaaaaaa";
@@ -1030,11 +1030,12 @@ fn releasing_replacement_setup_requires_observed_idle_before_radio_shutdown() {
 }
 
 #[test]
-fn ssh_replacement_preserves_capacity_and_reservations_if_the_commit_fails() {
+fn ssh_replacement_does_not_touch_durable_storage() {
     for kind in [HoldKind::Ssh, HoldKind::Setup] {
         for point in ["written", "file-synced", "renamed", "directory-synced"] {
             let temp = tempfile::tempdir().unwrap();
-            let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();
+            let path = temp.path().join("network");
+            let mut policy = NetworkPolicy::open(&path, clock(0)).unwrap();
             let root = Caller {
                 uid: 0,
                 ..caller(1)
@@ -1044,20 +1045,15 @@ fn ssh_replacement_preserves_capacity_and_reservations_if_the_commit_fails() {
                     .reserve(&token(n), root, HoldKind::Ssh, &clock(0))
                     .unwrap();
             }
-            assert!(
-                policy
-                    .reserve(&token(40), root, kind, &clock(SETUP_MS - 1))
-                    .is_err()
-            );
+            let before = fs::read(path.join("state.json")).unwrap();
             policy.fail_save_at(point);
-            assert!(
-                policy
-                    .reserve(&token(40), root, kind, &clock(SETUP_MS))
-                    .is_err()
-            );
-            assert_eq!(policy.temporary.len(), MAX_HOLDS);
-            assert!(!policy.temporary.contains_key(&token(40).id()));
-            assert!(policy.status(&clock(SETUP_MS)).is_err());
+            policy
+                .reserve(&token(40), root, kind, &clock(SETUP_MS))
+                .unwrap();
+            assert_eq!(policy.temporary.len(), 1);
+            assert!(policy.temporary.contains_key(&token(40).id()));
+            assert!(policy.status(&clock(SETUP_MS)).is_ok());
+            assert_eq!(fs::read(path.join("state.json")).unwrap(), before);
         }
     }
 }
@@ -1169,4 +1165,82 @@ fn flush_failures_release_no_usable_status_and_reopen_preserves_whichever_record
         assert_eq!(policy.record.deployments.len(), 1);
         assert!(NetworkPolicy::open(&path, clock(1)).is_err());
     }
+}
+
+#[test]
+fn temporary_lifecycle_never_saves_and_restart_never_reuses_its_revisions() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network");
+    let mut policy = NetworkPolicy::open(&path, clock(0)).unwrap();
+    let before = fs::read(path.join("state.json")).unwrap();
+    let inode = fs::metadata(path.join("state.json")).unwrap().ino();
+    policy.fail_save_at("written");
+    let root = Caller {
+        uid: 0,
+        ..caller(1)
+    };
+    for (n, kind) in [
+        HoldKind::Ssh,
+        HoldKind::Setup,
+        HoldKind::TimeCheck,
+        HoldKind::Download,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        policy
+            .reserve(&token(n as u8), root, kind, &clock(1))
+            .unwrap();
+        policy.renew(&token(n as u8), root, &clock(1)).unwrap();
+        if kind == HoldKind::TimeCheck {
+            policy
+                .require_wireless(&token(n as u8), root, &clock(1))
+                .unwrap();
+        }
+        policy.release(&token(n as u8), root, &clock(1)).unwrap();
+    }
+    policy
+        .reserve(&token(20), root, HoldKind::Setup, &clock(1))
+        .unwrap();
+    observe_through(&mut policy, 1, 240_001, idle());
+    assert!(policy.temporary.is_empty());
+    let last = policy.status(&clock(240_001)).unwrap().generation;
+    assert_eq!(fs::read(path.join("state.json")).unwrap(), before);
+    assert_eq!(fs::metadata(path.join("state.json")).unwrap().ino(), inode);
+    drop(policy);
+    let mut reopened = NetworkPolicy::open(&path, clock(240_002)).unwrap();
+    assert!(reopened.status(&clock(240_002)).unwrap().generation > last);
+    assert!(
+        reopened
+            .set_policy(last, enabled(), &clock(240_002))
+            .is_err()
+    );
+    // An old-schema daemon advances the saved upper bound by one, so even a
+    // rollback cannot expose one of the former process's runtime revisions.
+    drop(reopened);
+    let (mut store, mut record) = store::Store::open(&path).unwrap();
+    record.advance().unwrap();
+    store.save(&record).unwrap();
+    assert!(record.generation > last);
+}
+
+#[test]
+fn runtime_revision_exhaustion_does_not_mutate_holds_or_saved_policy() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network");
+    let mut policy = NetworkPolicy::open(&path, clock(0)).unwrap();
+    policy.revision = policy.revision_limit - 1;
+    let before = fs::read(path.join("state.json")).unwrap();
+    assert!(
+        policy
+            .reserve(&token(1), caller(1), HoldKind::Setup, &clock(0))
+            .is_err()
+    );
+    assert!(policy.temporary.is_empty());
+    assert!(
+        policy
+            .set_policy(policy.revision, enabled(), &clock(0))
+            .is_err()
+    );
+    assert_eq!(fs::read(path.join("state.json")).unwrap(), before);
 }

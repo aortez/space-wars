@@ -29,6 +29,20 @@ struct ActivationTarget {
 }
 
 pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
+    if window.get_updates_visible() || window.get_install_fenced() {
+        if crate::updates::inventory(window)
+            .iter()
+            .any(|c| c.id == control_id && c.enabled)
+        {
+            if control_id == "updates.confirm" {
+                window.invoke_updates_confirm();
+            } else {
+                window.invoke_updates_cancel();
+            }
+            return true;
+        }
+        return false;
+    }
     if window.get_genomes_visible()
         && crate::genome_controls::inventory(window)
             .iter()
@@ -161,6 +175,7 @@ fn activation_target(
         "settings.autostart" => sound(4, UiAction::Confirm),
         "settings.controllers" => sound(7, UiAction::Confirm),
         "settings.network" => sound(8, UiAction::Confirm),
+        "settings.updates" => sound(9, UiAction::Confirm),
         "sound.back" => sound(5, UiAction::Confirm),
         "sound.retry" => sound(6, UiAction::Confirm),
         "autostart.activity.previous" => ActivationTarget {
@@ -237,6 +252,8 @@ fn activation_target(
         "pause.clock.aquarium" => pause_clock(17, UiAction::Confirm),
         "pause.clock.cell-swap" => pause_clock(18, UiAction::Confirm),
         "pause.clock.grass" => pause_clock(19, UiAction::Confirm),
+        "pause.clock.slot-machine" => pause_clock(20, UiAction::Confirm),
+        "pause.clock.spider" => pause_clock(21, UiAction::Confirm),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -311,6 +328,8 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.clock.aquarium" => 16,
         "launcher.settings.clock.cell-swap" => 17,
         "launcher.settings.clock.grass" => 18,
+        "launcher.settings.clock.slot-machine" => 19,
+        "launcher.settings.clock.spider" => 20,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

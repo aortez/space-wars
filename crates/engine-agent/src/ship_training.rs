@@ -94,6 +94,28 @@ pub fn config(seed: u64) -> Result<EvolutionConfig, EvolutionError> {
 #[derive(Debug, Clone, Default)]
 pub struct TrainingTask;
 
+/// The same recipe and reduction, using the job's shared episode budget.
+pub struct ParallelTask<'a>(pub &'a crate::training_workers::EpisodePool);
+
+impl EvaluationTask for ParallelTask<'_> {
+    type Fitness = ArrivalFitness;
+
+    fn manifest(&self) -> TaskManifest {
+        TrainingTask.manifest()
+    }
+
+    fn evaluate(&self, model: &DenseModel) -> Result<ArrivalFitness, EvolutionError> {
+        let results = self.0.map(&cases(Partition::Training), |case| {
+            ship_arrival::run_episode(case.clone(), Policy::Model(model.clone()), false)
+        });
+        let mut total = ArrivalFitness::default();
+        for result in results {
+            add(&mut total, result?.fitness);
+        }
+        Ok(total)
+    }
+}
+
 impl EvaluationTask for TrainingTask {
     type Fitness = ArrivalFitness;
 

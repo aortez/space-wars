@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-sensor-navigation-v1-20261022",
+  "kind": "exploratory-actual-hull-sensor-comparison",
+  "checkpoint": "C1-partial",
+  "completed_at_utc": "2026-10-23T01:56:30.704295+00:00",
+  "source_capture": "before final build/run; selected workspace files including uncommitted and untracked source",
+  "source_file_count": 1463,
+  "runtime_sha256": "bf244558394879a6fb1e8d4b331baf9b01dfcc1c67fa7342a7df8ef9b0eb915a",
+  "validation": {
+    "example_tests": {
+      "command": "cargo test -p scenario-spacewars --profile ci --example flight_sensor_probe --locked --offline",
+      "passed": 2,
+      "failed": 0
+    },
+    "probe": {
+      "scenes": 41,
+      "configurations": 5,
+      "snapshot_parity_and_coverage_observations": 205,
+      "native_actual_hull_fixtures": 25,
+      "solid_witnesses_per_configuration": 451,
+      "source_world_immutability": "passed"
+    },
+    "browser": {
+      "interactions": [
+        "scene/resolution/channel selection",
+        "ghost hull movement",
+        "path visibility",
+        "paired comparison table",
+        "hover",
+        "zoom",
+        "original terrain sequence playback"
+      ],
+      "desktop_width": 1440,
+      "mobile_width": 430,
+      "mobile_content_width": 415,
+      "javascript_errors": 0
+    },
+    "format_and_whitespace": "passed",
+    "clippy": "completed; existing unrelated warnings; none in changed example files",
+    "source_archive_and_current_source_hashes": "passed",
+    "embedded_source_runtime_and_snapshot_hashes": "passed"
+  },
+  "limitations": [
+    "Native static fits and fixed-heading translation are not dynamic flight qualification.",
+    "Common sampled 4x4 audit is not exhaustive truth and differs from C0 8x8.",
+    "No task envelope or observation contract frozen. Local archive, not an off-machine backup."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-sensor-navigation-v1-20261022",
+  "viewer_path": "data/training-experiments/learned-flight-sensor-navigation-v1-20261022/run/index.html",
+  "manifest_sha256": "1fa0525debf0e39fa18b64ac7799dcffba048adaee3fe536cb38eab099e68b6f",
+  "source_archive_sha256": "fa73613a17783ec06e39e3f2b4fbc3cb639567d4f518972470ee6c5bfa5ed37d",
+  "report_sha256": "9408f7a7763562fa32c9bfb7ffb30ba5f5167e4a331295f17305ff91cb13549e",
+  "compact_results_sha256": "db23a1032f09e1b07726a1624fcdce178302cf7c4e211c99026b1a4885ed15e5"
+}

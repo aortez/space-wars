@@ -22,30 +22,22 @@ fn scene(aspect: f32, direction: f32, profile: ClockDuckJumpProfile) -> ClockSta
         ],
         Duration::ZERO,
     );
-    let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
-    duck.direction = direction;
+    let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
+    duck.face(direction);
     duck.controller.profile = profile;
-    state.duck_visit = Some(Box::new(duck));
+    duck.admit(&mut state);
     state
 }
 
-fn at_opportunity(duck: &DuckEvent, near_wall: bool) -> bool {
+fn at_opportunity(duck: &DuckEvent, world: &PhysicsWorld, near_wall: bool) -> bool {
     if duck.controller.direction >= 0.0
-        || !duck.grounded()
+        || !duck.grounded(world)
         || duck.controller.navigator.flight_tick.is_some()
     {
         return false;
     }
-    let x = duck.position().unwrap().x;
-    let velocity = duck
-        .world
-        .as_ref()
-        .unwrap()
-        .motion(DUCK_BODY)
-        .unwrap()
-        .linear_velocity
-        .x
-        * duck.direction;
+    let x = duck.position(world).unwrap().x;
+    let velocity = world.motion(DUCK_BODY).unwrap().linear_velocity.x * duck.direction;
     velocity < 0.0
         && if near_wall {
             x <= duck.radius * 5.0 && x > duck.radius * 3.5
@@ -80,15 +72,20 @@ fn exit_turns_and_near_wall_tags_replay_on_all_target_layouts() {
                         let mut state = scene(width as f32 / height as f32, direction, profile);
                         for _ in 0..EXIT_DELAY_TICKS {
                             ClockScenario::step(&mut state, &[], STEP);
-                            if at_opportunity(state.duck_scene().unwrap(), near_wall) {
+                            if at_opportunity(
+                                state.duck_visit.as_ref().unwrap(),
+                                state.arena.world().unwrap(),
+                                near_wall,
+                            ) {
                                 break;
                             }
                         }
                         let duck = state.duck_visit.as_mut().unwrap();
+                        let world = state.arena.world().unwrap();
                         assert!(
-                            at_opportunity(duck, near_wall),
+                            at_opportunity(duck, world, near_wall),
                             "{name}: {:?}",
-                            duck.diagnostics()
+                            duck.diagnostics(Some(world))
                         );
                         assert!(!duck.exit_visible());
                         let tags = duck.controller.wall_tags[0];
@@ -201,31 +198,27 @@ fn near_wall_allowance_has_a_body_scaled_boundary_in_both_controller_paths() {
         for direction in [-1.0, 1.0] {
             for radii in [4.8, 5.2] {
                 let mut duck = if platforms {
-                    DuckEvent::new_platforms(Layout::new(800.0 / 480.0), 42)
+                    TestDuck::new_platforms(Layout::new(800.0 / 480.0), 42)
                 } else {
-                    DuckEvent::new(Layout::new(800.0 / 480.0), 42)
+                    TestDuck::new(Layout::new(800.0 / 480.0), 42)
                 };
-                duck.direction = direction;
+                duck.face(direction);
                 duck.skip_flap_detour_for_fixture();
                 for _ in 0..EXIT_DELAY_TICKS {
                     duck.step();
-                    if at_opportunity(&duck, true) {
+                    if at_opportunity(&duck, duck.arena.world().unwrap(), true) {
                         break;
                     }
                 }
-                assert!(at_opportunity(&duck, true));
+                assert!(at_opportunity(&duck, duck.arena.world().unwrap(), true));
                 // Put this boundary fixture just inside/outside the threshold
                 // on the same flat physical bank, after real calibration.
                 let position = duck
                     .physics_position(Vec2::new(duck.radius * radii, duck.position().unwrap().y));
-                let world = duck.world.as_mut().unwrap();
+                let velocity = Vec2::new(-direction * duck.radius * 2.0, 0.0);
+                let world = duck.arena.world_mut().unwrap();
                 world.set_pose(DUCK_BODY, position, 0.0, true);
-                world.set_velocity(
-                    DUCK_BODY,
-                    Vec2::new(-direction * duck.radius * 2.0, 0.0),
-                    0.0,
-                    true,
-                );
+                world.set_velocity(DUCK_BODY, velocity, 0.0, true);
                 duck.tick = OPENING_TICKS + EXIT_DELAY_TICKS - 1;
                 duck.step();
                 assert_eq!(
@@ -243,8 +236,8 @@ fn opening_mid_jump_finishes_the_physical_landing_before_replanning() {
     for aspect in [800.0 / 480.0, 1024.0 / 768.0, 480.0 / 800.0] {
         for direction in [-1.0, 1.0] {
             for profile in [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing] {
-                let mut duck = DuckEvent::new_platforms(Layout::new(aspect), 42);
-                duck.direction = direction;
+                let mut duck = TestDuck::new_platforms(Layout::new(aspect), 42);
+                duck.face(direction);
                 duck.controller.profile = profile;
                 for _ in 0..EXIT_DELAY_TICKS {
                     duck.step();

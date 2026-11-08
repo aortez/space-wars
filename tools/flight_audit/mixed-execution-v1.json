@@ -1,0 +1,19 @@
+{
+  "id": "mean-steering-sampled-buttons-v1",
+  "version": 1,
+  "status": "candidate-diagnostic",
+  "decision_hz": 60,
+  "steering": "tanh(actor_steering_mean)",
+  "buttons": "independent Gaussian auxiliary latents, threshold at zero",
+  "button_probability": "clamp(sigmoid(actor_logit), 1e-6, 1-1e-6)",
+  "button_latent_mean": "inverse_standard_normal_cdf(button_probability)",
+  "button_latent_std": 1.0,
+  "correlation_rho": 0.0,
+  "rng": "PyTorch CPU global generator, explicit per-episode seed",
+  "draw_order": ["unused_steering", "thrust", "brake"],
+  "unused_steering_draw": "Normal(actor_steering_mean, exp(clamp(saved_log_std, -5, 2)))",
+  "stream_lifetime": "reset once per episode; no reseeding within episode",
+  "control_owner": "learned policy for all three outputs",
+  "native_fallback": false,
+  "production_default_changed": false
+}

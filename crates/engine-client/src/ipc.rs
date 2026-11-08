@@ -678,6 +678,22 @@ fn handle_request(
     scenario_controls: &host::SharedScenarioControls,
     input_automation: &mut InputAutomation,
 ) {
+    if (window.get_install_fenced() || window.get_updates_visible())
+        && !matches!(
+            &request.command,
+            ControlCommand::Health(_)
+                | ControlCommand::UiState
+                | ControlCommand::Status
+                | ControlCommand::Screenshot { .. }
+                | ControlCommand::UiPress(_)
+                | ControlCommand::UiActivate(_)
+        )
+    {
+        request
+            .response
+            .error("Install handoff blocks app mutations.");
+        return;
+    }
     match request.command {
         ControlCommand::InputPress(press) => {
             input_automation.press(window, press, request.response, ui_state_tracker)
@@ -1222,6 +1238,26 @@ fn validate_clock_trigger(
             ControlFailureCode::ActionUnavailable,
             "A crow is already visiting; wait for departure",
         ))
+    } else if clock
+        .events
+        .iter()
+        .any(|event| event.kind == request.event && event.blocked_by_spider)
+    {
+        Some((
+            ControlFailureCode::ActionUnavailable,
+            if clock.spider.is_some() {
+                "A spider is visiting; wait for departure"
+            } else {
+                "The spider waits for the duck, crow or event to finish"
+            },
+        ))
+    } else if let Some(unavailable) = clock
+        .events
+        .iter()
+        .find(|event| event.kind == request.event)
+        .and_then(|event| event.blocked_by_arena)
+    {
+        Some((ControlFailureCode::ActionUnavailable, unavailable.notice()))
     } else if !clock.can_trigger {
         Some((
             ControlFailureCode::ActionUnavailable,
@@ -1464,6 +1500,7 @@ fn validate_ui_preconditions(
 #[cfg(unix)]
 fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState, ProtocolError> {
     let screen = classify_screen(ScreenVisibility {
+        updates: window.get_updates_visible() || window.get_install_fenced(),
         launcher_busy: window.get_launcher_busy(),
         sound: window.get_sound_visible(),
         device_info: window.get_device_info_visible(),
@@ -1487,6 +1524,9 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            updates_controls: crate::updates::inventory(window),
+            updates_focus: window.get_updates_focus(),
+            updates_message: window.get_updates_message().to_string(),
             genome_controls: if window.get_genomes_visible() {
                 crate::genome_controls::inventory(window)
             } else {
@@ -1600,6 +1640,8 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
             clock_cell_swap_enabled: window.get_launcher_clock_cell_swap_enabled(),
             clock_grass_enabled: window.get_launcher_clock_grass_enabled(),
+            clock_slot_machine_enabled: window.get_launcher_clock_slot_machine_enabled(),
+            clock_spider_enabled: window.get_launcher_clock_spider_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
                 window.get_launcher_clock_rain_amount().to_string()
             } else {
@@ -1705,17 +1747,25 @@ mod tests {
         for event in ClockEventKind::ALL {
             let request = ClockTriggerRequest::new(&clock, event);
             let result = validate_clock_trigger(&request, &ui, &clock);
-            if clock
+            let entry = clock
                 .events
                 .iter()
                 .find(|entry| entry.kind == event)
-                .unwrap()
-                .blocked_by_duck
-            {
+                .unwrap();
+            if entry.blocked_by_duck {
                 let failure = result.unwrap_err();
                 assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
                 assert!(failure.message.contains("dismiss the duck"));
                 assert_eq!(failure.current_clock_state, Some(clock.clone()));
+            } else if entry.blocked_by_spider {
+                // The spider waits for the player's duck; none is visiting.
+                assert_eq!(event, ClockEventKind::Spider);
+                let failure = result.unwrap_err();
+                assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+                assert_eq!(
+                    failure.message,
+                    "The spider waits for the duck, crow or event to finish"
+                );
             } else {
                 result.unwrap();
             }
@@ -1741,6 +1791,22 @@ mod tests {
             &clock,
         )
         .unwrap();
+        // Whatever the run's arena would refuse is unavailable, for its reason.
+        let mut refused = clock.clone();
+        let rain = refused
+            .events
+            .iter_mut()
+            .find(|event| event.kind == ClockEventKind::Rain)
+            .unwrap();
+        rain.blocked_by_arena = Some(engine_common::ClockArenaUnavailable::LayoutIncompatible);
+        let request = ClockTriggerRequest::new(&refused, ClockEventKind::Rain);
+        let failure = validate_clock_trigger(&request, &ui, &refused).unwrap_err();
+        assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+        assert_eq!(
+            failure.message,
+            engine_common::ClockArenaUnavailable::LayoutIncompatible.notice()
+        );
+        assert_eq!(failure.current_clock_state, Some(refused));
         let request = ClockTriggerRequest::new(&clock, ClockEventKind::Marquee);
         ui.screen = UiScreen::PauseMain;
         assert_eq!(

@@ -24,7 +24,7 @@ impl DoorPanel {
 
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     let width = layout.frame_width;
-    let doors = door_panels(state.duck_scene());
+    let doors = door_panels(state.duck_scene().as_deref());
     inner_shadow(frame, layout, width, doors);
     for door in doors.into_iter().flatten() {
         door_shadow(frame, door, width);

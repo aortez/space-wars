@@ -7,6 +7,18 @@ pub mod bootstrap_canonical;
 mod bootstrap_recovery;
 #[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
 pub mod supervised_install;
+#[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
+pub mod supervised_kiosk_crash;
+#[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
+pub mod supervised_kiosk_hang;
+#[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
+pub mod supervised_recovery_failure;
+#[cfg(all(target_os = "linux", feature = "recovery-qualification"))]
+pub mod supervised_trial_reset;
+#[cfg(all(test, target_os = "linux"))]
+#[allow(dead_code)]
+#[path = "../../engine-ota/tests/support/mod.rs"]
+mod test_feed;
 pub mod time;
 #[cfg(target_os = "linux")]
 pub mod time_query;
@@ -16,11 +28,15 @@ pub mod time_runtime;
 pub mod time_schedule;
 
 #[cfg(target_os = "linux")]
+pub mod install_handoff;
+#[cfg(target_os = "linux")]
 pub mod kiosk_health;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "linux")]
 pub mod maintenance;
+#[cfg(target_os = "linux")]
+mod network_access;
 #[cfg(target_os = "linux")]
 pub mod network_controller;
 #[cfg(target_os = "linux")]

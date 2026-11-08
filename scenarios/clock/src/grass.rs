@@ -4,6 +4,10 @@
 //! actual dirt only after the host checks canonical occupancy at that boundary.
 //! Retained cells occupy their original coordinates, so another introduction
 //! fills holes rather than stacking another layer.
+//!
+//! The layer is inset into the top of the supporting floor rather than stacked
+//! on it, so the walking surface stays at the floor line for every actor and
+//! event. Roots occupy the rows below that line and shoots grow above it.
 
 use engine_core::Vec2;
 
@@ -12,6 +16,27 @@ pub const SEED_COOLDOWN_TICKS: u64 = 20 * 60 * 60;
 pub const SEED_BATCH: usize = 3;
 pub const SEED_SPACING_CELLS: i32 = 4;
 pub const SEED_STARTING_RESERVES: [u64; 3] = [30; 3];
+
+/// Moss succession. One bounded mat per opening is admitted when the ceiling
+/// finishes closing, so a wider break leaves more cover behind as the lit grass
+/// withers.
+pub const MAX_MOSS_PATCHES: usize = crate::ceiling::MAX_OPENINGS;
+/// Mat cells across every patch together, the way grass's trait bounds all of
+/// its seeds at once: the moss policy recognises its own tissue by policy and
+/// support, so each mat counts the others. Six cells a patch at the widest
+/// break. The total stays small because every mat cell is also a light
+/// receiver, and shoots and mats together have to fit `MAX_RECEIVERS`.
+pub const MAX_MOSS_TISSUES: usize = 18;
+/// A mat waits longer between growth opportunities than grass does. The dim
+/// room saturates moss, but it pays only two energy a tick against upkeep, so
+/// a cell takes many ticks to fund the twenty a neighbour costs.
+pub const MOSS_GROWTH_INTERVAL_TICKS: u16 = 4;
+pub const MOSS_STARTING_RESERVES: [u64; 3] = [24; 3];
+/// Moss lies in the first air row above the floor line: its own cell has to be
+/// outside solid geometry, with the soil surface row beneath it as its contact.
+/// That is also the row a grass shoot rises into, so the two organisms compete
+/// by ordinary occupancy rather than through any moss-specific exemption.
+pub const MOSS_ROW: i32 = SOIL_DEPTH_CELLS as i32;
 
 #[derive(Default)]
 pub(crate) struct Introduction {
@@ -29,16 +54,20 @@ mod contracts;
 mod habitat;
 pub(crate) mod inspection;
 pub(crate) mod residents;
+#[cfg(test)]
+mod succession_contracts;
 pub(crate) mod surfaces;
 pub use habitat::{
     CLOCK_DIRT, MAX_SOIL_BODIES, MAX_SOIL_CHUNK_COLLIDERS, MAX_SOIL_EXPORTS_PER_UPDATE,
     MAX_SOIL_EXTERNAL_INPUT, SOIL_PHYSICS_ID, SoilAccounting, SoilHabitat, SoilSupportState,
 };
 pub use residents::{
-    BIOLOGY_TICK_MS, ClockPlants, MAX_BIOLOGY_STEPS_PER_UPDATE, MAX_PLANT_TISSUES, PlantPlayback,
+    BIOLOGY_TICK_MS, ClockPlants, MAX_BIOLOGY_STEPS_PER_UPDATE, MAX_GRASS_TISSUES,
+    MAX_PLANT_TISSUES, PlantPlayback,
 };
 
-/// World units; three rows leave finite underground runner/root space.
+/// World units; three rows leave finite underground runner/root space, cut into
+/// the supporting floor so the surface row's top rests on the floor line.
 pub const SOIL_CELL_SIZE: f32 = 2.0;
 pub const SOIL_DEPTH_CELLS: usize = 3;
 /// Covers the widest supported Clock layout (1920 units) at the target depth.
@@ -50,10 +79,21 @@ pub const MAX_SOIL_SITE_QUERIES: usize = 2880;
 pub struct SoilSite {
     /// Stable horizontal grid coordinate relative to the arena's left edge.
     pub column: usize,
-    /// Depth coordinate measured upward from the supporting floor.
+    /// Depth coordinate measured upward from the layer's deepest row. The
+    /// surface row is `SOIL_DEPTH_CELLS - 1`; its top is the floor line.
     pub row: usize,
     pub min: Vec2,
     pub max: Vec2,
+}
+
+impl SoilSite {
+    /// An inset cell at or below the floor line is inside solid support
+    /// geometry, which every floor type supplies as a thick slab, and
+    /// `plan_soil_admission` already refuses a column without full support.
+    /// No canonical occupancy query can observe an actor inside it.
+    pub fn inside_support(self, floor_y: f32) -> bool {
+        self.max.y <= floor_y + 1e-3
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,7 +162,8 @@ pub fn plan_soil_admission(
             if plan.queries == MAX_SOIL_SITE_QUERIES {
                 break;
             }
-            let y = floor_y + row as f32 * SOIL_CELL_SIZE;
+            // Inset: the surface row's top is the floor line, not its bottom.
+            let y = floor_y - (SOIL_DEPTH_CELLS - row) as f32 * SOIL_CELL_SIZE;
             let site = SoilSite {
                 column,
                 row,
@@ -181,8 +222,9 @@ mod tests {
                     .iter()
                     .any(|&(a, b)| a <= site.min.x && site.max.x <= b)
             );
-            assert!(site.min.y >= layout.floor_y);
-            assert!(site.max.y <= layout.floor_y + 6.0);
+            // Inset: the layer fills the floor's top rows, not the space above.
+            assert!(site.min.y >= layout.floor_y - 6.0);
+            assert!(site.max.y <= layout.floor_y);
         }
     }
 

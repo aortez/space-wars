@@ -4,6 +4,7 @@
     "attached::attached_workflows_preserve_launcher_running_and_paused_sessions",
     "autostart::autostart_clock_launch_and_disable_smoke",
     "clock::aquarium_preview_pause_enablement_and_restart_use_the_public_ui",
+    "clock::arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run",
     "clock::cell_swap_preview_and_saved_switch_use_the_public_controls",
     "clock::clock_fonts_save_live_choices_and_survive_restart",
     "clock::color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunch",
@@ -21,6 +22,7 @@
     "controllers::controllers_are_reachable_from_launcher_and_pause_without_resuming",
     "device_info::device_info_is_shared_read_only_scrollable_and_returns_to_its_parent",
     "garden_lab::garden_lab_pause_step_and_renderers_smoke",
+    "material_lab::material_lab_pause_save_load_and_both_renderers",
     "kiosk_health_challenges_run_on_the_live_ui_thread",
     "launcher_can_run_the_classic_spacewars_menu_lifecycle",
     "launcher_can_run_the_clock_menu_lifecycle",
@@ -63,7 +65,7 @@
     },
     {
       "test": "clock::ceiling_opening_raster_normal_speed_and_aftermath",
-      "reason": "Complete 300-second unpaused sunlight hold, closing and five-minute aftermath at 1x; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
+      "reason": "Complete 300-second unpaused sunlight hold, closing, five-minute aftermath and moss succession at 1x, then a later opening reseeding over the retained mat; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
     },
     {
       "test": "clock::ceiling_opening_vector_moving_blocker_evidence",
@@ -71,7 +73,7 @@
     },
     {
       "test": "clock::ceiling_opening_vector_normal_speed_and_aftermath",
-      "reason": "Complete 300-second unpaused sunlight hold, closing and five-minute aftermath at 1x; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
+      "reason": "Complete 300-second unpaused sunlight hold, closing, five-minute aftermath and moss succession at 1x, then a later opening reseeding over the retained mat; existing grass admission/pause/disable/restart smoke covers bounded ceiling controls on PRs."
     },
     {
       "test": "clock::demo_profile_automatically_runs_multiple_bounded_events",

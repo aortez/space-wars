@@ -1,0 +1,426 @@
+{
+  "experiment": "recovery_guidance_graded_braking_v1",
+  "cases": [
+    {
+      "case": "train-42-p1-d65",
+      "partition": "additional",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 52,
+          "owned_ticks": 52,
+          "brake_ticks": 0,
+          "thrust_ticks": 52,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.30129337310791016,
+          "highest_raw_brake": -0.30129337310791016,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 53,
+          "owned_ticks": 53,
+          "brake_ticks": 0,
+          "thrust_ticks": 53,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.3109636902809143,
+          "highest_raw_brake": -0.3109636902809143,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "host_preempted",
+          "ticks": 53,
+          "owned_ticks": 53,
+          "brake_ticks": 0,
+          "thrust_ticks": 53,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.40297460556030273,
+          "highest_raw_brake": -0.40297460556030273,
+          "host_goal": "launch",
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "train-42-p2-d65",
+      "partition": "additional",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 37,
+          "owned_ticks": 37,
+          "brake_ticks": 0,
+          "thrust_ticks": 19,
+          "first_brake_decision": null,
+          "initial_raw_brake": -1.1419806480407715,
+          "highest_raw_brake": -0.6124227046966553,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 38,
+          "owned_ticks": 38,
+          "brake_ticks": 0,
+          "thrust_ticks": 19,
+          "first_brake_decision": null,
+          "initial_raw_brake": -1.2065036296844482,
+          "highest_raw_brake": -0.6085331439971924,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "host_preempted",
+          "ticks": 33,
+          "owned_ticks": 33,
+          "brake_ticks": 0,
+          "thrust_ticks": 23,
+          "first_brake_decision": null,
+          "initial_raw_brake": -1.0503506660461426,
+          "highest_raw_brake": -0.35341328382492065,
+          "host_goal": "launch",
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "train-10101-p2-d65",
+      "partition": "additional",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 38,
+          "owned_ticks": 38,
+          "brake_ticks": 0,
+          "thrust_ticks": 14,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.7290171384811401,
+          "highest_raw_brake": -0.7290171384811401,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 42,
+          "owned_ticks": 42,
+          "brake_ticks": 0,
+          "thrust_ticks": 18,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.7756263017654419,
+          "highest_raw_brake": -0.7756263017654419,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "host_preempted",
+          "ticks": 28,
+          "owned_ticks": 28,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.9634696245193481,
+          "highest_raw_brake": -0.8985536098480225,
+          "host_goal": "launch",
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "seed-42-weak-round-p1",
+      "partition": "additional",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 52,
+          "owned_ticks": 52,
+          "brake_ticks": 0,
+          "thrust_ticks": 52,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.30129337310791016,
+          "highest_raw_brake": -0.30129337310791016,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 53,
+          "owned_ticks": 53,
+          "brake_ticks": 0,
+          "thrust_ticks": 53,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.3109636902809143,
+          "highest_raw_brake": -0.3109636902809143,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "host_preempted",
+          "ticks": 53,
+          "owned_ticks": 53,
+          "brake_ticks": 0,
+          "thrust_ticks": 53,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.40297460556030273,
+          "highest_raw_brake": -0.40297460556030273,
+          "host_goal": "launch",
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "validation-1021-WeakAngular-p2",
+      "partition": "additional",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 44,
+          "owned_ticks": 44,
+          "brake_ticks": 0,
+          "thrust_ticks": 37,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.29350417852401733,
+          "highest_raw_brake": -0.29350417852401733,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 47,
+          "owned_ticks": 47,
+          "brake_ticks": 0,
+          "thrust_ticks": 35,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.3115484118461609,
+          "highest_raw_brake": -0.3115484118461609,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "host_preempted",
+          "ticks": 40,
+          "owned_ticks": 40,
+          "brake_ticks": 0,
+          "thrust_ticks": 40,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.22412264347076416,
+          "highest_raw_brake": -0.22412264347076416,
+          "host_goal": "launch",
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "validation-1021-WeakRound-p2",
+      "partition": "additional",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 44,
+          "owned_ticks": 44,
+          "brake_ticks": 0,
+          "thrust_ticks": 37,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.29350417852401733,
+          "highest_raw_brake": -0.29350417852401733,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 47,
+          "owned_ticks": 47,
+          "brake_ticks": 0,
+          "thrust_ticks": 35,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.3115484118461609,
+          "highest_raw_brake": -0.3115484118461609,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "host_preempted",
+          "ticks": 40,
+          "owned_ticks": 40,
+          "brake_ticks": 0,
+          "thrust_ticks": 40,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.22412264347076416,
+          "highest_raw_brake": -0.22412264347076416,
+          "host_goal": "launch",
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "validation-10037-WeakAngular-p1",
+      "partition": "additional",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 43,
+          "owned_ticks": 43,
+          "brake_ticks": 0,
+          "thrust_ticks": 16,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.8699401021003723,
+          "highest_raw_brake": -0.1827215552330017,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 44,
+          "owned_ticks": 44,
+          "brake_ticks": 0,
+          "thrust_ticks": 15,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.9071491956710815,
+          "highest_raw_brake": -0.19215619564056396,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "arrived",
+          "ticks": 72,
+          "owned_ticks": 71,
+          "brake_ticks": 32,
+          "thrust_ticks": 19,
+          "first_brake_decision": 40,
+          "initial_raw_brake": -0.7531905770301819,
+          "highest_raw_brake": 0.187763512134552,
+          "host_goal": null,
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "validation-10037-WeakRound-p1",
+      "partition": "additional",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 43,
+          "owned_ticks": 43,
+          "brake_ticks": 0,
+          "thrust_ticks": 16,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.8699401021003723,
+          "highest_raw_brake": -0.1827215552330017,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 44,
+          "owned_ticks": 44,
+          "brake_ticks": 0,
+          "thrust_ticks": 15,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.9071491956710815,
+          "highest_raw_brake": -0.19215619564056396,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "arrived",
+          "ticks": 72,
+          "owned_ticks": 71,
+          "brake_ticks": 32,
+          "thrust_ticks": 19,
+          "first_brake_decision": 40,
+          "initial_raw_brake": -0.7531905770301819,
+          "highest_raw_brake": 0.187763512134552,
+          "host_goal": null,
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "validation-16411-WeakAngular-p1",
+      "partition": "validation",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 49,
+          "owned_ticks": 49,
+          "brake_ticks": 0,
+          "thrust_ticks": 22,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.28193041682243347,
+          "highest_raw_brake": -0.15786464512348175,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 49,
+          "owned_ticks": 49,
+          "brake_ticks": 0,
+          "thrust_ticks": 22,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.29429012537002563,
+          "highest_raw_brake": -0.1858459711074829,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "arrived",
+          "ticks": 76,
+          "owned_ticks": 75,
+          "brake_ticks": 29,
+          "thrust_ticks": 24,
+          "first_brake_decision": 47,
+          "initial_raw_brake": -0.2017453908920288,
+          "highest_raw_brake": 0.1273198127746582,
+          "host_goal": null,
+          "host_avoidance": null
+        }
+      }
+    },
+    {
+      "case": "validation-16411-WeakRound-p1",
+      "partition": "validation",
+      "controllers": {
+        "baseline": {
+          "outcome": "host_preempted",
+          "ticks": 49,
+          "owned_ticks": 49,
+          "brake_ticks": 0,
+          "thrust_ticks": 22,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.28193041682243347,
+          "highest_raw_brake": -0.15786464512348175,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "control": {
+          "outcome": "host_preempted",
+          "ticks": 49,
+          "owned_ticks": 49,
+          "brake_ticks": 0,
+          "thrust_ticks": 22,
+          "first_brake_decision": null,
+          "initial_raw_brake": -0.29429012537002563,
+          "highest_raw_brake": -0.1858459711074829,
+          "host_goal": "launch",
+          "host_avoidance": null
+        },
+        "graded": {
+          "outcome": "arrived",
+          "ticks": 76,
+          "owned_ticks": 75,
+          "brake_ticks": 29,
+          "thrust_ticks": 24,
+          "first_brake_decision": 47,
+          "initial_raw_brake": -0.2017453908920288,
+          "highest_raw_brake": 0.1273198127746582,
+          "host_goal": null,
+          "host_avoidance": null
+        }
+      }
+    }
+  ],
+  "decision_indexing": "One-based row within the scored continuation; common neutral preparation tick excluded"
+}

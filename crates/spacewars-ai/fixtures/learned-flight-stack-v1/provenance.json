@@ -1,0 +1,33 @@
+{
+  "stack": "learned_flight_stack_v1",
+  "composition": {
+    "hold_ticks": 6,
+    "motor_hz": 60,
+    "command_contract": "navigation-command-v1",
+    "envelope": "zero gravity, stationary planet, open wings, speeds up to 20 units per second, goals within 200 units, static clear, obstructed and altered geometry"
+  },
+  "navigation": {
+    "file": "navigation.json",
+    "sha256": "eac796afb0f636b9872dfd937c00a8090a2d4b2d16018d224762b2b2ea02f824",
+    "format_version": 4,
+    "architecture": "polar-conv8x8-coordinates-set-attention32-mlp64x64-v1",
+    "experiment": "LF-083",
+    "report": "docs/flight-navigation-fit-v1.md",
+    "source": "data/training-experiments/learned-flight-navigation-fit-v1-20261026/policy-final.json",
+    "qualification": {
+      "development": "72 of 72 static tasks, generation seed 7700002",
+      "held_out": "71 of 72 static tasks, generation seed 7700003",
+      "native_parity": "6.7e-6 maximum head difference against the Python fit"
+    }
+  },
+  "motor": {
+    "file": "motor.json",
+    "sha256": "e47e2456a2c6d96b6a1624155b1a95093bec56c79b5aa2815ca631abeb029ce1",
+    "format_version": 1,
+    "architecture": "motor18-actor32x32-critic32x32-v1",
+    "experiment": "LF-078",
+    "report": "docs/flight-motor-teacher-v4.md",
+    "source": "data/training-experiments/learned-flight-motor-teacher-fit-v4-20261025/policy-final.json",
+    "qualification": "the unpolished v4 teacher fit: every development set and 200 of 200 held-out motor tasks"
+  }
+}

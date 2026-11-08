@@ -1,0 +1,1272 @@
+{
+  "experiment": "recovery_guidance_brake_joint_fit_v1",
+  "baseline_genome": "6ff82f329388dae5957dd77187520dc4f3322c4f2965fd8c88580b3569a4ad1e",
+  "runtime": "diagnostic_v1/linux/x86_64/524ec9d8372102f9486df7c379b46d2633ed249fbdba6d6ba7cf3f346d8f1315",
+  "recipe_sha256": "6f914b2baecaa10ed2aa8b6f718b613cdb4fb4a5a9a8298361f0c488d5096f4a",
+  "source_patch_sha256": "4b17cb1ebee7dc92652acde15c0901e45dce1b926a4f56bc31fa574d92c2e4a3",
+  "preflight_sha256": "817b154ad18f86fbd87bd01c71dee0c16aba908584c1d218722bd9ff36ff5877",
+  "counts": {
+    "historical_match_endpoints": 114,
+    "historical_precision_endpoints": 157,
+    "match_rows": 5683,
+    "byte_identical_historical_match_traces": 114,
+    "precision_rows": 92900,
+    "exact_rational_certificates": 10,
+    "evaluation_episodes": 271,
+    "export_episodes_including_native_trace_parity": 542
+  },
+  "preserved_decisions": 98336,
+  "precision_decisions": 92900,
+  "protected_match_decisions": 5436,
+  "failed_starts": [
+    {
+      "case": "train-42-p1-d65",
+      "tick": 884,
+      "baseline_raw_brake": -0.40297460556030273,
+      "relative_speed": 39.23007170562631,
+      "target_distance": 16.923494303113166
+    },
+    {
+      "case": "train-42-p2-d65",
+      "tick": 785,
+      "baseline_raw_brake": -1.0503506660461426,
+      "relative_speed": 44.20551303420503,
+      "target_distance": 54.81826664846896
+    },
+    {
+      "case": "train-10101-p2-d65",
+      "tick": 1243,
+      "baseline_raw_brake": -0.9634696245193481,
+      "relative_speed": 50.2590169277287,
+      "target_distance": 64.1200937237009
+    },
+    {
+      "case": "seed-42-weak-round-p1",
+      "tick": 884,
+      "baseline_raw_brake": -0.40297460556030273,
+      "relative_speed": 39.23007170562631,
+      "target_distance": 16.923494303113166
+    },
+    {
+      "case": "validation-1021-WeakAngular-p2",
+      "tick": 1043,
+      "baseline_raw_brake": -0.22412264347076416,
+      "relative_speed": 31.973746383019538,
+      "target_distance": 34.438227430804176
+    },
+    {
+      "case": "validation-1021-WeakRound-p2",
+      "tick": 1043,
+      "baseline_raw_brake": -0.22412264347076416,
+      "relative_speed": 31.973746383019538,
+      "target_distance": 34.438227430804176
+    }
+  ],
+  "fits": [
+    {
+      "label": "all-starts",
+      "targets": [
+        "train-42-p1-d65",
+        "seed-42-weak-round-p1",
+        "train-42-p2-d65",
+        "train-10101-p2-d65",
+        "validation-1021-WeakAngular-p2",
+        "validation-1021-WeakRound-p2"
+      ],
+      "outer_optimum": -0.0,
+      "numeric_outer_upper": 3.079565542436441e-08,
+      "strict_optimum": -0.5251753538649622
+    },
+    {
+      "label": "start-0",
+      "targets": [
+        "train-42-p1-d65",
+        "seed-42-weak-round-p1"
+      ],
+      "outer_optimum": -0.0,
+      "numeric_outer_upper": 2.2789192345237803e-08,
+      "strict_optimum": -0.2014873149594698
+    },
+    {
+      "label": "start-1",
+      "targets": [
+        "train-42-p2-d65"
+      ],
+      "outer_optimum": -0.0,
+      "numeric_outer_upper": 2.2475864468801666e-08,
+      "strict_optimum": -0.5251753538648445
+    },
+    {
+      "label": "start-2",
+      "targets": [
+        "train-10101-p2-d65"
+      ],
+      "outer_optimum": -0.0,
+      "numeric_outer_upper": 4.260365826183304e-08,
+      "strict_optimum": -0.4817348130725
+    },
+    {
+      "label": "start-3",
+      "targets": [
+        "validation-1021-WeakAngular-p2",
+        "validation-1021-WeakRound-p2"
+      ],
+      "outer_optimum": -0.0,
+      "numeric_outer_upper": 1.9395438675873443e-08,
+      "strict_optimum": -0.11206131278509329
+    }
+  ],
+  "exact_certificates": [
+    {
+      "label": "all-starts",
+      "kind": "outer",
+      "blocked_targets": [
+        "train-42-p2-d65"
+      ],
+      "precision_only": false,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "0",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 22,
+          "constraint": {
+            "domain": "match",
+            "case": "development-inspected-113-WeakRound-p1",
+            "tick": 628,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "39561654650761815563770352430827727814828879846466035518693/139366300060088089495849521059048121560604121339989578891308"
+        },
+        {
+          "row_index": 551,
+          "constraint": {
+            "domain": "match",
+            "case": "seed-10101-weak-round-p2",
+            "tick": 1346,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "51272738021910290084422770165507626536279660012884108581073/69683150030044044747924760529524060780302060669994789445654"
+        },
+        {
+          "row_index": 2374,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-16411-WeakAngular-p2",
+            "tick": 1166,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "386687775595072379364433783849018422041525250634355734876855/278732600120176178991699042118096243121208242679979157782616"
+        },
+        {
+          "row_index": 9831,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_inward_b2_p1",
+            "tick": 564,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "51255032538713478001406753839798907637264490655283877685607/34841575015022022373962380264762030390151030334997394722827"
+        },
+        {
+          "row_index": 16179,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p1",
+            "tick": 101,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "270147479943093599551192147727294300373264244367968074211587/139366300060088089495849521059048121560604121339989578891308"
+        },
+        {
+          "row_index": 16725,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p2",
+            "tick": 148,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "49953357506521750305564565821190457522242091193651588113019/139366300060088089495849521059048121560604121339989578891308"
+        },
+        {
+          "row_index": 17174,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p2",
+            "tick": 597,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "356492350995358032778705812171058252849616313372021236056201/278732600120176178991699042118096243121208242679979157782616"
+        },
+        {
+          "row_index": 27226,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b1_p2",
+            "tick": 44,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "469946293166288895759928269556129537717849614352291430500835/278732600120176178991699042118096243121208242679979157782616"
+        },
+        {
+          "row_index": 58613,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_geometry_b2_p1",
+            "tick": 524,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "320061012648635328553720634271651492326621073876724073424353/278732600120176178991699042118096243121208242679979157782616"
+        }
+      ]
+    },
+    {
+      "label": "all-starts",
+      "kind": "strict",
+      "blocked_targets": [
+        "train-42-p2-d65"
+      ],
+      "precision_only": false,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "-66953840239747135713621176034614883163290150792320353187341515808927150465/127488542154559050083317956706382282619398544842868907910415399110504873984",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 3067,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-262147-WeakRound-p1",
+            "tick": 5236,
+            "brake": true,
+            "required_signed_margin": 7.801967349063688e-06
+          },
+          "positive_rational_multiplier": "275337678142840766236256002105334856248174681926498268251413/884629467974289499544157366245233105463131490240259096547"
+        },
+        {
+          "row_index": 19342,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b2_p2",
+            "tick": 56,
+            "brake": false,
+            "required_signed_margin": 1.2435379122210932e-05
+          },
+          "positive_rational_multiplier": "148544424862800891703636505490440042380326851457919304502741/1769258935948578999088314732490466210926262980480518193094"
+        },
+        {
+          "row_index": 20233,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b2_p3",
+            "tick": 86,
+            "brake": true,
+            "required_signed_margin": 9.274436346295989e-05
+          },
+          "positive_rational_multiplier": "30840145794944546494607892542938482264159771507669605154547247/14154071487588631992706517859923729687410103843844145544752"
+        },
+        {
+          "row_index": 28015,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b1_p3",
+            "tick": 354,
+            "brake": false,
+            "required_signed_margin": 8.473183340684809e-05
+          },
+          "positive_rational_multiplier": "11938466061052518310730929554014595965340639646902699735237671/14154071487588631992706517859923729687410103843844145544752"
+        },
+        {
+          "row_index": 30677,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b2_p3",
+            "tick": 474,
+            "brake": true,
+            "required_signed_margin": 2.166104488188214e-05
+          },
+          "positive_rational_multiplier": "378317003750980322385126007123189396392684145087847677855095/884629467974289499544157366245233105463131490240259096547"
+        },
+        {
+          "row_index": 31063,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b3_p0",
+            "tick": 37,
+            "brake": true,
+            "required_signed_margin": 7.992269645251682e-05
+          },
+          "positive_rational_multiplier": "1641839816002770705646345732580721916979363647522138416027161/7077035743794315996353258929961864843705051921922072772376"
+        },
+        {
+          "row_index": 31669,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b3_p1",
+            "tick": 214,
+            "brake": true,
+            "required_signed_margin": 9.90354406413263e-05
+          },
+          "positive_rational_multiplier": "1303283879182728265869110672336734963783178483120885853762855/7077035743794315996353258929961864843705051921922072772376"
+        },
+        {
+          "row_index": 93138,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_target_motion_b3_p4",
+            "tick": 344,
+            "brake": false,
+            "required_signed_margin": 4.1896966668342195e-05
+          },
+          "positive_rational_multiplier": "579630719546331098000357882751067836232041227656231996559840/884629467974289499544157366245233105463131490240259096547"
+        },
+        {
+          "row_index": 97118,
+          "constraint": {
+            "domain": "precision",
+            "case": "validation_left_rotated",
+            "tick": 72,
+            "brake": false,
+            "required_signed_margin": 9.967490788043154e-05
+          },
+          "positive_rational_multiplier": "1550131824650502967200492268520906632095630812747704178822445/884629467974289499544157366245233105463131490240259096547"
+        }
+      ]
+    },
+    {
+      "label": "start-0",
+      "kind": "outer",
+      "blocked_targets": [
+        "train-42-p1-d65",
+        "seed-42-weak-round-p1"
+      ],
+      "precision_only": false,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "0",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 551,
+          "constraint": {
+            "domain": "match",
+            "case": "seed-10101-weak-round-p2",
+            "tick": 1346,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "66707067012295220750079851261499367032535602618916317582018368/59256559300999122501515990149874119240750771030425380952980007"
+        },
+        {
+          "row_index": 3480,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-32771-WeakAngular-p2",
+            "tick": 996,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "415013258865745577429132967196176312285494770933278814324495360/414795915106993857510611931049118834685255397212977666670860049"
+        },
+        {
+          "row_index": 12710,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b0_p0",
+            "tick": 414,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "107341836922896020761937500125989002027734064830891239017538480/414795915106993857510611931049118834685255397212977666670860049"
+        },
+        {
+          "row_index": 16083,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p1",
+            "tick": 5,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "175154097620193564602541432516760829473983780602739796554223360/414795915106993857510611931049118834685255397212977666670860049"
+        },
+        {
+          "row_index": 16725,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p2",
+            "tick": 148,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "277261940995223136072117785142016251860578480878849096411307456/414795915106993857510611931049118834685255397212977666670860049"
+        },
+        {
+          "row_index": 25270,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b0_p3",
+            "tick": 178,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "30916060808052097027455711785790510993161356744916346895587258/138265305035664619170203977016372944895085132404325888890286683"
+        },
+        {
+          "row_index": 27226,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b1_p2",
+            "tick": 44,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "21484744366552658411605926967962060972718220419942196181132566/21831363952999676711084838476269412351855547221735666666887371"
+        },
+        {
+          "row_index": 33108,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b3_p3",
+            "tick": 340,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "795406369509192932765415578988825197942109515668881938991084721/414795915106993857510611931049118834685255397212977666670860049"
+        },
+        {
+          "row_index": 81972,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_target_motion_b0_p3",
+            "tick": 1,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "147517574466652375630390436016950042118407934236986467074536832/138265305035664619170203977016372944895085132404325888890286683"
+        }
+      ]
+    },
+    {
+      "label": "start-0",
+      "kind": "strict",
+      "blocked_targets": [
+        "train-42-p1-d65",
+        "seed-42-weak-round-p1"
+      ],
+      "precision_only": true,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "-64591884238593579999621681447458085600140666112580639923428582943085509/320575437970305350539778415656093257486297595534540835024325690234241024",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 18027,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b2_p0",
+            "tick": 217,
+            "brake": false,
+            "required_signed_margin": 3.34353508799623e-05
+          },
+          "positive_rational_multiplier": "9146767442959897008868901944132982369194642267120584288752/35591023236392666022595944814287755862547157407698254497"
+        },
+        {
+          "row_index": 23465,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b0_p0",
+            "tick": 36,
+            "brake": true,
+            "required_signed_margin": 7.647200631222262e-05
+          },
+          "positive_rational_multiplier": "8589921218586242159764606434001009198536210972670760650195/35591023236392666022595944814287755862547157407698254497"
+        },
+        {
+          "row_index": 27805,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b1_p3",
+            "tick": 144,
+            "brake": true,
+            "required_signed_margin": 8.593402365009162e-05
+          },
+          "positive_rational_multiplier": "9383011932118171620493291840835893531721296498073673268680/35591023236392666022595944814287755862547157407698254497"
+        },
+        {
+          "row_index": 31669,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b3_p1",
+            "tick": 214,
+            "brake": true,
+            "required_signed_margin": 9.90354406413263e-05
+          },
+          "positive_rational_multiplier": "20421731674262024629855320751660852297081244162087924669962/35591023236392666022595944814287755862547157407698254497"
+        },
+        {
+          "row_index": 45077,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_combined_a1_b1_p1",
+            "tick": 78,
+            "brake": false,
+            "required_signed_margin": 9.50372835738511e-05
+          },
+          "positive_rational_multiplier": "9567941762981924335651288511206211747195348496927461338356/35591023236392666022595944814287755862547157407698254497"
+        },
+        {
+          "row_index": 48987,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_combined_a2_b1_p0",
+            "tick": 40,
+            "brake": false,
+            "required_signed_margin": 8.56982762401648e-05
+          },
+          "positive_rational_multiplier": "2704235762106591119180827216876734132498286018976959207619/35591023236392666022595944814287755862547157407698254497"
+        },
+        {
+          "row_index": 72273,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_initial_motion_b1_p5",
+            "tick": 262,
+            "brake": false,
+            "required_signed_margin": 6.49526157249225e-05
+          },
+          "positive_rational_multiplier": "21946809451348485561804646243234541877052281101741934071475/35591023236392666022595944814287755862547157407698254497"
+        },
+        {
+          "row_index": 90005,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_target_motion_b2_p4",
+            "tick": 520,
+            "brake": true,
+            "required_signed_margin": 9.38414120686959e-05
+          },
+          "positive_rational_multiplier": "7513356692234683689655556173886896903285115844661191409460/35591023236392666022595944814287755862547157407698254497"
+        },
+        {
+          "row_index": 93138,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_target_motion_b3_p4",
+            "tick": 344,
+            "brake": false,
+            "required_signed_margin": 4.1896966668342195e-05
+          },
+          "positive_rational_multiplier": "2577858121040616740285707229748469560545856750134309346592/35591023236392666022595944814287755862547157407698254497"
+        }
+      ]
+    },
+    {
+      "label": "start-1",
+      "kind": "outer",
+      "blocked_targets": [
+        "train-42-p2-d65"
+      ],
+      "precision_only": false,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "0",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 551,
+          "constraint": {
+            "domain": "match",
+            "case": "seed-10101-weak-round-p2",
+            "tick": 1346,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "736168538576099515009538857388502126017073904610328094934912/1994116754561711443914197441917750368208754934903770157491285"
+        },
+        {
+          "row_index": 2374,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-16411-WeakAngular-p2",
+            "tick": 1166,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "484042248715304942702956521153435213086744738942157449733332/398823350912342288782839488383550073641750986980754031498257"
+        },
+        {
+          "row_index": 3648,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-32803-WeakAngular-p2",
+            "tick": 3793,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "180213084439142919016900417975083167398602166697287392583472/1994116754561711443914197441917750368208754934903770157491285"
+        },
+        {
+          "row_index": 5130,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-73-WeakAngular-p1",
+            "tick": 813,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "2047331541502992019457247413339716194862683744791256265786414/1994116754561711443914197441917750368208754934903770157491285"
+        },
+        {
+          "row_index": 17174,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p2",
+            "tick": 597,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "2606236179892126984939787808335242487986473111763273610922093/1994116754561711443914197441917750368208754934903770157491285"
+        },
+        {
+          "row_index": 27226,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b1_p2",
+            "tick": 44,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "3237622403746366327717331673397084810964823681631864126633039/3988233509123422887828394883835500736417509869807540314982570"
+        },
+        {
+          "row_index": 32364,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b3_p2",
+            "tick": 79,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "1368302070646853571994537452346650581972571012345996313947408/1994116754561711443914197441917750368208754934903770157491285"
+        },
+        {
+          "row_index": 57115,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_geometry_b1_p4",
+            "tick": 20,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "1995464941881194239835862968584178044607568036085575134771327/3988233509123422887828394883835500736417509869807540314982570"
+        },
+        {
+          "row_index": 58613,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_geometry_b2_p1",
+            "tick": 524,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "1920763297190733814878585521271737268218116779647721861085594/1994116754561711443914197441917750368208754934903770157491285"
+        }
+      ]
+    },
+    {
+      "label": "start-1",
+      "kind": "strict",
+      "blocked_targets": [
+        "train-42-p2-d65"
+      ],
+      "precision_only": true,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "-591294881992523/1125899906842624",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 23461,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b0_p0",
+            "tick": 32,
+            "brake": false,
+            "required_signed_margin": 5.2946347713189734e-05
+          },
+          "positive_rational_multiplier": "4393579493285723376335049043919766296749671187110686471585/4598840124266454930758179650743559433792627619618986561"
+        },
+        {
+          "row_index": 27805,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b1_p3",
+            "tick": 144,
+            "brake": true,
+            "required_signed_margin": 8.593402365009162e-05
+          },
+          "positive_rational_multiplier": "30241033620602968669581944238968119267433857699347504518339/27593040745598729584549077904461356602755765717713919366"
+        },
+        {
+          "row_index": 41299,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_combined_a0_b1_p3",
+            "tick": 113,
+            "brake": true,
+            "required_signed_margin": 7.214374818165226e-05
+          },
+          "positive_rational_multiplier": "12560412073260227442595525899273354002501588403247327749451/27593040745598729584549077904461356602755765717713919366"
+        },
+        {
+          "row_index": 46722,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_combined_a2_b0_p0",
+            "tick": 59,
+            "brake": false,
+            "required_signed_margin": 6.928889011009742e-05
+          },
+          "positive_rational_multiplier": "16913134404816516321414019975184765279945486720976244867727/27593040745598729584549077904461356602755765717713919366"
+        },
+        {
+          "row_index": 48195,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_combined_a2_b0_p3",
+            "tick": 4,
+            "brake": true,
+            "required_signed_margin": 8.507616829528386e-05
+          },
+          "positive_rational_multiplier": "1149357930638042650325898352558515415253247463428287125475/27593040745598729584549077904461356602755765717713919366"
+        },
+        {
+          "row_index": 53006,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_geometry_b0_p3",
+            "tick": 194,
+            "brake": false,
+            "required_signed_margin": 8.572769214876264e-05
+          },
+          "positive_rational_multiplier": "9841335221537367919734676705387571088421650107990302877923/9197680248532909861516359301487118867585255239237973122"
+        },
+        {
+          "row_index": 61087,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_geometry_b2_p5",
+            "tick": 133,
+            "brake": false,
+            "required_signed_margin": 9.16922969947942e-05
+          },
+          "positive_rational_multiplier": "12903249451553186137040269171689446424793501698329086527497/27593040745598729584549077904461356602755765717713919366"
+        },
+        {
+          "row_index": 66572,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_initial_motion_b0_p3",
+            "tick": 165,
+            "brake": false,
+            "required_signed_margin": 4.281121188742798e-05
+          },
+          "positive_rational_multiplier": "1820219224548460787219987911096908883054781188677651719060/13796520372799364792274538952230678301377882858856959683"
+        },
+        {
+          "row_index": 95659,
+          "constraint": {
+            "domain": "precision",
+            "case": "stationary_right",
+            "tick": 202,
+            "brake": true,
+            "required_signed_margin": 9.811482227656265e-05
+          },
+          "positive_rational_multiplier": "7560651377424371759670111963340815079136679818592471497332/4598840124266454930758179650743559433792627619618986561"
+        }
+      ]
+    },
+    {
+      "label": "start-2",
+      "kind": "outer",
+      "blocked_targets": [
+        "train-10101-p2-d65"
+      ],
+      "precision_only": false,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "0",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 551,
+          "constraint": {
+            "domain": "match",
+            "case": "seed-10101-weak-round-p2",
+            "tick": 1346,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "272004172448916019722518515874936136488489838945058275117312/183437777293046926402614234240231627789406403641202376343469"
+        },
+        {
+          "row_index": 2374,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-16411-WeakAngular-p2",
+            "tick": 1166,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "298940100116149130422631402383087412434565204937467215915137/183437777293046926402614234240231627789406403641202376343469"
+        },
+        {
+          "row_index": 11533,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_inward_b3_p2",
+            "tick": 1,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "113997398773958467289999978962501071020879314291689353661128/183437777293046926402614234240231627789406403641202376343469"
+        },
+        {
+          "row_index": 17174,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p2",
+            "tick": 597,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "78799303580908781472488468919174289154272646254859669849676/183437777293046926402614234240231627789406403641202376343469"
+        },
+        {
+          "row_index": 21926,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b3_p1",
+            "tick": 253,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "540717272673455084304965824928284423133637084788956596809798/183437777293046926402614234240231627789406403641202376343469"
+        },
+        {
+          "row_index": 27226,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b1_p2",
+            "tick": 44,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "344511031295103789341134210357455817494610455581776459611124/183437777293046926402614234240231627789406403641202376343469"
+        },
+        {
+          "row_index": 35978,
+          "constraint": {
+            "domain": "precision",
+            "case": "moving_right",
+            "tick": 510,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "724428457424417054661924871373339527563905765927479064985464/183437777293046926402614234240231627789406403641202376343469"
+        },
+        {
+          "row_index": 47062,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_combined_a2_b0_p0",
+            "tick": 399,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "279581113495457407362426492827404824273052166184251879613390/183437777293046926402614234240231627789406403641202376343469"
+        },
+        {
+          "row_index": 63072,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_geometry_b3_p3",
+            "tick": 54,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "212346249821554919275679663825511089320006047638291460208240/183437777293046926402614234240231627789406403641202376343469"
+        }
+      ]
+    },
+    {
+      "label": "start-2",
+      "kind": "strict",
+      "blocked_targets": [
+        "train-10101-p2-d65"
+      ],
+      "precision_only": false,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "-635189211567622036317444321978402339215549554984784936023271844891062373/1318545378766341055470485967082268340428677001268837742769176429853671424",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 3067,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-262147-WeakRound-p1",
+            "tick": 5236,
+            "brake": true,
+            "required_signed_margin": 7.801967349063688e-06
+          },
+          "positive_rational_multiplier": "41848229348150797742457404516802103153462910796543938573720/146387943851948982340092749408174503992072446186693850697"
+        },
+        {
+          "row_index": 15925,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p0",
+            "tick": 824,
+            "brake": false,
+            "required_signed_margin": 5.30034980980032e-05
+          },
+          "positive_rational_multiplier": "84979971437197251969159016707635470812525440482278327714846/146387943851948982340092749408174503992072446186693850697"
+        },
+        {
+          "row_index": 29032,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b2_p1",
+            "tick": 200,
+            "brake": false,
+            "required_signed_margin": 8.8715177539056e-05
+          },
+          "positive_rational_multiplier": "137639291666031167028648913508969111840863711592397976595211/292775887703897964680185498816349007984144892373387701394"
+        },
+        {
+          "row_index": 30351,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b2_p3",
+            "tick": 148,
+            "brake": true,
+            "required_signed_margin": 5.938888318013369e-05
+          },
+          "positive_rational_multiplier": "49579082459070770124407100479658984095175162193467396513230/146387943851948982340092749408174503992072446186693850697"
+        },
+        {
+          "row_index": 31669,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b3_p1",
+            "tick": 214,
+            "brake": true,
+            "required_signed_margin": 9.90354406413263e-05
+          },
+          "positive_rational_multiplier": "67330339467227207616445829032065884557769655135040788670339/146387943851948982340092749408174503992072446186693850697"
+        },
+        {
+          "row_index": 33761,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_train_inward_mirrored",
+            "tick": 153,
+            "brake": true,
+            "required_signed_margin": 1.9791748609443438e-05
+          },
+          "positive_rational_multiplier": "556403587151946056104071707193702913115466740739130459936155/292775887703897964680185498816349007984144892373387701394"
+        },
+        {
+          "row_index": 81088,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_target_motion_b0_p1",
+            "tick": 1,
+            "brake": false,
+            "required_signed_margin": 2.628285185263257e-05
+          },
+          "positive_rational_multiplier": "11375478048125785732793721178286563704892802070665739087940/146387943851948982340092749408174503992072446186693850697"
+        },
+        {
+          "row_index": 88290,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_target_motion_b2_p1",
+            "tick": 59,
+            "brake": true,
+            "required_signed_margin": 8.128908295756965e-05
+          },
+          "positive_rational_multiplier": "94282845828470153914902585949213605609856803154060065856200/146387943851948982340092749408174503992072446186693850697"
+        },
+        {
+          "row_index": 97118,
+          "constraint": {
+            "domain": "precision",
+            "case": "validation_left_rotated",
+            "tick": 72,
+            "brake": false,
+            "required_signed_margin": 9.967490788043154e-05
+          },
+          "positive_rational_multiplier": "366213583304405285216311671683593618040139875745721058331872/146387943851948982340092749408174503992072446186693850697"
+        }
+      ]
+    },
+    {
+      "label": "start-3",
+      "kind": "outer",
+      "blocked_targets": [
+        "validation-1021-WeakAngular-p2",
+        "validation-1021-WeakRound-p2"
+      ],
+      "precision_only": false,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "0",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 2374,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-16411-WeakAngular-p2",
+            "tick": 1166,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "244583675577640378265652261642148728926064110307146377006476783/1080293308423391554955472731902698293754243351799400509680745907"
+        },
+        {
+          "row_index": 2854,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-2381-WeakAngular-p2",
+            "tick": 682,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "123555292017961342824418845017970977879194464343894331189306477/1080293308423391554955472731902698293754243351799400509680745907"
+        },
+        {
+          "row_index": 3480,
+          "constraint": {
+            "domain": "match",
+            "case": "validation-32771-WeakAngular-p2",
+            "tick": 996,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "256589510901269104174187227097729056720444233438281043136737023/1080293308423391554955472731902698293754243351799400509680745907"
+        },
+        {
+          "row_index": 10645,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_inward_b3_p0",
+            "tick": 9,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "132649293914154790474909924172395240723655773534232058729578746/1080293308423391554955472731902698293754243351799400509680745907"
+        },
+        {
+          "row_index": 16725,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b1_p2",
+            "tick": 148,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "2095022412310765044478337000757515470360151512679077254931485792/1080293308423391554955472731902698293754243351799400509680745907"
+        },
+        {
+          "row_index": 32902,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b3_p3",
+            "tick": 134,
+            "brake": true,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "2199066546382595513508652281500670215346611447174299427867675788/1080293308423391554955472731902698293754243351799400509680745907"
+        },
+        {
+          "row_index": 56593,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_geometry_b1_p3",
+            "tick": 459,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "69174286357028002267414731237743580318840674865372636590744790/1080293308423391554955472731902698293754243351799400509680745907"
+        },
+        {
+          "row_index": 78884,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_initial_motion_b3_p4",
+            "tick": 9,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "537060340712325581043270747647444298855297897555839197520664760/1080293308423391554955472731902698293754243351799400509680745907"
+        },
+        {
+          "row_index": 81972,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_target_motion_b0_p3",
+            "tick": 1,
+            "brake": false,
+            "required_signed_margin": -0.0
+          },
+          "positive_rational_multiplier": "581014648853303718933146420061821224516483527814207787095514324/1080293308423391554955472731902698293754243351799400509680745907"
+        }
+      ]
+    },
+    {
+      "label": "start-3",
+      "kind": "strict",
+      "blocked_targets": [
+        "validation-1021-WeakAngular-p2",
+        "validation-1021-WeakRound-p2"
+      ],
+      "precision_only": true,
+      "exact_weak_sign_upper_bound": 0,
+      "exact_signed_margin_upper_bound": "-57071892311768982473265112594073711324067071946616015502444032449980173/509291662692023922839667525660084202581663149669251892357258355887046656",
+      "meaning": "A strictly positive target logit conflicts with the listed successful weak-sign constraints for the frozen hidden features. This does not establish an f32 impossibility or require identical actions for all successful controllers.",
+      "support": [
+        {
+          "row_index": 20233,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_moving_b2_p3",
+            "tick": 86,
+            "brake": true,
+            "required_signed_margin": 9.274436346295989e-05
+          },
+          "positive_rational_multiplier": "945541593519136312913935586731519146451598243094992208785/7067841627128922427631789816294741215808349744504522521"
+        },
+        {
+          "row_index": 28016,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b1_p3",
+            "tick": 355,
+            "brake": false,
+            "required_signed_margin": 7.526148623182571e-05
+          },
+          "positive_rational_multiplier": "237789134160259380180066732022400955666309340498909852465/7067841627128922427631789816294741215808349744504522521"
+        },
+        {
+          "row_index": 30351,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b2_p3",
+            "tick": 148,
+            "brake": true,
+            "required_signed_margin": 5.938888318013369e-05
+          },
+          "positive_rational_multiplier": "4643649639201345641442261725189615788504171541942056409733/28271366508515689710527159265178964863233398978018090084"
+        },
+        {
+          "row_index": 30677,
+          "constraint": {
+            "domain": "precision",
+            "case": "mixed_fresh_stationary_b2_p3",
+            "tick": 474,
+            "brake": true,
+            "required_signed_margin": 2.166104488188214e-05
+          },
+          "positive_rational_multiplier": "415212850793439913978729868736921721255481380406726729396/7067841627128922427631789816294741215808349744504522521"
+        },
+        {
+          "row_index": 43677,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_combined_a1_b0_p3",
+            "tick": 123,
+            "brake": true,
+            "required_signed_margin": 8.089720512000076e-05
+          },
+          "positive_rational_multiplier": "3352975628963099259314243591045902408546404595896093585361/28271366508515689710527159265178964863233398978018090084"
+        },
+        {
+          "row_index": 62639,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_geometry_b3_p2",
+            "tick": 128,
+            "brake": true,
+            "required_signed_margin": 7.495008572533379e-05
+          },
+          "positive_rational_multiplier": "1539041887433261346656698986927988596697982718649652759391/7067841627128922427631789816294741215808349744504522521"
+        },
+        {
+          "row_index": 79069,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_initial_motion_b3_p4",
+            "tick": 194,
+            "brake": false,
+            "required_signed_margin": 6.507000117794703e-05
+          },
+          "positive_rational_multiplier": "1081884614456949233690233258693639214709876116350592188777/7067841627128922427631789816294741215808349744504522521"
+        },
+        {
+          "row_index": 81088,
+          "constraint": {
+            "domain": "precision",
+            "case": "qualification_target_motion_b0_p1",
+            "tick": 1,
+            "brake": false,
+            "required_signed_margin": 2.628285185263257e-05
+          },
+          "positive_rational_multiplier": "68878468576127165744048014246332919786626381976246989337/14135683254257844855263579632589482431616699489009045042"
+        },
+        {
+          "row_index": 97118,
+          "constraint": {
+            "domain": "precision",
+            "case": "validation_left_rotated",
+            "tick": 72,
+            "brake": false,
+            "required_signed_margin": 9.967490788043154e-05
+          },
+          "positive_rational_multiplier": "3551907507508805524423798563432397124614016078517788182956/7067841627128922427631789816294741215808349744504522521"
+        }
+      ]
+    }
+  ],
+  "candidates": [],
+  "evaluation": [
+    {
+      "gained": [],
+      "genome": "6ff82f329388dae5957dd77187520dc4f3322c4f2965fd8c88580b3569a4ad1e",
+      "label": "baseline",
+      "lost_matches": [],
+      "lost_precision": [],
+      "match_traces": [],
+      "score": [
+        157,
+        108,
+        0
+      ],
+      "static_flips": 0,
+      "static_pass": true,
+      "targets": []
+    }
+  ],
+  "timings": {
+    "export": 32.65832810400025,
+    "fit": 4.855219675002445,
+    "evaluate": 30.90438278700094
+  },
+  "solver_seconds": 4.235282833000383,
+  "conclusion": "No fitted candidate. Each distinct failed initial state has an exact real-arithmetic conflict with retained brake decisions. The strict action-preserving fit cannot provide the requested brake-on start; alternate successful trajectories, later braking, hidden-feature changes and f32 threshold behavior remain outside that conclusion.",
+  "production_changes": false
+}

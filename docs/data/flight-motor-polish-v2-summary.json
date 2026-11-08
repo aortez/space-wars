@@ -1,0 +1,202 @@
+{
+  "kind": "motor-teacher-polish-v4",
+  "cells": [
+    {
+      "arm": "hold6",
+      "seed": 17,
+      "hold": 6,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "lateral_passed": 104,
+        "lateral_cases": 104,
+        "random_passed": 200,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 61.75,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 161.35,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.33748430013656616,
+        "development_physical_failures": 0,
+        "random_physical_failures": 0,
+        "physical_failures": 0
+      },
+      "final": {
+        "tracking_passed": 0,
+        "tracking_cases": 24,
+        "stopping_passed": 0,
+        "stopping_cases": 80,
+        "aligned_passed": 6,
+        "aligned_cases": 104,
+        "lateral_passed": 8,
+        "lateral_cases": 104,
+        "random_passed": 36,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 60.75,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": null,
+        "braking_acquired": 0,
+        "max_post_acquisition_velocity_error": 1.098523497581482,
+        "development_physical_failures": 0,
+        "random_physical_failures": 0,
+        "physical_failures": 0
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": false,
+          "stopping_not_lost": false,
+          "aligned_all_retained": false,
+          "lateral_not_lost": false,
+          "random_not_lost": false,
+          "faster_tracking_acquisition": true,
+          "faster_braking_acquisition": false,
+          "post_acquisition_error_bounded": false
+        },
+        "passed": false
+      },
+      "reproduces_pilot": null
+    },
+    {
+      "arm": "hold6",
+      "seed": 29,
+      "hold": 6,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "lateral_passed": 104,
+        "lateral_cases": 104,
+        "random_passed": 200,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 61.75,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 161.35,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.33748430013656616,
+        "development_physical_failures": 0,
+        "random_physical_failures": 0,
+        "physical_failures": 0
+      },
+      "final": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "lateral_passed": 103,
+        "lateral_cases": 104,
+        "random_passed": 199,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 57.25,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 115.95,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.33086758852005005,
+        "development_physical_failures": 0,
+        "random_physical_failures": 0,
+        "physical_failures": 0
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": true,
+          "stopping_not_lost": true,
+          "aligned_all_retained": true,
+          "lateral_not_lost": false,
+          "random_not_lost": false,
+          "faster_tracking_acquisition": true,
+          "faster_braking_acquisition": true,
+          "post_acquisition_error_bounded": true
+        },
+        "passed": false
+      },
+      "reproduces_pilot": null
+    },
+    {
+      "arm": "hold6",
+      "seed": 43,
+      "hold": 6,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "lateral_passed": 104,
+        "lateral_cases": 104,
+        "random_passed": 200,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 61.75,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 161.35,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.33748430013656616,
+        "development_physical_failures": 0,
+        "random_physical_failures": 0,
+        "physical_failures": 0
+      },
+      "final": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 0,
+        "stopping_cases": 80,
+        "aligned_passed": 24,
+        "aligned_cases": 104,
+        "lateral_passed": 48,
+        "lateral_cases": 104,
+        "random_passed": 137,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 63.5,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 107.55555555555556,
+        "braking_acquired": 9,
+        "max_post_acquisition_velocity_error": 0.34117570519447327,
+        "development_physical_failures": 0,
+        "random_physical_failures": 0,
+        "physical_failures": 0
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": true,
+          "stopping_not_lost": false,
+          "aligned_all_retained": false,
+          "lateral_not_lost": false,
+          "random_not_lost": false,
+          "faster_tracking_acquisition": false,
+          "faster_braking_acquisition": false,
+          "post_acquisition_error_bounded": true
+        },
+        "passed": false
+      },
+      "reproduces_pilot": null
+    }
+  ],
+  "arms": {
+    "hold6": {
+      "cells": 3,
+      "qualifying_seeds": 0,
+      "reproduced": true,
+      "mean_tracking_acquisition": 60.5
+    }
+  },
+  "selected_arm": null,
+  "verification_passed": true,
+  "sources_unchanged": true,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "navigation_qualified": false
+}

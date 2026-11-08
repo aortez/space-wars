@@ -106,6 +106,9 @@ pub struct PilotObservationV1 {
     pub vehicle: VehicleId,
     pub location: PilotLocation,
     pub controls_armed: bool,
+    /// The seat is in learned flight control, as the learned transfer host
+    /// leaves it on exactly the ticks the stack flies the published leg.
+    pub learned_control: bool,
     pub queries_ready: bool,
     pub ship: PilotMotion,
     /// Last shared gravity solve expressed as acceleration at the scenario's
@@ -210,6 +213,8 @@ impl SurfaceSortieState {
             vehicle: pilot.vehicle,
             location: self.location(player),
             controls_armed: pilot.controls_armed,
+            learned_control: self.flight_control_mode(player)
+                == Some(flight::FlightControlMode::Learned),
             queries_ready: ready,
             ship: PilotMotion {
                 position: ship_motion.map_or(ship.position + physics::ship_pivot(ship.form), |m| {

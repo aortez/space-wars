@@ -16,6 +16,7 @@ fn debris(display: DisplaySnapshot, layout: Layout) -> Vec<Cell> {
             angle: index as f32 * 0.7 - 20.0,
             side: target.side,
             label: target.label,
+            home: target.home,
             velocity: Vec2::ZERO,
             spin: 0.0,
         })

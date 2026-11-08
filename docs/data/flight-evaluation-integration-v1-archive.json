@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-evaluation-integration-v1-20261023",
+  "kind": "routine evaluation integration verification",
+  "completed_at_utc": "2026-10-24T05:30:19.142666+00:00",
+  "source_file_count": 1526,
+  "source_archive_sha256": "23e5592585d38c8af2cd590b3fb71207becea9b0fbf46f18b8e11e25e0a46181",
+  "runtime_sha256": "e39a1c0b7e06c044ba764729e890f871872b70d248a07eae5fe025e80b724e2a",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "mixed_repeats": 4,
+  "legacy_repeats": 1,
+  "new_replay_episodes": 240,
+  "physics_ticks": 264317,
+  "outcomes": {
+    "legacy": {
+      "attempts": 48,
+      "successes": 0,
+      "physical_failures": 0,
+      "physics_ticks": 86400
+    },
+    "mixed": {
+      "attempts": 192,
+      "successes": 137,
+      "physical_failures": 0,
+      "physics_ticks": 177917
+    }
+  },
+  "substantive_training_updates": 0,
+  "correctness_training": "two independent verification invocations; each evaluated/skipped 2 updates and resumed final update, 8 ticks x 4 slots per update",
+  "candidate_execution_contract": "mean-steering-sampled-buttons-v1",
+  "production_default_changed": false,
+  "qualification_gate_changed": false,
+  "confirmation_used": false,
+  "general_flight_claim": false,
+  "validation": {
+    "production_tests": 52,
+    "new_integration_tests": 7,
+    "preliminary_integration_tests": 7,
+    "exact_legacy_trajectories": 48,
+    "exact_mixed_trajectory_probability_pairs": 192,
+    "caller_rng_preserved": true,
+    "task_order_independent": true,
+    "training_checkpoint_evaluation_and_resume_bitwise_equal": true,
+    "old_checkpoint_exact_resume_refused": true,
+    "source_file_count": 1526,
+    "copied_parent_inputs_unchanged": 441,
+    "prior_manifests_unchanged": 17,
+    "compile_whitespace": "passed"
+  },
+  "retained_file_count": 1193,
+  "retained_bytes_excluding_manifest": 495397056,
+  "limitations": [
+    "Replay of existing development results, not independent evidence of generalization.",
+    "Mixed decoder remains Python evaluation only; native gameplay implementation is separate.",
+    "Qualification for repeated mixed trials requires a separately frozen recipe.",
+    "Local retention is not off-machine backup; external dependencies/toolchain binaries excluded."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-evaluation-integration-v1-20261023",
+  "manifest_sha256": "586ea2326ea0d45e9b07b388824a59b9bf095a550eaea9f5047e90d7979924c8",
+  "compact_results_sha256": "1d966998e92247121c9e491577452db62cbc4eb3732ac735c646bcde48f9816b",
+  "report_sha256": "878f59c7ea85830a438726ae4ed237da2959b08a1fa8a33f92db1c93504fb28b"
+}

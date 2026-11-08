@@ -34,6 +34,12 @@ fn catalog_has_distinct_bounded_digits_and_exact_cell_partitions() {
             assert_eq!(combined, glyph.0);
         }
         assert!(fonts::guides(font).cells().count() <= 54);
+        for cell in fonts::CellMask(u64::MAX >> 10).cells() {
+            let owner = SegmentKind::ALL
+                .into_iter()
+                .find(|kind| fonts::region(font, *kind).contains(cell));
+            assert_eq!(fonts::segment_at(font, cell), owner, "{font:?} {cell:?}");
+        }
     }
     for font in ClockFont::ALL.into_iter().skip(1) {
         assert_ne!(

@@ -1,0 +1,33 @@
+{
+  "kind": "continuous control implementation validation",
+  "date": "2026-10-24",
+  "action_contract": "continuous-flight-v2",
+  "python_suite_passed": 42,
+  "scenario_tests_passed": 413,
+  "scenario_tests_ignored": 2,
+  "ai_tests_passed": 463,
+  "ai_tests_ignored": 1,
+  "final_binary_parity_resume_tests": 2,
+  "scenario_examples_compile": true,
+  "encoder_dimensions_unchanged": true,
+  "parameter_count": 39447,
+  "policy_output_count": 3,
+  "initial_fixture_errors_corrected": 4,
+  "retained_checkpoint_count": 98,
+  "retained_policy_export_count": 99,
+  "source_file_count": 1533,
+  "source_files_changed": 30,
+  "source_files_added": 1,
+  "previous_manifests_unchanged": 21,
+  "confirmation_used": false,
+  "learning_experiment_run": false,
+  "model_promoted": false,
+  "gamepad_binding_changed": false,
+  "full_suite_bridge_sha256": "a198a51d8a4e05028ac6f20265076c893343ab608da73563a97a5e2288fc89a1",
+  "final_bridge_sha256": "e938d3a383c43a404715da851808b828afff036e9885c58f36c3d4842abc244a",
+  "limitations": [
+    "Two-update training fixtures validate implementation, not flight competence.",
+    "Prior binary-control performance is not a comparable continuous-control result.",
+    "No physical gamepad binding was assigned; callers can use the analog game action API."
+  ]
+}

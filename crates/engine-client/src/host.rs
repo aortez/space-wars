@@ -216,7 +216,10 @@ impl ScenarioControls {
         if !self.clock_state().is_some_and(|state| {
             state.can_trigger
                 && state.events.iter().any(|entry| {
-                    entry.kind == event && !entry.blocked_by_duck && !entry.blocked_by_crow
+                    entry.kind == event
+                        && !entry.blocked_by_duck
+                        && !entry.blocked_by_crow
+                        && !entry.blocked_by_spider
                 })
         }) {
             return false;
@@ -752,6 +755,12 @@ pub fn start_scenario_loop(
         let now = Instant::now();
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
+        if window.get_install_fenced() {
+            input.borrow_mut().clear();
+            controls.borrow_mut().clear();
+            accumulator = Duration::ZERO;
+            return;
+        }
         if let Some(audio) = controls.borrow().audio
             && settings.audio != audio
         {
@@ -2826,6 +2835,7 @@ mod tests {
         );
         let mut controls = ScenarioControls::default();
         controls.publish_clock_state(&scenario, 7, false);
+        // The spider waits for the player's duck, as a second duck does.
         for event in ClockEventKind::ALL {
             let expected = matches!(
                 event,
@@ -2840,6 +2850,7 @@ mod tests {
                     | ClockEventKind::Explosion
                     | ClockEventKind::Aquarium
                     | ClockEventKind::Grass
+                    | ClockEventKind::SlotMachine
             );
             assert_eq!(controls.request_clock_event(event), expected, "{event:?}");
             if expected {

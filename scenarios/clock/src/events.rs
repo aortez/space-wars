@@ -7,13 +7,14 @@ pub(crate) mod explosion;
 pub(crate) mod falling;
 pub(crate) mod marquee;
 pub(crate) mod meltdown;
+pub(crate) mod slot_machine;
 #[cfg(test)]
 mod tests;
 
 use engine_common::{ClockEventKind, ClockEventProfile, ClockEventTrigger, ClockEvents};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-use crate::{DisplaySnapshot, SegmentState, layout::Layout};
+use crate::{DisplaySnapshot, SegmentState, arena::ClockArena, layout::Layout};
 use color_cycle::ColorCycle;
 pub use color_cycle::{COLOR_CYCLE_TICKS, DigitPalette};
 use digit_slide::{DIGIT_SLIDE_TICKS, DigitSlideEvent};
@@ -23,6 +24,7 @@ use falling::FallingEvent;
 pub use falling::{FALLING_TICKS, REFORMING_TICKS};
 use marquee::{MARQUEE_TICKS, MarqueeEvent};
 use meltdown::{DRAINING_TICKS, MELTING_TICKS, MeltdownEvent};
+use slot_machine::{SLOT_MACHINE_TICKS, SlotMachineEvent};
 
 pub const FIXED_HZ: u32 = 60;
 pub const COOLDOWN_TICKS: u64 = 120;
@@ -57,6 +59,7 @@ pub enum EventPhase {
     Resetting,
     Presenting,
     Sliding,
+    Spinning,
     Swapping,
     Reconciling,
     Raining,
@@ -81,6 +84,7 @@ impl EventPhase {
             Self::Resetting => "resetting",
             Self::Presenting => "presenting",
             Self::Sliding => "sliding",
+            Self::Spinning => "spinning",
             Self::Swapping => "swapping",
             Self::Reconciling => "reconciling",
             Self::Raining => "raining",
@@ -222,14 +226,28 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: crate::grass::INTRODUCTION_TICKS,
         cooldown_ticks: crate::grass::SEED_COOLDOWN_TICKS,
     },
+    EventDefinition {
+        kind: ClockEventKind::SlotMachine,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::DigitGeometry,
+        duration_ticks: SLOT_MACHINE_TICKS,
+        cooldown_ticks: 30 * 60,
+    },
+    EventDefinition {
+        kind: ClockEventKind::Spider,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::Arena,
+        duration_ticks: crate::spider::visit::SPIDER_TICKS,
+        cooldown_ticks: 30 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
     pub segments: &'a mut [SegmentState],
+    pub surfaces: &'a mut crate::digit_surfaces::SurfaceLedger,
     pub display: DisplaySnapshot,
     pub layout: Layout,
     pub floor: crate::floor::FloorGeometry,
-    pub soil: Option<&'a mut crate::grass::SoilHabitat>,
 }
 
 /// An event owns its local phase and temporary resources. Dropping the variant
@@ -240,6 +258,7 @@ pub(super) enum ActiveEvent {
     Meltdown(Box<MeltdownEvent>),
     Marquee(Box<MarqueeEvent>),
     DigitSlide(DigitSlideEvent),
+    SlotMachine(Box<SlotMachineEvent>),
     CellSwap(Box<cell_swap::CellSwapEvent>),
     Rain(Box<crate::rain::RainEvent>),
     Explosion(ExplosionEvent),
@@ -268,6 +287,7 @@ impl ActiveEvent {
         seed: u64,
         config: super::ClockConfig,
         previous_display: Option<DisplaySnapshot>,
+        preview: bool,
     ) -> Self {
         match kind {
             ClockEventKind::Grass => Self::Grass(crate::grass::Introduction::default()),
@@ -284,17 +304,28 @@ impl ActiveEvent {
             ))),
             ClockEventKind::Duck => unreachable!("a duck admission creates an independent visit"),
             ClockEventKind::Crow => unreachable!("a crow admission creates an independent visit"),
+            ClockEventKind::Spider => {
+                unreachable!("a spider admission creates an independent visit")
+            }
             ClockEventKind::Marquee => Self::Marquee(Box::new(MarqueeEvent::new(
                 resolve_marquee_preset(config.marquee_preset, seed),
                 config.marquee_message,
                 context.display,
             ))),
-            ClockEventKind::DigitSlide => {
-                Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
-            }
+            ClockEventKind::DigitSlide => Self::DigitSlide(DigitSlideEvent::new(
+                previous_display,
+                context.display,
+                context.surfaces,
+            )),
+            // A periodic event has no previous reading either, so the
+            // admission has to say whether a person asked for this one.
+            ClockEventKind::SlotMachine => Self::SlotMachine(Box::new(
+                SlotMachineEvent::new(context.display, seed, preview).hold(context.surfaces),
+            )),
             ClockEventKind::CellSwap => Self::CellSwap(Box::new(cell_swap::CellSwapEvent::new(
                 context.display,
                 seed,
+                context.surfaces,
             ))),
             ClockEventKind::Rain => Self::Rain(Box::new(crate::rain::RainEvent::new(
                 context.layout,
@@ -315,6 +346,7 @@ impl ActiveEvent {
             Self::Meltdown(_) => ClockEventKind::Meltdown,
             Self::Marquee(_) => ClockEventKind::Marquee,
             Self::DigitSlide(_) => ClockEventKind::DigitSlide,
+            Self::SlotMachine(_) => ClockEventKind::SlotMachine,
             Self::CellSwap(_) => ClockEventKind::CellSwap,
             Self::Rain(_) => ClockEventKind::Rain,
         }
@@ -330,16 +362,22 @@ impl ActiveEvent {
         }
     }
 
-    pub fn vacant_arena(&self) -> Option<&duck::DuckEvent> {
+    /// Whether a player who joins this event brings it into the arena, so
+    /// the arena takes the event's claim with the visit's. Joining a
+    /// standalone Falling, Explosion, Meltdown or Aquarium does, except
+    /// Meltdown's water lab, which a player never joins.
+    pub fn joins_into_arena(&self) -> bool {
         match self {
-            Self::Aquarium(event) => event.vacant_arena(),
-            Self::Falling(event) => event.vacant_arena(),
-            Self::Explosion(event) => event.vacant_arena(),
-            Self::Meltdown(event) => event.vacant_arena(),
-            _ => None,
+            Self::Meltdown(event) if event.lab => false,
+            Self::Aquarium(_) | Self::Falling(_) | Self::Explosion(_) | Self::Meltdown(_) => {
+                !self.shares_visit_arena()
+            }
+            _ => false,
         }
     }
 
+    /// How opaque this event shows the arena once its character has left. A
+    /// player who rejoins sees the arena fade in from here.
     pub fn arena_opacity(&self) -> f32 {
         match self {
             Self::Falling(event) => event.arena_opacity(),
@@ -349,66 +387,116 @@ impl ActiveEvent {
         }
     }
 
+    /// Whether the rigid world the run is simulating is this event's own
+    /// rather than the arena. A shared-arena event's never is, and Rain's
+    /// floats stop being canonical as soon as a visit exists, before its first
+    /// step has built the arena.
+    pub fn simulates_apart(&self, visit: bool) -> bool {
+        match self {
+            Self::Falling(_) | Self::Explosion(_) | Self::Meltdown(_) | Self::Aquarium(_) => {
+                !self.shares_visit_arena()
+            }
+            Self::Rain(_) => !visit,
+            _ => false,
+        }
+    }
+
+    /// The rigid world this event owns apart from the arena, if it has one.
+    pub fn own_world(&self) -> Option<&engine_rapier::world::PhysicsWorld> {
+        match self {
+            Self::Falling(event) => event.own_world(),
+            Self::Explosion(event) => event.own_world(),
+            Self::Meltdown(event) => event.own_world(),
+            Self::Rain(event) => event.own_world(),
+            _ => None,
+        }
+    }
+
+    /// A player's character in this event's arena: a new one on the terrain a
+    /// departed character left, or the first, which the event's own world
+    /// becomes the arena for.
     pub fn join_arena(
         &mut self,
+        arena: &mut ClockArena,
         layout: Layout,
         seed: u64,
         session: u64,
         seat: u8,
     ) -> Option<Box<duck::DuckEvent>> {
+        if let Some(duck) =
+            duck::DuckEvent::rejoin_arena(arena, self.arena_opacity(), session, seat)
+        {
+            return Some(Box::new(duck));
+        }
         match self {
-            Self::Aquarium(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
-            Self::Falling(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
-            Self::Explosion(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(seed, session, seat)),
-            Self::Meltdown(event) => event
-                .rejoin(session, seat)
-                .or_else(|| event.join_player(layout, seed, session, seat)),
+            Self::Aquarium(event) => event.join_player(arena, seed, session, seat),
+            Self::Falling(event) => event.join_player(arena, seed, session, seat),
+            Self::Explosion(event) => event.join_player(arena, seed, session, seat),
+            Self::Meltdown(event) => event.join_player(arena, layout, seed, session, seat),
             _ => None,
         }
     }
 
-    pub fn retain_arena(&mut self, duck: Box<duck::DuckEvent>) {
+    pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>, arena: &mut ClockArena) {
         match self {
-            Self::Aquarium(event) => event.retain_arena(duck),
-            Self::Falling(event) => event.retain_arena(duck),
-            Self::Explosion(event) => event.retain_arena(duck),
-            Self::Meltdown(event) => event.retain_arena(duck),
-            _ => unreachable!("only leased mechanics arenas outlive the visit"),
-        }
-    }
-
-    pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>) {
-        match self {
-            Self::Aquarium(event) => event.release(player),
-            Self::Falling(event) => event.release(player),
-            Self::Explosion(event) => event.release(player),
-            Self::Meltdown(event) => event.release(player),
+            Self::Aquarium(event) => event.release(player, arena),
+            Self::Falling(event) => event.release(player, arena),
+            Self::Explosion(event) => event.release(player, arena),
+            Self::Meltdown(event) => event.release(player, arena),
             _ => (),
         }
     }
 
-    /// Returns true when the event has finished.
-    pub fn step(&mut self, context: EventContext<'_>) -> bool {
+    /// The event's tick up to the arena's one step. A standalone event steps its
+    /// own world here and finishes its tick; one sharing the arena reads it
+    /// back in `observe` after the step. Returns true when the event has
+    /// finished.
+    pub fn step(
+        &mut self,
+        context: EventContext<'_>,
+        visit: Option<&mut duck::DuckEvent>,
+        arena: &mut ClockArena,
+    ) -> bool {
         match self {
             Self::Grass(event) => event.step(),
-            Self::Aquarium(event) => event.step(context, None),
-            Self::Falling(event) => event.step(context, None),
-            Self::Explosion(event) => event.step(context, None),
+            Self::Aquarium(event) => event.step(context, visit, arena),
+            Self::Falling(event) => event.step(context),
+            Self::Explosion(event) => event.step(context, arena),
             Self::ColorCycle(event) => event.step(),
-            Self::Meltdown(event) => event.step(context),
+            Self::Meltdown(event) => event.step_with_visit(context, visit, arena),
             Self::Marquee(event) => event.step(),
-            Self::DigitSlide(event) => event.step(),
-            Self::CellSwap(event) => event.step(),
+            Self::DigitSlide(event) => event.step(context.surfaces),
+            Self::SlotMachine(event) => {
+                let finished = event.step();
+                event.carry_surfaces(context.surfaces);
+                finished
+            }
+            Self::CellSwap(event) => event.step(context.surfaces),
             Self::Rain(event) => {
                 event.synchronize(context.display, context.segments);
-                event.step_with_soil(context.soil)
+                event.step()
             }
+        }
+    }
+
+    /// What an event sharing the arena reads back after the arena's step.
+    /// Returns true when the event has finished.
+    pub fn observe(
+        &mut self,
+        context: EventContext<'_>,
+        visit: Option<&duck::DuckEvent>,
+        arena: &mut ClockArena,
+    ) -> bool {
+        debug_assert!(self.shares_visit_arena());
+        match self {
+            Self::Aquarium(event) => event.observe(visit, arena),
+            Self::Falling(event) => event.observe(context, arena),
+            Self::Explosion(event) => {
+                event.observe(context, arena);
+                false
+            }
+            Self::Meltdown(event) => event.observe(context, arena),
+            _ => unreachable!("only the shared events read the arena back"),
         }
     }
 
@@ -422,6 +510,7 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.phase(),
             Self::Marquee(_) => EventPhase::Presenting,
             Self::DigitSlide(_) => EventPhase::Sliding,
+            Self::SlotMachine(_) => EventPhase::Spinning,
             Self::CellSwap(event) => {
                 if event.tick < cell_swap::CELL_SWAP_TICKS {
                     EventPhase::Swapping
@@ -443,6 +532,7 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.phase_tick(),
             Self::Marquee(event) => event.tick,
             Self::DigitSlide(event) => event.tick,
+            Self::SlotMachine(event) => event.phase_tick(),
             Self::CellSwap(event) => {
                 event
                     .tick
@@ -456,16 +546,19 @@ impl ActiveEvent {
         }
     }
 
+    /// Only an event's own world. The arena is counted once by `ClockState`,
+    /// whoever is using it, and a standalone Aquarium has no rigid world.
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
-            Self::Grass(_) => (0, 0),
-            Self::Aquarium(event) => event.physics_counts(),
+            Self::Grass(_) | Self::Aquarium(_) => (0, 0),
             Self::Falling(event) => event.physics_counts(),
             Self::Explosion(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),
-            Self::ColorCycle(_) | Self::Marquee(_) | Self::DigitSlide(_) | Self::CellSwap(_) => {
-                (0, 0)
-            }
+            Self::ColorCycle(_)
+            | Self::Marquee(_)
+            | Self::DigitSlide(_)
+            | Self::SlotMachine(_)
+            | Self::CellSwap(_) => (0, 0),
             Self::Rain(event) => event.physics_counts(),
         }
     }
@@ -474,6 +567,65 @@ impl ActiveEvent {
         match self {
             Self::ColorCycle(event) => event.palette(),
             _ => DigitPalette::default(),
+        }
+    }
+
+    /// Where the face's own surface at `cell` of `slot` is, in a slot this
+    /// event does not hold. Only a takeover moves the face without holding it.
+    pub fn face_pose(
+        &self,
+        layout: Layout,
+        slot: usize,
+        cell: crate::GridCell,
+    ) -> crate::digit_surfaces::SurfacePose {
+        match self {
+            Self::Marquee(event) => event.face_pose(layout, slot, cell),
+            _ => crate::digit_surfaces::SurfacePose::anchored(layout, slot, cell),
+        }
+    }
+
+    /// What moves the face's own surfaces while this event runs.
+    pub fn face_source(&self) -> crate::digit_surfaces::SurfaceSource {
+        match self {
+            Self::Marquee(_) => crate::digit_surfaces::SurfaceSource::Marquee,
+            _ => crate::digit_surfaces::SurfaceSource::Anchored,
+        }
+    }
+
+    /// The surfaces of the slots this event holds, in its own order.
+    pub fn surfaces(
+        &self,
+        layout: Layout,
+        segments: &[SegmentState],
+        out: &mut Vec<(crate::SurfaceId, crate::digit_surfaces::SurfacePose)>,
+    ) {
+        match self {
+            Self::CellSwap(event) => event.surfaces(layout, out),
+            Self::DigitSlide(event) => event.surfaces(layout, out),
+            Self::Explosion(event) => event.surfaces(layout, out),
+            Self::Falling(event) => event.surfaces(layout, segments, out),
+            Self::Meltdown(event) => event.surfaces(layout, out),
+            Self::SlotMachine(event) => event.surfaces(layout, out),
+            _ => (),
+        }
+    }
+
+    /// Gives the slots this event holds back to the face, with whatever it
+    /// settled there, and retires the rest of its pieces.
+    pub fn release_surfaces(
+        &mut self,
+        segments: &[SegmentState],
+        surfaces: &mut crate::digit_surfaces::SurfaceLedger,
+    ) {
+        match self {
+            Self::CellSwap(event) => event.release_surfaces(surfaces),
+            Self::DigitSlide(event) => event.release_surfaces(surfaces),
+            Self::Explosion(event) => event.release_surfaces(segments, surfaces),
+            Self::Falling(event) => event.release_surfaces(segments, surfaces),
+            Self::Marquee(event) => event.release_surfaces(surfaces),
+            Self::Meltdown(event) => event.release_surfaces(segments, surfaces),
+            Self::SlotMachine(event) => event.release_surfaces(surfaces),
+            _ => (),
         }
     }
 

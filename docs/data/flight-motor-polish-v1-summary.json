@@ -1,0 +1,361 @@
+{
+  "kind": "motor-teacher-polish-v1",
+  "cells": [
+    {
+      "arm": "current",
+      "seed": 17,
+      "hold": 1,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 93,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 66.0,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 215.325,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.24076877534389496,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "final": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 93,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 64.75,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 116.025,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.2635129690170288,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": true,
+          "stopping_not_lost": true,
+          "aligned_all_retained": true,
+          "random_not_lost": true,
+          "faster_tracking_acquisition": true,
+          "faster_braking_acquisition": true,
+          "post_acquisition_error_bounded": true
+        },
+        "passed": true
+      },
+      "reproduces_pilot": true
+    },
+    {
+      "arm": "current",
+      "seed": 29,
+      "hold": 1,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 93,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 66.0,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 215.325,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.24076877534389496,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "final": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 65,
+        "stopping_cases": 80,
+        "aligned_passed": 89,
+        "aligned_cases": 104,
+        "random_passed": 85,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 68.5,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 327.775,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.31434953212738037,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": true,
+          "stopping_not_lost": false,
+          "aligned_all_retained": false,
+          "random_not_lost": false,
+          "faster_tracking_acquisition": false,
+          "faster_braking_acquisition": false,
+          "post_acquisition_error_bounded": true
+        },
+        "passed": false
+      },
+      "reproduces_pilot": true
+    },
+    {
+      "arm": "current",
+      "seed": 43,
+      "hold": 1,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 93,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 66.0,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 215.325,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.24076877534389496,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "final": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 93,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 62.25,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 188.1,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.4364449679851532,
+        "development_physical_failures": 0,
+        "random_physical_failures": 1,
+        "physical_failures": 1
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": true,
+          "stopping_not_lost": true,
+          "aligned_all_retained": true,
+          "random_not_lost": true,
+          "faster_tracking_acquisition": true,
+          "faster_braking_acquisition": true,
+          "post_acquisition_error_bounded": true
+        },
+        "passed": true
+      },
+      "reproduces_pilot": true
+    },
+    {
+      "arm": "hold6",
+      "seed": 17,
+      "hold": 6,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 92,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 61.0,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 207.825,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.1935526728630066,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "final": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 92,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 58.5,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 122.275,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.3970222473144531,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": true,
+          "stopping_not_lost": true,
+          "aligned_all_retained": true,
+          "random_not_lost": true,
+          "faster_tracking_acquisition": true,
+          "faster_braking_acquisition": true,
+          "post_acquisition_error_bounded": true
+        },
+        "passed": true
+      },
+      "reproduces_pilot": true
+    },
+    {
+      "arm": "hold6",
+      "seed": 29,
+      "hold": 6,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 92,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 61.0,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 207.825,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.1935526728630066,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "final": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 93,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 57.0,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 95.85,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.30236881971359253,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": true,
+          "stopping_not_lost": true,
+          "aligned_all_retained": true,
+          "random_not_lost": true,
+          "faster_tracking_acquisition": true,
+          "faster_braking_acquisition": true,
+          "post_acquisition_error_bounded": true
+        },
+        "passed": true
+      },
+      "reproduces_pilot": true
+    },
+    {
+      "arm": "hold6",
+      "seed": 43,
+      "hold": 6,
+      "initial": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 92,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 61.0,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 207.825,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.1935526728630066,
+        "development_physical_failures": 0,
+        "random_physical_failures": 2,
+        "physical_failures": 2
+      },
+      "final": {
+        "tracking_passed": 24,
+        "tracking_cases": 24,
+        "stopping_passed": 80,
+        "stopping_cases": 80,
+        "aligned_passed": 104,
+        "aligned_cases": 104,
+        "random_passed": 93,
+        "random_cases": 200,
+        "mean_tracking_acquisition": 62.75,
+        "tracking_acquired": 24,
+        "mean_braking_acquisition": 103.15,
+        "braking_acquired": 40,
+        "max_post_acquisition_velocity_error": 0.6950708627700806,
+        "development_physical_failures": 0,
+        "random_physical_failures": 1,
+        "physical_failures": 1
+      },
+      "gates": {
+        "checks": {
+          "no_development_physical_failure": true,
+          "random_physical_failures_not_increased": true,
+          "tracking_all_retained": true,
+          "stopping_not_lost": true,
+          "aligned_all_retained": true,
+          "random_not_lost": true,
+          "faster_tracking_acquisition": false,
+          "faster_braking_acquisition": true,
+          "post_acquisition_error_bounded": false
+        },
+        "passed": false
+      },
+      "reproduces_pilot": true
+    }
+  ],
+  "arms": {
+    "current": {
+      "cells": 3,
+      "qualifying_seeds": 2,
+      "reproduced": true,
+      "mean_tracking_acquisition": 65.16666666666667
+    },
+    "hold6": {
+      "cells": 3,
+      "qualifying_seeds": 2,
+      "reproduced": true,
+      "mean_tracking_acquisition": 59.416666666666664
+    }
+  },
+  "selected_arm": "hold6",
+  "verification_passed": true,
+  "sources_unchanged": true,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "navigation_qualified": false
+}

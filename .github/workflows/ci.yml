@@ -76,6 +76,24 @@ jobs:
         run: cargo build --locked --profile ci -p engine-ota --features publisher --example feed_sign --example feed_inventory
       - name: Check separately enabled supervised installer
         run: cargo check --locked --profile ci -p engine-os-manager --features recovery-qualification --all-targets
+      - name: Test owner retry staging guards
+        run: cargo test --locked --profile ci -p engine-os-manager --example stage_update
+      - name: Test supervised kiosk hang guards
+        run: |
+          cargo test --locked --profile ci -p engine-os-manager --features recovery-qualification supervised_kiosk_hang -- --test-threads=1
+          python3 -m unittest discover -s yocto/tests -p kiosk_hang_test.py
+      - name: Test supervised trial reset guards
+        run: |
+          cargo test --locked --profile ci -p engine-os-manager --features recovery-qualification supervised_trial_reset -- --test-threads=1
+          python3 -m unittest discover -s yocto/tests -p trial_reset_test.py
+      - name: Test supervised kiosk crash guards
+        run: |
+          cargo test --locked --profile ci -p engine-os-manager --features recovery-qualification supervised_kiosk_crash -- --test-threads=1
+          python3 -m unittest discover -s yocto/tests -p kiosk_crash_test.py
+      - name: Test supervised recovery service failure guards
+        run: |
+          cargo test --locked --profile ci -p engine-os-manager --features recovery-qualification supervised_recovery_failure -- --test-threads=1
+          python3 -m unittest discover -s yocto/tests -p recovery_failure_test.py
       - name: Test initial owner authority with disposable keys
         run: /usr/bin/python3 .github/ci/ota_authority_tests.py -v
         env:
@@ -131,7 +149,7 @@ jobs:
         env:
           SPACEWARS_REQUIRE_UPDATE_SANDBOX: 1
       - name: Lint Pi deployment scripts
-        run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update-wrapper.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer-wrapper.sh yocto/meta-spacewars/recipes-support/ab-boot/files/spacewars-legacy-update-disabled yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh yocto/tests/nm-profile-refresh.sh
+        run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update-wrapper.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer-wrapper.sh yocto/meta-spacewars/recipes-support/ab-boot/files/spacewars-legacy-update-disabled yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh yocto/tests/nm-profile-refresh.sh yocto/meta-spacewars/recipes-support/spacewars-journal/files/spacewars-journal-prepare.sh
       - name: Report sandbox configuration and kernel denials
         if: failure()
         run: |
@@ -201,6 +219,16 @@ jobs:
         run: |
           python3 -m unittest discover -s .github/ci -p 'test_*.py'
           python3 -m unittest discover -s tools -p 'test_picade_input.py'
+      - name: Check docs for private data and raw results
+        env:
+          BASE_REF: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git fetch --quiet --depth=1 origin "$BASE_REF"
+            python3 .github/ci/check_docs_data.py --baseline FETCH_HEAD
+          else
+            python3 .github/ci/check_docs_data.py
+          fi
       - name: Test recorded bot-trip analysis
         run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
       - name: Install pinned Rust compiler cache

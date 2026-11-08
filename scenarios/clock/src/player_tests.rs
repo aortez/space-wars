@@ -227,13 +227,15 @@ fn player_visit_outlives_automatic_visual_events_and_keeps_live_time() {
     assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
     ticks(&mut state, COOLDOWN_TICKS as usize);
     assert!(state.next_event_tick().is_some());
+    // An animation or a visitor, the spider included, is an admission.
+    let id = state.event_id();
     for _ in 0..601 {
         tick(&mut state, &[]);
-        if state.event_kind().is_some() {
+        if state.event_id() > id {
             break;
         }
     }
-    assert!(state.event_kind().is_some(), "automatic schedule resumes");
+    assert!(state.event_id() > id, "automatic schedule resumes");
     assert_eq!(state.settings(), settings);
 }
 
@@ -255,6 +257,8 @@ fn disabled_events_and_off_profile_do_not_disable_player_visits_or_change_prefer
         aquarium: false,
         cell_swap: false,
         grass: false,
+        slot_machine: false,
+        spider: false,
     };
     ClockScenario::step(
         &mut state,
@@ -326,7 +330,7 @@ fn screen_relative_movement_back_wall_and_real_exit_work_in_both_directions() {
             directions[usize::from(direction > 0.0)] = true;
             // A flat authored fixture isolates entry, screen mirroring and exit
             // from obstacle planning. Movement still goes through real Rapier.
-            scene.course.as_mut().unwrap().surfaces = vec![Surface {
+            scene.terrain.course.as_mut().unwrap().surfaces = vec![Surface {
                 start: -scene.radius * 8.0,
                 end: scene.width + scene.radius * 8.0,
                 height: 0.0,
@@ -375,7 +379,7 @@ fn missing_a_gap_falls_and_releases_player_resources() {
     toggle(&mut state, 1);
     let scene = state.duck_visit.as_mut().unwrap();
     let axis = (scene.direction * 1000.0) as i16;
-    scene.course.as_mut().unwrap().surfaces = vec![
+    scene.terrain.course.as_mut().unwrap().surfaces = vec![
         Surface {
             start: -64.0,
             end: scene.width * 0.3,
@@ -420,6 +424,16 @@ fn replacing_events_and_player_visits_resize_and_repeated_cleanup_are_bounded() 
             ticks(&mut state, 90);
             let event_id = state.event_id();
             let active_at_spawn = state.event_kind();
+            if event == ClockEventKind::Spider {
+                // A player's duck waits for the spider's visit.
+                toggle(&mut state, 1);
+                assert_eq!(state.event_notice.unwrap().0, "Spider is visiting");
+                assert!(state.player_duck_state().is_none());
+                assert!(state.spider_state().is_some());
+                state.finish_spider_visit();
+                assert!(state.spider_state().is_none());
+                continue;
+            }
             toggle(&mut state, 1);
             assert_eq!(
                 state.event_id(),

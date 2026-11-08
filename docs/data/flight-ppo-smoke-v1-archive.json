@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-ppo-smoke-v1-20261022",
+  "kind": "bounded PPO integration smoke",
+  "checkpoint": "C3-scoped-complete",
+  "completed_at_utc": "2026-10-23T04:47:14.157238+00:00",
+  "source_capture": "selected dirty/untracked workspace source before final executable build/run",
+  "source_file_count": 1494,
+  "runtime_sha256": "9dce6218a8a5eac5a2095089bcf2acfa18bf05d2f9ca271108eab6e646aef3f9",
+  "source_archive_sha256": "b12d8a68c80b1dc5f540b2145fbc772af280caba1519d5cc7bf71a616980ba96",
+  "validation": {
+    "integration_tests": 8,
+    "ai_tests": {
+      "passed": 463,
+      "ignored": 1,
+      "failed": 0
+    },
+    "scenario_tests": {
+      "passed": 650,
+      "ignored": 2,
+      "failed": 0
+    },
+    "checkpoint_full_state_bitwise_equal": true,
+    "trained_parity_fixtures": 48,
+    "max_abs_output_error": 1.430511474609375e-06,
+    "format_python_compile_whitespace": "passed",
+    "clippy": "20 existing warnings; none in new runtime",
+    "source_and_runtime_identity": "passed",
+    "previous_six_manifests": "unchanged"
+  },
+  "training_ticks": 8192,
+  "evaluation_ticks": 18746,
+  "resume_verification_repeated_ticks": 1024,
+  "capability_claim": false,
+  "limitations": [
+    "One learner seed and tiny practice-world sample; zero successful development arrivals.",
+    "Final deterministic policy holds brake without thrust; no navigation competence demonstrated.",
+    "Exact continuation tested on compatible host/runtime at completed update boundaries only.",
+    "Python/registry/toolchain dependency binaries excluded.",
+    "Local retention is not an off-machine backup."
+  ],
+  "retained_file_count": 86,
+  "retained_bytes_excluding_manifest": 95291989,
+  "archive_path": "data/training-experiments/learned-flight-ppo-smoke-v1-20261022",
+  "manifest_sha256": "048c319560eb17254ec17de5093df6bf48eac3a43d70eda30529c775ab646648",
+  "compact_results_sha256": "fa67efa3c593ec9d4dbe42638bf64c0a0ea859b7537df31d87b4fa9a28c870d5",
+  "report_sha256": "73c6723a1e20d4e6b9d71a8b4770aa658ade7a18031f467657cdfec8bc09402b"
+}

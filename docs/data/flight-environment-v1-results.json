@@ -1,0 +1,92 @@
+{
+  "checks": [
+    {
+      "final_errors": {
+        "position": 0.0,
+        "spin": 0.0,
+        "velocity": 0.0
+      },
+      "name": "stationary-arrival",
+      "progress": {
+        "dwell_ticks": 30,
+        "elapsed_ticks": 30,
+        "outcome": "success"
+      },
+      "replay_verified": true
+    },
+    {
+      "final_errors": {
+        "position": 0.00244140625,
+        "spin": 0.0,
+        "velocity": 0.0
+      },
+      "name": "moving-arrival",
+      "progress": {
+        "dwell_ticks": 30,
+        "elapsed_ticks": 30,
+        "outcome": "success"
+      },
+      "replay_verified": true
+    },
+    {
+      "final_errors": {
+        "position": 0.0,
+        "spin": 1.7999999523162842,
+        "velocity": 0.0
+      },
+      "name": "spinning-arrival",
+      "progress": {
+        "dwell_ticks": 0,
+        "elapsed_ticks": 60,
+        "outcome": "deadline"
+      },
+      "replay_verified": true
+    },
+    {
+      "final_errors": {
+        "position": 59.99249267578125,
+        "spin": 0.0,
+        "velocity": 70.0
+      },
+      "name": "fast-flythrough",
+      "progress": {
+        "dwell_ticks": 0,
+        "elapsed_ticks": 60,
+        "outcome": "deadline"
+      },
+      "replay_verified": true
+    },
+    {
+      "final_errors": {
+        "position": 82.50856018066406,
+        "spin": 0.5096326470375061,
+        "velocity": 2.764155149459839
+      },
+      "name": "wall-impact",
+      "progress": {
+        "dwell_ticks": 0,
+        "elapsed_ticks": 16,
+        "outcome": "collision"
+      },
+      "replay_verified": true
+    },
+    {
+      "final_errors": {
+        "position": 0.195556640625,
+        "spin": 0.0,
+        "velocity": 0.12087978422641754
+      },
+      "name": "braking-arrival",
+      "progress": {
+        "dwell_ticks": 30,
+        "elapsed_ticks": 64,
+        "outcome": "success"
+      },
+      "replay_verified": true
+    }
+  ],
+  "decision_hz": 60,
+  "kind": "environment_smoke_checks",
+  "physics_hz": 60,
+  "policy_training": false
+}

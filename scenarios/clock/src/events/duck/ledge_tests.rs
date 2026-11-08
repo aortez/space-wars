@@ -4,16 +4,16 @@ use engine_common::{
 };
 use ledge::LedgeCommand;
 
-fn entrance(aspect: f32, direction: f32) -> DuckEvent {
-    let mut duck = DuckEvent::new_player(Layout::new(aspect), 42, None, 1, 1);
-    duck.direction = direction;
+fn entrance(aspect: f32, direction: f32) -> TestDuck {
+    let mut duck = TestDuck::new_player(Layout::new(aspect), 42, None, 1, 1);
+    duck.face(direction);
     for _ in 0..OPENING_TICKS {
         duck.step();
     }
     duck
 }
 
-fn catch_flap(duck: &mut DuckEvent) {
+fn catch_flap(duck: &mut TestDuck) {
     let mut trace = Vec::new();
     for _ in 0..65 {
         let jump = duck.jumps == 0 && duck.grounded();
@@ -46,7 +46,7 @@ fn catch_flap(duck: &mut DuckEvent) {
     );
 }
 
-fn climb(duck: &mut DuckEvent) {
+fn climb(duck: &mut TestDuck) {
     duck.set_ledge_command(LedgeCommand::Climb);
     for _ in 0..150 {
         duck.step();
@@ -62,7 +62,7 @@ fn normal_jump_catches_hangs_and_climbs_the_fully_open_flap() {
     for aspect in [5.0 / 3.0, 4.0 / 3.0, 0.6] {
         for direction in [-1.0, 1.0] {
             let mut duck = entrance(aspect, direction);
-            let mass = duck.world.as_ref().unwrap().body_mass(DUCK_BODY);
+            let mass = duck.arena.world().unwrap().body_mass(DUCK_BODY);
             catch_flap(&mut duck);
             assert_eq!(duck.jumps, 1);
             assert!(!duck.grounded(), "hanging is not ground support");
@@ -77,9 +77,9 @@ fn normal_jump_catches_hangs_and_climbs_the_fully_open_flap() {
             }
             climb(&mut duck);
             assert!(duck.grounded());
-            assert_eq!(duck.world.as_ref().unwrap().body_mass(DUCK_BODY), mass);
+            assert_eq!(duck.arena.world().unwrap().body_mass(DUCK_BODY), mass);
             assert_eq!(
-                duck.world.as_ref().unwrap().body_kind(DUCK_BODY),
+                duck.arena.world().unwrap().body_kind(DUCK_BODY),
                 Some(BodyKind::Dynamic)
             );
             duck.step();
@@ -102,11 +102,11 @@ fn normal_jump_catches_hangs_and_climbs_the_fully_open_flap() {
 fn deliberate_drop_keeps_momentum_and_requires_rearming() {
     let mut duck = entrance(5.0 / 3.0, 1.0);
     catch_flap(&mut duck);
-    let before = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+    let before = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
     duck.set_ledge_command(LedgeCommand::Release);
     duck.set_player_input(0, true, false, true);
     duck.step();
-    let after = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
+    let after = duck.arena.world().unwrap().motion(DUCK_BODY).unwrap();
     assert!(
         (after.linear_velocity.y - before.linear_velocity.y + duck.movement.gravity * DT).abs()
             < 0.001
@@ -124,9 +124,9 @@ fn deliberate_drop_keeps_momentum_and_requires_rearming() {
     assert!(!duck.diagnostics().ledge.rearm_required);
 }
 
-fn block(duck: &mut DuckEvent, position: Vec2, half: Vec2) -> PhysicsId {
-    let id = PhysicsId::new(9000);
-    assert!(duck.world.as_mut().unwrap().insert_body(
+fn block(duck: &mut TestDuck, position: Vec2, half: Vec2) -> PhysicsId {
+    let id = PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start);
+    assert!(duck.arena.world_mut().unwrap().insert_body(
         BodyId::new(id, BodyRole::PRIMARY),
         BodySpec {
             kind: BodyKind::Fixed,
@@ -161,7 +161,7 @@ fn blocked_pull_up_waits_in_a_real_hang_and_can_retry_when_clear() {
         assert_eq!(duck.ledge_state().reason, Some(Reason::ClimbBlocked));
         assert_eq!(duck.ledge_state().climbs, 0);
     }
-    duck.world.as_mut().unwrap().remove_entity(blocker);
+    duck.arena.world_mut().unwrap().remove_entity(blocker);
     duck.step();
     climb(&mut duck);
 }
@@ -177,7 +177,7 @@ fn an_occupied_landing_refuses_the_initial_catch() {
         anchor + Vec2::new(-r * 1.5, r * 1.5),
         Vec2::splat(r * 0.5),
     );
-    duck.world.as_mut().unwrap().step(DT);
+    duck.arena.world_mut().unwrap().step(DT);
     let mut refused = false;
     for _ in 0..65 {
         let jump = duck.jumps == 0 && duck.grounded();
@@ -225,14 +225,14 @@ fn an_obstacle_added_during_the_pull_up_releases_without_passing_through_it() {
         Some(Reason::Obstructed | Reason::Disrupted)
     ));
     let (min, max) = duck
-        .world
-        .as_ref()
+        .arena
+        .world()
         .unwrap()
         .body_solid_bounds(BodyId::new(blocker, BodyRole::PRIMARY))
         .unwrap();
     let p = duck
-        .world
-        .as_ref()
+        .arena
+        .world()
         .unwrap()
         .motion(DUCK_BODY)
         .unwrap()
@@ -245,13 +245,13 @@ fn support_loss_and_external_impulses_release_the_same_dynamic_body() {
     for remove in [false, true] {
         let mut duck = entrance(5.0 / 3.0, 1.0);
         catch_flap(&mut duck);
-        let mass = duck.world.as_ref().unwrap().body_mass(DUCK_BODY);
+        let mass = duck.arena.world().unwrap().body_mass(DUCK_BODY);
         if remove {
             duck.remove_flaps();
             // A retired flap that reopens has a new generation, never the old anchor.
         } else {
             let r = duck.radius;
-            duck.world.as_mut().unwrap().apply_velocity_delta(
+            duck.arena.world_mut().unwrap().apply_velocity_delta(
                 DUCK_BODY,
                 Vec2::new(r * 40.0, 0.0),
                 true,
@@ -267,7 +267,7 @@ fn support_loss_and_external_impulses_release_the_same_dynamic_body() {
                 Reason::Disrupted
             })
         );
-        assert_eq!(duck.world.as_ref().unwrap().body_mass(DUCK_BODY), mass);
+        assert_eq!(duck.arena.world().unwrap().body_mass(DUCK_BODY), mass);
         assert!(duck.ledge_anchor().is_none());
     }
 }
@@ -329,27 +329,23 @@ fn takeover_and_retirement_preserve_then_release_attachment_ownership() {
         // The shared fixture's source is now the automatic side. No body/state
         // mutation occurs when the real takeover operation changes ownership.
         duck.player = None;
-        let motion = duck.world.as_ref().unwrap().motion(DUCK_BODY);
+        let motion = duck.arena.world().unwrap().motion(DUCK_BODY);
         let stats = duck.ledge_state();
         let anchor = duck.ledge_anchor();
         duck.set_ledge_command(LedgeCommand::Release);
         assert!(duck.take_control(8, 2));
         assert_eq!(duck.ledge_state(), stats);
         assert_eq!(duck.ledge_anchor(), anchor);
-        assert_eq!(duck.world.as_ref().unwrap().motion(DUCK_BODY), motion);
+        assert_eq!(duck.arena.world().unwrap().motion(DUCK_BODY), motion);
         duck.step();
         assert_eq!(
             duck.ledge_state().releases,
             0,
             "old source's uncommitted drop is discarded"
         );
-        let mut arena = VisitArena::claim(&mut duck);
-        arena.retain(Box::new(duck));
-        let vacant = arena.vacant().unwrap();
-        assert!(vacant.ledge_anchor().is_none());
-        assert_eq!(vacant.ledge_state(), Default::default());
-        assert!(vacant.door_panels().iter().all(Option::is_none));
-        let rejoined = arena.rejoin(9, 1).unwrap();
+        // Leaving takes the attachment with the character's body and flaps.
+        let rejoined = duck.rejoin(9, 1);
+        assert!(rejoined.ledge_anchor().is_none());
         assert_eq!(rejoined.ledge_state(), Default::default());
     }
 }
@@ -382,8 +378,8 @@ fn nearby_foreign_solids_are_not_grab_targets_and_blocked_hangs_are_refused() {
         }
         let r = duck.radius;
         let p = duck
-            .world
-            .as_ref()
+            .arena
+            .world()
             .unwrap()
             .motion(DUCK_BODY)
             .unwrap()
@@ -394,7 +390,7 @@ fn nearby_foreign_solids_are_not_grab_targets_and_blocked_hangs_are_refused() {
             Vec2::new(r * 3.0, r * 0.5),
         );
         if dynamic {
-            let world = duck.world.as_mut().unwrap();
+            let world = duck.arena.world_mut().unwrap();
             world.set_body_kind(BodyId::new(id, BodyRole::PRIMARY), BodyKind::Dynamic, true);
             world.set_gravity_scale(BodyId::new(id, BodyRole::PRIMARY), 0.0, true);
         }
@@ -435,10 +431,10 @@ fn nearby_foreign_solids_are_not_grab_targets_and_blocked_hangs_are_refused() {
 #[test]
 fn a_course_near_miss_uses_the_same_shared_climb_in_both_directions() {
     for direction in [-1.0, 1.0] {
-        let mut duck = DuckEvent::new_player(Layout::new(5.0 / 3.0), 42, None, 1, 1);
-        duck.direction = direction;
+        let mut duck = TestDuck::new_player(Layout::new(5.0 / 3.0), 42, None, 1, 1);
+        duck.face(direction);
         let r = duck.radius;
-        duck.course.as_mut().unwrap().surfaces = vec![
+        duck.terrain.course.as_mut().unwrap().surfaces = vec![
             planner::Surface {
                 start: 0.0,
                 end: r * 12.0,
@@ -503,7 +499,7 @@ fn ledge_scene_fixtures_replay_and_render_with_pause_and_teardown() {
                     )],
                     Duration::ZERO,
                 );
-                state.duck_visit = Some(Box::new(entrance(aspect, direction)));
+                entrance(aspect, direction).admit(&mut state);
                 let step = |state: &mut crate::ClockState| {
                     ClockScenario::step(state, &[], Duration::from_nanos(16_666_667))
                 };
@@ -529,8 +525,9 @@ fn ledge_scene_fixtures_replay_and_render_with_pause_and_teardown() {
                 };
                 for _ in 0..65 {
                     let duck = state.duck_visit.as_mut().unwrap();
-                    let jump = duck.jumps == 0 && duck.grounded();
-                    let steer = if duck.position().unwrap().x > duck.radius * 5.6 {
+                    let world = state.arena.world().unwrap();
+                    let jump = duck.jumps == 0 && duck.grounded(world);
+                    let steer = if duck.position(world).unwrap().x > duck.radius * 5.6 {
                         (-direction * 300.0) as i16
                     } else {
                         0
@@ -600,7 +597,7 @@ fn ledge_scene_fixtures_replay_and_render_with_pause_and_teardown() {
                 let mut duck = entrance(aspect, direction);
                 catch_flap(&mut duck);
                 duck.set_ledge_command(LedgeCommand::Release);
-                state.duck_visit = Some(Box::new(duck));
+                duck.admit(&mut state);
                 for _ in 0..3 {
                     step(&mut state);
                 }

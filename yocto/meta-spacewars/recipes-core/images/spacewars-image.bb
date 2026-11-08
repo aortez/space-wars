@@ -11,8 +11,14 @@ require spacewars-image-identity.inc
 # NetworkManager recipe in this layer set does not emit that split package.
 IMAGE_INSTALL:remove = "networkmanager-nmtui"
 
-# USB boot. Keep this aligned with kas-spacewars.yml.
+# wic names the image's disk after this. Keep it aligned with kas-spacewars.yml.
 BOOT_DEVICE = "sda"
+
+# Keep the flashed root's stock fstab. wic would add /dev/${BOOT_DEVICE}N
+# entries for /boot and /data; a card has no /dev/sda4, so its boot would wait
+# for that device and stop in emergency mode. boot.mount and data.mount mount
+# both partitions by label from either medium, as installed updates already do.
+WIC_CREATE_EXTRA_ARGS:append = " --no-fstab-update"
 
 HOSTNAME_DEFAULT = "spacewars"
 
@@ -136,4 +142,5 @@ IMAGE_INSTALL:append = " \
     spacewars-hardware \
     spacewars-bluetooth \
     spacewars-ssh-host-keys \
+    spacewars-journal \
 "

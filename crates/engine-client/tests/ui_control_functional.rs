@@ -28,6 +28,9 @@ const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 #[path = "ui_control_functional/launcher_catalog.rs"]
 mod launcher_catalog;
 
+#[path = "ui_control_functional/material_lab.rs"]
+mod material_lab;
+
 #[path = "ui_control_functional/garden_lab.rs"]
 mod garden_lab;
 
@@ -777,6 +780,14 @@ impl FunctionalHarness {
                     "1"
                 } else {
                     "0"
+                },
+            )
+            .env(
+                "SPACEWARS_CLOCK_ARENA_FIXTURE",
+                if test_name.starts_with("clock-arena") {
+                    "two-owners"
+                } else {
+                    ""
                 },
             )
             // These UI workflows must not reach the host's NetworkManager or

@@ -369,3 +369,70 @@ fn bounded_records_and_nonregular_host_inputs_reject() {
     assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
     assert!(regular(&fifo).is_err());
 }
+
+#[test]
+fn development_images_pack_from_any_source_but_need_the_declaration_and_structure() {
+    let mut fixture = Fixture::new();
+    fixture.write(
+        "etc/spacewars/development-runtime.json",
+        include_bytes!("../../../yocto/meta-spacewars/recipes-spacewars/spacewars/files/development-runtime.json"),
+        0o644,
+    );
+    // A dirty source, provenance and toolchain no policy selected.
+    fixture.image.source.dirty = true;
+    fixture.image.source.revision.push_str("-dirty");
+    fixture.write(
+        "usr/share/spacewars/source.json",
+        &serde_json::to_vec(&fixture.image.source).unwrap(),
+        0o644,
+    );
+    fixture.write("usr/share/spacewars/build-inputs.json", b"{}", 0o644);
+    fixture.identity();
+    fixture.build();
+    assert!(fixture.inspect().is_err());
+    let output = fixture.directory.path().join("development");
+    let image = pack_development(&fixture.root, &output).unwrap();
+    let written =
+        DevelopmentImage::parse(&fs::read(output.join("development.json")).unwrap()).unwrap();
+    assert_eq!(written, image);
+    image.matches_identity(&fixture.image).unwrap();
+    assert!(image.source_dirty);
+    assert_eq!(
+        image.expanded.bytes,
+        fs::metadata(&fixture.root).unwrap().len()
+    );
+    assert_eq!(
+        image.compressed,
+        blob(&fs::read(output.join("image.ext4.zst")).unwrap())
+    );
+    assert_eq!(fs::read_dir(&output).unwrap().count(), 2);
+    assert!(pack_development(&fixture.root, &output).is_err());
+
+    for change in 0..3 {
+        let fixture = Fixture::new();
+        match change {
+            // Older sources can't read the trial's record.
+            0 => {}
+            1 => fixture.write(
+                "etc/spacewars/development-runtime.json",
+                br#"{"schema":1,"protocol":2}"#,
+                0o644,
+            ),
+            _ => {
+                fixture.write(
+                    "etc/spacewars/development-runtime.json",
+                    include_bytes!("../../../yocto/meta-spacewars/recipes-spacewars/spacewars/files/development-runtime.json"),
+                    0o644,
+                );
+                fixture.write("usr/bin/engine-client", b"replaced executable", 0o755);
+            }
+        }
+        fixture.build();
+        let output = fixture.directory.path().join("development");
+        assert!(
+            pack_development(&fixture.root, &output).is_err(),
+            "change {change}"
+        );
+        assert!(!output.exists());
+    }
+}

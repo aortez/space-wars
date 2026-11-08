@@ -13,8 +13,7 @@ pub(super) struct Return {
 }
 
 impl Return {
-    pub fn valid(self, duck: &DuckEvent) -> bool {
-        let world = duck.world.as_ref().unwrap();
+    pub fn valid(self, duck: &DuckEvent, world: &PhysicsWorld) -> bool {
         world.incoming_motion(self.body, DT).is_some_and(|m| {
             (m.position - self.pose).length() < duck.radius * 0.01
                 && (m.angle - self.angle).abs() < 0.001
@@ -39,13 +38,13 @@ impl Return {
 impl DuckEvent {
     pub(super) fn plan_flap_detour(
         &mut self,
+        world: &PhysicsWorld,
         water: Option<&WaterWorld>,
     ) -> Option<(Edge, Return)> {
-        let edge = edges(self)
+        let edge = edges(self, world)
             .into_iter()
             .flatten()
             .find(|e| e.flap.is_some_and(|(side, _)| side == 0))?;
-        let world = self.world.as_ref()?;
         let motion = world.motion(DUCK_BODY)?;
         let r = self.radius;
         let anchor = edge.anchor(world)?;
@@ -59,7 +58,7 @@ impl DuckEvent {
             world.body_kind(body),
             Some(BodyKind::Fixed | BodyKind::KinematicPosition)
         ) || motion.linear_velocity.length() > r
-            || !(5.7 * r..=6.3 * r).contains(&self.position()?.x)
+            || !(5.7 * r..=6.3 * r).contains(&self.position(world)?.x)
         {
             return None;
         }
@@ -99,7 +98,7 @@ impl DuckEvent {
             pose: pose.position,
             angle: pose.angle,
         };
-        if !landing.valid(self) || !landing.dry(water, r) {
+        if !landing.valid(self, world) || !landing.dry(water, r) {
             return None;
         }
         let hang = anchor + Vec2::new(edge.outward * r * 1.12, -r * 0.9);
@@ -138,12 +137,13 @@ impl DuckEvent {
                 break;
             }
         }
-        (reachable && self.detour_return_clear(perch, Vec2::ZERO, landing))
+        (reachable && self.detour_return_clear(world, perch, Vec2::ZERO, landing))
             .then_some((edge, landing))
     }
 
     pub(super) fn detour_return_clear(
         &mut self,
+        world: &PhysicsWorld,
         from: Vec2,
         mut velocity: Vec2,
         landing: Return,
@@ -155,7 +155,7 @@ impl DuckEvent {
             position = self.detour_flight_step(position, &mut velocity, &command);
             if tick % 4 == 3 || (velocity.y < 0.0 && position.y <= landing.center.y) {
                 if !clear_path(
-                    self.world.as_ref().unwrap(),
+                    world,
                     previous,
                     position,
                     self.radius * 0.97,

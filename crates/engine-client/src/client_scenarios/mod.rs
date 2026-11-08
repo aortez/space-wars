@@ -14,6 +14,7 @@ use crate::render::{FrameLayout, Viewport};
 mod clock;
 mod falling;
 mod garden_lab;
+mod material_lab;
 mod nes;
 mod null;
 mod pizza;
@@ -70,6 +71,7 @@ pub enum ScenarioAsset {
     None,
     NesRom(crate::nes_roms::NesRomAsset),
     PizzaLab(crate::pizza_lab::Config),
+    MaterialLab(std::path::PathBuf),
 }
 
 impl ScenarioStartMode {
@@ -470,6 +472,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     clock::REGISTRATION,
     falling::REGISTRATION,
     garden_lab::REGISTRATION,
+    material_lab::REGISTRATION,
     nes::REGISTRATION,
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
@@ -494,6 +497,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     surface_sortie::SURFACE_ROUND_REGISTRATION,
     surface_sortie::PILOT_REGISTRATION,
     surface_sortie::RECOVERY_REGISTRATION,
+    surface_sortie::LEARNED_FLIGHT_REGISTRATION,
     surface_sortie::JETPACK_REGISTRATION,
     surface_sortie::COMBAT_REGISTRATION,
     surface_sortie::DUEL_REGISTRATION,
@@ -579,6 +583,7 @@ mod tests {
                 "clock",
                 "falling",
                 "garden-lab",
+                "material-lab",
                 "nes",
                 "pizza",
                 "rover-lab",
@@ -603,6 +608,7 @@ mod tests {
                 "spacewars-surface-round",
                 "spacewars-terrain-ai",
                 "spacewars-terrain-recovery",
+                "spacewars-terrain-learned-flight",
                 "spacewars-terrain-jetpack",
                 "spacewars-terrain-combat",
                 "spacewars-terrain-duel",

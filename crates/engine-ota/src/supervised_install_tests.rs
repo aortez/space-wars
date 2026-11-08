@@ -1,5 +1,6 @@
 use super::*;
 use crate::boot_linux::PhysicalIdentity;
+use crate::native_install::admit_reboot_time;
 use crate::recovery::{BootObservation, Phase, RecoveryCapability, RecoveryError, Slot, SlotImage};
 use crate::recovery_linux::{DeviceNumber, DiskLayout, Partition};
 use crate::test_support::{self as feed, Fault};
@@ -243,30 +244,25 @@ async fn supervised_attempt_is_durable_single_use_and_does_not_qualify_ordinary_
             .advance(|r| r.begin_supervised(&f.candidate, boot, selection.recovery, false))
             .is_err()
     );
-    assert!(store.record().supervised_reboot(id, boot, false).is_err());
+    assert!(store.record().trial_reboot(id, boot, false).is_err());
     let image = f.candidate.image();
     store
         .advance(|r| r.written(id, image.compressed.sha256, image.expanded.sha256, boot))
         .unwrap();
     assert_eq!(
-        store.record().supervised_reboot(id, boot, false).unwrap(),
+        store.record().trial_reboot(id, boot, false).unwrap(),
         Slot::B
     );
-    assert!(store.record().supervised_reboot(id, boot, true).is_err());
+    assert!(store.record().trial_reboot(id, boot, true).is_err());
     store.advance(|r| r.trial_prepared(id, boot)).unwrap();
     assert!(store.advance(|r| r.trial_prepared(id, boot)).is_err());
     assert_eq!(
-        store.record().supervised_reboot(id, boot, true).unwrap(),
+        store.record().trial_reboot(id, boot, true).unwrap(),
         Slot::B
     );
     let mut changed = boot.clone();
     changed.boot_id = "22222222-2221-1111-1111-111111111111".into();
-    assert!(
-        store
-            .record()
-            .supervised_reboot(id, &changed, true)
-            .is_err()
-    );
+    assert!(store.record().trial_reboot(id, &changed, true).is_err());
     store
         .advance(|r| r.fail(FailureReason::InstallationFailed, boot))
         .unwrap();
@@ -274,7 +270,7 @@ async fn supervised_attempt_is_durable_single_use_and_does_not_qualify_ordinary_
         store.record().transaction().unwrap().phase,
         Phase::RolledBack
     );
-    assert!(store.record().supervised_reboot(id, boot, true).is_err());
+    assert!(store.record().trial_reboot(id, boot, true).is_err());
     // A fresh plan cannot erase quarantine. Only the existing explicit retry
     // view may admit attempt two, and its generation floor remains persisted.
     let current = store.record().fingerprint();

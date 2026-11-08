@@ -1,7 +1,7 @@
 //! Real floor geometry expressed as transforms from retained material coordinates.
 use super::*;
 use crate::{
-    events::duck::{DuckEvent, arena::CourseGeometry},
+    events::duck::{ArenaTerrain, arena::CourseGeometry},
     floor::{FloorGeometry, responsive::ResponsiveFloor},
     layout::Layout,
 };
@@ -81,43 +81,14 @@ pub(crate) fn course(course: &CourseGeometry) -> Vec<Surface> {
         })
         .collect()
 }
-pub(crate) fn duck(duck: &DuckEvent) -> Vec<Surface> {
-    if let Some(floor) = duck.responsive_floor() {
-        responsive(duck.layout, floor)
-    } else if let Some(floor) = duck.drain_floor {
+pub(crate) fn terrain(terrain: &ArenaTerrain) -> Vec<Surface> {
+    if let Some(floor) = terrain.responsive_floor() {
+        responsive(terrain.layout, floor)
+    } else if let Some(floor) = terrain.drain_floor {
         ordinary(floor.geometry())
-    } else if duck.course.is_some() {
-        course(&CourseGeometry::from_duck(duck))
+    } else if terrain.course.is_some() {
+        course(&CourseGeometry::from_terrain(terrain))
     } else {
         Vec::new()
-    }
-}
-
-pub(crate) fn world<'a>(
-    event: &'a Option<crate::events::ActiveEvent>,
-    duck: Option<&'a DuckEvent>,
-) -> Option<&'a engine_rapier::world::PhysicsWorld> {
-    use crate::events::ActiveEvent::*;
-    match event {
-        Some(Falling(e)) => e.canonical_world(duck),
-        Some(Explosion(e)) => e.canonical_world(duck),
-        Some(Meltdown(e)) => e.canonical_world(duck),
-        Some(Aquarium(e)) => e.canonical_world(duck),
-        Some(Rain(e)) if duck.is_none() => e.canonical_world(),
-        _ => duck.and_then(DuckEvent::existing_world),
-    }
-}
-pub(crate) fn world_mut<'a>(
-    event: &'a mut Option<crate::events::ActiveEvent>,
-    duck: Option<&'a mut DuckEvent>,
-) -> Option<&'a mut engine_rapier::world::PhysicsWorld> {
-    use crate::events::ActiveEvent::*;
-    match event {
-        Some(Falling(e)) => e.canonical_world_mut(duck),
-        Some(Explosion(e)) => e.canonical_world_mut(duck),
-        Some(Meltdown(e)) => e.canonical_world_mut(duck),
-        Some(Aquarium(e)) => e.canonical_world_mut(duck),
-        Some(Rain(e)) if duck.is_none() => e.canonical_world_mut(),
-        _ => duck.and_then(DuckEvent::existing_world_mut),
     }
 }

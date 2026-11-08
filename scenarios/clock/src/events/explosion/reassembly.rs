@@ -1,7 +1,7 @@
 //! Visual return paths after the physics batch is retired. Keep unchanged cell
 //! destinations, then deterministically reuse spare blocks for the latest face.
 //! This is bounded choreography, not another physics world or a path planner.
-use super::{Cell, MAX_EXPLOSION_CELLS, REFORMING_TICKS};
+use super::{Cell, Home, MAX_EXPLOSION_CELLS, REFORMING_TICKS};
 use crate::{
     digits::{self, DisplaySnapshot},
     layout::Layout,
@@ -17,6 +17,19 @@ struct Target {
     position: Vec2,
     side: f32,
     label: bool,
+    /// The digit cell it is, which an AM/PM pixel or a surplus block's
+    /// vanishing point is not.
+    home: Option<Home>,
+}
+
+/// Where the return is taking one block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Destination {
+    Cell(Home),
+    /// An AM/PM pixel.
+    Label,
+    /// A surplus block shrinking into a neighbour.
+    Merging,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -43,6 +56,7 @@ fn targets(display: DisplaySnapshot, layout: Layout) -> Vec<Target> {
                 position: layout.cell_center(segment.id, cell),
                 side: layout.pitch * 0.8,
                 label: false,
+                home: Some((segment.id.digit_slot, cell)),
             });
         }
     }
@@ -52,6 +66,7 @@ fn targets(display: DisplaySnapshot, layout: Layout) -> Vec<Target> {
                 position: glyph.cell_center(layout, cell),
                 side: layout.pitch * PIXEL_SIZE,
                 label: true,
+                home: None,
             });
         }
     }
@@ -71,6 +86,7 @@ impl Reassembly {
                         position: cell.origin,
                         side: cell.side,
                         label: cell.label,
+                        home: cell.home,
                     },
                     assigned: true,
                     started: 0,
@@ -150,6 +166,7 @@ impl Reassembly {
                     angle: donor.map_or(0.0, |cell| cell.angle),
                     side: 0.0,
                     label: target.label,
+                    home: target.home,
                     velocity: Vec2::ZERO,
                     spin: 0.0,
                 };
@@ -190,6 +207,7 @@ impl Reassembly {
                         position,
                         side: 0.0,
                         label: cell.label,
+                        home: None,
                     },
                     assigned: false,
                     started: tick,
@@ -198,6 +216,16 @@ impl Reassembly {
         }
         assert!(cells.len() <= MAX_EXPLOSION_CELLS);
         self.display = display;
+    }
+
+    /// Where block `index` is going, in the order of the event's blocks.
+    pub(super) fn destination(&self, index: usize) -> Destination {
+        let flight = &self.flights[index];
+        match (flight.assigned, flight.target.home) {
+            (false, _) => Destination::Merging,
+            (true, Some(home)) => Destination::Cell(home),
+            (true, None) => Destination::Label,
+        }
     }
 
     pub(super) fn sample(&self, cells: &mut [Cell], tick: u64) {

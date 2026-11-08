@@ -1,5 +1,9 @@
 use super::{CliError, control_error, human_error, parse_timeout};
 use clap::Subcommand;
+use engine_common::{
+    ClockArenaOwner, ClockArenaState, ClockArenaUnavailable, ClockDigitSurfaceState,
+    ClockSurfaceChangeKind, ClockSurfaceRetirement,
+};
 use spacewars_control::{
     ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState, ClockStatePredicate,
     ClockTriggerRequest, ControlClient,
@@ -33,7 +37,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap or grass.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion, aquarium, cell-swap, grass, slot-machine or spider.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -53,11 +57,11 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
-        /// Admission ID; with --event crow, matches its stable visit ID.
+        /// Admission ID; with --event crow or spider, matches its stable visit ID.
         #[arg(long)]
         event_id: Option<u64>,
         #[arg(long, default_value_t = 0)]
@@ -104,7 +108,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={}, blocked by spider={}, blocked by arena={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -114,7 +118,11 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.cooldown_ticks,
                         event.automatic_ready_at_tick,
                         event.blocked_by_duck,
-                        event.blocked_by_crow
+                        event.blocked_by_crow,
+                        event.blocked_by_spider,
+                        event
+                            .blocked_by_arena
+                            .map_or("none", ClockArenaUnavailable::as_str)
                     );
                 }
             }
@@ -261,6 +269,12 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         if let Some(error) = &state.settings_error {
             println!("Settings warning: {error}");
         }
+        if let Some(arena) = &state.arena {
+            print_arena(arena);
+        }
+        if let Some(surfaces) = &state.digit_surfaces {
+            print_digit_surfaces(surfaces);
+        }
         if let Some(explosion) = &state.explosion {
             println!(
                 "Explosion: {} cells, {} live (cap {}), shared arena={}",
@@ -284,6 +298,31 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 crow.water_tolerance.label(),
                 crow.wetness_milli,
                 crow.wet_departures
+            );
+        }
+        if let Some(spider) = &state.spider {
+            println!(
+                "Spider #{} (seed {}): {}, age={} phase tick={} remaining={}, {} at {:?} going {:?} up {:?}, holds {:?}, tied to {:?}, shooting={} line={:?}, climbs={} swings={} falls={} recoveries={}, proxies={}, failed exit={}",
+                spider.visit_id,
+                spider.seed,
+                spider.phase.as_str(),
+                spider.age_ticks,
+                spider.phase_tick,
+                spider.remaining_ticks,
+                spider.mode.as_str(),
+                spider.position_milli,
+                spider.velocity_milli,
+                spider.up_milli,
+                spider.support,
+                spider.anchor,
+                spider.shooting,
+                spider.line_length_milli,
+                spider.climbs,
+                spider.swings,
+                spider.falls,
+                spider.recoveries,
+                spider.proxies,
+                spider.failed_exit
             );
         }
         let world_vector =
@@ -528,6 +567,172 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
     }
     Ok(())
+}
+
+fn print_arena(arena: &ClockArenaState) {
+    let (accounting, limits) = (arena.accounting, arena.limits);
+    println!(
+        "Arena: {} claims, {} residents (at most {} and {}); {} bodies, {} colliders, {} joints (at most {}, {}, {}); floor {} bodies",
+        accounting.claims,
+        accounting.residents,
+        limits.claims,
+        limits.residents,
+        accounting.bodies,
+        accounting.colliders,
+        accounting.joints,
+        limits.capacity.bodies,
+        limits.capacity.colliders,
+        limits.capacity.joints,
+        arena.floor.bodies
+    );
+    let claims: Vec<_> = arena
+        .claims
+        .iter()
+        .map(|claim| {
+            let owner = match claim.owner {
+                ClockArenaOwner::Visit => "visit".into(),
+                ClockArenaOwner::Event { event } => format!("event {}", event.as_str()),
+                ClockArenaOwner::Soil => "soil".into(),
+                ClockArenaOwner::Fixture { index } => format!("fixture {index}"),
+                ClockArenaOwner::Spider => "spider".into(),
+            };
+            format!(
+                "{owner} {}/{} bodies, {}/{} colliders",
+                claim.population.bodies,
+                claim.budget.bodies,
+                claim.population.colliders,
+                claim.budget.colliders
+            )
+        })
+        .collect();
+    println!(
+        "Arena claims: {}",
+        if claims.is_empty() {
+            "none".into()
+        } else {
+            claims.join("; ")
+        }
+    );
+    println!(
+        "Arena run: {} worlds, {} steps; granted={} released={} refused={}; layout incompatible={}, last remap={:?}",
+        accounting.worlds,
+        accounting.steps,
+        accounting.granted,
+        accounting.released,
+        accounting.refused,
+        accounting.layout_incompatible,
+        accounting.last_remap
+    );
+    if let Some(step) = arena.last_step {
+        println!(
+            "Arena step: {} us (collision detection {} us, solver {} us); bodies active={} sleeping={}; pairs candidate={} contact={}, contacts={}, CCD substeps={}",
+            step.wall_us,
+            step.collision_detection_us,
+            step.solver_us,
+            step.active_bodies,
+            step.sleeping_bodies,
+            step.candidate_pairs,
+            step.contact_pairs,
+            step.contacts,
+            step.ccd_substeps
+        );
+    }
+}
+
+fn print_digit_surfaces(surfaces: &ClockDigitSurfaceState) {
+    let accounting = surfaces.accounting;
+    let sources: Vec<_> = surfaces
+        .sources
+        .iter()
+        .map(|count| format!("{} {}", count.source.as_str(), count.live))
+        .collect();
+    println!(
+        "Digit surfaces: {} live, {} departing (peak {}, at most {}); sources: {}",
+        accounting.live,
+        accounting.departing,
+        accounting.peak_live,
+        surfaces.limits.live,
+        if sources.is_empty() {
+            "none".into()
+        } else {
+            sources.join(", ")
+        }
+    );
+    let reasons: Vec<_> = ClockSurfaceRetirement::ALL
+        .into_iter()
+        .filter(|reason| accounting.retired.get(*reason) > 0)
+        .map(|reason| format!("{} {}", reason.as_str(), accounting.retired.get(reason)))
+        .collect();
+    println!(
+        "Digit surface run: admitted={} handed off={} departed={} retired={}{}; last change #{}",
+        accounting.admitted,
+        accounting.handed_off,
+        accounting.departed,
+        accounting.retired.total(),
+        if reasons.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", reasons.join(", "))
+        },
+        accounting.sequence
+    );
+    let milli = |value: i32| value as f64 / 1000.0;
+    for surface in &surfaces.sample {
+        let [min_x, min_y, max_x, max_y] = surface.footprint_milli.map(milli);
+        println!(
+            "Digit surface {}: slot {} cell {:?}, {}{}, origin ({:.3}, {:.3}), angle {:.1} degrees, scale {:.3}, footprint ({min_x:.2}, {min_y:.2})..({max_x:.2}, {max_y:.2}), opacity {:.3}{}{}",
+            surface.id,
+            surface.slot,
+            surface.cell,
+            surface.source.as_str(),
+            if surface.departing { " departing" } else { "" },
+            milli(surface.origin_milli[0]),
+            milli(surface.origin_milli[1]),
+            milli(surface.angle_millidegrees),
+            milli(surface.scale_milli),
+            f64::from(surface.opacity_milli) / 1000.0,
+            surface
+                .clip_milli
+                .map_or(String::new(), |[low, high]| format!(
+                    ", clipped to y {:.3}..{:.3}",
+                    milli(low),
+                    milli(high)
+                )),
+            surface
+                .body
+                .map_or(String::new(), |body| format!(", body {body}"))
+        );
+    }
+    let changes: Vec<_> = surfaces
+        .recent
+        .iter()
+        .map(|change| {
+            let what = match change.change {
+                ClockSurfaceChangeKind::Admitted { slot, cell, source } => {
+                    format!("admitted in slot {slot} at {cell:?} by {}", source.as_str())
+                }
+                ClockSurfaceChangeKind::HandedOff { from, to } => {
+                    format!("handed off {} to {}", from.as_str(), to.as_str())
+                }
+                ClockSurfaceChangeKind::Departing => "departing".into(),
+                ClockSurfaceChangeKind::Retired { reason } => {
+                    format!("retired {}", reason.as_str())
+                }
+            };
+            format!(
+                "#{} tick {} surface {} {what}",
+                change.sequence, change.tick, change.id
+            )
+        })
+        .collect();
+    println!(
+        "Digit surface changes: {}",
+        if changes.is_empty() {
+            "none".into()
+        } else {
+            changes.join("; ")
+        }
+    );
 }
 
 #[cfg(test)]

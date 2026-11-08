@@ -66,6 +66,9 @@ pub trait Backend {
 #[serde(rename_all = "kebab-case")]
 pub enum Deferred {
     ObservationUnavailable,
+    CoordinatorBusy,
+    CoordinatorUnavailable,
+    StorageUnavailable,
     ProtectionUnavailable,
     RadioUnavailable,
     Suspended,
@@ -118,6 +121,7 @@ pub struct Admission {
 
 pub struct Controller<B: Backend> {
     policy: NetworkPolicy,
+    access: crate::network_access::Access,
     backend: B,
     actual: Option<Observation>,
     observed_clock: Option<Clock>,
@@ -127,15 +131,38 @@ pub struct Controller<B: Backend> {
 
 impl<B: Backend> Controller<B> {
     pub fn open(directory: &Path, mut backend: B) -> Result<Self> {
-        let policy = NetworkPolicy::open(directory, backend.clock()?)?;
+        let clock = backend.clock()?;
+        let mut policy = NetworkPolicy::open(directory, clock.clone())?;
+        let access = crate::network_access::Access::default();
+        access.initialize(policy.radio(&clock)?.blocks_ssh(&clock.boot_id));
+        policy.attach_access(access.clone());
         Ok(Self {
             policy,
+            access,
             backend,
             actual: None,
             observed_clock: None,
             activity: None,
             deferred: None,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pause_save_at(
+        &mut self,
+        point: &'static str,
+        entered: std::sync::mpsc::SyncSender<()>,
+        resume: std::sync::mpsc::Receiver<()>,
+    ) {
+        self.policy.pause_save_at(point, entered, resume);
+    }
+
+    pub(crate) fn access(&self) -> crate::network_access::Access {
+        self.access.clone()
+    }
+
+    pub(crate) fn ssh_blocked(&self) -> bool {
+        self.policy.ssh_blocked()
     }
 
     /// Refresh actual state without requesting a radio change.
@@ -325,8 +352,11 @@ impl<B: Backend> Controller<B> {
             && (state.owned_off || state.pending.as_ref().is_some_and(|p| !p.enabled));
         state.witness = Some(Witness::new(&snapshot.clock, &snapshot.radio));
         state.pending = None;
-        state.suspended = None;
+        let cleared = state.suspended.take();
         self.policy.save_radio(state, &snapshot.clock)?;
+        if let Some(suspension) = cleared {
+            tracing::warn!(?suspension, "owner resume cleared the network suspension");
+        }
         self.policy.reset_quiet();
         self.tick()
     }
@@ -361,6 +391,9 @@ impl<B: Backend> Controller<B> {
                 }
             }
         };
+        // An admission during the final observation (including a slow disk
+        // integrity read) invalidates it even if the ten-second bridge expires.
+        let admission_epoch = self.access.epoch();
         // Observations before obtaining protection cannot authorize this write.
         let Some(fresh) = self.refresh()? else {
             return self.report();
@@ -373,6 +406,11 @@ impl<B: Backend> Controller<B> {
             || snapshot.radio.startup
             || snapshot.radio.checkpoint_count != 0
         {
+            return self.report();
+        }
+        if !self.access.begin_radio(enabled, admission_epoch) {
+            self.policy.reset_quiet();
+            self.deferred = Some(Deferred::ProtectionUnavailable);
             return self.report();
         }
         let mut state = self.policy.radio(&snapshot.clock)?;
@@ -394,6 +432,7 @@ impl<B: Backend> Controller<B> {
                 state.pending = None;
                 state.suspended = Some(Suspension::CommandRejected);
                 self.policy.save_radio(state, &clock)?;
+                tracing::warn!(enabled, "radio command rejected; network control suspended");
                 self.actual = None;
                 self.deferred = Some(Deferred::Suspended);
             }
@@ -404,9 +443,14 @@ impl<B: Backend> Controller<B> {
                 self.deferred = Some(Deferred::ObservationUnavailable);
                 self.policy.reset_quiet();
             }
-            Err(_) => {
+            Err(error) => {
                 state.suspended = Some(Suspension::CommandUncertain);
                 self.policy.save_radio(state, &clock)?;
+                tracing::warn!(
+                    enabled,
+                    %error,
+                    "radio command outcome unknown; network control suspended"
+                );
                 self.actual = None;
                 self.deferred = Some(Deferred::CommandUncertain);
             }
@@ -456,6 +500,7 @@ impl<B: Backend> Controller<B> {
             return Ok(None);
         };
         let mut state = self.policy.radio(&snapshot.clock)?;
+        let previous = state.suspended;
         let observed = Witness::new(&snapshot.clock, &snapshot.radio);
         let mut awaiting = false;
         if state.suspended.is_none() {
@@ -496,6 +541,15 @@ impl<B: Backend> Controller<B> {
             }
         }
         self.policy.save_radio(state.clone(), &snapshot.clock)?;
+        if previous.is_none()
+            && let Some(suspension) = state.suspended
+        {
+            // Only an owner resume clears it, so this marks when it began.
+            tracing::warn!(
+                ?suspension,
+                "network control suspended until an owner resume"
+            );
+        }
         self.deferred = if awaiting {
             Some(Deferred::ReadbackPending)
         } else if state.pending.is_some() {
@@ -518,6 +572,7 @@ impl<B: Backend> Controller<B> {
             return Ok(state.owned_off.then_some(true));
         }
         if status.policy.stay_connected
+            || self.access.protected()
             || status.holds.iter().any(|hold| {
                 hold.expires_in_ms > 0
                     && (hold.wireless_required

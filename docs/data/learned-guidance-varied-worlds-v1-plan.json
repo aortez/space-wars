@@ -1,0 +1,134 @@
+{
+ "experiment": "recovery-guidance-varied-worlds-v1",
+ "version": 1,
+ "created_utc": "2026-10-19T07:07:48.034961+00:00",
+ "question": "Training and holdout match starts from lab worlds with and without a sun and with two to eight planets, with native control's outcome from every start.",
+ "prior_directory": "/home/data/workspace/space-wars3/data/training-experiments/recovery-guidance-perception-warm-start-v1-20261018",
+ "prior_source_freeze_sha256": "22a194c2c3988f19f3b39bcc9eac78921011615f7d8d9cd8e1306c51c75db834",
+ "prior_results_sha256": "5b88ea47cb305ee85826916bb5662467605e4fb3af47bf1d8a01d98c63f8fd4c",
+ "inputs": {
+  "inputs.json": "6f9c932fda211ab79ce930f52d67ac2bfd4fd07ae7610cdc387665a36ed3f829",
+  "candidate.json": "5088139d6c09f0787bd0785865eb1f76dd3fdd3eebe869adf4a0f87ce5ab8097",
+  "time-final.json": "7951cc9a0505d06a0b69e8620476a589fa87e493a5290194c1fac4553e6422e4"
+ },
+ "novelty_sha256": "7683a96f91051b5a76e645c5aa7e1578003ab50222a4e6ec16898900fd36e7af",
+ "models": {
+  "e0f25b68": {
+   "file": "candidate.json",
+   "sha256": "5088139d6c09f0787bd0785865eb1f76dd3fdd3eebe869adf4a0f87ce5ab8097",
+   "genome": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1"
+  },
+  "e03d3e29": {
+   "file": "time-final.json",
+   "sha256": "7951cc9a0505d06a0b69e8620476a589fa87e493a5290194c1fac4553e6422e4",
+   "genome": "e03d3e2900722539e1a05838c4134a4b01bc33451582e795c37f53b502885b42"
+  }
+ },
+ "cells": [
+  {
+   "name": "sun2",
+   "sun": true,
+   "planets": 2,
+   "varied_edge": false
+  },
+  {
+   "name": "sun3",
+   "sun": true,
+   "planets": 3,
+   "varied_edge": false
+  },
+  {
+   "name": "sun5",
+   "sun": true,
+   "planets": 5,
+   "varied_edge": false
+  },
+  {
+   "name": "sun8",
+   "sun": true,
+   "planets": 8,
+   "varied_edge": false
+  },
+  {
+   "name": "nosun2",
+   "sun": false,
+   "planets": 2,
+   "varied_edge": false
+  },
+  {
+   "name": "nosun3",
+   "sun": false,
+   "planets": 3,
+   "varied_edge": false
+  },
+  {
+   "name": "nosun5",
+   "sun": false,
+   "planets": 5,
+   "varied_edge": false
+  },
+  {
+   "name": "nosun8",
+   "sun": false,
+   "planets": 8,
+   "varied_edge": false
+  },
+  {
+   "name": "sun3-edge",
+   "sun": true,
+   "planets": 3,
+   "varied_edge": true
+  }
+ ],
+ "layout": {
+  "standard_edge_margin": 200,
+  "edge_margins": [
+   120,
+   320
+  ],
+  "edge_draw": "spacewars.varied_worlds.edge.v1"
+ },
+ "discovery": {
+  "prefix_ticks": 10800,
+  "batch": 16,
+  "entry_altitude": 85.0,
+  "route_buffer": 65.0,
+  "entry_distance": 35.0,
+  "low_margin": 30.0,
+  "capture_distance": 105.0,
+  "capture_clearance": 10.0,
+  "rule": "Native Recovery bot in both seats, asteroids off, one dirt shape per world: angular for even seeds, round for odd. An approach is a destination since native control last selected it. Each keeps its first eligible state and, when lower than every earlier start of the approach, its eligible state closest to the route buffer of the sun or another planet, below low_margin, among states at least capture_clearance outside the capture distance. Eligible: a direct transfer in the destination frame within entry_distance of the entry, still valid after a neutral tick, with unsaturated inputs. No controller-outcome filter. Each cell takes consecutive seeds from its range until it has its starts, keeping whole worlds."
+ },
+ "sets": {
+  "training": {
+   "first_seed": 96200001,
+   "cell_stride": 1000,
+   "starts_per_cell": 150,
+   "standard_starts": 150
+  },
+  "holdout": {
+   "first_seed": 96300001,
+   "cell_stride": 1000,
+   "starts_per_cell": 60,
+   "standard_starts": 240
+  }
+ },
+ "preflight": {
+  "known_match_sources": 482,
+  "standard_check_seeds": 4,
+  "standard_check_ticks": 600
+ },
+ "baselines": {
+  "training": [
+   "native",
+   "e0f25b68",
+   "e03d3e29"
+  ],
+  "holdout": [
+   "native"
+  ]
+ },
+ "holdout_rule": "Only native control runs on the holdout until milestone 6's final evaluation.",
+ "reports": "By cell and overall: starts, completions, native successes lost, median ticks on shared successes, starts faster and slower than native control, and total ticks with 300 for a failed start. Coverage: margins, edge distance, destination size and speed, and bodies left out of the sensor's slots.",
+ "production_controls_changed": false
+}

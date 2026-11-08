@@ -214,6 +214,11 @@ impl SurfacePilot {
         };
         let limits = flight::FlightControlLimits::for_sweep(sweep);
         landing.assist_strength *= 1.0 - sweep;
+        if self.flight_control_mode == flight::FlightControlMode::Learned {
+            // Disable only the terrain-dependent actuator corrections. Keep
+            // measured landing telemetry and ordinary rate control/braking.
+            landing.assist_strength = 0.0;
+        }
         let up = (motion.position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
         let forward = Vec2::Y.rotate_radians(motion.angle);
@@ -235,7 +240,7 @@ impl SurfacePilot {
         };
         let mut acceleration = thrust_direction * (thrust * limits.thrust_acceleration * governor);
         if ship.brake > 0.0 {
-            acceleration += limits.braking(relative);
+            acceleration += limits.braking(relative) * ship.brake;
         } else if thrust == 0.0 {
             acceleration += right
                 * (-landing.lateral_speed * 3.0)
@@ -262,10 +267,11 @@ impl SurfacePilot {
             } else {
                 0.0
             };
-        let strength = if ship.turn != 0.0 || ship.brake > 0.0 {
+        let strength = if ship.turn != 0.0 {
             1.0
         } else {
-            0.25 + 0.75 * landing.assist_strength
+            let base = 0.25 + 0.75 * landing.assist_strength;
+            base + (1.0 - base) * ship.brake
         };
         let spin_delta = (desired_spin - motion.angular_velocity).clamp(
             -limits.turn_acceleration * strength * dt,

@@ -2,6 +2,7 @@
 //! Run pinned tools without signing keys; policy must be selected independently
 //! of the candidate. Only fixed read-only filesystem tools inspect image bytes.
 use crate::boot::BootManifest;
+use crate::development::DevelopmentImage;
 use crate::image_tools::{ImageReader, ImageTools};
 use crate::install_linux::{Target, check_ext4_header, write_checked_ext4_guarded};
 use crate::{Blob, BuildSource, Error, ImageFormat, ImageIdentity, Result, Sha256};
@@ -171,17 +172,7 @@ impl Qualification {
 
 fn inspect(root: &mut File, policy: &Policy) -> Result<Qualification> {
     policy.validate()?;
-    let before = root.metadata()?;
-    if !before.is_file() || !(4096..=MAX_ROOT_BYTES).contains(&before.len()) {
-        return Err(invalid(
-            "qualification requires a bounded regular ext4 image",
-        ));
-    }
-    let expanded = hash(root, before.len())?;
-    root.rewind()?;
-    let mut header = [0u8; 4096];
-    root.read_exact(&mut header)?;
-    check_ext4_header(&header, expanded.bytes)?;
+    let (before, expanded) = measure(root)?;
     let image = ImageTools::default().check_bootstrap(root)?;
     if image.source.dirty
         || image.source.commit != policy.source_commit
@@ -204,13 +195,7 @@ fn inspect(root: &mut File, policy: &Policy) -> Result<Qualification> {
         crate::MAX_IMAGE_IDENTITY_BYTES,
     )?;
     reader.file("/etc/spacewars/bootstrap-runtime.json", 0o644, 1024)?;
-    let source: BuildSource =
-        serde_json::from_slice(&reader.file("/usr/share/spacewars/source.json", 0o644, 4096)?)?;
-    if source != image.source {
-        return Err(invalid(
-            "packaged source record differs from image identity",
-        ));
-    }
+    check_contents(&mut reader, &image)?;
     let input_bytes = reader.file("/usr/share/spacewars/build-inputs.json", 0o644, 16 * 1024)?;
     if Sha256::digest(&input_bytes) != policy.build_inputs_sha256 {
         return Err(invalid(
@@ -289,6 +274,62 @@ fn inspect(root: &mut File, policy: &Policy) -> Result<Qualification> {
             "packaged compiler/configuration record differs from policy",
         ));
     }
+    if hash(root, before.len())? != expanded || !unchanged(&before, &root.metadata()?) {
+        return Err(invalid("image changed during qualification"));
+    }
+    Ok(Qualification {
+        schema: 1,
+        image,
+        build_inputs_sha256: policy.build_inputs_sha256,
+        build_inputs: inputs,
+        compiler,
+        expanded,
+    })
+}
+
+/// A development image skips the release policy: any source state, builder
+/// and provenance. The unit still checks its compatibility before writing.
+fn inspect_development(root: &mut File) -> Result<(ImageIdentity, Blob)> {
+    let (before, expanded) = measure(root)?;
+    let image = ImageTools::default().check_development(root)?;
+    let mut reader = ImageReader::new(root);
+    reader.file(
+        "/etc/spacewars/image.json",
+        0o644,
+        crate::MAX_IMAGE_IDENTITY_BYTES,
+    )?;
+    reader.file("/etc/spacewars/development-runtime.json", 0o644, 1024)?;
+    check_contents(&mut reader, &image)?;
+    if hash(root, before.len())? != expanded || !unchanged(&before, &root.metadata()?) {
+        return Err(invalid("image changed during qualification"));
+    }
+    Ok((image, expanded))
+}
+
+fn measure(root: &mut File) -> Result<(Metadata, Blob)> {
+    let before = root.metadata()?;
+    if !before.is_file() || !(4096..=MAX_ROOT_BYTES).contains(&before.len()) {
+        return Err(invalid(
+            "qualification requires a bounded regular ext4 image",
+        ));
+    }
+    let expanded = hash(root, before.len())?;
+    root.rewind()?;
+    let mut header = [0u8; 4096];
+    root.read_exact(&mut header)?;
+    check_ext4_header(&header, expanded.bytes)?;
+    Ok((before, expanded))
+}
+
+/// Structural checks shared by release and development images.
+fn check_contents(reader: &mut ImageReader<'_>, image: &ImageIdentity) -> Result<()> {
+    let source: BuildSource =
+        serde_json::from_slice(&reader.file("/usr/share/spacewars/source.json", 0o644, 4096)?)?;
+    if source != image.source {
+        return Err(invalid(
+            "packaged source record differs from image identity",
+        ));
+    }
     let manifest = reader.file(
         "/etc/spacewars/boot-manifest.json",
         0o644,
@@ -316,17 +357,7 @@ fn inspect(root: &mut File, policy: &Policy) -> Result<Qualification> {
             ));
         }
     }
-    if hash(root, before.len())? != expanded || !unchanged(&before, &root.metadata()?) {
-        return Err(invalid("image changed during qualification"));
-    }
-    Ok(Qualification {
-        schema: 1,
-        image,
-        build_inputs_sha256: policy.build_inputs_sha256,
-        build_inputs: inputs,
-        compiler,
-        expanded,
-    })
+    Ok(())
 }
 
 /// Verify one bounded Zstandard frame using the same decoder/readback checks as
@@ -338,6 +369,15 @@ pub fn verify(
     scratch: &Path,
 ) -> Result<Qualification> {
     policy.validate()?;
+    decode(candidate, payload, scratch, |root| inspect(root, policy))
+}
+
+fn decode<T>(
+    candidate: &Candidate,
+    payload: &Path,
+    scratch: &Path,
+    check: impl FnOnce(&mut File) -> Result<T>,
+) -> Result<T> {
     candidate.validate()?;
     let mut payload = regular(payload)?;
     let original = payload.metadata()?;
@@ -357,7 +397,7 @@ pub fn verify(
         &mut payload,
         &mut target,
         |file| {
-            result = Some(inspect(&mut file.try_clone()?, policy)?);
+            result = Some(check(&mut file.try_clone()?)?);
             Ok(())
         },
         &mut |_| Ok(()),
@@ -372,6 +412,49 @@ pub fn verify(
 /// Generation/channel assignment and signing belong to a different stage.
 pub fn pack(policy: &Policy, rootfs: &Path, output: &Path) -> Result<Candidate> {
     policy.validate()?;
+    package(
+        rootfs,
+        output,
+        |root| Ok(inspect(root, policy)?.expanded),
+        |candidate, payload, scratch| {
+            let verified = verify(policy, candidate, payload, scratch)?;
+            Ok(vec![
+                ("candidate.json", serde_json::to_vec_pretty(candidate)?),
+                ("qualification.json", serde_json::to_vec_pretty(&verified)?),
+            ])
+        },
+    )
+}
+
+/// The same single-frame payload for `maintenance development install`, with
+/// a development descriptor taken from the decoded image instead of a policy.
+pub fn pack_development(rootfs: &Path, output: &Path) -> Result<DevelopmentImage> {
+    let mut descriptor = None;
+    package(
+        rootfs,
+        output,
+        |root| Ok(inspect_development(root)?.1),
+        |candidate, payload, scratch| {
+            let (image, expanded) = decode(candidate, payload, scratch, inspect_development)?;
+            let development =
+                DevelopmentImage::from_identity(&image, candidate.compressed.clone(), expanded);
+            development.validate()?;
+            let bytes = serde_json::to_vec_pretty(&development)?;
+            descriptor = Some(development);
+            Ok(vec![("development.json", bytes)])
+        },
+    )?;
+    descriptor.ok_or_else(|| invalid("development descriptor was not written"))
+}
+
+type Records = Vec<(&'static str, Vec<u8>)>;
+
+fn package(
+    rootfs: &Path,
+    output: &Path,
+    qualify: impl FnOnce(&mut File) -> Result<Blob>,
+    finish: impl FnOnce(&Candidate, &Path, &Path) -> Result<Records>,
+) -> Result<Candidate> {
     let parent = fs::canonicalize(
         output
             .parent()
@@ -390,7 +473,7 @@ pub fn pack(policy: &Policy, rootfs: &Path, output: &Path) -> Result<Candidate> 
     let output_name =
         CString::new(output_name).map_err(|_| invalid("invalid candidate directory"))?;
     let mut root = regular(rootfs)?;
-    let qualification = inspect(&mut root, policy)?;
+    let expanded = qualify(&mut root)?;
     let original = root.metadata()?;
     let pending = tempfile::Builder::new()
         .prefix(".ota-candidate-")
@@ -404,16 +487,14 @@ pub fn pack(policy: &Policy, rootfs: &Path, output: &Path) -> Result<Candidate> 
     let mut encoder = zstd::stream::write::Encoder::new(payload, 3)?;
     encoder.window_log(26)?;
     encoder.include_checksum(true)?;
-    encoder.set_pledged_src_size(Some(qualification.expanded.bytes))?;
+    encoder.set_pledged_src_size(Some(expanded.bytes))?;
     root.rewind()?;
-    let mut copied = (&mut root).take(qualification.expanded.bytes + 1);
-    if std::io::copy(&mut copied, &mut encoder)? != qualification.expanded.bytes {
+    let mut copied = (&mut root).take(expanded.bytes + 1);
+    if std::io::copy(&mut copied, &mut encoder)? != expanded.bytes {
         return Err(invalid("expanded image length changed during packaging"));
     }
     encoder.finish()?.sync_all()?;
-    if !unchanged(&original, &root.metadata()?)
-        || hash(&mut root, original.len())? != qualification.expanded
-    {
+    if !unchanged(&original, &root.metadata()?) || hash(&mut root, original.len())? != expanded {
         return Err(invalid("expanded image changed during packaging"));
     }
     let mut payload = regular(&payload_path)?;
@@ -422,14 +503,10 @@ pub fn pack(policy: &Policy, rootfs: &Path, output: &Path) -> Result<Candidate> 
         schema: 1,
         format: ImageFormat::RootfsExt4Zstd,
         compressed: hash(&mut payload, length)?,
-        expanded: qualification.expanded,
+        expanded,
     };
     candidate.validate()?;
-    let verified = verify(policy, &candidate, &payload_path, pending.path())?;
-    for (name, bytes) in [
-        ("candidate.json", serde_json::to_vec_pretty(&candidate)?),
-        ("qualification.json", serde_json::to_vec_pretty(&verified)?),
-    ] {
+    for (name, bytes) in finish(&candidate, &payload_path, pending.path())? {
         let mut file = OpenOptions::new()
             .write(true)
             .create_new(true)

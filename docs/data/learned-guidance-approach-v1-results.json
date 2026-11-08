@@ -1,0 +1,676 @@
+{
+  "protocol": "recovery_guidance_approach_probe_v1",
+  "plan_sha256": "55b9300606111c86b6a3430e264e46b0d6cdd720d043190779116dc85f7c3aa8",
+  "runtime": "diagnostic_v1/linux/x86_64/154f6b9e08703fd60b06d0696383e47f1e5cb5dfe2d0189efd6a09d9898a2838",
+  "candidate_passed": false,
+  "counts": [
+    {
+      "arrived": 6,
+      "cases": 8,
+      "controller": "mission"
+    },
+    {
+      "arrived": 8,
+      "cases": 8,
+      "controller": "reference"
+    },
+    {
+      "arrived": 4,
+      "cases": 8,
+      "controller": "model"
+    }
+  ],
+  "scope": "Eight development starts from two world seeds and correlated dirt variants; component continuations, not a live hybrid or independent reliability estimate.",
+  "gate": "8/8 safe native handoffs in <=300 steps, no case exclusions; failed.",
+  "applied_component_decisions_verified": 1412,
+  "episodes": [
+    {
+      "case": "seed-42-weak-angular-p1",
+      "controller": "mission",
+      "outcome": "arrived",
+      "elapsed_ticks": 50,
+      "owned_component_ticks": 0,
+      "thrust_ticks": 23,
+      "brake_ticks": 16,
+      "absolute_turn": 16.3771976493299,
+      "initial": {
+        "altitude": 101.92348385926039,
+        "relative_speed": 39.230074882906976,
+        "inward_speed": 38.85457300354061,
+        "native_climb_threshold": 100.19355686574933,
+        "climb_margin": 1.7299269935110537,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 79.3632852269269,
+        "relative_speed": 17.59516267927094,
+        "inward_speed": 17.593331734781273,
+        "native_climb_threshold": 76.19050643060123,
+        "climb_margin": 3.1727787963256686,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-42-weak-angular-p2",
+      "controller": "mission",
+      "outcome": "host_preempted",
+      "elapsed_ticks": 117,
+      "owned_component_ticks": 0,
+      "thrust_ticks": 9,
+      "brake_ticks": 20,
+      "absolute_turn": 104.72043831646442,
+      "initial": {
+        "altitude": 119.56893781358042,
+        "relative_speed": 25.175704209142545,
+        "inward_speed": 24.53608256065215,
+        "native_climb_threshold": 82.04038694846277,
+        "climb_margin": 37.52855086511765,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 80.49504977646612,
+        "relative_speed": 24.423405172899407,
+        "inward_speed": 23.415517937360264,
+        "native_climb_threshold": 80.9657296054968,
+        "climb_margin": -0.47067982903068817,
+        "health": 100.0
+      },
+      "preempting_goal": "launch"
+    },
+    {
+      "case": "seed-42-weak-round-p1",
+      "controller": "mission",
+      "outcome": "arrived",
+      "elapsed_ticks": 50,
+      "owned_component_ticks": 0,
+      "thrust_ticks": 23,
+      "brake_ticks": 16,
+      "absolute_turn": 16.3771976493299,
+      "initial": {
+        "altitude": 101.92348385926039,
+        "relative_speed": 39.230074882906976,
+        "inward_speed": 38.85457300354061,
+        "native_climb_threshold": 100.19355686574933,
+        "climb_margin": 1.7299269935110537,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 79.3632852269269,
+        "relative_speed": 17.59516267927094,
+        "inward_speed": 17.593331734781273,
+        "native_climb_threshold": 76.19050643060123,
+        "climb_margin": 3.1727787963256686,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-42-weak-round-p2",
+      "controller": "mission",
+      "outcome": "host_preempted",
+      "elapsed_ticks": 117,
+      "owned_component_ticks": 0,
+      "thrust_ticks": 9,
+      "brake_ticks": 20,
+      "absolute_turn": 104.72043831646442,
+      "initial": {
+        "altitude": 119.56893781358042,
+        "relative_speed": 25.175704209142545,
+        "inward_speed": 24.53608256065215,
+        "native_climb_threshold": 82.04038694846277,
+        "climb_margin": 37.52855086511765,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 80.49504977646612,
+        "relative_speed": 24.423405172899407,
+        "inward_speed": 23.415517937360264,
+        "native_climb_threshold": 80.9657296054968,
+        "climb_margin": -0.47067982903068817,
+        "health": 100.0
+      },
+      "preempting_goal": "launch"
+    },
+    {
+      "case": "seed-10101-weak-angular-p1",
+      "controller": "mission",
+      "outcome": "arrived",
+      "elapsed_ticks": 47,
+      "owned_component_ticks": 0,
+      "thrust_ticks": 12,
+      "brake_ticks": 29,
+      "absolute_turn": 29.882200703024864,
+      "initial": {
+        "altitude": 119.4698319564915,
+        "relative_speed": 28.02759328708143,
+        "inward_speed": 28.010562622783667,
+        "native_climb_threshold": 85.6918323688977,
+        "climb_margin": 33.7779995875938,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 102.20513159972515,
+        "relative_speed": 17.97455300279416,
+        "inward_speed": 17.878062540328525,
+        "native_climb_threshold": 76.39250240391796,
+        "climb_margin": 25.81262919580719,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-angular-p2",
+      "controller": "mission",
+      "outcome": "arrived",
+      "elapsed_ticks": 69,
+      "owned_component_ticks": 0,
+      "thrust_ticks": 30,
+      "brake_ticks": 68,
+      "absolute_turn": 37.23482420446817,
+      "initial": {
+        "altitude": 119.25173365885965,
+        "relative_speed": 28.15412685353748,
+        "inward_speed": 27.745965047903063,
+        "native_climb_threshold": 85.39677152878917,
+        "climb_margin": 33.85496213007048,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 104.72948782921637,
+        "relative_speed": 11.111090439521183,
+        "inward_speed": 11.048573777411146,
+        "native_climb_threshold": 72.44141965029795,
+        "climb_margin": 32.28806817891842,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-round-p1",
+      "controller": "mission",
+      "outcome": "arrived",
+      "elapsed_ticks": 47,
+      "owned_component_ticks": 0,
+      "thrust_ticks": 12,
+      "brake_ticks": 29,
+      "absolute_turn": 29.882200703024864,
+      "initial": {
+        "altitude": 119.4698319564915,
+        "relative_speed": 28.02759328708143,
+        "inward_speed": 28.010562622783667,
+        "native_climb_threshold": 85.6918323688977,
+        "climb_margin": 33.7779995875938,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 102.20513159972515,
+        "relative_speed": 17.97455300279416,
+        "inward_speed": 17.878062540328525,
+        "native_climb_threshold": 76.39250240391796,
+        "climb_margin": 25.81262919580719,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-round-p2",
+      "controller": "mission",
+      "outcome": "arrived",
+      "elapsed_ticks": 69,
+      "owned_component_ticks": 0,
+      "thrust_ticks": 30,
+      "brake_ticks": 68,
+      "absolute_turn": 37.23482420446817,
+      "initial": {
+        "altitude": 119.25173365885965,
+        "relative_speed": 28.15412685353748,
+        "inward_speed": 27.745965047903063,
+        "native_climb_threshold": 85.39677152878917,
+        "climb_margin": 33.85496213007048,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 104.72948782921637,
+        "relative_speed": 11.111090439521183,
+        "inward_speed": 11.048573777411146,
+        "native_climb_threshold": 72.44141965029795,
+        "climb_margin": 32.28806817891842,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-42-weak-angular-p1",
+      "controller": "reference",
+      "outcome": "arrived",
+      "elapsed_ticks": 20,
+      "owned_component_ticks": 19,
+      "thrust_ticks": 16,
+      "brake_ticks": 19,
+      "absolute_turn": 0.9124084159266204,
+      "initial": {
+        "altitude": 101.92348385926039,
+        "relative_speed": 39.230074882906976,
+        "inward_speed": 38.85457300354061,
+        "native_climb_threshold": 100.19355686574933,
+        "climb_margin": 1.7299269935110537,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 92.88953238644135,
+        "relative_speed": 17.904561088841024,
+        "inward_speed": 17.90352230740449,
+        "native_climb_threshold": 76.4107222202346,
+        "climb_margin": 16.478810166206742,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-42-weak-angular-p2",
+      "controller": "reference",
+      "outcome": "arrived",
+      "elapsed_ticks": 193,
+      "owned_component_ticks": 192,
+      "thrust_ticks": 58,
+      "brake_ticks": 192,
+      "absolute_turn": 47.752231630671304,
+      "initial": {
+        "altitude": 119.56893781358042,
+        "relative_speed": 25.175704209142545,
+        "inward_speed": 24.53608256065215,
+        "native_climb_threshold": 82.04038694846277,
+        "climb_margin": 37.52855086511765,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 104.93698413732369,
+        "relative_speed": 2.7072613211093084,
+        "inward_speed": 2.6921393891130605,
+        "native_climb_threshold": 70.14495228980829,
+        "climb_margin": 34.79203184751541,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-42-weak-round-p1",
+      "controller": "reference",
+      "outcome": "arrived",
+      "elapsed_ticks": 20,
+      "owned_component_ticks": 19,
+      "thrust_ticks": 16,
+      "brake_ticks": 19,
+      "absolute_turn": 0.9124084159266204,
+      "initial": {
+        "altitude": 101.92348385926039,
+        "relative_speed": 39.230074882906976,
+        "inward_speed": 38.85457300354061,
+        "native_climb_threshold": 100.19355686574933,
+        "climb_margin": 1.7299269935110537,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 92.88953238644135,
+        "relative_speed": 17.904561088841024,
+        "inward_speed": 17.90352230740449,
+        "native_climb_threshold": 76.4107222202346,
+        "climb_margin": 16.478810166206742,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-42-weak-round-p2",
+      "controller": "reference",
+      "outcome": "arrived",
+      "elapsed_ticks": 193,
+      "owned_component_ticks": 192,
+      "thrust_ticks": 58,
+      "brake_ticks": 192,
+      "absolute_turn": 47.752231630671304,
+      "initial": {
+        "altitude": 119.56893781358042,
+        "relative_speed": 25.175704209142545,
+        "inward_speed": 24.53608256065215,
+        "native_climb_threshold": 82.04038694846277,
+        "climb_margin": 37.52855086511765,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 104.93698413732369,
+        "relative_speed": 2.7072613211093084,
+        "inward_speed": 2.6921393891130605,
+        "native_climb_threshold": 70.14495228980829,
+        "climb_margin": 34.79203184751541,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-angular-p1",
+      "controller": "reference",
+      "outcome": "arrived",
+      "elapsed_ticks": 146,
+      "owned_component_ticks": 145,
+      "thrust_ticks": 50,
+      "brake_ticks": 145,
+      "absolute_turn": 56.84502954862546,
+      "initial": {
+        "altitude": 119.4698319564915,
+        "relative_speed": 28.02759328708143,
+        "inward_speed": 28.010562622783667,
+        "native_climb_threshold": 85.6918323688977,
+        "climb_margin": 33.7779995875938,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 104.95346358120864,
+        "relative_speed": 2.7723011982515713,
+        "inward_speed": 2.7199139232886917,
+        "native_climb_threshold": 70.147958635002,
+        "climb_margin": 34.805504946206646,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-angular-p2",
+      "controller": "reference",
+      "outcome": "arrived",
+      "elapsed_ticks": 145,
+      "owned_component_ticks": 144,
+      "thrust_ticks": 69,
+      "brake_ticks": 144,
+      "absolute_turn": 32.65433063270757,
+      "initial": {
+        "altitude": 119.25173365885965,
+        "relative_speed": 28.15412685353748,
+        "inward_speed": 27.745965047903063,
+        "native_climb_threshold": 85.39677152878917,
+        "climb_margin": 33.85496213007048,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 104.93209430001542,
+        "relative_speed": 2.861683665695756,
+        "inward_speed": 2.820910027898977,
+        "native_climb_threshold": 70.15915066771002,
+        "climb_margin": 34.7729436323054,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-round-p1",
+      "controller": "reference",
+      "outcome": "arrived",
+      "elapsed_ticks": 146,
+      "owned_component_ticks": 145,
+      "thrust_ticks": 50,
+      "brake_ticks": 145,
+      "absolute_turn": 56.84502954862546,
+      "initial": {
+        "altitude": 119.4698319564915,
+        "relative_speed": 28.02759328708143,
+        "inward_speed": 28.010562622783667,
+        "native_climb_threshold": 85.6918323688977,
+        "climb_margin": 33.7779995875938,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 104.95346358120864,
+        "relative_speed": 2.7723011982515713,
+        "inward_speed": 2.7199139232886917,
+        "native_climb_threshold": 70.147958635002,
+        "climb_margin": 34.805504946206646,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-round-p2",
+      "controller": "reference",
+      "outcome": "arrived",
+      "elapsed_ticks": 145,
+      "owned_component_ticks": 144,
+      "thrust_ticks": 69,
+      "brake_ticks": 144,
+      "absolute_turn": 32.65433063270757,
+      "initial": {
+        "altitude": 119.25173365885965,
+        "relative_speed": 28.15412685353748,
+        "inward_speed": 27.745965047903063,
+        "native_climb_threshold": 85.39677152878917,
+        "climb_margin": 33.85496213007048,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 104.93209430001542,
+        "relative_speed": 2.861683665695756,
+        "inward_speed": 2.820910027898977,
+        "native_climb_threshold": 70.15915066771002,
+        "climb_margin": 34.7729436323054,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-42-weak-angular-p1",
+      "controller": "model",
+      "outcome": "host_preempted",
+      "elapsed_ticks": 52,
+      "owned_component_ticks": 52,
+      "thrust_ticks": 52,
+      "brake_ticks": 0,
+      "absolute_turn": 50.624272108078,
+      "initial": {
+        "altitude": 101.92348385926039,
+        "relative_speed": 39.230074882906976,
+        "inward_speed": 38.85457300354061,
+        "native_climb_threshold": 100.19355686574933,
+        "climb_margin": 1.7299269935110537,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 78.34023584551372,
+        "relative_speed": 30.696791777993784,
+        "inward_speed": 20.606368906244903,
+        "native_climb_threshold": 78.49244879000514,
+        "climb_margin": -0.1522129444914171,
+        "health": 100.0
+      },
+      "preempting_goal": "launch"
+    },
+    {
+      "case": "seed-42-weak-angular-p2",
+      "controller": "model",
+      "outcome": "arrived",
+      "elapsed_ticks": 65,
+      "owned_component_ticks": 64,
+      "thrust_ticks": 27,
+      "brake_ticks": 40,
+      "absolute_turn": 62.96270930767059,
+      "initial": {
+        "altitude": 119.56893781358042,
+        "relative_speed": 25.175704209142545,
+        "inward_speed": 24.53608256065215,
+        "native_climb_threshold": 82.04038694846277,
+        "climb_margin": 37.52855086511765,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 86.33147846391401,
+        "relative_speed": 17.8565599672698,
+        "inward_speed": 17.77903766712081,
+        "native_climb_threshold": 76.32188360737801,
+        "climb_margin": 10.009594856535998,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-42-weak-round-p1",
+      "controller": "model",
+      "outcome": "host_preempted",
+      "elapsed_ticks": 52,
+      "owned_component_ticks": 52,
+      "thrust_ticks": 52,
+      "brake_ticks": 0,
+      "absolute_turn": 50.624272108078,
+      "initial": {
+        "altitude": 101.92348385926039,
+        "relative_speed": 39.230074882906976,
+        "inward_speed": 38.85457300354061,
+        "native_climb_threshold": 100.19355686574933,
+        "climb_margin": 1.7299269935110537,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 78.34023584551372,
+        "relative_speed": 30.696791777993784,
+        "inward_speed": 20.606368906244903,
+        "native_climb_threshold": 78.49244879000514,
+        "climb_margin": -0.1522129444914171,
+        "health": 100.0
+      },
+      "preempting_goal": "launch"
+    },
+    {
+      "case": "seed-42-weak-round-p2",
+      "controller": "model",
+      "outcome": "arrived",
+      "elapsed_ticks": 65,
+      "owned_component_ticks": 64,
+      "thrust_ticks": 27,
+      "brake_ticks": 40,
+      "absolute_turn": 62.96270930767059,
+      "initial": {
+        "altitude": 119.56893781358042,
+        "relative_speed": 25.175704209142545,
+        "inward_speed": 24.53608256065215,
+        "native_climb_threshold": 82.04038694846277,
+        "climb_margin": 37.52855086511765,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 86.33147846391401,
+        "relative_speed": 17.8565599672698,
+        "inward_speed": 17.77903766712081,
+        "native_climb_threshold": 76.32188360737801,
+        "climb_margin": 10.009594856535998,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-angular-p1",
+      "controller": "model",
+      "outcome": "arrived",
+      "elapsed_ticks": 58,
+      "owned_component_ticks": 57,
+      "thrust_ticks": 33,
+      "brake_ticks": 51,
+      "absolute_turn": 55.87090641260147,
+      "initial": {
+        "altitude": 119.4698319564915,
+        "relative_speed": 28.02759328708143,
+        "inward_speed": 28.010562622783667,
+        "native_climb_threshold": 85.6918323688977,
+        "climb_margin": 33.7779995875938,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 97.42199469640587,
+        "relative_speed": 17.51431040653533,
+        "inward_speed": 15.50794038125347,
+        "native_climb_threshold": 74.80992429737024,
+        "climb_margin": 22.612070399035634,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-angular-p2",
+      "controller": "model",
+      "outcome": "host_preempted",
+      "elapsed_ticks": 33,
+      "owned_component_ticks": 33,
+      "thrust_ticks": 33,
+      "brake_ticks": 0,
+      "absolute_turn": 32.71150875091553,
+      "initial": {
+        "altitude": 119.25173365885965,
+        "relative_speed": 28.15412685353748,
+        "inward_speed": 27.745965047903063,
+        "native_climb_threshold": 85.39677152878917,
+        "climb_margin": 33.85496213007048,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 101.46358463848048,
+        "relative_speed": 42.48147583568713,
+        "inward_speed": 39.764932753988305,
+        "native_climb_threshold": 101.62499753858424,
+        "climb_margin": -0.16141290010375542,
+        "health": 100.0
+      },
+      "preempting_goal": "launch"
+    },
+    {
+      "case": "seed-10101-weak-round-p1",
+      "controller": "model",
+      "outcome": "arrived",
+      "elapsed_ticks": 58,
+      "owned_component_ticks": 57,
+      "thrust_ticks": 33,
+      "brake_ticks": 51,
+      "absolute_turn": 55.87090641260147,
+      "initial": {
+        "altitude": 119.4698319564915,
+        "relative_speed": 28.02759328708143,
+        "inward_speed": 28.010562622783667,
+        "native_climb_threshold": 85.6918323688977,
+        "climb_margin": 33.7779995875938,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 97.42199469640587,
+        "relative_speed": 17.51431040653533,
+        "inward_speed": 15.50794038125347,
+        "native_climb_threshold": 74.80992429737024,
+        "climb_margin": 22.612070399035634,
+        "health": 100.0
+      },
+      "preempting_goal": null
+    },
+    {
+      "case": "seed-10101-weak-round-p2",
+      "controller": "model",
+      "outcome": "host_preempted",
+      "elapsed_ticks": 33,
+      "owned_component_ticks": 33,
+      "thrust_ticks": 33,
+      "brake_ticks": 0,
+      "absolute_turn": 32.71150875091553,
+      "initial": {
+        "altitude": 119.25173365885965,
+        "relative_speed": 28.15412685353748,
+        "inward_speed": 27.745965047903063,
+        "native_climb_threshold": 85.39677152878917,
+        "climb_margin": 33.85496213007048,
+        "health": 100.0
+      },
+      "final": {
+        "altitude": 101.46358463848048,
+        "relative_speed": 42.48147583568713,
+        "inward_speed": 39.764932753988305,
+        "native_climb_threshold": 101.62499753858424,
+        "climb_margin": -0.16141290010375542,
+        "health": 100.0
+      },
+      "preempting_goal": "launch"
+    }
+  ]
+}

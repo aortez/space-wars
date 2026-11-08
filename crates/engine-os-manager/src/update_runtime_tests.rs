@@ -5,7 +5,178 @@ use crate::network_policy::{self, Activity, HoldKind, Intent, Policy};
 use engine_ota::Sha256;
 use std::collections::BTreeMap;
 
+use crate::test_feed as feed;
+
+impl Fixture {
+    async fn install_ready(&mut self) -> InstallCandidate {
+        let signed = feed::Fixture::new().await;
+        let mut trust = engine_ota::TrustStore::initialize(
+            &self._temp.path().join("trust"),
+            &signed.root_bytes,
+            feed::location(),
+        )
+        .unwrap();
+        let transport = signed
+            .publish(
+                1,
+                &[feed::descriptor(Channel::Release, 2)],
+                "2027-08-01T00:00:00Z".parse().unwrap(),
+                feed::Fault::None,
+            )
+            .await;
+        let candidate = feed::candidate(
+            trust
+                .refresh(
+                    Arc::new(transport),
+                    self.fake.time(),
+                    Channel::Release,
+                    &feed::device(),
+                    &engine_ota::ImageHistory::default(),
+                )
+                .await
+                .unwrap(),
+        );
+        self.runner.ready = Some(Ready {
+            candidate,
+            proof: (),
+            time: self.fake.time().unwrap(),
+        });
+        self.runner.publish(&self.handle).unwrap();
+        self.handle.install_candidate().unwrap()
+    }
+}
+
+#[tokio::test]
+async fn installation_selection_excludes_channel_changes_and_checks_until_release() {
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    let selection = f.handle.claim_install(&candidate).unwrap();
+    assert!(f.handle.check_now().is_err());
+    assert!(f.handle.select_channel(Channel::Nightly).is_err());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    // Cross the automatic-check threshold. Only the heartbeat may advance.
+    f.fake.edit(|w| {
+        w.ms = 60_000;
+        w.partial = false;
+    });
+    f.step();
+    selection.check().unwrap();
+    assert_eq!(f.fake.0.lock().unwrap().prepares, 0);
+    assert!(
+        f.handle
+            .status()
+            .unwrap()
+            .schedule
+            .unwrap()
+            .active
+            .is_none()
+    );
+    drop(selection);
+    assert!(f.handle.select_channel(Channel::Nightly).is_ok());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    f.step();
+    assert_eq!(
+        f.handle.status().unwrap().schedule.unwrap().channel,
+        Channel::Nightly
+    );
+}
+
+#[tokio::test]
+async fn installation_selection_rejects_unpublished_scheduling_and_stale_evidence() {
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    f.handle.shared.lock().unwrap().selecting = true;
+    let guard = Selecting(f.handle.shared.clone());
+    assert!(f.handle.install_candidate().is_err());
+    assert!(f.handle.claim_install(&candidate).is_err());
+    drop(guard);
+    let mut changed = candidate.clone();
+    changed.generation += 1;
+    assert!(f.handle.claim_install(&changed).is_err());
+    f.fake.edit(|w| w.ms += 15_001);
+    assert!(f.handle.claim_install(&candidate).is_err());
+    f.runner.publish(&f.handle).unwrap();
+    let selection = f.handle.claim_install(&candidate).unwrap();
+    f.fake.edit(|w| w.time = false);
+    assert!(selection.check().is_err());
+    f.fake.edit(|w| {
+        w.time = true;
+        w.ms =
+            (candidate.candidate.expires().as_microsecond() as u64 - 1_800_000_000_000_000) / 1000;
+    });
+    f.step();
+    assert!(selection.check().is_err());
+    drop(selection);
+    let mut f = Fixture::new();
+    let candidate = f.install_ready().await;
+    assert!(f.handle.check_now().is_ok());
+    assert!(f.handle.claim_install(&candidate).is_err());
+}
+
 const BOOT: &str = "11111111-2222-3333-4444-555555555555";
+
+#[tokio::test]
+async fn abandoned_install_revalidates_before_reoffering_without_another_update_check() {
+    for invalid in [false, true] {
+        let mut f = Fixture::new();
+        let now = f.fake.clock().unwrap();
+        let completed = f
+            .runner
+            .schedule
+            .automatic(&now, false, Opportunity::Connected)
+            .unwrap()
+            .active
+            .unwrap();
+        assert!(f.runner.schedule.admitted(&now, completed.id).unwrap());
+        assert!(
+            f.runner
+                .schedule
+                .payload_started(&now, completed.id, &now)
+                .unwrap()
+        );
+        f.runner
+            .schedule
+            .finish(&now, completed.id, Completion::Ready)
+            .unwrap();
+        let candidate = f.install_ready().await;
+        let before = f.handle.status().unwrap().schedule;
+        let selection = f.handle.claim_install(&candidate).unwrap();
+        f.fake.edit(|w| {
+            w.ready_valid = false; // The installer replaced retained trust.
+            w.busy_ready_refresh = true; // Reconciliation still owns maintenance.
+            w.fail_ready_refresh = invalid;
+        });
+        f.step();
+        selection.check().unwrap();
+        assert_eq!(f.fake.0.lock().unwrap().ready_refreshes, 0);
+        drop(selection);
+        assert!(f.handle.install_candidate().is_err());
+        assert!(f.handle.claim_install(&candidate).is_err());
+        f.step();
+        assert!(f.handle.install_candidate().is_err());
+        assert!(f.runner.ready.is_some());
+        f.fake.edit(|w| w.busy_ready_refresh = false);
+        f.step();
+        let after = f.handle.status().unwrap();
+        assert_eq!(after.schedule, before);
+        if invalid {
+            assert_eq!(after.reason, Some(Reason::StaleReady));
+            assert!(f.handle.install_candidate().is_err());
+        } else {
+            assert_eq!(after.phase, Phase::Ready);
+            assert_eq!(
+                f.handle.install_candidate().unwrap().candidate.id(),
+                candidate.candidate.id()
+            );
+            assert!(f.handle.claim_install(&candidate).is_ok());
+        }
+        let world = f.fake.0.lock().unwrap();
+        assert_eq!(world.ready_refreshes, 2);
+        assert_eq!(world.prepares, 0);
+        assert_eq!(world.sessions, 0);
+        assert_eq!(world.holds.len(), 1); // Only the unrelated owner's hold.
+    }
+}
 
 #[test]
 fn native_network_read_accepts_publication_after_the_callers_clock_sample() {
@@ -58,6 +229,7 @@ enum Work {
     Finish,
     Fail,
     Wait,
+    Flush,
 }
 struct World {
     ms: u64,
@@ -66,11 +238,17 @@ struct World {
     partial: bool,
     route: bool,
     radio_observed: bool,
+    network_stale: bool,
     radio_startup: bool,
+    suspended: Option<network_controller::Suspension>,
     time: bool,
     work: Work,
     fail_prepare: bool,
     busy_prepare: bool,
+    ready_valid: bool,
+    busy_ready_refresh: bool,
+    fail_ready_refresh: bool,
+    ready_refreshes: usize,
     fail_admit: bool,
     fail_renew: bool,
     admit_delay: u64,
@@ -80,6 +258,7 @@ struct World {
     renewals: usize,
     holds: BTreeMap<String, u64>,
     trace: Vec<&'static str>,
+    flush: Option<(mpsc::SyncSender<()>, mpsc::Receiver<()>)>,
 }
 #[derive(Clone)]
 struct Fake(Arc<Mutex<World>>);
@@ -92,11 +271,17 @@ impl Fake {
             partial: true,
             route: true,
             radio_observed: true,
+            network_stale: false,
             radio_startup: false,
+            suspended: None,
             time: true,
             work: Work::Finish,
             fail_prepare: false,
             busy_prepare: false,
+            ready_valid: true,
+            busy_ready_refresh: false,
+            fail_ready_refresh: false,
+            ready_refreshes: 0,
             fail_admit: false,
             fail_renew: false,
             admit_delay: 0,
@@ -106,6 +291,7 @@ impl Fake {
             renewals: 0,
             holds: BTreeMap::from([("other-owner".into(), u64::MAX)]),
             trace: Vec::new(),
+            flush: None,
         })))
     }
     fn edit(&self, change: impl FnOnce(&mut World)) {
@@ -124,6 +310,9 @@ impl Inputs for Fake {
     }
     fn network(&self, _clock: &Clock) -> Option<Snapshot> {
         let w = self.0.lock().unwrap();
+        if w.network_stale {
+            return None;
+        }
         Some(Snapshot {
             epoch: w.epoch,
             status: network_controller::Status {
@@ -170,9 +359,12 @@ impl Inputs for Fake {
                 }),
                 owned_off: false,
                 pending: None,
-                suspended: None,
-                deferred: (!w.radio_observed)
-                    .then_some(network_controller::Deferred::ObservationUnavailable),
+                suspended: w.suspended,
+                deferred: if !w.radio_observed {
+                    Some(network_controller::Deferred::ObservationUnavailable)
+                } else {
+                    w.suspended.map(|_| network_controller::Deferred::Suspended)
+                },
             },
         })
     }
@@ -245,10 +437,42 @@ impl Backend for Fake {
                 }
                 Err(interrupted())
             }
+            Work::Flush => {
+                control.progress(Progress {
+                    phase: download::Phase::Downloading,
+                    candidate_id: None,
+                    bytes: 10,
+                    total: 10,
+                });
+                // A storage syscall cannot poll cancellation until it returns.
+                let (entered, resume) = fake.0.lock().unwrap().flush.take().unwrap();
+                entered.send(()).unwrap();
+                resume.recv_timeout(Duration::from_secs(5)).unwrap();
+                Ok(Finished {
+                    outcome: download::Outcome::NoCandidate,
+                    proof: None,
+                    time: control.checkpoint()?.unwrap(),
+                })
+            }
         }
     }
     fn ready_valid(&mut self, _proof: &()) -> bool {
-        true
+        self.0.lock().unwrap().ready_valid
+    }
+    fn refresh_ready(
+        &mut self,
+        _ready: &mut Ready<()>,
+    ) -> std::result::Result<(), PreparationError> {
+        let mut w = self.0.lock().unwrap();
+        w.ready_refreshes += 1;
+        if w.busy_ready_refresh {
+            return Err(PreparationError::MaintenanceBusy);
+        }
+        if w.fail_ready_refresh {
+            return Err(PreparationError::failed("ready-refresh", unavailable()));
+        }
+        w.ready_valid = true;
+        Ok(())
     }
     fn admit(&mut self, token: &HoldToken, request: &DownloadReservation) -> Result<()> {
         let mut w = self.0.lock().unwrap();
@@ -302,6 +526,9 @@ impl Fixture {
             requests: tx,
             stop: Arc::new(AtomicBool::new(false)),
             shared: Arc::new(Mutex::new(Shared {
+                installation: None,
+                refresh_ready: false,
+                selecting: false,
                 status: Status {
                     phase: Phase::Idle,
                     reason: None,
@@ -804,6 +1031,78 @@ fn runtime_channel_change_and_network_epoch_loss_cancel_before_releasing() {
 }
 
 #[test]
+fn runtime_blocked_payload_flush_retains_ownership_and_settles_without_restart() {
+    for failure in ["none", "stale-observation", "renewal"] {
+        let mut f = Fixture::new();
+        let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+        let (resume_tx, resume_rx) = mpsc::sync_channel(1);
+        f.fake.edit(|w| {
+            w.work = Work::Flush;
+            w.flush = Some((entered_tx, resume_rx));
+        });
+        f.step();
+        entered_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+        f.step(); // Publish full payload receipt before the storage stall.
+        let next_ms = f.handle.status().unwrap().schedule.unwrap().next_ms;
+        f.fake.edit(|w| {
+            w.ms += 30_000;
+            w.network_stale = failure == "stale-observation";
+            w.fail_renew = failure == "renewal";
+        });
+        f.step();
+        let during = f.handle.status().unwrap();
+        assert_eq!(during.progress.unwrap().bytes, 10);
+        assert_eq!(
+            during.phase,
+            if failure == "none" {
+                Phase::Downloading
+            } else {
+                Phase::Stopping
+            },
+            "{failure}"
+        );
+        assert!(f.fake.0.lock().unwrap().running);
+        assert_eq!(f.fake.0.lock().unwrap().holds.len(), 2);
+        assert!(!f.fake.0.lock().unwrap().trace.contains(&"released"));
+
+        // Restored observations cannot revive a cancelled attempt while its
+        // original storage write is still outstanding.
+        f.fake.edit(|w| {
+            w.ms += 30_000;
+            w.network_stale = false;
+            w.fail_renew = false;
+        });
+        f.step();
+        resume_tx.send(()).unwrap();
+        f.until(|f| f.runner.job.is_none());
+        let after = f.handle.status().unwrap();
+        assert_eq!(after.phase, Phase::Idle, "{failure}");
+        assert!(after.ready.is_none());
+        let schedule = after.schedule.unwrap();
+        assert!(schedule.active.is_none());
+        assert_eq!(schedule.next_ms, next_ms);
+        assert_eq!(
+            schedule.completion,
+            Some(if failure == "none" {
+                Completion::NoCandidate
+            } else {
+                Completion::Cancelled
+            }),
+            "{failure}"
+        );
+        f.step();
+        let world = f.fake.0.lock().unwrap();
+        assert_eq!(world.sessions, 1);
+        assert_eq!(world.holds.len(), 1);
+        assert!(world.holds.contains_key("other-owner"));
+        assert_eq!(
+            &world.trace[world.trace.len() - 2..],
+            &["io-finished", "released"]
+        );
+    }
+}
+
+#[test]
 fn runtime_renewals_never_extend_the_thirty_minute_total() {
     let mut f = Fixture::new();
     f.fake.edit(|w| w.work = Work::Wait);
@@ -857,6 +1156,34 @@ fn runtime_preparation_admission_and_network_failures_wait_for_next_daily_opport
         assert_eq!(f.fake.0.lock().unwrap().holds.len(), 1);
         assert!(f.handle.status().unwrap().reason.is_some());
     }
+}
+
+#[test]
+fn suspended_network_fails_admission_and_names_the_suspension() {
+    let mut f = Fixture::new();
+    f.fake.edit(|w| {
+        w.partial = false;
+        w.suspended = Some(network_controller::Suspension::ProfilesChanged);
+    });
+    f.step();
+    f.until(|f| f.runner.job.is_none());
+    let status = f.handle.status().unwrap();
+    assert_eq!(status.reason, Some(Reason::NetworkUnavailable));
+    assert_eq!(
+        status.schedule.unwrap().completion,
+        Some(Completion::Failed)
+    );
+    let ms = {
+        let w = f.fake.0.lock().unwrap();
+        assert_eq!(w.prepares, 1);
+        w.ms
+    };
+    // Release the world lock first; the fake's network read takes it again.
+    let snapshot = f.fake.network(&clock(ms)).unwrap();
+    assert_eq!(
+        policy_refusal(&snapshot),
+        "network control is suspended (ProfilesChanged)"
+    );
 }
 
 #[test]

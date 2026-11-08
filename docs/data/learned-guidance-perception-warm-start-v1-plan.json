@@ -1,0 +1,69 @@
+{
+ "experiment": "recovery-guidance-perception-warm-start-v1",
+ "version": 1,
+ "created_utc": "2026-10-19T03:55:59.710614+00:00",
+ "question": "Do networks that read the perception blocks, warm-started from dense parents, fly every known case exactly as their parents do?",
+ "prior_directory": "/home/data/workspace/space-wars3/data/training-experiments/recovery-guidance-time-ranking-v1-20261018",
+ "prior_source_freeze_sha256": "2a9011e312a78d597d98151d5d9ce2d16eccc9b2dc40e798eb24df8ce97c60a8",
+ "prior_results_sha256": "ef5ab63de267866a7f894dbc7fff0514d859a8f1d4c90292c2791442c3940c71",
+ "inputs": {
+  "inputs.json": "6f9c932fda211ab79ce930f52d67ac2bfd4fd07ae7610cdc387665a36ed3f829",
+  "base-plan.json": "3919c9eca778e457b7273bbd6db75c56ca5d940acf5d9cf638ab8a303090461d",
+  "candidate.json": "5088139d6c09f0787bd0785865eb1f76dd3fdd3eebe869adf4a0f87ce5ab8097",
+  "time-final.json": "7951cc9a0505d06a0b69e8620476a589fa87e493a5290194c1fac4553e6422e4",
+  "time-selection.json": "b337f619d5b80b765a938f3ba6596ef2c3c3c1322c73623f0aa2b96e205aa3eb",
+  "training-episodes.json": "ea9c5bd11f5c8f4a0814aa8180941cfcd68ffa416e569c6de0daf62a5babcd4b",
+  "excluded-episodes.json": "7b434bfdef6f9c2b079276e00aa183733275a3ee42e7fef937a70b5b35f79317",
+  "precision-candidate.json": "f283aeb9cb4a650e73d6e11be56c93bea1801db80b531a01a6becfbdc940804a",
+  "precision-time-final.json": "f3b06da4e4a2f0671175dc52c88e6b676b54c94458b1cd6cf640e6dcd4983b48"
+ },
+ "parents": {
+  "candidate": {
+   "file": "candidate.json",
+   "sha256": "5088139d6c09f0787bd0785865eb1f76dd3fdd3eebe869adf4a0f87ce5ab8097",
+   "genome": "e0f25b68492df8d1a2e334b2b30da2a5fa8a45bfde8d7dd674cb7ee655c46de1",
+   "recorded": "candidate",
+   "precision": "precision-candidate.json",
+   "warm_start_seed": 1
+  },
+  "time-final": {
+   "file": "time-final.json",
+   "sha256": "7951cc9a0505d06a0b69e8620476a589fa87e493a5290194c1fac4553e6422e4",
+   "genome": "e03d3e2900722539e1a05838c4134a4b01bc33451582e795c37f53b502885b42",
+   "recorded": "time-final",
+   "precision": "precision-time-final.json",
+   "warm_start_seed": 2
+  }
+ },
+ "observation": {
+  "name": "arrival_perception_v1",
+  "inputs": 225,
+  "body_slots": 8,
+  "body_values": 11,
+  "arcs": 16,
+  "arc_values": 8,
+  "fill_range": 400.0,
+  "threat_seconds": 2.0,
+  "distance_transform": "100 / (100 + distance)",
+  "speed_transform": "speed / (|speed| + 70)"
+ },
+ "warm_start": {
+  "encoder_width": 4,
+  "initial_scale": 0.5,
+  "parameters": 255,
+  "rule": "The trunk is the parent network, with zero weights for the eight pooled summaries. Each encoder is one tanh layer of width 4 with deterministic uniform weights and biases in +/-0.5."
+ },
+ "sets": {
+  "training": 464,
+  "excluded": 18,
+  "precision": 157
+ },
+ "comparison": "Each parent and its child fly every set with the copied runners. The parent's episodes must equal the time-ranking evaluation's records, the child's episodes must equal the same records, and every child decision must have the same raw output bits as the parent's. Precision records omit traces and take the current runtime, as the time-ranking preflight normalized them; the child's brain fields name the child.",
+ "pass": "Both children reproduce their parents on all 464 training and 157 precision cases, the 621 known cases, and on the 18 excluded known approaches.",
+ "cost": {
+  "sources": 32,
+  "repetitions": 2000,
+  "measure": "Single-threaded time per call on the first 32 training starts: reading the bodies, sensing and encoding, and inference by the child and the parent."
+ },
+ "production_controls_changed": false
+}

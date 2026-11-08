@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-mixed-duration-v1-20261023",
+  "kind": "matched 128 versus 256 training updates under candidate mixed evaluation",
+  "completed_at_utc": "2026-10-24T06:36:27.937675+00:00",
+  "source_file_count": 1528,
+  "source_archive_sha256": "f836afd35f61f383089a11bef3cad3847f7b10737bd43b1107058a6ed175779e",
+  "runtime_sha256": "e39a1c0b7e06c044ba764729e890f871872b70d248a07eae5fe025e80b724e2a",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "updates": 256,
+  "training_ticks": 786432,
+  "evaluation_ticks": 426044,
+  "reused_baseline_ticks": 177917,
+  "new_checkpoints": 771,
+  "new_evaluation_episodes": 384,
+  "gates": {
+    "all_runs_completed": true,
+    "learning_evidence": true,
+    "scoped_progression": false,
+    "duration_benefit": false
+  },
+  "final_successes": {
+    "17": 38,
+    "29": 40,
+    "43": 6
+  },
+  "confirmation_used": false,
+  "general_flight_claim": false,
+  "validation": {
+    "new_report_tests": 6,
+    "unchanged_production_tests_reused": 52,
+    "matched_training_state_updates": [
+      0,
+      128
+    ],
+    "raw_rust_python_parity_fixtures": 48,
+    "maximum_abs_output_error": 1.9073486328125e-06,
+    "copied_parent_inputs_unchanged": 405,
+    "prior_manifests_unchanged": 18,
+    "compile_whitespace": "passed"
+  },
+  "retained_file_count": 2517,
+  "retained_bytes_excluding_manifest": 3580242448,
+  "limitations": [
+    "Repeated development starts; no independent confirmation or broader-navigation qualification.",
+    "Only training duration changed; this does not compare alternative reward/architecture/exploration recipes.",
+    "Native gameplay mixed decoding is not implemented.",
+    "Local retention is not off-machine backup; external dependency/toolchain binaries excluded."
+  ],
+  "archive_path": "data/training-experiments/learned-flight-mixed-duration-v1-20261023",
+  "manifest_sha256": "121e63f3083e0a302e15211e0f8f3ae54a310912c56757a4ef7a970f40faa7f3",
+  "compact_results_sha256": "c5d401361bdd30b352e015c8497dbe6d8e37d402923d7746b2a44778e3a5f762",
+  "report_sha256": "d48882a863730decbf33c6ba388bb39a8193ea973d52cedde950dc3f6d222c84"
+}

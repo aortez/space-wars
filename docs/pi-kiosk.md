@@ -497,12 +497,12 @@ noninteractive reader, inheriting output and signals; it neither buffers the
 log nor contacts the application's control socket. It works while the app is
 hung, stopped, or restarting. SSH access to the device is still required.
 
-There is no new log store, polling loop, or per-frame logging. Existing
-journald rotation/retention remains unchanged: this image uses a volatile
-journal, so capture logs before rebooting. Startup and launch logs identify the
-renderer. Renderer selections, fallbacks, Clock setting changes, previews,
-pauses, and restarts provide a small event trail. User-provided marquee text
-is not included in settings-change records.
+Startup and launch logs identify the renderer. Renderer selections, fallbacks,
+Clock setting changes, previews, pauses, and restarts provide a small event
+trail. User-provided marquee text is not included in settings-change records.
+The image's [persistent system journal](#persistent-system-journal) retains
+previous boots for owner diagnostics; this restricted application reader still
+shows only the current boot.
 
 Installing the helper and its sudo rule requires **one normal rootfs update**;
 `--fast` cannot add them. They are included in the fast-update compatibility
@@ -514,6 +514,82 @@ mode the kiosk migrates a saved vector preference to raster and fixes the
 Renderer row to raster. GPU mode supports either adapter; the `raster` choice
 at 1× uses direct geometry by default, while native-video scenarios retain
 their own path. Desktop and CPU-only headless benchmarks are unchanged.
+
+### Persistent system journal
+
+Images containing `spacewars-journal` keep the system journal in the root-owned
+`/data/spacewars-journal` directory, separate from kiosk-owned settings and the
+A/B root filesystems. Early boot logs stay in RAM. The journal flush service
+requires `/data` and the journal bind mount to succeed before copying those
+entries to disk. `/var/log` links into the `/var/volatile` tmpfs, and
+`systemd-tmpfiles` creates `/var/volatile/log` only after the flush, so
+preparation creates that directory itself. If preparation fails, journald
+continues using its bounded RAM store. On orderly shutdown it syncs and
+relinquishes the persistent store before unmounting it.
+
+Each slot binds the **same flat store** at `/var/log/journal/<current-machine-id>`.
+The system machine ID is unchanged. Journald opens a new file when the previous
+writer had a different ID, preserving the old file for reading and rotation.
+This gives both slots one retention budget instead of accumulating a separate
+budget for every root image. `SplitMode=none` keeps user messages in the system
+journal under the same budget; it grants no additional journal access to the
+kiosk account.
+
+| Setting | Persistent disk journal | Early-boot / fallback RAM journal |
+| --- | --- | --- |
+| Maximum use | 128 MiB | 16 MiB |
+| Keep free | 256 MiB | 16 MiB |
+| Maximum file size | 8 MiB | 2 MiB |
+| Maximum files | 32 | 16 |
+
+Compression is enabled. Only the size and file-count limits remove history,
+so busy devices drop old history sooner. Each boot starts at the image's
+build-time clock until timesyncd or NTP sets it. Time-based rotation and
+retention would therefore delete every boot's first file by its old start
+time, which is how generation 19 lost each boot's early entries. These are
+[journald retention limits](https://www.freedesktop.org/software/systemd/man/255/journald.conf.html),
+not a filesystem quota: rotation removes archived files and active-file
+allocation can temporarily exceed a target. Normal-priority messages sync
+every 30 seconds, so a sudden power loss or watchdog reset can lose the latest
+unsynced tail. Retention is not a backup.
+
+Use the owner account for previous boots and system-wide diagnostics. Selecting
+the directory explicitly includes the other slot's machine ID:
+
+```sh
+ssh swadmin@sw-picade-2.local sudo journalctl --directory=/data/spacewars-journal --list-boots --no-pager
+ssh swadmin@sw-picade-2.local sudo journalctl --directory=/data/spacewars-journal --boot=-1 --unit=spacewars-kiosk.service --no-pager
+ssh swadmin@sw-picade-2.local sudo journalctl --directory=/data/spacewars-journal --disk-usage
+```
+
+For an older failed trial, use its boot ID from `--list-boots` with
+`--boot=<boot-id>`; `-1` means the most recent retained previous boot. A rollback
+to an image predating this feature does not erase the directory: the same
+explicit-directory commands can read it, but that older image will not persist
+its own new logs. Existing volatile logs from boots before installation cannot
+be recovered.
+
+Installation requires a normal rootfs image update; `--fast` does not install
+the journal configuration or units. No kernel or boot partition change is
+needed. Check `systemctl status spacewars-journal systemd-journal-flush` and
+`grep /journal/ /proc/self/mountinfo` when diagnosing missing persistent logs.
+
+`yocto/tests/journal_test.py` runs real journald in disposable mount/PID
+namespaces. It covers early RAM logging and flush, clean restarts, changed slot
+machine IDs, a synced abrupt daemon kill followed by rollback, previous-boot
+queries, journal integrity, and rotation after flooding both slots. Boot IDs
+are simulated; this does not replace a real image boot and device reboot/trial
+qualification. The fixture never starts or stops the host's journal service.
+Preparation runs against an empty `/var/volatile` tmpfs, as on the device.
+Generation 19's first device boots found that an earlier fixture had created
+`/var/volatile/log` in advance, which hid the failure. The six journal tests
+passed on systemd 259.5 (workstation). The combined-slot flood fixture submits over 384 MiB of
+unique message payloads, checks usage at each batch against 128 MiB, and
+verifies that old entries expire while the latest synced marker remains.
+With the preparation fix, the full Yocto helper suite ran 71 Node tests and 120
+Python tests, with one pre-existing skip in each suite. Generation 19 was the
+first device boot of this feature. The fix still needs an image build and a
+device trial that reads the trial boot back from the store.
 
 ### Fast application updates
 
@@ -566,6 +642,11 @@ during an update. Normal A/B updates replace fast-installed binaries in their
 destination slot. If SSH is lost during installation, reconnect and check
 `spacewars-cli status`/service health before retrying; do not assume success
 from a dropped connection.
+
+For OS, service or device-manager changes, a unit that allows them takes a
+[development image install](ota-development-installs.md) instead:
+`./update.sh --development --target sw-picade-2.local` writes the full image to
+the inactive slot and boots it as a trial that returns automatically on failure.
 
 After boot, [App Settings → Network](network-setup.md) can scan and connect using
 the cabinet, controller or touch input. Its timed trial restores the previous

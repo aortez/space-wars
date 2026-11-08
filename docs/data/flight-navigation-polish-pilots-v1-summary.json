@@ -1,0 +1,278 @@
+{
+ "round-1-gaussian-heading": [
+  {
+   "cell": "anchor0-seed-17",
+   "seed": 17,
+   "anchor": 0.0,
+   "anchor_terms": "command",
+   "heading_sampler": "gaussian",
+   "updates": 120,
+   "initial_passed": 72,
+   "final_passed": 65,
+   "held_out_passed": 65,
+   "initial_ticks": {
+    "clear": 668.1666666666666,
+    "obstructed": 863.875,
+    "altered": 735.4166666666666
+   },
+   "final_ticks": {
+    "clear": 788.625,
+    "obstructed": 1150.6315789473683,
+    "altered": 920.6363636363636
+   },
+   "held_out_ticks": {
+    "clear": 822.7083333333334,
+    "obstructed": 1059.4736842105262,
+    "altered": 911.9090909090909
+   },
+   "training_outcomes": {
+    "obstructed/collision": 84,
+    "clear/success": 414,
+    "obstructed/success": 337,
+    "altered/success": 393,
+    "obstructed/deadline": 15,
+    "altered/deadline": 8,
+    "altered/collision": 27,
+    "clear/deadline": 16
+   },
+   "physical_failures": 111,
+   "kl_early_stops": 119,
+   "seconds": 814
+  },
+  {
+   "cell": "anchor0-seed-29",
+   "seed": 29,
+   "anchor": 0.0,
+   "anchor_terms": "command",
+   "heading_sampler": "gaussian",
+   "updates": 120,
+   "initial_passed": 72,
+   "final_passed": 23,
+   "held_out_passed": 18,
+   "initial_ticks": {
+    "clear": 668.1666666666666,
+    "obstructed": 863.875,
+    "altered": 735.4166666666666
+   },
+   "final_ticks": {
+    "clear": 1059.8333333333333,
+    "obstructed": 1042.7142857142858,
+    "altered": 1228.75
+   },
+   "held_out_ticks": {
+    "clear": 1154.8333333333333,
+    "obstructed": 782.6666666666666,
+    "altered": 1225.3333333333333
+   },
+   "training_outcomes": {
+    "obstructed/collision": 34,
+    "altered/collision": 16,
+    "clear/success": 330,
+    "altered/success": 300,
+    "obstructed/success": 289,
+    "altered/deadline": 61,
+    "obstructed/deadline": 56,
+    "clear/deadline": 47
+   },
+   "physical_failures": 50,
+   "kl_early_stops": 120,
+   "seconds": 847
+  },
+  {
+   "cell": "anchor1-seed-17",
+   "seed": 17,
+   "anchor": 1.0,
+   "anchor_terms": "command",
+   "heading_sampler": "gaussian",
+   "updates": 120,
+   "initial_passed": 72,
+   "final_passed": 65,
+   "held_out_passed": 66,
+   "initial_ticks": {
+    "clear": 668.1666666666666,
+    "obstructed": 863.875,
+    "altered": 735.4166666666666
+   },
+   "final_ticks": {
+    "clear": 939.4782608695652,
+    "obstructed": 1183.909090909091,
+    "altered": 1002.0
+   },
+   "held_out_ticks": {
+    "clear": 989.5652173913044,
+    "obstructed": 1142.0,
+    "altered": 866.2608695652174
+   },
+   "training_outcomes": {
+    "obstructed/collision": 18,
+    "clear/success": 422,
+    "obstructed/success": 399,
+    "altered/success": 415,
+    "obstructed/deadline": 7,
+    "altered/collision": 7,
+    "clear/deadline": 2,
+    "altered/deadline": 1
+   },
+   "physical_failures": 25,
+   "kl_early_stops": 119,
+   "seconds": 1325
+  },
+  {
+   "cell": "anchor1-seed-29",
+   "seed": 29,
+   "anchor": 1.0,
+   "anchor_terms": "command",
+   "heading_sampler": "gaussian",
+   "updates": 120,
+   "initial_passed": 72,
+   "final_passed": 67,
+   "held_out_passed": 66,
+   "initial_ticks": {
+    "clear": 668.1666666666666,
+    "obstructed": 863.875,
+    "altered": 735.4166666666666
+   },
+   "final_ticks": {
+    "clear": 800.6521739130435,
+    "obstructed": 967.4285714285714,
+    "altered": 775.3913043478261
+   },
+   "held_out_ticks": {
+    "clear": 843.1666666666666,
+    "obstructed": 992.0,
+    "altered": 743.0434782608696
+   },
+   "training_outcomes": {
+    "obstructed/collision": 24,
+    "altered/collision": 9,
+    "clear/success": 409,
+    "altered/success": 389,
+    "obstructed/success": 372,
+    "altered/deadline": 18,
+    "obstructed/deadline": 21,
+    "clear/deadline": 3
+   },
+   "physical_failures": 33,
+   "kl_early_stops": 119,
+   "seconds": 1304
+  }
+ ],
+ "round-2-speed-only": [
+  {
+   "cell": "speed-anchor0-seed-17",
+   "seed": 17,
+   "anchor": 0.0,
+   "anchor_terms": "heading",
+   "heading_sampler": "deterministic",
+   "updates": 120,
+   "initial_passed": 72,
+   "final_passed": 0,
+   "held_out_passed": 0,
+   "initial_ticks": {
+    "clear": 668.1666666666666,
+    "obstructed": 863.875,
+    "altered": 735.4166666666666
+   },
+   "final_ticks": {
+    "clear": null,
+    "obstructed": null,
+    "altered": null
+   },
+   "held_out_ticks": {
+    "clear": null,
+    "obstructed": null,
+    "altered": null
+   },
+   "training_outcomes": {
+    "obstructed/collision": 16,
+    "clear/success": 122,
+    "altered/success": 107,
+    "obstructed/success": 87,
+    "obstructed/deadline": 168,
+    "clear/deadline": 144,
+    "altered/deadline": 152,
+    "altered/collision": 9
+   },
+   "physical_failures": 25,
+   "kl_early_stops": 69,
+   "seconds": 595
+  },
+  {
+   "cell": "speed-anchor1-seed-17",
+   "seed": 17,
+   "anchor": 1.0,
+   "anchor_terms": "heading",
+   "heading_sampler": "deterministic",
+   "updates": 120,
+   "initial_passed": 72,
+   "final_passed": 70,
+   "held_out_passed": 68,
+   "initial_ticks": {
+    "clear": 668.1666666666666,
+    "obstructed": 863.875,
+    "altered": 735.4166666666666
+   },
+   "final_ticks": {
+    "clear": 971.8333333333334,
+    "obstructed": 909.4545454545455,
+    "altered": 799.7916666666666
+   },
+   "held_out_ticks": {
+    "clear": 925.7727272727273,
+    "obstructed": 914.1818181818181,
+    "altered": 780.125
+   },
+   "training_outcomes": {
+    "obstructed/collision": 11,
+    "clear/success": 432,
+    "altered/success": 432,
+    "obstructed/success": 422,
+    "obstructed/deadline": 8,
+    "altered/deadline": 4,
+    "clear/deadline": 4,
+    "altered/collision": 2
+   },
+   "physical_failures": 13,
+   "kl_early_stops": 42,
+   "seconds": 993
+  },
+  {
+   "cell": "speed-anchor1-seed-29",
+   "seed": 29,
+   "anchor": 1.0,
+   "anchor_terms": "heading",
+   "heading_sampler": "deterministic",
+   "updates": 120,
+   "initial_passed": 72,
+   "final_passed": 39,
+   "held_out_passed": 41,
+   "initial_ticks": {
+    "clear": 668.1666666666666,
+    "obstructed": 863.875,
+    "altered": 735.4166666666666
+   },
+   "final_ticks": {
+    "clear": 1218.3076923076924,
+    "obstructed": 1058.6923076923076,
+    "altered": 1004.6923076923077
+   },
+   "held_out_ticks": {
+    "clear": 1288.5,
+    "obstructed": 1087.0588235294117,
+    "altered": 974.6875
+   },
+   "training_outcomes": {
+    "obstructed/collision": 7,
+    "clear/success": 422,
+    "altered/success": 431,
+    "obstructed/success": 418,
+    "altered/deadline": 2,
+    "obstructed/deadline": 5,
+    "clear/deadline": 7
+   },
+   "physical_failures": 7,
+   "kl_early_stops": 35,
+   "seconds": 1020
+  }
+ ]
+}

@@ -1,0 +1,327 @@
+[
+  {
+    "start": "fresh",
+    "recipe": "current",
+    "seed": 17,
+    "initial_passed": 0,
+    "final_passed": 0,
+    "final_tracking": "0/24",
+    "initial_slope": 0.0019221613183617592,
+    "final_slope": -0.026388713158667088,
+    "initial_bias": -19.18121545575559,
+    "final_bias": -20.706767961382866,
+    "track_outcomes": {
+      "deadline": 69
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 42
+  },
+  {
+    "start": "fresh",
+    "recipe": "current",
+    "seed": 29,
+    "initial_passed": 0,
+    "final_passed": 0,
+    "final_tracking": "0/24",
+    "initial_slope": -0.0014507444575428963,
+    "final_slope": 0.0036451825872063637,
+    "initial_bias": -19.287223191931844,
+    "final_bias": -16.245977748185396,
+    "track_outcomes": {
+      "deadline": 69
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 42
+  },
+  {
+    "start": "fresh",
+    "recipe": "current",
+    "seed": 43,
+    "initial_passed": 32,
+    "final_passed": 0,
+    "final_tracking": "0/24",
+    "initial_slope": -0.002705361694097519,
+    "final_slope": 0.07156731560826302,
+    "initial_bias": -19.18874230235815,
+    "final_bias": -19.707651436328888,
+    "track_outcomes": {
+      "deadline": 69
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 42
+  },
+  {
+    "start": "fresh",
+    "recipe": "repeat",
+    "seed": 17,
+    "initial_passed": 0,
+    "final_passed": 0,
+    "final_tracking": "0/24",
+    "initial_slope": 0.0019221613183617592,
+    "final_slope": 0.05374508909881115,
+    "initial_bias": -19.18121545575559,
+    "final_bias": -18.703289180994034,
+    "track_outcomes": {
+      "deadline": 429
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 74
+  },
+  {
+    "start": "fresh",
+    "recipe": "repeat",
+    "seed": 29,
+    "initial_passed": 0,
+    "final_passed": 50,
+    "final_tracking": "0/24",
+    "initial_slope": -0.0014507444575428963,
+    "final_slope": 0.021343082189559937,
+    "initial_bias": -19.287223191931844,
+    "final_bias": -18.562859408557415,
+    "track_outcomes": {
+      "deadline": 429
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 74
+  },
+  {
+    "start": "fresh",
+    "recipe": "repeat",
+    "seed": 43,
+    "initial_passed": 32,
+    "final_passed": 0,
+    "final_tracking": "0/24",
+    "initial_slope": -0.002705361694097519,
+    "final_slope": 0.0036705704405903816,
+    "initial_bias": -19.18874230235815,
+    "final_bias": -14.306730264797807,
+    "track_outcomes": {
+      "deadline": 429
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 74
+  },
+  {
+    "start": "fresh",
+    "recipe": "steep",
+    "seed": 17,
+    "initial_passed": 0,
+    "final_passed": 0,
+    "final_tracking": "0/24",
+    "initial_slope": 0.0019221613183617592,
+    "final_slope": -0.00689641572535038,
+    "initial_bias": -19.18121545575559,
+    "final_bias": -21.64962080307305,
+    "track_outcomes": {
+      "deadline": 69
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 43
+  },
+  {
+    "start": "fresh",
+    "recipe": "steep",
+    "seed": 29,
+    "initial_passed": 0,
+    "final_passed": 0,
+    "final_tracking": "0/24",
+    "initial_slope": -0.0014507444575428963,
+    "final_slope": -0.021488345228135586,
+    "initial_bias": -19.287223191931844,
+    "final_bias": -16.060453290119767,
+    "track_outcomes": {
+      "deadline": 69
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 43
+  },
+  {
+    "start": "fresh",
+    "recipe": "steep",
+    "seed": 43,
+    "initial_passed": 32,
+    "final_passed": 0,
+    "final_tracking": "0/24",
+    "initial_slope": -0.002705361694097519,
+    "final_slope": 0.07608551997691393,
+    "initial_bias": -19.18874230235815,
+    "final_bias": -20.642159190028906,
+    "track_outcomes": {
+      "deadline": 69
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 0,
+    "seconds": 43
+  },
+  {
+    "start": "warm",
+    "recipe": "current",
+    "seed": 17,
+    "initial_passed": 104,
+    "final_passed": 104,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -4.548145610408483,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": -0.09150104131549597,
+    "track_outcomes": {
+      "success": 78
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 54,
+    "seconds": 44
+  },
+  {
+    "start": "warm",
+    "recipe": "current",
+    "seed": 29,
+    "initial_passed": 104,
+    "final_passed": 89,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -4.720967242938059,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": -0.19074274459853768,
+    "track_outcomes": {
+      "success": 78
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 51,
+    "seconds": 44
+  },
+  {
+    "start": "warm",
+    "recipe": "current",
+    "seed": 43,
+    "initial_passed": 104,
+    "final_passed": 104,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -6.716044452327878,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": -0.9302601381205022,
+    "track_outcomes": {
+      "success": 78
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 55,
+    "seconds": 43
+  },
+  {
+    "start": "warm",
+    "recipe": "repeat",
+    "seed": 17,
+    "initial_passed": 104,
+    "final_passed": 104,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -4.36945005153575,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": 0.2856336021795869,
+    "track_outcomes": {
+      "success": 471
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 71,
+    "seconds": 90
+  },
+  {
+    "start": "warm",
+    "recipe": "repeat",
+    "seed": 29,
+    "initial_passed": 104,
+    "final_passed": 104,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -6.293881535293622,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": 0.11841643135994673,
+    "track_outcomes": {
+      "success": 471
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 71,
+    "seconds": 95
+  },
+  {
+    "start": "warm",
+    "recipe": "repeat",
+    "seed": 43,
+    "initial_passed": 104,
+    "final_passed": 104,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -10.379160864193864,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": -3.7101088726194575,
+    "track_outcomes": {
+      "success": 432,
+      "deadline": 39
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 74,
+    "seconds": 99
+  },
+  {
+    "start": "warm",
+    "recipe": "steep",
+    "seed": 17,
+    "initial_passed": 104,
+    "final_passed": 104,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -5.166852919801386,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": 0.06359162973240018,
+    "track_outcomes": {
+      "success": 78
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 47,
+    "seconds": 44
+  },
+  {
+    "start": "warm",
+    "recipe": "steep",
+    "seed": 29,
+    "initial_passed": 104,
+    "final_passed": 104,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -6.087082218637079,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": -0.35831958753988147,
+    "track_outcomes": {
+      "success": 78
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 56,
+    "seconds": 44
+  },
+  {
+    "start": "warm",
+    "recipe": "steep",
+    "seed": 43,
+    "initial_passed": 104,
+    "final_passed": 86,
+    "final_tracking": "24/24",
+    "initial_slope": -4.231568863240227,
+    "final_slope": -5.081292800623487,
+    "initial_bias": -0.018567522056400776,
+    "final_bias": 0.0870115333236754,
+    "track_outcomes": {
+      "success": 78
+    },
+    "physical_failures": 0,
+    "kl_early_stops": 51,
+    "seconds": 43
+  }
+]

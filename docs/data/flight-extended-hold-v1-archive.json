@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-extended-hold-v1-20261024",
+  "kind": "extended paired first-exit hold training experiment",
+  "completed_at_utc": "2026-10-24T22:13:16.363644+00:00",
+  "source_file_count": 1547,
+  "source_archive_sha256": "8ad8114eac25fbe46c95ab2863f0324d4f125848676de44dcd179ad28181a05f",
+  "runtime_sha256": "85d6f22d5625710d0b8e20dfa6f37b34df54c1e8ea748df897a6450ac3a496be",
+  "learner_seeds": [
+    17,
+    29,
+    43
+  ],
+  "arms": [
+    "long",
+    "early"
+  ],
+  "updates_per_seed_arm": 128,
+  "checkpoint_count": 782,
+  "policy_export_count": 20,
+  "training_ticks": 786432,
+  "evaluation_ticks": 177930,
+  "preflight_training_ticks": 6144,
+  "parity_fixtures": 192,
+  "preflight_parity_fixtures": 32,
+  "gates": {
+    "long": {
+      "learning_evidence": false,
+      "scoped_hold": false
+    },
+    "early": {
+      "learning_evidence": true,
+      "scoped_hold": true
+    }
+  },
+  "paired": [
+    {
+      "seed": 17,
+      "immediate_hold_difference": 16
+    },
+    {
+      "seed": 29,
+      "immediate_hold_difference": 16
+    },
+    {
+      "seed": 43,
+      "immediate_hold_difference": 16
+    }
+  ],
+  "early_hold_improvement": true,
+  "confirmation_used": false,
+  "model_promoted": false,
+  "approach_or_navigation_claim": false,
+  "validation": {
+    "source_archive_and_workspace_verified": true,
+    "source_files": 1547,
+    "frozen_specification_configs_runtime_unchanged": true,
+    "copied_parent_inputs_unchanged": 17,
+    "previous_manifests_unchanged": 28,
+    "python_tests": 22,
+    "unchanged_native_baseline_passed": 418,
+    "unchanged_native_baseline_ignored": 2,
+    "native_python_endpoint_comparisons": 192,
+    "preflight_native_parity_comparisons": 32,
+    "exact_preflight_resume_both_arms": true,
+    "exact_preflight_main_updates": [
+      0,
+      2
+    ],
+    "matched_initial_parameters_and_starts": true,
+    "all_six_parent32_states_exact_except_update_cap": true,
+    "long_arm_parent128_model_optimizer_rng_exact": true,
+    "all_physical_outcomes_and_complete_dwell_reconstructed": true,
+    "budgets_passed": true,
+    "compile_whitespace": "passed",
+    "all_12_process_exits_zero": true
+  },
+  "retained_file_count": 79904,
+  "retained_bytes_excluding_manifest": 4282964998,
+  "archive_path": "data/training-experiments/learned-flight-extended-hold-v1-20261024",
+  "manifest_sha256": "3cea68e2bef9420ea0cfe7303191a5ae16e35fec76d49416c86f6345316bfd15",
+  "report_sha256": "c130e219415de03d6dc9ddbec1c93d79c13aabb148a1bb080277cfb7d9382bbd",
+  "results_sha256": "ea1fa019c3395d2f0e2d4a5731c2c6abd17ffa729d777048a6b38c786e2a4c85"
+}

@@ -1,0 +1,21 @@
+{
+  "learner_seed": 17,
+  "train_task_seed": 3110001,
+  "development_task_seed": 3110002,
+  "train_tasks_per_family": 4,
+  "eval_tasks_per_family": 2,
+  "updates": 8,
+  "rollout_ticks": 256,
+  "epochs": 4,
+  "minibatch": 256,
+  "learning_rate": 0.0003,
+  "gamma": 0.9995,
+  "lambda": 0.98,
+  "clip": 0.2,
+  "value_weight": 0.5,
+  "entropy_weight": 0.01,
+  "grad_clip": 0.5,
+  "target_kl": 0.03,
+  "wall_seconds": 600,
+  "action_contract": "continuous-flight-v2"
+}

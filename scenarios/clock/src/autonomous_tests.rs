@@ -68,7 +68,8 @@ fn taking_control_of_a_wet_automatic_duck_preserves_rain_motion_and_its_clock() 
         state.phase_tick(),
         state.event_id(),
     );
-    let world = state.duck_visit.as_ref().unwrap().arena_world() as *const _;
+    let activity = engine_rapier::world::physics_activity();
+    let worlds = state.arena_accounting().worlds;
     state.toggle_player_duck(2);
     assert_eq!(state.duck_state(), None);
     let player = state.player_duck_state().unwrap();
@@ -85,9 +86,11 @@ fn taking_control_of_a_wet_automatic_duck_preserves_rain_motion_and_its_clock() 
         time
     );
     assert_eq!(
-        state.duck_visit.as_ref().unwrap().arena_world() as *const _,
-        world
+        engine_rapier::world::physics_activity(),
+        activity,
+        "the visit keeps its world"
     );
+    assert_eq!(state.arena_accounting().worlds, worlds, "the same arena");
 }
 
 #[test]
@@ -133,6 +136,8 @@ fn ordinary_demo_schedule_can_rain_on_an_existing_automatic_duck() {
         aquarium: false,
         cell_swap: false,
         grass: false,
+        slot_machine: false,
+        spider: false,
     };
     state.configure(settings);
     for _ in 0..800 {

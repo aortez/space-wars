@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "experiment_id": "learned-flight-sensor-v1-20261022",
+  "checkpoint": "C0",
+  "archive_path": "data/training-experiments/learned-flight-sensor-v1-20261022",
+  "viewer_path": "data/training-experiments/learned-flight-sensor-v1-20261022/inspection/index.html",
+  "manifest_sha256": "1d0232cf18305bcd70d2159c4da6de5ce19a01d6887e56fbbcd80bd32643930a",
+  "source_archive_sha256": "a6b640f5bf99770536caf1d5ccfca5d9a1771ecb4224470727d7ca20cc5551b6",
+  "runtime_sha256": "078a4b8d22d4a91159a75011153c3479a4ff9fe1de26ce8c9add60efd7cedeb9",
+  "report_sha256": "db8e782a7042ec9336923cfa8ce0f0d7313a94064b67a9eae820c819966522b7",
+  "git_head_at_archive": "d9f1ee9d725fcb797f1a5271bcf49043217e375f",
+  "working_tree_dirty": true,
+  "archived_at_utc": "2026-10-23T01:25:30.710437+00:00",
+  "source_file_count": 1459,
+  "validation": {
+    "original_report_and_snapshot_hashes": "passed",
+    "embedded_source_hashes": "passed",
+    "runtime_hash": "passed",
+    "source_archive_member_hashes": "passed",
+    "artifact_copy_hashes": "passed"
+  },
+  "limitations": [
+    "Archive-time working files, including untracked source. The report verifies four embedded source hashes and the preserved executable; the original run did not record a complete build-time source manifest.",
+    "crates/, scenarios/, vendor/, .cargo/, Cargo.toml, Cargo.lock and any rust-toolchain file; registry dependencies and system libraries are not bundled.",
+    "Local ignored data directory; survives target cleanup, not backed up off-machine."
+  ],
+  "kind": "retrospective-sensor-inspection-baseline"
+}

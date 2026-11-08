@@ -157,21 +157,27 @@ fn operate(
     )?)
     .map_err(|_| invalid("invalid canonical manifest text"))?;
     let manifest = BootManifest::parse(manifest_text.as_bytes(), inputs.image.boot_identity)?;
-    let derived = BootPlan::create(
+    let derived = BootPlan::derives(
+        &inputs.plan,
         &inputs.image,
         &manifest,
         &config,
         &profile,
         &BootCommandLine::parse(inputs.command_line_template.as_bytes())?,
-        &PlanRequest {
+        PlanRequest {
             board: Board::from_model(&runtime.physical.model)?,
             profile: runtime.profile.clone(),
             roots: runtime.roots()?,
             target: runtime.layout.active,
             trial_id: trial,
+            retained_initramfs: inputs
+                .binding
+                .original_boot_files
+                .get(crate::bootstrap::INITRAMFS)
+                .cloned(),
         },
     )?;
-    if derived != inputs.plan {
+    if !derived {
         return Err(invalid(
             "canonical plan differs from the actual board, profile or root pair",
         ));

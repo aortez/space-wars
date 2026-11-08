@@ -27,6 +27,9 @@ pub mod bootstrap;
 mod contract;
 #[cfg(target_os = "linux")]
 pub mod coordinator;
+pub mod development;
+#[cfg(target_os = "linux")]
+pub mod development_linux;
 #[cfg(target_os = "linux")]
 pub mod download;
 #[cfg(target_os = "linux")]
@@ -38,6 +41,8 @@ mod image_tools;
 pub mod install_linux;
 #[cfg(target_os = "linux")]
 pub mod install_lock;
+#[cfg(target_os = "linux")]
+pub mod native_install;
 #[cfg(target_os = "linux")]
 pub mod network_linux;
 #[cfg(target_os = "linux")]
@@ -54,6 +59,8 @@ mod watchdog_linux;
 #[cfg(target_os = "linux")]
 pub use watchdog_linux::{EarlyWatchdog, WatchdogCompletion};
 pub mod recovery;
+#[cfg(target_os = "linux")]
+mod recovery_admission;
 #[cfg(target_os = "linux")]
 pub mod recovery_linux;
 #[cfg(all(target_os = "linux", any(test, feature = "recovery-qualification")))]

@@ -608,6 +608,8 @@ enabled = true
                 aquarium: false,
                 cell_swap: false,
                 grass: false,
+                slot_machine: false,
+                spider: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -736,6 +738,8 @@ enabled = true
                         | engine_common::ClockEventKind::Aquarium
                         | engine_common::ClockEventKind::CellSwap
                         | engine_common::ClockEventKind::Grass
+                        | engine_common::ClockEventKind::SlotMachine
+                        | engine_common::ClockEventKind::Spider
                 )
             );
         }
@@ -762,6 +766,8 @@ enabled = true
                         | engine_common::ClockEventKind::Aquarium
                         | engine_common::ClockEventKind::CellSwap
                         | engine_common::ClockEventKind::Grass
+                        | engine_common::ClockEventKind::SlotMachine
+                        | engine_common::ClockEventKind::Spider
                 )
             );
         }
@@ -954,7 +960,7 @@ enabled = true
     #[test]
     fn legacy_player_selection_defaults_p1_to_human_and_new_bot_choices_roundtrip() {
         use engine_common::SpacewarsController::{
-            DestinationBot, Human, PlannerBot, RecoveryBot, RuleBot, ValueBot,
+            DestinationBot, Human, LearnedFlightBot, PlannerBot, RecoveryBot, RuleBot, ValueBot,
         };
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
@@ -968,9 +974,21 @@ enabled = true
         assert_eq!(DestinationBot.automatic_bot(), DestinationBot);
         assert_eq!(ValueBot.automatic_bot(), ValueBot);
         assert_eq!(RecoveryBot.automatic_bot(), RecoveryBot);
+        assert_eq!(LearnedFlightBot.automatic_bot(), LearnedFlightBot);
         loaded.spacewars.player_1_controller = ValueBot;
         loaded.spacewars.player_2_controller = RecoveryBot;
         save_settings(&loaded, &path).unwrap();
+        assert_eq!(
+            load_settings(&path).unwrap().settings.spacewars,
+            loaded.spacewars
+        );
+        loaded.spacewars.player_1_controller = LearnedFlightBot;
+        save_settings(&loaded, &path).unwrap();
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains("player_1_controller = \"learned-flight-bot\"")
+        );
         assert_eq!(
             load_settings(&path).unwrap().settings.spacewars,
             loaded.spacewars

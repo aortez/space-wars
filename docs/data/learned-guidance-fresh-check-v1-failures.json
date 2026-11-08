@@ -1,0 +1,4287 @@
+{
+  "runtime": "diagnostic_v1/linux/x86_64/e6998f2eae08ab91584dba81aca68c4eedb30c88df8c08cfc7fd8982b5d19af7",
+  "plan_sha256": "4a429f43c40f27bfb0331c1fa96006f0c99d4028802afc15141fae40b8b60d04",
+  "method": "Read-only inspection of frozen traces and endpoints. Climb boundary reconstructed in float64 as altitude < 70 + falling^2 / 50 from mission_pilot.rs; saved native decisions remain authoritative. No reset, training, fallback, or changed controller experiment.",
+  "cases": [
+    {
+      "case": {
+        "name": "validation-94000002-WeakAngular-p1",
+        "planet": 0,
+        "seat": 0,
+        "seed": 94000002,
+        "shape": "weak-angular",
+        "source_entry_distance": 34.57671356201172,
+        "source_relative_speed": 30.021879196166992,
+        "source_tick": 4367
+      },
+      "category": "sun",
+      "all_four_failed": true,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 4,
+          "brake_ticks": 4,
+          "thrust_ticks": 4,
+          "initial": {
+            "altitude": 119.08663879494725,
+            "target_relative_speed": 30.00729095150609,
+            "falling": 29.402011254223535,
+            "climb_boundary": 87.28956531586975,
+            "climb_margin": 31.797073479077497
+          },
+          "final": {
+            "altitude": 117.17593059627904,
+            "target_relative_speed": 28.38389094134951,
+            "falling": 28.239177840065025,
+            "climb_boundary": 85.9490233016564,
+            "climb_margin": 31.22690729462265
+          },
+          "first_applied": [
+            -0.9832585453987122,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.3174856901168823,
+            0.3540114760398865
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1197.842041015625,
+                "y": 1194.65283203125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 1,
+                "reason": null,
+                "tick": 849
+              },
+              {
+                "kind": "departed",
+                "planet": 1,
+                "reason": null,
+                "tick": 2215
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 4016
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 4016
+              }
+            ],
+            "frame_changes": 4,
+            "goal": "transfer",
+            "goal_since": 4016,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 4,
+          "brake_ticks": 4,
+          "thrust_ticks": 4,
+          "initial": {
+            "altitude": 119.08663879494725,
+            "target_relative_speed": 30.00729095150609,
+            "falling": 29.402011254223535,
+            "climb_boundary": 87.28956531586975,
+            "climb_margin": 31.797073479077497
+          },
+          "final": {
+            "altitude": 117.17593059627904,
+            "target_relative_speed": 28.38389094134951,
+            "falling": 28.239177840065025,
+            "climb_boundary": 85.9490233016564,
+            "climb_margin": 31.22690729462265
+          },
+          "first_applied": [
+            -0.9825832843780518,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.20321419835090637,
+            0.2204154133796692
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1197.842041015625,
+                "y": 1194.65283203125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 1,
+                "reason": null,
+                "tick": 849
+              },
+              {
+                "kind": "departed",
+                "planet": 1,
+                "reason": null,
+                "tick": 2215
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 4016
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 4016
+              }
+            ],
+            "frame_changes": 4,
+            "goal": "transfer",
+            "goal_since": 4016,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "host_preempted",
+          "ticks": 5,
+          "brake_ticks": 4,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.08663879494725,
+            "target_relative_speed": 30.00729095150609,
+            "falling": 29.402011254223535,
+            "climb_boundary": 87.28956531586975,
+            "climb_margin": 31.797073479077497
+          },
+          "final": {
+            "altitude": 116.75484776790108,
+            "target_relative_speed": 27.73067991553931,
+            "falling": 27.158648749221985,
+            "climb_boundary": 84.75184403767234,
+            "climb_margin": 32.00300373022874
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1198.06494140625,
+                "y": 1194.42626953125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 1,
+                "reason": null,
+                "tick": 849
+              },
+              {
+                "kind": "departed",
+                "planet": 1,
+                "reason": null,
+                "tick": 2215
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 4016
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 4016
+              }
+            ],
+            "frame_changes": 4,
+            "goal": "transfer",
+            "goal_since": 4016,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 5,
+          "brake_ticks": 5,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.08663879494725,
+            "target_relative_speed": 30.00729095150609,
+            "falling": 29.402011254223535,
+            "climb_boundary": 87.28956531586975,
+            "climb_margin": 31.797073479077497
+          },
+          "final": {
+            "altitude": 116.82557161201962,
+            "target_relative_speed": 26.113465545312778,
+            "falling": 25.625921952831117,
+            "climb_boundary": 83.13375751865183,
+            "climb_margin": 33.69181409336778
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1198.066650390625,
+                "y": 1194.424560546875
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 1,
+                "reason": null,
+                "tick": 849
+              },
+              {
+                "kind": "departed",
+                "planet": 1,
+                "reason": null,
+                "tick": 2215
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 4016
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 4016
+              }
+            ],
+            "frame_changes": 4,
+            "goal": "transfer",
+            "goal_since": 4016,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000002-WeakRound-p1",
+        "planet": 0,
+        "seat": 0,
+        "seed": 94000002,
+        "shape": "weak-round",
+        "source_entry_distance": 34.57671356201172,
+        "source_relative_speed": 30.021879196166992,
+        "source_tick": 4367
+      },
+      "category": "sun",
+      "all_four_failed": true,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 4,
+          "brake_ticks": 4,
+          "thrust_ticks": 4,
+          "initial": {
+            "altitude": 119.08663879494725,
+            "target_relative_speed": 30.00729095150609,
+            "falling": 29.402011254223535,
+            "climb_boundary": 87.28956531586975,
+            "climb_margin": 31.797073479077497
+          },
+          "final": {
+            "altitude": 117.17593059627904,
+            "target_relative_speed": 28.38389094134951,
+            "falling": 28.239177840065025,
+            "climb_boundary": 85.9490233016564,
+            "climb_margin": 31.22690729462265
+          },
+          "first_applied": [
+            -0.9832585453987122,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.3174856901168823,
+            0.3540114760398865
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1197.842041015625,
+                "y": 1194.65283203125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 1,
+                "reason": null,
+                "tick": 849
+              },
+              {
+                "kind": "departed",
+                "planet": 1,
+                "reason": null,
+                "tick": 2215
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 4016
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 4016
+              }
+            ],
+            "frame_changes": 4,
+            "goal": "transfer",
+            "goal_since": 4016,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 4,
+          "brake_ticks": 4,
+          "thrust_ticks": 4,
+          "initial": {
+            "altitude": 119.08663879494725,
+            "target_relative_speed": 30.00729095150609,
+            "falling": 29.402011254223535,
+            "climb_boundary": 87.28956531586975,
+            "climb_margin": 31.797073479077497
+          },
+          "final": {
+            "altitude": 117.17593059627904,
+            "target_relative_speed": 28.38389094134951,
+            "falling": 28.239177840065025,
+            "climb_boundary": 85.9490233016564,
+            "climb_margin": 31.22690729462265
+          },
+          "first_applied": [
+            -0.9825832843780518,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.20321419835090637,
+            0.2204154133796692
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1197.842041015625,
+                "y": 1194.65283203125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 1,
+                "reason": null,
+                "tick": 849
+              },
+              {
+                "kind": "departed",
+                "planet": 1,
+                "reason": null,
+                "tick": 2215
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 4016
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 4016
+              }
+            ],
+            "frame_changes": 4,
+            "goal": "transfer",
+            "goal_since": 4016,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "host_preempted",
+          "ticks": 5,
+          "brake_ticks": 4,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.08663879494725,
+            "target_relative_speed": 30.00729095150609,
+            "falling": 29.402011254223535,
+            "climb_boundary": 87.28956531586975,
+            "climb_margin": 31.797073479077497
+          },
+          "final": {
+            "altitude": 116.75484776790108,
+            "target_relative_speed": 27.73067991553931,
+            "falling": 27.158648749221985,
+            "climb_boundary": 84.75184403767234,
+            "climb_margin": 32.00300373022874
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1198.06494140625,
+                "y": 1194.42626953125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 1,
+                "reason": null,
+                "tick": 849
+              },
+              {
+                "kind": "departed",
+                "planet": 1,
+                "reason": null,
+                "tick": 2215
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 4016
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 4016
+              }
+            ],
+            "frame_changes": 4,
+            "goal": "transfer",
+            "goal_since": 4016,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 5,
+          "brake_ticks": 5,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.08663879494725,
+            "target_relative_speed": 30.00729095150609,
+            "falling": 29.402011254223535,
+            "climb_boundary": 87.28956531586975,
+            "climb_margin": 31.797073479077497
+          },
+          "final": {
+            "altitude": 116.82557161201962,
+            "target_relative_speed": 26.113465545312778,
+            "falling": 25.625921952831117,
+            "climb_boundary": 83.13375751865183,
+            "climb_margin": 33.69181409336778
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1198.066650390625,
+                "y": 1194.424560546875
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 1,
+                "reason": null,
+                "tick": 849
+              },
+              {
+                "kind": "departed",
+                "planet": 1,
+                "reason": null,
+                "tick": 2215
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 2216
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 4016
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 4016
+              }
+            ],
+            "frame_changes": 4,
+            "goal": "transfer",
+            "goal_since": 4016,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000019-WeakAngular-p2",
+        "planet": 0,
+        "seat": 1,
+        "seed": 94000019,
+        "shape": "weak-angular",
+        "source_entry_distance": 34.96516036987305,
+        "source_relative_speed": 29.633460998535156,
+        "source_tick": 1933
+      },
+      "category": "sun",
+      "all_four_failed": true,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 6,
+          "brake_ticks": 6,
+          "thrust_ticks": 6,
+          "initial": {
+            "altitude": 119.48268552188745,
+            "target_relative_speed": 29.62884933066032,
+            "falling": 28.946762566922715,
+            "climb_boundary": 86.75830126211596,
+            "climb_margin": 32.72438425977148
+          },
+          "final": {
+            "altitude": 116.78466396336921,
+            "target_relative_speed": 25.60685451272141,
+            "falling": 25.601371369865124,
+            "climb_boundary": 83.108604320355,
+            "climb_margin": 33.67605964301421
+          },
+          "first_applied": [
+            -0.965252697467804,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.2910447120666504,
+            0.3464207351207733
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1344.4481201171875,
+                "y": 1098.3232421875
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 848,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 6,
+          "brake_ticks": 6,
+          "thrust_ticks": 6,
+          "initial": {
+            "altitude": 119.48268552188745,
+            "target_relative_speed": 29.62884933066032,
+            "falling": 28.946762566922715,
+            "climb_boundary": 86.75830126211596,
+            "climb_margin": 32.72438425977148
+          },
+          "final": {
+            "altitude": 116.78466396336921,
+            "target_relative_speed": 25.60685451272141,
+            "falling": 25.601371369865124,
+            "climb_boundary": 83.108604320355,
+            "climb_margin": 33.67605964301421
+          },
+          "first_applied": [
+            -0.9602831602096558,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.13402235507965088,
+            0.1603257954120636
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1344.4481201171875,
+                "y": 1098.3232421875
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 848,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "host_preempted",
+          "ticks": 8,
+          "brake_ticks": 5,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.48268552188745,
+            "target_relative_speed": 29.62884933066032,
+            "falling": 28.946762566922715,
+            "climb_boundary": 86.75830126211596,
+            "climb_margin": 32.72438425977148
+          },
+          "final": {
+            "altitude": 115.84516453821936,
+            "target_relative_speed": 26.783287137956734,
+            "falling": 26.294217253238862,
+            "climb_boundary": 83.82771721921048,
+            "climb_margin": 32.01744731900888
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1344.57763671875,
+                "y": 1097.57958984375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 848,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 8,
+          "brake_ticks": 8,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.48268552188745,
+            "target_relative_speed": 29.62884933066032,
+            "falling": 28.946762566922715,
+            "climb_boundary": 86.75830126211596,
+            "climb_margin": 32.72438425977148
+          },
+          "final": {
+            "altitude": 116.05325091620313,
+            "target_relative_speed": 23.661360854195905,
+            "falling": 23.237366591936627,
+            "climb_boundary": 80.79950412256105,
+            "climb_margin": 35.25374679364208
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1344.5770263671875,
+                "y": 1097.5823974609375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 848,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000019-WeakRound-p2",
+        "planet": 0,
+        "seat": 1,
+        "seed": 94000019,
+        "shape": "weak-round",
+        "source_entry_distance": 34.96516036987305,
+        "source_relative_speed": 29.633460998535156,
+        "source_tick": 1933
+      },
+      "category": "sun",
+      "all_four_failed": true,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 6,
+          "brake_ticks": 6,
+          "thrust_ticks": 6,
+          "initial": {
+            "altitude": 119.48268552188745,
+            "target_relative_speed": 29.62884933066032,
+            "falling": 28.946762566922715,
+            "climb_boundary": 86.75830126211596,
+            "climb_margin": 32.72438425977148
+          },
+          "final": {
+            "altitude": 116.78466396336921,
+            "target_relative_speed": 25.60685451272141,
+            "falling": 25.601371369865124,
+            "climb_boundary": 83.108604320355,
+            "climb_margin": 33.67605964301421
+          },
+          "first_applied": [
+            -0.965252697467804,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.2910447120666504,
+            0.3464207351207733
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1344.4481201171875,
+                "y": 1098.3232421875
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 848,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 6,
+          "brake_ticks": 6,
+          "thrust_ticks": 6,
+          "initial": {
+            "altitude": 119.48268552188745,
+            "target_relative_speed": 29.62884933066032,
+            "falling": 28.946762566922715,
+            "climb_boundary": 86.75830126211596,
+            "climb_margin": 32.72438425977148
+          },
+          "final": {
+            "altitude": 116.78466396336921,
+            "target_relative_speed": 25.60685451272141,
+            "falling": 25.601371369865124,
+            "climb_boundary": 83.108604320355,
+            "climb_margin": 33.67605964301421
+          },
+          "first_applied": [
+            -0.9602831602096558,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.13402235507965088,
+            0.1603257954120636
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1344.4481201171875,
+                "y": 1098.3232421875
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 848,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "host_preempted",
+          "ticks": 8,
+          "brake_ticks": 5,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.48268552188745,
+            "target_relative_speed": 29.62884933066032,
+            "falling": 28.946762566922715,
+            "climb_boundary": 86.75830126211596,
+            "climb_margin": 32.72438425977148
+          },
+          "final": {
+            "altitude": 115.84516453821936,
+            "target_relative_speed": 26.783287137956734,
+            "falling": 26.294217253238862,
+            "climb_boundary": 83.82771721921048,
+            "climb_margin": 32.01744731900888
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1344.57763671875,
+                "y": 1097.57958984375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 848,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 8,
+          "brake_ticks": 8,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.48268552188745,
+            "target_relative_speed": 29.62884933066032,
+            "falling": 28.946762566922715,
+            "climb_boundary": 86.75830126211596,
+            "climb_margin": 32.72438425977148
+          },
+          "final": {
+            "altitude": 116.05325091620313,
+            "target_relative_speed": 23.661360854195905,
+            "falling": 23.237366591936627,
+            "climb_boundary": 80.79950412256105,
+            "climb_margin": 35.25374679364208
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1344.5770263671875,
+                "y": 1097.5823974609375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 848,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000025-WeakAngular-p1",
+        "planet": 1,
+        "seat": 0,
+        "seed": 94000025,
+        "shape": "weak-angular",
+        "source_entry_distance": 7.540245532989502,
+        "source_relative_speed": 34.463253021240234,
+        "source_tick": 469
+      },
+      "category": "launch",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 1,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 91.99516309888233,
+            "target_relative_speed": 34.61232198233884,
+            "falling": 32.751032651509064,
+            "climb_boundary": 91.45260279480425,
+            "climb_margin": 0.54256030407808
+          },
+          "final": {
+            "altitude": 91.44948498711827,
+            "target_relative_speed": 34.717005070618654,
+            "falling": 32.78581908829678,
+            "climb_boundary": 91.49819866581052,
+            "climb_margin": -0.04871367869225196
+          },
+          "first_applied": [
+            -0.9157344102859497,
+            0.0,
+            0.0
+          ],
+          "brake_raw_range": [
+            -0.2912446856498718,
+            -0.2912446856498718
+          ],
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 471,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 1,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 91.99516309888233,
+            "target_relative_speed": 34.61232198233884,
+            "falling": 32.751032651509064,
+            "climb_boundary": 91.45260279480425,
+            "climb_margin": 0.54256030407808
+          },
+          "final": {
+            "altitude": 91.44948498711827,
+            "target_relative_speed": 34.717005070618654,
+            "falling": 32.78581908829678,
+            "climb_boundary": 91.49819866581052,
+            "climb_margin": -0.04871367869225196
+          },
+          "first_applied": [
+            -0.8698141574859619,
+            0.0,
+            0.0
+          ],
+          "brake_raw_range": [
+            -0.4171910583972931,
+            -0.4171910583972931
+          ],
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 471,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "native-mission": {
+          "outcome": "arrived",
+          "ticks": 26,
+          "brake_ticks": 7,
+          "thrust_ticks": 22,
+          "initial": {
+            "altitude": 91.99516309888233,
+            "target_relative_speed": 34.61232198233884,
+            "falling": 32.751032651509064,
+            "climb_boundary": 91.45260279480425,
+            "climb_margin": 0.54256030407808
+          },
+          "final": {
+            "altitude": 81.79732831772864,
+            "target_relative_speed": 17.79628199541654,
+            "falling": 17.320228810976065,
+            "climb_boundary": 75.9998065212913,
+            "climb_margin": 5.797521796437337
+          },
+          "first_applied": [
+            0.24793195724487305,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        },
+        "handwritten-guidance": {
+          "outcome": "arrived",
+          "ticks": 15,
+          "brake_ticks": 14,
+          "thrust_ticks": 14,
+          "initial": {
+            "altitude": 91.99516309888233,
+            "target_relative_speed": 34.61232198233884,
+            "falling": 32.751032651509064,
+            "climb_boundary": 91.45260279480425,
+            "climb_margin": 0.54256030407808
+          },
+          "final": {
+            "altitude": 85.98842116519026,
+            "target_relative_speed": 17.962865263510132,
+            "falling": 17.389532024218383,
+            "climb_boundary": 76.04791648042634,
+            "climb_margin": 9.940504684763923
+          },
+          "first_applied": [
+            0.210898756980896,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000025-WeakRound-p1",
+        "planet": 1,
+        "seat": 0,
+        "seed": 94000025,
+        "shape": "weak-round",
+        "source_entry_distance": 7.540245532989502,
+        "source_relative_speed": 34.463253021240234,
+        "source_tick": 469
+      },
+      "category": "launch",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 1,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 91.99516309888233,
+            "target_relative_speed": 34.61232198233884,
+            "falling": 32.751032651509064,
+            "climb_boundary": 91.45260279480425,
+            "climb_margin": 0.54256030407808
+          },
+          "final": {
+            "altitude": 91.44948498711827,
+            "target_relative_speed": 34.717005070618654,
+            "falling": 32.78581908829678,
+            "climb_boundary": 91.49819866581052,
+            "climb_margin": -0.04871367869225196
+          },
+          "first_applied": [
+            -0.9157344102859497,
+            0.0,
+            0.0
+          ],
+          "brake_raw_range": [
+            -0.2912446856498718,
+            -0.2912446856498718
+          ],
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 471,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 1,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 91.99516309888233,
+            "target_relative_speed": 34.61232198233884,
+            "falling": 32.751032651509064,
+            "climb_boundary": 91.45260279480425,
+            "climb_margin": 0.54256030407808
+          },
+          "final": {
+            "altitude": 91.44948498711827,
+            "target_relative_speed": 34.717005070618654,
+            "falling": 32.78581908829678,
+            "climb_boundary": 91.49819866581052,
+            "climb_margin": -0.04871367869225196
+          },
+          "first_applied": [
+            -0.8698141574859619,
+            0.0,
+            0.0
+          ],
+          "brake_raw_range": [
+            -0.4171910583972931,
+            -0.4171910583972931
+          ],
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 471,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "native-mission": {
+          "outcome": "arrived",
+          "ticks": 26,
+          "brake_ticks": 7,
+          "thrust_ticks": 22,
+          "initial": {
+            "altitude": 91.99516309888233,
+            "target_relative_speed": 34.61232198233884,
+            "falling": 32.751032651509064,
+            "climb_boundary": 91.45260279480425,
+            "climb_margin": 0.54256030407808
+          },
+          "final": {
+            "altitude": 81.79732831772864,
+            "target_relative_speed": 17.79628199541654,
+            "falling": 17.320228810976065,
+            "climb_boundary": 75.9998065212913,
+            "climb_margin": 5.797521796437337
+          },
+          "first_applied": [
+            0.24793195724487305,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        },
+        "handwritten-guidance": {
+          "outcome": "arrived",
+          "ticks": 15,
+          "brake_ticks": 14,
+          "thrust_ticks": 14,
+          "initial": {
+            "altitude": 91.99516309888233,
+            "target_relative_speed": 34.61232198233884,
+            "falling": 32.751032651509064,
+            "climb_boundary": 91.45260279480425,
+            "climb_margin": 0.54256030407808
+          },
+          "final": {
+            "altitude": 85.98842116519026,
+            "target_relative_speed": 17.962865263510132,
+            "falling": 17.389532024218383,
+            "climb_boundary": 76.04791648042634,
+            "climb_margin": 9.940504684763923
+          },
+          "first_applied": [
+            0.210898756980896,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000034-WeakAngular-p1",
+        "planet": 1,
+        "seat": 0,
+        "seed": 94000034,
+        "shape": "weak-angular",
+        "source_entry_distance": 23.823244094848633,
+        "source_relative_speed": 40.883628845214844,
+        "source_tick": 485
+      },
+      "category": "launch",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 6,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 108.14104138533236,
+            "target_relative_speed": 40.990206967820846,
+            "falling": 40.97136249025084,
+            "climb_boundary": 103.57305088615067,
+            "climb_margin": 4.56799049918169
+          },
+          "final": {
+            "altitude": 104.00808288234686,
+            "target_relative_speed": 41.5786231391925,
+            "falling": 41.563575462265874,
+            "climb_boundary": 104.5506161041494,
+            "climb_margin": -0.5425332218025432
+          },
+          "first_applied": [
+            -0.918302059173584,
+            0.0,
+            0.0
+          ],
+          "brake_raw_range": [
+            -0.26325494050979614,
+            -0.24911007285118103
+          ],
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 492,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 6,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 108.14104138533236,
+            "target_relative_speed": 40.990206967820846,
+            "falling": 40.97136249025084,
+            "climb_boundary": 103.57305088615067,
+            "climb_margin": 4.56799049918169
+          },
+          "final": {
+            "altitude": 104.00003540740937,
+            "target_relative_speed": 41.674051528315175,
+            "falling": 41.656157981468716,
+            "climb_boundary": 104.7047099555416,
+            "climb_margin": -0.7046745481322318
+          },
+          "first_applied": [
+            -0.8638407588005066,
+            0.0,
+            0.0
+          ],
+          "brake_raw_range": [
+            -0.3099232316017151,
+            -0.29367148876190186
+          ],
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 492,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "native-mission": {
+          "outcome": "host_preempted",
+          "ticks": 35,
+          "brake_ticks": 20,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 108.14104138533236,
+            "target_relative_speed": 40.990206967820846,
+            "falling": 40.97136249025084,
+            "climb_boundary": 103.57305088615067,
+            "climb_margin": 4.56799049918169
+          },
+          "final": {
+            "altitude": 88.86994141843144,
+            "target_relative_speed": 31.043534116409713,
+            "falling": 31.038553882605704,
+            "climb_boundary": 89.26783654246836,
+            "climb_margin": -0.3978951240369213
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 521,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "handwritten-guidance": {
+          "outcome": "arrived",
+          "ticks": 35,
+          "brake_ticks": 34,
+          "thrust_ticks": 6,
+          "initial": {
+            "altitude": 108.14104138533236,
+            "target_relative_speed": 40.990206967820846,
+            "falling": 40.97136249025084,
+            "climb_boundary": 103.57305088615067,
+            "climb_margin": 4.56799049918169
+          },
+          "final": {
+            "altitude": 90.51821955937245,
+            "target_relative_speed": 17.763941246684173,
+            "falling": 17.68630530186388,
+            "climb_boundary": 76.25610790461477,
+            "climb_margin": 14.262111654757689
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000034-WeakRound-p1",
+        "planet": 1,
+        "seat": 0,
+        "seed": 94000034,
+        "shape": "weak-round",
+        "source_entry_distance": 23.823244094848633,
+        "source_relative_speed": 40.883628845214844,
+        "source_tick": 485
+      },
+      "category": "launch",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 6,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 108.14104138533236,
+            "target_relative_speed": 40.990206967820846,
+            "falling": 40.97136249025084,
+            "climb_boundary": 103.57305088615067,
+            "climb_margin": 4.56799049918169
+          },
+          "final": {
+            "altitude": 104.00808288234686,
+            "target_relative_speed": 41.5786231391925,
+            "falling": 41.563575462265874,
+            "climb_boundary": 104.5506161041494,
+            "climb_margin": -0.5425332218025432
+          },
+          "first_applied": [
+            -0.918302059173584,
+            0.0,
+            0.0
+          ],
+          "brake_raw_range": [
+            -0.26325494050979614,
+            -0.24911007285118103
+          ],
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 492,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 6,
+          "brake_ticks": 0,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 108.14104138533236,
+            "target_relative_speed": 40.990206967820846,
+            "falling": 40.97136249025084,
+            "climb_boundary": 103.57305088615067,
+            "climb_margin": 4.56799049918169
+          },
+          "final": {
+            "altitude": 104.00003540740937,
+            "target_relative_speed": 41.674051528315175,
+            "falling": 41.656157981468716,
+            "climb_boundary": 104.7047099555416,
+            "climb_margin": -0.7046745481322318
+          },
+          "first_applied": [
+            -0.8638407588005066,
+            0.0,
+            0.0
+          ],
+          "brake_raw_range": [
+            -0.3099232316017151,
+            -0.29367148876190186
+          ],
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 492,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "native-mission": {
+          "outcome": "host_preempted",
+          "ticks": 35,
+          "brake_ticks": 20,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 108.14104138533236,
+            "target_relative_speed": 40.990206967820846,
+            "falling": 40.97136249025084,
+            "climb_boundary": 103.57305088615067,
+            "climb_margin": 4.56799049918169
+          },
+          "final": {
+            "altitude": 88.86994141843144,
+            "target_relative_speed": 31.043534116409713,
+            "falling": 31.038553882605704,
+            "climb_boundary": 89.26783654246836,
+            "climb_margin": -0.3978951240369213
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": null,
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 1,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "launch",
+            "goal_since": 521,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 1
+          }
+        },
+        "handwritten-guidance": {
+          "outcome": "arrived",
+          "ticks": 35,
+          "brake_ticks": 34,
+          "thrust_ticks": 6,
+          "initial": {
+            "altitude": 108.14104138533236,
+            "target_relative_speed": 40.990206967820846,
+            "falling": 40.97136249025084,
+            "climb_boundary": 103.57305088615067,
+            "climb_margin": 4.56799049918169
+          },
+          "final": {
+            "altitude": 90.51821955937245,
+            "target_relative_speed": 17.763941246684173,
+            "falling": 17.68630530186388,
+            "climb_boundary": 76.25610790461477,
+            "climb_margin": 14.262111654757689
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000041-WeakAngular-p1",
+        "planet": 0,
+        "seat": 0,
+        "seed": 94000041,
+        "shape": "weak-angular",
+        "source_entry_distance": 34.53321838378906,
+        "source_relative_speed": 29.984434127807617,
+        "source_tick": 4747
+      },
+      "category": "sun",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 18,
+          "brake_ticks": 18,
+          "thrust_ticks": 17,
+          "initial": {
+            "altitude": 119.05407167517049,
+            "target_relative_speed": 30.028871678805135,
+            "falling": 28.750188955292565,
+            "climb_boundary": 86.53146729930053,
+            "climb_margin": 32.52260437586996
+          },
+          "final": {
+            "altitude": 112.25710542456335,
+            "target_relative_speed": 18.207554292648616,
+            "falling": 17.666885554739636,
+            "climb_boundary": 76.24237690408536,
+            "climb_margin": 36.01472852047799
+          },
+          "first_applied": [
+            -0.955704391002655,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.18063390254974365,
+            0.37595367431640625
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 531.43408203125,
+                "y": 932.9859008789062
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 2,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 2,
+                "reason": null,
+                "tick": 200
+              },
+              {
+                "kind": "departed",
+                "planet": 2,
+                "reason": null,
+                "tick": 1343
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 3144
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 3144
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 3144,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 19,
+          "brake_ticks": 19,
+          "thrust_ticks": 13,
+          "initial": {
+            "altitude": 119.05407167517049,
+            "target_relative_speed": 30.028871678805135,
+            "falling": 28.750188955292565,
+            "climb_boundary": 86.53146729930053,
+            "climb_margin": 32.52260437586996
+          },
+          "final": {
+            "altitude": 111.95991010518938,
+            "target_relative_speed": 17.334743714846013,
+            "falling": 17.268033103239766,
+            "climb_boundary": 75.96369934509168,
+            "climb_margin": 35.996210760097696
+          },
+          "first_applied": [
+            -0.9499356746673584,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.049622565507888794,
+            0.1875414103269577
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 531.58837890625,
+                "y": 933.3226318359375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 2,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 2,
+                "reason": null,
+                "tick": 200
+              },
+              {
+                "kind": "departed",
+                "planet": 2,
+                "reason": null,
+                "tick": 1343
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 3144
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 3144
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 3144,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "arrived",
+          "ticks": 47,
+          "brake_ticks": 18,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.05407167517049,
+            "target_relative_speed": 30.028871678805135,
+            "falling": 28.750188955292565,
+            "climb_boundary": 86.53146729930053,
+            "climb_margin": 32.52260437586996
+          },
+          "final": {
+            "altitude": 101.95513470426819,
+            "target_relative_speed": 18.028080593027827,
+            "falling": 16.943553793287034,
+            "climb_boundary": 75.74168030292023,
+            "climb_margin": 26.21345440134796
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 35,
+          "brake_ticks": 35,
+          "thrust_ticks": 1,
+          "initial": {
+            "altitude": 119.05407167517049,
+            "target_relative_speed": 30.028871678805135,
+            "falling": 28.750188955292565,
+            "climb_boundary": 86.53146729930053,
+            "climb_margin": 32.52260437586996
+          },
+          "final": {
+            "altitude": 109.20810528877499,
+            "target_relative_speed": 7.591338245427279,
+            "falling": 7.479044743934044,
+            "climb_boundary": 71.11872220563535,
+            "climb_margin": 38.08938308313964
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 534.1166381835938,
+                "y": 938.6953735351562
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 2,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 2,
+                "reason": null,
+                "tick": 200
+              },
+              {
+                "kind": "departed",
+                "planet": 2,
+                "reason": null,
+                "tick": 1343
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 3144
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 3144
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 3144,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000041-WeakRound-p1",
+        "planet": 0,
+        "seat": 0,
+        "seed": 94000041,
+        "shape": "weak-round",
+        "source_entry_distance": 34.880393981933594,
+        "source_relative_speed": 30.061996459960938,
+        "source_tick": 4746
+      },
+      "category": "sun",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 18,
+          "brake_ticks": 18,
+          "thrust_ticks": 17,
+          "initial": {
+            "altitude": 119.39959330567359,
+            "target_relative_speed": 30.104155898202357,
+            "falling": 28.840793814417843,
+            "climb_boundary": 86.63582775691525,
+            "climb_margin": 32.76376554875834
+          },
+          "final": {
+            "altitude": 112.50688556851571,
+            "target_relative_speed": 18.722649437165877,
+            "falling": 18.20843008732939,
+            "climb_boundary": 76.63093852490324,
+            "climb_margin": 35.87594704361247
+          },
+          "first_applied": [
+            -0.958946168422699,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.1774788200855255,
+            0.3661195635795593
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 531.2811279296875,
+                "y": 932.6507568359375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 2,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 2,
+                "reason": null,
+                "tick": 200
+              },
+              {
+                "kind": "departed",
+                "planet": 2,
+                "reason": null,
+                "tick": 1343
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 3144
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 3144
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 3144,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 19,
+          "brake_ticks": 19,
+          "thrust_ticks": 14,
+          "initial": {
+            "altitude": 119.39959330567359,
+            "target_relative_speed": 30.104155898202357,
+            "falling": 28.840793814417843,
+            "climb_boundary": 86.63582775691525,
+            "climb_margin": 32.76376554875834
+          },
+          "final": {
+            "altitude": 112.21565883590063,
+            "target_relative_speed": 17.692932369618337,
+            "falling": 17.56795048350092,
+            "climb_boundary": 76.1726576838148,
+            "climb_margin": 36.04300115208582
+          },
+          "first_applied": [
+            -0.9536076784133911,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.056566208600997925,
+            0.17999200522899628
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 531.434326171875,
+                "y": 932.986328125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 2,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 2,
+                "reason": null,
+                "tick": 200
+              },
+              {
+                "kind": "departed",
+                "planet": 2,
+                "reason": null,
+                "tick": 1343
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 3144
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 3144
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 3144,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "arrived",
+          "ticks": 47,
+          "brake_ticks": 18,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.39959330567359,
+            "target_relative_speed": 30.104155898202357,
+            "falling": 28.840793814417843,
+            "climb_boundary": 86.63582775691525,
+            "climb_margin": 32.76376554875834
+          },
+          "final": {
+            "altitude": 102.15845896657416,
+            "target_relative_speed": 18.025168746734472,
+            "falling": 16.98171986265366,
+            "climb_boundary": 75.76757618987291,
+            "climb_margin": 26.390882776701247
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 36,
+          "brake_ticks": 36,
+          "thrust_ticks": 1,
+          "initial": {
+            "altitude": 119.39959330567359,
+            "target_relative_speed": 30.104155898202357,
+            "falling": 28.840793814417843,
+            "climb_boundary": 86.63582775691525,
+            "climb_margin": 32.76376554875834
+          },
+          "final": {
+            "altitude": 109.46598443121022,
+            "target_relative_speed": 7.1297063757615255,
+            "falling": 7.031688484838793,
+            "climb_boundary": 70.98889285895629,
+            "climb_margin": 38.477091572253926
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 534.1162109375,
+                "y": 938.6945190429688
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 1,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 2,
+                "reason": null,
+                "tick": 1
+              },
+              {
+                "kind": "arrived",
+                "planet": 2,
+                "reason": null,
+                "tick": 200
+              },
+              {
+                "kind": "departed",
+                "planet": 2,
+                "reason": null,
+                "tick": 1343
+              },
+              {
+                "kind": "replan",
+                "planet": null,
+                "reason": "pausing travel for nearby opponent",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_started",
+                "planet": null,
+                "reason": "nearby opponent after securing ground",
+                "tick": 1344
+              },
+              {
+                "kind": "pursuit_ended",
+                "planet": null,
+                "reason": "pursuit budget exhausted",
+                "tick": 3144
+              },
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 3144
+              }
+            ],
+            "frame_changes": 2,
+            "goal": "transfer",
+            "goal_since": 3144,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 1,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000044-WeakAngular-p2",
+        "planet": 0,
+        "seat": 1,
+        "seed": 94000044,
+        "shape": "weak-angular",
+        "source_entry_distance": 34.73823928833008,
+        "source_relative_speed": 30.247583389282227,
+        "source_tick": 1186
+      },
+      "category": "sun",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 51,
+          "brake_ticks": 40,
+          "thrust_ticks": 21,
+          "initial": {
+            "altitude": 119.2482865159287,
+            "target_relative_speed": 30.242419435869124,
+            "falling": 29.394357998060197,
+            "climb_boundary": 87.28056564236252,
+            "climb_margin": 31.96772087356618
+          },
+          "final": {
+            "altitude": 106.89223338990726,
+            "target_relative_speed": 12.354380754886463,
+            "falling": 8.362461817446793,
+            "climb_boundary": 71.39861535296511,
+            "climb_margin": 35.49361803694215
+          },
+          "first_applied": [
+            -0.8345533013343811,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            -0.08898721635341644,
+            0.7769525647163391
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 761.9332275390625,
+                "y": 574.756591796875
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "avoid_sun",
+            "goal_since": 1238,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 47,
+          "brake_ticks": 45,
+          "thrust_ticks": 24,
+          "initial": {
+            "altitude": 119.2482865159287,
+            "target_relative_speed": 30.242419435869124,
+            "falling": 29.394357998060197,
+            "climb_boundary": 87.28056564236252,
+            "climb_margin": 31.96772087356618
+          },
+          "final": {
+            "altitude": 107.79490643560234,
+            "target_relative_speed": 11.31839540950464,
+            "falling": 5.905615518937673,
+            "climb_boundary": 70.69752589315036,
+            "climb_margin": 37.09738054245199
+          },
+          "first_applied": [
+            -0.8150948286056519,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            -0.009497322142124176,
+            0.7163333892822266
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 759.6014404296875,
+                "y": 575.59521484375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "avoid_sun",
+            "goal_since": 1234,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "arrived",
+          "ticks": 46,
+          "brake_ticks": 19,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.2482865159287,
+            "target_relative_speed": 30.242419435869124,
+            "falling": 29.394357998060197,
+            "climb_boundary": 87.28056564236252,
+            "climb_margin": 31.96772087356618
+          },
+          "final": {
+            "altitude": 102.02418026115373,
+            "target_relative_speed": 17.421782835251104,
+            "falling": 17.03621423075373,
+            "climb_boundary": 75.80465190632272,
+            "climb_margin": 26.219528354831013
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        },
+        "handwritten-guidance": {
+          "outcome": "arrived",
+          "ticks": 158,
+          "brake_ticks": 157,
+          "thrust_ticks": 14,
+          "initial": {
+            "altitude": 119.2482865159287,
+            "target_relative_speed": 30.242419435869124,
+            "falling": 29.394357998060197,
+            "climb_boundary": 87.28056564236252,
+            "climb_margin": 31.96772087356618
+          },
+          "final": {
+            "altitude": 104.94564393306166,
+            "target_relative_speed": 2.658087100725028,
+            "falling": 2.6524499633346434,
+            "climb_boundary": 70.14070981615988,
+            "climb_margin": 34.80493411690178
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000044-WeakRound-p2",
+        "planet": 0,
+        "seat": 1,
+        "seed": 94000044,
+        "shape": "weak-round",
+        "source_entry_distance": 34.73823928833008,
+        "source_relative_speed": 30.247583389282227,
+        "source_tick": 1186
+      },
+      "category": "sun",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 51,
+          "brake_ticks": 40,
+          "thrust_ticks": 21,
+          "initial": {
+            "altitude": 119.2482865159287,
+            "target_relative_speed": 30.242419435869124,
+            "falling": 29.394357998060197,
+            "climb_boundary": 87.28056564236252,
+            "climb_margin": 31.96772087356618
+          },
+          "final": {
+            "altitude": 106.89223338990726,
+            "target_relative_speed": 12.354380754886463,
+            "falling": 8.362461817446793,
+            "climb_boundary": 71.39861535296511,
+            "climb_margin": 35.49361803694215
+          },
+          "first_applied": [
+            -0.8345533013343811,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            -0.08898721635341644,
+            0.7769525647163391
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 761.9332275390625,
+                "y": 574.756591796875
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "avoid_sun",
+            "goal_since": 1238,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 47,
+          "brake_ticks": 45,
+          "thrust_ticks": 24,
+          "initial": {
+            "altitude": 119.2482865159287,
+            "target_relative_speed": 30.242419435869124,
+            "falling": 29.394357998060197,
+            "climb_boundary": 87.28056564236252,
+            "climb_margin": 31.96772087356618
+          },
+          "final": {
+            "altitude": 107.79490643560234,
+            "target_relative_speed": 11.31839540950464,
+            "falling": 5.905615518937673,
+            "climb_boundary": 70.69752589315036,
+            "climb_margin": 37.09738054245199
+          },
+          "first_applied": [
+            -0.8150948286056519,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            -0.009497322142124176,
+            0.7163333892822266
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 759.6014404296875,
+                "y": 575.59521484375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "avoid_sun",
+            "goal_since": 1234,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "arrived",
+          "ticks": 46,
+          "brake_ticks": 19,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.2482865159287,
+            "target_relative_speed": 30.242419435869124,
+            "falling": 29.394357998060197,
+            "climb_boundary": 87.28056564236252,
+            "climb_margin": 31.96772087356618
+          },
+          "final": {
+            "altitude": 102.02418026115373,
+            "target_relative_speed": 17.421782835251104,
+            "falling": 17.03621423075373,
+            "climb_boundary": 75.80465190632272,
+            "climb_margin": 26.219528354831013
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        },
+        "handwritten-guidance": {
+          "outcome": "arrived",
+          "ticks": 158,
+          "brake_ticks": 157,
+          "thrust_ticks": 14,
+          "initial": {
+            "altitude": 119.2482865159287,
+            "target_relative_speed": 30.242419435869124,
+            "falling": 29.394357998060197,
+            "climb_boundary": 87.28056564236252,
+            "climb_margin": 31.96772087356618
+          },
+          "final": {
+            "altitude": 104.94564393306166,
+            "target_relative_speed": 2.658087100725028,
+            "falling": 2.6524499633346434,
+            "climb_boundary": 70.14070981615988,
+            "climb_margin": 34.80493411690178
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000047-WeakAngular-p2",
+        "planet": 0,
+        "seat": 1,
+        "seed": 94000047,
+        "shape": "weak-angular",
+        "source_entry_distance": 34.991268157958984,
+        "source_relative_speed": 30.922927856445312,
+        "source_tick": 2234
+      },
+      "category": "sun",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 34,
+          "brake_ticks": 34,
+          "thrust_ticks": 22,
+          "initial": {
+            "altitude": 119.52318266243549,
+            "target_relative_speed": 30.99147394154225,
+            "falling": 28.090181136122137,
+            "climb_boundary": 85.78116552520304,
+            "climb_margin": 33.74201713723245
+          },
+          "final": {
+            "altitude": 108.01243602313096,
+            "target_relative_speed": 12.378092881525081,
+            "falling": 11.163900137126307,
+            "climb_boundary": 72.49265332543457,
+            "climb_margin": 35.519782697696385
+          },
+          "first_applied": [
+            -0.9655427932739258,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.22742103040218353,
+            0.4560950994491577
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1040.063720703125,
+                "y": 1338.9727783203125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 963,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 35,
+          "brake_ticks": 35,
+          "thrust_ticks": 20,
+          "initial": {
+            "altitude": 119.52318266243549,
+            "target_relative_speed": 30.99147394154225,
+            "falling": 28.090181136122137,
+            "climb_boundary": 85.78116552520304,
+            "climb_margin": 33.74201713723245
+          },
+          "final": {
+            "altitude": 107.94846419321613,
+            "target_relative_speed": 10.982286532475268,
+            "falling": 10.032301186450193,
+            "climb_boundary": 72.012941341913,
+            "climb_margin": 35.93552285130312
+          },
+          "first_applied": [
+            -0.9608671069145203,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.14764316380023956,
+            0.2548566162586212
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1040.4666748046875,
+                "y": 1338.967041015625
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 963,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "arrived",
+          "ticks": 47,
+          "brake_ticks": 22,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.52318266243549,
+            "target_relative_speed": 30.99147394154225,
+            "falling": 28.090181136122137,
+            "climb_boundary": 85.78116552520304,
+            "climb_margin": 33.74201713723245
+          },
+          "final": {
+            "altitude": 102.65652634889648,
+            "target_relative_speed": 17.7381932461964,
+            "falling": 16.697868118662626,
+            "climb_boundary": 75.57637599416499,
+            "climb_margin": 27.080150354731487
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 57,
+          "brake_ticks": 57,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.52318266243549,
+            "target_relative_speed": 30.99147394154225,
+            "falling": 28.090181136122137,
+            "climb_boundary": 85.78116552520304,
+            "climb_margin": 33.74201713723245
+          },
+          "final": {
+            "altitude": 107.57980003990514,
+            "target_relative_speed": 4.3114706203451965,
+            "falling": 3.0724479595966443,
+            "climb_boundary": 70.18879872928859,
+            "climb_margin": 37.391001310616545
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1049.330810546875,
+                "y": 1338.7066650390625
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 963,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000047-WeakRound-p2",
+        "planet": 0,
+        "seat": 1,
+        "seed": 94000047,
+        "shape": "weak-round",
+        "source_entry_distance": 34.991268157958984,
+        "source_relative_speed": 30.922927856445312,
+        "source_tick": 2234
+      },
+      "category": "sun",
+      "all_four_failed": false,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 34,
+          "brake_ticks": 34,
+          "thrust_ticks": 22,
+          "initial": {
+            "altitude": 119.52318266243549,
+            "target_relative_speed": 30.99147394154225,
+            "falling": 28.090181136122137,
+            "climb_boundary": 85.78116552520304,
+            "climb_margin": 33.74201713723245
+          },
+          "final": {
+            "altitude": 108.01243602313096,
+            "target_relative_speed": 12.378092881525081,
+            "falling": 11.163900137126307,
+            "climb_boundary": 72.49265332543457,
+            "climb_margin": 35.519782697696385
+          },
+          "first_applied": [
+            -0.9655427932739258,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.22742103040218353,
+            0.4560950994491577
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1040.063720703125,
+                "y": 1338.9727783203125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 963,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 35,
+          "brake_ticks": 35,
+          "thrust_ticks": 20,
+          "initial": {
+            "altitude": 119.52318266243549,
+            "target_relative_speed": 30.99147394154225,
+            "falling": 28.090181136122137,
+            "climb_boundary": 85.78116552520304,
+            "climb_margin": 33.74201713723245
+          },
+          "final": {
+            "altitude": 107.94846419321613,
+            "target_relative_speed": 10.982286532475268,
+            "falling": 10.032301186450193,
+            "climb_boundary": 72.012941341913,
+            "climb_margin": 35.93552285130312
+          },
+          "first_applied": [
+            -0.9608671069145203,
+            1.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.14764316380023956,
+            0.2548566162586212
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1040.4666748046875,
+                "y": 1338.967041015625
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 963,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "arrived",
+          "ticks": 47,
+          "brake_ticks": 22,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.52318266243549,
+            "target_relative_speed": 30.99147394154225,
+            "falling": 28.090181136122137,
+            "climb_boundary": 85.78116552520304,
+            "climb_margin": 33.74201713723245
+          },
+          "final": {
+            "altitude": 102.65652634889648,
+            "target_relative_speed": 17.7381932461964,
+            "falling": 16.697868118662626,
+            "climb_boundary": 75.57637599416499,
+            "climb_margin": 27.080150354731487
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": null
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 57,
+          "brake_ticks": 57,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.52318266243549,
+            "target_relative_speed": 30.99147394154225,
+            "falling": 28.090181136122137,
+            "climb_boundary": 85.78116552520304,
+            "climb_margin": 33.74201713723245
+          },
+          "final": {
+            "altitude": 107.57980003990514,
+            "target_relative_speed": 4.3114706203451965,
+            "falling": 3.0724479595966443,
+            "climb_boundary": 70.18879872928859,
+            "climb_margin": 37.391001310616545
+          },
+          "first_applied": [
+            1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1049.330810546875,
+                "y": 1338.7066650390625
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 963,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000058-WeakAngular-p2",
+        "planet": 0,
+        "seat": 1,
+        "seed": 94000058,
+        "shape": "weak-angular",
+        "source_entry_distance": 34.91191482543945,
+        "source_relative_speed": 29.3260498046875,
+        "source_tick": 1543
+      },
+      "category": "sun",
+      "all_four_failed": true,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 28,
+          "brake_ticks": 28,
+          "thrust_ticks": 7,
+          "initial": {
+            "altitude": 119.4268945243295,
+            "target_relative_speed": 29.307236815998383,
+            "falling": 29.087495061684262,
+            "climb_boundary": 86.92164737927013,
+            "climb_margin": 32.50524714505937
+          },
+          "final": {
+            "altitude": 110.34659100842717,
+            "target_relative_speed": 13.815799064088239,
+            "falling": 13.757319590548025,
+            "climb_boundary": 73.78527684632952,
+            "climb_margin": 36.561314162097645
+          },
+          "first_applied": [
+            -0.8801745772361755,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.30034899711608887,
+            0.910345196723938
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1225.0980224609375,
+                "y": 1046.3438720703125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 1143,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 28,
+          "brake_ticks": 28,
+          "thrust_ticks": 5,
+          "initial": {
+            "altitude": 119.4268945243295,
+            "target_relative_speed": 29.307236815998383,
+            "falling": 29.087495061684262,
+            "climb_boundary": 86.92164737927013,
+            "climb_margin": 32.50524714505937
+          },
+          "final": {
+            "altitude": 110.49080365468868,
+            "target_relative_speed": 12.436275842565212,
+            "falling": 12.417728628000578,
+            "climb_boundary": 73.0839996855733,
+            "climb_margin": 37.40680396911537
+          },
+          "first_applied": [
+            -0.8811843991279602,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.3000188171863556,
+            0.8631688952445984
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1225.09912109375,
+                "y": 1046.3408203125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 1143,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "host_preempted",
+          "ticks": 30,
+          "brake_ticks": 21,
+          "thrust_ticks": 9,
+          "initial": {
+            "altitude": 119.4268945243295,
+            "target_relative_speed": 29.307236815998383,
+            "falling": 29.087495061684262,
+            "climb_boundary": 86.92164737927013,
+            "climb_margin": 32.50524714505937
+          },
+          "final": {
+            "altitude": 107.1298509113127,
+            "target_relative_speed": 21.567786566997345,
+            "falling": 21.54698830564863,
+            "climb_boundary": 79.28545410087517,
+            "climb_margin": 27.84439681043753
+          },
+          "first_applied": [
+            0.6997816562652588,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1224.869873046875,
+                "y": 1046.956787109375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 1143,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 29,
+          "brake_ticks": 29,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.4268945243295,
+            "target_relative_speed": 29.307236815998383,
+            "falling": 29.087495061684262,
+            "climb_boundary": 86.92164737927013,
+            "climb_margin": 32.50524714505937
+          },
+          "final": {
+            "altitude": 110.51034847812147,
+            "target_relative_speed": 8.5795372843314,
+            "falling": 8.504410218598993,
+            "climb_boundary": 71.44649986332422,
+            "climb_margin": 39.06384861479725
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1224.9835205078125,
+                "y": 1046.6519775390625
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 1143,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "validation-94000058-WeakRound-p2",
+        "planet": 0,
+        "seat": 1,
+        "seed": 94000058,
+        "shape": "weak-round",
+        "source_entry_distance": 34.91191482543945,
+        "source_relative_speed": 29.3260498046875,
+        "source_tick": 1543
+      },
+      "category": "sun",
+      "all_four_failed": true,
+      "controllers": {
+        "candidate": {
+          "outcome": "host_preempted",
+          "ticks": 28,
+          "brake_ticks": 28,
+          "thrust_ticks": 7,
+          "initial": {
+            "altitude": 119.4268945243295,
+            "target_relative_speed": 29.307236815998383,
+            "falling": 29.087495061684262,
+            "climb_boundary": 86.92164737927013,
+            "climb_margin": 32.50524714505937
+          },
+          "final": {
+            "altitude": 110.34659100842717,
+            "target_relative_speed": 13.815799064088239,
+            "falling": 13.757319590548025,
+            "climb_boundary": 73.78527684632952,
+            "climb_margin": 36.561314162097645
+          },
+          "first_applied": [
+            -0.8801745772361755,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.30034899711608887,
+            0.910345196723938
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1225.0980224609375,
+                "y": 1046.3438720703125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 1143,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "learned-reference": {
+          "outcome": "host_preempted",
+          "ticks": 28,
+          "brake_ticks": 28,
+          "thrust_ticks": 5,
+          "initial": {
+            "altitude": 119.4268945243295,
+            "target_relative_speed": 29.307236815998383,
+            "falling": 29.087495061684262,
+            "climb_boundary": 86.92164737927013,
+            "climb_margin": 32.50524714505937
+          },
+          "final": {
+            "altitude": 110.49080365468868,
+            "target_relative_speed": 12.436275842565212,
+            "falling": 12.417728628000578,
+            "climb_boundary": 73.0839996855733,
+            "climb_margin": 37.40680396911537
+          },
+          "first_applied": [
+            -0.8811843991279602,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": [
+            0.3000188171863556,
+            0.8631688952445984
+          ],
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1225.09912109375,
+                "y": 1046.3408203125
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 1143,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "native-mission": {
+          "outcome": "host_preempted",
+          "ticks": 30,
+          "brake_ticks": 21,
+          "thrust_ticks": 9,
+          "initial": {
+            "altitude": 119.4268945243295,
+            "target_relative_speed": 29.307236815998383,
+            "falling": 29.087495061684262,
+            "climb_boundary": 86.92164737927013,
+            "climb_margin": 32.50524714505937
+          },
+          "final": {
+            "altitude": 107.1298509113127,
+            "target_relative_speed": 21.567786566997345,
+            "falling": 21.54698830564863,
+            "climb_boundary": 79.28545410087517,
+            "climb_margin": 27.84439681043753
+          },
+          "first_applied": [
+            0.6997816562652588,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1224.869873046875,
+                "y": 1046.956787109375
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 1143,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        },
+        "handwritten-guidance": {
+          "outcome": "host_preempted",
+          "ticks": 29,
+          "brake_ticks": 29,
+          "thrust_ticks": 0,
+          "initial": {
+            "altitude": 119.4268945243295,
+            "target_relative_speed": 29.307236815998383,
+            "falling": 29.087495061684262,
+            "climb_boundary": 86.92164737927013,
+            "climb_margin": 32.50524714505937
+          },
+          "final": {
+            "altitude": 110.51034847812147,
+            "target_relative_speed": 8.5795372843314,
+            "falling": 8.504410218598993,
+            "climb_boundary": 71.44649986332422,
+            "climb_margin": 39.06384861479725
+          },
+          "first_applied": [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          "brake_raw_range": null,
+          "host_reason": {
+            "avoidance": {
+              "obstacle": "sun",
+              "waypoint": {
+                "x": 1224.9835205078125,
+                "y": 1046.6519775390625
+              }
+            },
+            "capture": null,
+            "combat": null,
+            "completed_recoveries": 0,
+            "completed_sorties": 0,
+            "destination_planning": {
+              "last_switch": null,
+              "switches": 0
+            },
+            "events": [
+              {
+                "kind": "selected",
+                "planet": 0,
+                "reason": null,
+                "tick": 1
+              }
+            ],
+            "frame_changes": 1,
+            "goal": "transfer",
+            "goal_since": 1143,
+            "hunt_clearance_handoff": "material_hunt_clearance_handoff_v1",
+            "opponent": null,
+            "policy": "material_mission_v13",
+            "pursuit": null,
+            "reason": null,
+            "recovery": null,
+            "replans": 0,
+            "target": 0
+          }
+        }
+      }
+    }
+  ],
+  "categories": {
+    "sun": 12,
+    "launch": 4
+  },
+  "all_four_failed": 6,
+  "at_least_one_control_arrived": 10
+}

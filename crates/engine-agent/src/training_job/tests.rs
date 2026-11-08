@@ -296,6 +296,10 @@ fn previews_and_periodic_validation_do_not_change_evolution_and_resume_pending_v
     assert!(!replay.trace.is_empty() && replay.trace.len() <= 1200);
     assert_eq!(replay, source.best.unwrap().replay(1).unwrap());
     assert_eq!(manager.control().snapshot().evaluated_candidates, 4);
+    manager
+        .control()
+        .set_workers(WorkerConfig::Fixed { workers: 4 })
+        .unwrap();
     manager.control().resume().unwrap();
     let completed = wait_for(&manager.control(), |s| s.state == JobState::Completed);
     assert_eq!(
@@ -307,10 +311,11 @@ fn previews_and_periodic_validation_do_not_change_evolution_and_resume_pending_v
         [1, 4]
     );
     assert!(completed.validation.iter().all(|v| v.cases.len() == 6));
+    assert_eq!(completed.workers.as_ref().unwrap().active, 0);
     drop(manager);
     let restored = Job::load_latest(root.path()).unwrap().unwrap();
     while !control.complete() {
-        control.advance().unwrap();
+        control.advance(None).unwrap();
     }
     assert_eq!(restored.run.encode().unwrap(), control.encode().unwrap());
     assert_eq!(restored.validation, completed.validation);

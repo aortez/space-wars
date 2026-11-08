@@ -197,7 +197,12 @@ fn grass_progress(name: &'static str, renderer: &'static str) {
             &serde_json::json!({"fixture":"favorable-v1","seed":4242,"renderer":renderer,"playback":1,"first_visible":first_shoot,"three_mature":established,"sequence":sequence}),
         );
         assert!(first_shoot.is_some_and(|s| s <= 5));
-        assert!(established.is_some_and(|s| (180..=300).contains(&s)));
+        // Each seed now grows from its own origin (#559), matching the
+        // headless favorable-establishment contract's 120–200 second window.
+        assert!(
+            established.is_some_and(|s| (120..=200).contains(&s)),
+            "three mature blades at biological second {established:?}"
+        );
         let final_state = h.clock_state();
         let view = final_state
             .grass
@@ -732,6 +737,26 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
     });
 }
 
+/// The digit surfaces of a face no event is moving: all anchored and none
+/// departing, with every one the run admitted either live or retired.
+fn digit_surfaces_at_rest(state: &ClockState) -> engine_common::ClockSurfaceAccounting {
+    let surfaces = state.digit_surfaces.as_ref().expect("the digit surfaces");
+    let run = surfaces.accounting;
+    assert!(run.live > 0 && run.live <= surfaces.limits.live);
+    assert_eq!(run.departing, 0);
+    assert_eq!(
+        surfaces
+            .sources
+            .iter()
+            .map(|count| (count.source, count.live))
+            .collect::<Vec<_>>(),
+        [(engine_common::ClockSurfaceSource::Anchored, run.live)]
+    );
+    assert_eq!(run.admitted - run.retired.total(), run.live as u64);
+    assert!(!surfaces.sample.is_empty() && surfaces.sample.len() <= surfaces.limits.sample);
+    run
+}
+
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn digit_slide_controls_preview_cleanup_and_persistence() {
@@ -762,11 +787,25 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
             engine_common::ClockEventTrigger::TimeChange
         );
         assert_eq!(catalog.duration_ticks, scenario_clock::DIGIT_SLIDE_TICKS);
+        let face = digit_surfaces_at_rest(&initial);
         harness.clock_trigger_event(&initial, ClockEventKind::DigitSlide);
         // The animation lasts less than a second. Don't require a loaded CI
         // process to catch it: exact phases/pause/rendering are core tests.
         let recovered = harness.clock_wait(&initial, "idle", initial.event_id + 1, 0);
         assert!(recovered.digit_slide.is_none());
+        // The live minute can change before or during this preview. Outgoing
+        // cells change owner once; incoming cells either settle (another
+        // handoff) or retire as interrupted when a newer reading supersedes
+        // them. Neither outcome may leave surfaces owned by the slide.
+        let slid = digit_surfaces_at_rest(&recovered);
+        let outgoing = slid.departed - face.departed;
+        let interrupted = slid.retired.interrupted - face.retired.interrupted;
+        assert!(outgoing > 0);
+        assert!(slid.retired.replaced >= face.retired.replaced + outgoing);
+        assert!(slid.handed_off - face.handed_off + interrupted >= 2 * outgoing);
+        if interrupted > 0 {
+            assert_ne!(initial.display_digits, recovered.display_digits);
+        }
         assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
         assert_eq!(recovered.next_event_tick, None);
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
@@ -802,6 +841,9 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
         let restarted = harness.clock_state();
         assert_eq!(restarted.event_id, 0);
         assert_eq!(restarted.settings, configured.settings);
+        // A restart is a new run, which admits a new face and nothing else.
+        let fresh = digit_surfaces_at_rest(&restarted);
+        assert!(fresh.admitted < digit_surfaces_at_rest(&recovered).admitted);
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.return-to-launcher", &menu);
@@ -947,6 +989,9 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             page.selected_control.as_deref(),
             Some("pause.clock.aquarium")
         );
+        // Spider sits between Aquarium and the recipe in the Marquee row.
+        page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.spider"));
         page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
             page.selected_control.as_deref(),
@@ -1269,6 +1314,8 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.aquarium", "Off", &page);
         page = harness.change_clock_setting("pause.clock.cell-swap", "Off", &page);
         page = harness.change_clock_setting("pause.clock.grass", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.slot-machine", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.spider", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -1335,7 +1382,14 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             page.selected_control.as_deref(),
             Some("pause.clock.cell-swap")
         );
-        let page = harness.press_guarded(UiAction::Down, &page);
+        let page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.grass"));
+        let page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.slot-machine")
+        );
+        let page = harness.press_guarded(UiAction::Right, &page);
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
@@ -1571,6 +1625,12 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
             control_value(&state, "launcher.settings.clock.crow.next"),
             Some("Off")
         );
+        // The spider is a resident visit too, in the run's arena.
+        let state = harness.activate_guarded("launcher.settings.clock.spider.next", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.spider.next"),
+            Some("Off")
+        );
         assert_eq!(
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Demo")
@@ -1589,7 +1649,10 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
         );
         assert!(initial.events.iter().all(|event| event.enabled
             == (event.trigger == engine_common::ClockEventTrigger::Periodic
-                && !matches!(event.kind, ClockEventKind::Duck | ClockEventKind::Crow))));
+                && !matches!(
+                    event.kind,
+                    ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::Spider
+                ))));
         assert!((360..=600).contains(&initial.next_event_tick.unwrap()));
         let mut previous = None;
         for event_id in 1..=2 {
@@ -1631,10 +1694,14 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
                 ClockEventKind::Grass
                 | ClockEventKind::ColorCycle
                 | ClockEventKind::Marquee
-                | ClockEventKind::CellSwap => {
+                | ClockEventKind::CellSwap
+                | ClockEventKind::SlotMachine => {
                     assert_eq!((active.body_count, active.collider_count), (0, 0));
                 }
-                ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::DigitSlide => {
+                ClockEventKind::Duck
+                | ClockEventKind::Crow
+                | ClockEventKind::Spider
+                | ClockEventKind::DigitSlide => {
                     panic!("resident/time-change kind admitted to timed cadence smoke: {kind:?}");
                 }
             }
@@ -1672,6 +1739,8 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.grass.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
+            "launcher.settings.clock.slot-machine.next",
+            "launcher.settings.clock.spider.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);
@@ -1922,7 +1991,16 @@ impl FunctionalHarness {
     }
 
     fn clock_trigger_failure(&mut self, state: &ClockState, code: ControlFailureCode) {
-        let request = ClockTriggerRequest::new(state, ClockEventKind::Falling);
+        let failure = self.clock_trigger_refusal(state, ClockEventKind::Falling);
+        assert_eq!(failure.code, code);
+    }
+
+    fn clock_trigger_refusal(
+        &mut self,
+        state: &ClockState,
+        event: ClockEventKind,
+    ) -> ControlFailure {
+        let request = ClockTriggerRequest::new(state, event);
         let error = self
             .client
             .clock_trigger_before(&request, request_deadline())
@@ -1931,7 +2009,7 @@ impl FunctionalHarness {
             &format!("clock trigger {request:?} (expected rejection)"),
             &error,
         );
-        assert_eq!(error.failure().unwrap().code, code);
+        error.failure().unwrap().clone()
     }
 
     fn require_clock(
@@ -2253,6 +2331,158 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
     });
 }
 
+/// Each owner holding the arena, in the order it claimed it, and whether it
+/// is a resident.
+fn arena_owners(state: &ClockState) -> Vec<(engine_common::ClockArenaOwner, bool)> {
+    state
+        .arena
+        .as_ref()
+        .expect("Clock publishes its arena")
+        .claims
+        .iter()
+        .map(|claim| (claim.owner, claim.resident))
+        .collect()
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run() {
+    use engine_common::{ClockArenaOwner, ClockArenaUnavailable};
+    // The harness starts every clock-arena run with the arena fixture's two
+    // owners: the ordinary three balls, and two more near the walls, where
+    // every visit's course has ground.
+    run_functional_test("clock-arena-residents", |harness| {
+        let fixtures = [
+            (ClockArenaOwner::Fixture { index: 0 }, true),
+            (ClockArenaOwner::Fixture { index: 1 }, true),
+        ];
+        // A run's arena as it starts: the fixtures alone, with all their
+        // balls, in the run's one world.
+        let fresh = |state: &ClockState| {
+            assert_eq!(arena_owners(state), fixtures);
+            let arena = state.arena.as_ref().unwrap();
+            let balls: Vec<_> = arena
+                .claims
+                .iter()
+                .map(|claim| claim.population.bodies)
+                .collect();
+            assert_eq!(balls, [3, 2]);
+            let run = arena.accounting;
+            assert_eq!(
+                (run.granted, run.released, run.refused, run.worlds),
+                (2, 0, 0, 1)
+            );
+        };
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        let state =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.event-profile.next"),
+            Some("Off")
+        );
+        harness.activate_guarded("launcher.settings.start", &state);
+        harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        fresh(&initial);
+
+        // Idle, the residents keep the arena with all they had while it steps
+        // under them.
+        let steps = initial.arena.as_ref().unwrap().accounting.steps + 120;
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        let resting = loop {
+            let state = harness.clock_state();
+            if state.arena.as_ref().unwrap().accounting.steps >= steps {
+                break state;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the arena stopped stepping: {state:?}"
+            );
+            thread::sleep(POLL_INTERVAL);
+        };
+        fresh(&resting);
+        let arena = resting.arena.as_ref().unwrap();
+        assert_eq!(arena.claims, initial.arena.as_ref().unwrap().claims);
+        assert!(arena.last_step.is_some());
+        assert!(
+            resting
+                .events
+                .iter()
+                .all(|event| event.blocked_by_arena.is_none())
+        );
+        harness.capture_screenshot("clock-arena-residents.png");
+
+        // A visit joins their world. Beside it, the two leave no room for the
+        // largest events, and the client refuses Meltdown for that reason.
+        harness.clock_trigger_event(&resting, ClockEventKind::Duck);
+        let predicate = ClockStatePredicate {
+            scenario_revision: resting.scenario_revision,
+            lifecycle: None,
+            event_kind: Some(ClockEventKind::Duck),
+            phase: None,
+            event_id: Some(1),
+            min_phase_tick: 0,
+        };
+        let result = harness
+            .client
+            .wait_for_clock_state(&predicate, TRANSITION_TIMEOUT);
+        let visiting = harness.require_clock(&format!("clock wait {predicate:?}"), result);
+        let refusal = harness.clock_trigger_refusal(&visiting, ClockEventKind::Meltdown);
+        assert_eq!(refusal.code, ControlFailureCode::ActionUnavailable);
+        assert_eq!(refusal.message, ClockArenaUnavailable::Capacity.notice());
+        // The client refused from what Clock published, so the arena was
+        // never asked.
+        let refused = refusal
+            .current_clock_state
+            .expect("the state it refused in");
+        let owners = arena_owners(&refused);
+        assert_eq!(owners[..2], fixtures);
+        assert!(owners.contains(&(ClockArenaOwner::Visit, false)));
+        let run = refused.arena.as_ref().unwrap().accounting;
+        assert_eq!((run.refused, run.worlds), (0, 1));
+        // The spider's room is Meltdown's, so it is refused with them.
+        for event in &refused.events {
+            let largest = matches!(
+                event.kind,
+                ClockEventKind::Aquarium
+                    | ClockEventKind::Explosion
+                    | ClockEventKind::Meltdown
+                    | ClockEventKind::Spider
+            );
+            assert_eq!(
+                event.blocked_by_arena,
+                largest.then_some(ClockArenaUnavailable::Capacity),
+                "{:?}",
+                event.kind
+            );
+        }
+        harness.capture_screenshot("clock-arena-visit.png");
+
+        // A restart ends the run with its residents and the visit, and the
+        // next starts anew, as does a new start from the launcher.
+        let gameplay = harness.state();
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert_ne!(restarted.scenario_revision, initial.scenario_revision);
+        assert_eq!(restarted.duck, None);
+        fresh(&restarted);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.return-to-launcher", &menu);
+        let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        harness.activate_guarded("launcher.start", &launcher);
+        harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        let relaunched = harness.clock_state();
+        assert_ne!(relaunched.scenario_revision, restarted.scenario_revision);
+        fresh(&relaunched);
+    });
+}
+
 #[test]
 #[ignore = "requires display and the complete ordinary-speed sunlight/aftermath sequence"]
 fn ceiling_opening_vector_normal_speed_and_aftermath() {
@@ -2305,6 +2535,7 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
         let mut history = Vec::new();
         let mut readings = std::collections::BTreeSet::new();
         let mut hold_shoots = 0;
+        let mut mat_at_close = 0;
         loop {
             let current = h.clock_state();
             let g = current.grass.as_ref().unwrap();
@@ -2314,6 +2545,8 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
             assert_eq!(g.optical_refusals, 0);
             assert_eq!(g.soil_added, g.soil_retained as u64 + g.soil_exported);
             assert!(g.living_tissues <= 64 && g.soil_retained <= 2880);
+            // Grass and the retained mat each answer to their own budget.
+            assert!(g.moss_tissues + g.moss_dead <= 18);
             assert_eq!(
                 g.ceiling_planned_material,
                 g.ceiling_pending_material as u64
@@ -2338,12 +2571,24 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
                 if label == "partial-closing" {
                     assert_eq!(g.ceiling_phase, "closing");
                     assert!((100..900).contains(&g.ceiling_opening_milli));
+                    // Nothing is admitted while the ceiling is still closing.
+                    assert_eq!(g.moss_tissues, 0);
                 }
                 if at >= 366 {
                     assert_eq!(g.ceiling_phase, "closed");
                 }
+                if label == "closed" {
+                    // Succession is admitted at the boundary the hold ends on,
+                    // one mat per opening, while the lit patch is still whole.
+                    assert!(g.moss_tissues > 0);
+                    assert_eq!(g.living_tissues, 64);
+                    mat_at_close = g.moss_tissues;
+                }
                 if label == "aftermath-60" {
                     assert!(g.shoots > 0 && g.stressed_tissues > 0);
+                    // Checkpoints are sampled against a real clock, so growth
+                    // is only required to hold, not to have advanced yet.
+                    assert!(g.moss_tissues >= mat_at_close);
                 }
                 if label == "aftermath-120" {
                     assert!(g.shoots > 0 && g.stressed_tissues > 0);
@@ -2352,7 +2597,11 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
                     assert_eq!(g.shoots, 0);
                 }
                 if label == "aftermath-300" {
+                    // The grass is gone and the mat is what the floor keeps:
+                    // the dim room saturates moss where it shades a blade out.
                     assert!(g.shoots < hold_shoots);
+                    assert!(g.moss_tissues > mat_at_close && g.moss_dead == 0);
+                    assert!(g.living_tissues < 64);
                 }
                 let capture = format!("ceiling-{renderer}-{at:03}-{label}.png");
                 h.capture_screenshot(&capture);
@@ -2387,6 +2636,50 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
             readings.len() >= 5,
             "Clock readings must continue through sunlight and aftermath"
         );
+        // A retained mat is not grass occupancy, so the next opening still
+        // delivers its layer and still plants its batch over the cover the
+        // last one left. Only the admission is sampled at this speed; the
+        // deterministic sequence belongs to the scenario contracts.
+        // Reseeding answers to grass occupancy, and the patch still holds its
+        // last tissues at the final checkpoint, so wait for it to retire
+        // first. Otherwise the refusal under test is the old patch's, not the
+        // mat's, and the mat outliving the patch is the claim being made here.
+        let cleared = Instant::now();
+        let mats = loop {
+            let current = h.clock_state();
+            let g = current.grass.as_ref().unwrap();
+            if g.living_tissues == 0 {
+                assert!(
+                    g.moss_tissues > 0,
+                    "the mat must outlive the patch it succeeded"
+                );
+                break g.moss_tissues;
+            }
+            assert!(
+                cleared.elapsed() < Duration::from_secs(240),
+                "the grass patch must retire before the mat is asked to share"
+            );
+            thread::sleep(Duration::from_millis(100));
+        };
+        let succeeded = h.clock_state();
+        h.clock_trigger_event(&succeeded, ClockEventKind::Grass);
+        let reseed = Instant::now();
+        loop {
+            let current = h.clock_state();
+            let g = current.grass.as_ref().unwrap();
+            if g.ceiling_sequence == 2 && g.ceiling_deliveries == 2 && g.seeded > 0 {
+                assert_eq!(g.seeded, 3);
+                assert_eq!(g.refusal, None);
+                assert!(g.moss_tissues >= mats);
+                h.capture_screenshot(&format!("ceiling-{renderer}-reseeded.png"));
+                break;
+            }
+            assert!(
+                reseed.elapsed() < Duration::from_secs(120),
+                "a later opening must reseed over the retained mat"
+            );
+            thread::sleep(Duration::from_millis(100));
+        }
         let before = h.clock_state();
         let gameplay = h.state();
         h.activate_guarded("gameplay.clock-controls", &gameplay);

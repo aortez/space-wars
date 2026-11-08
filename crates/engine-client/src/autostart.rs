@@ -94,7 +94,11 @@ pub(crate) fn install(
     }));
 
     let state = Rc::clone(&runtime);
+    let activity_window = window.as_weak();
     window.global::<UserActivity>().on_notify(move || {
+        if let Some(w) = activity_window.upgrade() {
+            w.invoke_updates_activity();
+        }
         state.borrow_mut().idle.reset();
         // Automatic launch changes the launch policy, not the input scheme.
         // Only an explicit Launcher action ends an automatic session.
@@ -102,9 +106,13 @@ pub(crate) fn install(
     });
 
     let state = Rc::clone(&runtime);
+    let activity_window = window.as_weak();
     window
         .global::<UserActivity>()
         .on_key_event(move |key, down| {
+            if let Some(w) = activity_window.upgrade() {
+                w.invoke_updates_activity();
+            }
             let key = key.to_string();
             let mut state = state.borrow_mut();
             state.idle.reset();
@@ -123,6 +131,7 @@ pub(crate) fn install(
         state.keys.clear();
         state.idle.reset();
         if let Some(window) = weak.upgrade() {
+            window.invoke_updates_interrupted();
             window.global::<UserActivity>().set_pointer_held(false);
             window.invoke_network_conceal();
         }
@@ -135,6 +144,9 @@ pub(crate) fn install(
     let return_writer = writer.clone();
     window.on_autostart_return(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         return_launcher.cancel_automatic();
         window.set_autostart_running(false);
         window.set_autostart_activity("".into());
@@ -155,6 +167,9 @@ pub(crate) fn install(
     let weak = window.as_weak();
     window.on_autostart_open(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         if window.get_sound_visible() && !window.get_launcher_busy() {
             window.set_sound_focus_index(4);
             window.set_autostart_focus_index(0);
@@ -167,6 +182,9 @@ pub(crate) fn install(
     let state = Rc::clone(&runtime);
     window.on_autostart_adjust(move |index, delta| {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         if !window.get_autostart_settings_visible() {
             return;
         }
@@ -221,6 +239,9 @@ pub(crate) fn install(
     let start_launcher = Rc::clone(&launcher);
     window.on_autostart_start_now(move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() {
+            return;
+        }
         let p = start_settings.read().unwrap().autostart.normalized();
         if !window.get_launcher_visible()
             || window.get_launcher_busy()
@@ -239,6 +260,11 @@ pub(crate) fn install(
     let weak = window.as_weak();
     timer.start(TimerMode::Repeated, Duration::from_millis(100), move || {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_install_fenced() || window.get_updates_visible() {
+            let mut state = runtime.borrow_mut();
+            state.idle.reset(); state.last_tick = Instant::now();
+            return;
+        }
         let now = Instant::now();
         let p = settings.read().unwrap().autostart.normalized();
         let (elapsed, held) = {

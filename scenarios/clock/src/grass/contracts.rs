@@ -340,7 +340,9 @@ fn clock_grass_contract_all_floor_adapters_and_shared_arena_preserve_material_id
             let a = soil.accounting();
             assert_eq!(a.added, a.retained as u64 + a.exported);
             assert_eq!(a.added, 1200);
-            if let Some(world) = surfaces::world(&s.active_event, s.duck_visit.as_deref()) {
+            if let Some(world) =
+                crate::arena::canonical_world(&s.active_event, s.duck_visit.is_some(), &s.arena)
+            {
                 assert!(
                     world.contains_entity(PhysicsId::new(SOIL_PHYSICS_ID)),
                     "{kind:?}"
@@ -453,7 +455,11 @@ fn clock_grass_contract_favorable_establishment_timing() {
         "favorable-v1 seed=215 column=10 intensity=1000 first-visible={visible:?} three-mature={established:?}"
     );
     assert!(visible.is_some_and(|s| s <= 5));
-    assert!(established.is_some_and(|s| (180..=300).contains(&s)));
+    // The batch's seeds are separate patches, each planning inside its own
+    // origin and radius. One retained policy used to plan every seed from the
+    // first seed's origin, which truncated the outer two and slowed the whole
+    // batch; the measured window widened downward when that was corrected.
+    assert!(established.is_some_and(|s| (120..=200).contains(&s)));
     if let Some(path) = std::env::var_os("SPACEWARS_CLOCK_GRASS_ARTIFACTS") {
         let path = std::path::PathBuf::from(path);
         std::fs::create_dir_all(&path).unwrap();

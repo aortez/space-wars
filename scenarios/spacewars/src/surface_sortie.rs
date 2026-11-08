@@ -17,6 +17,10 @@ pub mod comparison;
 pub mod compatibility;
 pub mod destination_cover;
 pub mod flight;
+pub mod flight_calibration;
+pub mod flight_environment;
+pub mod flight_policy_observation;
+pub mod flight_sensing;
 pub mod free_flight;
 mod ground_diagnostics;
 pub mod ground_navigation;
@@ -53,7 +57,7 @@ mod travel;
 pub use claim::{
     PlanetClaimObservation, PlanetClaimPhase, PlanetClaimStatus, PlanetFlagObservation,
 };
-pub use flight::SurfaceWingAction;
+pub use flight::{SurfaceFlightAction, SurfaceWingAction};
 pub use landing::{LandingPhase, LandingTelemetry};
 pub use material::{SurfaceMiningAction, SurfaceMiningObservation, dirt_config};
 pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
@@ -200,10 +204,12 @@ pub(super) struct SurfacePilot {
     motion_metrics: SurfaceMotionMetrics,
     idle_anchor: Option<(bool, Vec2)>,
     input: SurfaceSortieAction,
+    flight_input: Option<SurfaceFlightAction>,
     interact_was_held: bool,
     controls_armed: bool,
     wing_input: bool,
     flight_enabled: bool,
+    flight_control_mode: flight::FlightControlMode,
     pub(super) combat: Option<combat::CombatSeat>,
     vitals: Option<match_rules::PilotVitals>,
     damage: impact::SurfaceDamageObservation,
@@ -254,10 +260,12 @@ impl SurfacePilot {
             motion_metrics: SurfaceMotionMetrics::default(),
             idle_anchor: None,
             input: SurfaceSortieAction::default(),
+            flight_input: None,
             interact_was_held: false,
             controls_armed: false,
             wing_input: false,
             flight_enabled: false,
+            flight_control_mode: flight::FlightControlMode::default(),
             combat: None,
             vitals: None,
             damage: impact::SurfaceDamageObservation::default(),
@@ -823,6 +831,12 @@ impl Scenario for SurfaceSortieScenario {
         for (player, input) in actions.iter().filter_map(SurfaceSortieAction::decode) {
             if let Some(pilot) = state.pilots.get_mut(player.index()) {
                 pilot.input = input;
+                pilot.flight_input = None;
+            }
+        }
+        for (player, input) in actions.iter().filter_map(SurfaceFlightAction::decode) {
+            if let Some(pilot) = state.pilots.get_mut(player.index()) {
+                pilot.flight_input = Some(input);
             }
         }
         // Bounded seat-local samples; no per-tick actor collection allocation.
@@ -838,6 +852,9 @@ impl Scenario for SurfaceSortieScenario {
             let input = state.pilots[player].input;
             if !state.pilots[player].controls_armed {
                 state.pilots[player].controls_armed = input == SurfaceSortieAction::default()
+                    && state.pilots[player]
+                        .flight_input
+                        .is_none_or(|a| a == SurfaceFlightAction::default())
                     && !state.pilots[player].wing_input
                     && !state.damage.held[player]
                     && state.pilots[player]
@@ -874,8 +891,13 @@ impl Scenario for SurfaceSortieScenario {
                 pilot.facing = effective.horizontal.signum();
             }
             let ship = &mut state.world.ships[pilot.vehicle.0];
-            ship.set_thrust(if !on_foot && !ship.dead && effective.primary_held {
-                1.0
+            let analog = if pilot.controls_armed {
+                pilot.flight_input
+            } else {
+                None
+            };
+            ship.set_thrust(if !on_foot && !ship.dead && pilot.controls_armed {
+                analog.map_or(f32::from(effective.primary_held), |a| a.thrust)
             } else {
                 0.0
             });
@@ -884,8 +906,8 @@ impl Scenario for SurfaceSortieScenario {
             } else {
                 effective.horizontal
             });
-            ship.set_brake(if !on_foot && !ship.dead && effective.brake_held {
-                1.0
+            ship.set_brake(if !on_foot && !ship.dead && pilot.controls_armed {
+                analog.map_or(f32::from(effective.brake_held), |a| a.brake)
             } else {
                 0.0
             });

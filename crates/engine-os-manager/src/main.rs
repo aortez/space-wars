@@ -2,6 +2,8 @@ use clap::{Parser, Subcommand};
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
+mod install_cli;
+
 #[derive(Parser)]
 #[command(about = "Space-Wars independent device service")]
 struct Args {
@@ -34,6 +36,10 @@ enum Command {
         /// The four original SSH_CONNECTION fields, quoted as one argument.
         #[arg(long)]
         ssh_connection: String,
+        /// Boot ID of an earlier request that came back to the original default
+        /// without a trial, such as a hung reboot that was power-cycled.
+        #[arg(long)]
+        retry_interrupted_request: Option<String>,
     },
     /// Run the root-owned device service (normally started by systemd).
     Serve,
@@ -57,6 +63,11 @@ enum Command {
     SyncNow,
     /// Queue a bounded update check/download; never installs or reboots.
     CheckUpdates,
+    /// Inspect or explicitly confirm a candidate-bound manual installation.
+    Install {
+        #[command(subcommand)]
+        operation: install_cli::Command,
+    },
     /// Select a signed update channel; this does not change the installed image.
     UpdateChannel {
         #[arg(value_parser = ["release", "nightly"])]
@@ -119,6 +130,27 @@ enum MaintenanceCommand {
     },
     /// Change the fixed experimental renderer under the OTA lock.
     Renderer { renderer: String },
+    /// Opt-in installs of locally built images over SSH, with the OTA trial and recovery.
+    Development {
+        #[command(subcommand)]
+        operation: DevelopmentCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum DevelopmentCommand {
+    /// Allow development installs on this unit.
+    Enable,
+    /// Refuse development installs again; the installed image is unchanged.
+    Disable,
+    /// Report whether development installs are enabled and what is installed.
+    Status,
+    /// Write a staged image to the inactive slot and request its trial reboot.
+    Install {
+        /// Private root-owned directory with development.json and <sha256>.ext4.zst.
+        stage: std::path::PathBuf,
+        payload_sha256: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -193,6 +225,7 @@ fn run(_args: Args) -> engine_os_manager::Result<()> {
 fn run(args: Args) -> engine_os_manager::Result<()> {
     use engine_os_manager::{RTC_BOOT_PATH, SOCKET_PATH, linux, service};
     match args.command {
+        Command::Install { operation } => install_cli::run(operation)?,
         Command::CheckUpdates => println!(
             "{}",
             serde_json::to_string(&service::update_request(
@@ -253,6 +286,7 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             written_root,
             trial,
             ssh_connection,
+            retry_interrupted_request,
         } => {
             daemon::require_root()?;
             let digest = |value: String| {
@@ -264,6 +298,7 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                 digest(written_root)?,
                 digest(trial)?,
                 &ssh_connection,
+                retry_interrupted_request.as_deref(),
             )?;
             println!("{}", serde_json::to_string(&report)?);
         }
@@ -401,6 +436,57 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                 ),
                 MaintenanceCommand::Fast { arguments } => run(Request::fast(arguments)?)?,
                 MaintenanceCommand::Renderer { renderer } => run(Request::renderer(renderer)?)?,
+                MaintenanceCommand::Development { operation } => {
+                    use engine_ota::development_linux as development;
+                    let status = match operation {
+                        DevelopmentCommand::Enable => development::enable()?,
+                        DevelopmentCommand::Disable => development::disable()?,
+                        DevelopmentCommand::Status => development::status()?,
+                        DevelopmentCommand::Install {
+                            stage,
+                            payload_sha256,
+                        } => {
+                            use std::io::Write;
+                            let digest = engine_ota::Sha256::try_from(payload_sha256)
+                                .map_err(|error| engine_os_manager::Error::Invalid(error.into()))?;
+                            // Output errors are ignored: a dropped SSH connection
+                            // must not stop a write the journal already owns.
+                            let mut shown = None;
+                            let transaction = development::install(
+                                &stage,
+                                digest,
+                                engine_os_manager::maintenance::require_clear_handoff,
+                                |progress| {
+                                    let percent = (progress.bytes * 100)
+                                        .checked_div(progress.total)
+                                        .unwrap_or(100);
+                                    let step = (progress.stage, percent / 10 * 10);
+                                    if shown != Some(step) {
+                                        shown = Some(step);
+                                        let stage = serde_json::to_value(progress.stage)
+                                            .ok()
+                                            .and_then(|value| value.as_str().map(str::to_owned))
+                                            .unwrap_or_default();
+                                        let _ = writeln!(
+                                            std::io::stderr(),
+                                            "{stage}: {}% of {} MiB",
+                                            step.1,
+                                            progress.total >> 20
+                                        );
+                                    }
+                                },
+                                engine_os_manager::maintenance::request_development_reboot,
+                            )?;
+                            let _ = writeln!(
+                                std::io::stdout(),
+                                "{}",
+                                serde_json::json!({"transaction": transaction, "reboot_requested": true})
+                            );
+                            return Ok(());
+                        }
+                    };
+                    println!("{}", serde_json::to_string(&status)?);
+                }
             }
         }
         Command::CaptureRtc => {
@@ -567,6 +653,10 @@ mod daemon {
             boot_id.clone(),
         )?;
         let update_status = updates.handle();
+        let _install = engine_os_manager::install_handoff::service::Runtime::bind_native(
+            boot_id.clone(),
+            updates.handle(),
+        )?;
         let update_action = update_status.clone();
         let time_checks = engine_os_manager::time_runtime::spawn(
             shared.clone(),

@@ -1,6 +1,7 @@
 //! Clock-owned sunlight opportunity. The timed event slot never owns the hold.
 use crate::{ClockState, layout::Layout};
-use engine_core::lighting::{ApertureSource, LightId};
+use engine_core::lighting::{ApertureSource, LightId, MAX_APERTURES};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
 pub const OPENING_DURATION: Duration = Duration::from_secs(5);
@@ -8,6 +9,13 @@ pub const OPEN_DURATION: Duration = Duration::from_secs(300);
 pub const CLOSING_DURATION: Duration = Duration::from_secs(60);
 /// Owner half of the sunlight identity; the opening sequence completes it.
 pub const SUNLIGHT_OWNER: u64 = 0x4345_494c_494e_4700;
+/// One opening is the quiet case; several give separate lit patches. Bounded
+/// below the organism limit so every patch can hold its own resident.
+pub const MAX_OPENINGS: usize = 3;
+/// Narrowest useful opening: a patch needs a few columns of lit soil.
+const MIN_OPENING_CELLS: f32 = 3.0;
+/// Lit floor runs beside the clock face, one corridor on each side.
+pub(crate) const CORRIDORS: usize = 2;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Phase {
@@ -30,6 +38,11 @@ pub struct Ceiling {
     pub cancelled_material: u64,
     pub planned_material: u64,
     pub committed_material: u64,
+    /// Disjoint openings as (corridor, seat, low, high), with low and high the
+    /// fractional span inside that seat. Seats partition their corridor, so
+    /// openings cannot overlap, and fractions survive a resize as the same
+    /// holes rather than new ones.
+    openings: Vec<(usize, usize, f32, f32)>,
 }
 /// Explicit compatibility for every current event category. Water replacement
 /// retires the opportunity; other effects keep one independent source owner.
@@ -38,11 +51,11 @@ pub(crate) fn compatible_event(kind: engine_common::ClockEventKind) -> bool {
     match kind {
         Meltdown | Aquarium => false,
         Falling | ColorCycle | Explosion | Duck | Marquee | DigitSlide | Rain | Crow | CellSwap
-        | Grass => true,
+        | Grass | SlotMachine | Spider => true,
     }
 }
 impl Ceiling {
-    pub fn start(&mut self) -> bool {
+    pub fn start(&mut self, seed: u64) -> bool {
         if self.phase != Phase::Closed {
             return false;
         }
@@ -50,7 +63,27 @@ impl Ceiling {
         self.phase = Phase::Opening;
         self.elapsed = Duration::ZERO;
         self.pending = true;
+        self.openings = Self::plan_openings(seed);
         true
+    }
+
+    /// One opening per equal slot of its corridor, jittered inside that slot.
+    /// Partitioning keeps every opening disjoint, which the lighting
+    /// publication requires, without rejecting a drawn layout. Sides alternate,
+    /// so a single opening takes the left corridor and a pair takes one each.
+    fn plan_openings(seed: u64) -> Vec<(usize, usize, f32, f32)> {
+        let mut rng = StdRng::seed_from_u64(seed ^ 0x4345_494c_5f48_4f4c);
+        let count = rng.random_range(1..=MAX_OPENINGS);
+        let mut openings = Vec::with_capacity(count);
+        for side in 0..CORRIDORS {
+            let share = count / CORRIDORS + usize::from(side < count % CORRIDORS);
+            for seat in 0..share {
+                let width = rng.random_range(0.62..0.98);
+                let low = (1.0 - width) * rng.random_range(0.0..1.0);
+                openings.push((side, seat, low, low + width));
+            }
+        }
+        openings
     }
     pub fn cancel(&mut self) {
         if self.phase != Phase::Closed {
@@ -92,6 +125,16 @@ impl Ceiling {
         }
         delivered
     }
+    /// Time since this opening delivered its layer, for the decorative cover's
+    /// recession. `None` before delivery and once the ceiling has closed, so
+    /// the cover appears with the material and leaves with the light.
+    pub(crate) fn cover_age(&self) -> Option<Duration> {
+        match self.phase {
+            Phase::Open => Some(self.elapsed),
+            Phase::Closing => Some(OPEN_DURATION + self.elapsed),
+            Phase::Opening | Phase::Closed => None,
+        }
+    }
     pub fn fraction(&self) -> f32 {
         match self.phase {
             Phase::Closed => 0.0,
@@ -100,64 +143,134 @@ impl Ceiling {
             Phase::Closing => 1.0 - self.elapsed.as_secs_f32() / CLOSING_DURATION.as_secs_f32(),
         }
     }
-    pub(crate) fn region(layout: Layout) -> (f32, f32) {
-        // Keep the baseline opportunity beside every 6×9 font, rather than
-        // beneath whichever segments happen to form the current hour.
-        // Narrow layouts admit fewer seeds into the smaller real corridor;
-        // wide layouts keep material and beam work bounded to a small patch.
-        let left = layout.bounds_min.x + layout.frame_width + 2.0;
-        let right = (layout.face_origin.x - 2.0).min(left + 48.0);
-        (left, right)
+    /// Floor an opening may be cut above. Material covers the whole floor, but
+    /// sunlight only reaches the corridors beside the 6×9 font: the face spans
+    /// nearly the whole arena, and a vertical beam through whichever segments
+    /// happen to form the current hour does not sustain a patch. Measured over
+    /// 180 s with openings under the face, every organism died.
+    pub(crate) fn corridors(layout: Layout) -> [(f32, f32); CORRIDORS] {
+        [
+            (
+                layout.bounds_min.x + layout.frame_width,
+                layout.face_origin.x - 2.0,
+            ),
+            (
+                -layout.face_origin.x + 2.0,
+                layout.bounds_max.x - layout.frame_width,
+            ),
+        ]
     }
-    pub(crate) fn source(&self, layout: Layout) -> Option<ApertureSource> {
+
+    /// Outer bounds of the lit corridors, for callers that need one span.
+    pub(crate) fn span(layout: Layout) -> (f32, f32) {
+        let corridors = Self::corridors(layout);
+        (corridors[0].0, corridors[CORRIDORS - 1].1)
+    }
+
+    /// Every live opening, left to right. Closure removes light from both edges
+    /// of each one, so a closing ceiling dims its patches in place.
+    pub(crate) fn sources(&self, layout: Layout) -> Vec<ApertureSource> {
         let fraction = self.fraction();
         if fraction <= 0.0 {
-            return None;
+            return Vec::new();
         }
-        // The admission corridor and source share one layout-derived footprint.
-        // Closure removes light from both edges.
-        let (left, right) = Self::region(layout);
-        let center = (left + right) * 0.5;
-        let half = (right - left) * 0.5 * fraction;
-        Some(ApertureSource {
-            id: LightId(SUNLIGHT_OWNER, self.sequence),
-            left: center - half,
-            right: center + half,
-            ceiling_y: layout.canopy_y,
-            strength: 950.0,
-        })
+        self.seats(layout)
+            .into_iter()
+            .map(|(index, center, width)| {
+                let half = width * 0.5 * fraction;
+                ApertureSource {
+                    // One identity per opening per sequence, so a later ceiling
+                    // can never reuse a live source's lifetime.
+                    id: LightId(
+                        SUNLIGHT_OWNER,
+                        self.sequence * MAX_APERTURES as u64 + index as u64,
+                    ),
+                    left: center - half,
+                    right: center + half,
+                    ceiling_y: layout.canopy_y,
+                    strength: 950.0,
+                }
+            })
+            .collect()
+    }
+
+    /// Full width of every opening in this sequence, whatever the ceiling is
+    /// currently doing. Succession follows the floor the light reached, and a
+    /// closed ceiling publishes no sources left to read.
+    pub(crate) fn lit_spans(&self, layout: Layout) -> Vec<(f32, f32)> {
+        self.seats(layout)
+            .into_iter()
+            .map(|(_, center, width)| (center - width * 0.5, center + width * 0.5))
+            .collect()
+    }
+
+    /// One `(index, center, full width)` per seated opening, left to right.
+    fn seats(&self, layout: Layout) -> Vec<(usize, f32, f32)> {
+        let corridors = Self::corridors(layout);
+        let minimum = MIN_OPENING_CELLS * crate::grass::SOIL_CELL_SIZE;
+        let mut seats = Vec::with_capacity(self.openings.len());
+        for (side, &(start, end)) in corridors.iter().enumerate() {
+            let corridor = (end - start).max(0.0);
+            let seated: Vec<_> = self
+                .openings
+                .iter()
+                .enumerate()
+                .filter(|(_, o)| o.0 == side)
+                .collect();
+            if seated.is_empty() {
+                continue;
+            }
+            let slot = corridor / seated.len() as f32;
+            // A corridor too narrow to seat every planned opening at a useful
+            // width seats one across the whole corridor instead. Overlapping
+            // openings would be refused by the lighting publication outright.
+            let count = if slot < minimum { 1 } else { seated.len() };
+            for &(index, &(_, seat, low, high)) in seated.iter().take(count) {
+                let (slot_start, slot_width) = if count == 1 {
+                    (start, corridor)
+                } else {
+                    (start + slot * seat as f32, slot)
+                };
+                let width = (slot_width * (high - low)).clamp(minimum.min(slot_width), slot_width);
+                let left = (slot_start + slot_width * low).min(slot_start + slot_width - width);
+                seats.push((index, left + width * 0.5, width));
+            }
+        }
+        seats
     }
 }
 impl ClockState {
     pub(crate) fn plan_ceiling_material(&mut self) {
         use crate::grass;
         use engine_rapier::world::{CollisionGroups, PhysicsId};
-        if !self.plants.plants.observe().tissues.is_empty() {
+        if self.plants.grass_tissues() > 0 {
             return;
         }
         let layout = Layout::new(self.aspect_ratio());
-        let (left, right) = Ceiling::region(layout);
+        // An opening delivers an even layer over every actual support. Its
+        // horizontal extent decides where light lands, not where dirt rests.
         let (surfaces, _) = self.soil_surfaces();
         let supports: Vec<_> = surfaces
             .iter()
-            .map(|s| {
-                if self.config.favorable_grass_fixture {
-                    (s.left, s.right)
-                } else {
-                    (s.left.max(left), s.right.min(right))
-                }
-            })
+            .map(|s| (s.left, s.right))
             .filter(|(a, b)| a < b)
             .collect();
         let temporary = grass::SoilHabitat::new(layout);
         let soil = self.soil.as_ref().unwrap_or(&temporary);
-        let world = grass::surfaces::world(&self.active_event, self.duck_visit.as_deref());
+        let world = crate::arena::canonical_world(
+            &self.active_event,
+            self.duck_visit.is_some(),
+            &self.arena,
+        );
         self.ceiling.material = soil
             .plan_admission(&supports, |site| {
                 let Some(surface) = surfaces.iter().find(|s| s.covers(site.min.x, site.max.x))
                 else {
                     return true;
                 };
+                if site.inside_support(layout.floor_y) {
+                    return false;
+                }
                 world.is_some_and(|w| {
                     !w.current_cuboid_is_clear(
                         surface.map((site.min + site.max) * 0.5),
@@ -173,7 +286,120 @@ impl ClockState {
     }
     pub fn cancel_ceiling(&mut self) {
         self.ceiling.cancel();
-        self.plants.aperture = None;
+        self.plants.apertures.clear();
+    }
+
+    /// Succession on the floor the opening lit. The room's own light saturates
+    /// moss where it leaves a grass shoot far below its threshold, so when the
+    /// ceiling finishes closing each former opening keeps one bounded mat on
+    /// the retained soil it exposed, and the corridor holds low cover as the
+    /// lit patch withers. A mat is admitted in the nearest free soil column to
+    /// its opening's span, the span's own columns from the near edge first and
+    /// then outward through the corridor, rather than the centre where the
+    /// next seed batch lands, so the two organisms meet by ordinary occupancy
+    /// in the row they share instead of displacing each other. A cancelled
+    /// ceiling never reaches this boundary.
+    pub(crate) fn introduce_moss(&mut self) {
+        use crate::grass;
+        use engine_core::plants::Role;
+        if !self.config.events.grass {
+            return;
+        }
+        let layout = Layout::new(self.aspect_ratio());
+        let spans = self.ceiling.lit_spans(layout);
+        if spans.is_empty() {
+            return;
+        }
+        self.synchronize_soil();
+        let Some(soil) = self.soil.as_ref() else {
+            return;
+        };
+        // A mat may spread along the corridors the openings are cut through.
+        // Those sit beside the face by construction, so the retained window
+        // stays two ranges however many ceilings have come and gone, and no
+        // mat creeps onto floor that this room's light has never reached.
+        let corridors: Vec<(i32, i32)> = Ceiling::corridors(layout)
+            .into_iter()
+            .filter_map(|(left, right)| soil.columns_within(left, right))
+            .collect();
+        let surface_row = grass::SOIL_DEPTH_CELLS as i32 - 1;
+        let observation = self.plants.plants.observe();
+        let settled: Vec<i32> = observation
+            .tissues
+            .iter()
+            .filter(|t| t.role == Role::Moss && t.health > 0)
+            .map(|t| t.cell[0])
+            .collect();
+        // Any tissue in the mat's row refuses the cell by occupancy, living or
+        // not, so those columns are passed over rather than tried.
+        let occupied: Vec<i32> = observation
+            .tissues
+            .iter()
+            .filter(|t| t.cell[1] == grass::MOSS_ROW)
+            .map(|t| t.cell[0])
+            .collect();
+        let mut orders: Vec<Vec<i32>> = Vec::with_capacity(spans.len());
+        for (left, right) in spans {
+            let Some((low, high)) = soil.columns_within(left, right) else {
+                continue;
+            };
+            let Some(&(start, end)) = corridors
+                .iter()
+                .find(|&&(start, end)| start <= low && high <= end)
+            else {
+                continue;
+            };
+            // One mat per opening, and a corridor whose floor already carries
+            // living moss from an earlier ceiling keeps it, rather than
+            // collecting a second mat on every visit. The corridor is what is
+            // matched, because a mat may stand beside the span that seated it.
+            if settled.iter().any(|x| (start..=end).contains(x)) {
+                continue;
+            }
+            let mut order: Vec<i32> = (low..=high).collect();
+            for distance in 1.. {
+                let below = low - distance;
+                let above = high + distance;
+                if below < start && above > end {
+                    break;
+                }
+                if below >= start {
+                    order.push(below);
+                }
+                if above <= end {
+                    order.push(above);
+                }
+            }
+            orders.push(order);
+        }
+        let mut chosen: Vec<i32> = Vec::with_capacity(orders.len());
+        let mut captured = false;
+        for order in orders {
+            let soil = self.soil.as_ref().expect("synchronized soil habitat");
+            for column in order {
+                if chosen.contains(&column) || occupied.contains(&column) {
+                    continue;
+                }
+                let dirt = soil
+                    .terrain()
+                    .cell(engine_terrain::CellCoord::new(column, surface_row))
+                    .is_some_and(|c| c.material == grass::CLOCK_DIRT);
+                if !dirt {
+                    continue;
+                }
+                // Capacity, occupancy and surface contact are all the runtime's
+                // to refuse, and it validates every one before it admits a
+                // cell; a refusal moves on to the next candidate.
+                if self.plants.plant_moss(soil, column).is_ok() {
+                    if !captured {
+                        self.plants.moss_columns = Some(corridors.clone());
+                        captured = true;
+                    }
+                    chosen.push(column);
+                    break;
+                }
+            }
+        }
     }
 }
 

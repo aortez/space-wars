@@ -1,0 +1,241 @@
+//! Certified force-free drift, explicit rounding defects, and departure evidence.
+use super::*;
+
+use super::{GravityErrorAxis as ErrorAxis, GravityFlight as Flight};
+
+impl History {
+    pub(in crate::world::loading::response::gravity) fn charge(
+        &mut self,
+        errors: [f64; 3],
+    ) -> Result<(), Rejection> {
+        let mut totals = self.errors;
+        for (i, axis) in [ErrorAxis::Work, ErrorAxis::Impulse, ErrorAxis::Position]
+            .into_iter()
+            .enumerate()
+        {
+            let next = self.errors[i] + errors[i];
+            if !next.is_finite() || (errors[i] != 0.0 && next == self.errors[i]) {
+                return Err(Rejection::Numerical);
+            }
+            let bound = 1.0e-5 * self.scales[i];
+            if next.abs() > bound {
+                return Err(Rejection::NumericalAllowance {
+                    axis,
+                    attempted: next,
+                    bound,
+                });
+            }
+            totals[i] = next;
+        }
+        self.errors = totals;
+        Ok(())
+    }
+}
+
+pub(in crate::world::loading::response::gravity) struct Drift;
+impl PhysicsHooks for Drift {
+    fn report_applied_contact_impulses(&self) -> bool {
+        true
+    }
+
+    fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {
+        // Convex ballistic x(t) and both endpoint bounds proved no crossing.
+        // Rotation/tangent motion and every other body are excluded by admission.
+        context.solver_contacts.clear();
+    }
+}
+
+impl Scene {
+    // The caller certifies geometry and exact stationary support before entering.
+    pub(in crate::world::loading::response::gravity) fn fly<const N: usize>(
+        &self,
+        world: &mut PhysicsWorld,
+        duration: f32,
+    ) -> Result<(Flight, PhysicsStepMetrics), Rejection> {
+        if self.plates.bodies.len() != N || ![2, 3].contains(&N) {
+            return Err(Rejection::UnsupportedScene);
+        }
+        if !duration.is_finite() || duration <= 0.0 {
+            return Err(Rejection::InvalidTimestep);
+        }
+        let handles: [_; N] = std::array::from_fn(|i| self.plates.bodies[i]);
+        let start = handles.map(|h| Endpoint::read(&world.raw.bodies[h]));
+        let (x, v, m) = (
+            self.frame.x(start[0].position),
+            f64::from(self.frame.speed(start[0].velocity)),
+            f64::from(start[0].mass),
+        );
+        let a = self.acceleration;
+        let h = f64::from(duration);
+        let predicted = x + v * h + 0.5 * a * h * h;
+        if !predicted.is_finite() || x > TOUCH || predicted > TOUCH {
+            return Err(Rejection::Numerical);
+        }
+        let middle = (v + 0.5 * a * h) as f32;
+        let final_v = (v + a * h) as f32;
+        if !middle.is_finite() || !final_v.is_finite() {
+            return Err(Rejection::Numerical);
+        }
+        let n = world
+            .raw
+            .integration_parameters
+            .num_solver_iterations
+            .checked_add(
+                world
+                    .raw
+                    .bodies
+                    .iter()
+                    .map(|(_, b)| b.additional_solver_iterations())
+                    .max()
+                    .unwrap_or(0),
+            )
+            .ok_or(Rejection::Numerical)?;
+        let factor = 16.0 * (n as f64 + 4.0);
+        let relative = factor * f64::from(f32::EPSILON);
+        if n == 0 || relative >= 0.01 {
+            return Err(Rejection::Numerical);
+        }
+        // Rapier integrates in world coordinates. Translation can enlarge the
+        // uncertainty used for departure, but never the local work/error budget.
+        let drift_bound = relative
+            * (self.frame.world_axis(start[0].position).abs() + (f64::from(middle) * h).abs())
+            + factor * f64::from(f32::from_bits(1)) * (f64::from(middle).abs() + 1.0);
+        world.raw.bodies[handles[0]].set_linvel(self.frame.vector(middle), true);
+        let metrics = auxiliary_step(world, duration, &Drift);
+        if world.raw.bodies[handles[0]].linvel() != self.frame.vector(middle) {
+            return Err(Rejection::Numerical);
+        }
+        world.raw.bodies[handles[0]].set_linvel(self.frame.vector(final_v), true);
+        let end = handles.map(|h| Endpoint::read(&world.raw.bodies[h]));
+        let mut unchanged = end[0].clone();
+        unchanged.position = start[0].position;
+        unchanged.velocity = start[0].velocity;
+        let (end_x, end_v) = (
+            self.frame.x(end[0].position),
+            f64::from(self.frame.speed(end[0].velocity)),
+        );
+        if !self.frame.valid_endpoint(&end[0])
+            || !self.frame.valid_position(end[0].position, 0)
+            || unchanged != start[0]
+            || end[1..] != start[1..]
+            || end_x > TOUCH
+            || (end_x - x - f64::from(middle) * h).abs() > drift_bound
+        {
+            return Err(Rejection::Numerical);
+        }
+        // Retain the independent fixture's per-flight work check as well as
+        // the persistent prefix bounds. Neither uses common transport energy.
+        let before_energy = 0.5 * m * v * v - m * a * x;
+        let after_energy = 0.5 * m * end_v * end_v - m * a * end_x;
+        let gravity_work = m * a * (end_x - x);
+        let kinetic_change = 0.5 * m * (end_v - v) * (end_v + v);
+        let errors = [
+            gravity_work - kinetic_change,
+            m * (a * h - (end_v - v)),
+            (end_x - x) - (v * h + 0.5 * a * h * h),
+        ];
+        if !after_energy.is_finite()
+            || errors.iter().any(|e| !e.is_finite())
+            || errors[0].abs() > 1.0e-5 * before_energy.max(after_energy)
+        {
+            return Err(Rejection::Numerical);
+        }
+        let uncertainty = drift_bound + (f64::from(middle) - v - 0.5 * a * h).abs() * h;
+        let minimum = if v < 0.0 && v + a * h >= 0.0 {
+            x - v * v / (2.0 * a)
+        } else {
+            x.min(predicted)
+        };
+        let flight = Flight {
+            duration,
+            gravity_work,
+            kinetic_change,
+            errors,
+            predicted_x: predicted,
+            uncertainty,
+            gap_upper: (-minimum).max(-end_x).max(-x) + uncertainty,
+        };
+        Ok((flight, metrics))
+    }
+}
+
+impl OwnedEpisode {
+    pub(in crate::world::loading::response::gravity) fn after_flight(
+        &mut self,
+        flight: &Flight,
+        before: f64,
+        end: &Endpoint,
+        frame: Frame,
+        tolerance: f32,
+    ) -> Result<bool, Rejection> {
+        if self.held {
+            return Err(Rejection::UnsafeSupport);
+        }
+        self.turned |= before < 0.0 && frame.speed(end.velocity) >= 0.0;
+        self.gap_upper = self.gap_upper.max(flight.gap_upper);
+        let lower = (-frame.x(end.position)).min(-flight.predicted_x) - flight.uncertainty;
+        Ok(lower > 2.0 * f64::from(tolerance))
+    }
+}
+
+impl Staged {
+    pub(super) fn motion(&self) -> (f64, f64, f64) {
+        let body = &self.world.raw.bodies[self.scene.plates.bodies[0]];
+        (
+            self.scene.frame.x(body.translation().to_array()),
+            f64::from(self.scene.frame.speed(body.linvel().to_array())),
+            f64::from(body.mass()),
+        )
+    }
+
+    pub(super) fn fly(
+        mut self,
+        duration: f32,
+    ) -> Result<(Self, Flight, Option<EpisodeEvent>), Rejection> {
+        if !duration.is_finite() || duration <= 0.0 {
+            return Err(Rejection::InvalidTimestep);
+        }
+        self.validate()?;
+        let before = self.motion().1;
+        let (flight, metrics) = self.scene.fly::<2>(&mut self.world, duration)?;
+        let end = self.endpoints();
+        let loading = self.world.loading.as_mut().unwrap();
+        let state = loading.gravity.as_mut().unwrap();
+        state.history.charge(flight.errors)?;
+        let Status::Active(active) = &mut state.status else {
+            return Err(Rejection::StaleContinuation);
+        };
+        active.plates[0].endpoint = end[0].clone();
+        let mut departure = None;
+        if let Some(episode) = &mut active.episode
+            && episode.after_flight(
+                &flight,
+                before,
+                &end[0],
+                self.scene.frame,
+                loading.config.touch_tolerance,
+            )?
+        {
+            if loading.records >= loading.config.max_records_per_step {
+                return Err(Rejection::RecordLimit);
+            }
+            departure = Some(EpisodeEvent {
+                sources: episode.sources,
+                id: episode.id,
+                transition: EpisodeTransition::End,
+                closing_speed: 0.0,
+            });
+            loading.records += 1;
+            loading.episodes.remove(&episode.sources);
+            active.episode = None;
+        }
+        if !loading.gravity.as_ref().unwrap().valid_for(loading) {
+            return Err(Rejection::StaleContinuation);
+        }
+        if self.world.collect_events {
+            self.world.rebuild_events();
+        }
+        self.metrics.push(metrics);
+        Ok((self, flight, departure))
+    }
+}

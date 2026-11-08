@@ -49,6 +49,8 @@ mod settings;
 mod settings_writer;
 mod sound_controls;
 #[cfg(test)]
+mod spider_visual_tests;
+#[cfg(test)]
 mod thruster_visual_tests;
 mod training_controls;
 mod training_history;
@@ -58,6 +60,7 @@ mod ui_inventory;
 mod ui_navigation;
 #[cfg(test)]
 mod ui_render_tests;
+mod updates;
 #[cfg(test)]
 mod water_visual_tests;
 
@@ -465,12 +468,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Headless conversion returned above and never opens a graphics device.
     let raster_only = select_slint_backend(&args)?;
     let window = MainWindow::new()?;
+    let startup_required = updates::startup_required();
+    window.set_install_fenced(startup_required);
+    if startup_required {
+        window.set_launcher_visible(true);
+    }
     renderer_policy::initialize(&window)?;
     needs_writeback |= renderer_policy::normalize_settings(&mut loaded, raster_only);
     effective_launch.renderer =
         renderer_policy::resolve(effective_launch.renderer, raster_only, "startup_options");
     let settings = Arc::new(RwLock::new(loaded));
-    save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)?;
+    if !startup_required {
+        save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)?;
+    }
 
     window.set_raster_only(raster_only);
     let settings_writer = settings_writer::SettingsWriter::new(settings_path.clone())?;
@@ -519,6 +529,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings_writer.clone(),
     );
     network_controls::install(&window);
+    let _updates = updates::install(
+        &window,
+        Arc::clone(&settings),
+        settings_writer.clone(),
+        Rc::clone(&input),
+    );
     let _training = training_controls::install(&window, config_directory.join("training"))?;
     let _genomes = genome_controls::install(&window, config_directory.join("training"))?;
     device_info::install(
@@ -551,71 +567,95 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.ignore_physical_controllers,
     );
 
-    if args.touch_test {
-        show_launcher(
-            &window,
-            &effective_launch,
-            &settings,
-            &settings_writer,
-            &rom_catalog,
-        );
-        window.set_touch_test_visible(true);
-    } else if args.uses_debug_render() {
-        *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
-            &window,
-            args.debug_triangles,
-            effective_launch.renderer,
-        ));
-    } else if launch_directly {
-        let scenario_settings = settings.read().unwrap().clone();
-        let launch_result = resolve_launch_asset(
-            &effective_launch,
-            args.rom.as_deref(),
-            &scenario_settings,
-            &rom_catalog.borrow(),
-        )
-        .and_then(|asset| {
-            let asset = pizza_lab
-                .clone()
-                .map(client_scenarios::ScenarioAsset::PizzaLab)
-                .unwrap_or(asset);
-            start_scenario_from_launch(
-                &window,
-                &effective_launch,
-                args.benchmark,
-                args.benchmark_configuration(),
-                Rc::clone(&scenario_controls),
-                Rc::clone(&input),
-                scenario_settings.clone(),
-                asset,
-            )
-            .map_err(|error| error.to_string())
-        });
-        match launch_result {
-            Ok(timer) => *render_timer.borrow_mut() = Some(timer),
-            Err(error) => {
-                tracing::error!(%error, "direct scenario launch failed; showing launcher.");
+    let startup_error = Rc::new(RefCell::new(None::<String>));
+    let _initial_launch = {
+        let settings = Arc::clone(&settings);
+        let settings_writer = settings_writer.clone();
+        let render_timer = Rc::clone(&render_timer);
+        let scenario_controls = Rc::clone(&scenario_controls);
+        let input = Rc::clone(&input);
+        let rom_catalog = Rc::clone(&rom_catalog);
+        let startup_error = startup_error.clone();
+        updates::after_startup(&window, move |window| {
+            if startup_required
+                && let Err(error) =
+                    save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)
+            {
+                *startup_error.borrow_mut() = Some(error.to_string());
+                let _ = slint::quit_event_loop();
+                return;
+            }
+            if args.touch_test {
                 show_launcher(
-                    &window,
+                    window,
                     &effective_launch,
                     &settings,
                     &settings_writer,
                     &rom_catalog,
                 );
-                window.set_launcher_error_text(SharedString::from(error));
+                window.set_touch_test_visible(true);
+            } else if args.uses_debug_render() {
+                *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
+                    window,
+                    args.debug_triangles,
+                    effective_launch.renderer,
+                ));
+            } else if launch_directly {
+                let scenario_settings = settings.read().unwrap().clone();
+                let launch_result = resolve_launch_asset(
+                    &effective_launch,
+                    args.rom.as_deref(),
+                    &scenario_settings,
+                    &rom_catalog.borrow(),
+                    settings_path.parent(),
+                )
+                .and_then(|asset| {
+                    let asset = pizza_lab
+                        .clone()
+                        .map(client_scenarios::ScenarioAsset::PizzaLab)
+                        .unwrap_or(asset);
+                    start_scenario_from_launch(
+                        window,
+                        &effective_launch,
+                        args.benchmark,
+                        args.benchmark_configuration(),
+                        Rc::clone(&scenario_controls),
+                        Rc::clone(&input),
+                        scenario_settings.clone(),
+                        asset,
+                    )
+                    .map_err(|error| error.to_string())
+                });
+                match launch_result {
+                    Ok(timer) => *render_timer.borrow_mut() = Some(timer),
+                    Err(error) => {
+                        tracing::error!(%error, "direct scenario launch failed; showing launcher.");
+                        show_launcher(
+                            window,
+                            &effective_launch,
+                            &settings,
+                            &settings_writer,
+                            &rom_catalog,
+                        );
+                        window.set_launcher_error_text(SharedString::from(error));
+                    }
+                }
+            } else {
+                show_launcher(
+                    window,
+                    &effective_launch,
+                    &settings,
+                    &settings_writer,
+                    &rom_catalog,
+                );
             }
-        }
-    } else {
-        show_launcher(
-            &window,
-            &effective_launch,
-            &settings,
-            &settings_writer,
-            &rom_catalog,
-        );
-    }
+        })
+    };
 
     window.run()?;
+    if let Some(error) = startup_error.borrow_mut().take() {
+        return Err(error.into());
+    }
     // The window is closed: finish queued preference changes before a normal
     // application exit, without making the visible UI wait on storage.
     if settings_writer.status().pending {
@@ -862,6 +902,8 @@ fn show_launcher(
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
     window.set_launcher_clock_cell_swap_enabled(settings.clock.events.cell_swap);
+    window.set_launcher_clock_slot_machine_enabled(settings.clock.events.slot_machine);
+    window.set_launcher_clock_spider_enabled(settings.clock.events.spider);
     window.set_launcher_clock_grass_enabled(settings.clock.events.grass);
     window.set_launcher_clock_rain_enabled(settings.clock.events.rain);
     window.set_launcher_clock_rain_amount(settings.clock.rain_amount.label().into());
@@ -943,7 +985,14 @@ fn resolve_launch_asset(
     explicit_rom: Option<&Path>,
     settings: &Settings,
     catalog: &nes_roms::NesRomCatalog,
+    config_directory: Option<&Path>,
 ) -> Result<client_scenarios::ScenarioAsset, String> {
+    if launch.scenario == "material-lab" {
+        let directory = config_directory.ok_or("Material Lab save directory is unavailable")?;
+        return Ok(client_scenarios::ScenarioAsset::MaterialLab(
+            directory.join("material-lab.bin"),
+        ));
+    }
     if launch.scenario != "nes" {
         return Ok(client_scenarios::ScenarioAsset::None);
     }
@@ -1114,22 +1163,38 @@ fn install_ingame_menu_callbacks(
     rom_catalog: SharedNesRomCatalog,
 ) {
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_pizza_gravity(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_pizza_gravity();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_resume(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_resume();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_restart(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_restart();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_new_match(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_new_match();
     });
 
@@ -1156,27 +1221,47 @@ fn install_ingame_menu_callbacks(
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_start_benchmark(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_benchmark();
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p1_zoom_in(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_in(0);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p1_zoom_out(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_out(0);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p2_zoom_in(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_in(1);
     });
 
     let controls = Rc::clone(&scenario_controls);
+    let guard = window.as_weak();
     window.on_ingame_p2_zoom_out(move || {
+        if guard.upgrade().is_none_or(|w| w.get_install_fenced()) {
+            return;
+        }
         controls.borrow_mut().request_zoom_out(1);
     });
 
@@ -1209,7 +1294,14 @@ fn install_ui_navigation(window: &MainWindow) {
 
 fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
     let clock_input = Rc::clone(&input);
+    let input_window = window.as_weak();
     window.on_clock_input_key(move |code, pressed| {
+        if input_window
+            .upgrade()
+            .is_none_or(|w| w.get_install_fenced() || w.get_updates_visible())
+        {
+            return;
+        }
         let key = match code {
             0 => input::GameKey::NesLeft,
             1 => input::GameKey::NesRight,
@@ -1229,6 +1321,12 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
     let weak = window.as_weak();
     window.on_keyboard_action(move |code, repeat| {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_updates_visible() || window.get_install_fenced() {
+            if !repeat && let Some(action) = UiAction::from_code(code) {
+                updates::handle_action(&window, action);
+            }
+            return;
+        }
         if window.get_launcher_busy() {
             return;
         }
@@ -1281,6 +1379,10 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
 }
 
 fn handle_ui_action(window: &MainWindow, action: UiAction) {
+    if window.get_updates_visible() || window.get_install_fenced() {
+        updates::handle_action(window, action);
+        return;
+    }
     if window.global::<UserActivity>().invoke_notify() {
         return;
     }
@@ -1550,7 +1652,13 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 }
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
-    match window.get_launcher_scenario().as_str() {
+    launcher_settings_item_count_for(window.get_launcher_scenario().as_str())
+}
+
+/// Confirm leaves the settings page on the final index, so this count decides
+/// where Back sits. The focus order in `ui_inventory` has to agree with it.
+pub(crate) fn launcher_settings_item_count_for(scenario: &str) -> i32 {
+    match scenario {
         "spacewars" => 11,
         "spacewars-classic" => 8,
         "pizza" => 7,
@@ -1559,7 +1667,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 6,
-        "clock" => 20,
+        "clock" => 22,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1712,6 +1820,7 @@ fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta
                 "mission v12",
                 "value v13",
                 "recovery v1",
+                "learned flight v1",
             ],
             delta,
         ))),
@@ -1724,6 +1833,7 @@ fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta
                 "mission v12",
                 "value v13",
                 "recovery v1",
+                "learned flight v1",
             ],
             delta,
         ))),
@@ -1879,6 +1989,16 @@ fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
         window.invoke_clock_fonts_open();
         return;
     }
+    if focus == 19 {
+        window.set_launcher_clock_slot_machine_enabled(
+            !window.get_launcher_clock_slot_machine_enabled(),
+        );
+        return;
+    }
+    if focus == 20 {
+        window.set_launcher_clock_spider_enabled(!window.get_launcher_clock_spider_enabled());
+        return;
+    }
     if focus == 18 {
         window.set_launcher_clock_grass_enabled(!window.get_launcher_clock_grass_enabled());
         return;
@@ -2008,6 +2128,9 @@ fn handle_return_to_launcher(
         return;
     };
 
+    if window.get_install_fenced() {
+        return;
+    }
     if window.get_autostart_running() {
         window.invoke_autostart_return();
         return;
@@ -2540,6 +2663,8 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             marquee: window.get_launcher_clock_marquee_enabled(),
             digit_slide: window.get_launcher_clock_digit_slide_enabled(),
             rain: window.get_launcher_clock_rain_enabled(),
+            slot_machine: window.get_launcher_clock_slot_machine_enabled(),
+            spider: window.get_launcher_clock_spider_enabled(),
         },
         marquee_preset: engine_common::ClockMarqueePreset::ALL
             .into_iter()
@@ -2650,6 +2775,7 @@ fn spacewars_controller_label(controller: SpacewarsController) -> &'static str {
         SpacewarsController::DestinationBot => "mission v12",
         SpacewarsController::ValueBot => "value v13",
         SpacewarsController::RecoveryBot => "recovery v1",
+        SpacewarsController::LearnedFlightBot => "learned flight v1",
     }
 }
 
@@ -2661,6 +2787,7 @@ fn spacewars_controller_from_label(label: &str) -> Result<SpacewarsController, S
         "mission v12" | "destination bot v12" => Ok(SpacewarsController::DestinationBot),
         "value v13" => Ok(SpacewarsController::ValueBot),
         "recovery v1" => Ok(SpacewarsController::RecoveryBot),
+        "learned flight v1" => Ok(SpacewarsController::LearnedFlightBot),
         other => Err(format!("Unknown Spacewars controller {other:?}.")),
     }
 }
@@ -3957,7 +4084,8 @@ mod tests {
             raster_scale: 1.0,
         };
 
-        let asset = resolve_launch_asset(&launch, None, &settings, &catalog).unwrap();
+        let asset =
+            resolve_launch_asset(&launch, None, &settings, &catalog, Some(config.path())).unwrap();
 
         let client_scenarios::ScenarioAsset::NesRom(asset) = asset else {
             panic!("NES launch did not resolve a cartridge asset");
@@ -4333,6 +4461,8 @@ mod tests {
                     aquarium: false,
                     cell_swap: false,
                     grass: false,
+                    slot_machine: false,
+                    spider: false,
                 },
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),

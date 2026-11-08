@@ -2,7 +2,9 @@
 //! No wall clock, input devices, saved Clock settings, or presentation sleeps.
 
 use engine_common::{Action, ClockEventKind, ClockEventProfile, ClockMarqueePreset, Scenario};
-use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
+use scenario_clock::{
+    ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState, arena_fixture::FixtureStart,
+};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, clap::ValueEnum)]
 pub enum ClockBenchmarkCase {
@@ -20,11 +22,21 @@ pub enum ClockBenchmarkCase {
     /// beam and biology continue for the whole 365-second hold, so longer
     /// measured windows sample a larger living patch.
     Grass,
+    /// Idle, with the development arena fixture's two owners resting in the
+    /// run's arena: five balls on the closed floor, stepped every tick while
+    /// nothing else happens. They drop onto the floor as the run starts, and
+    /// all five are asleep within three seconds.
+    Residents,
+    /// One spider visit per cycle: the frame, up to 233 proxies and the
+    /// spider in the run's arena, stepped every tick through the descent,
+    /// the digits and the way out, with the digits' proxies reposed as the
+    /// seconds change.
+    Spider,
 }
 
 impl ClockBenchmarkCase {
     #[cfg(test)]
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::Idle,
         Self::Falling,
         Self::ColorCycle,
@@ -35,15 +47,20 @@ impl ClockBenchmarkCase {
         Self::Rain,
         Self::Aquarium,
         Self::Grass,
+        Self::Residents,
+        Self::Spider,
     ];
 
     pub fn as_str(self) -> &'static str {
-        self.event().map_or("idle", ClockEventKind::as_str)
+        match self {
+            Self::Residents => "residents",
+            _ => self.event().map_or("idle", ClockEventKind::as_str),
+        }
     }
 
     fn event(self) -> Option<ClockEventKind> {
         Some(match self {
-            Self::Idle => return None,
+            Self::Idle | Self::Residents => return None,
             Self::Falling => ClockEventKind::Falling,
             Self::ColorCycle => ClockEventKind::ColorCycle,
             Self::Meltdown => ClockEventKind::Meltdown,
@@ -53,15 +70,30 @@ impl ClockBenchmarkCase {
             Self::Rain => ClockEventKind::Rain,
             Self::Aquarium => ClockEventKind::Aquarium,
             Self::Grass => ClockEventKind::Grass,
+            Self::Spider => ClockEventKind::Spider,
         })
     }
 
     pub fn cycle_ticks(self) -> u64 {
+        // A spider's visit may run its exit grace past its budget.
+        let grace = match self {
+            Self::Spider => scenario_clock::SPIDER_EXIT_GRACE_TICKS,
+            _ => 0,
+        };
         self.event().map_or(60, |event| {
             scenario_clock::EVENT_CATALOG[event as usize].duration_ticks
+                + grace
                 + scenario_clock::COOLDOWN_TICKS
                 + 60
         })
+    }
+
+    /// The arena residents the run starts with.
+    fn arena_fixture(self) -> FixtureStart {
+        match self {
+            Self::Residents => FixtureStart::TwoOwners,
+            _ => FixtureStart::None,
+        }
     }
 }
 
@@ -86,6 +118,7 @@ impl Driver {
                 event_profile: ClockEventProfile::Off,
                 marquee_preset: config.marquee_preset,
                 rain_amount: engine_common::ClockRainAmount::Heavy,
+                arena_fixture: config.case.arena_fixture(),
                 ..ClockConfig::default()
             },
             seed,
@@ -125,6 +158,19 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    /// A report names each case as the command line that chose it does.
+    #[test]
+    fn reports_name_every_case_as_the_command_line_does() {
+        use clap::ValueEnum;
+        assert_eq!(
+            ClockBenchmarkCase::value_variants(),
+            ClockBenchmarkCase::ALL
+        );
+        for case in ClockBenchmarkCase::ALL {
+            assert_eq!(case.as_str(), case.to_possible_value().unwrap().get_name());
+        }
+    }
+
     #[test]
     fn every_fixture_repeats_deterministically_and_cleans_up() {
         for case in ClockBenchmarkCase::ALL {
@@ -147,21 +193,45 @@ mod tests {
                     ClockScenario::render_frame(&b)
                 );
                 assert_eq!(a.duck_state(), b.duck_state());
-                active += u64::from(a.event_kind().is_some() || a.has_duck_visit());
+                active += u64::from(
+                    a.event_kind().is_some() || a.has_duck_visit() || a.spider_state().is_some(),
+                );
                 assert_eq!(a.reading().unwrap().hour(), 8);
                 assert_eq!(a.reading().unwrap().minute(), 8);
                 if (tick + 1) % case.cycle_ticks() == 0 {
                     assert_eq!(a.lifecycle(), scenario_clock::EventLifecycle::Idle);
-                    assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+                    // Residents keep the arena for the rest of the run:
+                    // delivered soil its one body, and the fixture's resting
+                    // balls theirs and the closed floor kept under them.
+                    let soil = usize::from(a.grass_state().soil_added > 0);
+                    let balls: usize = a
+                        .arena_fixtures()
+                        .iter()
+                        .map(|owner| owner.balls.len())
+                        .sum();
+                    assert_eq!(
+                        balls,
+                        if case == ClockBenchmarkCase::Residents {
+                            5
+                        } else {
+                            0
+                        }
+                    );
+                    assert_eq!(a.body_count(), soil + balls + usize::from(balls > 0));
+                    assert_eq!(a.collider_count() > 0, soil + balls > 0);
+                }
+                if case == ClockBenchmarkCase::Residents {
+                    // Their world steps every tick, with nothing else to do.
+                    assert_eq!(a.arena_accounting().steps, tick + 1);
                 }
             }
-            assert_eq!(active > 0, case != ClockBenchmarkCase::Idle);
+            assert_eq!(active > 0, case.event().is_some());
             // The ceiling refuses a second Grass request during its hold, so
             // that fixture starts one event and keeps its sunlight owner.
             assert_eq!(
                 a.event_id(),
                 match case {
-                    ClockBenchmarkCase::Idle => 0,
+                    ClockBenchmarkCase::Idle | ClockBenchmarkCase::Residents => 0,
                     ClockBenchmarkCase::Grass => 1,
                     _ => 2,
                 }

@@ -7,6 +7,13 @@ resolving ownership. Each body uses a declared control profile. The details
 below develop that direction; the first concrete profile remains the proposed
 [arrival guidance interface](guidance-component-v1.md).
 
+For new flight development, the
+[learned flight controller plan](learned-flight-controller-v1.md) specifies
+continuous skill ownership with no native takeover. Generic fallback options
+below are not part of that flight contract. Task completion, explicit
+cancellation and body lifecycle events still require defined control release;
+they do not authorize a native controller to rescue an unfinished flight task.
+
 ## Control profiles
 
 A versioned profile defines the actions a brain understands and how they reach

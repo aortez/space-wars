@@ -1,0 +1,1450 @@
+{
+ "matches": {
+  "selection-1..24": {
+   "withheld": {
+    "directories": [
+     "lf093-long-r1-1..12",
+     "lf093-long-r1-13..24"
+    ],
+    "same_seat": {
+     "pairs": 47,
+     "faster": 13,
+     "within_5_percent": 23,
+     "slower": 11,
+     "first_leg_median": {
+      "native": 1068,
+      "learned": 1089
+     },
+     "first_leg_mean": {
+      "native": 1126.787234042553,
+      "learned": 1097.6382978723404
+     },
+     "handoffs": {
+      "learned_seats": 192,
+      "native_seats": 193
+     },
+     "sorties": {
+      "learned_seats": 124,
+      "native_seats": 127
+     },
+     "all_legs": {
+      "learned": {
+       "n": 192,
+       "median": 707.0,
+       "mean": 793.28125,
+       "max": 3225
+      },
+      "native": {
+       "n": 193,
+       "median": 709,
+       "mean": 790.8134715025907,
+       "max": 2589
+      }
+     },
+     "deadlines": 5,
+     "refusals": 11,
+     "resumptions": 17,
+     "budget_replans": {
+      "learned_seats": 1,
+      "native_seats": 1
+     },
+     "decided_mixed_matches": {
+      "learned": 24,
+      "native": 24
+     },
+     "spinning": {
+      "flown_ticks": 105564,
+      "ticks_with_spin_over_1_5": 32574,
+      "share": 0.3085711037853814
+     },
+     "typical_first_leg_ratio": 0.9739043544026428,
+     "legs_over_2000": {
+      "learned": 3,
+      "native": 2
+     },
+     "seats_behind_native_handoffs": "18 of 48",
+     "match_ticks": [
+      3710,
+      3718,
+      3843,
+      4693,
+      4945,
+      5799,
+      5826,
+      5929,
+      6776,
+      6833,
+      7399,
+      7831,
+      7902,
+      8504,
+      8802,
+      9754,
+      10025,
+      10098,
+      10317,
+      11200,
+      12839,
+      13891,
+      14062,
+      14850,
+      15174,
+      16049,
+      16574,
+      16811,
+      17120,
+      17826,
+      18790,
+      19885,
+      20192,
+      21290,
+      21862,
+      22268,
+      22614,
+      22872,
+      23627,
+      23942,
+      24232,
+      25367,
+      31349,
+      32240,
+      32859,
+      32994,
+      33059,
+      34630,
+      35711,
+      36000
+     ],
+     "results": [
+      "Player 1 wins / opposing pilot lost",
+      "Player 1 wins / time limit / more planets owned",
+      "Player 2 wins / opposing pilot lost",
+      "Player 2 wins / time limit / more planets owned"
+     ]
+    },
+    "head_to_head": {
+     "matches": 48,
+     "learned": {
+      "handoffs": 192,
+      "sorties": 124,
+      "legs": 192,
+      "median": 707.0,
+      "mean": 793,
+      "over_2000": 3,
+      "max": 3225,
+      "budget_replans": 1,
+      "recoveries": 23
+     },
+     "native_opponent": {
+      "handoffs": 212,
+      "sorties": 127,
+      "legs": 212,
+      "median": 651.0,
+      "mean": 751,
+      "over_2000": 2,
+      "max": 2429,
+      "budget_replans": 0,
+      "recoveries": 26
+     },
+     "matches_learned_fewer_handoffs": 20,
+     "matches_learned_more_handoffs": 16
+    },
+    "native_fallback": {
+     "flown_ticks": 105564,
+     "native_ticks": 11,
+     "native_share": 0.00010419133317546768,
+     "seats_by_last_refusal": {
+      "unsupported flight policy control state": 1
+     }
+    },
+    "lengths": {
+     "native_only_mean_ticks": 21464.5,
+     "mixed_mean_ticks": 22565.291666666668,
+     "handoffs_per_10_minutes": {
+      "learned_seats": 6.381481884974528,
+      "same_match_native_opponents": 7.04621958132604,
+      "native_only_seats": 6.743693074611568
+     }
+    },
+    "learned_entries": null
+   },
+   "entry": {
+    "directories": [
+     "lf094-entry-1..12",
+     "lf094-entry-13..24"
+    ],
+    "same_seat": {
+     "pairs": 48,
+     "faster": 17,
+     "within_5_percent": 18,
+     "slower": 13,
+     "first_leg_median": {
+      "native": 1085.5,
+      "learned": 1126.5
+     },
+     "first_leg_mean": {
+      "native": 1132.9375,
+      "learned": 1134.0208333333333
+     },
+     "handoffs": {
+      "learned_seats": 180,
+      "native_seats": 193
+     },
+     "sorties": {
+      "learned_seats": 117,
+      "native_seats": 127
+     },
+     "all_legs": {
+      "learned": {
+       "n": 180,
+       "median": 668.5,
+       "mean": 794.6944444444445,
+       "max": 3357
+      },
+      "native": {
+       "n": 193,
+       "median": 709,
+       "mean": 790.8134715025907,
+       "max": 2589
+      }
+     },
+     "deadlines": 14,
+     "refusals": 0,
+     "resumptions": 2,
+     "budget_replans": {
+      "learned_seats": 5,
+      "native_seats": 1
+     },
+     "decided_mixed_matches": {
+      "learned": 21,
+      "native": 27
+     },
+     "spinning": {
+      "flown_ticks": 174200,
+      "ticks_with_spin_over_1_5": 57129,
+      "share": 0.32795063145809417
+     },
+     "typical_first_leg_ratio": 0.9745311530401889,
+     "legs_over_2000": {
+      "learned": 10,
+      "native": 2
+     },
+     "seats_behind_native_handoffs": "23 of 48",
+     "match_ticks": [
+      3710,
+      3869,
+      4693,
+      5330,
+      5799,
+      5888,
+      5929,
+      6776,
+      6833,
+      7399,
+      7831,
+      7902,
+      8504,
+      8544,
+      8802,
+      11200,
+      11265,
+      11632,
+      12200,
+      12839,
+      13285,
+      13891,
+      14360,
+      15174,
+      16049,
+      16334,
+      16350,
+      16811,
+      17052,
+      17120,
+      19885,
+      21263,
+      22614,
+      23346,
+      23627,
+      24541,
+      25367,
+      29085,
+      31349,
+      33059,
+      34152,
+      35459,
+      35938,
+      36000
+     ],
+     "results": [
+      "Player 1 wins / opposing pilot lost",
+      "Player 1 wins / time limit / more planets owned",
+      "Player 2 wins / opposing pilot lost",
+      "Player 2 wins / time limit / more planets owned"
+     ]
+    },
+    "head_to_head": {
+     "matches": 48,
+     "learned": {
+      "handoffs": 180,
+      "sorties": 117,
+      "legs": 180,
+      "median": 668.5,
+      "mean": 795,
+      "over_2000": 10,
+      "max": 3357,
+      "budget_replans": 5,
+      "recoveries": 24
+     },
+     "native_opponent": {
+      "handoffs": 218,
+      "sorties": 132,
+      "legs": 218,
+      "median": 707.0,
+      "mean": 757,
+      "over_2000": 0,
+      "max": 1984,
+      "budget_replans": 1,
+      "recoveries": 30
+     },
+     "matches_learned_fewer_handoffs": 25,
+     "matches_learned_more_handoffs": 11
+    },
+    "native_fallback": {
+     "flown_ticks": 174200,
+     "native_ticks": 0,
+     "native_share": 0.0,
+     "seats_by_last_refusal": {}
+    },
+    "lengths": {
+     "native_only_mean_ticks": 21464.5,
+     "mixed_mean_ticks": 24443.895833333332,
+     "handoffs_per_10_minutes": {
+      "learned_seats": 5.522851223081427,
+      "same_match_native_opponents": 6.688786481287506,
+      "native_only_seats": 6.743693074611568
+     }
+    },
+    "learned_entries": {
+     "ordinary_ticks": 82516,
+     "alternate_ticks": 91481,
+     "blocked_ticks": 203
+    }
+   }
+  },
+  "validation-49..60": {
+   "withheld": {
+    "directories": [
+     "lf093-long-r1-49..60"
+    ],
+    "same_seat": {
+     "pairs": 24,
+     "faster": 7,
+     "within_5_percent": 14,
+     "slower": 3,
+     "first_leg_median": {
+      "native": 1074.5,
+      "learned": 997.0
+     },
+     "first_leg_mean": {
+      "native": 998.125,
+      "learned": 965.375
+     },
+     "handoffs": {
+      "learned_seats": 94,
+      "native_seats": 98
+     },
+     "sorties": {
+      "learned_seats": 51,
+      "native_seats": 67
+     },
+     "all_legs": {
+      "learned": {
+       "n": 94,
+       "median": 524.0,
+       "mean": 641.1063829787234,
+       "max": 2062
+      },
+      "native": {
+       "n": 98,
+       "median": 727.0,
+       "mean": 823.7857142857143,
+       "max": 2499
+      }
+     },
+     "deadlines": 1,
+     "refusals": 4,
+     "resumptions": 8,
+     "budget_replans": {
+      "learned_seats": 2,
+      "native_seats": 1
+     },
+     "decided_mixed_matches": {
+      "learned": 12,
+      "native": 11
+     },
+     "spinning": {
+      "flown_ticks": 45289,
+      "ticks_with_spin_over_1_5": 13828,
+      "share": 0.3053280045927267
+     },
+     "typical_first_leg_ratio": 0.9634152362302083,
+     "legs_over_2000": {
+      "learned": 1,
+      "native": 2
+     },
+     "seats_behind_native_handoffs": "11 of 24",
+     "match_ticks": [
+      4095,
+      4291,
+      4773,
+      4924,
+      5058,
+      7859,
+      10328,
+      10617,
+      10719,
+      10737,
+      12728,
+      13184,
+      14257,
+      15244,
+      16623,
+      16685,
+      18328,
+      20994,
+      22105,
+      23011,
+      25765,
+      26739,
+      27596,
+      32313,
+      33241,
+      36000
+     ],
+     "results": [
+      "Draw / time limit / equal planets",
+      "Player 1 wins / opposing pilot lost",
+      "Player 1 wins / time limit / more planets owned",
+      "Player 2 wins / opposing pilot lost",
+      "Player 2 wins / time limit / more planets owned"
+     ]
+    },
+    "head_to_head": {
+     "matches": 24,
+     "learned": {
+      "handoffs": 94,
+      "sorties": 51,
+      "legs": 94,
+      "median": 524.0,
+      "mean": 641,
+      "over_2000": 1,
+      "max": 2062,
+      "budget_replans": 2,
+      "recoveries": 11
+     },
+     "native_opponent": {
+      "handoffs": 89,
+      "sorties": 54,
+      "legs": 89,
+      "median": 631,
+      "mean": 692,
+      "over_2000": 0,
+      "max": 1975,
+      "budget_replans": 0,
+      "recoveries": 8
+     },
+     "matches_learned_fewer_handoffs": 11,
+     "matches_learned_more_handoffs": 12
+    },
+    "native_fallback": {
+     "flown_ticks": 45289,
+     "native_ticks": 4,
+     "native_share": 8.831386748504184e-05,
+     "seats_by_last_refusal": {
+      "unsupported flight policy control state": 1
+     }
+    },
+    "lengths": {
+     "native_only_mean_ticks": 22503.416666666668,
+     "mixed_mean_ticks": 21590.541666666668,
+     "handoffs_per_10_minutes": {
+      "learned_seats": 6.53063745119873,
+      "same_match_native_opponents": 6.18326311868816,
+      "native_only_seats": 6.532341385197062
+     }
+    },
+    "learned_entries": null
+   },
+   "entry": {
+    "directories": [
+     "lf094-entry-49..60"
+    ],
+    "same_seat": {
+     "pairs": 23,
+     "faster": 8,
+     "within_5_percent": 10,
+     "slower": 5,
+     "first_leg_median": {
+      "native": 1059,
+      "learned": 932
+     },
+     "first_leg_mean": {
+      "native": 990.1304347826087,
+      "learned": 982.2608695652174
+     },
+     "handoffs": {
+      "learned_seats": 99,
+      "native_seats": 98
+     },
+     "sorties": {
+      "learned_seats": 58,
+      "native_seats": 67
+     },
+     "all_legs": {
+      "learned": {
+       "n": 99,
+       "median": 534,
+       "mean": 683.0505050505051,
+       "max": 2482
+      },
+      "native": {
+       "n": 98,
+       "median": 727.0,
+       "mean": 823.7857142857143,
+       "max": 2499
+      }
+     },
+     "deadlines": 5,
+     "refusals": 0,
+     "resumptions": 5,
+     "budget_replans": {
+      "learned_seats": 3,
+      "native_seats": 1
+     },
+     "decided_mixed_matches": {
+      "learned": 13,
+      "native": 11
+     },
+     "spinning": {
+      "flown_ticks": 86663,
+      "ticks_with_spin_over_1_5": 28711,
+      "share": 0.33129478554861935
+     },
+     "typical_first_leg_ratio": 0.947097691826322,
+     "legs_over_2000": {
+      "learned": 3,
+      "native": 2
+     },
+     "seats_behind_native_handoffs": "11 of 24",
+     "match_ticks": [
+      4291,
+      4773,
+      4875,
+      4924,
+      5058,
+      5265,
+      6475,
+      8019,
+      10737,
+      13184,
+      13613,
+      13970,
+      14271,
+      16544,
+      16623,
+      18328,
+      18602,
+      19711,
+      20994,
+      21406,
+      22218,
+      23011,
+      24524,
+      27596,
+      28916,
+      33241,
+      36000
+     ],
+     "results": [
+      "Player 1 wins / opposing pilot lost",
+      "Player 1 wins / time limit / more planets owned",
+      "Player 2 wins / opposing pilot lost",
+      "Player 2 wins / time limit / more planets owned"
+     ]
+    },
+    "head_to_head": {
+     "matches": 24,
+     "learned": {
+      "handoffs": 99,
+      "sorties": 58,
+      "legs": 99,
+      "median": 534,
+      "mean": 683,
+      "over_2000": 3,
+      "max": 2482,
+      "budget_replans": 3,
+      "recoveries": 10
+     },
+     "native_opponent": {
+      "handoffs": 81,
+      "sorties": 58,
+      "legs": 81,
+      "median": 698,
+      "mean": 768,
+      "over_2000": 2,
+      "max": 2406,
+      "budget_replans": 1,
+      "recoveries": 6
+     },
+     "matches_learned_fewer_handoffs": 6,
+     "matches_learned_more_handoffs": 11
+    },
+    "native_fallback": {
+     "flown_ticks": 86663,
+     "native_ticks": 0,
+     "native_share": 0.0,
+     "seats_by_last_refusal": {}
+    },
+    "lengths": {
+     "native_only_mean_ticks": 22503.416666666668,
+     "mixed_mean_ticks": 20463.666666666668,
+     "handoffs_per_10_minutes": {
+      "learned_seats": 7.256764020784805,
+      "same_match_native_opponents": 5.937352380642113,
+      "native_only_seats": 6.532341385197062
+     }
+    },
+    "learned_entries": {
+     "ordinary_ticks": 41093,
+     "alternate_ticks": 45332,
+     "blocked_ticks": 238
+    }
+   }
+  },
+  "confirmation-37..48": {
+   "withheld": {
+    "directories": [
+     "lf093-confirm-full-long-r1-37..48"
+    ],
+    "same_seat": {
+     "pairs": 23,
+     "faster": 7,
+     "within_5_percent": 12,
+     "slower": 4,
+     "first_leg_median": {
+      "native": 1082,
+      "learned": 1120
+     },
+     "first_leg_mean": {
+      "native": 1172.1304347826087,
+      "learned": 1181.5652173913043
+     },
+     "handoffs": {
+      "learned_seats": 99,
+      "native_seats": 85
+     },
+     "sorties": {
+      "learned_seats": 55,
+      "native_seats": 56
+     },
+     "all_legs": {
+      "learned": {
+       "n": 99,
+       "median": 709,
+       "mean": 763.969696969697,
+       "max": 3056
+      },
+      "native": {
+       "n": 85,
+       "median": 778,
+       "mean": 855.3529411764706,
+       "max": 2443
+      }
+     },
+     "deadlines": 1,
+     "refusals": 30,
+     "resumptions": 32,
+     "budget_replans": {
+      "learned_seats": 5,
+      "native_seats": 1
+     },
+     "decided_mixed_matches": {
+      "learned": 10,
+      "native": 14
+     },
+     "spinning": {
+      "flown_ticks": 52617,
+      "ticks_with_spin_over_1_5": 16434,
+      "share": 0.3123325161069616
+     },
+     "typical_first_leg_ratio": 1.0400794114374114,
+     "legs_over_2000": {
+      "learned": 3,
+      "native": 4
+     },
+     "seats_behind_native_handoffs": "11 of 24",
+     "match_ticks": [
+      3477,
+      4255,
+      6673,
+      7386,
+      8219,
+      8397,
+      9982,
+      10810,
+      10869,
+      13839,
+      14092,
+      14503,
+      15285,
+      17246,
+      17574,
+      17719,
+      18582,
+      18814,
+      19761,
+      19836,
+      20352,
+      20725,
+      21064,
+      27035,
+      27658,
+      36000
+     ],
+     "results": [
+      "Player 1 wins / opposing pilot lost",
+      "Player 1 wins / time limit / more planets owned",
+      "Player 2 wins / opposing pilot lost",
+      "Player 2 wins / time limit / more planets owned"
+     ]
+    },
+    "head_to_head": {
+     "matches": 24,
+     "learned": {
+      "handoffs": 99,
+      "sorties": 55,
+      "legs": 99,
+      "median": 709,
+      "mean": 764,
+      "over_2000": 3,
+      "max": 3056,
+      "budget_replans": 5,
+      "recoveries": 10
+     },
+     "native_opponent": {
+      "handoffs": 89,
+      "sorties": 65,
+      "legs": 89,
+      "median": 810,
+      "mean": 908,
+      "over_2000": 3,
+      "max": 2534,
+      "budget_replans": 3,
+      "recoveries": 8
+     },
+     "matches_learned_fewer_handoffs": 8,
+     "matches_learned_more_handoffs": 12
+    },
+    "native_fallback": {
+     "flown_ticks": 52617,
+     "native_ticks": 30,
+     "native_share": 0.0005698330389195966,
+     "seats_by_last_refusal": {
+      "unsupported flight policy control state": 3
+     }
+    },
+    "lengths": {
+     "native_only_mean_ticks": 18550,
+     "mixed_mean_ticks": 21767.583333333332,
+     "handoffs_per_10_minutes": {
+      "learned_seats": 6.82207104601261,
+      "same_match_native_opponents": 6.132972960556791,
+      "native_only_seats": 6.873315363881401
+     }
+    },
+    "learned_entries": null
+   },
+   "entry": {
+    "directories": [
+     "lf094-entry-full-37..48"
+    ],
+    "same_seat": {
+     "pairs": 23,
+     "faster": 11,
+     "within_5_percent": 9,
+     "slower": 3,
+     "first_leg_median": {
+      "native": 1082,
+      "learned": 1042
+     },
+     "first_leg_mean": {
+      "native": 1172.1304347826087,
+      "learned": 1058.304347826087
+     },
+     "handoffs": {
+      "learned_seats": 136,
+      "native_seats": 85
+     },
+     "sorties": {
+      "learned_seats": 90,
+      "native_seats": 56
+     },
+     "all_legs": {
+      "learned": {
+       "n": 136,
+       "median": 696.0,
+       "mean": 819.0367647058823,
+       "max": 2779
+      },
+      "native": {
+       "n": 85,
+       "median": 778,
+       "mean": 855.3529411764706,
+       "max": 2443
+      }
+     },
+     "deadlines": 11,
+     "refusals": 22,
+     "resumptions": 39,
+     "budget_replans": {
+      "learned_seats": 4,
+      "native_seats": 1
+     },
+     "decided_mixed_matches": {
+      "learned": 15,
+      "native": 8
+     },
+     "spinning": {
+      "flown_ticks": 127865,
+      "ticks_with_spin_over_1_5": 41022,
+      "share": 0.32082274273647987
+     },
+     "typical_first_leg_ratio": 0.9358686196344337,
+     "legs_over_2000": {
+      "learned": 9,
+      "native": 4
+     },
+     "seats_behind_native_handoffs": "5 of 24",
+     "match_ticks": [
+      4255,
+      7386,
+      8140,
+      8219,
+      10071,
+      10869,
+      13709,
+      14092,
+      14503,
+      15424,
+      17574,
+      18582,
+      18814,
+      19640,
+      19836,
+      20390,
+      20725,
+      22064,
+      22688,
+      23966,
+      24626,
+      24961,
+      25461,
+      25904,
+      27593,
+      30289,
+      31402,
+      31858,
+      33358,
+      34319,
+      36000
+     ],
+     "results": [
+      "Draw / time limit / equal planets",
+      "Player 1 wins / opposing pilot lost",
+      "Player 1 wins / time limit / more planets owned",
+      "Player 2 wins / opposing pilot lost",
+      "Player 2 wins / time limit / more planets owned"
+     ]
+    },
+    "head_to_head": {
+     "matches": 24,
+     "learned": {
+      "handoffs": 136,
+      "sorties": 90,
+      "legs": 136,
+      "median": 696.0,
+      "mean": 819,
+      "over_2000": 9,
+      "max": 2779,
+      "budget_replans": 4,
+      "recoveries": 12
+     },
+     "native_opponent": {
+      "handoffs": 99,
+      "sorties": 76,
+      "legs": 99,
+      "median": 929,
+      "mean": 920,
+      "over_2000": 2,
+      "max": 2443,
+      "budget_replans": 7,
+      "recoveries": 13
+     },
+     "matches_learned_fewer_handoffs": 3,
+     "matches_learned_more_handoffs": 15
+    },
+    "native_fallback": {
+     "flown_ticks": 127865,
+     "native_ticks": 22,
+     "native_share": 0.00017202686746893743,
+     "seats_by_last_refusal": {
+      "unsupported flight policy control state": 1
+     }
+    },
+    "lengths": {
+     "native_only_mean_ticks": 18550,
+     "mixed_mean_ticks": 24754.916666666668,
+     "handoffs_per_10_minutes": {
+      "learned_seats": 8.240787183690783,
+      "same_match_native_opponents": 5.998808317539614,
+      "native_only_seats": 6.873315363881401
+     }
+    },
+    "learned_entries": {
+     "ordinary_ticks": 67491,
+     "alternate_ticks": 59974,
+     "blocked_ticks": 422
+    }
+   }
+  },
+  "asteroids8-37..48": {
+   "withheld": {
+    "directories": [
+     "lf093-confirm-asteroids8-long-r1-37..48"
+    ],
+    "same_seat": {
+     "pairs": 22,
+     "faster": 6,
+     "within_5_percent": 13,
+     "slower": 3,
+     "first_leg_median": {
+      "native": 1188.5,
+      "learned": 1086.0
+     },
+     "first_leg_mean": {
+      "native": 1215,
+      "learned": 1187.590909090909
+     },
+     "handoffs": {
+      "learned_seats": 110,
+      "native_seats": 123
+     },
+     "sorties": {
+      "learned_seats": 57,
+      "native_seats": 80
+     },
+     "all_legs": {
+      "learned": {
+       "n": 110,
+       "median": 638.0,
+       "mean": 757.0909090909091,
+       "max": 2658
+      },
+      "native": {
+       "n": 123,
+       "median": 732,
+       "mean": 807.6666666666666,
+       "max": 2443
+      }
+     },
+     "deadlines": 1,
+     "refusals": 15,
+     "resumptions": 18,
+     "budget_replans": {
+      "learned_seats": 7,
+      "native_seats": 3
+     },
+     "decided_mixed_matches": {
+      "learned": 11,
+      "native": 12
+     },
+     "spinning": {
+      "flown_ticks": 56505,
+      "ticks_with_spin_over_1_5": 18128,
+      "share": 0.3208211662684718
+     },
+     "typical_first_leg_ratio": 0.9683968060498629,
+     "legs_over_2000": {
+      "learned": 5,
+      "native": 3
+     },
+     "seats_behind_native_handoffs": "9 of 24",
+     "match_ticks": [
+      3477,
+      6268,
+      6323,
+      8906,
+      9890,
+      10543,
+      10782,
+      11078,
+      11198,
+      11584,
+      11919,
+      12172,
+      12481,
+      12829,
+      17019,
+      17119,
+      20334,
+      22066,
+      22423,
+      23350,
+      25321,
+      29550,
+      32408,
+      36000
+     ],
+     "results": [
+      "Draw / time limit / equal planets",
+      "Player 1 wins / opposing pilot lost",
+      "Player 1 wins / time limit / more planets owned",
+      "Player 2 wins / opposing pilot lost",
+      "Player 2 wins / time limit / more planets owned"
+     ]
+    },
+    "head_to_head": {
+     "matches": 24,
+     "learned": {
+      "handoffs": 110,
+      "sorties": 57,
+      "legs": 110,
+      "median": 638.0,
+      "mean": 757,
+      "over_2000": 5,
+      "max": 2658,
+      "budget_replans": 7,
+      "recoveries": 8
+     },
+     "native_opponent": {
+      "handoffs": 103,
+      "sorties": 55,
+      "legs": 103,
+      "median": 550,
+      "mean": 740,
+      "over_2000": 4,
+      "max": 2803,
+      "budget_replans": 2,
+      "recoveries": 4
+     },
+     "matches_learned_fewer_handoffs": 7,
+     "matches_learned_more_handoffs": 10
+    },
+    "native_fallback": {
+     "flown_ticks": 56505,
+     "native_ticks": 15,
+     "native_share": 0.0002653927813163482,
+     "seats_by_last_refusal": {
+      "unsupported flight policy control state": 2
+     }
+    },
+    "lengths": {
+     "native_only_mean_ticks": 26369.666666666668,
+     "mixed_mean_ticks": 20858.5,
+     "handoffs_per_10_minutes": {
+      "learned_seats": 7.910444183426421,
+      "same_match_native_opponents": 7.40705228084474,
+      "native_only_seats": 6.996675473081445
+     }
+    },
+    "learned_entries": null
+   },
+   "entry": {
+    "directories": [
+     "lf094-entry-asteroids8-37..48"
+    ],
+    "same_seat": {
+     "pairs": 22,
+     "faster": 11,
+     "within_5_percent": 9,
+     "slower": 2,
+     "first_leg_median": {
+      "native": 1188.5,
+      "learned": 1006.0
+     },
+     "first_leg_mean": {
+      "native": 1215,
+      "learned": 1081.1363636363637
+     },
+     "handoffs": {
+      "learned_seats": 114,
+      "native_seats": 123
+     },
+     "sorties": {
+      "learned_seats": 74,
+      "native_seats": 80
+     },
+     "all_legs": {
+      "learned": {
+       "n": 114,
+       "median": 724.5,
+       "mean": 867.921052631579,
+       "max": 3101
+      },
+      "native": {
+       "n": 123,
+       "median": 732,
+       "mean": 807.6666666666666,
+       "max": 2443
+      }
+     },
+     "deadlines": 10,
+     "refusals": 21,
+     "resumptions": 41,
+     "budget_replans": {
+      "learned_seats": 9,
+      "native_seats": 3
+     },
+     "decided_mixed_matches": {
+      "learned": 12,
+      "native": 10
+     },
+     "spinning": {
+      "flown_ticks": 132123,
+      "ticks_with_spin_over_1_5": 41319,
+      "share": 0.3127313185440839
+     },
+     "typical_first_leg_ratio": 0.8831684535240775,
+     "legs_over_2000": {
+      "learned": 5,
+      "native": 3
+     },
+     "seats_behind_native_handoffs": "8 of 24",
+     "match_ticks": [
+      7001,
+      9516,
+      9890,
+      10691,
+      11584,
+      11900,
+      11919,
+      12172,
+      12407,
+      13019,
+      20421,
+      20470,
+      22668,
+      25321,
+      26064,
+      26271,
+      27846,
+      28108,
+      29550,
+      31408,
+      36000
+     ],
+     "results": [
+      "Draw / time limit / equal planets",
+      "Player 1 wins / opposing pilot lost",
+      "Player 1 wins / time limit / more planets owned",
+      "Player 2 wins / opposing pilot lost",
+      "Player 2 wins / time limit / more planets owned"
+     ]
+    },
+    "head_to_head": {
+     "matches": 24,
+     "learned": {
+      "handoffs": 114,
+      "sorties": 74,
+      "legs": 114,
+      "median": 724.5,
+      "mean": 868,
+      "over_2000": 5,
+      "max": 3101,
+      "budget_replans": 9,
+      "recoveries": 5
+     },
+     "native_opponent": {
+      "handoffs": 131,
+      "sorties": 66,
+      "legs": 131,
+      "median": 595,
+      "mean": 752,
+      "over_2000": 3,
+      "max": 2582,
+      "budget_replans": 4,
+      "recoveries": 5
+     },
+     "matches_learned_fewer_handoffs": 11,
+     "matches_learned_more_handoffs": 11
+    },
+    "native_fallback": {
+     "flown_ticks": 132123,
+     "native_ticks": 21,
+     "native_share": 0.00015891754449691247,
+     "seats_by_last_refusal": {
+      "unsupported flight policy control state": 2
+     }
+    },
+    "lengths": {
+     "native_only_mean_ticks": 26369.666666666668,
+     "mixed_mean_ticks": 26157.916666666668,
+     "handoffs_per_10_minutes": {
+      "learned_seats": 6.5372178594753025,
+      "same_match_native_opponents": 7.512066136765479,
+      "native_only_seats": 6.996675473081445
+     }
+    },
+    "learned_entries": {
+     "ordinary_ticks": 58362,
+     "alternate_ticks": 73140,
+     "blocked_ticks": 642
+    }
+   }
+  }
+ },
+ "traces": {
+  "withheld": {
+   "directory": "lf093-traces-w-long-r1-1..24",
+   "seats": 48,
+   "flown_ticks": 105564,
+   "slow_ticks": 11340,
+   "slow_ticks_beside_sun": 6240,
+   "longest_slow_run": 780,
+   "entries": {
+    "transfer_ticks": 172259,
+    "ticks": {
+     "published: unrecorded": 105575,
+     "withheld: sun": 34929,
+     "withheld: planet": 31718,
+     "withheld: other": 37
+    },
+    "shares": {
+     "published: unrecorded": 0.613,
+     "withheld: sun": 0.203,
+     "withheld: planet": 0.184,
+     "withheld: other": 0.0
+    },
+    "published_attempts": {
+     "with an alternate entry": 0,
+     "all": 192
+    },
+    "parked_at_another_planet": {},
+    "seats_most_alternate": []
+   }
+  },
+  "entry": {
+   "directory": "lf094-traces-entry-1..24",
+   "seats": 48,
+   "flown_ticks": 174200,
+   "slow_ticks": 31920,
+   "slow_ticks_beside_sun": 20220,
+   "longest_slow_run": 1260,
+   "entries": {
+    "transfer_ticks": 174200,
+    "ticks": {
+     "published: alternate": 91670,
+     "published: ordinary": 82332,
+     "published: blocked": 198
+    },
+    "shares": {
+     "published: alternate": 0.526,
+     "published: ordinary": 0.473,
+     "published: blocked": 0.001
+    },
+    "published_attempts": {
+     "with an alternate entry": 136,
+     "all": 253
+    },
+    "parked_at_another_planet": {},
+    "seats_most_alternate": [
+     [
+      "trace-seed23-seat1.tsv",
+      8091
+     ],
+     [
+      "trace-seed23-seat0.tsv",
+      7669
+     ],
+     [
+      "trace-seed5-seat1.tsv",
+      6843
+     ],
+     [
+      "trace-seed1-seat0.tsv",
+      6401
+     ],
+     [
+      "trace-seed19-seat1.tsv",
+      5125
+     ]
+    ]
+   }
+  }
+ },
+ "first_legs_by_entry": {
+  "entry": {
+   "alternate": {
+    "legs": 20,
+    "learned_median": 1338.5,
+    "native_median": 1231.0,
+    "typical_ratio": 0.9896653692869953,
+    "faster": 8,
+    "within_5_percent": 5,
+    "slower": 7,
+    "longest": [
+     "seed 4 seat 1: 2798 against 1840",
+     "seed 23 seat 0: 2181 against 1457",
+     "seed 6 seat 1: 1597 against 1191"
+    ]
+   },
+   "ordinary": {
+    "legs": 28,
+    "learned_median": 1037.5,
+    "native_median": 990.5,
+    "typical_ratio": 0.9638629016662016,
+    "faster": 9,
+    "within_5_percent": 13,
+    "slower": 6,
+    "longest": [
+     "seed 24 seat 0: 1184 against 989",
+     "seed 22 seat 1: 1078 against 941",
+     "seed 12 seat 0: 1649 against 1495"
+    ]
+   }
+  }
+ },
+ "sun_side_set": {
+  "tasks-600": {
+   "tasks": 445,
+   "families": {
+    "transfer": 225,
+    "long_transfer": 220
+   },
+   "median_start_distance": 598.5130615234375,
+   "median_goal_to_sun": 455.68065615143297
+  },
+  "tasks-inway": {
+   "tasks": 236,
+   "families": {
+    "transfer": 77,
+    "long_transfer": 159
+   },
+   "median_start_distance": 731.656494140625,
+   "median_goal_to_sun": 420.44525273978235
+  }
+ },
+ "law_sun_side": {
+  "current": {
+   "cases": 236,
+   "passed": 115,
+   "within_50": 194,
+   "over_300": 25,
+   "mean_success_ticks": 1314.5739130434783,
+   "families": {
+    "transfer": 66,
+    "long_transfer": 49
+   }
+  },
+  "sun reach 105": {
+   "cases": 236,
+   "passed": 113,
+   "within_50": 201,
+   "over_300": 23,
+   "mean_success_ticks": 1306.513274336283,
+   "families": {
+    "transfer": 68,
+    "long_transfer": 45
+   }
+  },
+  "sun reach 135": {
+   "cases": 236,
+   "passed": 110,
+   "within_50": 201,
+   "over_300": 20,
+   "mean_success_ticks": 1300.9545454545455,
+   "families": {
+    "transfer": 67,
+    "long_transfer": 43
+   }
+  },
+  "lead": {
+   "cases": 236,
+   "passed": 102,
+   "within_50": 203,
+   "over_300": 20,
+   "mean_success_ticks": 1285.1176470588234,
+   "families": {
+    "transfer": 63,
+    "long_transfer": 39
+   }
+  },
+  "lead, sun reach 105": {
+   "cases": 236,
+   "passed": 101,
+   "within_50": 195,
+   "over_300": 28,
+   "mean_success_ticks": 1286.4356435643565,
+   "families": {
+    "transfer": 62,
+    "long_transfer": 39
+   }
+  },
+  "tangent, sun reach 135": {
+   "cases": 236,
+   "passed": 109,
+   "within_50": 203,
+   "over_300": 18,
+   "mean_success_ticks": 1299.6146788990825,
+   "families": {
+    "transfer": 66,
+    "long_transfer": 43
+   }
+  },
+  "heat-free brake": {
+   "cases": 236,
+   "passed": 117,
+   "within_50": 197,
+   "over_300": 22,
+   "mean_success_ticks": 1317.7435897435898,
+   "families": {
+    "transfer": 67,
+    "long_transfer": 50
+   }
+  },
+  "outward waypoint": {
+   "cases": 236,
+   "passed": 114,
+   "within_50": 192,
+   "over_300": 27,
+   "mean_success_ticks": 1311.9473684210527,
+   "families": {
+    "transfer": 65,
+    "long_transfer": 49
+   }
+  },
+  "heat-free brake, outward waypoint": {
+   "cases": 236,
+   "passed": 116,
+   "within_50": 196,
+   "over_300": 24,
+   "mean_success_ticks": 1315.2413793103449,
+   "families": {
+    "transfer": 66,
+    "long_transfer": 50
+   }
+  },
+  "heat-free brake, sun reach 105": {
+   "cases": 236,
+   "passed": 114,
+   "within_50": 206,
+   "over_300": 20,
+   "mean_success_ticks": 1311.657894736842,
+   "families": {
+    "transfer": 69,
+    "long_transfer": 45
+   }
+  }
+ }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "continuous-sampled-v2",
+  "version": 2,
+  "action_contract": "continuous-flight-v2",
+  "steering": "tanh of Gaussian latent",
+  "thrust": "sigmoid of Gaussian latent",
+  "brake": "sigmoid of Gaussian latent",
+  "deviation": "three learned independent log standard deviations, clamped [-5,2]",
+  "evaluation_correlation": 0,
+  "decision_hz": 60,
+  "native_fallback": false
+}

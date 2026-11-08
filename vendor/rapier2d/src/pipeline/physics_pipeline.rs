@@ -16,7 +16,7 @@ use crate::geometry::{
     ContactManifoldIndex, ModifiedColliders, NarrowPhase, TemporaryInteractionIndex,
 };
 use crate::math::{Real, Vector};
-use crate::pipeline::{EventHandler, PhysicsHooks};
+use crate::pipeline::{EventHandler, PhysicsHooks, SolverContactBatchContext};
 use crate::prelude::ModifiedRigidBodies;
 use {crate::dynamics::RigidBodySet, crate::geometry::ColliderSet};
 
@@ -195,6 +195,7 @@ impl PhysicsPipeline {
         colliders: &mut ColliderSet,
         impulse_joints: &mut ImpulseJointSet,
         multibody_joints: &mut MultibodyJointSet,
+        report_applied_contact_impulses: bool,
         events: &dyn EventHandler,
     ) {
         self.counters.stages.island_construction_time.resume();
@@ -259,6 +260,9 @@ impl PhysicsPipeline {
         if self.solvers.len() < num_active_islands {
             self.solvers
                 .resize_with(num_active_islands, IslandSolver::new);
+        }
+        for solver in self.solvers.iter_mut().take(num_active_islands) {
+            solver.set_report_applied_contact_impulses(report_applied_contact_impulses);
         }
 
         #[cfg(not(feature = "parallel"))]
@@ -506,6 +510,7 @@ impl PhysicsPipeline {
     ) {
         self.counters.reset();
         self.counters.step_started();
+        let report_applied_contact_impulses = hooks.report_applied_contact_impulses();
 
         // Apply some of delayed wake-ups.
         self.counters.stages.user_changes.start();
@@ -692,6 +697,12 @@ impl PhysicsPipeline {
             self.counters.custom.resume();
             self.interpolate_kinematic_velocities(&integration_parameters, islands, bodies);
             self.counters.custom.pause();
+            hooks.modify_solver_contacts_batch(&mut SolverContactBatchContext {
+                bodies,
+                colliders,
+                dt: integration_parameters.dt,
+                narrow_phase,
+            });
             self.build_islands_and_solve_velocity_constraints(
                 gravity,
                 &integration_parameters,
@@ -701,6 +712,7 @@ impl PhysicsPipeline {
                 colliders,
                 impulse_joints,
                 multibody_joints,
+                report_applied_contact_impulses,
                 events,
             );
 

@@ -1,5 +1,12 @@
 # Ship guidance component and coordination
 
+**Scope clarification, 2026-10-22:** this document describes the original
+arrival-practice contract and its existing artifacts. The
+[learned flight controller plan](learned-flight-controller-v1.md) governs new
+flight development. Its broader task will have a new observation/action
+contract; the nine features, practice envelope and transition proposals here
+do not constrain that contract. Existing practice models retain these semantics.
+
 Proposed first component contract for the
 [evolutionary training plan](evolutionary-training.md). A practice brain gives
 one guidance component a target position and velocity. The component controls

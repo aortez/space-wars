@@ -8,6 +8,7 @@ pub mod buoyancy;
 pub mod profile;
 pub mod rover;
 pub mod spaceling;
+pub mod spider;
 pub mod terrain;
 pub mod world;
 

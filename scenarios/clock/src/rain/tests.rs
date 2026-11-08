@@ -247,7 +247,10 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                                 let m = floats
                                     .world
                                     .motion(engine_rapier::world::BodyId::new(
-                                        engine_rapier::world::PhysicsId::new(1001 + side as u64),
+                                        engine_rapier::world::PhysicsId::new(
+                                            crate::arena::ids::canonical::RESPONSIVE_PANELS.start
+                                                + side as u64,
+                                        ),
                                         engine_rapier::world::BodyRole::PRIMARY,
                                     ))
                                     .unwrap();
@@ -647,6 +650,15 @@ fn clock_stays_live_while_raining_or_draining_and_pause_resize_replace_clean_up(
                 &[ClockAction::preview_event(kind)],
                 Duration::ZERO,
             );
+            if kind == ClockEventKind::Spider {
+                // The spider waits for the event before it rather than
+                // replacing it.
+                let before = ClockEventKind::ALL[kind as usize - 1];
+                assert_eq!(state.last_started_event, Some(before));
+                assert_eq!(state.event_kind(), Some(before));
+                assert!(state.spider_state().is_none());
+                continue;
+            }
             assert_eq!(state.last_started_event, Some(kind));
             if kind == ClockEventKind::Duck {
                 assert!(state.duck_state().is_some());

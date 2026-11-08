@@ -202,7 +202,7 @@ async fn signed_ext4_health_failure_survives_restart_and_a_new_feed() {
             candidate.image().compressed.clone(),
         )
         .unwrap();
-        payload.verify(candidate.image()).unwrap();
+        payload.verify(&candidate.image().compressed).unwrap();
 
         // Even a signed, fully staged candidate cannot waive qualification.
         let unqualified = RecoveryCapability {

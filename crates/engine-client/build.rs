@@ -55,7 +55,15 @@ fn main() {
         })
         .unwrap_or_else(|| "unknown (source archive)".into());
     println!("cargo:rustc-env=SPACEWARS_BUILD_REVISION={revision}");
-    slint_build::compile("ui/main.slint").expect("slint compile failed");
+    // Slint recursively compiles the UI tree. The Windows build-script main
+    // stack is too small for this UI, so give compilation its own bounded stack.
+    std::thread::Builder::new()
+        .name("slint-compiler".into())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| slint_build::compile("ui/main.slint").expect("slint compile failed"))
+        .expect("start slint compiler")
+        .join()
+        .expect("slint compiler thread panicked");
 }
 
 fn watch_existing(path: impl AsRef<std::path::Path>) {

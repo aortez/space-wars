@@ -54,6 +54,8 @@ fn fixed_selection_includes_unknown_data_and_preserves_links_without_following_t
         "data/spacewars-bootstrap/package",
         "data/logs",
         "data/spacewars/coredumps",
+        "data/spacewars-retired/0123456789abcdef/bootstrap/completed",
+        "data/spacewars-retired/0123456789abcdef/system/recovery",
         "etc/NetworkManager/system-connections",
         "data/new-user-state",
     ] {
@@ -113,9 +115,17 @@ fn fixed_selection_includes_unknown_data_and_preserves_links_without_following_t
     ] {
         assert!(entries.contains_key(&PathBuf::from(path)), "{path}");
     }
-    for path in DATA_EXCLUSIONS.iter().copied() {
+    for path in DATA_EXCLUSIONS
+        .iter()
+        .copied()
+        .chain(["data/spacewars-retired/0123456789abcdef/bootstrap"])
+    {
         assert!(!entries.keys().any(|p| p.starts_with(path)), "{path}");
     }
+    // Retired production records stay in the data copy.
+    assert!(entries.contains_key(&PathBuf::from(
+        "data/spacewars-retired/0123456789abcdef/system/recovery/file"
+    )));
     assert!(entries.contains_key(&PathBuf::from("etc/NetworkManager/system-connections/file")));
     assert_eq!(
         entries[&PathBuf::from("data/new-user-state/link")],
