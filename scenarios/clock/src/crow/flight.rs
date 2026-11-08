@@ -28,17 +28,42 @@ enum Leg {
     Land,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Flight {
     pub velocity: Vec2,
     /// Normalized wing pose: raised (+1), level (0), lowered (-1).
     pub wing: f32,
+    /// How much quicker than the crow this bird flies: its cruising speed,
+    /// its steering gains and the lift it can call on all scale by it. The
+    /// landing acceptance does not, so a hasty bird still sets down softly.
+    pub haste: f32,
     leg: Leg,
     launch_x: f32,
     stroke: Option<Stroke>,
 }
 
+impl Default for Flight {
+    fn default() -> Self {
+        Self {
+            velocity: Vec2::ZERO,
+            wing: 0.0,
+            haste: 1.0,
+            leg: Leg::default(),
+            launch_x: 0.0,
+            stroke: None,
+        }
+    }
+}
+
 impl Flight {
+    /// The crow's controller at `haste` times its pace.
+    pub fn hasty(haste: f32) -> Self {
+        Self {
+            haste,
+            ..Self::default()
+        }
+    }
+
     pub fn retarget(&mut self, position: Vec2, grounded: bool, layout: Layout) {
         self.leg = Leg::Climb;
         self.launch_x = position.x;
@@ -68,7 +93,8 @@ impl Flight {
         let scale = layout.pitch;
         let gravity = scale * 10.0;
         let width = layout.bounds_max.x - layout.bounds_min.x;
-        let speed = (width * 0.55).max(scale * 9.0);
+        let haste = self.haste;
+        let speed = (width * 0.55).max(scale * 9.0) * haste;
         if self.leg == Leg::Climb && position.y >= cruise {
             self.leg = Leg::Cross;
         }
@@ -88,7 +114,7 @@ impl Flight {
         };
         // Critically damped near the target: do not overshoot and turn around
         // repeatedly during the final approach.
-        let desired_x = ((aim.x - position.x) * 2.5).clamp(-speed, speed);
+        let desired_x = ((aim.x - position.x) * 2.5 * haste).clamp(-speed, speed);
         let acceleration_x =
             ((desired_x - self.velocity.x) * 10.0).clamp(-speed * 3.0, speed * 3.0);
         // Forward motion supports some weight while gliding, but never all of it.
@@ -98,13 +124,13 @@ impl Flight {
             // Start a deliberate stroke only when the glide can no longer
             // carry the desired motion. Leave room for the resulting rise.
             let error = aim.y - position.y - self.velocity.y * 0.15;
-            let desired_y = (error * 2.5).clamp(-scale * 6.0, scale * 7.0);
+            let desired_y = (error * 2.5 * haste).clamp(-scale * 6.0 * haste, scale * 7.0 * haste);
             if self.velocity.y < desired_y - scale * 0.4 {
                 let landing = self.leg == Leg::Land;
                 let extra = scale * if landing { 0.3 } else { 1.2 };
                 let minimum = scale * if landing { 1.0 } else { 2.8 };
                 let impulse = (desired_y - self.velocity.y + (gravity - glide) * 0.15 + extra)
-                    .clamp(minimum, scale * 8.0);
+                    .clamp(minimum, scale * 8.0 * haste);
                 // The body's remaining headroom bounds a stroke even during
                 // a strong climb or an interrupted hop near the upper frame.
                 let headroom =

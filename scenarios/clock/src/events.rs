@@ -70,6 +70,7 @@ pub enum EventPhase {
     Swimming,
     Minting,
     Cascading,
+    Gathering,
 }
 
 impl EventPhase {
@@ -97,6 +98,7 @@ impl EventPhase {
             Self::Swimming => "swimming",
             Self::Minting => "minting",
             Self::Cascading => "cascading",
+            Self::Gathering => "gathering",
         }
     }
 }
@@ -664,6 +666,7 @@ impl ActiveEvent {
                     | EventPhase::Exploding
                     | EventPhase::Minting
                     | EventPhase::Cascading
+                    | EventPhase::Gathering
             )
     }
 }

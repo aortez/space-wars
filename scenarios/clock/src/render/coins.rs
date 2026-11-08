@@ -1,13 +1,14 @@
 //! Coins: the face's lit cells turn into gold pieces where they stand, drop
-//! and pile in the arena, then fly home and square up as they arrive. The
-//! batch is Explosion's with `Debris::Coins`; only the drawing is this
-//! module's.
+//! and pile in the arena, lie there while the magpie takes its pick, then
+//! fly home and square up as they arrive. The batch is Explosion's with
+//! `Debris::Coins`; only the drawing is this module's, and the bird's is
+//! `magpie`'s.
 use super::*;
 use crate::events::explosion::ExplosionEvent;
 
 /// A coin's face and its rim.
-const COIN_FILL: RenderColor = RenderColor::rgb(0.96, 0.78, 0.26);
-const COIN_EDGE: RenderColor = RenderColor::rgb(0.62, 0.44, 0.08);
+pub(super) const COIN_FILL: RenderColor = RenderColor::rgb(0.96, 0.78, 0.26);
+pub(super) const COIN_EDGE: RenderColor = RenderColor::rgb(0.62, 0.44, 0.08);
 /// Points on a piece's outline while it is between a square and a disc. A
 /// regular 24-gon's radius errs from its circle by under one percent, and the
 /// square's corners fall on its vertices.
@@ -90,7 +91,8 @@ pub(super) fn render(
     // what is drawn: the cell's face until the minting turn is edge-on, the
     // coin from then on, and a piece squaring up as it flies home.
     let (width, roundness) = event.piece_shape();
-    for cell in &event.cells {
+    // A taken coin is in the magpie's beak, or gone with it.
+    for cell in event.cells.iter().filter(|cell| !cell.taken) {
         if cell.side <= 0.0 {
             continue;
         }
@@ -117,6 +119,9 @@ pub(super) fn render(
             look,
             stroke_width,
         );
+    }
+    if let Some(magpie) = event.magpie().filter(|magpie| magpie.in_view()) {
+        magpie::render(frame, magpie, layout);
     }
 }
 

@@ -973,13 +973,69 @@ pub struct ClockExplosionState {
 }
 
 /// Bounded coin diagnostics; phase/timing live on the timed event. The
-/// batch is Explosion's, so the fields are its fields.
+/// batch is Explosion's, so the first fields are its fields; the rest are
+/// the magpie's, which gathers from the pile while the batch holds it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockCoinsState {
     pub cells: u32,
     pub live_cells: u32,
     pub max_cells: u32,
     pub shared_arena: bool,
+    /// Coins the magpie has carried out of view. They do not come home.
+    #[serde(default)]
+    pub taken: u32,
+    /// The guest, from the moment the coins have landed until it is gone.
+    #[serde(default)]
+    pub magpie: Option<ClockMagpieState>,
+}
+
+/// Where the magpie is in its visit. `Away` is between trips, and after the
+/// last one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockMagpiePhase {
+    Away,
+    Entering,
+    Flying,
+    Landed,
+    Hopping,
+    Taking,
+    Leaving,
+}
+
+impl ClockMagpiePhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Away => "away",
+            Self::Entering => "entering",
+            Self::Flying => "flying",
+            Self::Landed => "landed",
+            Self::Hopping => "hopping",
+            Self::Taking => "taking",
+            Self::Leaving => "leaving",
+        }
+    }
+}
+
+/// The magpie that gathers coins: a drawn bird on the crow's flight
+/// controller, never a rigid body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockMagpieState {
+    pub phase: ClockMagpiePhase,
+    pub phase_tick: u64,
+    /// Its feet, in world mill units.
+    pub position_milli: [i32; 2],
+    pub facing_right: bool,
+    /// Which side of the view it comes from and carries its coins to.
+    pub home_right: bool,
+    /// The coin it is after, by its place in the batch.
+    pub target: Option<u32>,
+    /// Whether a coin is in its beak.
+    pub carrying: bool,
+    /// Trips that carried a coin out of view.
+    pub trips: u32,
+    /// Trips it gave up: the coin was gone, or the approach ran out of time.
+    pub abandoned: u32,
 }
 
 /// Bounded Crow visitor diagnostics, independent of the timed animation.

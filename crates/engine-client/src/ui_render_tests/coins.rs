@@ -1,9 +1,10 @@
 //! Fixed-reading captures of the Coins event through the production raster
 //! adapter and the real UI: the lit cells turning about their axes, the
-//! cascade, the pile and the return in the device-sized views, and the pause
-//! and launcher pages that hold the switch. A sample always runs; the stills
-//! and every other frame of the 800x480 film are written out when
-//! `SPACEWARS_COINS_ARTIFACTS` names a directory, for the docs' pictures.
+//! cascade, the pile, the magpie's first trip and the return in the
+//! device-sized views, and the pause and launcher pages that hold the
+//! switch. A sample always runs; the stills and every third frame of the
+//! 800x480 film are written out when `SPACEWARS_COINS_ARTIFACTS` names a
+//! directory, for the docs' pictures.
 use super::*;
 use crate::{
     render::{FrameLayout, Viewport},
@@ -120,15 +121,27 @@ fn coins_render_the_turn_cascade_pile_return_and_controls_at_target_sizes() {
                 );
                 break;
             }
-            assert!(tick < 20 * 60, "{width}x{height}: the event never ended");
+            assert!(tick < 40 * 60, "{width}x{height}: the event never ended");
+            // The magpie's stills are its first trip: just landed by the
+            // pile, the coin in its beak with its head still down, and on
+            // its way out with it.
+            let magpie = state.coins_state().and_then(|coins| coins.magpie);
+            let first_trip = |phase: &str, at: u64| {
+                magpie.filter(|bird| {
+                    bird.phase.as_str() == phase && bird.phase_tick == at && bird.trips == 0
+                })
+            };
             let still = match (phase, state.phase_tick()) {
                 (Some("minting"), 18) => Some("minting"),
                 (Some("cascading"), 30) => Some("cascading"),
                 (Some("cascading"), 230) => Some("piled"),
+                (Some("gathering"), _) if first_trip("landed", 2).is_some() => Some("landed"),
+                (Some("gathering"), _) if first_trip("taking", 26).is_some() => Some("taking"),
+                (Some("gathering"), _) if first_trip("leaving", 30).is_some() => Some("carrying"),
                 (Some("reforming"), 45) => Some("reforming"),
                 _ => None,
             };
-            let film = width == 800 && output.is_some() && tick % 2 == 0;
+            let film = width == 800 && output.is_some() && tick % 3 == 0;
             if still.is_some() || film || tick % 60 == 0 {
                 let frame = ClockScenario::render_frame(&state);
                 let pixels = draw(&ui, window, &frame, viewport);
@@ -167,13 +180,13 @@ fn coins_render_the_turn_cascade_pile_return_and_controls_at_target_sizes() {
             }
             ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
         }
-        for phase in ["minting", "cascading", "reforming"] {
+        for phase in ["minting", "cascading", "gathering", "reforming"] {
             assert!(
                 phases.contains(phase),
                 "{width}x{height}: no {phase}: {phases:?}"
             );
         }
-        assert_eq!(traces.len() % 4, 0, "{width}x{height}: a still was missed");
+        assert_eq!(traces.len() % 7, 0, "{width}x{height}: a still was missed");
         // Screens include the actual menu tree, not a reconstructed mockup.
         for live in [false, true] {
             reset_panels(&ui);

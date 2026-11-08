@@ -6,8 +6,10 @@
 //! departs as it shrinks and is retired as merged away.
 //!
 //! Coins is the same batch made of round pieces: the cells turn into coins
-//! where they stand, drop with a little jitter, roll and pile, and come home
-//! by the same return. `Debris` says which of the two a batch is.
+//! where they stand, drop with a little jitter, roll and pile, lie there for
+//! the magpie, and come home by the same return. `Debris` says which of the
+//! two a batch is. The magpie is the batch's guest: it takes coins out of
+//! the pile and out of view, and the return grows their replacements.
 use engine_common::ClockEventKind;
 use engine_core::Vec2;
 use engine_rapier::world::{
@@ -33,7 +35,10 @@ use crate::{
     physics::FallingWorld,
 };
 
+pub(crate) mod magpie;
 mod reassembly;
+pub use magpie::GATHERING_TICKS;
+use magpie::Magpie;
 use reassembly::{Destination, Reassembly};
 
 pub const WARNING_TICKS: u64 = 36;
@@ -43,7 +48,7 @@ pub const BURST_TICKS: u64 = 210;
 /// `coins_tests`.
 pub const CASCADE_TICKS: u64 = 240;
 pub const EXPLOSION_TICKS: u64 = WARNING_TICKS + BURST_TICKS + REFORMING_TICKS;
-pub const COINS_TICKS: u64 = WARNING_TICKS + CASCADE_TICKS + REFORMING_TICKS;
+pub const COINS_TICKS: u64 = WARNING_TICKS + CASCADE_TICKS + GATHERING_TICKS + REFORMING_TICKS;
 pub const MAX_EXPLOSION_CELLS: usize = crate::fonts::MAX_DIGIT_CELLS + meridiem::MAX_CELLS;
 
 /// What the batch is made of. Explosion blasts square blocks outward; Coins
@@ -62,14 +67,6 @@ impl Debris {
         match self {
             Self::Blast => ClockEventKind::Explosion,
             Self::Coins => ClockEventKind::Coins,
-        }
-    }
-
-    /// How long the pieces are live bodies before the return.
-    const fn live_ticks(self) -> u64 {
-        match self {
-            Self::Blast => BURST_TICKS,
-            Self::Coins => CASCADE_TICKS,
         }
     }
 
@@ -92,6 +89,9 @@ pub(crate) struct Cell {
     pub angle: f32,
     pub side: f32,
     pub label: bool,
+    /// In the magpie's beak or gone with it: no body, not drawn in the pile,
+    /// and dropped from the batch when the return begins.
+    pub taken: bool,
     /// The digit cell it left, or is first split off for.
     home: Option<Home>,
     velocity: Vec2,
@@ -122,6 +122,11 @@ pub(crate) struct ExplosionEvent {
     mechanics: Mechanics,
     drain: Option<DrainGeometry>,
     reassembly: Option<Reassembly>,
+    /// The magpie, which only Coins has.
+    guest: Option<Magpie>,
+    /// Coins the guest has taken, counted on because the cells leave the
+    /// batch at the return.
+    taken: u32,
 }
 
 fn body_id(debris: Debris, index: usize) -> BodyId {
@@ -139,6 +144,15 @@ impl ExplosionEvent {
     pub fn own_world(&self) -> Option<&PhysicsWorld> {
         match &self.mechanics {
             Mechanics::Standalone(world) => world.as_deref(),
+            Mechanics::Shared => None,
+        }
+    }
+
+    /// The standalone world, for a test to move a coin in.
+    #[cfg(test)]
+    pub fn own_world_mut(&mut self) -> Option<&mut PhysicsWorld> {
+        match &mut self.mechanics {
+            Mechanics::Standalone(world) => world.as_deref_mut(),
             Mechanics::Shared => None,
         }
     }
@@ -241,6 +255,7 @@ impl ExplosionEvent {
                 angle: 0.0,
                 side,
                 label: home.is_none(),
+                taken: false,
                 home,
                 velocity,
                 spin,
@@ -289,7 +304,16 @@ impl ExplosionEvent {
             mechanics,
             drain,
             reassembly: None,
+            // The guest's own stream, so its choices never move the coins'
+            // jitter.
+            guest: (debris == Debris::Coins).then(|| Magpie::new(layout, seed ^ 0x4d41_4750_4945)),
+            taken: 0,
         }
+    }
+
+    /// The magpie, while the batch is Coins.
+    pub(crate) fn magpie(&self) -> Option<&Magpie> {
+        self.guest.as_ref()
     }
 
     /// The phase as the event publishes it. Coins names its first two phases
@@ -318,7 +342,7 @@ impl ExplosionEvent {
                 let width = (std::f32::consts::PI * self.tick as f32 / WARNING_TICKS as f32).cos();
                 (width.abs().max(0.04), if width >= 0.0 { 0.0 } else { 1.0 })
             }
-            (Debris::Coins, EventPhase::Exploding) => (1.0, 1.0),
+            (Debris::Coins, EventPhase::Exploding | EventPhase::Gathering) => (1.0, 1.0),
             (Debris::Coins, _) => {
                 let t = (self.tick as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
                 (1.0, 1.0 - t * t * (3.0 - 2.0 * t))
@@ -327,7 +351,7 @@ impl ExplosionEvent {
     }
     pub fn live_cell_count(&self) -> usize {
         if self.live_bodies {
-            self.cells.len()
+            self.cells.iter().filter(|cell| !cell.taken).count()
         } else {
             0
         }
@@ -348,6 +372,8 @@ impl ExplosionEvent {
             live_cells: self.live_cell_count() as u32,
             max_cells: MAX_EXPLOSION_CELLS as u32,
             shared_arena: self.shares_visit_arena(),
+            taken: self.taken,
+            magpie: self.guest.as_ref().map(Magpie::diagnostics),
         }
     }
 
@@ -384,8 +410,10 @@ impl ExplosionEvent {
         if self.live_bodies {
             let world = arena.world_mut().unwrap();
             let scale = self.gravity / -world.gravity().y;
-            for i in 0..self.cells.len() {
-                assert!(world.set_gravity_scale(body_id(self.debris, i), scale, false));
+            for (i, cell) in self.cells.iter().enumerate() {
+                if !cell.taken {
+                    assert!(world.set_gravity_scale(body_id(self.debris, i), scale, false));
+                }
             }
         }
         duck.claim_arena(arena, self.debris.kind());
@@ -403,12 +431,48 @@ impl ExplosionEvent {
     ) -> bool {
         self.tick += 1;
         let burst = self.phase == EventPhase::Warning && self.tick >= WARNING_TICKS;
-        let reform = self.phase == EventPhase::Exploding && self.tick >= self.debris.live_ticks();
+        // A blast's blocks return straight from where they land. Coins lie in
+        // the arena for the magpie first.
+        let gather = self.phase == EventPhase::Exploding
+            && self.debris == Debris::Coins
+            && self.tick >= CASCADE_TICKS;
+        let reform = match (self.debris, self.phase) {
+            (Debris::Blast, EventPhase::Exploding) => self.tick >= BURST_TICKS,
+            (Debris::Coins, EventPhase::Gathering) => self.tick >= GATHERING_TICKS,
+            _ => false,
+        };
+        // The guest acts on the pile as it lies, and keeps going through the
+        // return so that it is never cut off in the air.
+        let taken = match &mut self.guest {
+            Some(guest) if matches!(self.phase, EventPhase::Gathering | EventPhase::Reforming) => {
+                let remaining = if self.phase == EventPhase::Gathering {
+                    GATHERING_TICKS - self.tick
+                } else {
+                    0
+                };
+                guest.step(&self.cells, remaining)
+            }
+            _ => None,
+        };
         let world = match &mut self.mechanics {
             Mechanics::Standalone(world) => world.as_deref_mut(),
             Mechanics::Shared => Some(arena.world_mut().expect("leased arena")),
         };
+        debug_assert!(
+            taken.is_none() || world.is_some(),
+            "a coin is taken from a live pile"
+        );
         if let Some(world) = world {
+            if let Some(index) = taken {
+                // The coin is the bird's now: out of the world here, and out
+                // of the batch when the return begins.
+                assert!(
+                    world.remove_entity(body_id(self.debris, index).entity),
+                    "a coin in the pile"
+                );
+                self.cells[index].taken = true;
+                self.taken += 1;
+            }
             if burst {
                 world.reserve(self.cells.len(), self.cells.len(), 0);
                 for (i, cell) in self.cells.iter().enumerate() {
@@ -462,10 +526,19 @@ impl ExplosionEvent {
             }
             self.phase = EventPhase::Exploding;
             self.tick = 0;
+        } else if gather {
+            self.phase = EventPhase::Gathering;
+            self.tick = 0;
         } else if reform {
             if let Mechanics::Standalone(world) = &mut self.mechanics {
                 *world = None;
             }
+            // What the magpie kept is the return's shortfall: the batch is
+            // the coins that remain, and the body ids they were counted by
+            // are no longer needed.
+            let mut kept = self.cells.iter().map(|cell| !cell.taken);
+            self.pieces.retain(|_| kept.next().unwrap_or(true));
+            self.cells.retain(|cell| !cell.taken);
             self.phase = EventPhase::Reforming;
             self.tick = 0;
             digits::apply_snapshot(segments, display);
@@ -491,6 +564,7 @@ impl ExplosionEvent {
             self.assign_pieces(surfaces);
         }
         let finished = self.advance_phase(segments, display, arena);
+        self.retire_taken(surfaces);
         if let Mechanics::Standalone(world) = &mut self.mechanics {
             let world = world.as_deref_mut().map(|world| {
                 world.step(1.0 / 60.0);
@@ -513,6 +587,18 @@ impl ExplosionEvent {
         self.sample_reassembly(context.display, context.layout, context.surfaces);
     }
 
+    /// A coin the magpie has taken stops being a digit cell: its surface
+    /// goes with it.
+    fn retire_taken(&mut self, surfaces: &mut SurfaceLedger) {
+        for (cell, piece) in self.cells.iter().zip(self.pieces.iter_mut()) {
+            if cell.taken
+                && let Some(piece) = piece.take()
+            {
+                surfaces.retire(piece.id, Retirement::Taken);
+            }
+        }
+    }
+
     /// Live cells take their bodies' poses.
     fn read_back(
         debris: Debris,
@@ -521,7 +607,7 @@ impl ExplosionEvent {
         world: Option<&PhysicsWorld>,
     ) {
         if live_bodies && let Some(world) = world {
-            for (i, cell) in cells.iter_mut().enumerate() {
+            for (i, cell) in cells.iter_mut().enumerate().filter(|(_, cell)| !cell.taken) {
                 let motion = world.motion(body_id(debris, i)).expect("live batch cell");
                 cell.position = motion.position;
                 cell.angle = motion.angle;
@@ -537,6 +623,18 @@ impl ExplosionEvent {
     ) {
         if self.phase == EventPhase::Reforming {
             if self.reassembly.is_none() {
+                // A coin the drain took has been falling out of sight for
+                // most of the gathering; it comes home from just below the
+                // view, not from however far it got, so that it arrives at the
+                // pace of the rest. A blast's pieces are in the world for a
+                // few seconds and come home from wherever they are, without a
+                // jump at the hand-off.
+                if self.debris == Debris::Coins {
+                    let below = layout.bounds_min.y - layout.pitch * 12.0;
+                    for cell in &mut self.cells {
+                        cell.position.y = cell.position.y.max(below);
+                    }
+                }
                 self.reassembly = Some(Reassembly::new(&mut self.cells, display, layout));
                 self.assign_pieces(surfaces);
             }
@@ -669,7 +767,7 @@ impl ExplosionEvent {
     }
 
     fn remove_bodies(debris: Debris, world: &mut PhysicsWorld, cells: &[Cell]) {
-        for i in 0..cells.len() {
+        for (i, _) in cells.iter().enumerate().filter(|(_, cell)| !cell.taken) {
             assert!(world.remove_entity(body_id(debris, i).entity), "live batch");
         }
     }

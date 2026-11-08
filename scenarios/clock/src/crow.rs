@@ -10,7 +10,7 @@ pub(crate) use environment::Environment;
 pub(crate) use water_tolerance::WaterTolerance;
 #[cfg(test)]
 mod behavior_tests;
-use flight::Flight;
+pub(crate) use flight::Flight;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use crate::{SegmentRepresentation, SegmentState, layout::Layout};
