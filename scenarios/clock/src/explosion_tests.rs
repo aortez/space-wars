@@ -174,6 +174,7 @@ fn changed_readings_reassemble_the_latest_face_before_the_final_handoff() {
                         layout,
                         floor,
                     },
+                    None,
                     &mut state.arena
                 ));
                 let visible = event

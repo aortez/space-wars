@@ -17,6 +17,7 @@ fn catalog_covers_every_kind_once_and_has_bounded_timing() {
             ClockEventKind::Rain => 42 * 60,
             ClockEventKind::Aquarium => 66 * 60,
             ClockEventKind::Spider => 30 * 60,
+            ClockEventKind::Coins => 30 * 60,
             _ => 12 * 60,
         };
         assert!(definition.duration_ticks > 0 && definition.duration_ticks <= max_duration);

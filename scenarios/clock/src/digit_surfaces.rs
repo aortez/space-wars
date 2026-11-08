@@ -681,6 +681,7 @@ pub(crate) fn diagnostics(state: &ClockState) -> ClockDigitSurfaceState {
                 melted: accounting.retired(Retirement::Melted),
                 exited: accounting.retired(Retirement::Exited),
                 reclaimed: accounting.retired(Retirement::Reclaimed),
+                taken: accounting.retired(Retirement::Taken),
             },
             sequence: accounting.sequence,
         },

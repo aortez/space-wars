@@ -70,6 +70,7 @@ pub enum EventPhase {
     Swimming,
     Minting,
     Cascading,
+    Gathering,
 }
 
 impl EventPhase {
@@ -97,6 +98,7 @@ impl EventPhase {
             Self::Swimming => "swimming",
             Self::Minting => "minting",
             Self::Cascading => "cascading",
+            Self::Gathering => "gathering",
         }
     }
 }
@@ -483,7 +485,9 @@ impl ActiveEvent {
             Self::Grass(event) => event.step(),
             Self::Aquarium(event) => event.step(context, visit, arena),
             Self::Falling(event) => event.step(context),
-            Self::Explosion(event) | Self::Coins(event) => event.step(context, arena),
+            Self::Explosion(event) | Self::Coins(event) => {
+                event.step(context, visit.as_deref(), arena)
+            }
             Self::ColorCycle(event) => event.step(),
             Self::Meltdown(event) => event.step_with_visit(context, visit, arena),
             Self::Marquee(event) => event.step(),
@@ -664,6 +668,7 @@ impl ActiveEvent {
                     | EventPhase::Exploding
                     | EventPhase::Minting
                     | EventPhase::Cascading
+                    | EventPhase::Gathering
             )
     }
 }
