@@ -258,9 +258,12 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))
         }
         UiAction::Left | UiAction::Right => {
+            // Switches and the two actions hand the arrows to navigation.
+            // Selectors adjust, and so do Time and Date, whose rows the
+            // navigation table keeps them on.
             if matches!(
                 index,
-                2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 17 | 18 | 19 | 20 | 21
+                2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 15 | 17 | 18 | 19 | 20 | 21 | 22
             ) {
                 window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
                     index, action,
