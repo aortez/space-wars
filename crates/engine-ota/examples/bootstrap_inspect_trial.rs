@@ -5,7 +5,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args_os().len() != 1 {
         return Err("usage: bootstrap_inspect_trial (no arguments)".into());
     }
-    let lock = engine_ota::install_lock::InstallLock::acquire()?;
+    // The recovery service holds the lock through its boot health window.
+    let lock = engine_ota::install_lock::InstallLock::acquire().map_err(|error| match error {
+        engine_ota::Error::Busy => {
+            "the install lock is busy: the recovery service holds it while it observes the boot (about the first 70 seconds); retry after it finishes".to_owned()
+        }
+        other => other.to_string(),
+    })?;
     let store =
         engine_ota::bootstrap::TrialStore::open(&lock)?.ok_or("no active bootstrap trial")?;
     println!(
