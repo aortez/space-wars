@@ -500,6 +500,36 @@ disk images name `/dev/sda1` and `/dev/sda4` in the flashed root's `fstab`. A
 card has no `/dev/sda4`, so its first boot waited 90 seconds for that device
 and entered emergency mode, without network or a console login.
 
+Three units moved to cards this way. `sw-picade-2.local` moved on 2026-11-02
+(`ota-picade2-sd-approval-20261103`), `spacewars.local` on 2026-11-07
+(`ota-pi5-sd-first-boot-20261107`, `ota-pi5-sd-bootstrap-20261107`) and
+`sw-picade.local` on 2026-11-07 (`ota-picade-sd-first-boot-20261107`,
+`ota-picade-sd-bootstrap-20261107`). A card flashed from a published
+generation's full disk image makes that generation the bootstrap's
+generation-zero image: `sw-picade.local` started from generation 25, which its
+Release channel already carried, so its first update check finds nothing newer,
+while `spacewars.local` started from Nightly generation 24 and takes Release
+generation 25 as an ordinary update. Points from those runs:
+
+- Apply the data restore before the first boot, or over SSH as root followed by
+  a reboot; the card otherwise boots with fresh SSH host keys and the flash
+  utility's Wi-Fi profile. Keep the old medium's key fingerprint and compare.
+- A package or tool set streamed from the workstation with `tar` keeps the
+  workstation's numeric owner, which the unit maps to its kiosk account.
+  `bootstrap_check` then refuses the store with "unsafe file ownership"; make the
+  copied files root-owned before the first check.
+- `bootstrap_backup` wants `/boot` mounted read-only and `bootstrap_stage_boot`
+  wants it read-write; remount between them.
+- The workstation verifiers read the exported active tree: `binding.json` with
+  `recovery-copies/`, `data-copy/` or `legacy-root/`. The direct archive from
+  `bootstrap_export_data` is a separate recovery copy and does not verify.
+- `bootstrap_inspect_trial` reports `Busy` while the recovery service holds the
+  install lock during its health window, about the first 70 seconds of a boot.
+- A Pi 4 writes the card about half as fast as a Pi 5: boot staging took 13
+  minutes and canonical preparation 18, against 6.5 and 9 on the Pi 5. A
+  cabinet's Wi-Fi may reassociate every few minutes, so keep SSH sessions
+  alive and export the recovery copies compressed.
+
 No physical recovery case, including power loss, has run on an SD card yet.
 
 ## Read the existing device
@@ -1579,8 +1609,13 @@ and reservations must never be relabeled to bypass protocol checks.
 
 ## Upgrade a provisioned unit's boot set
 
-**Status 2026-11-05:** implemented and covered by workstation tests only. No
-unit has run it yet.
+**Status 2026-11-07:** `sw-picade-2.local` ran it on 2026-11-06 from its SD
+card, moving from the 6.6 to the 6.12 boot set with a package built from the
+kernel branch before #587 merged (`ota-picade2-kernel612-upgrade-20261106`,
+`ota-picade2-kernel612-approval-20261106`,
+`ota-picade2-kernel612-provisioner-20261107`). The other two units took the
+alternative and were re-flashed onto SD cards with a 6.12 image
+(see [SD card boot media](#sd-card-boot-media)).
 
 An image whose boot identity differs from a unit's installed boot set is
 `ManualBootUpgrade`. A rootfs install cannot replace the kernel, device trees or
