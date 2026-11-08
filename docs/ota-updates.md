@@ -80,10 +80,10 @@ generation-10 boot and automatic payload staging were not tested in that run.
 These remain supervised results, not unattended rollout qualification.
 
 The earlier generation-7 review-fix record (`ota-picade2-review-fixes-20261018`)
-and the [generation-8 rfkill evidence PR #525](https://github.com/aortez/space-wars/pull/525)
+and the generation-8 rfkill qualification record (`ota-rfkill-qualification-20261022`),
+written up under [Second Picade bounded-readback qualification](#second-picade-bounded-readback-qualification-2026-10-22),
 retain their exact sources and separate restart/radio/time/OTA scope. #511 is
-closed after the generation-8 qualification; #525 remains an open documentation
-PR at this checkpoint.
+closed after the generation-8 qualification.
 The generation-6 Pi 5 record (`ota-profile-image-20261018`) and
 earlier second-Picade record (`ota-picade2-profile-image-20261018`) retain
 their original source `0a32db2` and scope.
@@ -119,7 +119,7 @@ and the three listener masks to their source contracts. SSH boot-ID lookup is
 limited to the stopped-service fallback; failure there does not prevent a later
 coordinator admission.
 
-The revised image passed qualification on the selected second Picade. Native
+The generation-7 revised image passed qualification on the selected second Picade. Native
 startup checks kept the actual packaged daemon responsive for missing, invalid
 and valid handoffs; the negative cases emitted the default warning. The first
 observer failed because `nsenter` is absent on the image; its logs and the
@@ -184,8 +184,9 @@ New image changes and previously untested failure cases still need qualification
 ### Next implementation sequence
 
 1. The selected-Pi network gate is complete: #511's readback qualification and
-   #523's SSH/storage qualification passed. Land the retained #525 evidence PR;
-   per-device corrected-image rollout remains tracked in #267.
+   #523's SSH/storage qualification passed, and the generation-8 record is
+   written up in this document; per-device corrected-image rollout remains
+   tracked in #267.
 2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
    consent, app save/acknowledgement, fixed privileged install operation, progress,
    trial and confirmed outcome. Define their shared handoff together; the
@@ -559,7 +560,9 @@ atomic replacement and file/directory flushes. Existing missing/corrupt state,
 changed paths, unsafe permissions and uncertain flushes cannot reset saved
 policy or deployment ownership. Only a new directory receives default state.
 The service-start grace covers the existing 100-second setup checkpoint and
-ten-second quiet period. Expired setup holds retain an additional checkpoint
+ten-second quiet period. Normal idle shutdown also uses this ten-second quiet
+grace, not a two-minute grace; the 120-second setup lease and time-check limit
+are separate bounds. Expired setup holds retain an additional checkpoint
 allowance. Reaping requires fresh, continuous idle observations of SSH sessions,
 NetworkManager checkpoints, the install lock and live operations. Unknown,
 busy or stale observations prevent shutdown intent.
@@ -3452,6 +3455,86 @@ source, image, trial/review results, normal boot, both cycles and private-artifa
 hashes. This run did not access or update the primary Picade. Automatic publishing
 and installation remain disabled; PR review and the remaining #267 gates still
 precede unattended rollout.
+
+### Second Picade bounded-readback qualification (2026-10-22)
+
+The owner-selected second Picade, a Pi 4 Model B Rev 1.2, installed signed
+Nightly generation 8 from merged source
+`d7987f6e781d33e39f3e35f243f2c6fc87ac0f6d` (#519). The
+qualification record (`ota-rfkill-qualification-20261022`) binds the
+payload, packaged binaries, source, native controls and 56 private-artifact
+hashes. Raw settings and journals remain private. The NetworkManager binary
+is unchanged from the previously qualified provider. This was supervised
+owner-local publication, not a claim of exact-main hosted CI admission or
+automatic Release promotion.
+
+The healthy trial committed on slot b, observed 535 seconds after monitoring
+started; that interval is not an install-performance benchmark. Existing settings
+values were preserved, with only new grass, automatic pizza events and live-ball
+limit defaults added. The local Bluetooth GATT database regenerated; other
+selected durable bytes and existing metadata matched. Earlier failed selection
+or staging attempts remain recorded and were not replayed blindly.
+
+The owner's normal daily power cycle supplied the normal-boot check. The device
+returned with actual/default/good slots b/b/b, `tryboot=false` and the same recovery
+record. Its automatic Release check started 8.201 seconds after boot and returned
+`no-candidate`. Boot-to-health timing was not observed, and the previous boot's
+RAM journal was lost (#521). A single later service restart preserved the daily
+check's completion and next deadline. Across 23.325 seconds of observation,
+the game kept its PID and presented 1,366 more frames; fresh SSH succeeded in
+0.603 seconds. One transient missing status socket was tolerated during startup.
+
+Both installed cycles closed SSH and used an independent on-device observer and
+bounded restoration. Each enabled partial offline, observed Wi-Fi off after
+idle eligibility and the ten-second quiet grace, then used the public manual
+`sync-now` API after a 305-second accepted-sync age. An offline Nightly-to-Release
+channel round trip made Release due; the automatic Release check joined the
+time wake without a manual OTA request or any Nightly attempt. Both checks
+returned `no-candidate`, and Wi-Fi returned to idle. These runs exercised the real
+time worker and automatic OTA join, not the daily timer, a payload download or
+automatic installation.
+
+| Installed check | Normal cycle | CPU-loaded cycle |
+| --- | --- | --- |
+| First radio-off observation / settled cycle | 15 s / 336 s | 17 s / 341 s |
+| Original time / OTA attempt IDs | 8 / 31 | 10 / 32 |
+| Game frames presented during retained observation | 56,583 | 56,165 |
+| Fresh SSH after restoration | 0.515 s | 0.440 s |
+| Faults / owner resumes / emergency restorations | 0 / 0 / 0 | 0 / 0 / 0 |
+
+The loaded run used four CPU workers for 31.5 seconds around time wake, automatic
+OTA and return to idle; its first radio-off phase was unloaded. Over the measured
+28.63-second window the device was 97.81% CPU busy, with the workers consuming
+75.74% of total CPU capacity. Temperature peaked at 79.367 C, below the 80 C abort
+threshold. The retained D-Bus trace has 1,119 messages and exactly three radio
+writes: wake, return to idle and cleanup. First matching readbacks arrived
+0.137149, 0.758337 and 0.135845 seconds after their respective dispatches. These
+are trace intervals, not measurements from the monitor's monotonic deadline.
+No stale post-acknowledgement `GetAll` reply or readback-pending observation was
+seen; the live deferral branch was not demonstrated by this run.
+
+Delay-specific qualification comes from the same Pi's deterministic native
+controls: three idle and three CPU/disk-loaded runs each passed all 42 selected
+tests, including all eight new delay/conflict/SSH cases. The tested PR head and
+installed merge have the same Git tree and identical test-binary hash. The
+loaded controls recorded 3.68 user CPU cores and 99.6% disk busy over 91.86 seconds;
+queued writes took about two minutes to drain after load stopped. The private-bus
+and controller cases establish delayed/duplicate completion within the original
+deadline, expiry including queued or late signals, restart behavior, witness
+conflict rejection and bounded SSH admission without another radio write or
+implicit owner resume. The evidence maps all five #511 acceptance items to
+these cases and the installed cycles; it does not claim a naturally occurring
+live stale-readback reproduction.
+
+The installed cycles retained original worker identities and deadlines, profile
+revisions, boot and game process, with selected saved bytes unchanged. Only
+NetworkManager connection timestamp metadata changed in the private settings
+snapshots. Final collection confirmed Release selected, partial offline off,
+healthy service, no pending command or suspension, and all load workers and
+transient units gone. The other two devices were not accessed. Repeated-login
+storage stalls remain #523 and previous-boot journal retention remains #521;
+neither is fixed by this qualification. Publication and installation automation
+remain disabled, with the wider #262/#264/#265/#266/#267 work still outstanding.
 
 ### Download readiness contract
 
