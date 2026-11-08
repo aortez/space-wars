@@ -1495,10 +1495,20 @@ uses this adapter only to reconcile an existing transaction.
 ### Repeated updates and watchdog completion
 
 A committed trial retains the firmware tryboot flag and original command line
-until reset. The journal retains that exact successful boot so it can start a
-later update without an extra reboot. Running trial identity comes from the
-loaded command line; replacing the next trial selector cannot change it.
-Interruption during the later update still quarantines the new attempt.
+until reset. The journal retains that exact successful boot, and the record can
+start a later update from it. Native installation admission is stricter: it
+accepts only a confirmed normal boot, so a unit left on its committed trial
+boot refused the next panel install with a generic unavailability (seen on
+`sw-picade-2` on 2026-11-07, hidden on the Picades by their nightly power cycle
+and not on the always-on living room). Since 2026-11-08 the recovery service
+requests one normal reboot as soon as the trial's watchdog completes, authorized
+against the committed record and the completed watchdog; a service restart on
+the same boot asks again, and the normal boot asks for nothing. If the request
+fails, the service reports `healthy` with the reason, the Updates panel says a
+normal restart is pending instead of "not available", and the install CLI
+returns `normal-boot-required`. Running trial identity comes from the loaded
+command line; replacing the next trial selector cannot change it. Interruption
+during the later update still quarantines the new attempt.
 
 Layout inspection selects the mount ID of an actually opened directory, using
 `/proc/self/fdinfo`, rather than requiring one mount-table entry for its path.

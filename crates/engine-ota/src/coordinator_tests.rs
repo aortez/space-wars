@@ -8,6 +8,7 @@ struct Backend {
     early: bool,
     fail_apply: bool,
     fail_stop: bool,
+    fail_confirming_reboot: bool,
     sample_count: u64,
     bad_sample_at: Option<u64>,
 }
@@ -69,6 +70,14 @@ impl RecoveryBackend for Backend {
         self.events.push("normal-reboot");
         Ok(())
     }
+    fn reboot_confirmed_good(&mut self, store: &RecoveryStore) -> Result<()> {
+        store.durable_record()?.confirming_reboot(&self.boot)?;
+        self.events.push("confirming-reboot");
+        if self.fail_confirming_reboot {
+            return Err(invalid("fixture reboot request failed"));
+        }
+        Ok(())
+    }
     fn wait_for_sample(&mut self) {
         self.boot.uptime_ms += 2_000;
     }
@@ -85,6 +94,7 @@ fn setup() -> (tempfile::TempDir, RecoveryStore, Backend) {
         early: true,
         fail_apply: false,
         fail_stop: false,
+        fail_confirming_reboot: false,
         sample_count: 0,
         bad_sample_at: None,
     };
@@ -97,15 +107,15 @@ fn actual_journal_orders_health_selector_commit_and_watchdog_completion() {
     let mut progress = Vec::new();
     assert_eq!(
         recover(&mut store, &mut backend, |p| progress.push(p.stage)).unwrap(),
-        RecoveryOutcome::Healthy
+        RecoveryOutcome::ConfirmingRebootRequested
     );
     assert_eq!(backend.boot.uptime_ms, 80_000);
     assert_eq!(backend.sample_count, 31);
     assert_eq!(
-        &backend.events[backend.events.len() - 2..],
-        &["selector", "stop-watchdog"]
+        &backend.events[backend.events.len() - 3..],
+        &["selector", "stop-watchdog", "confirming-reboot"]
     );
-    assert_eq!(progress.last(), Some(&RecoveryStage::Healthy));
+    assert_eq!(progress.last(), Some(&RecoveryStage::RebootRequested));
     assert!(!backend.events.contains(&"normal-reboot"));
     drop(store);
     let mut store = RecoveryStore::open(&directory.path().join("recovery")).unwrap();
@@ -115,8 +125,54 @@ fn actual_journal_orders_health_selector_commit_and_watchdog_completion() {
     );
     backend.events.clear();
     backend.boot.uptime_ms += 86_400_000;
-    recover(&mut store, &mut backend, |_| {}).unwrap();
-    assert_eq!(backend.events, ["stop-watchdog"]);
+    // A service restart on the committing trial boot asks for the confirming
+    // reboot again; the boot still carries the firmware's tryboot flag.
+    assert_eq!(
+        recover(&mut store, &mut backend, |_| {}).unwrap(),
+        RecoveryOutcome::ConfirmingRebootRequested
+    );
+    assert_eq!(backend.events, ["stop-watchdog", "confirming-reboot"]);
+}
+
+#[test]
+fn failed_confirming_reboot_reports_healthy_with_the_reason_and_a_normal_boot_asks_nothing() {
+    let (directory, mut store, mut backend) = setup();
+    backend.fail_confirming_reboot = true;
+    let mut progress = Vec::new();
+    assert_eq!(
+        recover(&mut store, &mut backend, |p| progress.push(p)).unwrap(),
+        RecoveryOutcome::Healthy
+    );
+    assert_eq!(backend.events.last(), Some(&"confirming-reboot"));
+    let last = progress.last().unwrap();
+    assert_eq!(last.stage, RecoveryStage::Healthy);
+    assert!(
+        last.detail
+            .as_deref()
+            .is_some_and(|detail| detail.contains("confirming normal reboot was not requested")),
+        "{last:?}"
+    );
+    assert!(
+        progress
+            .iter()
+            .any(|p| p.stage == RecoveryStage::RebootRequested
+                && p.detail.as_deref() == Some(CONFIRMING_REBOOT))
+    );
+    // The confirming normal boot: no tryboot flag, same default, nothing to do.
+    drop(store);
+    let mut store = RecoveryStore::open(&directory.path().join("recovery")).unwrap();
+    backend.events.clear();
+    backend.boot.boot_id = "33333333-3333-3333-3333-333333333333".into();
+    backend.boot.tryboot = false;
+    backend.boot.trial_id = None;
+    backend.boot.uptime_ms = 30_000;
+    let mut progress = Vec::new();
+    assert_eq!(
+        recover(&mut store, &mut backend, |p| progress.push(p.stage)).unwrap(),
+        RecoveryOutcome::Healthy
+    );
+    assert!(backend.events.is_empty(), "{:?}", backend.events);
+    assert_eq!(progress, [RecoveryStage::Healthy]);
 }
 
 #[test]
@@ -181,7 +237,7 @@ fn selector_error_leaves_durable_proof_and_restart_reconciles_actual_choice() {
     let mut store = RecoveryStore::open(&directory.path().join("recovery")).unwrap();
     backend.events.clear();
     recover(&mut store, &mut backend, |_| {}).unwrap();
-    assert_eq!(backend.events, ["stop-watchdog"]);
+    assert_eq!(backend.events, ["stop-watchdog", "confirming-reboot"]);
     assert_eq!(
         store.record().transaction().unwrap().phase,
         Phase::Committed
@@ -201,6 +257,7 @@ fn stop_failure_does_not_report_success_or_undo_the_committed_good_root() {
     );
     assert_eq!(backend.boot.default_slot, Some(Slot::B));
     assert!(!backend.events.contains(&"normal-reboot"));
+    assert!(!backend.events.contains(&"confirming-reboot"));
 }
 
 #[test]

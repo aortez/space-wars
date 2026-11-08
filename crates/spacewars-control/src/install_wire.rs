@@ -142,6 +142,9 @@ pub struct ServiceReply {
 pub enum Failure {
     Invalid,
     Unavailable,
+    /// The last update committed on a trial boot that has not been followed
+    /// by a normal boot yet; installation admission waits for that restart.
+    NormalBootRequired,
     Busy,
     Stale,
     Expired,

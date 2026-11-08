@@ -419,6 +419,15 @@ impl<'a> BootController<'a> {
         Ok(())
     }
 
+    /// Recheck immediately before requesting the normal reboot that confirms a
+    /// trial committed on this boot. The trial watchdog must already be completed.
+    pub fn authorize_confirming_reboot(&self, journal: &RecoveryStore) -> Result<()> {
+        let boot = self.observe()?.observation;
+        journal.durable_record()?.confirming_reboot(&boot)?;
+        crate::watchdog_linux::require_completed(journal, &boot)?;
+        Ok(())
+    }
+
     pub(crate) fn authorize_trial_reboot(
         &self,
         journal: &RecoveryStore,

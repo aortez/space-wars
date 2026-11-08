@@ -139,16 +139,25 @@ impl Backend for Native {
             .updates
             .install_candidate()
             .map_err(|_| Failure::NotReady)?;
-        let result = (|| -> crate::Result<()> {
+        let result = (|| -> crate::Result<Option<Failure>> {
             let lock = InstallLock::acquire()?;
             let boot = BootController::open(&lock)?;
+            // A trial committed on this boot still carries the firmware's tryboot
+            // flag; admission accepts only the confirming normal boot after it.
+            if boot.observe()?.observation.tryboot {
+                return Ok(Some(Failure::NormalBootRequired));
+            }
             let recovery =
                 RecoveryStore::open(Path::new(crate::recovery_service::RECOVERY_DIRECTORY))?;
             journal::Journal::open_native()?.require_clear(&lock, &recovery)?;
             boot.plan_install(&recovery, &selected.candidate)?;
-            Ok(())
+            Ok(None)
         })();
-        result.map_err(|_| Failure::Unavailable)?;
+        match result {
+            Ok(None) => {}
+            Ok(Some(failure)) => return Err(failure),
+            Err(_) => return Err(Failure::Unavailable),
+        }
         self.context_for(&selected)
     }
     fn prepare(&self, prepare: &Prepare) -> Result<(Acknowledgement, HostInstance), Failure> {

@@ -148,6 +148,12 @@ The app listener hands requests to the UI thread. It records the full settings
 snapshot, scene and input revisions, establishes a launch/input fence, and asks
 `SettingsWriter::save_exact` for an ordered barrier receipt. Ordinary saves may
 still coalesce; this exact document cannot be replaced by a newer queued save.
+
+On the trial boot that commits an update, the committed outcome says the device
+restarts once more to confirm the new software, because the recovery service
+requests that normal reboot itself. A panel opened on a committed trial boot
+that was not confirmed yet is told that a normal restart is pending rather than
+that installation is unavailable.
 A valid launcher draft is included and retained in memory when preparation
 starts. Settings changes, other queued saves, scene changes, focus loss and
 preparation expiry revoke an unacknowledged handoff. A failed save cannot ack.

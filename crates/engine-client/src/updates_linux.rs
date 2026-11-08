@@ -821,6 +821,9 @@ fn progress_message(phase: Phase) -> Option<&'static str> {
 fn failure_message(error: Failure) -> &'static str {
     match error {
         Failure::Unavailable => "Installation is not available on this device yet.",
+        Failure::NormalBootRequired => {
+            "The last update is waiting for a normal restart. Restart the device, then return to Updates."
+        }
         Failure::NotReady => "No verified update is ready to install.",
         Failure::Busy => "The device is busy. Return to Updates to try again.",
         Failure::Expired | Failure::Stale => {

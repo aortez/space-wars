@@ -88,6 +88,8 @@ pub trait RecoveryBackend {
     fn apply(&mut self, store: &RecoveryStore, action: &Action) -> Result<BootObservation>;
     fn complete_watchdog(&mut self, store: &RecoveryStore) -> Result<WatchdogCompletion>;
     fn reboot_previous_good(&mut self, store: &RecoveryStore, transaction: Sha256) -> Result<()>;
+    /// Request the normal reboot that confirms a trial committed on this boot.
+    fn reboot_confirmed_good(&mut self, store: &RecoveryStore) -> Result<()>;
     fn wait_for_sample(&mut self) {
         std::thread::sleep(Duration::from_secs(2));
     }
@@ -97,7 +99,12 @@ pub trait RecoveryBackend {
 pub enum RecoveryOutcome {
     Healthy,
     RebootRequested,
+    /// The trial committed on this boot; a normal reboot confirms it.
+    ConfirmingRebootRequested,
 }
+
+const CONFIRMING_REBOOT: &str =
+    "Committed on the trial boot; restarting once to confirm the normal boot";
 
 /// Reconcile exactly once on startup. A restarted observer gets a fresh health
 /// window but inherits the original boot deadline and untouched early watchdog.
@@ -113,8 +120,33 @@ pub fn recover(
     for _ in 0..6 {
         match action {
             Action::None => {
-                if backend.observe()?.tryboot {
+                let boot = backend.observe()?;
+                if boot.tryboot {
                     backend.complete_watchdog(store)?;
+                    // Installation admission wants a confirmed normal boot, so a
+                    // commit on this trial boot ends with one normal reboot. A
+                    // service restart on the same boot asks again; the next
+                    // boot carries no tryboot flag and asks for nothing.
+                    if store.record().confirming_reboot(&boot).is_ok() {
+                        report(RecoveryProgress::for_store(
+                            RecoveryStage::RebootRequested,
+                            store,
+                            Some(CONFIRMING_REBOOT.into()),
+                        ));
+                        match backend.reboot_confirmed_good(store) {
+                            Ok(()) => return Ok(RecoveryOutcome::ConfirmingRebootRequested),
+                            Err(error) => {
+                                report(RecoveryProgress::for_store(
+                                    RecoveryStage::Healthy,
+                                    store,
+                                    Some(format!(
+                                        "confirming normal reboot was not requested: {error}; the next installation needs a restart first"
+                                    )),
+                                ));
+                                return Ok(RecoveryOutcome::Healthy);
+                            }
+                        }
+                    }
                 }
                 report(RecoveryProgress::for_store(
                     RecoveryStage::Healthy,

@@ -18,6 +18,7 @@ struct BootFixture {
     healthy: bool,
     samples: u64,
     normal_reboots: u32,
+    confirming_reboots: u32,
     watchdog_completions: u32,
     selector_changes: u32,
 }
@@ -65,6 +66,12 @@ impl RecoveryBackend for BootFixture {
         store.durable_record()?.watchdog_completion(&self.boot)?;
         self.watchdog_completions += 1;
         Ok(WatchdogCompletion::Stopped)
+    }
+
+    fn reboot_confirmed_good(&mut self, store: &RecoveryStore) -> Result<()> {
+        store.durable_record()?.confirming_reboot(&self.boot)?;
+        self.confirming_reboots += 1;
+        Ok(())
     }
 
     fn reboot_previous_good(&mut self, store: &RecoveryStore, id: Sha256) -> Result<()> {
@@ -290,12 +297,14 @@ async fn signed_ext4_health_failure_survives_restart_and_a_new_feed() {
             healthy,
             samples: 0,
             normal_reboots: 0,
+            confirming_reboots: 0,
             watchdog_completions: 0,
             selector_changes: 0,
         };
         let outcome = recover(&mut recovery, &mut backend, |_| {}).unwrap();
         if healthy {
-            assert_eq!(outcome, RecoveryOutcome::Healthy);
+            // The commit on the trial boot ends with the confirming normal reboot.
+            assert_eq!(outcome, RecoveryOutcome::ConfirmingRebootRequested);
             assert_eq!(
                 recovery.record().transaction().unwrap().phase,
                 Phase::Committed
@@ -303,6 +312,7 @@ async fn signed_ext4_health_failure_survives_restart_and_a_new_feed() {
             assert_eq!(backend.boot.uptime_ms, 80_000);
             assert_eq!(backend.boot.default_slot, Some(Slot::B));
             assert_eq!(backend.normal_reboots, 0);
+            assert_eq!(backend.confirming_reboots, 1);
             assert_eq!(backend.watchdog_completions, 1);
             assert_eq!(backend.selector_changes, 1);
             assert_eq!(
@@ -315,6 +325,7 @@ async fn signed_ext4_health_failure_survives_restart_and_a_new_feed() {
         assert_eq!(backend.boot.uptime_ms, TRIAL_DEADLINE_MS);
         assert_eq!(backend.boot.default_slot, Some(good.slot));
         assert_eq!(backend.normal_reboots, 1);
+        assert_eq!(backend.confirming_reboots, 0);
         assert_eq!(backend.watchdog_completions, 0);
         assert_eq!(backend.selector_changes, 0);
         assert_eq!(recovery.record().good(), &good);

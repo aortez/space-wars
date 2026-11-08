@@ -108,6 +108,16 @@ impl RecoveryBackend for LinuxBackend<'_> {
             },
         ))
     }
+    fn reboot_confirmed_good(&mut self, store: &RecoveryStore) -> engine_ota::Result<()> {
+        self.boot.authorize_confirming_reboot(store)?;
+        futures_lite::future::block_on(futures_lite::future::or(
+            normal_reboot(|| self.boot.authorize_confirming_reboot(store)),
+            async {
+                async_io::Timer::after(Duration::from_secs(5)).await;
+                Err(ota_error("confirming normal reboot request timed out"))
+            },
+        ))
+    }
 }
 
 pub(crate) async fn normal_reboot(
