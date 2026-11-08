@@ -1,0 +1,339 @@
+[
+ {
+  "nearest": null,
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 1.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   12.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 1.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 0.3,
+  "spin": 0.0,
+  "previous_steering": 1.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.5,
+  "previous_steering": 0.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": -0.5,
+  "previous_steering": 0.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 1.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": -1.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": -1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   -1.5
+  ],
+  "error": -1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   0.1
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   3.0,
+   3.0
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   6.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   6.1,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.5,
+  "previous_steering": 0.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   8.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 1.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   5.6,
+   0.1
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 1.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 0.36,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.2,
+  "previous_steering": 0.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.9,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   0.3
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   3.0,
+   2.9
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   3.0,
+   2.8
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   -2.8
+  ],
+  "error": -1.5,
+  "spin": 0.3,
+  "previous_steering": 0.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   0.1
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 1.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   0.1
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": -1.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   3.0
+  ],
+  "error": -1.5,
+  "spin": 0.0,
+  "previous_steering": -1.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   0.1
+  ],
+  "error": 1.5,
+  "spin": 0.0,
+  "previous_steering": 0.5,
+  "sense": 0.0
+ },
+ {
+  "nearest": [
+   3.0,
+   2.9
+  ],
+  "error": -1.5,
+  "spin": 0.0,
+  "previous_steering": 0.95,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.08,
+  "previous_steering": 1.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": 0.03,
+  "previous_steering": 1.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   0.1
+  ],
+  "error": 1.5,
+  "spin": 0.02,
+  "previous_steering": 1.0,
+  "sense": 1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": -0.11,
+  "previous_steering": 0.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   1.5
+  ],
+  "error": 1.5,
+  "spin": -0.13,
+  "previous_steering": 0.0,
+  "sense": -1.0
+ },
+ {
+  "nearest": [
+   3.0,
+   -1.5
+  ],
+  "error": 1.5,
+  "spin": 0.13,
+  "previous_steering": 0.0,
+  "sense": 1.0
+ }
+]

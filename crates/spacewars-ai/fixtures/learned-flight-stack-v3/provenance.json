@@ -1,0 +1,48 @@
+{
+  "stack": "learned_flight_stack_v3",
+  "composition": {
+    "hold_ticks": 6,
+    "motor_hz": 60,
+    "command_contract": "navigation-command-v3",
+    "advisory": "four elements carried from the navigation command to the motor's inputs, the turn sense first and three held at zero",
+    "envelope": "match worlds: gravity, orbiting and spinning planets, the sun's heat and the boundary, speeds to 60 units per second, goals resting in a planet's spinning frame, the four practice families with seeded gravity and spin, transfers between the planets of a generated arena, starting up to 3,000 units from their entry, climbs from the ground and through contact with it, and turns on the ground that the ground blocks one way"
+  },
+  "navigation": {
+    "file": "navigation.json",
+    "sha256": "d55b56536edf570e51beb9ba93b59c2c1b5c41ddb00e87dca57ba677eecad425",
+    "format_version": 6,
+    "architecture": "polar-conv8x8-coordinates-set-attention32-mlp64x64-v1",
+    "experiment": "LF-100",
+    "report": "docs/flight-turn-sense-v1.md",
+    "source": "data/training-experiments/learned-flight-mission-polish-v1-20261029/nav-fit-lf100-m2t-s2/policy-final.json",
+    "qualification": {
+      "development": "83 of 96 tasks: 24 transfers and 12 long transfers at seed 7700101, 12 of each practice family at seed 7700002 and 12 grounded climbs; 20 transfers, 11 clear, 12 obstructed, 12 altered, 11 moving, 5 long transfers and 12 grounded",
+      "held_out": "84 of 96 tasks: 24 transfers and 12 long transfers at seed 7700102, 12 of each practice family at seed 7700003 and 12 grounded climbs; 22 transfers, 12 clear, 11 obstructed, 12 altered, 11 moving, 4 long transfers and 12 grounded",
+      "law_held_out": "88 of 96 for the v3 law the network imitates, 23 transfers, 12 of each practice family, 5 long transfers and 12 grounded, flying the LF-100 motor network",
+      "sense_agreement": "the fourth head agrees with the law on 96.4 percent of the final training rounds rows where the law sets a sense and 99.7 percent of all rows; on the 12 development grounded tasks it sets 178 of the laws 185 senses and 32 the law does not, none of them in flight on the obstructed tasks",
+      "native_parity": "2.4e-6 maximum head difference against the Python fit",
+      "selection": "the second seed of the LF-099 recipe with the grounded family as a seventh and the sense term weighted twelve on the advised rows, under the law whose sense requires the ground against the hull; the first seed had 80 and 82 with 7 of 12 obstructed development tasks ending in collisions; two seeds without the weight had 87 and 80, 82 and 76 with the sense head agreeing on 37 to 39 percent of the advised rows, and two with the weight under the law that read the ground to ten units had 71 and 77, 75 and 79, losing the obstructed family to collisions and the grounded family to deadlines",
+      "matches": "whole ten-minute matches against the recovery bot in both seat orders, paired by seed and seat against main (the LF-099 stack with the climb legs), the native-only matches byte for byte main's: under the default settings on seeds 1 to 84 6.96 handoffs per ten minutes against 6.79 (+0.17 with a 95 percent interval of -0.59 to +0.93) and the native-only seats' 6.83, identical first legs 107 faster, 27 within five percent and 31 slower of 165, median leg 686 against 719, 36 deadlines against 34, 19 legs over 2,000 ticks against 13, decided matches 90 won to 75 lost against 95 to 72; under the 8-second asteroid stream on seeds 37 to 84 7.42 against 6.73 (+0.69, -0.58 to +1.88) and the native-only seats' 6.48, 20 deadlines against 25, climb ticks 121,133 against 144,671, and on seeds 37 to 48 alone 7.39 against 5.95 (+1.43, -0.20 to +3.08) with 3 deadlines against 11 and 29,247 climb ticks against 59,117; under loose dirt on seeds 37 to 48 7.48 against 7.30 and under the 3-second stream 8.85 against 8.26 with 9 deadlines against 4",
+      "predecessor": "LF-099 fit 2452a7db46c9fe724af1fe032a904aec4984dc8ed02d511df0e5b158429937b2: development 70 and held out 66 of 84 over the LF-099 motor"
+    }
+  },
+  "motor": {
+    "file": "motor.json",
+    "sha256": "e70f0cd138ef64261e1062211d0c3af58e0fdd17808f2812ea20a35bfb81850c",
+    "format_version": 5,
+    "architecture": "motor22-actor64x64-critic32x32-v5",
+    "experiment": "LF-100",
+    "report": "docs/flight-turn-sense-v1.md",
+    "source": "data/training-experiments/learned-flight-mission-polish-v1-20261029/motor/fit-lf100-sense-r3-seed2/policy-final.json",
+    "qualification": {
+      "teacher": "the v8 law, the v7 gains (thrust_gate 0.35 to 0.7, half_turn 0.7) with the turn sense's override: with the sense set the spin goes its way at the limit, slowing in proportion to the angle still to turn that way, the thrust behind its gate and the brake off; under the environment's reference sense it recovers 92 of 96 blocked turns against 41 without the sense and 92 of 96 grounded climbs against 81",
+      "matrix_development": "280 of 320",
+      "matrix_held_out": "276 of 320",
+      "v1_sets_under_v2_gate": "312 of 312",
+      "contact_sets": "recovered: 92 of 96 grounded climbs, 79 of 80 low falling climbs, 80 of 80 half turns and 90 of 96 blocked turns, against 79, 79, 80 and 30 for the LF-099 fit",
+      "native_parity": "1.1e-5 maximum action difference against the Python fit",
+      "selection": "the second of four fits of the v8 law with three in ten of its teacher episodes on the contact tasks, the blocked family among them, chosen on the matrix, where it alone is at or above the retained motor, and level with the best on every contact set; in the stack harness under the LF-099 navigation network lifted to the v3 format, the sense always free, 20 and 21 of 24 transfers and 86 and 91 of 96 practice tasks against 21, 21, 90 and 91 for the retained pair, transfers about 1,100 ticks against 1,230 at spinning shares of 0.10 to 0.12 against 0.17 to 0.19; on 24 settled grounded tasks under the lifted network 23 arrive and none sits on the ground, against 20 and 4 for the LF-099 motor",
+      "predecessor": "LF-099 fit 8d6d39cf2dfa30a908d9ac592dd7ba988157d0ee2a431716e70b80f8e8934fcd: 269 and 268 of 320"
+    }
+  }
+}

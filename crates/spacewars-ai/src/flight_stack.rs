@@ -27,8 +27,10 @@ use std::fmt;
 
 pub const STACK_ID: &str = "learned_flight_stack_v1";
 pub const STACK_ID_V2: &str = "learned_flight_stack_v2";
-/// Ticks each navigation command is held while the motor network flies it.
-pub const HOLD_TICKS: u32 = 6;
+pub const STACK_ID_V3: &str = "learned_flight_stack_v3";
+/// Ticks each navigation command is held while the motor network flies it,
+/// the cadence the motor environment's reference sense keeps too.
+pub const HOLD_TICKS: u32 = motor::COMMAND_HOLD_TICKS;
 pub const MAX_DEADLINE_TICKS: u32 = 1800;
 
 const NAVIGATION_EXPORT: &[u8] =
@@ -37,6 +39,9 @@ const MOTOR_EXPORT: &[u8] = include_bytes!("../fixtures/learned-flight-stack-v1/
 const NAVIGATION_EXPORT_V2: &[u8] =
     include_bytes!("../fixtures/learned-flight-stack-v2/navigation.json");
 const MOTOR_EXPORT_V2: &[u8] = include_bytes!("../fixtures/learned-flight-stack-v2/motor.json");
+const NAVIGATION_EXPORT_V3: &[u8] =
+    include_bytes!("../fixtures/learned-flight-stack-v3/navigation.json");
+const MOTOR_EXPORT_V3: &[u8] = include_bytes!("../fixtures/learned-flight-stack-v3/motor.json");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlightStackError {
@@ -111,6 +116,13 @@ impl FlightStack {
     /// network, the match-envelope stack with goal-relative commands.
     pub fn retained_v2() -> Result<Self, FlightStackError> {
         Self::embedded(NAVIGATION_EXPORT_V2, MOTOR_EXPORT_V2)
+    }
+
+    /// The retained exports under `fixtures/learned-flight-stack-v3`: the
+    /// LF-100 refitted navigation network over the LF-100 v8 fitted motor
+    /// network, the match-envelope stack whose commands carry a turn sense.
+    pub fn retained_v3() -> Result<Self, FlightStackError> {
+        Self::embedded(NAVIGATION_EXPORT_V3, MOTOR_EXPORT_V3)
     }
 
     fn embedded(navigation: &[u8], motor: &[u8]) -> Result<Self, FlightStackError> {
@@ -463,6 +475,56 @@ mod tests {
         assert_eq!(stack.contract(), 2);
         assert_eq!(stack.navigation().max_speed(), 60.0);
         assert!(stack.motor().infer(&[0.0; 18]).is_ok());
+        let stack = FlightStack::retained_v3().unwrap();
+        assert_eq!(stack.contract(), 3);
+        assert_eq!(stack.navigation().max_speed(), 60.0);
+        assert!(stack.motor().infer(&[0.0; 22]).is_ok());
+        assert!(stack.motor().infer(&[0.0; 18]).is_err());
+    }
+
+    #[test]
+    fn a_lifted_v3_stack_flies_the_v2_fixtures_identically() {
+        let navigation: FlightPolicyFile = serde_json::from_slice(NAVIGATION_EXPORT_V2).unwrap();
+        let motor: MotorPolicyFile = serde_json::from_slice(MOTOR_EXPORT_V2).unwrap();
+        let lifted = FlightStack::from_files(
+            crate::learned_navigation::lifted_to_v3(navigation),
+            crate::learned_motor::lifted_to_v3(motor),
+        )
+        .unwrap();
+        assert_eq!(lifted.contract(), 3);
+        assert!(lifted.motor().infer(&[0.0; 22]).is_ok());
+        assert!(lifted.motor().infer(&[0.0; 18]).is_err());
+        let retained = FlightStack::retained_v2().unwrap();
+        let mut env = FlightEnvironment::new(FlightTask::default()).unwrap();
+        let mut lifted_env = FlightEnvironment::new(FlightTask::default()).unwrap();
+        let (mut driver, mut lifted_driver) = (
+            FlightStackDriver::new(0).unwrap(),
+            FlightStackDriver::new(0).unwrap(),
+        );
+        let goal = goal_of(&env, 1);
+        let mut ticks = 0;
+        while env.progress().outcome.is_none() {
+            let decision = driver.decide(&retained, env.state(), goal).unwrap();
+            let other = lifted_driver
+                .decide(&lifted, lifted_env.state(), goal)
+                .unwrap();
+            assert_eq!(other.action, decision.action, "tick {ticks}");
+            assert_eq!(other.command, decision.command, "tick {ticks}");
+            assert_eq!(other.command.advisory, [0.0; 4]);
+            assert_eq!(other.progress, decision.progress);
+            if let Some(navigation) = &other.navigation {
+                assert_eq!(navigation.sense_latent, Some(0.0));
+                assert_eq!(
+                    navigation.command,
+                    decision.navigation.as_ref().unwrap().command
+                );
+            }
+            env.step(decision.action).unwrap();
+            lifted_env.step(other.action).unwrap();
+            ticks += 1;
+        }
+        assert_eq!(env.progress().outcome, Some(FlightOutcome::Success));
+        assert_eq!(lifted_env.progress().outcome, Some(FlightOutcome::Success));
     }
 
     #[test]

@@ -18,8 +18,8 @@ use spacewars_ai::learned_motor::{
     ARCHITECTURE, MOVEMENT_ARCHITECTURE, MotorPolicy, MotorPolicyFile, RESIDUAL_ARCHITECTURE,
 };
 use spacewars_ai::learned_navigation::{
-    COMMAND_CONTRACT, COMMAND_CONTRACT_V2, FORMAT_VERSION, FORMAT_VERSION_V2, MAX_SPEED,
-    MAX_SPEED_V2, NavigationCommand, NavigationPolicy,
+    COMMAND_CONTRACT, COMMAND_CONTRACT_V2, COMMAND_CONTRACT_V3, FORMAT_VERSION, FORMAT_VERSION_V2,
+    FORMAT_VERSION_V3, MAX_SPEED, MAX_SPEED_V2, NavigationCommand, NavigationPolicy,
 };
 use std::io::{self, BufRead, Write};
 
@@ -183,7 +183,9 @@ impl Bridge {
                 "command_contract_v2":COMMAND_CONTRACT_V2,"max_speed_v2":MAX_SPEED_V2,
                 "navigation_architecture":NAVIGATION_ARCHITECTURE,"navigation_format_version":FORMAT_VERSION,
                 "navigation_format_version_v2":FORMAT_VERSION_V2,
+                "command_contract_v3":COMMAND_CONTRACT_V3,"navigation_format_version_v3":FORMAT_VERSION_V3,
                 "motor_schema":motor::schema(),"motor_schema_v2":motor::schema_v2(),
+                "motor_schema_v3":motor::schema_v3(),
                 "motor_architectures":[ARCHITECTURE,RESIDUAL_ARCHITECTURE,MOVEMENT_ARCHITECTURE]})),
             Request::Generate {
                 seed,
@@ -232,8 +234,15 @@ impl Bridge {
                 let file: MotorPolicyFile =
                     serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
                         .map_err(|e| e.to_string())?;
-                self.motor = Some(MotorPolicy::from_file(file)?);
-                Ok(json!({"loaded":true}))
+                let motor = MotorPolicy::from_file(file)?;
+                if let Some(navigation) = &self.navigation
+                    && navigation.contract() != motor.contract()
+                {
+                    return Err("navigation and motor contracts differ".into());
+                }
+                let contract = motor.contract();
+                self.motor = Some(motor);
+                Ok(json!({"loaded":true,"contract":contract}))
             }
             Request::LoadNavigationPolicy { path } => {
                 let file: FlightPolicyFile =

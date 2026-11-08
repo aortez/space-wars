@@ -109,7 +109,7 @@ fn candidate_host() -> Option<spacewars_ai::mission_learned_transfer::LearnedTra
     let navigation = serde_json::from_slice(&match navigation_path {
         Some(path) => std::fs::read(path).unwrap(),
         None => include_bytes!(
-            "../../../../../spacewars-ai/fixtures/learned-flight-stack-v2/navigation.json"
+            "../../../../../spacewars-ai/fixtures/learned-flight-stack-v3/navigation.json"
         )
         .to_vec(),
     })
@@ -117,7 +117,7 @@ fn candidate_host() -> Option<spacewars_ai::mission_learned_transfer::LearnedTra
     let motor = serde_json::from_slice(&match motor_path {
         Some(path) => std::fs::read(path).unwrap(),
         None => include_bytes!(
-            "../../../../../spacewars-ai/fixtures/learned-flight-stack-v2/motor.json"
+            "../../../../../spacewars-ai/fixtures/learned-flight-stack-v3/motor.json"
         )
         .to_vec(),
     })

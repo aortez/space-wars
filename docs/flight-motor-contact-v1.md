@@ -406,13 +406,20 @@ alone leave under the 3-second stream, 6.11 against 7.01.
   ground that stops it, and a ship on its back can only turn the long way.
   Its inputs carry no contact, so it cannot tell a blocked turn from a slow
   one: a contact input in a new motor contract, or a law that turns the
-  other way after a held turn makes no spin, is the next motor step.
+  other way after a held turn makes no spin, is the next motor step. Done by
+  [LF-100](flight-turn-sense-v1.md): the command carries a turn sense that
+  navigation sets from its view of the ground, and on these twelve seeds
+  under the 8-second stream the learned seats' climb ticks halve and 3
+  attempts end at their deadline against 11.
 - **The lift-off in dirt.** The native controls own the lift-off by the
   leg's gate, and in loose dirt they can leave a ship on its feet for the
   rest of a match.
 - **The 8-second stream.** The rate there is the stage's one significant
   loss, in matches whose flow the learned seats change by winning; a longer
-  run of that condition would tell match flow from flight.
+  run of that condition would tell match flow from flight. Run over 48
+  seeds on 2026-11-07, the condition is level: 6.73 handoffs per ten
+  minutes against the native-only seats' 6.48 (+0.25, -0.84 to +1.33), the
+  gap its sample; see [LF-100](flight-turn-sense-v1.md).
 - **The navigation network's held-out imitation**, 66 of 84 against its
   law's 79, chosen over a closer fit by the matches.
 

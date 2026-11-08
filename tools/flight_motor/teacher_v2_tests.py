@@ -1,4 +1,4 @@
-"""The v7 planet-frame teacher: the thrust waits for the nose and the half turn keeps its direction, the v6 and v5 laws stay reachable; no native physics."""
+"""The v7 planet-frame teacher: the thrust waits for the nose and the half turn keeps its direction, the v6 and v5 laws stay reachable, and under the v3 contract the turn sense is obeyed; no native physics."""
 import math
 import unittest
 import torch
@@ -9,6 +9,11 @@ def row(delta=0., command=16., vx=0., vy=0., gx=0., gy=0., spin=0.):
     """A v2 motor input row: command heading delta, command speed, body-frame relative velocity, gravity, spin; open wings."""
     s = stage.SCALE; g = stage.GRAVITY_SCALE
     return [math.sin(delta), math.cos(delta), command / s, vx / s, vy / s, vx / s, vy / s, spin / 2., gx / g, gy / g, 1., 1., 1., 1., 1., 0., 0., 0.]
+
+
+def row_v3(sense=0., **kwargs):
+    """A v3 motor input row: the v2 row and the advisory vector, the turn sense first."""
+    return row(**kwargs) + [sense, 0., 0., 0.]
 
 
 class TeacherV2Tests(unittest.TestCase):
@@ -155,6 +160,62 @@ class TeacherV2Tests(unittest.TestCase):
         self.assertTrue(all(r['settle'] for r in stage.ground_tasks(1)))
         self.assertFalse(any(r.get('settle') for r in stage.falling_tasks(1) + stage.half_turn_tasks(1)
                              + stage.drifting_turn_tasks(1) + stage.tilted_climb_tasks(1)))
+
+    def test_the_sense_turns_the_long_way_with_the_brake_off_and_the_thrust_gated(self):
+        # At rest with the command 1.5 radians to the left, the law turns left
+        # by the shorter way; a sense of -1 turns right instead, at the limit,
+        # with the brake off and the thrust behind its gate; a sense the
+        # shorter way keeps the turn, and a free sense is the v2 law.
+        v2 = stage.scalar_teacher_v2(row(delta=1.5))
+        self.assertEqual(stage.scalar_teacher_v2(row_v3(delta=1.5)), v2)
+        self.assertLess(v2['steering'], -.5)
+        reversed_ = stage.scalar_teacher_v2(row_v3(delta=1.5, sense=-1.))
+        self.assertAlmostEqual(reversed_['steering'], 1., places=5)
+        self.assertEqual(reversed_['brake'], 0.); self.assertEqual(reversed_['thrust'], 0.)
+        self.assertLess(stage.scalar_teacher_v2(row_v3(delta=1.5, sense=1.))['steering'], -.5)
+        # The sense's turn slows into the attitude vector as the ordinary law
+        # does: the shorter way under a sense is the ordinary steering.
+        self.assertAlmostEqual(stage.scalar_teacher_v2(row_v3(delta=-.5, sense=-1.))['steering'],
+                               stage.scalar_teacher_v2(row(delta=-.5))['steering'], places=5)
+        # The long way round to a command 0.5 radians right, taken left, is a
+        # saturated left turn.
+        self.assertAlmostEqual(stage.scalar_teacher_v2(row_v3(delta=-.5, sense=1.))['steering'], -1., places=5)
+        # Stopping commands obey the sense too.
+        stopping = stage.scalar_teacher_v2(row_v3(delta=2., command=0., sense=-1.))
+        self.assertAlmostEqual(stopping['steering'], 1., places=5); self.assertEqual(stopping['brake'], 0.)
+        with self.assertRaises(ValueError):
+            stage.teacher_v2(torch.tensor([row() + [0.]], dtype=torch.float32))
+
+    def test_the_blocked_tasks_cross_the_ground_to_a_command_on_the_other_side(self):
+        rows = stage.blocked_tasks(1)
+        self.assertEqual(len(rows), 96); self.assertEqual(rows, stage.blocked_tasks(1))
+        for r in rows:
+            task = r['task']
+            self.assertTrue(task['contact_allowed'] and task['start']['gravity'] and r['settle'])
+            attitude = float(r['mode'][len('attitude'):])
+            command = stage.wrap(task['heading_delta'] + attitude)
+            self.assertLess(command * attitude, 0.)
+            self.assertGreater(abs(attitude) + abs(command), math.pi)
+            self.assertLessEqual(abs(command), 1.3)
+        sets = stage.contact_sets(1, contract=3)
+        self.assertIn('blocked', sets)
+        self.assertTrue(all(r['task']['contract'] == 3 for rows in sets.values() for r in rows))
+        plain = stage.contact_sets(1)
+        self.assertNotIn('blocked', plain)
+        self.assertTrue(all(r['task']['contract'] == 2 for rows in plain.values() for r in rows))
+        rng = __import__('random').Random(3)
+        kinds = {r['task']['heading_delta'] != 0. and r.get('settle', False) for r in (stage.random_contact_task(rng, 3) for _ in range(40))}
+        self.assertEqual(kinds, {True, False})
+
+    def test_synthetic_v3_rows_carry_a_sense_on_two_fifths_and_zero_spares(self):
+        rows = stage.synthetic_inputs_v2(torch.Generator().manual_seed(1), 10000, contract=3)
+        self.assertEqual(tuple(rows.shape), (10000, 22))
+        sense = rows[:, stage.SENSE]
+        self.assertTrue(set(sense.unique().tolist()) <= {-1., 0., 1.})
+        self.assertAlmostEqual((sense != 0).float().mean().item(), .4, delta=.03)
+        self.assertEqual(rows[:, stage.SENSE + 1:].abs().sum().item(), 0.)
+        self.assertEqual(tuple(stage.synthetic_inputs_v2(torch.Generator().manual_seed(1), 100).shape), (100, 18))
+        self.assertEqual(stage.under_contract([{'task': {'contract': 2}}], 3), [{'task': {'contract': 3}}])
 
 
 if __name__ == '__main__':

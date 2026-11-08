@@ -14,6 +14,7 @@ import json
 import math
 from multiprocessing import Pool
 from pathlib import Path
+import random
 import time
 
 from tools.flight_ppo.bridge import Bridge
@@ -23,6 +24,16 @@ from .reference import DISTANCE_SCALE, VELOCITY_SCALE, clearance_by_heading, saf
 
 CONTRACT = 2
 SUN_RADIUS = 200.
+SPIN_SCALE = 1.8
+# The turn sense's thresholds, as the motor environment's reference sense in
+# scenarios/spacewars/src/surface_sortie/flight_environment/motor.rs has them;
+# the shared cases beside it hold the two to the same answers.
+SENSE_TOUCH = 6.
+SENSE_GATE = .35
+SENSE_SPIN = .12
+SENSE_STALLED = .06
+SENSE_SATURATED = .9
+SENSE_AHEAD = .3
 # Speeds to 60 and a longer lookahead for transfers; the approach gain and
 # braking model are the v1 values. sun_margin inflates the heat disk.
 # escape_time/escape_speed: as the time to reach the nearest surface, falling
@@ -57,6 +68,55 @@ LAW = dict(reference.LAW, contract=CONTRACT, max_speed=60., lookahead=120., brak
            momentum_speed=20., momentum_brake_acceleration=20., motion_weight=.3, motion_ramp=(5., 20.),
            global_range=240., body_margin=65., detour_margin=105., detour_turn=.5, detour_commit_speed=12., sun_lead=True, heat_brake=False, approach_gain=.8,
            speed_deadband=.5)
+# The v3 law: the same commands with the advisory vector, the turn sense first.
+LAW_V3 = dict(LAW, contract=3)
+
+
+def turn_sense(nearest, error, spin, previous_steering):
+    """The turn sense: the sign of the spin to turn with when the ground would block the shorter turn, 0 for the motor's own choice.
+
+    With a surface against the hull, within SENSE_TOUCH of the origin, and the
+    command outside the thrust gate: a turn under way is kept; a saturated steering whose turn has no spin is a turn the ground
+    blocks, and the sense is the other way, the steering's own sign since
+    steering is positive clockwise; otherwise, with the surface beside the
+    ship, the nose turns away from it, whichever way is shorter. The rule has
+    no state: the six-tick hold gives a turn time to build its spin before the
+    next reading, a turn that builds it is kept, and one that does not is
+    reversed, so a ship blocked both ways rocks between them instead of
+    resting on one. A surface on the left, at a positive bearing, is left by
+    a clockwise turn, a negative spin.
+    """
+    if nearest is None:
+        return 0.
+    distance, bearing = nearest
+    if distance > SENSE_TOUCH or abs(error) <= SENSE_GATE:
+        return 0.
+    if abs(spin) > SENSE_SPIN:
+        return math.copysign(1., spin)
+    if abs(previous_steering) > SENSE_SATURATED and abs(spin) < SENSE_STALLED:
+        return math.copysign(1., previous_steering)
+    if SENSE_AHEAD < abs(bearing) < math.pi - SENSE_AHEAD:
+        return -math.copysign(1., bearing)
+    return 0.
+
+
+def sense_reading(inputs, error):
+    """What the turn sense is read from: the nearest surface within touch as a distance and a bearing from the nose, positive to the left, the motor command's heading error, the spin and the steering applied on the previous tick."""
+    n = inputs['nearest']; g = inputs['self_goal']
+    nearest = None
+    if n[0] > 0. and n[1] * DISTANCE_SCALE <= SENSE_TOUCH:
+        nearest = (n[1] * DISTANCE_SCALE, math.atan2(-n[2] * DISTANCE_SCALE, n[3] * DISTANCE_SCALE))
+    return nearest, error, g[10] * SPIN_SCALE, g[29]
+
+
+def advised(command, relative, goal_velocity, inputs, law):
+    """The command dict with, under the v3 law, the advisory vector: the turn sense read against the motor's command, the relative command plus the goal's velocity, which the host adds."""
+    if law.get('contract') != 3:
+        return command
+    absolute = (relative[0] + goal_velocity[0], relative[1] + goal_velocity[1])
+    heading = math.atan2(command['heading_sin'], command['heading_cos'])
+    error = math.atan2(-absolute[0], absolute[1]) if math.hypot(*absolute) >= 1e-6 else heading
+    return dict(command, advisory=[turn_sense(*sense_reading(inputs, error)), 0., 0., 0.])
 
 
 def relative_velocity(inputs):
@@ -454,7 +514,9 @@ def command(inputs, bearings, law=LAW, edges=None, trace=None):
             command_heading = math.atan2(-command[0], command[1])
         else:
             command_heading, command_speed = (heading if clearance > law['margin'] else 0.), 0.
-        return ({'heading_sin': math.sin(command_heading), 'heading_cos': math.cos(command_heading), 'speed': command_speed},
+        relative = (-math.sin(command_heading) * command_speed, math.cos(command_heading) * command_speed)
+        return (advised({'heading_sin': math.sin(command_heading), 'heading_cos': math.cos(command_heading), 'speed': command_speed},
+                        relative, goal_velocity, inputs, law),
                 {'distance': distance, 'clearance': 0., 'goal_speed': 0., 'goal_velocity': math.hypot(*goal_velocity), 'braking': True})
     speed = min(goal_speed, safe_speed(clearance, law))
     if speed < goal_speed:
@@ -474,7 +536,9 @@ def command(inputs, bearings, law=LAW, edges=None, trace=None):
         command_heading, command_speed = (0. if distance < law['stop_radius'] else heading), 0.
     else:
         command_heading = math.atan2(-desired[0], desired[1])
-    return ({'heading_sin': math.sin(command_heading), 'heading_cos': math.cos(command_heading), 'speed': command_speed},
+    relative = (-math.sin(command_heading) * command_speed, math.cos(command_heading) * command_speed)
+    return (advised({'heading_sin': math.sin(command_heading), 'heading_cos': math.cos(command_heading), 'speed': command_speed},
+                    relative, goal_velocity, inputs, law),
             {'distance': distance, 'clearance': clearance, 'goal_speed': goal_speed, 'goal_velocity': math.hypot(*goal_velocity)})
 
 
@@ -492,6 +556,29 @@ def transfer_sets(bridge, seed, count, max_attempts=None, distances='standard'):
     return rows
 
 
+GROUNDED_ALTITUDE = 15.
+GROUNDED_FALLS = (0., 8., 12.)
+# The settle of up to 150 ticks counts toward the deadline, and the law itself
+# needs up to 850 ticks on the family, so 900 raced the networks against it.
+GROUNDED_DEADLINE = 1200
+GROUNDED_CLIMB = 85.
+
+
+def grounded_sets(seed, count):
+    """Climbs from the ground above the practice planet, the grounded family: the ship starts at the task contract's lowest altitude with its nose at any angle, at rest or falling, and comes down while the goal waits up the radial, with contact allowed, so the law's turn sense is read where the ground blocks a turn (LF-100)."""
+    rng = random.Random(seed); rows = []
+    for index in range(count):
+        attitude = rng.uniform(-math.pi, math.pi); bearing = rng.uniform(-math.pi, math.pi); fall = rng.choice(GROUNDED_FALLS)
+        task = {'start': {'seed': rng.randrange(1 << 31), 'bearing': bearing, 'altitude': GROUNDED_ALTITUDE, 'heading_offset': attitude,
+                          'relative_velocity': {'x': math.sin(bearing) * fall, 'y': -math.cos(bearing) * fall}, 'spin': 0., 'gravity': True,
+                          'planet_spin': rng.choice([-.015, 0., .015])},
+                'goal_offset': {'x': -math.sin(bearing) * GROUNDED_CLIMB, 'y': math.cos(bearing) * GROUNDED_CLIMB}, 'goal_velocity': {'x': 0., 'y': 0.},
+                'arrival': {'position': 3., 'velocity': 1., 'spin': .2, 'dwell_ticks': 30}, 'deadline_ticks': GROUNDED_DEADLINE,
+                'obstacles': [], 'terrain_edits': [], 'contact_allowed': True}
+        rows.append({'index': index, 'family': 'grounded', 'recipe': 'attitude%+.2f' % attitude, 'settle': True, 'task': task})
+    return rows
+
+
 def generated_sets(bridge, seed, per_family, max_rounds=4000):
     """The practice generator's four families with their seeded gravity and spin kept."""
     batch = bridge.call('generate', seed=seed, per_family=per_family, max_rounds=max_rounds)
@@ -506,8 +593,28 @@ def generated_sets(bridge, seed, per_family, max_rounds=4000):
     return rows
 
 
+SETTLE_LIMIT = 150
+SETTLE_REST = 10
+NEUTRAL = {'steering': 0., 'thrust': 0., 'brake': 0.}
+STOP = {'heading_sin': 0., 'heading_cos': 1., 'speed': 0.}
+
+
+def settle(bridge, item):
+    """Neutral controls until the ship has rested in contact for ten ticks, at most 150: the grounded family begins on the ground, as the motor's contact sets do; a stop is held meanwhile, since the bridge steps actions under a held command."""
+    bridge.call('set_command', commands=[STOP])
+    ticks = 0; resting = 0
+    while item['progress']['outcome'] is None and resting < SETTLE_REST and ticks < SETTLE_LIMIT:
+        item = bridge.call('step_actions', actions=[NEUTRAL])['items'][0]; ticks += 1
+        motor = item['motor_inputs'] or [0.] * 5
+        speed = math.hypot(motor[3], motor[4]) * VELOCITY_SCALE
+        resting = resting + 1 if item['evidence'] and item['evidence']['collision'] and speed < 1. else 0
+    return item
+
+
 def run_row(bridge, row, law, bearings, edges):
     item = bridge.call('reset', tasks=[row['task']])['items'][0]
+    if row.get('settle'):
+        item = settle(bridge, item)
     decisions = 0; min_clearance = DISTANCE_SCALE; max_speed = 0.
     while item['progress']['outcome'] is None:
         action, info = command(item['inputs'], bearings, law, edges)

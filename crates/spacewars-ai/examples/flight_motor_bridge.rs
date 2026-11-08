@@ -36,6 +36,7 @@ impl Bridge {
         match request {
             Request::Schema => Ok(
                 json!({"protocol":2,"schema":motor::schema(),"schema_v2":motor::schema_v2(),
+                    "schema_v3":motor::schema_v3(),"command_hold_ticks":motor::COMMAND_HOLD_TICKS,
                     "max_speed_v2":motor::MAX_SPEED_V2,"architecture":ARCHITECTURE,
                     "architectures":[ARCHITECTURE,RESIDUAL_ARCHITECTURE,MOVEMENT_ARCHITECTURE]}),
             ),

@@ -33,6 +33,9 @@ pub struct FlightPolicyFile {
 pub struct FlightPolicy {
     weights: BTreeMap<String, Tensor>,
     goal_residual: bool,
+    /// Actor heads: three for the flight and v1 and v2 navigation policies,
+    /// four for a v3 navigation policy with its turn sense.
+    heads: usize,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -51,20 +54,22 @@ impl FlightPolicy {
             (3, GOAL_RESIDUAL_ARCHITECTURE) => true,
             _ => return Err("incompatible flight policy contract"),
         };
-        Self::validated(file, goal_residual)
+        Self::validated(file, goal_residual, 3)
     }
 
     /// Checks the schema and every tensor of a file whose contract the caller
     /// has already matched; the navigation policy shares these weights under
-    /// its own format version and reads the three heads differently.
+    /// its own format version and reads the heads differently, a fourth
+    /// among them under its v3 contract.
     pub(crate) fn validated(
         file: FlightPolicyFile,
         goal_residual: bool,
+        heads: usize,
     ) -> Result<Self, &'static str> {
         if file.observation_schema != schema() {
             return Err("incompatible flight policy contract");
         }
-        let expected = Self::expected_shapes(goal_residual);
+        let expected = Self::expected_shapes(goal_residual, heads);
         if file.weights.len() != expected.len() {
             return Err("wrong flight policy tensor count");
         }
@@ -86,11 +91,15 @@ impl FlightPolicy {
         Ok(Self {
             weights: file.weights,
             goal_residual,
+            heads,
         })
     }
 
     /// Tensor names and shapes of the exported encoder, heads and deviations.
-    pub(crate) fn expected_shapes(goal_residual: bool) -> BTreeMap<String, Vec<usize>> {
+    pub(crate) fn expected_shapes(
+        goal_residual: bool,
+        heads: usize,
+    ) -> BTreeMap<String, Vec<usize>> {
         let mut expected = BTreeMap::new();
         for (name, input, output) in [
             ("map_fc", 192, 32),
@@ -100,7 +109,7 @@ impl FlightPolicy {
             ("query", 35, 32),
             ("fusion1", 137, 64),
             ("fusion2", 64, 64),
-            ("actor", 64, 3),
+            ("actor", 64, heads),
             ("critic", 64, 1),
         ] {
             expected.insert(format!("{name}.weight"), vec![output, input]);
@@ -110,7 +119,7 @@ impl FlightPolicy {
         expected.insert("conv1.bias".into(), vec![8]);
         expected.insert("conv2.weight".into(), vec![8, 8, 3, 3]);
         expected.insert("conv2.bias".into(), vec![8]);
-        expected.insert("log_std".into(), vec![3]);
+        expected.insert("log_std".into(), vec![heads]);
         if goal_residual {
             expected.insert("goal_hidden.weight".into(), vec![16, 2]);
             expected.insert("goal_hidden.bias".into(), vec![16]);
@@ -144,11 +153,12 @@ impl FlightPolicy {
         })
     }
 
-    /// The three raw actor heads and the value, before any output mapping.
+    /// The raw actor heads, three or four, and the value, before any output
+    /// mapping.
     pub(crate) fn heads(
         &self,
         inputs: &FlightPolicyInputs,
-    ) -> Result<([f32; 3], f32), &'static str> {
+    ) -> Result<(Vec<f32>, f32), &'static str> {
         if inputs.self_goal.len() != 35
             || inputs.cells.len() != 1472
             || inputs.rays.len() != 128
@@ -241,6 +251,7 @@ impl FlightPolicy {
         {
             return Err("non-finite flight inference");
         }
-        Ok(([actor[0], actor[1], actor[2]], value))
+        debug_assert_eq!(actor.len(), self.heads);
+        Ok((actor, value))
     }
 }

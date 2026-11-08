@@ -587,7 +587,7 @@ impl MaterialMissionPilot {
             "configure before the first intent"
         );
         self.learned_transfer = enabled;
-        self.telemetry.learned_transfer = enabled.then_some(crate::flight_stack::STACK_ID_V2);
+        self.telemetry.learned_transfer = enabled.then_some(crate::flight_stack::STACK_ID_V3);
         self.telemetry.learned_entries = enabled.then_some(LearnedEntries::default());
     }
     pub fn learned_transfer(&self) -> bool {

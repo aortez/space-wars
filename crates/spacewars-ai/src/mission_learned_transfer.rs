@@ -102,7 +102,7 @@ pub struct LearnedTransferHost {
 
 impl LearnedTransferHost {
     pub fn new(seats: usize) -> Result<Self, FlightStackError> {
-        Self::with_stack(FlightStack::retained_v2()?, seats)
+        Self::with_stack(FlightStack::retained_v3()?, seats)
     }
 
     /// A host flying a stack other than the retained one, for evaluating a
@@ -327,7 +327,7 @@ impl LearnedTransferHost {
 mod tests {
     use super::*;
     use crate::BrainReset;
-    use crate::flight_stack::STACK_ID_V2;
+    use crate::flight_stack::STACK_ID_V3;
     use crate::mission_pilot::MissionGoal;
     use crate::mission_policy::{MissionBot, MissionPolicy};
     use engine_common::Scenario;
@@ -347,10 +347,10 @@ mod tests {
         };
         let mut bot = MissionBot::new(MissionPolicy::Legacy, context, Default::default())
             .with_learned_transfer(true);
-        assert_eq!(bot.telemetry().learned_transfer, Some(STACK_ID_V2));
+        assert_eq!(bot.telemetry().learned_transfer, Some(STACK_ID_V3));
         assert!(bot.learned_transfer());
         let mut host = LearnedTransferHost::new(2).unwrap();
-        assert_eq!(host.stack().contract(), 2);
+        assert_eq!(host.stack().contract(), 3);
         let mut first_leg = None;
         let mut handoff = None;
         let mut distances = Vec::new();

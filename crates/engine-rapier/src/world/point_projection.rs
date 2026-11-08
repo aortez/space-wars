@@ -8,6 +8,9 @@ pub struct PointProjectionOptions {
     pub collision_groups: CollisionGroups,
     /// When set, only this entity's colliders are considered.
     pub entity: Option<PhysicsId>,
+    /// When set, this entity's colliders are ignored: a ship asking for the
+    /// nearest surface other than its own hull.
+    pub exclude: Option<PhysicsId>,
 }
 
 impl Default for PointProjectionOptions {
@@ -17,6 +20,7 @@ impl Default for PointProjectionOptions {
             include_sensors: false,
             collision_groups: CollisionGroups::ALL,
             entity: None,
+            exclude: None,
         }
     }
 }
@@ -45,10 +49,11 @@ impl PhysicsWorld {
             return None;
         }
         let entity = options.entity;
+        let exclude = options.exclude;
         let predicate = |_: ColliderHandle, collider: &Collider| {
-            entity.is_none_or(|entity| {
-                decode_collider(collider.user_data).is_some_and(|id| id.entity == entity)
-            })
+            let id = decode_collider(collider.user_data);
+            entity.is_none_or(|entity| id.is_some_and(|id| id.entity == entity))
+                && exclude.is_none_or(|exclude| id.is_none_or(|id| id.entity != exclude))
         };
         let (handle, projection) = self.raw.project_point(
             to_rapier(point),
@@ -142,6 +147,13 @@ mod tests {
         .unwrap();
         assert_eq!(only.collider, near);
         assert!((only.distance - 5.5).abs() < 0.001, "{only:?}");
+        let other = project(PointProjectionOptions {
+            exclude: Some(far.entity),
+            ..options
+        })
+        .unwrap();
+        assert_eq!(other.collider, near);
+        assert!((other.distance - 5.5).abs() < 0.001, "{other:?}");
         assert!(
             project(PointProjectionOptions {
                 max_distance: 1.4,
