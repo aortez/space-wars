@@ -89,6 +89,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) updates_controls: Vec<UiControl>,
     pub(crate) updates_focus: i32,
     pub(crate) updates_message: String,
+    pub(crate) updates_busy: bool,
+    pub(crate) updates_progress_percent: Option<u32>,
     pub(crate) genome_controls: Vec<UiControl>,
     pub(crate) genome_selected: String,
     pub(crate) genome_error: Option<String>,
@@ -199,6 +201,16 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
                     UiControl::new("updates.status", "Status", false)
                         .with_value(context.updates_message.clone()),
                 );
+                if context.updates_busy {
+                    c.push(
+                        UiControl::new("updates.progress", "Progress", false).with_value(
+                            match context.updates_progress_percent {
+                                Some(percent) => format!("{percent}%"),
+                                None => "working".to_owned(),
+                            },
+                        ),
+                    );
+                }
                 c
             },
             actions: vec![

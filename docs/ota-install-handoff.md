@@ -141,8 +141,11 @@ Updates is reachable from launcher and paused-game App Settings using touch,
 keyboard, gamepad or the existing guarded UI control interface. It displays the
 exact channel, generation, build and image identity, with an explicit
 **Install & restart** or **End game, install & restart** confirmation. Desktop
-installation remains unavailable. The UI does not claim write progress or
-success from an in-memory acknowledgement.
+installation remains unavailable. While the service reports an installation
+phase, the panel shows an activity bar under the phase message: the native
+writer's byte counts fill it during the write and flush stages, and it sweeps in
+the other phases, so a long write on a slow card does not look like a hang. The
+UI does not claim success from an in-memory acknowledgement.
 
 The app listener hands requests to the UI thread. It records the full settings
 snapshot, scene and input revisions, establishes a launch/input fence, and asks

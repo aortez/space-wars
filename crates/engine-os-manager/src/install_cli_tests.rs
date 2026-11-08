@@ -47,7 +47,11 @@ fn reply(phase: Phase, ticket: Option<Ticket>) -> ServiceReply {
     ServiceReply {
         schema: SCHEMA,
         error: None,
-        status: Status { phase, ticket },
+        status: Status {
+            phase,
+            ticket,
+            written: None,
+        },
         offer: None,
         aborted: None,
     }

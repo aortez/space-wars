@@ -106,6 +106,7 @@ impl Backend for TestBackend {
         if let Some(delay) = &delay
             && delay.after_consumption
         {
+            admission.written(300_000_000, 1_000_000_000);
             admission.phase(Phase::Writing);
             delay.wait();
         }
@@ -503,6 +504,13 @@ fn final_admission_and_writing_do_not_block_status_or_cancellation() {
             }
         );
         assert_eq!(status.status.ticket.as_ref(), Some(&offer.ticket));
+        assert_eq!(
+            status.status.written,
+            after_consumption.then_some(Written {
+                bytes: 300_000_000,
+                total: 1_000_000_000,
+            })
+        );
         let cancel = f.request(ServiceRequest::Cancel {
             schema: SCHEMA,
             ticket: offer.ticket,

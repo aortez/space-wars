@@ -1527,6 +1527,11 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             updates_controls: crate::updates::inventory(window),
             updates_focus: window.get_updates_focus(),
             updates_message: window.get_updates_message().to_string(),
+            updates_busy: window.get_updates_busy(),
+            updates_progress_percent: {
+                let fraction = window.get_updates_progress();
+                (fraction >= 0.0).then(|| (fraction * 100.0).round() as u32)
+            },
             genome_controls: if window.get_genomes_visible() {
                 crate::genome_controls::inventory(window)
             } else {

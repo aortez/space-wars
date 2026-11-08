@@ -104,6 +104,7 @@ pub struct Coordinator {
     observed_ms: u64,
     state: State,
     progress: Option<spacewars_control::install::wire::Phase>,
+    written: Option<spacewars_control::install::wire::Written>,
 }
 
 /// One-use local value for the installer adapter; deliberately neither
@@ -125,17 +126,22 @@ impl ManualAuthorization {
 impl Coordinator {
     pub fn status(&self) -> spacewars_control::install::wire::Status {
         use spacewars_control::install::wire::{Phase, Status};
-        let (phase, ticket) = match &self.state {
-            State::Idle => (Phase::Idle, None),
-            State::Offered(s) => (Phase::Offered, Some(s.offer.ticket.clone())),
-            State::Preparing(_, p) => (Phase::Preparing, Some(p.ticket.clone())),
-            State::Aborted(t) => (Phase::Aborted, Some(t.clone())),
+        let (phase, ticket, written) = match &self.state {
+            State::Idle => (Phase::Idle, None, None),
+            State::Offered(s) => (Phase::Offered, Some(s.offer.ticket.clone()), None),
+            State::Preparing(_, p) => (Phase::Preparing, Some(p.ticket.clone()), None),
+            State::Aborted(t) => (Phase::Aborted, Some(t.clone()), None),
             State::Consumed(t) => (
                 self.progress.unwrap_or(Phase::Acknowledged),
                 Some(t.clone()),
+                self.written,
             ),
         };
-        Status { phase, ticket }
+        Status {
+            phase,
+            ticket,
+            written,
+        }
     }
 
     pub fn new(boot_id: String) -> crate::Result<Self> {
@@ -154,6 +160,7 @@ impl Coordinator {
             observed_ms: 0,
             state: State::Idle,
             progress: None,
+            written: None,
         })
     }
 

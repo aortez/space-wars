@@ -96,6 +96,7 @@ fn response(phase: Phase) -> ServiceReply {
         status: Status {
             phase,
             ticket: Some(ticket()),
+            written: None,
         },
         offer: None,
         aborted: None,
@@ -762,6 +763,7 @@ fn restart_before_host_prepare_retires_old_offer_and_allows_back_and_reopen() {
                     reply.status = Status {
                         phase: Phase::Offered,
                         ticket: Some(ticket.clone()),
+                        written: None,
                     };
                     reply.offer = Some(Offer {
                         schema: SCHEMA,
@@ -790,6 +792,7 @@ fn restart_before_host_prepare_retires_old_offer_and_allows_back_and_reopen() {
                 reply.status = Status {
                     phase: Phase::Idle,
                     ticket: None,
+                    written: None,
                 };
             }
             Ok(reply)
@@ -1450,4 +1453,65 @@ fn shipped_kiosk_launch_uses_runtime_identity_without_enabling_direct_launch() {
         assert_eq!(view.nonce, 42);
         assert!(view.available);
     }
+}
+
+#[test]
+fn writing_status_fills_the_activity_bar_and_reports_the_percentage() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let exchange = Arc::new(move |request: &ServiceRequest| match request {
+        ServiceRequest::Offer { .. } => {
+            let mut reply = response(Phase::Offered);
+            reply.offer = Some(Offer {
+                schema: SCHEMA,
+                ticket: ticket(),
+                candidate: Candidate {
+                    id: ticket().candidate,
+                    channel: Channel::Release,
+                    generation: 25,
+                    build_id: "rootfs-progress".into(),
+                },
+                ends_game: false,
+                expires_ms: transport::boot_ms().unwrap() + 300_000,
+            });
+            Ok(reply)
+        }
+        ServiceRequest::Confirm { .. } => Ok(response(Phase::Preparing)),
+        ServiceRequest::Status { .. } => {
+            let mut reply = response(Phase::Writing);
+            reply.status.written = Some(Written {
+                bytes: 300_000_000,
+                total: 1_000_000_000,
+            });
+            Ok(reply)
+        }
+        _ => panic!("unexpected request"),
+    });
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        dir.path().join("host.sock"),
+        exchange,
+        Rc::new(|| Some(0)),
+        uid(),
+        None,
+    );
+    h.window.invoke_updates_open();
+    h.until(false, |w| w.get_updates_can_confirm());
+    assert!(!h.window.get_updates_busy());
+    h.window.invoke_updates_confirm();
+    // Confirmation alone shows the sweeping bar; the writer's counts then fill it.
+    h.until(false, |w| w.get_updates_busy());
+    h.until(false, |w| w.get_updates_progress() > 0.0);
+    assert!((h.window.get_updates_progress() - 0.3).abs() < 0.001);
+    let message = h.window.get_updates_message().to_string();
+    assert!(message.contains("Installing the update"), "{message}");
+    assert!(
+        message.contains("300 of 1000 MB written (30%)"),
+        "{message}"
+    );
+    assert!(!h.window.get_updates_can_confirm());
 }
