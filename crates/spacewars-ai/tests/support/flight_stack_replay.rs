@@ -31,8 +31,11 @@ pub const TICK_TOLERANCE: usize = 4;
 
 /// Flies the archived task with the driver and holds it to the archive:
 /// exactly when this host reproduces the archived inference, within the
-/// tolerances otherwise. `goal` issues the goal for the environment's current
-/// state, as the host that flew the case issued it.
+/// tolerances otherwise. The archive's leading neutral steps, a settle the
+/// harness flew under neutral controls before the stack took the ship, are
+/// stepped as recorded and must reproduce exactly, since nothing in them is
+/// inferred. `goal` issues the goal for the environment's current state, as
+/// the host that flew the case issued it.
 pub fn drive_archived_trace(
     trace: &FlightTrace,
     stack: &FlightStack,
@@ -40,14 +43,23 @@ pub fn drive_archived_trace(
 ) {
     FlightEnvironment::replay(trace).unwrap();
     let mut env = FlightEnvironment::new(trace.task.clone()).unwrap();
+    let settle = trace
+        .steps
+        .iter()
+        .take_while(|step| step.action == Some(FlightAction::default()))
+        .count();
+    for (tick, archived) in trace.steps[..settle].iter().enumerate() {
+        let step = env.step(FlightAction::default()).unwrap();
+        assert_eq!(step, archived, "settle tick {tick}");
+    }
     let mut driver = FlightStackDriver::new(0).unwrap();
     let mut exact = true;
-    let mut flown = 0usize;
+    let mut flown = settle;
     while env.progress().outcome.is_none() {
         let tick = flown;
         let decision = driver.decide(stack, env.state(), goal(&env)).unwrap();
         let archived = trace.steps.get(tick);
-        if tick == 0 {
+        if tick == settle {
             exact = archived.and_then(|step| step.action) == Some(decision.action);
             if !exact {
                 eprintln!(
@@ -99,7 +111,7 @@ pub fn drive_archived_trace(
     }
     let decision = driver.decide(stack, env.state(), goal(&env)).unwrap();
     assert_eq!(decision.progress.outcome, Some(GoalOutcome::Arrived));
-    assert_eq!(decision.progress.elapsed_ticks as usize, flown);
+    assert_eq!(decision.progress.elapsed_ticks as usize, flown - settle);
 }
 
 fn within(a: FlightAction, b: FlightAction, tolerance: f32) -> bool {

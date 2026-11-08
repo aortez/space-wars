@@ -10,6 +10,9 @@ pub const MOVEMENT_ARCHITECTURE: &str = "motor18-protected-movement20x32x32-v3";
 /// The plain actor with 64-unit hidden layers, for laws the 32-unit actor
 /// cannot fit closely enough; the critic stays at 32.
 pub const WIDE_ARCHITECTURE: &str = "motor18-actor64x64-critic32x32-v4";
+/// The wide actor over the v3 contract's twenty-two inputs, the command's
+/// advisory vector among them.
+pub const SENSE_ARCHITECTURE: &str = "motor22-actor64x64-critic32x32-v5";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MotorPolicyFile {
@@ -23,19 +26,47 @@ pub struct MotorPolicy {
     residual: bool,
     movement: bool,
     contract: u32,
+    inputs: usize,
 }
+/// A wide v2 motor export under the v3 contract with zero weight on the four
+/// advisory inputs: it flies the same actions, so a stack lifted this way
+/// must fly the v2 flights identically.
+#[cfg(test)]
+pub(crate) fn lifted_to_v3(mut file: MotorPolicyFile) -> MotorPolicyFile {
+    assert_eq!(file.format_version, 4);
+    assert_eq!(file.architecture, WIDE_ARCHITECTURE);
+    for name in ["actor1.weight", "critic1.weight"] {
+        let tensor = file.weights.get_mut(name).unwrap();
+        assert_eq!(tensor.shape[1], 18);
+        tensor.values = tensor
+            .values
+            .chunks_exact(18)
+            .flat_map(|row| row.iter().copied().chain(std::iter::repeat_n(0.0, 4)))
+            .collect();
+        tensor.shape[1] = 22;
+    }
+    file.observation_schema = motor::schema_v3();
+    file.format_version = 5;
+    file.architecture = SENSE_ARCHITECTURE.into();
+    file
+}
+
 impl MotorPolicy {
     pub fn from_file(file: MotorPolicyFile) -> Result<Self, &'static str> {
         let movement = file.format_version == 3 && file.architecture == MOVEMENT_ARCHITECTURE;
         let residual =
             (file.format_version == 2 && file.architecture == RESIDUAL_ARCHITECTURE) || movement;
-        let wide = file.format_version == 4 && file.architecture == WIDE_ARCHITECTURE;
+        let sense = file.format_version == 5 && file.architecture == SENSE_ARCHITECTURE;
+        let wide = (file.format_version == 4 && file.architecture == WIDE_ARCHITECTURE) || sense;
         let plain = (file.format_version == 1 && file.architecture == ARCHITECTURE) || wide;
-        // The planet-frame v2 contract is carried by the plain actors only.
-        let contract = if file.observation_schema == motor::schema() {
-            motor::CONTRACT_V1
-        } else if file.observation_schema == motor::schema_v2() && plain {
-            motor::CONTRACT_V2
+        // The planet-frame v2 contract is carried by the plain actors only,
+        // and the v3 contract by the wide actor over its twenty-two inputs.
+        let (contract, inputs) = if file.observation_schema == motor::schema() && !sense {
+            (motor::CONTRACT_V1, 18)
+        } else if file.observation_schema == motor::schema_v2() && plain && !sense {
+            (motor::CONTRACT_V2, 18)
+        } else if file.observation_schema == motor::schema_v3() && sense {
+            (motor::CONTRACT_V3, 22)
         } else {
             return Err("incompatible motor policy contract");
         };
@@ -45,10 +76,10 @@ impl MotorPolicy {
         let width = if wide { 64 } else { 32 };
         let mut expected = BTreeMap::new();
         for (name, input, output) in [
-            ("actor1", 18, width),
+            ("actor1", inputs, width),
             ("actor2", width, width),
             ("actor", width, 3),
-            ("critic1", 18, 32),
+            ("critic1", inputs, 32),
             ("critic2", 32, 32),
             ("critic", 32, 1),
         ] {
@@ -87,6 +118,7 @@ impl MotorPolicy {
             residual,
             movement,
             contract,
+            inputs,
         })
     }
 
@@ -106,7 +138,7 @@ impl MotorPolicy {
             .collect()
     }
     pub fn infer(&self, inputs: &[f32]) -> Result<FlightPolicyOutput, &'static str> {
-        if inputs.len() != 18 || !inputs.iter().all(|v| v.is_finite()) {
+        if inputs.len() != self.inputs || !inputs.iter().all(|v| v.is_finite()) {
             return Err("invalid motor inputs");
         }
         let mut a = self.linear(

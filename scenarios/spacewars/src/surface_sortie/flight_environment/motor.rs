@@ -1,6 +1,7 @@
 //! Stationary-frame motor-command diagnostic on the production flight physics.
 //! The carrier's position-arrival rule cannot terminate before our deadline.
 use super::*;
+use engine_rapier::world::PointProjectionOptions;
 use serde_json::json;
 
 pub const MOTOR_FEATURES: [&str; 18] = [
@@ -73,12 +74,162 @@ pub fn schema_v2() -> serde_json::Value {
         "action_contract":"continuous-flight-v2","hz":60})
 }
 
+/// The v3 contract: the v2 inputs and the command's advisory vector, whose
+/// first element is the turn sense navigation sets from its view of the
+/// ground; the other three are zero until a rule needs them.
+pub const CONTRACT_V3: u32 = 3;
+/// Elements of the command's advisory vector.
+pub const ADVISORY_ELEMENTS: usize = 4;
+/// Ticks a navigation command, its advisory with it, is held while the motor
+/// flies it: the stack's cadence, which the motor environment's reference
+/// sense keeps, so the motor trains on the signal it is given in play.
+pub const COMMAND_HOLD_TICKS: u32 = 6;
+
+pub const MOTOR_FEATURES_V3: [&str; 22] = [
+    "heading_error_sin",
+    "heading_error_cos",
+    "command_speed_over70",
+    "frame_com_velocity_local_x_over70",
+    "frame_com_velocity_local_y_over70",
+    "frame_origin_velocity_local_x_over70",
+    "frame_origin_velocity_local_y_over70",
+    "spin_over2",
+    "gravity_local_x_over45",
+    "gravity_local_y_over45",
+    "thrust_acceleration_over45",
+    "turn_speed_over1_8",
+    "turn_acceleration_over6",
+    "brake_acceleration_over40",
+    "brake_gain_over4",
+    "previous_steering",
+    "previous_thrust",
+    "previous_brake",
+    "turn_sense",
+    "advisory_2",
+    "advisory_3",
+    "advisory_4",
+];
+
+pub fn schema_v3() -> serde_json::Value {
+    json!({"version":3,"kind":"planet-frame-heading-speed-sense-v3","features":MOTOR_FEATURES_V3,
+        "heading":"world radians; forward=(-sin(heading),cos(heading))",
+        "speed":"nonnegative COM speed along the command heading relative to the pilot's planet frame at the ship origin, up to 60",
+        "frame":"the planet frame the physical brake decelerates toward: its point velocity at the ship origin",
+        "arrival":"relative velocity within 1 for thirty complete intervals, with spin within 0.2 at a zero-speed command and within 0.5 otherwise; no heading requirement; retention judges velocity only",
+        "advisory":"four elements held with the command for six ticks: turn_sense is the sign of the spin to turn with, +1 counterclockwise and -1 clockwise, 0 for the motor's own choice; the rest are zero",
+        "action_contract":"continuous-flight-v2","hz":60})
+}
+
 pub fn schema_for(contract: u32) -> Result<serde_json::Value, &'static str> {
     match contract {
         CONTRACT_V1 => Ok(schema()),
         CONTRACT_V2 => Ok(schema_v2()),
+        CONTRACT_V3 => Ok(schema_v3()),
         _ => Err("unsupported motor contract"),
     }
+}
+
+/// The nearest surface within this many units of the ship's origin is against
+/// the hull: the hull reaches 5.6 from the origin at the nose and the wing
+/// tips and 2.6 aft, so a ship resting at any attitude is within it and a ship
+/// flying past a wall is not until it is about to scrape. The sense is for a
+/// turn the ground blocks; read to ten units it followed a turning ship along
+/// a wall and took the brake away, which the networks' flights, unlike the
+/// law's own, did not survive.
+pub const SENSE_TOUCH: f32 = 6.0;
+/// A command within this angle of the nose needs no sense; the thrust gate
+/// opens here.
+pub const SENSE_GATE: f32 = 0.35;
+/// A spin above this is a turn under way, kept whichever way it goes; a free
+/// pivot from rest passes it within the hold.
+pub const SENSE_SPIN: f32 = 0.12;
+/// A spin under this with the steering saturated is a turn the ground blocks;
+/// a blocked ship rocks under 0.05.
+pub const SENSE_STALLED: f32 = 0.06;
+/// The steering beyond which a turn counts as saturated.
+pub const SENSE_SATURATED: f32 = 0.9;
+/// A surface within this bearing of the nose or the tail is ahead or behind,
+/// not beside, and says nothing about which way a turn is free.
+pub const SENSE_AHEAD: f32 = 0.3;
+
+/// What the turn sense is read from, as navigation's law and the motor
+/// environment both read it: the nearest surface other than the ship's hull,
+/// as a distance and a bearing from the nose, positive to the left; the
+/// command's heading error, positive to the left; the ship's spin, positive
+/// counterclockwise; and the steering applied on the previous tick, positive
+/// clockwise.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SenseReading {
+    pub nearest: Option<(f32, f32)>,
+    pub error: f32,
+    pub spin: f32,
+    pub previous_steering: f32,
+}
+
+/// The turn sense: the sign of the spin to turn with when the ground would
+/// block the shorter turn, 0 for the motor's own choice. With a surface
+/// against the hull and the command outside the gate: a turn under way is kept; a saturated
+/// steering whose turn has no spin is a turn the ground blocks, and the
+/// sense is the other way; otherwise, with the surface beside the ship, the
+/// nose turns away from it, whichever way is shorter. The rule has no state:
+/// the hold gives a turn time to build its spin before the next reading, a
+/// turn that builds it is kept, and one that does not is reversed, so a ship
+/// blocked both ways rocks between them instead of resting on one.
+pub fn turn_sense(reading: SenseReading) -> f32 {
+    let Some((distance, bearing)) = reading.nearest else {
+        return 0.0;
+    };
+    if distance > SENSE_TOUCH || reading.error.abs() <= SENSE_GATE {
+        return 0.0;
+    }
+    if reading.spin.abs() > SENSE_SPIN {
+        return reading.spin.signum();
+    }
+    if reading.previous_steering.abs() > SENSE_SATURATED && reading.spin.abs() < SENSE_STALLED {
+        // Steering is positive clockwise, so the blocked turn's spin had the
+        // opposite sign; the other way round is the steering's own.
+        return reading.previous_steering.signum();
+    }
+    // A surface on the left, at a positive bearing, is left by a clockwise
+    // turn, a negative spin.
+    let beside = bearing.abs() > SENSE_AHEAD && bearing.abs() < std::f32::consts::PI - SENSE_AHEAD;
+    if beside { -bearing.signum() } else { 0.0 }
+}
+
+/// The sense reading of a player's ship under a command, from the completed
+/// step's physics.
+pub fn sense_reading(
+    state: &SurfaceSortieState,
+    player: usize,
+    previous_action: FlightAction,
+    command: MotorCommand,
+) -> Result<SenseReading, &'static str> {
+    let own = state
+        .free_flight_observation(player)
+        .ok_or("missing motor ship")?;
+    let body = state.world.physics.ship_body(own.vehicle.0);
+    let nearest = state
+        .world
+        .physics
+        .world
+        .project_point(
+            own.ship.position,
+            PointProjectionOptions {
+                max_distance: SENSE_TOUCH,
+                exclude: Some(body.entity),
+                ..Default::default()
+            },
+        )
+        .map(|hit| {
+            let local = (hit.point - own.ship.position).rotate_radians(-own.ship.angle);
+            (hit.distance, (-local.x).atan2(local.y))
+        });
+    Ok(SenseReading {
+        nearest,
+        error: wrap(command.heading - own.ship.angle),
+        spin: own.ship.spin,
+        previous_steering: previous_action.steering,
+    })
 }
 
 fn default_contract() -> u32 {
@@ -125,7 +276,9 @@ fn is_zero(value: &f32) -> bool {
 
 impl MotorTask {
     fn trace_version(&self) -> u32 {
-        if self.contact_allowed {
+        if self.contract == CONTRACT_V3 {
+            6
+        } else if self.contact_allowed {
             5
         } else if self.heading_rate != 0.0 {
             4
@@ -139,7 +292,7 @@ impl MotorTask {
     }
 
     pub fn max_speed(&self) -> f32 {
-        if self.contract == CONTRACT_V2 {
+        if self.contract != CONTRACT_V1 {
             MAX_SPEED_V2
         } else {
             MAX_SPEED_V1
@@ -151,6 +304,15 @@ impl MotorTask {
 pub struct MotorCommand {
     pub heading: f32,
     pub speed: f32,
+    /// The command's advisory vector under the v3 contract, the turn sense
+    /// first and the rest zero until a rule needs them; absent, as zero, in
+    /// the records of the earlier contracts.
+    #[serde(default, skip_serializing_if = "no_advisory")]
+    pub advisory: [f32; ADVISORY_ELEMENTS],
+}
+
+fn no_advisory(advisory: &[f32; ADVISORY_ELEMENTS]) -> bool {
+    advisory.iter().all(|v| *v == 0.0)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -166,7 +328,7 @@ impl MotorErrors {
     /// against a planet's gravity while it cruises must turn as it goes around
     /// the planet, and the arrival dwell judges spin at the stop.
     fn qualifies(self, contract: u32, stopping: bool) -> bool {
-        if contract == CONTRACT_V2 {
+        if contract != CONTRACT_V1 {
             self.velocity <= 1.0 && self.spin <= if stopping { 0.2 } else { 0.5 }
         } else {
             self.heading <= 5.0_f32.to_radians() && self.velocity <= 1.0 && self.spin <= 0.2
@@ -177,7 +339,7 @@ impl MotorErrors {
     /// the nose may reorient against gravity or a rotating frame while the
     /// velocity holds.
     fn retains(self, contract: u32, stopping: bool) -> bool {
-        if contract == CONTRACT_V2 {
+        if contract != CONTRACT_V1 {
             self.velocity <= 1.0
         } else {
             self.qualifies(contract, stopping)
@@ -222,6 +384,8 @@ pub struct MotorEnvironment {
     progress: FlightProgress,
     command: MotorCommand,
     retention: Option<MotorRetention>,
+    /// Ticks the command's advisory has been held under the v3 contract.
+    sense_ticks: u32,
     trace: MotorTrace,
 }
 
@@ -262,8 +426,28 @@ pub fn command_inputs_for(
     match contract {
         CONTRACT_V1 => command_inputs_at(state, player, previous_action, command),
         CONTRACT_V2 => command_inputs_v2_at(state, player, previous_action, command),
+        CONTRACT_V3 => command_inputs_v3_at(state, player, previous_action, command),
         _ => Err("unsupported motor contract"),
     }
+}
+
+/// The v3 inputs: the v2 inputs and the command's advisory vector.
+pub fn command_inputs_v3_at(
+    state: &SurfaceSortieState,
+    player: usize,
+    previous_action: FlightAction,
+    command: MotorCommand,
+) -> Result<Vec<f32>, &'static str> {
+    if !command
+        .advisory
+        .iter()
+        .all(|v| v.is_finite() && v.abs() <= 1.0)
+    {
+        return Err("invalid command advisory");
+    }
+    let mut inputs = command_inputs_v2_at(state, player, previous_action, command)?;
+    inputs.extend(command.advisory);
+    Ok(inputs)
 }
 
 /// The v2 inputs: velocities relative to the pilot's planet frame at the ship
@@ -372,7 +556,7 @@ pub fn command_inputs_at(
 
 impl MotorEnvironment {
     pub fn new(task: MotorTask) -> Result<Self, &'static str> {
-        if task.contract != CONTRACT_V1 && task.contract != CONTRACT_V2 {
+        if ![CONTRACT_V1, CONTRACT_V2, CONTRACT_V3].contains(&task.contract) {
             return Err("unsupported motor contract");
         }
         let stationary = task.contract == CONTRACT_V1;
@@ -420,10 +604,19 @@ impl MotorEnvironment {
             contact_allowed: task.contact_allowed,
             ..Default::default()
         })?;
-        let command = MotorCommand {
+        let mut command = MotorCommand {
             heading: wrap(flight.frame.angle + task.heading_delta),
             speed: task.speed,
+            advisory: [0.0; ADVISORY_ELEMENTS],
         };
+        if task.contract == CONTRACT_V3 {
+            command.advisory[0] = turn_sense(sense_reading(
+                &flight.state,
+                0,
+                flight.previous_action,
+                command,
+            )?);
+        }
         let progress = FlightProgress::default();
         let retention = task
             .retention_horizon_ticks
@@ -434,6 +627,7 @@ impl MotorEnvironment {
             progress,
             command,
             retention,
+            sense_ticks: 0,
             trace: MotorTrace {
                 version: task.trace_version(),
                 task,
@@ -456,7 +650,7 @@ impl MotorEnvironment {
         let delta = wrap(command.heading - frame.angle);
         let desired = Vec2::new(-command.heading.sin(), command.heading.cos()) * command.speed;
         // The v2 command is relative to the pilot's planet frame.
-        let reference = if contract == CONTRACT_V2 {
+        let reference = if contract != CONTRACT_V1 {
             flight
                 .state
                 .free_flight_observation(0)
@@ -505,6 +699,16 @@ impl MotorEnvironment {
                     + self.trace.task.heading_rate * (self.progress.elapsed_ticks + 1) as f32
                         / FLIGHT_HZ as f32,
             );
+        }
+        // The reference turn sense, read again when the hold runs out, as
+        // navigation issues it in play.
+        if contract == CONTRACT_V3 {
+            self.sense_ticks += 1;
+            if self.sense_ticks >= COMMAND_HOLD_TICKS {
+                self.sense_ticks = 0;
+                self.command.advisory[0] =
+                    turn_sense(sense_reading(&self.flight.state, 0, action, self.command)?);
+            }
         }
         let mut item = Self::observe(
             &self.flight,
@@ -757,7 +961,7 @@ mod tests {
         );
         assert!(
             MotorEnvironment::new(MotorTask {
-                contract: 3,
+                contract: 4,
                 ..task(0.0)
             })
             .is_err()
@@ -773,6 +977,195 @@ mod tests {
         let legacy: MotorTask =
             serde_json::from_value(serde_json::to_value(task(0.0)).unwrap()).unwrap();
         assert_eq!(legacy.contract, CONTRACT_V1);
+    }
+
+    #[test]
+    fn v3_tasks_carry_the_command_advisory_as_four_more_inputs() {
+        let mut t = task_v2(0.3, 40.0);
+        t.contract = CONTRACT_V3;
+        let env = MotorEnvironment::new(t.clone()).unwrap();
+        let item = env.item();
+        assert_eq!(env.trace().version, 6);
+        assert_eq!(item.inputs.len(), 22);
+        // Nothing is within reach at altitude, so the sense is free and the
+        // v2 inputs come first, unchanged.
+        assert_eq!(&item.inputs[18..], &[0.0; 4]);
+        assert_eq!(
+            &item.inputs[..18],
+            &command_inputs_for(
+                CONTRACT_V2,
+                env.flight.state(),
+                0,
+                FlightAction::default(),
+                env.command
+            )
+            .unwrap()[..]
+        );
+        let advised = MotorCommand {
+            advisory: [-1.0, 0.0, 0.0, 0.0],
+            ..env.command
+        };
+        let inputs = command_inputs_for(
+            CONTRACT_V3,
+            env.flight.state(),
+            0,
+            FlightAction::default(),
+            advised,
+        )
+        .unwrap();
+        assert_eq!(&inputs[18..], &[-1.0, 0.0, 0.0, 0.0]);
+        for bad in [1.5, f32::NAN] {
+            assert!(
+                command_inputs_for(
+                    CONTRACT_V3,
+                    env.flight.state(),
+                    0,
+                    FlightAction::default(),
+                    MotorCommand {
+                        advisory: [bad, 0.0, 0.0, 0.0],
+                        ..env.command
+                    },
+                )
+                .is_err()
+            );
+        }
+        // The advisory is absent from the records of the earlier contracts
+        // and read as zero from them.
+        let value = serde_json::to_value(env.command).unwrap();
+        assert!(value.get("advisory").is_none());
+        let legacy: MotorCommand = serde_json::from_value(value).unwrap();
+        assert_eq!(legacy, env.command);
+        let value = serde_json::to_value(advised).unwrap();
+        assert_eq!(value["advisory"], serde_json::json!([-1.0, 0.0, 0.0, 0.0]));
+        assert_eq!(
+            serde_json::from_value::<MotorCommand>(value).unwrap(),
+            advised
+        );
+        assert_eq!(
+            schema_for(CONTRACT_V3).unwrap()["features"]
+                .as_array()
+                .unwrap()
+                .len(),
+            22
+        );
+    }
+
+    #[test]
+    fn positive_steering_spins_the_ship_clockwise() {
+        // The sense rule reads steering as positive clockwise, the opposite
+        // sign to the spin it produces.
+        let mut env = MotorEnvironment::new(task_v2(0.0, 0.0)).unwrap();
+        for _ in 0..20 {
+            env.step(FlightAction {
+                steering: 1.0,
+                thrust: 0.0,
+                brake: 0.0,
+            })
+            .unwrap();
+        }
+        assert!(env.item().frame.spin < -0.1, "{:?}", env.item().frame.spin);
+    }
+
+    #[test]
+    fn the_turn_sense_reverses_a_blocked_turn_and_leaves_a_free_one() {
+        let reading = |nearest, error, spin, previous_steering| SenseReading {
+            nearest,
+            error,
+            spin,
+            previous_steering,
+        };
+        let beside_left = Some((3.0, 1.5));
+        // Nothing within reach, or a command within the gate: free.
+        assert_eq!(turn_sense(reading(None, 1.5, 0.0, 1.0)), 0.0);
+        assert_eq!(turn_sense(reading(Some((12.0, 1.5)), 1.5, 0.0, 1.0)), 0.0);
+        assert_eq!(turn_sense(reading(beside_left, 0.3, 0.0, 1.0)), 0.0);
+        // A turn under way is kept, whichever way it goes.
+        assert_eq!(turn_sense(reading(beside_left, 1.5, 0.5, 0.0)), 1.0);
+        assert_eq!(turn_sense(reading(beside_left, 1.5, -0.5, 0.0)), -1.0);
+        // A saturated steering whose turn has no spin is blocked: the sense
+        // is the other way, the steering's own sign, whatever the geometry;
+        // a slow turn still building its spin is left to the geometry.
+        assert_eq!(turn_sense(reading(beside_left, 1.5, 0.0, 1.0)), 1.0);
+        assert_eq!(turn_sense(reading(beside_left, 1.5, 0.03, -1.0)), -1.0);
+        assert_eq!(turn_sense(reading(Some((3.0, 0.1)), 1.5, 0.02, 1.0)), 1.0);
+        assert_eq!(turn_sense(reading(beside_left, 1.5, 0.08, 1.0)), -1.0);
+        assert_eq!(turn_sense(reading(beside_left, 1.5, 0.0, 0.9)), -1.0);
+        // A surface beside the ship is left by the turn away from it, whatever
+        // the command's side.
+        assert_eq!(turn_sense(reading(beside_left, 1.5, 0.0, 0.0)), -1.0);
+        assert_eq!(turn_sense(reading(beside_left, -1.5, 0.0, 0.0)), -1.0);
+        assert_eq!(turn_sense(reading(Some((3.0, -1.5)), -1.5, 0.0, 0.0)), 1.0);
+        // A surface ahead or behind says nothing about the way round.
+        assert_eq!(turn_sense(reading(Some((3.0, 0.1)), 1.5, 0.0, 0.0)), 0.0);
+        assert_eq!(turn_sense(reading(Some((3.0, 3.0)), 1.5, 0.0, 0.5)), 0.0);
+    }
+
+    /// The cases navigation's law in `tools/flight_navigation/reference_v2.py`
+    /// is held to as well, so the two readings of the rule agree.
+    #[test]
+    fn the_turn_sense_agrees_with_the_shared_cases() {
+        #[derive(Deserialize)]
+        struct Case {
+            nearest: Option<(f32, f32)>,
+            error: f32,
+            spin: f32,
+            previous_steering: f32,
+            sense: f32,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!("turn_sense_cases.json")).unwrap();
+        assert!(cases.len() >= 20);
+        for (index, case) in cases.iter().enumerate() {
+            assert_eq!(
+                turn_sense(SenseReading {
+                    nearest: case.nearest,
+                    error: case.error,
+                    spin: case.spin,
+                    previous_steering: case.previous_steering,
+                }),
+                case.sense,
+                "case {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_grounded_v3_task_reads_the_surface_and_holds_its_sense_for_six_ticks() {
+        let mut t = task_v2(1.0, 20.0);
+        t.contract = CONTRACT_V3;
+        t.contact_allowed = true;
+        t.deadline_ticks = 600;
+        t.start.gravity = true;
+        t.start.altitude = 15.0;
+        t.start.heading_offset = std::f32::consts::FRAC_PI_2;
+        let mut env = MotorEnvironment::new(t).unwrap();
+        let neutral = FlightAction::default();
+        let mut ticks = 0;
+        while !env.item().evidence.collision && ticks < 300 {
+            env.step(neutral).unwrap();
+            ticks += 1;
+        }
+        assert!(env.item().evidence.collision, "the ship comes down");
+        let reading = sense_reading(env.flight.state(), 0, neutral, env.command).unwrap();
+        let (distance, _) = reading.nearest.expect("the ground within reach");
+        assert!(distance <= SENSE_TOUCH, "{distance}");
+        // The sense in the inputs is the one held for the command, read again
+        // only when the hold runs out.
+        let mut changes = 0;
+        let mut last = env.item().inputs[18];
+        for _ in 0..24 {
+            env.step(FlightAction {
+                steering: 1.0,
+                thrust: 0.0,
+                brake: 0.0,
+            })
+            .unwrap();
+            let sense = env.item().inputs[18];
+            assert!([-1.0, 0.0, 1.0].contains(&sense));
+            assert_eq!(sense, env.command.advisory[0]);
+            changes += usize::from(sense != last);
+            last = sense;
+        }
+        assert!(changes <= 4, "{changes} changes over 24 ticks");
     }
 
     #[test]

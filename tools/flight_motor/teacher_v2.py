@@ -27,10 +27,14 @@ import torch
 from tools.flight_ppo.bridge import Bridge
 from tools.flight_ppo.checkpoint import atomic_json, sha
 from . import aligned, teacher, velocity
-from .model import ARCHITECTURE, WIDE_ARCHITECTURE, MotorModel
+from .model import ARCHITECTURE, SENSE_ARCHITECTURE, WIDE_ARCHITECTURE, MotorModel
 
 KIND = 'motor-teacher-fit-v2'
 CONTRACT = 2
+# The motor inputs of each command contract: the v3 contract adds the
+# command's advisory vector, the turn sense first.
+INPUTS = {2: 18, 3: 22}
+SENSE = 18
 SCALE = 70.
 MAX_SPEED = 60.
 GRAVITY_SCALE = 45.
@@ -139,7 +143,7 @@ def teacher_v2(x, gains=GAINS):
     commanded heading or against gravity, and thrust holding the ship when
     gravity would otherwise sink it.
     """
-    if x.ndim != 2 or x.shape[1] != 18:
+    if x.ndim != 2 or x.shape[1] not in INPUTS.values():
         raise ValueError('wrong motor input shape')
     command = x[:, 2] * SCALE; vx = x[:, 3] * SCALE; vy = x[:, 4] * SCALE
     gx = x[:, 8] * GRAVITY_SCALE; gy = x[:, 9] * GRAVITY_SCALE
@@ -241,9 +245,21 @@ def teacher_v2(x, gains=GAINS):
         hovered = hover * torch.atan2(against.sin(), against.cos())
     spin_stopping = (gains['spin'] * hovered).clamp(-TURN_SPEED, TURN_SPEED)
     spin = torch.where(moving, spin_moving, spin_stopping).clamp(-TURN_SPEED, TURN_SPEED)
-    steering = (-spin / TURN_SPEED).clamp(-1., 1.)
     thrust = torch.where(moving, thrust_moving, thrust_stopping)
     brake = torch.where(moving, brake_moving, brake_stopping)
+    if x.shape[1] > SENSE:
+        # The v3 contract's turn sense, the sign of the spin to turn with when
+        # the ground blocks the shorter turn: the turn goes that way at the
+        # limit, slowing in proportion to the angle still to turn that way so
+        # it ends on the attitude vector, with the thrust still behind its
+        # gate and the brake off, since the brake resists the pivot.
+        sense = x[:, SENSE]
+        advised = sense != 0.
+        target = torch.where(moving, pursued, hovered)
+        remaining = torch.where(torch.sign(target) == sense, target.abs(), 2 * math.pi - target.abs())
+        spin = torch.where(advised, sense * (gains['spin'] * remaining).clamp(max=TURN_SPEED), spin)
+        brake = torch.where(advised, torch.zeros_like(brake), brake)
+    steering = (-spin / TURN_SPEED).clamp(-1., 1.)
     return torch.stack((steering, thrust, brake), dim=1)
 
 
@@ -252,8 +268,13 @@ def scalar_teacher_v2(inputs, gains=GAINS):
     return {'steering': steering, 'thrust': thrust, 'brake': brake}
 
 
-def synthetic_inputs_v2(generator, count):
-    """Open-wing v2 rows with gravity up to 10 in any direction; half concentrate on the aligned regime."""
+def synthetic_inputs_v2(generator, count, contract=CONTRACT):
+    """Open-wing v2 rows with gravity up to 10 in any direction; half concentrate on the aligned regime.
+
+    Under the v3 contract the rows carry the advisory vector: a turn sense
+    either way on a fifth of the rows each, so the fit learns to obey it
+    everywhere, and zeros in the spare elements.
+    """
     def uniform(low, high):
         return torch.rand((count,), generator=generator) * (high - low) + low
     near = torch.rand((count,), generator=generator) < .5
@@ -266,10 +287,22 @@ def synthetic_inputs_v2(generator, count):
     gravity = torch.where(torch.rand((count,), generator=generator) < .4, torch.zeros(count), uniform(0., 18.))
     gravity_direction = uniform(-math.pi, math.pi)
     ones = torch.ones(count)
-    return torch.stack((delta.sin(), delta.cos(), command / SCALE, vx / SCALE, vy / SCALE, (vx + uniform(-.5, .5)) / SCALE,
+    rows = torch.stack((delta.sin(), delta.cos(), command / SCALE, vx / SCALE, vy / SCALE, (vx + uniform(-.5, .5)) / SCALE,
                         (vy + uniform(-.5, .5)) / SCALE, spin / 2., gravity * gravity_direction.sin() / GRAVITY_SCALE,
                         gravity * gravity_direction.cos() / GRAVITY_SCALE, ones, ones, ones, ones, ones,
                         uniform(-1., 1.), uniform(0., 1.), uniform(0., 1.)), dim=1)
+    if contract == 3:
+        draw = torch.rand((count,), generator=generator)
+        sense = torch.where(draw < .2, -ones, torch.where(draw < .4, ones, torch.zeros(count)))
+        rows = torch.cat((rows, sense[:, None], torch.zeros((count, INPUTS[3] - SENSE - 1))), dim=1)
+    return rows
+
+
+def under_contract(rows, contract):
+    """The task rows with their tasks under the given command contract."""
+    for row in rows:
+        row['task']['contract'] = contract
+    return rows
 
 
 def start(rng, bearing, offset, altitude, gravity, planet_spin, forward, lateral, magnitude, spin, delta):
@@ -522,14 +555,38 @@ def tilted_climb_tasks(seed, bridge=None):
     return rows
 
 
-def random_contact_task(rng):
-    """A rollout row from the contact families: a climb from the ground, a low falling climb or a command behind the nose, with random parameters."""
-    kind = rng.choice(('ground', 'falling', 'half_turn'))
+BLOCKED_ATTITUDES = (2., -2., 2.3, -2.3, 2.6, -2.6, 2.9, -2.9)
+
+
+def blocked_command(rng, attitude):
+    """A command from the up on the side opposite a nose below the horizontal, the two angles summing past a half turn, so the shorter turn to it goes through the ground and the longer through the sky."""
+    return -math.copysign(rng.uniform(max(.3, math.pi - abs(attitude) + .1), 1.3), attitude)
+
+
+def blocked_tasks(seed, bridge=None):
+    """Turns the ground blocks, 96 tasks: the ship falls from altitude 15 with its nose at one of eight attitudes below the horizontal and the controls neutral until it rests, then a command up across to the other side at a climb speed."""
+    rng = random.Random(seed); rows = []
+    for world in ('practice', 'arena'):
+        for attitude in BLOCKED_ATTITUDES:
+            for speed in CLIMB_SPEEDS:
+                for _ in range(2):
+                    row = admitted(bridge, rng, lambda r: {'task': contact_task(r, world, attitude, blocked_command(r, attitude), speed, 15.)})
+                    rows.append({'index': len(rows), 'family': 'blocked_' + world, 'mode': 'attitude%+.1f' % attitude,
+                                 'level': 'speed%d' % speed, 'direction': 'up_across', 'settle': True, 'task': row['task']})
+    return rows
+
+
+def random_contact_task(rng, contract=CONTRACT):
+    """A rollout row from the contact families: a climb from the ground, a low falling climb or a command behind the nose, and under the v3 contract a turn the ground blocks, with random parameters."""
+    kind = rng.choice(('ground', 'falling', 'half_turn') + (('blocked',) if contract == 3 else ()))
     world = 'arena' if rng.random() < .5 else 'practice'
     speed = rng.uniform(10., MAX_SPEED)
     if kind == 'ground':
         attitude = rng.uniform(-math.pi, math.pi)
         return {'task': contact_task(rng, world, attitude, rng.uniform(-.6, .6), speed, 15.), 'settle': True}
+    if kind == 'blocked':
+        attitude = rng.choice([-1., 1.]) * rng.uniform(2., 3.)
+        return {'task': contact_task(rng, world, attitude, blocked_command(rng, attitude), speed, 15.), 'settle': True}
     if kind == 'falling':
         attitude = rng.choice([-1., 1.]) * rng.uniform(1., math.pi)
         altitude = rng.uniform(16., 40.)
@@ -576,8 +633,11 @@ class Recovery:
             self.tick = self.ticks
 
 
-def contact_sets(seed, bridge=None):
-    return {'ground': ground_tasks(seed, bridge), 'falling': falling_tasks(seed, bridge), 'half_turn': half_turn_tasks(seed, bridge)}
+def contact_sets(seed, bridge=None, contract=CONTRACT):
+    sets = {'ground': ground_tasks(seed, bridge), 'falling': falling_tasks(seed, bridge), 'half_turn': half_turn_tasks(seed, bridge)}
+    if contract == 3:
+        sets['blocked'] = blocked_tasks(seed, bridge)
+    return {name: under_contract(rows, contract) for name, rows in sets.items()}
 
 
 def v1_sets_as_v2():
@@ -593,8 +653,8 @@ def v1_sets_as_v2():
     return rows
 
 
-def collect_rollouts(bridge, rng, episodes, driver='teacher', perturb=True, gains=GAINS, contact_share=0.):
-    """Observed v2 inputs from closed-loop episodes driven by the teacher or the loaded network.
+def collect_rollouts(bridge, rng, episodes, driver='teacher', perturb=True, gains=GAINS, contact_share=0., contract=CONTRACT):
+    """Observed inputs from closed-loop episodes driven by the teacher or the loaded network, under the command contract.
 
     Random held actions spread the visited states; the recorded rows are still
     labelled by the teacher afterwards, so perturbation never changes a target.
@@ -606,7 +666,8 @@ def collect_rollouts(bridge, rng, episodes, driver='teacher', perturb=True, gain
         contact = contact_share > 0. and rng.random() < contact_share
         while True:
             # An arena start can meet terrain or the other seat; the sampler draws again, as the admission screens do.
-            row = random_contact_task(rng) if contact else {'task': random_task_v2(rng)}
+            row = random_contact_task(rng, contract) if contact else {'task': random_task_v2(rng)}
+            row['task']['contract'] = contract
             try:
                 item = bridge.call('reset', tasks=[row['task']])['items'][0]
                 break
@@ -633,7 +694,7 @@ def collect_rollouts(bridge, rng, episodes, driver='teacher', perturb=True, gain
     # The teacher ignores previous actions; randomizing half of them stops the fit from copying them.
     mask = torch.rand((len(x),)) < .5
     noise = torch.stack((torch.rand(len(x)) * 2 - 1, torch.rand(len(x)), torch.rand(len(x))), dim=1)
-    x[mask, 15:] = noise[mask]
+    x[mask, 15:18] = noise[mask]
     return x, outcomes
 
 
@@ -726,29 +787,34 @@ def fit_actor(model, x, y, steps, batch, learning_rate, generator, log=print, st
         return teacher.action_error(model(x)[0], y).tolist()
 
 
-def evaluate_sets(bridge, model, out, hold=1, contact=False):
-    """Closed-loop evaluation of the loaded policy on the development matrix, a held-out matrix and the v1 sets, and with contact the three contact sets on seed 1."""
+RECOVERY_SETS = ('ground', 'falling', 'half_turn', 'blocked')
+
+
+def evaluate_sets(bridge, model, out, hold=1, contact=False, contract=CONTRACT):
+    """Closed-loop evaluation of the loaded policy on the development matrix, a held-out matrix and the v1 sets, and with contact the contact sets on seed 1, under the command contract."""
     summaries = {}
     sets = [('matrix-development', matrix_tasks(1)), ('matrix-held-out', matrix_tasks(2)), ('v1-sets', v1_sets_as_v2())]
+    sets = [(name, under_contract(rows, contract)) for name, rows in sets]
     if contact:
-        sets += [(name, rows) for name, rows in contact_sets(1, bridge).items()]
+        sets += [(name, rows) for name, rows in contact_sets(1, bridge, contract).items()]
     for name, rows in sets:
         results = teacher.evaluate(bridge, model, rows, out / f'evaluation-{name}', hold, prepare=settle,
-                                   recovered=(lambda item: Recovery()) if name in ('ground', 'falling', 'half_turn') else None)
+                                   recovered=(lambda item: Recovery()) if name in RECOVERY_SETS else None)
         summaries[name] = summarize(results)
         summaries[name]['max_parity'] = max(r['parity'] for r in results)
     return summaries
 
 
-def load_export(path, schema):
-    """A motor export's actor and critic in a MotorModel, for evaluating an export the run did not fit."""
+def load_export(path, schema=None):
+    """A motor export's actor and critic in a MotorModel, for evaluating an export the run did not fit; the file's own schema unless one is given."""
     data = json.loads(Path(path).read_text())
-    model = MotorModel(schema, 64 if data['format_version'] == 4 else 32)
+    model = MotorModel(schema or data['observation_schema'], 64 if data['format_version'] in (4, 5) else 32)
     model.load_state_dict({k: torch.tensor(v['values'], dtype=torch.float32).reshape(v['shape']) for k, v in data['weights'].items()})
     return model
 
 
-EVALUATION_SETS = ('matrix-development', 'matrix-held-out', 'v1-sets', 'ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb')
+EVALUATION_SETS = ('matrix-development', 'matrix-held-out', 'v1-sets', 'ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb',
+                   'blocked')
 
 
 def evaluate_export(args):
@@ -758,14 +824,19 @@ def evaluate_export(args):
         raise ValueError('unknown evaluation set')
     started = time.monotonic(); summaries = {}
     with Bridge(args.bridge) as bridge:
-        model = load_export(args.policy, bridge.contract['schema_v2'])
+        model = load_export(args.policy)
+        contract = model.schema['version']
         bridge.call('load_policy', path=str(Path(args.policy).resolve()))
-        contact = contact_sets(1, bridge)
+        contact = contact_sets(1, bridge, contract)
         contact['drifting_turn'] = drifting_turn_tasks(1, bridge)
         contact['tilted_climb'] = tilted_climb_tasks(1, bridge)
+        if 'blocked' not in contact:
+            # The blocked set judges a v2 export too, under its own contract.
+            contact['blocked'] = blocked_tasks(1, bridge)
         for name in names:
             rows = {'matrix-development': lambda: matrix_tasks(1), 'matrix-held-out': lambda: matrix_tasks(2),
                     'v1-sets': v1_sets_as_v2}.get(name, lambda: contact[name])()
+            rows = under_contract(rows, contract)
             results = teacher.evaluate(bridge, model, rows, args.out / f'evaluation-{name}', prepare=settle,
                                        recovered=(lambda item: Recovery()) if name in contact else None)
             summaries[name] = summarize(results)
@@ -785,13 +856,14 @@ def reference(args):
     if args.set == 'cruise':
         with Bridge(args.bridge) as bridge:
             rows = cruise_tasks(args.seed, bridge)
-    elif args.set in ('ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb'):
+    elif args.set in ('ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb', 'blocked'):
         with Bridge(args.bridge) as bridge:
             rows = {'ground': ground_tasks, 'falling': falling_tasks, 'half_turn': half_turn_tasks,
-                    'drifting_turn': drifting_turn_tasks, 'tilted_climb': tilted_climb_tasks}[args.set](args.seed, bridge)
+                    'drifting_turn': drifting_turn_tasks, 'tilted_climb': tilted_climb_tasks, 'blocked': blocked_tasks}[args.set](args.seed, bridge)
     else:
         rows = matrix_tasks(args.seed) if args.set == 'matrix' else v1_sets_as_v2()
-    atomic_json(args.out / 'plan.json', {'kind': 'motor-teacher-v2-reference', 'set': args.set, 'gains': gains, 'contract': CONTRACT,
+    rows = under_contract(rows, args.contract)
+    atomic_json(args.out / 'plan.json', {'kind': 'motor-teacher-v2-reference', 'set': args.set, 'gains': gains, 'contract': args.contract,
                                          'bridge_sha256': sha(args.bridge), 'seed': args.seed, 'tasks': len(rows)})
     atomic_json(args.out / 'tasks.json', rows)
     results = reference_results(args.bridge, rows, gains, args.workers)
@@ -810,7 +882,9 @@ def fit(args):
     torch.set_num_threads(args.threads); torch.manual_seed(args.seed); random.seed(args.seed)
     generator = torch.Generator().manual_seed(args.seed); rng = random.Random(args.seed)
     started = time.monotonic()
-    plan = {'kind': KIND, 'contract': CONTRACT, 'gains': gains, 'architecture': WIDE_ARCHITECTURE if args.width == 64 else ARCHITECTURE,
+    contract = args.contract
+    plan = {'kind': KIND, 'contract': contract, 'gains': gains,
+            'architecture': SENSE_ARCHITECTURE if contract == 3 else WIDE_ARCHITECTURE if args.width == 64 else ARCHITECTURE,
             'steering_weight': args.steering_weight, 'bridge_sha256': sha(args.bridge),
             'arguments': {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}}
     atomic_json(args.out / 'plan.json', plan)
@@ -818,9 +892,9 @@ def fit(args):
     def log(line):
         print(line, flush=True); log_lines.append(line)
     with Bridge(args.bridge) as bridge:
-        model = MotorModel(bridge.contract['schema_v2'], args.width)
-        x = synthetic_inputs_v2(generator, args.synthetic)
-        rollouts, outcomes = collect_rollouts(bridge, rng, args.episodes, gains=gains, contact_share=args.contact_share)
+        model = MotorModel(bridge.contract['schema_v3' if contract == 3 else 'schema_v2'], args.width)
+        x = synthetic_inputs_v2(generator, args.synthetic, contract)
+        rollouts, outcomes = collect_rollouts(bridge, rng, args.episodes, gains=gains, contact_share=args.contact_share, contract=contract)
         log('teacher rollouts: %d rows from %d episodes, outcomes %s' % (len(rollouts), args.episodes, outcomes))
         x = torch.cat((x, rollouts)); y = teacher_v2(x, gains)
         log('round 0: fitting %d rows' % len(x))
@@ -830,19 +904,19 @@ def fit(args):
             export = args.out / f'policy-round-{round_index - 1}.json'; model.export(export)
             bridge.call('load_policy', path=str(export.resolve()))
             visited, outcomes = collect_rollouts(bridge, rng, args.round_episodes, driver='policy', gains=gains,
-                                                 contact_share=args.contact_share)
+                                                 contact_share=args.contact_share, contract=contract)
             log('round %d: network rollouts %d rows, outcomes %s' % (round_index, len(visited), outcomes))
             x = torch.cat((x, visited)); y = teacher_v2(x, gains)
             errors.append(fit_actor(model, x, y, args.round_steps, args.batch, args.learning_rate / 2, generator, log, args.steering_weight))
             rounds.append({'rows': len(x), 'network_outcomes': outcomes, 'mean_absolute_error': errors[-1]})
         export = args.out / 'policy-final.json'; model.export(export)
         bridge.call('load_policy', path=str(export.resolve()))
-        summaries = evaluate_sets(bridge, model, args.out, contact=args.contact_share > 0.)
+        summaries = evaluate_sets(bridge, model, args.out, contact=args.contact_share > 0., contract=contract)
     for name, summary in summaries.items():
         log('%s: %d/%d passed, parity %.2e' % (name, summary['passed'], summary['cases'], summary['max_parity']))
         for family, group in summary['by_family'].items():
             log('  %s %d/%d' % (family, group['passed'], group['cases']))
-    atomic_json(args.out / 'summary.json', {'kind': KIND, 'contract': CONTRACT, 'gains': gains, 'rounds': rounds,
+    atomic_json(args.out / 'summary.json', {'kind': KIND, 'contract': contract, 'gains': gains, 'rounds': rounds,
                                             'evaluations': summaries, 'seconds': time.monotonic() - started,
                                             'policy_sha256': sha(export)})
     (args.out / 'log.txt').write_text('\n'.join(log_lines) + '\n')
@@ -853,7 +927,10 @@ def main():
     p.add_argument('mode', choices=('reference', 'fit', 'evaluate'))
     p.add_argument('--bridge', default=DEFAULT_BRIDGE); p.add_argument('--out', type=Path, required=True)
     p.add_argument('--seed', type=int, default=1); p.add_argument('--workers', type=int, default=8)
-    p.add_argument('--set', choices=('matrix', 'v1', 'cruise', 'ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb'), default='matrix')
+    p.add_argument('--set', choices=('matrix', 'v1', 'cruise', 'ground', 'falling', 'half_turn', 'drifting_turn', 'tilted_climb', 'blocked'),
+                   default='matrix')
+    p.add_argument('--contract', type=int, choices=(2, 3), default=CONTRACT,
+                   help='the motor command contract: 3 adds the advisory vector with the turn sense')
     p.add_argument('--gains', type=json.loads, default=None, help='JSON overrides of the law gains')
     p.add_argument('--synthetic', type=int, default=400_000); p.add_argument('--episodes', type=int, default=300)
     p.add_argument('--steps', type=int, default=40_000); p.add_argument('--batch', type=int, default=4096)

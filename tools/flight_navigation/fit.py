@@ -164,15 +164,20 @@ def fit(model, x, y, meta, steps, batch, learning_rate, generator, log=print):
     return error_summary(model, x, y, meta)
 
 
-def evaluate(bridge, model, rows, directory, log=None):
-    """Closed-loop evaluation of the loaded network with native/Python parity on each task's first observation."""
+def evaluate(bridge, model, rows, directory, log=None, prepare=None):
+    """Closed-loop evaluation of the loaded network with native/Python parity on each task's first observation; a row marked to settle is first brought to rest by `prepare`."""
     directory.mkdir(); results = []
     for row in rows:
         item = bridge.call('reset', tasks=[row['task']])['items'][0]
+        if prepare is not None and row.get('settle'):
+            item = prepare(bridge, item)
         native = bridge.call('infer_navigation', inputs=[item['inputs']])['outputs'][0]
         with torch.no_grad():
             actor = model(tensor([item]))[0][0]
-        parity = max(abs(a - b) for a, b in zip(actor.tolist(), native['latents']))
+        latents = native['latents'] + ([native['sense_latent']] if native.get('sense_latent') is not None else [])
+        if len(latents) != len(actor):
+            raise ValueError('native and Python head counts differ')
+        parity = max(abs(a - b) for a, b in zip(actor.tolist(), latents))
         if parity > PARITY_LIMIT:
             raise ValueError('native and Python inference disagree')
         decisions = 0; max_speed = 0.; outcome = None
