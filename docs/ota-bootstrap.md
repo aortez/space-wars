@@ -1,5 +1,9 @@
 # Preparing the existing Pis for OTA
 
+Run records named like `ota-<subject>-<date>` are private files kept outside
+the repository, on the owner's workstation; this document keeps their
+summaries.
+
 **Status reviewed 2026-10-18:** bootstrap is complete on the replacement Pi 5 and
 both Picades. This document retains the migration runbook and historical
 recovery evidence. The [active OTA plan](ota-updates.md#current-implementation)
@@ -36,17 +40,17 @@ Finalization archived the temporary assets and established an initial
 generation-zero recovery baseline on each, accepted by the production recovery
 service.
 **Trusted feed and signed delivery:** initial empty-feed checks established trust
-on both primary Pis ([original evidence](data/ota-owner-feed-20261017.json)).
+on both primary Pis (original evidence: `ota-owner-feed-20261017`).
 Both subsequently passed real signed installation and application-health
 rollback/quarantine ([signed trials](ota-recovery-qualification.md#physical-signed-trials-2026-10-17)).
-The second Picade's [rollout record](data/ota-second-picade-rollout-20261018.json)
+The second Picade's rollout record (`ota-second-picade-rollout-20261018`)
 covers its trust provisioning, a healthy signed generation-two install and a
 normal reboot, without the primary boards' injected failure cases.
 The latest owner-supervised publication is Nightly generation 7 / metadata
 version 8; Release remains empty. The Pi 5 runs generation 6 and the
 owner-selected second Picade generation 7; the primary Picade remains on
-generation 2 / source `5b420c9`. The [generation-6](data/ota-picade2-profile-image-20261018.json)
-and [generation-7](data/ota-picade2-review-fixes-20261018.json) second-Picade
+generation 2 / source `5b420c9`. The generation-6 (`ota-picade2-profile-image-20261018`)
+and generation-7 (`ota-picade2-review-fixes-20261018`) second-Picade
 records cover its later signed trials, normal boots and installed radio/time/OTA
 checks.
 **Remaining:** primary-Picade corrected-image rollout, the rest of the Pi 4/5
@@ -63,7 +67,7 @@ candidate quarantine on both primary Pis. Interrupted promotion and physical
 power loss remain separate qualification steps. The early generation-zero test
 is not applicable to their current signed-update state.
 
-The [2026-10-17 hardware record](data/ota-bootstrap-live-20261017.json) tracks
+The 2026-10-17 hardware record (`ota-bootstrap-live-20261017`) tracks
 the initial run; follow-up records appear below. That Picade run completed raw,
 data/configuration and original-file backups with independently verified
 workstation exports, plus the fixed fallback file replacements and independent
@@ -85,9 +89,9 @@ early watchdog was followed by an automatic reset and return to original slot A.
 The corrected runtime passed that check in a second trial, which then failed
 its kiosk state-write check and returned to slot A. Both consumed attempts and
 their recovery copies are retained. See the
-[first replacement trial record](data/ota-pi5-replacement-bootstrap-20261017.json)
-and [second trial record](data/ota-pi5-corrected-bootstrap-20261017.json). The
-[third attempt](data/ota-pi5-bootstrap-success-20261017.json), using the clean
+first replacement trial record (`ota-pi5-replacement-bootstrap-20261017`)
+and second trial record (`ota-pi5-corrected-bootstrap-20261017`). The
+third attempt (`ota-pi5-bootstrap-success-20261017`), using the clean
 `e986718` image, completed the migration and recovery handoff described below.
 
 ### Replacement Pi 5 USB drive
@@ -226,7 +230,7 @@ recovery baseline. That attempt must never be reset or activated again.
 
 ### Explicit failed-attempt reconciliation and corrected image
 
-The [reconciliation record](data/ota-pi5-failed-trial-reconciliation-20261017.json)
+The reconciliation record (`ota-pi5-failed-trial-reconciliation-20261017`)
 retains the exact consumed journal and all recovery copies. A device-specific
 operator procedure required the unchanged fallback boot, original board and
 mount identities, the shared installation lock, stopped runtime writers, and
@@ -245,7 +249,7 @@ journal's bytes and all prior backups. Root slots, normal configuration, later
 user data and fallback replacement scratch files were untouched. Both runtime
 services restarted successfully without a reboot.
 
-The [corrected image record](data/ota-corrected-bootstrap-image-20261017.json)
+The corrected image record (`ota-corrected-bootstrap-image-20261017`)
 binds the clean `a05944b` source to frozen Pi 4/Picade and Pi 5/HyperPixel packages.
 All 6,768 Yocto tasks succeeded, with 6,738 reused. Independent candidate
 inspection verified the image, embedded build inputs and compiler policy. An
@@ -258,7 +262,7 @@ it did not reuse the archived attempt's activation allowance.
 
 ### Second trial and the health-worker capability correction
 
-The [second trial record](data/ota-pi5-corrected-bootstrap-20261017.json) binds the
+The second trial record (`ota-pi5-corrected-bootstrap-20261017`) binds the
 new attempt to the `a05944b` image and its fresh raw, data and original-file
 preservation receipts. The 18,751-entry data archive was independently exported
 and checked for contents, modes, links and timestamps. Numeric owners remain in
@@ -312,7 +316,7 @@ or reactivated.
 
 ### Successful Pi 5 bootstrap and recovery handoff
 
-The [success record](data/ota-pi5-bootstrap-success-20261017.json) binds the
+The success record (`ota-pi5-bootstrap-success-20261017`) binds the
 completed migration to clean source `e986718`. All 6,768 Yocto tasks succeeded,
 with 6,734 reused. Independent candidate inspection accepted the image, embedded
 build inputs and compiler policy. The recovery unit extracted from the actual
@@ -376,7 +380,7 @@ appears below; physical failure qualification remains separate.
 
 ### Primary Picade bootstrap
 
-The [Picade hardware record](data/ota-picade-bootstrap-success-20261017.json)
+The Picade hardware record (`ota-picade-bootstrap-success-20261017`)
 captures the completed migration and recovery handoff on `sw-picade.local`. It
 used the same clean `e986718` image and frozen Pi 4 package as the successful
 Pi 5 run. No image was rebuilt. The board, PNY USB drive, layout, original slot A
@@ -636,7 +640,7 @@ predate the bootstrap runtime and preservation checks and are rejected by the
 current package checker. Clean source `04b6cb7` now has a protocol-5 Yocto image
 and schema-3 kits for both freshly flashed devices, targeting slot B. Those
 artifacts include the corrected watchdog kernel and SSH admission fixes.
-The [live preservation record](data/ota-bootstrap-live-20261017.json) records
+The live preservation record (`ota-bootstrap-live-20261017`) records
 their use and the hardware limitations; neither kit is a signed OTA release.
 
 ## Root package check and preparation reservation
@@ -1490,7 +1494,7 @@ privileged initialization request. Static image ownership/dependency checks and
 `systemd-analyze verify` pass; this does not establish live service sandbox or
 reboot behavior. The Pi 5's boot ID, all 101 boot files, physical layout, kernel
 and hardware profile remain unchanged.
-[Source, artifact and device evidence](data/ota-network-preservation-20261015.json)
+Source, artifact and device evidence (`ota-network-preservation-20261015`)
 records this checkpoint. Existing bootstrap kits built from `514264c` contain
 the earlier manager; they do not acquire this behavior from the new source tree.
 
@@ -1718,7 +1722,7 @@ admission rechecks the actual filesystems.
 The exact packaged manager loaded on both Pis and rejected `prepare`, `activate`
 and `finish` as UID 1000 before installed-path access. Both boot IDs stayed
 unchanged. No package was installed, and no live boot/data/credential changes,
-watchdog operation or reboot occurred. [Clean runtime and kit evidence](data/ota-bootstrap-image-20261015.json)
+watchdog operation or reboot occurred. Clean runtime and kit evidence (`ota-bootstrap-image-20261015`)
 records source/layer revisions, artifact and bundle hashes, device observations,
 audit commands and remaining live gates. Root connection details, independent
 backup/restore checks and supervised migration remain pending.
@@ -1739,7 +1743,7 @@ on the Pi 5. The actual packaged manager loads there and rejects both privileged
 key commands from that account. Its boot ID and all 101 boot files remained
 unchanged. The Picade was unreachable during that run, so its package had no
 fresh live preflight. Root SSH on the Pi 5 continued to reject the existing key.
-[Source identities, artifact hashes and validation evidence](data/ota-bootstrap-20261015.json)
+Source identities, artifact hashes and validation evidence (`ota-bootstrap-20261015`)
 record those historical limits; later bootstrap records above cover the completed
 migrations using the separately provisioned owner account.
 
@@ -1759,7 +1763,7 @@ layout and all 101 boot files. No device reservation, partition write or boot
 change was performed. The real private package passed all 193 checksums and
 expanded-root round-trip validation. Root SSH still rejected the current key,
 and the Picade did not resolve.
-[Preparation validation evidence](data/ota-bootstrap-preparation-20261015.json)
+Preparation validation evidence (`ota-bootstrap-preparation-20261015`)
 records the source and image identities separately.
 
 The shared-writer refactoring at `ff78362` passed all 124 OTA tests, Clippy,
@@ -1776,7 +1780,7 @@ The 157,286,400-byte boot artifact and 520,093,696-byte clean root artifact also
 passed copy, readback, source comparison and export verification on the
 workstation, using temporary regular files and an explicitly synthetic device
 binding. The Pi 5 retained its boot ID, layout, hardware profile and all 101 boot
-files. [Raw recovery-copy validation evidence](data/ota-bootstrap-backup-20261015.json)
+files. Raw recovery-copy validation evidence (`ota-bootstrap-backup-20261015`)
 keeps these fixture results separate from the still-unperformed live backups.
 
 The data/configuration archive at `16df0be` passed all 151 OTA tests and 38
@@ -1786,7 +1790,7 @@ and actual bind-mount handling in a private namespace. All 11 new ordinary
 fixture tests passed on the Pi 5 as UID 1000; the installed-data command refused
 that account. Its boot ID remained unchanged. These tests used temporary data;
 no installed credentials were captured and no live recovery archive was made.
-[Data archive validation evidence](data/ota-data-backup-20261015.json) records
+Data archive validation evidence (`ota-data-backup-20261015`) records
 the exact binaries and scopes. The latest clean runtime image remains
 `c14c53f`; these operator examples were built separately.
 
@@ -1798,7 +1802,7 @@ The Pi 5 kit also passed the device reader with synthetic device inputs.
 All 43 bootstrap-related fixture tests passed as UID 1000 on the Pi 5 in
 60.11 seconds; its boot ID remained unchanged. The installed legacy helpers
 and sudo grants remain in place. Root SSH still rejected the current key and
-the Picade did not resolve. [Fallback-root asset evidence](data/ota-legacy-assets-20261015.json)
+the Picade did not resolve. Fallback-root asset evidence (`ota-legacy-assets-20261015`)
 records the package identities and separates these checks from live migration.
 
 Original-file preservation at `437369c` passed all 162 OTA and 38 manager tests,
@@ -1809,7 +1813,7 @@ used only temporary paths in a private namespace. All 19 selected preservation
 and mount/layout tests passed as UID 1000 on the Pi 5; the actual preparation
 command rejected that account. Its boot ID remained unchanged. These are
 fixture results, not live migration or physical power-loss qualification.
-[Original-file preservation evidence](data/ota-legacy-preservation-20261015.json)
+Original-file preservation evidence (`ota-legacy-preservation-20261015`)
 
 Restartable file replacement at `643930b` passed all 181 OTA and 38 manager
 host tests, Clippy with warnings denied, Rust 1.89 and AArch64 builds. The final
@@ -1822,7 +1826,7 @@ On Pi 5, 27 selected fixture tests passed as UID 1000, with one optional namespa
 test ignored, in 79.90 seconds. The actual replacement command refused that
 unprivileged account before installed paths were touched. Its boot ID remained
 unchanged. No live migration, service change, watchdog open, partition write
-or reboot occurred. [Replacement evidence](data/ota-legacy-replacement-20261015.json)
+or reboot occurred. Replacement evidence (`ota-legacy-replacement-20261015`)
 records the exact scope and binaries. The runtime image and schema 2 kits have
 not been rebuilt or installed by this step.
 
@@ -1833,7 +1837,7 @@ entry point rejected that UID before inspecting installed paths. The Pi's SSH
 parser accepted a temporary configuration pointing at the persistent key roles.
 Its original loaded services and sudo grants remain unchanged. This is parser
 and fixture evidence, not successful migration, host-key validation or login.
-[Access-check evidence](data/ota-legacy-access-check-20261015.json) records exact
+Access-check evidence (`ota-legacy-access-check-20261015`) records exact
 binaries, captures and the remaining live checks. It also records intermittent
 `Busy` failures from the multithreaded `cargo test` runner: unrelated test forks
 can temporarily retain flock descriptors. Local qualification uses serial tests;
@@ -1849,7 +1853,7 @@ publishing completion. They do not establish physical power-loss behavior.
 The real operator command rejected UID 1000 before opening installed paths, and
 the boot ID stayed unchanged. The privileged admission path, raw block-device
 operations and boot/hardware qualification remain unexecuted.
-[Root-install evidence](data/ota-bootstrap-root-install-20261015.json) records
+Root-install evidence (`ota-bootstrap-root-install-20261015`) records
 the exact artifacts, command outputs and remaining live gates.
 
 The first-boot runtime at `6b5a098` passed 219 OTA and 38 manager tests, 71 Yocto
@@ -1860,7 +1864,7 @@ files, synthetic health/boot evidence and a fake watchdog. Its boot ID stayed
 unchanged. The new mount-source test uses synthetic mountinfo; it does not prove
 the prepared device's systemd namespace. No new image or schema-3 kits were
 built, and no live boot staging, trial activation or recovery qualification
-occurred. [Runtime evidence](data/ota-bootstrap-runtime-20261015.json) records the
+occurred. Runtime evidence (`ota-bootstrap-runtime-20261015`) records the
 exact artifact/log hashes and the remaining migration/integration work.
 
 Boot staging at `e02f182` passed 228 OTA and 38 manager tests, Clippy, Rust 1.89,
@@ -1870,7 +1874,7 @@ interrupted preparation/publication, immutable completed trees, unchanged
 retained boot files, selected space credit and receipt admission. The actual
 staging command rejected the ordinary Pi account before installed-path admission;
 its boot ID stayed unchanged. No root staging operation, clean image build,
-one-shot activation or physical failure test occurred. [Staging evidence](data/ota-bootstrap-stage-20261015.json)
+one-shot activation or physical failure test occurred. Staging evidence (`ota-bootstrap-stage-20261015`)
 records the exact artifacts, logs and remaining hardware/integration limits.
 
 One-shot activation at `1aed0da` passed 233 OTA and 39 manager tests, 71 Yocto
@@ -1881,7 +1885,7 @@ fixture also passed on Pi 5 in 0.80 seconds, covering the successful sequence an
 13 failure cases. The real activation command rejected UID 1000 before parsing
 digests or accessing installed paths; the boot ID stayed unchanged. This was
 temporary-file/private-bus testing, not live system-bus or reboot qualification.
-[Activation evidence](data/ota-bootstrap-activation-20261015.json) records exact
+Activation evidence (`ota-bootstrap-activation-20261015`) records exact
 artifacts/logs and the remaining root-access, migration and integration work.
 
 Canonical migration at `48acde7` was validated with 247 OTA and 40 manager tests,
@@ -1889,7 +1893,7 @@ Canonical migration at `48acde7` was validated with 247 OTA and 40 manager tests
 14 migration fixtures passed on host ext4 in 84.17 seconds and Pi 5 in 107.10
 seconds; the private normal-reboot D-Bus test passed on Pi 5 in 0.10 seconds.
 Both real canonical commands rejected UID 1000 before digest parsing or installed
-paths, with an unchanged boot ID. [Canonical migration evidence](data/ota-bootstrap-canonical-20261015.json)
+paths, with an unchanged boot ID. Canonical migration evidence (`ota-bootstrap-canonical-20261015`)
 records the validation order, exact binaries/logs, retained fallback guarantees
 and outstanding cleanup, production provisioning and physical qualification.
 These temporary fixtures exercised no live boot files, system bus or reboot.
@@ -1899,7 +1903,7 @@ Finalization at `00d4bce` was validated with 256 OTA and 40 manager tests,
 33 retirement, handoff and recovery fixtures passed on host ext4 in 197.17 seconds
 and on Pi 5 as UID 1000 in 308.82 seconds. All three real canonical commands
 rejected that account before digest parsing or installed-path access; the boot
-ID stayed unchanged. [Finalization evidence](data/ota-bootstrap-finish-20261015.json)
+ID stayed unchanged. Finalization evidence (`ota-bootstrap-finish-20261015`)
 records exact logs and artifacts, validation order, and the protocol-4 bootstrap /
 protocol-2 recovery contract. These checks used temporary files; live FAT cleanup,
 production provisioning and hardware qualification remain outstanding.
