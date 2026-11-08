@@ -120,11 +120,23 @@ pub enum Phase {
     Aborted,
 }
 
+/// Bytes of the inactive root written so far and the image total. The native
+/// writer reports them during its write and flush stages; other phases carry
+/// no byte counts and the panel shows an indeterminate activity bar.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Written {
+    pub bytes: u64,
+    pub total: u64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Status {
     pub phase: Phase,
     pub ticket: Option<Ticket>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub written: Option<Written>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -222,6 +234,11 @@ impl Message for ServiceReply {
         }
         if let Some(ticket) = &self.status.ticket {
             ticket.validate()?;
+        }
+        if let Some(written) = &self.status.written
+            && (written.bytes > written.total || self.status.ticket.is_none())
+        {
+            return Err(Error::Invalid);
         }
         if let Some(offer) = &self.offer {
             offer.validate()?;

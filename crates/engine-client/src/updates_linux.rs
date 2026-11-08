@@ -351,6 +351,9 @@ struct Panel {
     active: Option<Ticket>,
     busy: bool,
     awaiting: bool,
+    /// The service phase the panel last showed as work in progress; it keeps
+    /// the activity bar visible between status polls and clears on outcomes.
+    working: Option<Phase>,
     last_poll: Instant,
     generation: u64,
 }
@@ -369,6 +372,7 @@ impl Panel {
         self.generation += 1;
         self.busy = false;
         self.awaiting = false;
+        self.working = None;
         self.opening = false;
         self.offer = None;
         self.active = None;
@@ -403,6 +407,7 @@ pub(crate) fn install(
                     status: Status {
                         phase: Phase::Unavailable,
                         ticket: None,
+                        written: None,
                     },
                     offer: None,
                     aborted: None,
@@ -523,6 +528,7 @@ fn start(
         active: None,
         busy: false,
         awaiting: false,
+        working: None,
         last_poll: Instant::now(),
         generation: 0,
     }));
@@ -584,6 +590,7 @@ fn start(
         );
         p.awaiting = p.busy;
         if p.busy {
+            p.working = Some(Phase::Preparing);
             w.set_updates_can_confirm(false);
             w.set_updates_message("Preparing installation…".into());
         }
@@ -697,6 +704,7 @@ fn start(
                         w.set_updates_can_confirm(false);
                         w.set_updates_can_cancel(!w.get_install_fenced());
                     } else if let Some(offer) = reply.offer {
+                        p.working = None;
                         w.set_updates_message(
                             format!(
                                 "{:?} · generation {}\n{}\nImage {}\n\n{}",
@@ -723,6 +731,7 @@ fn start(
                         w.set_updates_can_confirm(true);
                         p.offer = Some(offer);
                     } else if let Some(error) = reply.error {
+                        p.working = None;
                         w.set_updates_can_confirm(false);
                         w.set_updates_message(if w.get_install_fenced() {
                             "Waiting for the device service. The app remains held for installation."
@@ -734,11 +743,14 @@ fn start(
                         && reply.status.ticket.as_ref() == p.ticket()
                         && let Some(message) = progress_message(reply.status.phase)
                     {
-                        w.set_updates_message(message.into());
+                        p.working = Some(reply.status.phase);
+                        w.set_updates_message(progress_text(message, &reply.status).into());
+                        w.set_updates_progress(progress_fraction(&reply.status));
                         w.set_updates_can_confirm(false);
                     }
                 }
                 Err(_) => {
+                    p.working = None;
                     w.set_updates_can_confirm(false);
                     w.set_updates_message(
                         if w.get_install_fenced() {
@@ -756,8 +768,14 @@ fn start(
                 .as_ref()
                 .is_some_and(|offer| now >= offer.expires_ms)
         {
+            p.working = None;
             w.set_updates_can_confirm(false);
             w.set_updates_message(failure_message(Failure::Expired).into());
+        }
+        // The bar stays up between polls and sweeps until the writer reports bytes.
+        w.set_updates_busy(p.working.is_some());
+        if p.working.is_none() {
+            w.set_updates_progress(-1.0);
         }
         if let Some(recovery) = &mut recovery {
             recovery.tick(&w, host.borrow_mut().as_mut(), &mut p, &commands);
@@ -816,6 +834,29 @@ fn progress_message(phase: Phase) -> Option<&'static str> {
         Phase::RecoveryRequired => "Installation stopped. Waiting for a recovery decision…",
         _ => return None,
     })
+}
+
+/// The bar's fill from the writer's byte counts; -1 keeps it indeterminate.
+fn progress_fraction(status: &Status) -> f32 {
+    match (status.phase, status.written) {
+        (Phase::Writing | Phase::Flushing, Some(written)) if written.total > 0 => {
+            (written.bytes as f64 / written.total as f64).clamp(0.0, 1.0) as f32
+        }
+        _ => -1.0,
+    }
+}
+
+/// The phase message with the written megabytes and percentage while writing.
+fn progress_text(message: &str, status: &Status) -> String {
+    match (status.phase, status.written) {
+        (Phase::Writing, Some(written)) if written.total > 0 => format!(
+            "{message}\n{} of {} MB written ({}%)",
+            written.bytes / 1_000_000,
+            written.total.div_ceil(1_000_000),
+            written.bytes * 100 / written.total
+        ),
+        _ => message.to_owned(),
+    }
 }
 
 fn failure_message(error: Failure) -> &'static str {

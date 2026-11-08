@@ -103,6 +103,9 @@ impl Native {
                     WriteStage::CheckingFilesystem => Phase::CheckingFilesystem,
                     WriteStage::Prepared => Phase::CheckingFilesystem,
                 });
+                if matches!(progress.stage, WriteStage::Writing | WriteStage::Flushing) {
+                    admission.written(progress.bytes, progress.total);
+                }
                 if last_renewal.elapsed() >= Duration::from_secs(30) {
                     last_renewal = Instant::now();
                     if super::hold::renew(&token).is_err() {

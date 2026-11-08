@@ -73,6 +73,13 @@ impl Admission {
             state.progress = Some(phase);
         }
     }
+    /// Bytes the writer has put on the inactive root, for the panel's bar.
+    pub fn written(&self, bytes: u64, total: u64) {
+        let mut state = self.state.lock().unwrap();
+        if matches!(&state.state, State::Consumed(t) if t == &self.ticket) {
+            state.written = Some(spacewars_control::install::wire::Written { bytes, total });
+        }
+    }
     pub fn stopped(&self) -> bool {
         self.stop.load(Ordering::Relaxed)
     }
@@ -200,6 +207,7 @@ impl Runtime {
                     if settled && matches!(state.state, State::Consumed(_)) {
                         state.state = State::Idle;
                         state.progress = None;
+                        state.written = None;
                     }
                     let mut offer = None;
                     if context.is_err() {
@@ -248,6 +256,7 @@ impl Runtime {
                             && matches!(state.state, State::Consumed(_))
                         {
                             state.progress = Some(Phase::RecoveryRequired);
+                            state.written = None;
                         }
                     }
                 }
@@ -287,6 +296,7 @@ fn reply(state: &Coordinator, error: Option<Failure>, enabled: bool) -> ServiceR
         Status {
             phase: Phase::Unavailable,
             ticket: None,
+            written: None,
         }
     };
     let aborted = if status.phase == Phase::Aborted {

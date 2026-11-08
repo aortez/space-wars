@@ -302,3 +302,47 @@ fn service_incarnations_cannot_overwrite_retired_ticket_history() {
     );
     assert!(!gate.fenced());
 }
+
+#[test]
+fn written_counts_round_trip_and_cannot_exceed_the_total_or_lack_a_ticket() {
+    let ticket = request().ticket;
+    let mut reply = wire::ServiceReply {
+        schema: SCHEMA,
+        error: None,
+        status: wire::Status {
+            phase: wire::Phase::Writing,
+            ticket: Some(ticket.clone()),
+            written: Some(wire::Written {
+                bytes: 300,
+                total: 1000,
+            }),
+        },
+        offer: None,
+        aborted: None,
+    };
+    reply.validate().unwrap();
+    let json = serde_json::to_string(&reply).unwrap();
+    assert!(json.contains("\"written\":{\"bytes\":300,\"total\":1000}"));
+    let decoded: wire::ServiceReply = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded.status.written, reply.status.written);
+    // A reply without counts still decodes, and none are written back out.
+    let plain: wire::ServiceReply =
+        serde_json::from_str(&json.replace(",\"written\":{\"bytes\":300,\"total\":1000}", ""))
+            .unwrap();
+    assert_eq!(plain.status.written, None);
+    assert!(!serde_json::to_string(&plain).unwrap().contains("written"));
+    reply.status.written = Some(wire::Written {
+        bytes: 1001,
+        total: 1000,
+    });
+    assert_eq!(reply.validate(), Err(Error::Invalid));
+    reply.status = wire::Status {
+        phase: wire::Phase::Idle,
+        ticket: None,
+        written: Some(wire::Written {
+            bytes: 0,
+            total: 1000,
+        }),
+    };
+    assert_eq!(reply.validate(), Err(Error::Invalid));
+}
