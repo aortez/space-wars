@@ -255,12 +255,12 @@ impl AsteroidPressure {
         // It never reads a ship, spaceling, flag or selected landing site.
         let aim = planet.position
             + tangent * random_range_f32(&mut rng, -planet.radius - 110.0, planet.radius + 110.0);
-        let (min_radius, max_radius, min_speed, max_speed) = match o.settings.severity {
-            MaterialAsteroidSeverity::Light => (1.5, 2.5, 25.0, 60.0),
-            MaterialAsteroidSeverity::Mixed => (2.0, 4.0, 40.0, 120.0),
-            MaterialAsteroidSeverity::Heavy => (3.0, 5.0, 80.0, 160.0),
+        let (scale, min_speed, max_speed) = match o.settings.severity {
+            MaterialAsteroidSeverity::Light => (DebrisScale::LIGHT, 25.0, 60.0),
+            MaterialAsteroidSeverity::Mixed => (DebrisScale::NATURAL, 40.0, 120.0),
+            MaterialAsteroidSeverity::Heavy => (DebrisScale::HEAVY, 80.0, 160.0),
         };
-        let radius = random_range_f32(&mut rng, min_radius, max_radius);
+        let radius = scale.radius(&mut rng);
         let velocity =
             (aim - position).normalized() * random_range_f32(&mut rng, min_speed, max_speed);
         let mut asteroid = DebrisState::new(
