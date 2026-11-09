@@ -9,8 +9,12 @@ The device CLI exposes the same exact-ticket offer, confirmation, cancellation
 and status operations without granting a separate installation authority.
 The native manual writer is connected to these gates. Installation remains
 **unavailable on unqualified devices**: ordinary recovery admission requires
-retained, owner-approved physical evidence, and no device approval has been
-provisioned. There is no runtime switch to bypass that gate.
+retained, owner-approved physical evidence. All three units have carried
+published approvals since 2026-10-27 and 2026-10-28, renewed after each medium
+or kernel change, and the panel has installed Release generation 20 on both
+household units (2026-10-30), generation 25 on the living room (2026-11-07) and
+Nightly generations 20 and 24 to 26 on `sw-picade-2`. There is no runtime
+switch to bypass that gate.
 
 The contract lives in
 [`spacewars-control::install`](../crates/spacewars-control/src/install.rs) and
@@ -379,14 +383,18 @@ image update, not copying just the service executable onto an older image.
 
 ## Integration still required
 
-Complete the physical recovery matrix and owner approval, then qualify the
-coordinated image's systemd permissions, actual DRM presentation, write/readback,
-trial commit/rollback, worker failure and service/app restart on the device.
-Include UI and CLI confirmations, explicit game termination, cancellation and lost
-CLI replies. Local socket/Slint tests do not replace those checks.
+The physical recovery matrix and owner approval are complete
+([recovery qualification](ota-recovery-qualification.md)), and the coordinated
+image's permissions, presentation, write/readback, trial commit and confirming
+reboot have run on the devices through UI and CLI confirmations. Still
+unexercised on hardware: worker failure, service or app restart during an
+install, explicit game termination, cancellation of a live offer or
+preparation, rollback of a panel install and lost CLI replies. Local
+socket/Slint tests do not replace those checks.
 
-Ask/Automatic preferences and overnight admission follow this manual path; they
-must reuse the same writer, locks, recovery and final app handoff.
+Ask/Automatic preferences and overnight admission are not implemented. They
+follow this manual path and must reuse the same writer, locks, recovery and
+final app handoff.
 
 ## Validation scope
 

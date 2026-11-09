@@ -11,96 +11,93 @@ outside this update path; incompatible boot assets require a supervised upgrade.
 
 ## Current implementation
 
-Status reviewed **2026-10-25**. This section is the active OTA plan; the detailed
-implementation and dated experiments below retain their original source and
-device scope. A past experiment's “not installed” or “remaining” statement is
-not the current fleet status. Do not replay a retained operator script without
-rechecking its source, device identity and current transaction state.
+Status reviewed **2026-11-08**. This section is the active OTA plan; the dated
+sections below retain their original source and device scope. A past
+experiment's "not installed" or "remaining" statement is not the current fleet
+status. Do not replay a retained operator script without rechecking its source,
+device identity and current transaction state.
 
-`crates/engine-ota` implements the shared verification and image eligibility
-contract for [#261](https://github.com/aortez/space-wars/issues/261), plus the
-recovery journal, Linux boot adapters and verified inactive-root writer. It is
-not an enabled automatic updater. Both primary Pis have now installed real
-owner-signed Nightly images and passed application-health rollback/quarantine and
-successful normal-boot checks. Automated publishing, installation-service/policy
-integration and the remaining physical failure/performance qualification are
-outstanding. See the [physical signed trials](ota-recovery-qualification.md#physical-signed-trials-2026-10-17).
+All three units take signed root filesystem updates through the same path.
+`crates/engine-ota` holds the shared verification and image-eligibility
+contract, the recovery journal, the Linux boot adapters and the verified
+inactive-root writer; `engine-os-manager` is the device service with the time,
+network, download and install coordinators. The service checks the feed shortly
+after boot and then daily, downloads the newest eligible image for the unit's
+channel, and the Updates panel offers it. The owner's Install press writes the
+inactive slot through the verified writer, the unit trial-boots the candidate,
+the recovery service confirms its health and commits, and since #600 the
+service reboots into the normal boot by itself. A failed trial returns to the
+good image and quarantines the candidate. Installation is admitted only on a
+unit with a published recovery approval bound to its board, medium, boot set
+and kernel ([recovery qualification](ota-recovery-qualification.md)). Automatic
+installation does not exist yet: every install is a press, and downloads are
+the only unattended step.
 
-`engine-os-manager` contains the independent time/status service for
-[#256](https://github.com/aortez/space-wars/issues/256), plus a separate network
-coordinator and scheduled download worker, described below. Its local APIs expose
-bounded time/update checks, channel selection and network policy. Installation,
-reboot and arbitrary-command operations are not exposed. The freshly flashed
-kiosks run the device service; public OTA trust and signed staging have been
-verified on all three units, while automatic installation remains disabled. The
-failed Pi 5 USB drive was replaced with verified data restoration. The
-replacement Pi 5 (`ota-pi5-bootstrap-success-20261017`),
-primary Picade (`ota-picade-bootstrap-success-20261017`) and
-second Picade (`ota-second-picade-rollout-20261018`) have completed
-supervised bootstrap through the initial recovery baseline. All three passed trial,
-staged normal and canonical normal boots, independent archive verification and
-production recovery-service checks. See the [bootstrap status](ota-bootstrap.md)
-for preservation, hardware evidence and the remaining rollout gates.
+Publication is owner-local. Each Nightly generation is built on the workstation
+from the selected `main` commit in the pinned kas container, qualified against
+that commit's passing CI run, prepared, reviewed and signed with pinned drivers,
+and published by the owner. A Release promotion signs the same payload under
+the Release role against a local qualification record. The feed's timestamp is
+renewed weekly by the owner. The scheduled image workflow has never completed a
+hosted build; see [Publication](#publication) below.
 
-### Latest qualified state
+### Fleet and feed state
 
-The current installed image on the owner-selected second Picade is
-`ebf0081175545f0af723d6e320e5693886b81462`, signed generation 12, on normal slot B.
-The offline kiosk-hang record (`ota-picade2-kiosk-hang-20261024`) observes
-automatic fallback from generation 13, one quarantined attempt and preservation
-through a separate normal boot. The original host observer failed; an explicitly
-authorized read-only diagnostic established return within 249.329 seconds, and
-the record retains both host corrections and the observation gap. No physical
-installation approval was granted. The subsequent
-repeated-failure record (`ota-picade2-repeated-failure-20261024`) consumed
-the single explicit retry, observed return within 191.705 seconds and retained
-both attempts through another normal boot. Ordinary selection and a third retry
-were refused after the updater became idle. Generation 13 has no remaining
-attempt. The subsequent software-reset record (`ota-picade2-trial-reset-20261025`)
-uses signed generation 14 from merged main `c68b21063f0b`. One early reset was
-acknowledged at 19.524 seconds of trial uptime; normal generation 12/B was observed
-29.475 seconds after invocation. The `trial-reset` quarantine survived a separate
-offline normal boot, and ordinary reselection was refused after WAN restoration.
-The subsequent kiosk-crash record (`ota-picade2-kiosk-crash-20261025`)
-consumed generation 14's sole explicit retry. Five verified process crashes
-prevented continuous trial health; automatic return to generation 12/B was
-observed 189.919 seconds after series invocation. The exact health-timeout
-quarantine survived another offline normal boot, and a third attempt was refused
-after WAN restoration. Both generations 13 and 14 are exhausted; the device
-remains on generation 12. Six of eleven physical cases now have observations on
-this binding; five cases and owner review remain before approval.
+| Unit | Medium and kernel | Image | Channel | Latest records |
+| --- | --- | --- | --- | --- |
+| `spacewars.local`, Pi 5 / HyperPixel | 32 GB SD card since 2026-11-07, Linux 6.12 | Release generation 25 on a normal boot | Release | `ota-pi5-sd-bootstrap-20261107`, `ota-pi5-generation25-install-20261107`, `ota-pi5-generation25-normal-reboot-20261108` |
+| `sw-picade.local`, primary Pi 4 / Picade | 32 GB SD card since 2026-11-07, Linux 6.12 | The generation 25 image as its generation-zero baseline | Release | `ota-picade-sd-bootstrap-20261107` |
+| `sw-picade-2.local`, second Pi 4 / Picade | 32 GB SD card since 2026-11-02, Linux 6.12 since 2026-11-06 | Nightly generation 26 on a normal boot | Nightly | `ota-picade2-sd-approval-20261103`, `ota-picade2-kernel612-upgrade-20261106`, `ota-picade2-generation26-install-20261108` |
+| Owner feed | Metadata version 33 | Release: generations 26, 25, 20 and 18; Nightly: generations 1 to 26 | | `ota-release-generation26-20261108` |
 
-The earlier generation-10 source
-`44c3647657964600fdd7e21195a5d9356466b8be` retains separate SSH coverage. The
-SSH qualification record (`ota-ssh-storage-qualification-20261023`)
-binds its committed slot-B trial, installed binaries, 384 fresh logins over
-fifteen minutes, forty unauthenticated connections and installed refusal logs.
-Implementation #526 and evidence #529 are merged; #523 is closed. A normal
-generation-10 boot and automatic payload staging were not tested in that run.
-These remain supervised results, not unattended rollout qualification.
+Release rollout so far:
 
-The earlier generation-7 review-fix record (`ota-picade2-review-fixes-20261018`)
-and the generation-8 rfkill qualification record (`ota-rfkill-qualification-20261022`),
-written up under [Second Picade bounded-readback qualification](#second-picade-bounded-readback-qualification-2026-10-22),
-retain their exact sources and separate restart/radio/time/OTA scope. #511 is
-closed after the generation-8 qualification.
-The generation-6 Pi 5 record (`ota-profile-image-20261018`) and
-earlier second-Picade record (`ota-picade2-profile-image-20261018`) retain
-their original source `0a32db2` and scope.
+- **2026-10-27:** generation 18 promoted as the first Release target
+  (`ota-release-generation18-20261027`) after the recovery approval bundle and
+  the Pi 5's supervised install from generation 6
+  (`ota-pi5-generation18-20261027`). The Picades followed on 2026-10-28
+  (`ota-picade2-generation18-install-20261028`,
+  `ota-picade-generation18-20261028`).
+- **2026-10-28:** generation 20 promoted (`ota-release-generation20-20261028`)
+  after the first Updates-panel install, pressed on the `sw-picade-2` cabinet.
+  Both household units downloaded it by themselves on 2026-10-29, the first
+  observed daily-timer delivery (`ota-release-generation20-downloads-20261029`),
+  and installed it from the Updates panel on 2026-10-30
+  (`ota-release-generation20-installs-20261030`).
+- **2026-11-07:** generation 25, the first 6.12 Release image, promoted after
+  the SD card moves (`ota-release-generation25-20261107`); `spacewars.local`
+  installed it from the panel the same evening.
+- **2026-11-08:** generation 26 promoted (`ota-release-generation26-20261108`)
+  with the Updates-screen activity bar (#598), the confirming normal reboot
+  (#600) and the Install cursor lock (#601), after its Nightly install on
+  `sw-picade-2`. The household units take it from their next check with the
+  owner's press.
 
-| Device or feed | Latest recorded state | Next qualification |
-| --- | --- | --- |
-| `spacewars.local`, Pi 5 / HyperPixel | Source `0a32db2`, signed Nightly generation 6; healthy trial/normal boot and radio/time/OTA cycles | Review-fix image rollout, actual daily timer, payload/gameplay checks, integrated install policy |
-| `sw-picade.local`, primary Pi 4 / Picade | Source `5b420c9`, good generation 2; healthy game/recovery, update preparation failing; candidate provider/SSH controls passed | Corrected-image rollout and installed startup/radio/time/OTA checks |
-| `sw-picade-2.local`, second Pi 4 / Picade | Source `ebf00811`, good generation 12 on normal B; generation 13 exhausted after offline hang/repeated-failure tests, generation 14 exhausted after offline software-reset/kiosk-crash tests; both retained through normal boots; Release selected, partial offline off | Remaining five physical cases and owner review; a new eligible payload is required for another fault trial; actual daily timer and payload/gameplay performance remain separate |
-| Owner feed | Fourteen supervised Nightly generations, metadata version 15; Release targets remain empty | Protected automated publishing, renewal and explicit Release promotion |
+Nightly generations 21 to 23 never committed on `sw-picade-2`: a failing USB
+stick, a device-service disk permission (#584) and a 6.6 kernel shutdown race
+on the SD card, fixed by the move to 6.12. Generations 24 to 26 committed from
+the panel on 2026-11-07 and 2026-11-08
+(`ota-picade2-generation24-install-20261107`,
+`ota-picade2-generation25-install-20261107`,
+`ota-picade2-generation26-install-20261108`).
 
-The earlier time-wake experiments used the real `sync-now` API, and OTA joined
-automatically. They did not observe the daily timer. The already-current image
-was ineligible, so those cycles downloaded or installed no new payload. Publication
-and installation automation remain disabled. The selected device was returned
-to Release with partial offline disabled; the other two units were not accessed
-or changed during the generation-10 qualification.
+### Publication
+
+The owner-local drivers (`prepare`, `sign`, `publish`) live beside each
+generation's evidence on the workstation and pin the source commit, the CI
+run, the payload digest, the publisher state they were prepared against, and
+the tools and modules they run. Prepare and sign use a read-only GitHub client;
+publish is the owner's command. The workstation build reuses its warm Yocto
+state and takes about ten minutes.
+
+The hosted [image workflow](../.github/workflows/ota-build.yml) builds the
+same unsigned candidate on a standard runner at 02:23 UTC. It has not completed
+a build in any of its runs since 2026-10-18: a cold Yocto build on four cores
+with 12 GiB either exceeds its 330-minute limit or fails compiling
+`engine-client` after four and a half hours. No published generation came from
+it, and its artifacts were never needed because signing is an owner action
+either way. The open question is whether to drop the schedule or give it a
+runner that can finish.
 
 ### Review corrections and next network gate
 
@@ -165,57 +162,48 @@ partial-offline rollout behind the remaining #267 gates.
 
 ### Remaining work and ownership
 
-Completed bootstrap and signed-delivery evidence remains valid within its
-recorded scope; neither needs to be repeated merely to restart this plan.
-New image changes and previously untested failure cases still need qualification.
+Completed bootstrap, approval and signed-delivery evidence remains valid within
+its recorded scope; none of it needs repeating to continue this plan. New image
+changes and the accepted-risk failure cases still need qualification when a
+test unit and a fresh candidate are available.
 
-| Issue | Integration required |
+| Issue | State |
 | --- | --- |
 | #256 | Corrected installed time service verified after signed update and normal boot on both primary Pis; broader provider and RTC retention qualification remain |
 | #258–#260 | Native off/time-wake/automatic-OTA/off cycle and SSH controls passed on Pi 5 and the selected second Picade; expected setup profile changes and remaining per-device rollout remain |
-| #261 | Shared metadata/image contract and verification fixtures implemented and used by the supervised path; retain those checks through normal service integration |
-| #262 | Owner-local publication, admission checks and durable journal/readback implemented; daily CI builds unsigned candidates; protected automatic signing/publication, renewal and Release promotion remain |
-| #263 | Earlier signed trials retain their Pi 5/primary-Picade scope; the second Picade now has offline kiosk-hang/repeated-failure, software-reset and kiosk-crash rollback, quarantine through normal boots and exhausted-retry refusal, with documented earlier observation/close-out deviations. Remaining startup/service failures, watchdog, interrupted promotion and power-loss coverage still need qualification |
-| #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; bounded install-service sockets and candidate-bound app handoff implemented with the writer disabled; native writer integration and remaining physical maintenance/data checks remain |
-| #265 | Signed delivery verified; corrected startup/time-wake feed checks passed on Pi 5 and the second Picade; actual daily opportunity, new/resumed payload performance and fresh-SSH latency remain |
-| #266 | Manual Updates panel, consent, exact settings-save receipt and cancellable app handoff implemented; native progress/reconciliation, install CLI, saved Ask/Automatic policy and overnight admission/countdown remain |
-| #267 | Complete the Pi 4/5 failure/channel/mode/performance matrix, primary-Picade corrected-image rollout and operator documentation; retain exact pre-update settings for migration comparisons |
+| #261 | Shared metadata/image contract and verification fixtures in use by every publication and install; retain those checks through further service integration |
+| #262 | Owner-local publication in use: 26 Nightly generations and four Release promotions prepared, reviewed and signed with pinned drivers and published by the owner; the weekly timestamp renewal is the owner's command; the hosted candidate workflow has never completed a build, and automatic signing is not pursued while signing stays an owner action |
+| #263 | The 2026-10-27 approval bundle holds all eleven case reports: seven observed passes, two reviewed from earlier observations, interrupted promotion as owner-accepted risk and power loss as a partial observation plus accepted risk; the confirming normal reboot (#600) was observed on 2026-11-08 |
+| #264 | Native writer connected and in routine use from the Updates panel on all three units; development installs (#566) implemented but not yet enabled on `sw-picade-2`; cancellation, worker failure, lost CLI replies, rollback of a panel install and service or app restart during an install remain untested on hardware |
+| #265 | Daily checks and downloads run unattended on all three units and delivered Release generation 20 by themselves on 2026-10-29; download impact on gameplay and resumed downloads remain unmeasured |
+| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the saved Ask/Automatic setting, overnight window, idle wait, countdown and postponement are not implemented |
+| #267 | All three units run 6.12 from SD cards with published approvals and take Release or Nightly through the panel; the remaining physical cases are accepted risk under the run-once rule; these pages are the operator documentation |
 
 ### Next implementation sequence
 
-1. The selected-Pi network gate is complete: #511's readback qualification and
-   #523's SSH/storage qualification passed, and the generation-8 record is
-   written up in this document; per-device corrected-image rollout remains
-   tracked in #267.
-2. Join #264 and #266 with one manual **Install and restart** flow: exact-candidate
-   consent, app save/acknowledgement, fixed privileged install operation, progress,
-   trial and confirmed outcome. Define their shared handoff together; the
-   installer transaction belongs to #264 and user/host consent to #266.
-   The [manual handoff integration](ota-install-handoff.md) now connects bounded
-   service/app sockets, the Updates panel, exact save receipts and presentation
-   gates. The durable handoff journal now associates one-use consent with the
-   existing recovery transaction and reconciles crash boundaries in fixtures.
-   Service/app startup and outcome reconciliation now use that journal and keep
-   gameplay fenced while a decision is unavailable. Production installation
-   remains unavailable until the native writer and final admission gates are
-   connected. `BootController::plan_install` now checks retained, owner-approved
-   physical recovery evidence against the actual device/boot/kernel before
-   producing an ordinary recovery plan; no device approval has been provisioned.
-   Startup still needs device qualification with the matching service and app
-   binaries, and the remaining physical failure matrix must precede approval.
-3. Add saved Ask/Automatic settings and the overnight/idle/countdown/postponement
-   policy to that same install flow. Automatic must not be a second installer.
-4. Finish #262's protected publisher and daily metadata renewal. Tag-triggered
-   Release promotion must approve an exact already-qualified artifact; a tag
-   alone is not qualification. This work can proceed alongside device integration.
-5. Complete #267's physical interruption, full channel/mode, networking and
-   download/gameplay checks. Start Automatic Nightly on one designated test unit;
-   use Release on everyday units and expand only after recorded qualification.
-
-The scheduled [image workflow](../.github/workflows/ota-build.yml) already builds
-and validates unsigned main candidates. It does not sign, promote or trigger
-device installation. Keep the existing issue set; kernel/firmware/partition OTA
-stays in the separate, nonblocking [#268](https://github.com/aortez/space-wars/issues/268).
+1. Finish the generation 26 Release rollout. `spacewars.local` and
+   `sw-picade.local` download it at their next check and offer it on the
+   Updates panel; the owner's press installs it. The living room's install is
+   the first Pi 5 run of the confirming normal reboot, and the next install
+   made from generation 26 is the first live run of the activity bar and the
+   Install cursor lock.
+2. Enable development installs on `sw-picade-2` and make the two supervised
+   runs, one commit and one forced return
+   ([rollout](ota-development-installs.md#rollout)).
+3. Automatic installation (#266): a saved Ask/Automatic setting, the overnight
+   window, the idle wait, the countdown and postponement, reusing the manual
+   flow's writer, locks, recovery and app handoff. Pilot it on `sw-picade-2`'s
+   Nightly channel; the household units stay on Release and Ask.
+4. Publication (#262): decide the hosted image workflow, which has never
+   completed a build, by dropping its schedule or giving it a runner that can
+   finish. Signing and publishing stay owner actions, and the weekly renewal
+   stays the owner's command.
+5. Deferred qualification (#263, #267): interrupted promotion and the
+   promotion-boundary power cuts are accepted risk until a test unit and a
+   fresh candidate are set aside for them. Kernel, firmware and boot-asset
+   updates stay outside this path (#268); the move to 6.12 needed a supervised
+   bootstrap on every unit, so a shorter bootstrap for freshly flashed media is
+   a candidate when the next flash comes.
 
 **Agreed product policy, still to integrate:** defaults are Release and Ask
 before installing, with downloads in both modes. Automatic installation is

@@ -4,11 +4,15 @@ Run records named like `ota-<subject>-<date>` are private files kept outside
 the repository, on the owner's workstation; this document keeps their
 summaries.
 
-**Status reviewed 2026-10-18:** bootstrap is complete on the replacement Pi 5 and
-both Picades. This document retains the migration runbook and historical
-recovery evidence. The [active OTA plan](ota-updates.md#current-implementation)
-owns current device status and next steps; a fresh flash or repeated bootstrap
-is not the next action for those units.
+**Status reviewed 2026-11-08:** bootstrap is complete on all three units, twice
+over: the 2026-10-17 migrations of the original media, and the moves to 32 GB
+SD cards with the 6.12 boot set on 2026-11-02 (second Picade, with an in-place
+6.12 upgrade on 2026-11-06) and 2026-11-07 (Pi 5 and primary Picade), described
+under [SD card boot media](#sd-card-boot-media). This document retains the
+migration runbook and historical recovery evidence. The
+[active OTA plan](ota-updates.md#current-implementation) owns current device
+status and next steps; a fresh flash or repeated bootstrap is not the next
+action for those units.
 
 Device-specific commands, disk paths and scripts under `target/` below belong
 to their recorded attempts. Their identity checks, reservations and one-shot
@@ -46,19 +50,18 @@ rollback/quarantine ([signed trials](ota-recovery-qualification.md#physical-sign
 The second Picade's rollout record (`ota-second-picade-rollout-20261018`)
 covers its trust provisioning, a healthy signed generation-two install and a
 normal reboot, without the primary boards' injected failure cases.
-The latest owner-supervised publication is Nightly generation 7 / metadata
-version 8; Release remains empty. The Pi 5 runs generation 6 and the
-owner-selected second Picade generation 7; the primary Picade remains on
-generation 2 / source `5b420c9`. The generation-6 (`ota-picade2-profile-image-20261018`)
-and generation-7 (`ota-picade2-review-fixes-20261018`) second-Picade
-records cover its later signed trials, normal boots and installed radio/time/OTA
-checks.
-**Remaining:** primary-Picade corrected-image rollout, the rest of the Pi 4/5
-failure/performance matrix, normal install-service/policy integration and
-automated publishing. A successful second-Picade update does not establish its
-full deliberate-failure qualification.
-Automatic OTA installation is still disabled; a bootstrap package is not a signed
-OTA release.
+At the 2026-10-18 review the latest publication was Nightly generation 7 /
+metadata version 8 with Release empty; the Pi 5 ran generation 6, the owner-selected
+second Picade generation 7 and the primary Picade generation 2. The
+generation-6 (`ota-picade2-profile-image-20261018`) and generation-7
+(`ota-picade2-review-fixes-20261018`) second-Picade records cover its later
+signed trials, normal boots and installed radio/time/OTA checks. The fleet and
+feed state since then is in the
+[active OTA plan](ota-updates.md#fleet-and-feed-state).
+**Remaining:** none of this document's work. The primary-Picade rollout and the
+install-service integration are complete, and the rest of the failure matrix
+is tracked in the plan as accepted risk. A bootstrap package is not a signed
+OTA release, and automatic OTA installation does not exist yet.
 
 The [supervised recovery failure runner](ota-recovery-qualification.md) has now
 observed missing-root fallback on the primary Picade against this completed
