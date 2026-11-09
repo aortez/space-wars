@@ -19,6 +19,8 @@ mod tests;
 
 /// One displayed update advances this much physical time: about 68x slow motion.
 pub const PHYSICS_DT: f32 = 1.0 / 4096.0;
+/// The guided load/release case pauses here after its initial yielding phase.
+pub const YIELD_CHECKPOINT_STEP: u32 = 128;
 pub const MAX_SAVE_BYTES: u64 = 1_048_576;
 const SAVE_MAGIC: &[u8; 8] = b"MATLAB01";
 const LOAD_SAVE_MAGIC: &[u8; 8] = b"MATLAB02";
@@ -190,7 +192,7 @@ impl MaterialLabState {
             return None;
         }
         Some(
-            if self.steps < 128 && self.weight() == Load::Heavy.weight() {
+            if self.steps < YIELD_CHECKPOINT_STEP && self.weight() == Load::Heavy.weight() {
                 "Run until the wood yields; the lab will pause."
             } else if self.weight() == Load::Heavy.weight() {
                 "Release load, then Run to watch elastic recovery."
@@ -251,7 +253,7 @@ impl MaterialLabState {
                     });
                 }
                 if self.case == Case::LoadRelease
-                    && (self.steps == 128 || (separated && self.weight() == 0.0))
+                    && (self.steps == YIELD_CHECKPOINT_STEP || (separated && self.weight() == 0.0))
                 {
                     self.paused = true;
                 }
@@ -336,7 +338,9 @@ impl MaterialLabState {
         let mut commands = changes.iter().peekable();
         for step in 0..=save.steps {
             while commands.peek().is_some_and(|c| c.step == step) {
-                expected.set_load(commands.next().unwrap().load)?;
+                expected
+                    .set_load(commands.next().unwrap().load)
+                    .map_err(|_| "Invalid run history".to_string())?;
             }
             if step < save.steps {
                 expected.advance();

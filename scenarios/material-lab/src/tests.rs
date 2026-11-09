@@ -84,11 +84,11 @@ fn guided_load_release_and_return_keeps_damage_and_replays_commands() {
     assert!(s.set_load(Load::Released).is_err());
     assert_eq!(s.snapshot_bytes().unwrap(), initial);
     s.paused = false;
-    for _ in 0..128 {
+    for _ in 0..YIELD_CHECKPOINT_STEP {
         MaterialLabScenario::step(&mut s, &[], Duration::from_secs_f32(1.0 / 60.0));
     }
     assert!(s.paused);
-    assert_eq!(s.steps, 128);
+    assert_eq!(s.steps, YIELD_CHECKPOINT_STEP);
     assert!(s.summary().damage_work > 0.0);
     assert_eq!(s.impacts, 1);
     let yielded = s.summary();
@@ -142,6 +142,18 @@ fn guided_load_release_and_return_keeps_damage_and_replays_commands() {
     let terminal = s.snapshot_bytes().unwrap();
     assert!(s.set_load(Load::Heavy).is_err());
     assert_eq!(s.snapshot_bytes().unwrap(), terminal);
+    let (save, mut commands): (Save, Vec<LoadChange>) =
+        codec().deserialize(&terminal[8..]).unwrap();
+    commands.push(LoadChange {
+        step: s.steps,
+        load: Load::Heavy,
+    });
+    let mut bad = LOAD_SAVE_MAGIC.to_vec();
+    bad.extend(codec().serialize(&(save, commands)).unwrap());
+    assert_eq!(
+        MaterialLabState::from_snapshot_bytes(&bad).err().as_deref(),
+        Some("Invalid run history")
+    );
 }
 
 #[test]

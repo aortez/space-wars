@@ -165,6 +165,7 @@ impl ClientScenario for MaterialLabClientScenario {
     }
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
         self.poll();
+        let was_stopped = self.state.stopped.is_some();
         let mut acted = false;
         for action in actions {
             if let Action::Scenario {
@@ -186,6 +187,9 @@ impl ClientScenario for MaterialLabClientScenario {
         // Explicit step/load/run commands own this update; do not silently add a tick.
         if !acted && self.pending.is_none() {
             MaterialLabScenario::step(&mut self.state, &[], dt);
+        }
+        if !was_stopped && let Some(reason) = &self.state.stopped {
+            self.message = reason.clone();
         }
         StepResult::default()
     }
@@ -319,5 +323,23 @@ mod tests {
         settle(s);
         assert!(s.message.starts_with("Load failed"));
         assert_eq!(s.state.snapshot_bytes().unwrap(), next);
+        for single_step in [false, true] {
+            s.state = MaterialLabState::new(Case::Elastic);
+            s.state.paused = single_step;
+            s.selected = 1;
+            s.message = "Use Run or Single step to observe the response.".into();
+            for _ in 0..1000 {
+                tick(s, single_step);
+                if s.state.stopped.is_some() {
+                    break;
+                }
+            }
+            assert_eq!(Some(s.message.as_str()), s.state.stopped.as_deref());
+            s.selected = 5;
+            tick(s, true);
+            settle(s);
+            tick(s, false);
+            assert!(s.message.starts_with("Load failed"));
+        }
     }
 }

@@ -156,6 +156,8 @@ handoff, not all of #327.
 
 ## Application demonstration
 
-The [Material Lab](material-lab.md) hosts four bounded falling-platen cases with
-slow playback, pause, single step and a persistent save slot. It uses this native
-path without changing its physical or numerical restrictions.
+The [Material Lab](material-lab.md) hosts five bounded falling-platen cases,
+including a guided load/release/return. It provides load controls, slow playback,
+pause, single step and a persistent save slot that replays load history. It uses
+this native path and its [changing-load extension](material-changing-load.md)
+within their physical and numerical restrictions.
