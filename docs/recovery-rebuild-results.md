@@ -98,7 +98,7 @@ pass. Other integration suites were not rerun for this bounded task.
 
 All **103,504 dense actor rows** pass the recovery, physical visit, route/budget,
 laser and disabled-defense/clearance audits. The [manifest](data/recovery-rebuild-v1.json)
-and [portable review bundle](data/recovery-rebuild-v1.json.gz) bind all **64 frozen
+and portable review bundle (`docs/data/recovery-rebuild-v1.json.gz`, in git history) bind all **64 frozen
 inputs**, both commands, baseline records, native witnesses, complete audits,
 test/build logs and runtime binary. The two raw archives retain **32 files**:
 **2,156,084,298 raw bytes** compressed to **313,923,568 bytes**. Every archive

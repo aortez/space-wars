@@ -270,7 +270,7 @@ Retain **1,625 frozen source files, 123 copied inputs, 18 complete anchor prefix
 the frozen innovation tensor and all 972 branch-batch files**. Existing production
 sources and native runtime are unchanged from LF-063; the two new Python sources
 implement only this probe and its tests. Verify all **59 prior manifests** and
-all copied input origins unchanged at seal. See the [results mirror](data/flight-motor-action-return-v1-results.json)
+all copied input origins unchanged at seal. See the results mirror (`docs/data/flight-motor-action-return-v1-results.json`, in git history)
 and [archive receipt](data/flight-motor-action-return-v1-archive.json).
 
 ## Interpretation and next decision

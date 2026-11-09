@@ -222,10 +222,10 @@ The frozen binary is
 The completed summary is `target/projectile-response-sweep/v1/summary.json`,
 SHA-256 `aaeea92ed3c022db0c0ffd95091171e8b63496a55c0f00601120baa5f663a483`.
 
-The [manifest](data/projectile-response-sweep-v1.json) contains all 49 outcomes,
+The manifest (`docs/data/projectile-response-sweep-v1.json`, in git history) contains all 49 outcomes,
 coverage, cohort totals, per-case deltas, six exact development comparisons,
 input/tool/binary hashes and **776 raw-file hashes**. The
-[compressed archive](data/projectile-response-sweep-v1.json.gz) includes the
+compressed archive (`docs/data/projectile-response-sweep-v1.json.gz`, in git history) includes the
 original runner summary, physical visit audits, pulse witnesses, active-case
 loss/contact receipts and projectile tracks, report checkpoints and final
 reports excluding their large samples/events arrays. Final recovery counters

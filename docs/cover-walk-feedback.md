@@ -153,7 +153,7 @@ lifetime, equipment checks and bot defaults remain unchanged.
 
 The [result manifest](data/cover-walk-feedback-v1.json) records every game,
 physical visit, first receipt, advancement count and comparison. Its
-[compressed evidence](data/cover-walk-feedback-v1.json.gz) contains 40 exact
+compressed evidence (`docs/data/cover-walk-feedback-v1.json.gz`, in git history) contains 40 exact
 documents: current/prior summaries, hashes for all 261 raw files, physical and
 feedback witnesses, the remaining-bound calculation, archive script and logs.
 

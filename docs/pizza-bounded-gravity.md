@@ -243,7 +243,7 @@ client with `spacewars-cli` to `/tmp/spacewars-pizza-gravity-point` or
 `ROOT/RUN` back as `point-RUN` or `bounded-RUN` in one directory, then pass that
 directory to `summarize` with `--pi`.
 
-The [archive](data/pizza-gravity-20261018-raw.tar.gz) retains per-update CSV
+The archive (`docs/data/pizza-gravity-20261018-raw.tar.gz`, in git history) retains per-update CSV
 extracts and run metadata for all 170 reports, the complete seed-7 reports, the
 point-only benchmark output and the six Pi captures without their temporary
 config directories. Running `summarize` on its `extracts` directory with `--pi`

@@ -219,9 +219,9 @@ and profiled/ordinary release builds pass. Scenario Clippy retains the same seve
 pre-existing findings. All four final replay audits pass, preserving the shared
 maximum of **4 graph operations / 384 queries** and publication age at most 120.
 
-[The manifest](data/actual-landing-route-v2.json) records complete outcomes,
+The manifest (`docs/data/actual-landing-route-v2.json`, in git history) records complete outcomes,
 phase work, live poses and source/measurement clocks.
-[The compressed archive](data/actual-landing-route-v2.json.gz) retains 33 exact
+The compressed archive (`docs/data/actual-landing-route-v2.json.gz`, in git history) retains 33 exact
 documents, including both frozen plans, the corrected full summary, the original
 harness failure, probe/physical/route witnesses, validation logs and hashes for
 102 raw files. The separately linked stage-timing data embeds its reproduction

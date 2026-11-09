@@ -10,9 +10,9 @@ BIG = LIMIT + 1
 SMALL = LIMIT
 
 
-def run(files, texts=None, referenced=(), grandfathered=(), baseline=None):
+def run(files, texts=None, referenced=()):
     texts = texts or {}
-    return check(files, lambda path: texts.get(path, ""), set(referenced), list(grandfathered), baseline)
+    return check(files, lambda path: texts.get(path, ""), set(referenced))
 
 
 class SizeTests(unittest.TestCase):
@@ -34,27 +34,6 @@ class SizeTests(unittest.TestCase):
     def test_compressed_file_counts_as_read_by_its_stem(self):
         self.assertEqual(names("docs/data/trace-v1.json.gz"), {"trace-v1.json.gz", "trace-v1.json"})
         run([("docs/data/trace-v1.json.gz", BIG)], referenced={"trace-v1.json"})
-
-
-class GrandfatheredTests(unittest.TestCase):
-    def test_grandfathered_file_passes_while_it_stays_oversized(self):
-        files = [("docs/data/old-v1.json", BIG)]
-        self.assertIn("1 grandfathered", run(files, grandfathered=["docs/data/old-v1.json"]))
-        with self.assertRaisesRegex(ValueError, "no longer exists"):
-            run([], grandfathered=["docs/data/old-v1.json"])
-        with self.assertRaisesRegex(ValueError, "no longer needs grandfathering"):
-            run([("docs/data/old-v1.json", SMALL)], grandfathered=["docs/data/old-v1.json"])
-
-    def test_list_may_only_shrink_against_the_baseline(self):
-        files = [("docs/data/old-v1.json", BIG), ("docs/data/new-v1.json", BIG)]
-        both = ["docs/data/new-v1.json", "docs/data/old-v1.json"]
-        run(files, grandfathered=both, baseline=both)
-        run([files[0]], grandfathered=both[1:], baseline=both)
-        with self.assertRaisesRegex(ValueError, "new-v1.json: added to .*only shrinks"):
-            run(files, grandfathered=both, baseline=both[1:])
-
-    def test_without_a_baseline_additions_are_not_compared(self):
-        run([("docs/data/new-v1.json", BIG)], grandfathered=["docs/data/new-v1.json"])
 
 
 class ReferenceTests(unittest.TestCase):

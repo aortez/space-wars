@@ -244,7 +244,7 @@ Retain 1,585 sources, 314 copied inputs, six configs, unchanged runtime,
 diagnostics, tests, commands and timings. Sealing checks source/config/runtime
 hashes, copied input sources and all 47 prior manifests. The generic `best.json`
 metadata does not select a qualified model: the frozen gate assesses update 64.
-See [results](data/flight-fresh-initialization-v1-results.json) and
+See results (`docs/data/flight-fresh-initialization-v1-results.json`, in git history) and
 [archive receipt](data/flight-fresh-initialization-v1-archive.json). No confirmation
 use, later-stage training or promotion; local retention is not off-machine backup.
 

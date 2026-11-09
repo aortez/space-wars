@@ -141,7 +141,7 @@ archive hashes and run-log hashes were rechecked after completion. The retained
 
 The [manifest](data/pursuit-climb-laser-fresh-v1.json) records the complete
 screen, each paired result, validation counts and the departure-shortfall review.
-The [review archive](data/pursuit-climb-laser-fresh-v1.json.gz) preserves the
+The review archive (`docs/data/pursuit-climb-laser-fresh-v1.json.gz`, in git history) preserves the
 exact plan, complete summary, source/tests, all run logs, selected physical and
 laser audits, and review evidence. It contains 229 hash-verified documents;
 full compressed raw games remain local and hash-bound by the summary.

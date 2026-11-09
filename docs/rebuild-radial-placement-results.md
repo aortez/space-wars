@@ -91,7 +91,7 @@ formatting, locked Rust 1.89 release build and default-feature library check.
 Broad native Clippy still fails with the same **16 message/file diagnostic
 identities** as its retained baseline.
 
-The [manifest](data/rebuild-radial-placement-v1.json) and
+The manifest (`docs/data/rebuild-radial-placement-v1.json`, in git history) and
 [portable bundle](data/rebuild-radial-placement-v1.json.gz) include verified reports,
 contact probes, query audits, selection/arrival/native witnesses, paired
 differences, timelines, validation, frozen source and the reproducible exporter.

@@ -103,7 +103,7 @@ binary is `target/destination-retry/surface_mission_soak-0bafeb5`, SHA-256
 All 64 runs completed in `target/destination-retry/v1`. The
 [results manifest](data/capture-destination-retry-v1.json) contains aggregate
 results, checks and two successful-retry context observations. The linked
-[compressed full study](data/capture-destination-retry-v1.json.gz) preserves
+compressed full study (`docs/data/capture-destination-retry-v1.json.gz`, in git history) preserves
 commands, raw hashes, accepted forecasts, visits, memory and desktop timings.
 No policy or trial parameters changed after viewing gameplay results.
 

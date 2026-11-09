@@ -135,7 +135,7 @@ was used throughout.
 
 The [result manifest](data/integrated-bot-evaluation-v1.json) records the decision,
 failed acceptance conditions, per-world/subset totals, prediction coverage, input
-identities and archive hash. The [compressed evidence](data/integrated-bot-evaluation-v1.json.gz)
+identities and archive hash. The compressed evidence (`docs/data/integrated-bot-evaluation-v1.json.gz`, in git history)
 contains the exact failed/final summaries, frozen plan, all 112 audit documents,
 derived evidence analysis, first-divergence witnesses and explicitly reduced
 report projections. Full reports, per-tick streams and logs remain under

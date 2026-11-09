@@ -164,8 +164,8 @@ known rescue games retain their partial native impact observers, totaling
 replays preserve **18 original streams** byte for byte as well as non-timing
 reports, sensors, charged planning and derived results.
 
-The [manifest](data/recovery-strategies-v1.json) and
-[portable review bundle](data/recovery-strategies-v1.json.gz) bind the complete
+The manifest (`docs/data/recovery-strategies-v1.json`, in git history) and
+portable review bundle (`docs/data/recovery-strategies-v1.json.gz`, in git history) bind the complete
 plan, all 67 frozen inputs, commands, binary identity, predecessor summaries,
 both actors' results, audits, screen decisions, review scripts and check logs.
 Raw games remain local under `target/recovery-strategies/v1/archives`:

@@ -130,7 +130,7 @@ dependency/toolchain binaries are excluded. No commit or clean checkout is impli
 All six runs completed 128 updates each: **786,432 training ticks** and **315,912
 development ticks**, with concurrent elapsed times of 662.6–700.9 seconds per run.
 The frozen formula, budgets, tasks and gates were not revised during training.
-See [compact results](data/flight-graded-deadline-v1-results.json) and the
+See compact results (`docs/data/flight-graded-deadline-v1-results.json`, in git history) and the
 [archive receipt](data/flight-graded-deadline-v1-archive.json).
 
 | Measure | Control | Graded deadline |

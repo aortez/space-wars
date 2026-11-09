@@ -188,7 +188,7 @@ and runtime were unchanged.
 The new archive retains all 192 new and 576 reused physics/probability trace pairs,
 six model checkpoints/exports, 1,530 selected source files, 1,179 copied parent inputs,
 frozen specification, commands, logs and analysis. All nineteen earlier manifests
-and referenced parent inputs remain unchanged. See [compact results](data/flight-duration-execution-v1-results.json)
+and referenced parent inputs remain unchanged. See compact results (`docs/data/flight-duration-execution-v1-results.json`, in git history)
 and [archive receipt](data/flight-duration-execution-v1-archive.json). Local retention
 is not off-machine backup.
 

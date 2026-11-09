@@ -88,7 +88,7 @@ of what these recovery controllers actually do.
 
 ## Verification and scope
 
-The [audit receipt](data/terrain-recovery-round-opening-v1.json) records:
+The audit receipt (`docs/data/terrain-recovery-round-opening-v1.json`, in git history) records:
 
 - **25,800** prefix action/decision/scenario rows and **430** samples matching
   the earlier control exactly.

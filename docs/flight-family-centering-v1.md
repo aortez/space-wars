@@ -202,7 +202,7 @@ Preserve 1,577 frozen sources, 175 copied inputs, six configs, the unchanged run
 108 checkpoints, 24 pilot/resume exports, six preflight exports and every trace,
 response and learning-signal record. All 43 previous manifests and copied input
 sources remain unchanged. Source/runtime/config/archive hashes are verified. See
-[results](data/flight-family-centering-v1-results.json) and
+results (`docs/data/flight-family-centering-v1-results.json`, in git history) and
 [archive receipt](data/flight-family-centering-v1-archive.json). Local retention is
 not off-machine backup; no commit, confirmation use or promotion is implied.
 

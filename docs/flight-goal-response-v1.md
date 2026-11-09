@@ -201,5 +201,5 @@ retains 1,537 source files, 56 copied parent inputs, native runtime, pre-run spe
 all anchor/input/output batches, summaries and logs. All 23 previous manifests and
 referenced parent inputs remain unchanged. Parent seed 43's unexplained exit 143 is
 still a provenance limitation; this clean audit does not promote or requalify it.
-No model was promoted. See [machine-readable results](data/flight-goal-response-v1-results.json)
+No model was promoted. See machine-readable results (`docs/data/flight-goal-response-v1-results.json`, in git history)
 and [archive receipt](data/flight-goal-response-v1-archive.json).

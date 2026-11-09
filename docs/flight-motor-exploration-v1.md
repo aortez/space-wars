@@ -223,7 +223,7 @@ retain audit continuation state only.
 Retain 1,602 frozen sources, eight copied inputs, complete case/draw/variant
 matrices, all 480 native traces and sample records, twelve continuation traces,
 tests, commands, timings and full results. See
-[results](data/flight-motor-exploration-v1-results.json) and
+results (`docs/data/flight-motor-exploration-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-exploration-v1-archive.json). No confirmation
 use, model promotion or navigation qualification. Local retention is not off-machine backup.
 

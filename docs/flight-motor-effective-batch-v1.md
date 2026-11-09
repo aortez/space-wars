@@ -307,7 +307,7 @@ Retain 354 checkpoints, 342 rollouts, 48 inference exports, 5,239 completed
 training traces plus all partial traces, fifteen gradient evidence bundles,
 1,654 frozen source files and 183 copied inputs. All 68 earlier manifests and
 complete LF-069/LF-072 archives remain unchanged. See
-[results](data/flight-motor-effective-batch-v1-results.json),
+results (`docs/data/flight-motor-effective-batch-v1-results.json`, in git history),
 [findings](data/flight-motor-effective-batch-v1-findings.json), and
 [archive receipt](data/flight-motor-effective-batch-v1-archive.json).
 

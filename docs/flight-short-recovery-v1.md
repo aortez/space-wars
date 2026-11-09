@@ -128,7 +128,7 @@ All three pilot resumes reproduce the complete saved state. Every original-hold 
 
 Used **68,608 training ticks**, **1,019 optimizer steps**, **53,788 evaluation ticks** in **192 episodes**, and **112 parity comparisons**. All 11 subprocesses exited zero within their fixed limits. Retain 71 new checkpoints and 14 exports.
 
-Archive `data/training-experiments/learned-flight-short-recovery-v1-20261024` retains 1,554 source files, unchanged runtime, 123 copied inputs, all traces, admissions, logs and gate evidence. All 31 prior manifests and copied inputs remain unchanged. See [results](data/flight-short-recovery-v1-results.json) and [receipt](data/flight-short-recovery-v1-archive.json).
+Archive `data/training-experiments/learned-flight-short-recovery-v1-20261024` retains 1,554 source files, unchanged runtime, 123 copied inputs, all traces, admissions, logs and gate evidence. All 31 prior manifests and copied inputs remain unchanged. See results (`docs/data/flight-short-recovery-v1-results.json`, in git history) and [receipt](data/flight-short-recovery-v1-archive.json).
 
 ## Next decision
 

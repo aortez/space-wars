@@ -143,7 +143,7 @@ thresholds or scene-specific deposition exceptions were added. Investigating
 contact motion and packing in that confined pile is a useful next step.
 
 Measurements, executable/source hashes and per-second traces are in
-[`data/dirt-roof-20261008.json`](data/dirt-roof-20261008.json) and
+`docs/data/dirt-roof-20261008.json` (in git history) and
 [`data/dirt-roof-traces-20261008.jsonl.gz`](data/dirt-roof-traces-20261008.jsonl.gz).
 The local scripts, source snapshots, binaries and raw output are retained in
 `target/dirt-roof-review/`. The Picade application was deployed with the fast

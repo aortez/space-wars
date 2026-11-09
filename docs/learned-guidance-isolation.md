@@ -103,7 +103,7 @@ removed other cases and retention terms, and their solutions regress badly.
 
 [Replay all eight controllers](data/learned-guidance-isolation-v1-replay.html)
 on both shapes. Displayed speed is relative to the destination planet, matching
-the score and behavior plot. The [complete results](data/learned-guidance-isolation-v1-results.json)
+the score and behavior plot. The complete results (`docs/data/learned-guidance-isolation-v1-results.json`, in git history)
 retain lost-case lists, exact model identities, scores and trajectory metrics.
 
 ## Implications and next test

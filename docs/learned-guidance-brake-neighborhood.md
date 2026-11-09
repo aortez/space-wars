@@ -45,7 +45,7 @@ trace replays bring diagnostic time to 112.72 seconds. Preflight and physical
 source reconstruction bring the recorded execution phases to **2 minutes
 47.77 seconds**, excluding compilation, analysis and archiving.
 
-See the [results and trace audit](data/learned-guidance-brake-neighborhood-v1-results.json)
+See the results and trace audit (`docs/data/learned-guidance-brake-neighborhood-v1-results.json`, in git history)
 and [precision inspection](data/learned-guidance-brake-neighborhood-v1-inspection.json).
 
 ## What the useful direction changes

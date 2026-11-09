@@ -48,7 +48,7 @@ These are local captures, not device GPU screenshots.
 | --- | --- |
 | ![Mirrored turn, vector](screenshots/clock/exit-1024x768-right-Flowing-turn-departing-vector.png) | ![Portrait tag, vector](screenshots/clock/exit-480x800-left-Careful-tag-turned-vector.png) |
 
-[Capture telemetry and file hashes](screenshots/clock/duck-exit-manifest.json).
+Capture telemetry and file hashes (`docs/screenshots/clock/duck-exit-manifest.json`, in git history).
 
 ## Checks
 

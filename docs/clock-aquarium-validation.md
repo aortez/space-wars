@@ -17,7 +17,7 @@ its CPU-only full-cycle mean was 14.90 ms/frame and its worst interval p95 was
 
 See [the implementation and reproduction guide](clock.md#aquarium-177) for the
 phase budgets, water approximation, floor controller, collision geometry and
-resource ownership. The [compressed evidence](data/clock-aquarium-picade-20261014.json.gz)
+resource ownership. The compressed evidence (`docs/data/clock-aquarium-picade-20261014.json.gz`, in git history)
 contains the source manifest, binary manifest, sampled states, raw frame traces,
 CPU benchmark CSVs and environment readings. It excludes saved user settings.
 

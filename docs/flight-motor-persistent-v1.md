@@ -258,7 +258,7 @@ Retain **804 checkpoints, 48 policy exports, 792 rollouts**, every training and
 evaluation trace, 1,605 frozen sources, 110 copied inputs, configurations/tasks,
 preflight results, tests, commands, timings and read-only summaries. All **52 prior
 manifest hashes** and copied input origins remain unchanged. See
-[results](data/flight-motor-persistent-v1-results.json) and
+results (`docs/data/flight-motor-persistent-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-persistent-v1-archive.json). No reserved
 confirmation use, model promotion or navigation qualification. Local retention
 is not off-machine backup.

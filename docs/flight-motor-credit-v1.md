@@ -239,7 +239,7 @@ there are no new policy exports or training checkpoints. Models and input files
 remain unchanged. Retain 1,607 frozen sources, 3,814 copied inputs, row-level
 metrics, gradient vectors, all probe histories, scripts, logs and the frozen spec.
 All 53 prior manifest hashes remain unchanged. See
-[results](data/flight-motor-credit-v1-results.json) and
+results (`docs/data/flight-motor-credit-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-credit-v1-archive.json).
 
 This is a diagnosis of the retained recipe. It neither demonstrates learned

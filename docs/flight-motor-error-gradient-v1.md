@@ -275,7 +275,7 @@ all gradients, rewards, projections, results, scripts and logs. Verify the compl
 LF-069 parent archive and all 65 prior manifests unchanged. Only the existing
 Adam-accounting helper gains an optional component count; add three audit/test
 files. No trainer, reward, architecture or native runtime changes. See
-[results](data/flight-motor-error-gradient-v1-results.json),
+results (`docs/data/flight-motor-error-gradient-v1-results.json`, in git history),
 [analysis](data/flight-motor-error-gradient-v1-analysis.json) and
 [archive receipt](data/flight-motor-error-gradient-v1-archive.json).
 

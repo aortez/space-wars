@@ -11,7 +11,7 @@ On `mixed_train_inward_stationary`, the near-miss timed out after 1,200 ticks, r
 | near-miss | 464 | 156 | 620 |
 | selected | 464 | 157 | 621 |
 
-[Search results](data/learned-guidance-near-repair-v1-search.png) · [Settling measurements](data/learned-guidance-near-repair-v1-precision.png) · [Recorded replay](data/learned-guidance-near-repair-v1-replay.html) · [Machine-readable results](data/learned-guidance-near-repair-v1-results.json) · [Frozen plan](data/learned-guidance-near-repair-v1-plan.json)
+[Search results](data/learned-guidance-near-repair-v1-search.png) · [Settling measurements](data/learned-guidance-near-repair-v1-precision.png) · Recorded replay (`docs/data/learned-guidance-near-repair-v1-replay.html`, in git history) · Machine-readable results (`docs/data/learned-guidance-near-repair-v1-results.json`, in git history) · [Frozen plan](data/learned-guidance-near-repair-v1-plan.json)
 
 ## What this establishes
 

@@ -146,7 +146,7 @@ with checkpoint writes took 351.2–354.1 seconds per concurrent worker; trainin
 primary evaluation took 475.5–477.8 seconds. Secondary evaluation took 377.1–387.2
 seconds per worker. All saved computations were within their frozen caps.
 
-[Full results](data/flight-continuous-approach-v1-results.json) and the
+Full results (`docs/data/flight-continuous-approach-v1-results.json`, in git history) and the
 [archive receipt](data/flight-continuous-approach-v1-archive.json) retain model-level
 counts, all repeated trials, trajectories, controls and validation.
 

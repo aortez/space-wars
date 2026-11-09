@@ -104,7 +104,7 @@ executable SHA-256 is
 It is retained locally as `target/capture-flag-survey/surface-mission-soak-3eaaa6f`.
 The raw summary SHA-256 is
 `805c2bc5d090a06b87b11e61cb8904cefadde1c9a101bddf08d614592e4a9333`.
-The [tracked record](data/neutral-capture-timing-v1.json) preserves plans,
+The tracked record (`docs/data/neutral-capture-timing-v1.json`, in git history) preserves plans,
 sources, both estimates, outcomes, phase errors, commands and raw file hashes.
 It is a compact projection: chosen-site geometry is retained; full candidate
 lists and direction ledgers remain in the hashed raw reports and traces.

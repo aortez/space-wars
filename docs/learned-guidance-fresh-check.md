@@ -9,7 +9,7 @@
 | Native RecoveryBot mission control | 218 | — |
 | Handwritten arrival guidance | 210 | 96 |
 
-[Overall comparison](data/learned-guidance-fresh-check-v1-comparison.png) · [Both shapes and seats](data/learned-guidance-fresh-check-v1-match-strata.png) · [Precision groups](data/learned-guidance-fresh-check-v1-precision-groups.png) · [Match replay](data/learned-guidance-fresh-check-v1-matches-replay.html) · [Precision replay](data/learned-guidance-fresh-check-v1-precision-replay.html)
+[Overall comparison](data/learned-guidance-fresh-check-v1-comparison.png) · [Both shapes and seats](data/learned-guidance-fresh-check-v1-match-strata.png) · [Precision groups](data/learned-guidance-fresh-check-v1-precision-groups.png) · [Match replay](data/learned-guidance-fresh-check-v1-matches-replay.html) · Precision replay (`docs/data/learned-guidance-fresh-check-v1-precision-replay.html`, in git history)
 
 ## What generalized
 

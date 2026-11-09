@@ -86,7 +86,7 @@ and rerun the same fixed matrix; this is an audit repair, not source resampling.
 
 ## Results: 26 September 2026
 
-The complete record is [capture-transfer-scheduling-v1.json](data/capture-transfer-scheduling-v1.json).
+The complete record is `docs/data/capture-transfer-scheduling-v1.json` (in git history).
 Raw artifacts remain under `target/capture-flag-survey/transfer-scheduling-v1`.
 The completed matrix records clean audit revision `de54ba6`, with runtime
 unchanged from `036a36e`; only the documented audit correction separates them.

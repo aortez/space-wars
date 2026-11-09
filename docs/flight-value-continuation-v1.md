@@ -136,7 +136,7 @@ in **384 episodes**. No frozen process was retried. No update-64 run, confirmati
 promotion occurred. Preserve 1,567 sources, 569 input copies including 334 historical
 completed traces, 102 new checkpoints and 24 exports. The historical trace copies are
 explicitly identified; they do not count as new samples. All 38 previous manifests and
-copied inputs remain unchanged. See [results](data/flight-value-continuation-v1-results.json)
+copied inputs remain unchanged. See results (`docs/data/flight-value-continuation-v1-results.json`, in git history)
 and [archive receipt](data/flight-value-continuation-v1-archive.json).
 
 ### Next decision

@@ -114,7 +114,7 @@ in the validation record; it is not represented as a clean scenario-wide run.
 
 The lossless archive preserves 18 files and 1,417,616,645 raw bytes, compressed
 to 198,479,264 bytes. The committed
-[portable bundle](data/high-ledge-probe-v1.json.gz) includes the frozen plan
+portable bundle (`docs/data/high-ledge-probe-v1.json.gz`, in git history) includes the frozen plan
 and sources, full report and audits, all candidate measurements, both source
 observations, all 922 flight observations, the complete reference tape,
 validation logs, archive/member hashes and reproducible exporter. The raw

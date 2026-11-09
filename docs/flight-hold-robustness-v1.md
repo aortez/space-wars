@@ -166,7 +166,7 @@ Archive `data/training-experiments/learned-flight-hold-robustness-v1-20261024` r
 72 parity fixtures, reconstructed metrics, logs and scope clarification. All 29 prior
 manifests and referenced inputs remain unchanged. No training, confirmation use,
 model promotion or broader flight claim. See
-[results](data/flight-hold-robustness-v1-results.json) and
+results (`docs/data/flight-hold-robustness-v1-results.json`, in git history) and
 [archive receipt](data/flight-hold-robustness-v1-archive.json).
 
 ## Next decision

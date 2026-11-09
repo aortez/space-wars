@@ -173,7 +173,7 @@ No frozen process was retried. No longer run, confirmation or promotion occurred
 Retain 1,566 sources, six configs, 128 copied inputs, 108 new checkpoints and 24 exports,
 all traces, admissions, parity, process results and gates. The only production edits are
 model.py, ppo.py and run.py; the source archive records their exact versions. All 37 prior
-manifests and copied inputs remain unchanged. See [results](data/flight-value-isolation-v1-results.json)
+manifests and copied inputs remain unchanged. See results (`docs/data/flight-value-isolation-v1-results.json`, in git history)
 and [archive receipt](data/flight-value-isolation-v1-archive.json).
 
 ### Next decision

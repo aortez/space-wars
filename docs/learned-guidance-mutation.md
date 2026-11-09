@@ -69,8 +69,8 @@ unseen retention.
 
 ![Training, validation and offspring history](data/learned-guidance-mutation-v1.png)
 
-[Replay all seven controllers](data/learned-guidance-mutation-v1-replay.html) or
-inspect the [complete paired results](data/learned-guidance-mutation-v1-results.json).
+The replay of all seven controllers (`docs/data/learned-guidance-mutation-v1-replay.html`) and the
+complete paired results (`docs/data/learned-guidance-mutation-v1-results.json`) are in git history.
 The replay shows recorded target-relative paths and controls; it does not render
 terrain or the full world.
 

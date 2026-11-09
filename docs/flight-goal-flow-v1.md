@@ -179,7 +179,7 @@ Preserve 1,573 frozen sources, 53 copied inputs (24 checkpoints, 28 traces and p
 results), all derivative/gradient tensors, reconstructed batches/targets, collector
 and RNG snapshots, reports and scripts. Production sources/runtime are unchanged
 from LF-045; the retained native baseline is 421 passed/two ignored. All 41 previous
-manifests and copied inputs remain unchanged. See [results](data/flight-goal-flow-v1-results.json)
+manifests and copied inputs remain unchanged. See results (`docs/data/flight-goal-flow-v1-results.json`, in git history)
 and [archive receipt](data/flight-goal-flow-v1-archive.json). No model was promoted
 or reserved confirmation used. Local retention is not off-machine backup.
 

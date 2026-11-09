@@ -151,7 +151,7 @@ separate 45-second comparison. Runtime code is unchanged, so this pass validates
 the runner with real audited cases rather than repeating the engine unit suite.
 
 [Measurements, commands and identities](data/dirt-late-match-20261009.json) ·
-[Per-second terrain and recovery traces](data/dirt-late-match-traces-20261009.jsonl.gz).
+Per-second terrain and recovery traces (`docs/data/dirt-late-match-traces-20261009.jsonl.gz`, in git history).
 Full reports, saved render frames, source snapshots, executables, and scripts
 are retained in `target/dirt-late-match-review/`. No application redeployment,
 commit, or PR was needed for this diagnostic pass.

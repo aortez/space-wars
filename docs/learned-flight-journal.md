@@ -438,7 +438,7 @@ gate before reserved confirmation. No reward change, budget extension or obstacl
 training is part of this comparison.
 
 Evidence: [report](flight-persistent-exploration-v1.md),
-[results](data/flight-persistent-exploration-v1-results.json), and
+results (`docs/data/flight-persistent-exploration-v1-results.json`, in git history), and
 [archive receipt](data/flight-persistent-exploration-v1-archive.json). All six runs
 completed 786,432 training ticks plus 315,912 development ticks. Concurrent elapsed
 times were 550.4–587.9 seconds per run. The persistence manipulation passed:
@@ -488,7 +488,7 @@ confirmation remain unchanged. Treat approach and action diagnostics separately
 from success. The default reward retains .25; neither arm is a promoted fix.
 
 Evidence: [report](flight-velocity-shaping-v1.md),
-[results](data/flight-velocity-shaping-v1-results.json), and
+results (`docs/data/flight-velocity-shaping-v1-results.json`, in git history), and
 [archive receipt](data/flight-velocity-shaping-v1-archive.json). All six runs
 completed 786,432 training ticks plus 315,912 development ticks, with concurrent
 elapsed times 561.8–599.2 seconds per run. Both arms had 0/48 final successes,
@@ -540,7 +540,7 @@ progression and conditional confirmation gates, plus paired success gain ≥4/16
 in at least two seeds and the learning gate for an arrival-benefit claim.
 
 Evidence: [report](flight-credit-assignment-v1.md),
-[results](data/flight-credit-assignment-v1-results.json), and
+results (`docs/data/flight-credit-assignment-v1-results.json`, in git history), and
 [archive receipt](data/flight-credit-assignment-v1-archive.json). Six runs completed
 786,432 training ticks and 315,912 development ticks. Concurrent elapsed times
 were 589.8–629.4 seconds per run. Both arms had zero final successes and 48
@@ -595,7 +595,7 @@ including restores and preflight separately to 10,000. No optimizer steps,
 qualification changes, new task generation or reserved confirmation use.
 
 Evidence: [report](flight-learning-signal-audit-v1.md),
-[results](data/flight-learning-signal-audit-v1-results.json), and
+results (`docs/data/flight-learning-signal-audit-v1-results.json`, in git history), and
 [archive receipt](data/flight-learning-signal-audit-v1-archive.json). All 36 rollouts
 reconstructed exactly, covering 36,864 original action ticks. All 48 continuations
 timed out. Retained replay consumed 223,317 physics ticks including restores, plus
@@ -650,7 +650,7 @@ two seeds plus the learning gate for arrival benefit. The final-distance-only gr
 is bounded, survives potential telescoping and leaves within-radius timeouts tied.
 
 Evidence: [report](flight-graded-deadline-v1.md),
-[results](data/flight-graded-deadline-v1-results.json), and
+results (`docs/data/flight-graded-deadline-v1-results.json`, in git history), and
 [archive receipt](data/flight-graded-deadline-v1-archive.json). All six runs completed
 786,432 training ticks and 315,912 development ticks, taking 662.6–700.9 concurrent
 seconds per run. Both arms had 0/48 final successes, 48 deadlines, no goal-radius
@@ -778,7 +778,7 @@ gain in at least two models, each with ≥4/16 arrivals in at least three repeat
 for the declared material-arrival-improvement finding. This is diagnostic only.
 
 Evidence: [report](flight-action-execution-v1.md),
-[results](data/flight-action-execution-v1-results.json), and
+results (`docs/data/flight-action-execution-v1-results.json`, in git history), and
 [archive receipt](data/flight-action-execution-v1-archive.json). All 240 episodes
 completed in 410,538 physics ticks, plus 128 preflight ticks. Workers took
 333.3–347.4 concurrent seconds. All 48 deterministic traces matched the parent
@@ -841,7 +841,7 @@ and ≥4/16 arrivals in at least three repeats, in at least two models, for the 
 finding. Existing qualification and confirmation use are unchanged.
 
 Evidence: [report](flight-steering-ablation-v1.md),
-[results](data/flight-steering-ablation-v1-results.json), and
+results (`docs/data/flight-steering-ablation-v1-results.json`, in git history), and
 [archive receipt](data/flight-steering-ablation-v1-archive.json). All 192 episodes
 completed in 177,917 new physics ticks, plus 128 preflight ticks. The baseline's
 324,138 ticks were reused evidence. Workers took 128.6–153.8 concurrent seconds.
@@ -900,7 +900,7 @@ separate 1,000-tick cap. Require ≥25% trained success, ≥25 percentage-point 
 learning-gain finding. No old gate is retroactively changed.
 
 Evidence: [report](flight-learning-gain-v1.md),
-[results](data/flight-learning-gain-v1-results.json), and
+results (`docs/data/flight-learning-gain-v1-results.json`, in git history), and
 [archive receipt](data/flight-learning-gain-v1-archive.json). All 192 new episodes
 completed in 184,513 physics ticks, plus 128 preflight ticks. The trained baseline's
 177,917 ticks were reused. Workers took 133.7–138.7 concurrent seconds. Every initial
@@ -1022,7 +1022,7 @@ passed. Frozen inputs include source/runtime/configuration identity and copied b
 evidence; all three initial training states match their originals exactly. See the
 [specification and report](flight-mixed-duration-v1.md).
 
-Evidence: [compact results](data/flight-mixed-duration-v1-results.json) and
+Evidence: compact results (`docs/data/flight-mixed-duration-v1-results.json`, in git history) and
 [archive receipt](data/flight-mixed-duration-v1-archive.json). All three runs completed
 786,432 training ticks and 426,044 new evaluation ticks within the frozen budgets,
 taking 971.4–1,062.8 concurrent seconds. Initial and update-128 full training states
@@ -1090,7 +1090,7 @@ unchanged. Freeze 1,530 selected source files and 1,179 copied parent inputs, in
 six checkpoints/exports and every reused trajectory/probability record. See the
 [specification and report](flight-duration-execution-v1.md).
 
-Evidence: [compact results](data/flight-duration-execution-v1-results.json) and
+Evidence: compact results (`docs/data/flight-duration-execution-v1-results.json`, in git history) and
 [archive receipt](data/flight-duration-execution-v1-archive.json). All 192 new attempts
 completed in 320,906 ticks, plus 160 preflight ticks. Workers took 239.4–267.4 concurrent
 seconds. Reused references account for 324,138 sampled-128, 177,917 mixed-128 and
@@ -1161,7 +1161,7 @@ Freeze 1,532 selected source files and 132 copied parent inputs, including all 1
 checkpoints. Production source/runtime and physical/reward criteria stay unchanged.
 
 Evidence: [report](flight-update-attribution-v1.md),
-[results](data/flight-update-attribution-v1-results.json) and
+results (`docs/data/flight-update-attribution-v1-results.json`, in git history) and
 [archive receipt](data/flight-update-attribution-v1-archive.json). The scan selected
 197 (largest rise), 199 (largest drop) and 256. Mean starting thrust logit declined
 2.186546 over the interval, with 73 drops and 55 rises. Mean probability declined
@@ -1340,7 +1340,7 @@ zero. Completed artifacts support descriptive evaluation, but the anomaly separa
 blocks qualification; the physical gates already fail independently. No training rerun
 or model promotion. Retain 390 checkpoints, eight exports, all traces and source/runtime
 identities. All 22 previous manifests and three parent configs remain unchanged.
-See [results](data/flight-continuous-approach-v1-results.json) and
+See results (`docs/data/flight-continuous-approach-v1-results.json`, in git history) and
 [receipt](data/flight-continuous-approach-v1-archive.json).
 
 Next propose a separately frozen goal/velocity response probe using the final
@@ -1393,7 +1393,7 @@ raw error 1.90735e−6, action error 1.49012e−7. Retain all inputs/outputs, 1,
 source files, 56 copied parent inputs and runtime. All 23 prior manifests and referenced
 inputs unchanged. Parent seed-43 exit 143 remains recorded and is not requalified by
 this clean diagnostic. No model promotion. See [report](flight-goal-response-v1.md),
-[results](data/flight-goal-response-v1-results.json) and
+results (`docs/data/flight-goal-response-v1-results.json`, in git history) and
 [receipt](data/flight-goal-response-v1-archive.json).
 
 Next propose one controlled fresh-model input-scaling comparison: current scaling
@@ -1453,7 +1453,7 @@ models reproduced parent final parameters/optimizer/RNG exactly. Parent seed-43 
 new checkpoints, 20 exports, all response outputs, 1,539 sources and 194 copied parent
 inputs. All 24 earlier manifests and referenced inputs unchanged. No promotion or
 reserved confirmation. See [report](flight-input-scaling-v1.md),
-[results](data/flight-input-scaling-v1-results.json) and
+results (`docs/data/flight-input-scaling-v1-results.json`, in git history) and
 [receipt](data/flight-input-scaling-v1-archive.json).
 
 Propose a separately frozen **hold-position learning diagnostic** using the existing default scaling: start at the goal with zero translational velocity and spin, and require the same distance/speed/low-spin limits for 30 complete intervals. Keep continuous actuators, reward and PPO unchanged. This isolates learning to remain settled from learning approach and braking together; no native action labels or fallback. Declare a systematic start distribution, matched initialization evaluations, seeds, budgets and success gates before any run. Do not append these tasks to the approach training set ad hoc. If holding is learnable, consider a planned progression to approach only after reviewing that evidence; if not, inspect the hold task's learning signal before increasing complexity. This diagnostic is proposed, not implemented or run. Keep all prior archives, the original arrival requirements and unused confirmation partitions intact; no current model is promoted.
@@ -1560,7 +1560,7 @@ All twelve production updates and collectors/targets reproduced exactly. All 48 
 Retain 1,543 sources, 34 parent inputs, runtime, all rollout/collector/target states,
 RNG, gradients, row data, 48 branch snapshots and all probes. All 26 previous manifests
 and referenced inputs unchanged. See [report](flight-hold-update-audit-v1.md),
-[results](data/flight-hold-update-audit-v1-results.json) and
+results (`docs/data/flight-hold-update-audit-v1-results.json`, in git history) and
 [receipt](data/flight-hold-update-audit-v1-archive.json).
 
 Propose a separately frozen **hold-specific early-failure comparison**: end a training
@@ -1608,7 +1608,7 @@ Main 196,608 ticks/3,033 optimizer steps; preflight 6,144 ticks/96 steps; evalua
 Retain 1,545 sources, eight parent inputs, all 206 new checkpoints and twenty exports,
 all traces, runtime and logs. All 27 prior manifests and inputs unchanged. No model
 promotion, confirmation or approach/navigation qualification. See
-[report](flight-early-hold-v1.md), [results](data/flight-early-hold-v1-results.json)
+[report](flight-early-hold-v1.md), results (`docs/data/flight-early-hold-v1-results.json`, in git history)
 and [receipt](data/flight-early-hold-v1-archive.json).
 
 Propose a separately frozen matched 128-update long/early comparison with the same seeds, tasks, architecture, input scales, reward coefficients, PPO and exploration. The observed throttle reduction and longer sampled attempts justify testing additional learning at fixed settings. Use fresh runs, verify their update 32 model/Adam/RNG states against this archive, and preserve the original long-task evaluation and existing gates. Do not modify the sealed 32-update runs or use reserved confirmation tasks. This extension is proposed, not run; no model is promoted.
@@ -1646,7 +1646,7 @@ Main 786,432 ticks/12,072 optimizer steps; preflight 6,144 ticks/96 steps; evalu
 Retain 1,547 sources, seventeen inputs, all 782 new checkpoints and twenty exports,
 all traces, runtime and logs. All 28 prior manifests/inputs unchanged. No confirmation,
 model promotion or approach/navigation qualification. See
-[report](flight-extended-hold-v1.md), [results](data/flight-extended-hold-v1-results.json)
+[report](flight-extended-hold-v1.md), results (`docs/data/flight-extended-hold-v1-results.json`, in git history)
 and [receipt](data/flight-extended-hold-v1-archive.json).
 
 Propose a separately frozen, no-training robustness audit of all three final early-arm policies. Test longer holds and systematic small position, velocity and spin perturbations, with physical admission, explicit budgets and separate criteria for each scope. Inspect whether speed remains bounded and how the oscillating seed responds. Preserve the established thirty-interval result; do not silently redefine it as a longer-duration or recovery claim, select a new checkpoint, retune the models, or append individual failures to training. Keep reserved confirmation partitions unused until the next scope and acceptance rules are frozen. This audit is proposed, not run.
@@ -1682,7 +1682,7 @@ Used 122,371 new-probe ticks +1,440 reproduction ticks; 872 neutral setups, 72 p
 
 Retain 1,549 sources, 59 copied inputs, 600 traces and 200 admission records, runtime,
 parity and process evidence. All 29 previous manifests and inputs unchanged. See
-[report](flight-hold-robustness-v1.md), [results](data/flight-hold-robustness-v1-results.json)
+[report](flight-hold-robustness-v1.md), results (`docs/data/flight-hold-robustness-v1-results.json`, in git history)
 and [receipt](data/flight-hold-robustness-v1-archive.json).
 
 Specify the next learning task before running more training: a systematic near-goal stabilization/recovery distribution, with signed position, velocity and spin coverage and a separately declared sustained-hold criterion. Keep training, development and confirmation partitions explicit, and use fixed case families rather than appending these failed examples. Include matched task-request controls so duration/deadline conditioning is measured separately. Before a larger run, check the reward/return incentives and whether sampled rollouts actually reach the states needed to learn position correction and sustained low velocity. Preserve the existing short-hold result as a regression check. Keep the current network while designing that controlled test, without native teachers or handoffs. This is the next design decision; no new training recipe is implemented or run.
@@ -1708,7 +1708,7 @@ The exposure preflight passed but had no success and no fully eligible position-
 
 Used 393,216 main ticks +34,816 preflight ticks; 403,095 evaluation ticks in 576 episodes. All 18 subprocesses exited zero; native 421 passed/two ignored, Python 22 passed, parity 224 comparisons passed. Retain 1,552 sources, 60 inputs, 426 new checkpoints, 20 exports and all traces. All 30 prior manifests unchanged.
 
-See [report](flight-settle-recover-v1.md), [results](data/flight-settle-recover-v1-results.json) and [receipt](data/flight-settle-recover-v1-archive.json).
+See [report](flight-settle-recover-v1.md), results (`docs/data/flight-settle-recover-v1-results.json`, in git history) and [receipt](data/flight-settle-recover-v1-archive.json).
 
 Keep the LF-033 short-hold policies as the preserved reference; do not promote either new arm. Before further training, specify a staged shorter-horizon recovery curriculum with fixed signed-error families, explicit progression gates and an original-hold retention requirement. First establish repeatable correction to a short hold; extend requested dwell only after correction and retention pass across seeds. Freeze the progression schedule and distributions rather than appending failed examples. Use the existing reward as the comparison baseline; the present dense term has no demonstrated benefit. Check sampled simultaneous-tolerance coverage as well as case exposure at each stage. Keep confirmation partitions unused, the network unchanged, and native teachers/handoffs absent. This is a proposed next design decision, not another training run.
 
@@ -1733,7 +1733,7 @@ Pilot gate: `{"checks": {"signed_exposure": true, "sampled_success_each_seed": f
 
 Used 68,608 training ticks and 53,788 evaluation ticks in 192 episodes. All 11 subprocesses exited zero; 19 Python tests passed; unchanged native baseline 421 passed/two ignored; 112 parity comparisons passed. All exact resumes, control replay, initial trace reproductions and outcome/reward reconstructions passed. Retain 1,554 sources, 123 copied inputs, 71 new checkpoints and 14 exports. All 31 earlier manifests unchanged. No confirmation or model promotion.
 
-See [report](flight-short-recovery-v1.md), [results](data/flight-short-recovery-v1-results.json) and [receipt](data/flight-short-recovery-v1-archive.json).
+See [report](flight-short-recovery-v1.md), results (`docs/data/flight-short-recovery-v1-results.json`, in git history) and [receipt](data/flight-short-recovery-v1-archive.json).
 
 Keep the preserved LF-033 policies as the reference and leave the curriculum at its entry stage. Before another learning run, freeze a no-training exploration-noise probe using identical starts and task requests for deterministic mean actions and sampled actions at a small declared set of noise amplitudes. Include the four signed-error families and original-hold regression, pair random streams, hold policy means/weights fixed, and report successful correction, simultaneous-tolerance coverage and complete dwell. This tests whether inherited action noise suppresses usable experience without confusing it with task changes or PPO updates. Only then select a bounded training comparison or revise the fixed starting-error ranges. No new noise probe has been run; confirmation partitions, longer dwell stages, network changes and native teachers/handoffs remain unused.
 
@@ -1756,7 +1756,7 @@ Gates: `{"half": {"holding_noise_effect": false, "position_noise_effect": false,
 
 Used 972,617 action ticks in 1,344 episodes, 1,536 neutral setups, 96 parity comparisons and 384 paired normal streams. All seven subprocesses exited zero; 19 Python tests passed; unchanged native baseline 421 passed/two ignored. All parent trace, source/model/RNG neutrality, latent/action and physical-dwell checks passed. Native/Python deterministic outcome/tick differences: 0. Retain 1,556 sources and 105 copied inputs; all 32 earlier manifests unchanged. No training, confirmation, model promotion or new model artifacts.
 
-See [report](flight-noise-probe-v1.md), [results](data/flight-noise-probe-v1-results.json) and [receipt](data/flight-noise-probe-v1-archive.json).
+See [report](flight-noise-probe-v1.md), results (`docs/data/flight-noise-probe-v1-results.json`, in git history) and [receipt](data/flight-noise-probe-v1-archive.json).
 
 Freeze a paired short-recovery training pilot at full versus quarter latent-noise amplitude, using the same preserved policies, cases, reward, architecture and optimizer settings. Make amplitude an explicit versioned exploration setting and apply it consistently to sampling, PPO likelihoods and entropy; do not scale or clip executed actions after computing their probabilities. Require exact full-noise control reproduction and checkpoint resume, then retain the sampled-success, position-coverage and original-hold retention gates before any longer run. Report directional position results separately so forward-only behavior cannot qualify general correction. Keep the curriculum at thirty dwell ticks until correction and retention pass; do not extend dwell, change the network or add native teachers/handoffs yet. The quarter-noise training comparison is proposed, not run. Confirmation partitions and model promotion remain unused.
 
@@ -1780,7 +1780,7 @@ Pilot gates: `{"full": {"checks": {"signed_exposure": true, "sampled_success_eac
 
 Used 104,448 training ticks, 1,146 optimizer steps and 144,375 evaluation ticks in 384 episodes. All 19 subprocesses exited zero; sixteen focused Python tests passed, native baseline unchanged at 421 passed/two ignored, and 192 parity comparisons passed. Exact resumes, parent/control reproduction, matched initial states, physical/reward reconstruction and frozen hashes pass. Retain 1,558 sources, 122 inputs, 108 new checkpoints and 24 exports. All 33 earlier manifests unchanged. No confirmation or promotion.
 
-See [report](flight-noise-training-v1.md), [results](data/flight-noise-training-v1-results.json) and [receipt](data/flight-noise-training-v1-archive.json).
+See [report](flight-noise-training-v1.md), results (`docs/data/flight-noise-training-v1-results.json`, in git history) and [receipt](data/flight-noise-training-v1-archive.json).
 
 Preserve the original LF-033 policies and do not extend training or dwell. Freeze an update-attribution audit using the saved quarter-noise pilot checkpoints and rollouts before changing another training setting. Reproduce selected updates exactly, then measure how policy, value and entropy contributions and optimizer steps change mean steering/throttle/brake on fixed already-declared holding and correction states. Track likelihood ratios/KL, shared-encoder versus actor-head changes and sampled advantage/return signs, while distinguishing gradient evidence from counterfactual update effects. Compare with the matched full-noise controls and account for earlier attribution audits rather than repeating their conclusions by assumption. This should test why successful experience is not improving the mean policy; do not assume lower learning rate, a new reward or a larger network is the answer. Separately review future exposure gates so successful quick corrections are not penalized for spending less time outside tolerance, while keeping the retention gate mandatory. No new attribution audit is run here; confirmation, model promotion, native teachers/handoffs and later curriculum stages remain unused.
 
@@ -1833,13 +1833,13 @@ Retain 1,560 source files, 154 copied inputs (including all 102 parent checkpoin
 102 checkpoint probes, 18 cached rollouts/collector/target/gradient records, 72 branch
 snapshots and per-step probes. All 34 prior manifests and copied inputs remain unchanged.
 No new production checkpoint, policy export, flight evaluation, confirmation or promotion.
-See [machine-readable results](data/flight-noise-update-audit-v1-results.json) and
+See machine-readable results (`docs/data/flight-noise-update-audit-v1-results.json`, in git history) and
 [archive receipt](data/flight-noise-update-audit-v1-archive.json). `analysis.json` in the
 archive contains full-history stop counts, same-step comparisons and advantage summaries.
 
 
 See [report](flight-noise-update-audit-v1.md),
-[results](data/flight-noise-update-audit-v1-results.json) and
+results (`docs/data/flight-noise-update-audit-v1-results.json`, in git history) and
 [receipt](data/flight-noise-update-audit-v1-archive.json).
 
 Preserve the original LF-033 policies. Freeze a paired sixteen-update quarter-noise pilot at learning rates .0003 and .000075, with all three seeds, identical initial weights/fresh Adam, tasks, reward, loss coefficients and exploration. The narrower action distribution now has measured evidence of abrupt optimizer movement: 35/48 original updates stop on KL, including all first updates after one step. Test whether smaller steps improve actual original-hold retention and signed correction, not merely KL or average reward; reproduce the .0003 controls and exact resumes. Keep the thirty-tick dwell and mandatory retention gate, and freeze any revised exposure criterion before running so rapid successful correction is not penalized. This is a step-size hypothesis, not an established cure: policy-only drift and shared-value interference remain possible, and a slower regression would not qualify learning. Do not extend training, remove the critic, enlarge the network, add native teachers/handoffs or promote a model on this audit. No follow-up pilot has run yet; confirmation remains unused.
@@ -1909,7 +1909,7 @@ No frozen process was retried, no gate changed after execution, and no longer ru
 Retain 1,562 sources, six configs, 128 copied inputs, 108 new checkpoints and 24 exports,
 all training/evaluation traces, admissions, likelihood diagnostics, parity and process
 records. All 35 prior manifests and copied inputs remain unchanged. No confirmation or
-model promotion. See [results](data/flight-rate-training-v1-results.json) and
+model promotion. See results (`docs/data/flight-rate-training-v1-results.json`, in git history) and
 [archive receipt](data/flight-rate-training-v1-archive.json).
 
 See [report](flight-rate-training-v1.md).
@@ -1981,7 +1981,7 @@ in **384 episodes**. No frozen process was retried. No update-64 run, confirmati
 promotion occurred. Preserve 1,564 sources, 455 input copies including 229 historical
 completed traces, 102 new checkpoints and 24 exports. The historical trace copies are
 explicitly identified; they do not count as new samples. All 36 previous manifests and
-copied inputs remain unchanged. See [results](data/flight-rate-continuation-v1-results.json)
+copied inputs remain unchanged. See results (`docs/data/flight-rate-continuation-v1-results.json`, in git history)
 and [archive receipt](data/flight-rate-continuation-v1-archive.json).
 
 See [report](flight-rate-continuation-v1.md).
@@ -2062,7 +2062,7 @@ No frozen process was retried. No longer run, confirmation or promotion occurred
 Retain 1,566 sources, six configs, 128 copied inputs, 108 new checkpoints and 24 exports,
 all traces, admissions, parity, process results and gates. The only production edits are
 model.py, ppo.py and run.py; the source archive records their exact versions. All 37 prior
-manifests and copied inputs remain unchanged. See [results](data/flight-value-isolation-v1-results.json)
+manifests and copied inputs remain unchanged. See results (`docs/data/flight-value-isolation-v1-results.json`, in git history)
 and [archive receipt](data/flight-value-isolation-v1-archive.json).
 
 See [report](flight-value-isolation-v1.md).
@@ -2132,7 +2132,7 @@ in **384 episodes**. No frozen process was retried. No update-64 run, confirmati
 promotion occurred. Preserve 1,567 sources, 569 input copies including 334 historical
 completed traces, 102 new checkpoints and 24 exports. The historical trace copies are
 explicitly identified; they do not count as new samples. All 38 previous manifests and
-copied inputs remain unchanged. See [results](data/flight-value-continuation-v1-results.json)
+copied inputs remain unchanged. See results (`docs/data/flight-value-continuation-v1-results.json`, in git history)
 and [archive receipt](data/flight-value-continuation-v1-archive.json).
 
 See [report](flight-value-continuation-v1.md).
@@ -2265,7 +2265,7 @@ trials. Native runtime remains at its retained 421-pass/two-ignored baseline.
 Preserve 1,571 sources, 170 copied inputs, six frozen configs, 108 new checkpoints,
 24 training/resume exports and six preflight exports. All 40 previous manifests and
 copied input sources remain unchanged. Source/runtime/config hashes and archive
-contents are verified. See [results](data/flight-goal-scaling-v1-results.json) and
+contents are verified. See results (`docs/data/flight-goal-scaling-v1-results.json`, in git history) and
 [archive receipt](data/flight-goal-scaling-v1-archive.json). Local retention is not
 an off-machine backup; no commit, confirmation use or promotion is implied.
 
@@ -2366,7 +2366,7 @@ Preserve 1,573 frozen sources, 53 copied inputs (24 checkpoints, 28 traces and p
 results), all derivative/gradient tensors, reconstructed batches/targets, collector
 and RNG snapshots, reports and scripts. Production sources/runtime are unchanged
 from LF-045; the retained native baseline is 421 passed/two ignored. All 41 previous
-manifests and copied inputs remain unchanged. See [results](data/flight-goal-flow-v1-results.json)
+manifests and copied inputs remain unchanged. See results (`docs/data/flight-goal-flow-v1-results.json`, in git history)
 and [archive receipt](data/flight-goal-flow-v1-archive.json). No model was promoted
 or reserved confirmation used. Local retention is not off-machine backup.
 
@@ -2470,7 +2470,7 @@ Preserve 1,575 frozen sources, 172 copied inputs, six configs, the rebuilt runti
 108 checkpoints, 24 pilot/resume exports, six preflight exports and every trace and
 response output. All 42 previous manifests and copied input sources remain
 unchanged. Source/runtime/config/archive hashes are verified. See
-[results](data/flight-goal-residual-v1-results.json) and
+results (`docs/data/flight-goal-residual-v1-results.json`, in git history) and
 [archive receipt](data/flight-goal-residual-v1-archive.json). Local retention is not
 off-machine backup. No confirmation use, promotion or commit is implied.
 
@@ -2584,7 +2584,7 @@ Preserve 1,577 frozen sources, 175 copied inputs, six configs, the unchanged run
 108 checkpoints, 24 pilot/resume exports, six preflight exports and every trace,
 response and learning-signal record. All 43 previous manifests and copied input
 sources remain unchanged. Source/runtime/config/archive hashes are verified. See
-[results](data/flight-family-centering-v1-results.json) and
+results (`docs/data/flight-family-centering-v1-results.json`, in git history) and
 [archive receipt](data/flight-family-centering-v1-archive.json). Local retention is
 not off-machine backup; no commit, confirmation use or promotion is implied.
 
@@ -2711,7 +2711,7 @@ traces, 540 compressed Python traces and policy records, 240 Gaussian streams,
 all conditional densities, summaries, tests, commands and process timings. All
 44 previous manifests and copied input sources remain unchanged. Archive sealing
 verifies source, input and runtime hashes. See
-[results](data/flight-persistent-probe-v1-results.json) and
+results (`docs/data/flight-persistent-probe-v1-results.json`, in git history) and
 [archive receipt](data/flight-persistent-probe-v1-archive.json). Local retention is
 not off-machine backup. Confirmation partitions and model promotion remain unused.
 
@@ -2835,7 +2835,7 @@ Preserve 1,581 frozen sources, 918 copied inputs, unchanged runtime, sixty new n
 traces, 540 compressed Python traces and policy records, 240 streams, all summaries,
 likelihoods, commands, tests and timings. All 45 previous manifests and copied input
 sources remain unchanged. Sealing verifies frozen source/input/runtime hashes.
-See [results](data/flight-propulsion-probe-v1-results.json) and
+See results (`docs/data/flight-propulsion-probe-v1-results.json`, in git history) and
 [archive receipt](data/flight-propulsion-probe-v1-archive.json). Local retention is
 not off-machine backup. No confirmation use, model promotion or general-navigation
 claim follows this probe.
@@ -2973,7 +2973,7 @@ Preserve 1,583 frozen sources, 119 copied inputs, six configs, unchanged runtime
 trace and diagnostic, tests, commands and timings. All 46 prior manifests and
 copied input sources remain unchanged; sealing verifies source/config/runtime hashes.
 The generic run `best.json` metadata is not used for stage advancement: the frozen
-gate assesses update 64. See [results](data/flight-bearing-curriculum-v1-results.json)
+gate assesses update 64. See results (`docs/data/flight-bearing-curriculum-v1-results.json`, in git history)
 and [archive receipt](data/flight-bearing-curriculum-v1-archive.json). Local retention
 is not off-machine backup. No confirmation use, later-stage training or promotion.
 
@@ -3106,7 +3106,7 @@ Retain 1,585 sources, 314 copied inputs, six configs, unchanged runtime,
 diagnostics, tests, commands and timings. Sealing checks source/config/runtime
 hashes, copied input sources and all 47 prior manifests. The generic `best.json`
 metadata does not select a qualified model: the frozen gate assesses update 64.
-See [results](data/flight-fresh-initialization-v1-results.json) and
+See results (`docs/data/flight-fresh-initialization-v1-results.json`, in git history) and
 [archive receipt](data/flight-fresh-initialization-v1-archive.json). No confirmation
 use, later-stage training or promotion; local retention is not off-machine backup.
 
@@ -3358,7 +3358,7 @@ training remains separate implementation verification.
 Retain 1,597 frozen sources, 104 copied inputs, the task matrix, runtime/dependencies,
 96 scored traces, three continuation traces, every parity/probe result, tests,
 commands and timings. All 49 prior manifest hashes and copied input sources remain
-unchanged. See [results](data/flight-motor-retention-v1-results.json) and
+unchanged. See results (`docs/data/flight-motor-retention-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-retention-v1-archive.json). No reserved
 confirmation use, model promotion or navigation qualification. Local retention
 is not off-machine backup.
@@ -3410,7 +3410,7 @@ three or four times per seed. Retain 390 checkpoints, 12 exports, 387 rollouts,
 steps, 1,336 restoration ticks, 561,600 scored evaluation ticks and 1,780 neutral
 setups. All seven processes complete within budget; 50 earlier manifests remain
 unchanged. See [report](flight-motor-velocity-v1.md),
-[results](data/flight-motor-velocity-v1-results.json) and
+results (`docs/data/flight-motor-velocity-v1-results.json`, in git history) and
 [receipt](data/flight-motor-velocity-v1-archive.json).
 
 **Next decision:** Freeze a small **propulsion-exploration audit** before another training run.
@@ -3453,7 +3453,7 @@ All four processes finish within budget without retry. Retain 1,602 sources, eig
 copied inputs, all traces/sample records and twelve audit sampler snapshots.
 Fifty-one previous manifests remain unchanged. Zero training or new policy exports.
 See [report](flight-motor-exploration-v1.md),
-[results](data/flight-motor-exploration-v1-results.json) and
+results (`docs/data/flight-motor-exploration-v1-results.json`, in git history) and
 [receipt](data/flight-motor-exploration-v1-archive.json).
 
 **Next decision:** Freeze a **bounded paired velocity-learning comparison** using all three original
@@ -3502,7 +3502,7 @@ All 26 processes finish within budget without retry. Use 811,008 training ticks,
 12,672 optimizer steps, 9,599 restoration ticks, 1,123,200 evaluation ticks and
 3,665 neutral setups. Retain 804 checkpoints, 48 exports, 792 rollouts, 1,605 sources
 and 110 copied inputs. All 52 previous manifest hashes remain unchanged. See
-[report](flight-motor-persistent-v1.md), [results](data/flight-motor-persistent-v1-results.json)
+[report](flight-motor-persistent-v1.md), results (`docs/data/flight-motor-persistent-v1-results.json`, in git history)
 and [receipt](data/flight-motor-persistent-v1-archive.json).
 
 **Next decision:** Freeze a **read-only learning-signal and update audit** of the retained LF-057
@@ -3553,7 +3553,7 @@ budget without retry. Retain 1,607 sources, 3,814 input copies, rowwise data,
 gradients and all anchor histories; all 53 previous manifest hashes remain
 unchanged. No training/physics/optimizer steps, policy exports, confirmation use
 or model promotion. See [report](flight-motor-credit-v1.md),
-[results](data/flight-motor-credit-v1-results.json) and
+results (`docs/data/flight-motor-credit-v1-results.json`, in git history) and
 [receipt](data/flight-motor-credit-v1-archive.json).
 
 **Next decision:** Design a bounded **aligned velocity-entry experiment** before another full
@@ -3606,7 +3606,7 @@ first main rollouts pass. Use 811,008 training ticks, 12,672 optimizer steps,
 9,498 restoration ticks, 910,956 evaluation ticks and 3,677 neutral setups.
 Retain 804 checkpoints, 48 exports, 792 rollouts, 1,611 sources and 176 input copies.
 All 54 earlier manifests remain unchanged; no promotion or confirmation use.
-See [report](flight-motor-aligned-v1.md), [results](data/flight-motor-aligned-v1-results.json)
+See [report](flight-motor-aligned-v1.md), results (`docs/data/flight-motor-aligned-v1-results.json`, in git history)
 and [receipt](data/flight-motor-aligned-v1-archive.json).
 
 **Next decision:** Keep stopping actor updates in the next proposed baseline; the isolated arm has
@@ -3705,7 +3705,7 @@ traces. Actual work: 823,296 training ticks, 12,864 optimizer steps, 8,279 resto
 ticks, 1,117,535 evaluation ticks and 6,894 neutral setups. Retain 816 checkpoints,
 804 rollouts, 48 exports, 1,617 sources and 176 copied inputs. All 56 previous
 manifests remain unchanged. No confirmation use or promotion. See
-[report](flight-motor-sustained-v2.md), [results](data/flight-motor-sustained-v2-results.json)
+[report](flight-motor-sustained-v2.md), results (`docs/data/flight-motor-sustained-v2-results.json`, in git history)
 and [receipt](data/flight-motor-sustained-v2-archive.json).
 
 **Next decision:** Inspect the saved policies' corrective response before another training change.
@@ -3812,7 +3812,7 @@ Actual work: 823,296 training ticks, 12,864 optimizer steps, 12,618 restoration
 ticks, 1,120,694 evaluation ticks and 6,384 neutral setup ticks. Retain 816
 checkpoints, 804 rollouts, 48 exports, 1,623 sources and 204 inputs. All 58 prior
 manifests remain unchanged. No confirmation use or promotion. See
-[report](flight-motor-movement-v1.md), [results](data/flight-motor-movement-v1-results.json)
+[report](flight-motor-movement-v1.md), results (`docs/data/flight-motor-movement-v1-results.json`, in git history)
 and [receipt](data/flight-motor-movement-v1-archive.json).
 
 **Next decision:** Freeze a bounded matched-state action/return probe before another training
@@ -3860,7 +3860,7 @@ all performed actions/values and the full reward/credit summaries. Retain 1,625
 sources, 123 copied inputs, 18 prefixes, 972 batch files and every noise draw.
 All 59 prior manifests remain unchanged. No optimizer steps, new model, promotion
 or confirmation use. See [report](flight-motor-action-return-v1.md),
-[results](data/flight-motor-action-return-v1-results.json) and
+results (`docs/data/flight-motor-action-return-v1-results.json`, in git history) and
 [receipt](data/flight-motor-action-return-v1-archive.json).
 
 **Next decision:** Freeze a matched GAE-lambda comparison: .95 versus 1.0, keeping gamma .99,
@@ -3918,7 +3918,7 @@ Actual totals: 823,296 training ticks, 12,864 optimizer steps, 13,397 restoratio
 ticks, 1,121,184 evaluation ticks and 6,385 neutral setups. Retain 816 checkpoints,
 804 rollouts, 48 exports, 1,629 sources, 204 copied inputs and all diagnostics.
 All 60 prior manifests remain unchanged. No confirmation use or promotion. See
-[report](flight-motor-gae-v1.md), [results](data/flight-motor-gae-v1-results.json)
+[report](flight-motor-gae-v1.md), results (`docs/data/flight-motor-gae-v1-results.json`, in git history)
 and [receipt](data/flight-motor-gae-v1-archive.json).
 
 **Next decision:** Freeze a bounded read-only audit of the saved lambda-1 checkpoints and updates,
@@ -3968,7 +3968,7 @@ parent checkpoints. Retain 1,631 original sources, two corrections, 1,560 inputs
 all response/history/training statistics and both result versions. All 61 earlier
 manifests and copied input origins remain unchanged. No new physics, optimizer
 steps, checkpoints, exports, confirmation use or promotion. See
-[report](flight-motor-balance-v1.md), [results](data/flight-motor-balance-v1-results.json)
+[report](flight-motor-balance-v1.md), results (`docs/data/flight-motor-balance-v1-results.json`, in git history)
 and [receipt](data/flight-motor-balance-v1-archive.json).
 
 **Next decision:** Design a bounded paired test of **command-balanced collection within each
@@ -4024,7 +4024,7 @@ the regression's 1,024 training ticks, 16 optimizer steps, 714 restoration ticks
 and nine setups. Retain 564 checkpoints, 552 rollouts, 48 exports, 1,635 sources,
 180 inputs and all evidence. All 62 prior manifests remain unchanged. No
 confirmation use or promotion. See [report](flight-motor-command-balance-v1.md),
-[results](data/flight-motor-command-balance-v1-results.json) and
+results (`docs/data/flight-motor-command-balance-v1-results.json`, in git history) and
 [receipt](data/flight-motor-command-balance-v1-archive.json).
 
 **Next decision:** Freeze a bounded saved-gradient audit of the command-balanced runs and their
@@ -4076,7 +4076,7 @@ new training or physics, policy export, promotion or confirmation use. Original
 stopping and all 63 prior manifests remain unchanged. This is C4 audit 22;
 learning attempts remain 33 and general speed tracking remains unqualified.
 
-See [results](data/flight-motor-gradient-v1-results.json),
+See results (`docs/data/flight-motor-gradient-v1-results.json`, in git history),
 [analysis](data/flight-motor-gradient-v1-analysis.json) and
 [receipt](data/flight-motor-gradient-v1-archive.json).
 
@@ -4126,8 +4126,8 @@ confirmation use, promotion or navigation qualification. This is learning attemp
 Actual cost: 423,936 training ticks, 6,624 optimizer steps, 9,908 restoration
 ticks, 560,165 evaluation ticks and 3,294 setups. Retain 282 checkpoints, 276
 rollouts, 24 exports, 1,642 sources, 177 inputs and all trajectories/verification.
-See [results](data/flight-motor-single-speed-v1-results.json),
-[analysis](data/flight-motor-single-speed-v1-analysis.json) and
+See results (`docs/data/flight-motor-single-speed-v1-results.json`, in git history),
+analysis (`docs/data/flight-motor-single-speed-v1-analysis.json`, in git history) and
 [receipt](data/flight-motor-single-speed-v1-archive.json).
 
 **Next decision:** Freeze a bounded saved-update audit of underspeed versus overspeed contributions
@@ -4180,7 +4180,7 @@ No post-freeze source corrections or retries. Synthetic testing uses 73 optimize
 steps separately from 360 scored diagnostic replay steps. No new training ticks,
 physics, training checkpoints or exports. Retain fifteen replay evidence files,
 all gradients/rewards/projections and the original fixture-failure logs.
-See [results](data/flight-motor-error-gradient-v1-results.json),
+See results (`docs/data/flight-motor-error-gradient-v1-results.json`, in git history),
 [analysis](data/flight-motor-error-gradient-v1-analysis.json) and
 [receipt](data/flight-motor-error-gradient-v1-archive.json).
 
@@ -4233,7 +4233,7 @@ Preparation tests add five new /657 replay ticks and five setups. Retain 360
 batch files, 3,240 branch traces, 1,647 sources, 207 inputs, eighty prefixes,
 fifteen inference copies and all paired results. No post-freeze source changes,
 retry, optimizer update or trained-policy export. See
-[results](data/flight-motor-error-return-v1-results.json),
+results (`docs/data/flight-motor-error-return-v1-results.json`, in git history),
 [findings](data/flight-motor-error-return-v1-findings.json) and
 [receipt](data/flight-motor-error-return-v1-archive.json).
 
@@ -4284,7 +4284,7 @@ qualification. No physical failure occurs in this selected rollout window; prior
 failures remain protected. Preparation tests add 72 new /2,709 restore ticks and
 21 setups. Retain 255 rollouts/collector snapshots and all gradients, rewards,
 RNG, traces, fixed panels, 1,649 sources and 264 inputs. See
-[results](data/flight-motor-rollout-gradient-v1-results.json),
+results (`docs/data/flight-motor-rollout-gradient-v1-results.json`, in git history),
 [findings](data/flight-motor-rollout-gradient-v1-findings.json) and
 [receipt](data/flight-motor-rollout-gradient-v1-archive.json).
 
@@ -4335,7 +4335,7 @@ Retain 857,088 training ticks, 8,208 Adam steps,
 retained pre-freeze errors; no frozen-source correction or training retry.
 The 354 checkpoints, 342 rollouts, 48 exports, 5,239 completed training traces,
 fifteen gradient bundles and all partial traces/RNG remain archived. See
-[results](data/flight-motor-effective-batch-v1-results.json),
+results (`docs/data/flight-motor-effective-batch-v1-results.json`, in git history),
 [findings](data/flight-motor-effective-batch-v1-findings.json), and
 [receipt](data/flight-motor-effective-batch-v1-archive.json).
 

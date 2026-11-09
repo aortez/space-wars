@@ -152,7 +152,7 @@ Native tests: **421 passed, two ignored**. Focused Python tests: **22 passed**. 
 
 Main training used **393,216 action ticks** and **6,045 optimizer steps**, plus **34,816 preflight ticks**. Evaluation used **403,095 action ticks** in 576 episodes. All 18 subprocesses exited zero within budget; main run times 282.75–286.04 seconds. No budget extension, confirmation use, model promotion or general-navigation claim.
 
-Archive `data/training-experiments/learned-flight-settle-recover-v1-20261024` retains 1,552 sources, rebuilt runtime, 60 parent inputs, 426 new checkpoints, 20 exports, all training/evaluation traces, admissions, reward/coverage/parity evidence and logs. All 30 earlier manifests and copied inputs remain unchanged. See [results](data/flight-settle-recover-v1-results.json) and [receipt](data/flight-settle-recover-v1-archive.json).
+Archive `data/training-experiments/learned-flight-settle-recover-v1-20261024` retains 1,552 sources, rebuilt runtime, 60 parent inputs, 426 new checkpoints, 20 exports, all training/evaluation traces, admissions, reward/coverage/parity evidence and logs. All 30 earlier manifests and copied inputs remain unchanged. See results (`docs/data/flight-settle-recover-v1-results.json`, in git history) and [receipt](data/flight-settle-recover-v1-archive.json).
 
 ## Next decision
 

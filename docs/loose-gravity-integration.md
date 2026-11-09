@@ -108,7 +108,7 @@ Use `--shape round` for the other grain proxy. The regular Space Wars launcher
 uses the same integration when loose dirt is enabled; the cave fixture remains
 a headless development scene.
 
-[Measurements and build identities](data/dirt-gravity-20261008.json) ·
+Measurements and build identities (`docs/data/dirt-gravity-20261008.json`, in git history) ·
 [per-second diagnostics](data/dirt-gravity-traces-20261008.jsonl.gz) ·
 [packing profiles](data/dirt-gravity-profiles-20261008.jsonl.gz).
 

@@ -148,7 +148,7 @@ identities. Engine code is unchanged; the preceding engine test results are
 not counted as a new run.
 
 The [manifest](data/rebuild-forecast-selection-v2.json) and
-[portable review bundle](data/rebuild-forecast-selection-v2.json.gz) retain the
+portable review bundle (`docs/data/rebuild-forecast-selection-v2.json.gz`, in git history) retain the
 sources, plans, failed-batch evidence, forecast and actual samples, audits,
 validation logs, timing measurements, exporter and archive receipts. Verified
 full archives remain under `target/rebuild-forecast-selection/v1/archives/`

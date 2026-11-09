@@ -43,7 +43,7 @@ seconds for the graded arm, **9 minutes 59.55 seconds combined**. Preflight,
 source reconstruction and final comparison bring the recorded execution phases
 to **13 minutes 25.31 seconds**, excluding compilation, analysis and archiving.
 
-The [compact results](data/learned-guidance-graded-braking-v1-results.json)
+The compact results (`docs/data/learned-guidance-graded-braking-v1-results.json`, in git history)
 retain population distributions, per-case outcomes, probe values and validation
 counts. The [trace inspection](data/learned-guidance-graded-braking-v1-inspection.json)
 records the newly successful and remaining failed continuations.

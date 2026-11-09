@@ -128,7 +128,7 @@ is made.
 
 The [manifest](data/terrain-flight-forecast-v1.json) records commands, binary and
 input hashes, work and timing summaries, native receipts, validation and all five
-lossless archive inventories. The [portable review bundle](data/terrain-flight-forecast-v1.json.gz)
+lossless archive inventories. The portable review bundle (`docs/data/terrain-flight-forecast-v1.json.gz`, in git history)
 contains the frozen sources and plan, full reports and audits, forecast
 measurements, dense projected high-flight evidence, full recovery handoff
 witnesses, logs and reproducible exporter. The full raw streams remain in the

@@ -230,7 +230,7 @@ traces, 540 compressed Python traces and policy records, 240 Gaussian streams,
 all conditional densities, summaries, tests, commands and process timings. All
 44 previous manifests and copied input sources remain unchanged. Archive sealing
 verifies source, input and runtime hashes. See
-[results](data/flight-persistent-probe-v1-results.json) and
+results (`docs/data/flight-persistent-probe-v1-results.json`, in git history) and
 [archive receipt](data/flight-persistent-probe-v1-archive.json). Local retention is
 not off-machine backup. Confirmation partitions and model promotion remain unused.
 

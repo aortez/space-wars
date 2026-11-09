@@ -64,7 +64,7 @@ and steering comparisons as historical evidence.
 
 ## Diagnosis and declared tradeoff
 
-The [saved geometry report](data/projectile-response-selection-geometry-v1.json)
+The saved geometry report (`docs/data/projectile-response-selection-geometry-v1.json`, in git history)
 retains the four source observations, action bytes, rotating-frame calculation,
 contact/loss outcomes and dense clear-entry precontact tracks. Positive radial
 acceleration below points **toward** the warned-about projectile.

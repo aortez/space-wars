@@ -132,8 +132,8 @@ completed the remaining nine games. The pre-resume summary and both runner
 logs remain in the review bundle. No audit condition, runtime, case or frozen
 plan was changed in that repair.
 
-The [manifest](data/live-claim-ablation-v1.json) and
-[review bundle](data/live-claim-ablation-v1.json.gz) retain commands, hashes,
+The manifest (`docs/data/live-claim-ablation-v1.json`, in git history) and
+review bundle (`docs/data/live-claim-ablation-v1.json.gz`, in git history) retain commands, hashes,
 both player records, all comparisons, complete first-action witnesses,
 chronologies, source snapshots and validation logs. Full local streams cover
 **629,738 dense actor rows** and **113,028 partial native impact rows** under

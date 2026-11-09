@@ -214,9 +214,9 @@ of **4 graph operations / 384 queries**, with publication age at most 120 ticks
 and each handed-off generation bounded by its parent's expiry. Total work differs
 with changed trajectories; no device performance claim follows.
 
-[The manifest](data/covered-request-handoff-v1.json) retains per-case original,
+The manifest (`docs/data/covered-request-handoff-v1.json`, in git history) retains per-case original,
 initial-cover and scheduler outcomes.
-[The compressed archive](data/covered-request-handoff-v1.json.gz) contains 110
+The compressed archive (`docs/data/covered-request-handoff-v1.json.gz`, in git history) contains 110
 exact documents: frozen summaries/plan, handoff and current-observation witnesses,
 physical/route/flight/health evidence, first changed controls, visit/cover/damage
 timelines, validation logs and hashes for 534 raw files. The post-outcome focused

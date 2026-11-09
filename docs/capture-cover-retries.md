@@ -97,7 +97,7 @@ All 70 runs completed in `target/cover-retry-cooldown/v2`: six regression runs,
 at `058d761`; the corrected runner is `c8c1ac8`. The preserved executable
 `target/cover-retry-cooldown/surface_mission_soak-058d761` has SHA-256
 `8320cd4e3fea55915f2b1068b2138b989d1f74207076b6b6d554aa791e5ee17f`.
-The [evidence archive](data/capture-cover-retries-v1.json) retains commands,
+The evidence archive (`docs/data/capture-cover-retries-v1.json`, in git history) retains commands,
 source/tool/raw hashes, per-seat visits and forecasts, progress, work, timings,
 the directed native-choice audit and the rejected first validation attempt.
 Every retained raw hash was checked after the run.

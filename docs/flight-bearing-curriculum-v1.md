@@ -268,7 +268,7 @@ Preserve 1,583 frozen sources, 119 copied inputs, six configs, unchanged runtime
 trace and diagnostic, tests, commands and timings. All 46 prior manifests and
 copied input sources remain unchanged; sealing verifies source/config/runtime hashes.
 The generic run `best.json` metadata is not used for stage advancement: the frozen
-gate assesses update 64. See [results](data/flight-bearing-curriculum-v1-results.json)
+gate assesses update 64. See results (`docs/data/flight-bearing-curriculum-v1-results.json`, in git history)
 and [archive receipt](data/flight-bearing-curriculum-v1-archive.json). Local retention
 is not off-machine backup. No confirmation use, later-stage training or promotion.
 

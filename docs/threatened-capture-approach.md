@@ -214,9 +214,9 @@ route, flight-continuation, hull-gate and allocation auditors pass. Live charged
 work stays within 4 graph / 384 queries, and publication age stays within 120
 ticks. Extra diagnostic work is isolated from the ordinary sensor counters.
 
-[The result manifest](data/threatened-capture-approach-v1.json) retains all seven
+The result manifest (`docs/data/threatened-capture-approach-v1.json`, in git history) retains all seven
 snapshots, comparisons, physical outcomes and derived findings.
-[The compressed evidence archive](data/threatened-capture-approach-v1.json.gz)
+The compressed evidence archive (`docs/data/threatened-capture-approach-v1.json.gz`, in git history)
 contains 16 exact documents, including native paired measurements, the dense
 derived timeline, physical witnesses, full report, original plan, hypothetical
 score calculations and validation logs. Hashes for 18 raw files and every

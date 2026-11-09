@@ -219,7 +219,7 @@ action ticks** and **1,780 neutral setup ticks**. Every declared limit is met.
 Retain 1,600 frozen source files, 104 copied inputs, 390 new checkpoints, 12 policy
 exports, 387 rollout tensors, all traces, tests, timings and post-hoc analysis.
 All 50 prior manifest hashes and input origins remain unchanged. See
-[results](data/flight-motor-velocity-v1-results.json) and
+results (`docs/data/flight-motor-velocity-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-velocity-v1-archive.json). No reserved
 confirmation use, model promotion or navigation qualification. Local retention
 is not off-machine backup.

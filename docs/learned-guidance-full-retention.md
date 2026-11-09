@@ -62,7 +62,7 @@ different decimal representations map to identical values. The Rust replay
 already asserted complete episode equality before serialization. Training,
 evaluation, source and the selected genome were not rerun or changed.
 
-The [machine-readable results](data/learned-guidance-match-training-v3-results.json)
+The machine-readable results (`docs/data/learned-guidance-match-training-v3-results.json`, in git history)
 retain each approach outcome, settling metrics and verification counts.
 
 ## Population history

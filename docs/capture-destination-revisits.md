@@ -76,7 +76,7 @@ python3 tools/analyze-destination-revisits.py \
 ## Results
 
 The audit at `526385e` completed all 74 recordings from runtime `757efb5`.
-The [results archive](data/capture-destination-revisits-v1.json) retains each
+The results archive (`docs/data/capture-destination-revisits-v1.json`, in git history) retains each
 abandoned visit, its witnessed failure, pursuit episodes, next same-planet
 selection and accepted switch forecast where applicable. It also binds the
 original report/evaluation hashes and the analyzed native source files.

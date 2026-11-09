@@ -119,7 +119,7 @@ The frozen gameplay implementation is `757efb5`, with preserved binary
 `07955d51846d790797ef9a7c24cf1d792da5922d2536f674c74001efa82fd9ae`.
 All 74 original runs completed. The corrected audit from `9ca9bda` completes in
 `target/cover-response/v2`; it does not rerun or retune the 74 trials. The
-[results archive](data/capture-cover-response-v1.json) binds the original failed
+results archive (`docs/data/capture-cover-response-v1.json`, in git history) binds the original failed
 validation, corrected audit, all commands/raw hashes and two supplementary
 activation replays. A compressed companion retains the two witnessed covered
 selection observations from the recorded candidate traces.

@@ -149,7 +149,7 @@ candidate behavior, thresholds or promotion claim.
 
 ### Completed validation
 
-The [machine-readable evidence](data/published-flag-costs-v1.json) records the
+The machine-readable evidence (`docs/data/published-flag-costs-v1.json`, in git history) records the
 plan, commands, per-seat configuration, original predictions, actual milestones,
 failures, progress, timing and raw-file hashes. Candidate behavior was frozen at
 `26dd4c5`; the corrected runner at `bc4d483`; the corrected progress observer at

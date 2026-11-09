@@ -108,7 +108,7 @@ release build and default-feature library/dependency check. Broad native Clippy
 still **fails with the same 16 message/file diagnostic identities** as the baseline.
 
 The [manifest](data/rebuild-footing-recheck-v1.json) and
-[portable bundle](data/rebuild-footing-recheck-v1.json.gz) include full contact
+portable bundle (`docs/data/rebuild-footing-recheck-v1.json.gz`, in git history) include full contact
 probes, fresh/ignored failures, revalidation witnesses, surface-normal comparisons,
 timelines, validation, frozen and repaired source, and the complete audit history.
 Final archives use the suffix `-reaudit-394879659e93.tar.gz` under

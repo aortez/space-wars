@@ -3,9 +3,7 @@
 Prose and images belong under docs/. A data file there (JSON, CSV, text, HTML,
 a compressed archive and the like) stays under the size limit unless a source
 file names it, and no text file under docs/ names a device or carries a
-secret. Oversized files that predate the rule are listed in
-docs-data-grandfathered.txt; with --baseline REF, that list may only shrink
-relative to the copy at REF.
+secret.
 """
 
 import argparse
@@ -15,7 +13,6 @@ import sys
 from pathlib import Path
 
 LIMIT = 256 * 1024
-GRANDFATHERED = Path(".github/ci/docs-data-grandfathered.txt")
 PROSE = {".md"}
 IMAGES = {".gif", ".jpeg", ".jpg", ".png", ".svg", ".webp"}
 UNSCANNED = {".gz", ".tar", ".zip"} | IMAGES
@@ -134,23 +131,13 @@ def identifier_findings(path, text):
     return findings
 
 
-def check(files, read, referenced, grandfathered, baseline=None):
-    """Check tracked docs files: (path, size) pairs, a reader, names source files mention, the grandfathered paths and the baseline's."""
+def check(files, read, referenced):
+    """Check tracked docs files: (path, size) pairs, a reader and the names source files mention."""
     problems = []
-    listed = set(grandfathered)
-    sizes = dict(files)
-    for path in grandfathered:
-        if path not in sizes:
-            problems.append(f"{path}: no longer exists; remove it from {GRANDFATHERED}")
-        elif sizes[path] <= LIMIT or not is_data(path):
-            problems.append(f"{path}: no longer needs grandfathering; remove it from {GRANDFATHERED}")
-    if baseline is not None:
-        for path in sorted(listed - set(baseline)):
-            problems.append(f"{path}: added to {GRANDFATHERED}, which only shrinks")
     read_by_code = 0
     scanned = 0
     for path, size in files:
-        if is_data(path) and size > LIMIT and path not in listed:
+        if is_data(path) and size > LIMIT:
             if names(path) & referenced:
                 read_by_code += 1
             else:
@@ -165,7 +152,7 @@ def check(files, read, referenced, grandfathered, baseline=None):
         raise ValueError("\n".join(problems))
     return (
         f"Docs data check passed: {len(files)} files, {scanned} scanned for identifiers,"
-        f" {read_by_code} oversized data files read by code, {len(listed)} grandfathered."
+        f" {read_by_code} oversized data files read by code."
     )
 
 
@@ -202,42 +189,15 @@ def referenced_names(files):
     return set(result.stdout.split())
 
 
-def parse_grandfathered(text):
-    return [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("#")]
-
-
-def grandfathered_paths():
-    if not GRANDFATHERED.exists():
-        return []
-    return parse_grandfathered(GRANDFATHERED.read_text())
-
-
-def grandfathered_at(ref):
-    """The grandfathered list at a git ref, or None when that ref has no list."""
-    result = subprocess.run(
-        ["git", "show", f"{ref}:{GRANDFATHERED.as_posix()}"], capture_output=True, text=True, check=False
-    )
-    if result.returncode != 0:
-        return None
-    return parse_grandfathered(result.stdout)
-
-
 def read_text(path):
     return Path(path).read_bytes().decode("utf-8", "replace")
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--baseline", metavar="REF", help="git ref whose grandfathered list the current one may not add to"
-    )
-    args = parser.parse_args()
+    argparse.ArgumentParser(description=__doc__).parse_args()
     try:
-        baseline = grandfathered_at(args.baseline) if args.baseline else None
         files = tracked_docs()
-        print(check(files, read_text, referenced_names(files), grandfathered_paths(), baseline))
-        if args.baseline and baseline is None:
-            print(f"No grandfathered list at {args.baseline}; additions were not compared.")
+        print(check(files, read_text, referenced_names(files)))
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print(f"Docs data check failed:\n{error}", file=sys.stderr)
         return 1

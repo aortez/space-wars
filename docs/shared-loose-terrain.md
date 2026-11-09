@@ -692,7 +692,7 @@ cells, explaining the differing populations as well as trajectories.
 ### Reproduction and retained evidence
 
 [All timing summaries](data/loose-terrain-picade-20261003.csv) include per-run
-statistic medians and ranges. The [review archive](data/loose-terrain-picade-20261003.tar.gz)
+statistic medians and ranges. The review archive (`docs/data/loose-terrain-picade-20261003.tar.gz`, in git history)
 contains command order, exit statuses, raw runner outputs, thermal samples,
 analysis scripts, exact measured-source patches, executable SHA-256 values and
 the publication-order diagnostic. Extract it and run `python3 analyze.py` to

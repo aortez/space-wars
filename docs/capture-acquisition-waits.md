@@ -145,7 +145,7 @@ The implementation and fixed replays are documented in the
 
 ## Validation and retained evidence
 
-The [complete audit record](data/capture-acquisition-waits-v1.json) preserves
+The complete audit record (`docs/data/capture-acquisition-waits-v1.json`, in git history) preserves
 all historical attempt identities and original raw trace hashes, 33 consumed
 archive-member hashes, both longer no-flag wait ledgers, current native choice
 endpoints, repeated-mode bindings and skipped ordinary records. It is copied

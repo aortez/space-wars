@@ -119,7 +119,7 @@ collector, optimizer metrics and reconstructed GAE targets exactly. Four preflig
 tests passed, including a separate exact replay of update 129. No production source,
 reward, architecture, task or execution default changed.
 
-[Results](data/flight-update-attribution-v1-results.json) retain the complete scan,
+Results (`docs/data/flight-update-attribution-v1-results.json`, in git history) retain the complete scan,
 per-state predictions, component gradients, row groups and coefficient probes.
 The [archive receipt](data/flight-update-attribution-v1-archive.json) identifies the
 source, inputs and replay evidence.

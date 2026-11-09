@@ -92,7 +92,7 @@ it adds roughly 621,000 graph steps and 306,000 physics queries per failed
 snapshot, not a viable per-tick scan or a measurement of Pi performance.
 
 The [forecast manifest](data/capture-jetpack-approaches-v1.json) records the
-per-clock work and provenance. Its [compressed inputs](data/capture-jetpack-approaches-v1.json.gz)
+per-clock work and provenance. Its compressed inputs (`docs/data/capture-jetpack-approaches-v1.json.gz`, in git history)
 preserve the exact summary and probe documents. The binary SHA-256 is
 `7f1bdc5ad7829298cf7d6674f47a9ae457fce5399c448dfc7db382555511726d`;
 the summary SHA-256 is
@@ -185,7 +185,7 @@ totals/reset records change.
 
 The [execution manifest](data/capture-jetpack-execution-v1.json) records exact
 clocks, outcomes, hashes, commands and verification. Its
-[compressed evidence](data/capture-jetpack-execution-v1.json.gz) includes both
+compressed evidence (`docs/data/capture-jetpack-execution-v1.json.gz`, in git history) includes both
 audit summaries, exact diagnostic documents and original physical witness
 rows around each milestone, launch, crossing completion, counter reset and
 start/end. Full per-tick traces remain at the hashed local paths. The preserved

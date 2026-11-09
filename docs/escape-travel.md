@@ -191,8 +191,8 @@ The frozen profiled binary is
 `b78c35e2c3ed10cc82a8ce468db5816276716e046487572a618bae449bdcdc2d`.
 The complete summary at `target/escape-travel/v1/summary.json` has SHA-256
 `b0dfa9ca2351728d916c6a3877bcbfb894ff437cbe12c08396a1170009022873`.
-[The manifest](data/escape-travel-v1.json) records all outcomes and verification
-checks. [The archive](data/escape-travel-v1.json.gz)
+The manifest (`docs/data/escape-travel-v1.json`, in git history) records all outcomes and verification
+checks. The archive (`docs/data/escape-travel-v1.json.gz`, in git history)
 retains the frozen plan, summaries, every consumed travel observation, prior
 native receipt/abort and route/physical witnesses, first changed controls,
 mission/vehicle/damage history, arrival and weapon geometry, reproduction

@@ -162,7 +162,7 @@ trials. Native runtime remains at its retained 421-pass/two-ignored baseline.
 Preserve 1,571 sources, 170 copied inputs, six frozen configs, 108 new checkpoints,
 24 training/resume exports and six preflight exports. All 40 previous manifests and
 copied input sources remain unchanged. Source/runtime/config hashes and archive
-contents are verified. See [results](data/flight-goal-scaling-v1-results.json) and
+contents are verified. See results (`docs/data/flight-goal-scaling-v1-results.json`, in git history) and
 [archive receipt](data/flight-goal-scaling-v1-archive.json). Local retention is not
 an off-machine backup; no commit, confirmation use or promotion is implied.
 

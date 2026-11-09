@@ -213,9 +213,9 @@ The frozen binary is
 `2b3a3db1b83475c7ed746a889c7fa02f093aa31cffb8d99546f7feeab34fac9a`.
 The completed runner summary is `target/projectile-response/v1/summary.json`,
 SHA-256 `925e00db0de04e329c51273fb64722a3b94d345c86dd1b2172aa9b8e63cba600`.
-The [manifest](data/projectile-response-v1.json) records all 17 outcomes, contact
+The manifest (`docs/data/projectile-response-v1.json`, in git history) records all 17 outcomes, contact
 and loss receipts, input/tool/binary hashes, and **270 raw-file hashes**. The
-[compressed archive](data/projectile-response-v1.json.gz) preserves the original
+compressed archive (`docs/data/projectile-response-v1.json.gz`, in git history) preserves the original
 runner summary, pulse witnesses, dense damage changes, projectile tracks,
 physical visit audits, report checkpoints and final reports excluding their
 large samples/events arrays. Complete raw reports and streams remain at their

@@ -343,7 +343,7 @@ copied inputs**, all physical traces, target checks, feedback, analyses, failure
 configs, runtime, commands and logs. The source and frozen specification remain
 unchanged; all **60 prior manifests** and copied input origins are verified.
 The completed report, canonical plan, contract, journal and README are retained
-with the run. See [results](data/flight-motor-gae-v1-results.json) and
+with the run. See results (`docs/data/flight-motor-gae-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-gae-v1-archive.json).
 
 ## Interpretation and next decision

@@ -274,8 +274,8 @@ Retain 282 checkpoints, 276 rollouts, 24 exports, 1,642 source files, 177 copied
 inputs, all complete/partial training and evaluation traces, analysis, commands,
 logs and verification. All 64 prior manifests and the complete LF-067/LF-068
 archives remain unchanged. Source/config/task/runtime hashes remain frozen.
-See [results](data/flight-motor-single-speed-v1-results.json),
-[analysis](data/flight-motor-single-speed-v1-analysis.json) and
+See results (`docs/data/flight-motor-single-speed-v1-results.json`, in git history),
+analysis (`docs/data/flight-motor-single-speed-v1-analysis.json`, in git history) and
 [archive receipt](data/flight-motor-single-speed-v1-archive.json).
 
 ## Interpretation and next decision

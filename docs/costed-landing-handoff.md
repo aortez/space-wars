@@ -117,7 +117,7 @@ within 4/384. All **17** directed/regression v14 replays matched the predecessor
 exact evaluator bytes, mission telemetry and recorded physical outcomes. Every
 paired action/range/ownership prefix check passed.
 
-The [complete summary](data/costed-landing-handoff-v1.json) is an unchanged copy
+The complete summary (`docs/data/costed-landing-handoff-v1.json`, in git history) is an unchanged copy
 of the raw summary, SHA-256
 `03e2ca83139228fcb78fe998df4afa2f3c4fcc4e671a5c08d8080800e8813f3c`.
 It retains the full plan, commands, accepted switch forecasts, exact visits,

@@ -158,7 +158,7 @@ no auditor correction or gameplay rerun is required.
 
 The [manifest](data/acquisition-defense-loss-v1.json) binds the original evidence,
 commands, binary, frozen inputs, comparisons and raw archive members. The
-[review bundle](data/acquisition-defense-loss-v1.json.gz) contains exact plans,
+review bundle (`docs/data/acquisition-defense-loss-v1.json.gz`, in git history) contains exact plans,
 auditors, relevant runtime sources, physical/defense audits, joined contact
 evidence, selected traces, pod motion, reviews and logs. New raw and derived
 evidence is archived under `target/acquisition-defense/loss-v1/archives`:

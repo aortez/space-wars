@@ -92,7 +92,7 @@ advances the original world under neutral actions and verifies forecast poses,
 landing and contacts, repeatability and live-state retention.
 
 The [manifest](data/rebuild-native-forecast-v1.json) and
-[portable bundle](data/rebuild-native-forecast-v1.json.gz) contain all forecasts,
+portable bundle (`docs/data/rebuild-native-forecast-v1.json.gz`, in git history) contain all forecasts,
 actual comparison windows, cost samples, preceding audits, frozen source,
 validation logs and the exporter. Verified full archives remain under
 `target/rebuild-native-forecast/v1/archives/`.

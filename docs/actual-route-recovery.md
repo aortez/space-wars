@@ -152,8 +152,8 @@ The frozen profiled binary is
 The complete summary at `target/actual-recovery/v1/summary.json` has SHA-256
 `e1810fbe8fbd22d9d488381bee62ed8f5e62ba38dc93988d5fa78065b378e186`.
 
-[The manifest](data/actual-route-recovery-v1.json) records all outcomes and checks.
-[The archive](data/actual-route-recovery-v1.json.gz) retains the frozen plan,
+The manifest (`docs/data/actual-route-recovery-v1.json`, in git history) records all outcomes and checks.
+The archive (`docs/data/actual-route-recovery-v1.json.gz`, in git history) retains the frozen plan,
 complete summaries, original receipt/abort observations, physical/route/flight
 witnesses, first changed controls, post-abort physical transitions and native
 loss evidence, validation logs, reproduction scripts and raw-file hashes.

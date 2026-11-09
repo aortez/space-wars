@@ -242,7 +242,7 @@ panels, 1,649 frozen sources and 264 copied inputs. Full LF-069/LF-070/LF-071
 archives and all 67 prior manifests remain unchanged. The existing native binary
 retains its inherited five model /48 environment test evidence. No production
 source changed; only the new diagnostic and its tests were added.
-See [results](data/flight-motor-rollout-gradient-v1-results.json),
+See results (`docs/data/flight-motor-rollout-gradient-v1-results.json`, in git history),
 [findings](data/flight-motor-rollout-gradient-v1-findings.json) and
 [archive receipt](data/flight-motor-rollout-gradient-v1-archive.json).
 

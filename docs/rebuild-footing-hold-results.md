@@ -85,7 +85,7 @@ AI library/native dependency check. Broad native Clippy still **fails with the
 same 16 message/file diagnostic identities** as the preceding baseline.
 
 The [manifest](data/rebuild-footing-hold-v1.json) and
-[portable bundle](data/rebuild-footing-hold-v1.json.gz) retain reports/audits,
+portable bundle (`docs/data/rebuild-footing-hold-v1.json.gz`, in git history) retain reports/audits,
 holding and drift timelines, native placement disagreements, stale failure
 witnesses, recorded comparisons, validation logs, frozen source and provenance.
 Full traces remain in verified lossless archives:

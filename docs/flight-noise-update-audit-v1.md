@@ -183,7 +183,7 @@ Retain 1,560 source files, 154 copied inputs (including all 102 parent checkpoin
 102 checkpoint probes, 18 cached rollouts/collector/target/gradient records, 72 branch
 snapshots and per-step probes. All 34 prior manifests and copied inputs remain unchanged.
 No new production checkpoint, policy export, flight evaluation, confirmation or promotion.
-See [machine-readable results](data/flight-noise-update-audit-v1-results.json) and
+See machine-readable results (`docs/data/flight-noise-update-audit-v1-results.json`, in git history) and
 [archive receipt](data/flight-noise-update-audit-v1-archive.json). `analysis.json` in the
 archive contains full-history stop counts, same-step comparisons and advantage summaries.
 

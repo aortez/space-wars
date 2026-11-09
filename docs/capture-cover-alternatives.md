@@ -92,7 +92,7 @@ All ten replays and twenty requested snapshots completed in
 `target/cover-alternatives/v1`, using frozen source `98f9831` and preserved binary
 `target/cover-alternatives/surface_mission_soak-98f9831`, SHA-256
 `dde8c8233b0eb12704dcf2deac70424a33a44a84809524f439d47411a00cfe89`.
-The [results archive](data/capture-cover-alternatives-v1.json) contains commands,
+The results archive (`docs/data/capture-cover-alternatives-v1.json`, in git history) contains commands,
 hashes, parity checks and per-site findings. Its linked compressed input archive
 retains every complete probe observation, native assessment and route batch for
 reanalysis without repeating physics. All raw hashes were rechecked at export.

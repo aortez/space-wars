@@ -170,7 +170,7 @@ publication age 120. Total live work increases by 28,285 graph operations and
 This is not a performance or Raspberry Pi speedup claim.
 
 The [result manifest](data/local-powered-routes-v1.json) records every outcome,
-comparison and failure. The [compressed evidence archive](data/local-powered-routes-v1.json.gz)
+comparison and failure. The compressed evidence archive (`docs/data/local-powered-routes-v1.json.gz`, in git history)
 contains 48 exact documents: both frozen summaries, raw hashes, physical and
 route witnesses, first changed actions, the flight interruption, and validation
 logs. Its entries were rehashed against their original files. All 261 raw files

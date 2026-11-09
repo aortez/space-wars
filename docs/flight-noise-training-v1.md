@@ -146,7 +146,7 @@ All six pilot resumes reproduce exact complete states. Full-noise states 0/16 re
 
 Used **104,448 training action ticks**, **1,146 optimizer steps**, **144,375 evaluation ticks** in **384 episodes**, and **192 parity comparisons**. All 19 subprocesses exited zero within their fixed limits. Retain 108 new checkpoints and 24 exports. No confirmation use, model promotion, longer dwell or general-navigation claim.
 
-Archive `data/training-experiments/learned-flight-noise-training-v1-20261024` retains 1,558 sources, unchanged runtime, six configs, 122 copied inputs, all traces, admissions, checkpoints, logs and gate evidence. All 33 prior manifests and copied inputs remain unchanged. See [results](data/flight-noise-training-v1-results.json) and [receipt](data/flight-noise-training-v1-archive.json).
+Archive `data/training-experiments/learned-flight-noise-training-v1-20261024` retains 1,558 sources, unchanged runtime, six configs, 122 copied inputs, all traces, admissions, checkpoints, logs and gate evidence. All 33 prior manifests and copied inputs remain unchanged. See results (`docs/data/flight-noise-training-v1-results.json`, in git history) and [receipt](data/flight-noise-training-v1-archive.json).
 
 ## Next decision
 

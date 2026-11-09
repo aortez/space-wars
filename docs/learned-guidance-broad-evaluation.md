@@ -55,11 +55,11 @@ selected progress-first control is faster than the parent on 52 starts, slower
 on 155 and tied on 33. Total elapsed ticks are 12,851 versus 12,810. Timing was
 reported after evaluation and did not affect selection.
 
-[Open the synchronized replay](data/learned-guidance-broad-v1-replay.html) for
+The synchronized replay (`docs/data/learned-guidance-broad-v1-replay.html`, in git history) covers
 all six controllers on 256 fresh starts and the two retained diagnostic starts.
 It shows recorded paths relative to the moving target, controls and outcomes;
 it does not render terrain or the whole world. The
-[complete results](data/learned-guidance-broad-v1-results.json) retain paired
+complete results (`docs/data/learned-guidance-broad-v1-results.json`, in git history) retain paired
 case lists, outcome categories, world counts and diagnostic measurements.
 
 ## Why the retained sun route interrupts guidance

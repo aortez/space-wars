@@ -35,7 +35,7 @@ planets, physics audit, combat, asteroid events and physical damage history.
 Damage comparisons exclude only embedded diagnostic mission telemetry, whose
 policy label is expected to differ.
 
-The [retained result record](data/capture-destination-finished-v1.json) includes
+The retained result record (`docs/data/capture-destination-finished-v1.json`, in git history) includes
 all commands, binary/report hashes, both players' visits and abandoned attempts,
 survival, ownership, recovery, timings, decision coverage and comparisons.
 

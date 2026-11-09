@@ -285,7 +285,7 @@ Training also records three collisions across main movement episodes (joint seed
 Retain **804 checkpoints, 48 exports, 792 rollouts**, every training/evaluation
 trace, 1,611 frozen sources, 176 copied inputs, tasks/configurations, tests,
 commands, timings and analysis scripts. Original inputs and all **54 prior
-manifests** remain unchanged. See [results](data/flight-motor-aligned-v1-results.json)
+manifests** remain unchanged. See results (`docs/data/flight-motor-aligned-v1-results.json`, in git history)
 and [archive receipt](data/flight-motor-aligned-v1-archive.json). The run stays above
 the frozen disk reserve. No confirmation use, model promotion or navigation
 qualification. Local retention is not off-machine backup.

@@ -147,7 +147,7 @@ Archive `data/training-experiments/learned-flight-extended-hold-v1-20261024` ret
 checkpoints and twenty exports, admissions, complete/active traces, parity, process
 logs and post-run inspection. All 28 previous manifests and referenced inputs remain
 unchanged. No confirmation use, model promotion or approach/navigation claim. See
-[results](data/flight-extended-hold-v1-results.json) and
+results (`docs/data/flight-extended-hold-v1-results.json`, in git history) and
 [archive receipt](data/flight-extended-hold-v1-archive.json).
 
 ## Next decision

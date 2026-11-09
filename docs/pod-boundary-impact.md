@@ -158,7 +158,7 @@ quotas; this is not a performance improvement.
 
 [The result manifest](data/pod-boundary-impact-v1.json) retains all four outcomes,
 audits and the earlier pursuit observations.
-[The compressed evidence archive](data/pod-boundary-impact-v1.json.gz) contains
+The compressed evidence archive (`docs/data/pod-boundary-impact-v1.json.gz`, in git history) contains
 40 exact documents, including native impact streams, derived motion samples,
 the frozen plan, diagnostic patch/replay, physical witnesses, validation logs
 and hashes for 63 comparison files plus 14 initial diagnostic files. Embedded

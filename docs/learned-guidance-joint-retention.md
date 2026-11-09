@@ -146,8 +146,8 @@ No time-efficiency reward was changed in this experiment.
 
 ## Observability
 
-[Open the synchronized replay](data/learned-guidance-joint-retention-v1-replay.html)
-to compare all five fixed models on the ten declared cases.
+The synchronized replay (`docs/data/learned-guidance-joint-retention-v1-replay.html`, in git history)
+compares all five fixed models on the ten declared cases.
 
 The live observer reports total retention, separate precision and match deficits,
 and population completion. Replays include both parents, the original reference
@@ -196,7 +196,7 @@ physical source records remain unchanged.
 The final replay passes playback, case switching, all 50 terminal-state checks,
 precision dwell display checks and narrow-screen overflow checks. All four plots
 and desktop/mobile replay captures were inspected at 1× scale. The
-[machine-readable results](data/learned-guidance-joint-retention-v1-results.json)
+machine-readable results (`docs/data/learned-guidance-joint-retention-v1-results.json`, in git history)
 include exact model identities, case gains/losses, histories, timings, trajectory
 metrics and the failure-geometry inspection.
 

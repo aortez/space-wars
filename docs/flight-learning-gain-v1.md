@@ -91,7 +91,7 @@ binaries are excluded. No commit or clean checkout is implied.
 All **192 new initial-checkpoint episodes** completed in **184,513 physics ticks**,
 plus **128 preflight ticks**. The trained results reused **177,917** archived ticks.
 Workers took 133.7–138.7 concurrent seconds. There were no optimizer steps, new training,
-checkpoint substitutions or budget extensions. See [compact results](data/flight-learning-gain-v1-results.json)
+checkpoint substitutions or budget extensions. See compact results (`docs/data/flight-learning-gain-v1-results.json`, in git history)
 and [archive receipt](data/flight-learning-gain-v1-archive.json).
 
 | Model | Initial arrivals | Trained arrivals | Gain | Initial collisions | Trained collisions |

@@ -127,7 +127,7 @@ this check.
 The [manifest](data/rebuild-settling-v1.json) records frozen commands, source,
 binary and input hashes, full-game comparisons, recovery receipts, baseline
 lab results, validation and 44 lossless archive inventories. The
-[portable review bundle](data/rebuild-settling-v1.json.gz) includes frozen sources
+portable review bundle (`docs/data/rebuild-settling-v1.json.gz`, in git history) includes frozen sources
 and plans, full game reports/audits, all 40 lab reports, detailed placement and
 boarding witnesses, logs and the reproducible exporter. Full raw game streams
 remain under `target/rebuild-settling/v1/archives/`.
