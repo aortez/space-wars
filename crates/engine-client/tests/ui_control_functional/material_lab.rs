@@ -1,4 +1,5 @@
 use super::*;
+use scenario_material_lab::YIELD_CHECKPOINT_STEP;
 use spacewars_control::{InputButton, InputPressRequest};
 fn press(h: &mut FunctionalHarness, s: &mut UiState, b: InputButton) {
     *s = h
@@ -9,13 +10,23 @@ fn press(h: &mut FunctionalHarness, s: &mut UiState, b: InputButton) {
         )
         .unwrap()
         .state;
+    // Leave a neutral frame between presses; status diagnostics are cached.
     thread::sleep(Duration::from_millis(150));
 }
-fn choose(h: &mut FunctionalHarness, s: &mut UiState, target: u64) {
-    let mut current = snapshot(h, |_| true)["control"].as_u64().unwrap();
-    while current != target {
-        press(h, s, InputButton::Down);
-        current = (current + 1) % 6;
+fn choose(h: &mut FunctionalHarness, s: &mut UiState, current: &mut u64, target: u64) {
+    let state = snapshot(h, |_| true);
+    let count = state["control_count"].as_u64().unwrap();
+    assert!(target < count);
+    while *current != target {
+        let down = (target + count - *current) % count;
+        let up = (*current + count - target) % count;
+        let (button, next) = if down <= up {
+            (InputButton::Down, (*current + 1) % count)
+        } else {
+            (InputButton::Up, (*current + count - 1) % count)
+        };
+        press(h, s, button);
+        *current = next;
     }
     press(h, s, InputButton::South);
 }
@@ -37,7 +48,7 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
     }
 }
 fn physics(v: &Value) -> Value {
-    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"]})
+    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"]})
 }
 fn launch(h: &mut FunctionalHarness, mut s: UiState, renderer: &str) -> UiState {
     s = h.activate_until_scenario("material-lab", s);
@@ -63,9 +74,14 @@ fn material_lab_pause_save_load_and_both_renderers() {
         let mut s = launch(h, ready, "vector");
         let initial = snapshot(h, |v| v["paused"] == true);
         assert_eq!(initial["steps"], 0);
+        let mut control = initial["control"].as_u64().unwrap();
+        for _ in 0..3 {
+            choose(h, &mut s, &mut control, 3);
+        }
+        snapshot(h, |v| v["case"] == "Load, release & return");
         h.capture_screenshot("material-initial-vector.png");
-        choose(h, &mut s, 0);
-        snapshot(h, |v| v["steps"].as_u64().unwrap() > 210);
+        choose(h, &mut s, &mut control, 0);
+        snapshot(h, |v| v["steps"].as_u64().unwrap() > 80);
         h.pause_guarded(&s);
         let paused = h.wait_for(
             UiStatePredicate {
@@ -85,7 +101,16 @@ fn material_lab_pause_save_load_and_both_renderers() {
             },
             TRANSITION_TIMEOUT,
         );
-        choose(h, &mut s, 4);
+        let yielded = snapshot(h, |v| {
+            v["steps"] == YIELD_CHECKPOINT_STEP && v["paused"] == true
+        });
+        h.capture_screenshot("material-yielded-vector.png");
+        choose(h, &mut s, &mut control, 6);
+        let released = snapshot(h, |v| v["weight"] == 0.0);
+        assert_eq!(released["steps"], yielded["steps"]);
+        assert_eq!(released["summary"], yielded["summary"]);
+        assert_eq!(released["load_changes"].as_array().unwrap().len(), 1);
+        choose(h, &mut s, &mut control, 4);
         let saved = snapshot(h, |v| {
             v["storage_status"].as_str().unwrap().starts_with("Saved")
         });
@@ -93,16 +118,16 @@ fn material_lab_pause_save_load_and_both_renderers() {
         assert!(saved["summary"]["damage_work"].as_f64().unwrap() > 0.0);
         assert!(h.run_path().join("config/material-lab.bin").is_file());
         h.capture_screenshot("material-saved-vector.png");
-        choose(h, &mut s, 1);
+        choose(h, &mut s, &mut control, 1);
         let next = snapshot(h, |v| {
             v["steps"].as_u64() == Some(saved["steps"].as_u64().unwrap() + 1)
         });
-        choose(h, &mut s, 5);
+        choose(h, &mut s, &mut control, 5);
         let loaded = snapshot(h, |v| {
             v["storage_status"].as_str().unwrap().starts_with("Loaded")
         });
         assert_eq!(physics(&saved), physics(&loaded));
-        choose(h, &mut s, 1);
+        choose(h, &mut s, &mut control, 1);
         assert_eq!(
             physics(&snapshot(h, |v| v["steps"] == next["steps"])),
             physics(&next)
@@ -141,21 +166,36 @@ fn material_lab_pause_save_load_and_both_renderers() {
         );
         let ready = h.wait_until_ready();
         s = launch(h, ready, "raster");
-        choose(h, &mut s, 5);
+        control = snapshot(h, |_| true)["control"].as_u64().unwrap();
+        choose(h, &mut s, &mut control, 5);
         let loaded = snapshot(h, |v| {
             v["storage_status"].as_str().unwrap().starts_with("Loaded")
         });
         assert_eq!(physics(&saved), physics(&loaded));
         h.capture_screenshot("material-loaded-raster.png");
-        choose(h, &mut s, 0);
+        choose(h, &mut s, &mut control, 0);
+        let separated = snapshot(h, |v| v["paused"] == true && v["separations"] == 1);
+        assert!(separated["stopped"].is_null());
+        h.capture_screenshot("material-separated-raster.png");
+        choose(h, &mut s, &mut control, 7);
+        let light = snapshot(h, |v| v["weight"] == 1000.0);
+        assert_eq!(light["summary"], separated["summary"]);
+        assert_eq!(light["steps"], separated["steps"]);
+        assert_eq!(light["load_changes"].as_array().unwrap().len(), 2);
+        choose(h, &mut s, &mut control, 0);
         let end = snapshot(h, |v| v["stopped"].is_string());
         assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
+        assert_eq!(end["storage_status"], end["stopped"]);
         assert!(end["impacts"].as_u64().unwrap() >= 2);
         assert!(end["separations"].as_u64().unwrap() >= 1);
+        assert_eq!(
+            end["summary"]["damage_work"],
+            separated["summary"]["damage_work"]
+        );
         h.capture_screenshot("material-complete-raster.png");
         // Malformed input never replaces the visible, valid physical state.
         fs::write(h.run_path().join("config/material-lab.bin"), b"corrupt").unwrap();
-        choose(h, &mut s, 5);
+        choose(h, &mut s, &mut control, 5);
         let refused = snapshot(h, |v| {
             v["storage_status"]
                 .as_str()

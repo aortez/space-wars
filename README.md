@@ -96,7 +96,8 @@ The local launcher includes the following scenarios and presets:
   inspection, shade, light/resource controls, cutting and bounded playback.
   See [Garden Lab](docs/garden-lab.md).
 - **Material Lab** — a falling-platen sandbox for impact, material yielding,
-  support and rebound, with slow playback, pause, single step and save/load.
+  support and rebound, with five cases, load/release controls, slow playback,
+  pause, single step and saved load-history replay.
   Enable **Show all scenarios** in the launcher. See [Material Lab](docs/design/material-lab.md).
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
