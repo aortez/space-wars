@@ -168,7 +168,11 @@ fn rebound_corrupt_totals_and_owner_phase_refuse() {
                     w.remove_entity(body(2).entity);
                 }
                 change(state(&mut w));
-                assert!(PhysicsWorld::from_snapshot_bytes(&w.snapshot_bytes().unwrap()).is_err());
+                assert!(
+                    w.snapshot_bytes()
+                        .and_then(|bytes| PhysicsWorld::from_snapshot_bytes(&bytes))
+                        .is_err()
+                );
             }
         }
         for change in [

@@ -3,13 +3,16 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(super) struct History {
-    initial: StoredRegion,
+    pub(super) initial: StoredRegion,
     pub(super) mass: f32,
     pub(super) acceleration: f32,
-    initial_x: f64,
-    // Written only in the tagged v17 extension; v15/v16 history bytes stay fixed.
+    pub(super) initial_x: f64,
+    // Written in tagged v17/v18 extensions; v15/v16 history bytes stay fixed.
     #[serde(skip)]
     pub(super) incoming: Option<IncomingMotion>,
+    // Required only in the tagged v18 extension; earlier history bytes stay fixed.
+    #[serde(skip)]
+    pub(super) loads: Option<Vec<loads::LoadChange>>,
     pub(super) summary: DynamicCompressionSummary,
 }
 
@@ -97,6 +100,7 @@ impl History {
                     velocity: scene.plates.speed,
                 },
             ),
+            loads: None,
             summary: DynamicCompressionSummary::default(),
         };
         h.summary = h.initial_summary();
@@ -105,9 +109,12 @@ impl History {
         }
         Ok(h)
     }
-    // Enrollment selects the immutable physical contract. Old overload and exact
-    // safe-equilibrium histories retain revision 1, including their v15 bytes.
+    // Only an explicit load change upgrades an enrolled history. Otherwise old
+    // overload and exact safe-equilibrium histories retain revision 1/v15 bytes.
     pub(super) fn revision(&self) -> u32 {
+        if self.loads.is_some() {
+            return 4;
+        }
         if self.incoming.is_some() {
             return 3;
         }
@@ -126,7 +133,7 @@ impl History {
             .map_or(0.0, |v| f64::from(v.velocity))
     }
     fn weight(&self) -> f64 {
-        f64::from(self.mass) * f64::from(self.acceleration)
+        f64::from(self.mass) * f64::from(self.current_acceleration())
     }
     fn initial_summary(&self) -> DynamicCompressionSummary {
         let c = MaterialCurve::new(&self.initial);
@@ -155,7 +162,7 @@ impl History {
         let c = MaterialCurve::new(&self.initial);
         let s = &self.summary;
         let start = self.initial_summary();
-        let weight = self.weight();
+        let weight = f64::from(self.mass) * f64::from(self.acceleration);
         let rebound = self.revision() >= 2;
         let falling = self.incoming.is_some();
         let v0 = self.initial_velocity();
@@ -174,6 +181,7 @@ impl History {
             && c.y > 0.0
             && c.ey > 0.0
             && c.ey < c.depth / 4.0
+            && self.valid_loads()
             && (if falling {
                 (-c.depth / 4.0..=0.0).contains(&self.initial_x)
                     && (0.0..=64.0).contains(&v0)
@@ -236,7 +244,7 @@ impl History {
             )
             && near(
                 s.gravity_work,
-                weight * (s.indentation - self.initial_x),
+                self.gravity_totals(s.indentation, s.elapsed)[0],
                 s.scales[0],
             )
             && near(
@@ -268,7 +276,9 @@ impl History {
             )
             && near(
                 s.errors[1],
-                weight * s.elapsed - s.reaction_impulse - f64::from(self.mass) * (s.velocity - v0),
+                self.gravity_totals(s.indentation, s.elapsed)[1]
+                    - s.reaction_impulse
+                    - f64::from(self.mass) * (s.velocity - v0),
                 s.scales[1],
             )
             && near(
@@ -440,7 +450,7 @@ impl History {
         next.plastic_indentation = q.p;
         next.kinetic_energy = kinetic;
         next.elastic_energy = q.elastic;
-        next.gravity_work = self.weight() * (x - self.initial_x);
+        next.gravity_work = self.gravity_totals(x, old.elapsed)[0];
         next.damage_work = self.initial.remaining - region.remaining_precise();
         next.viscous_loss = add(old.viscous_loss, q.loss)?;
         next.charge_error = c.y * q.p - next.damage_work;

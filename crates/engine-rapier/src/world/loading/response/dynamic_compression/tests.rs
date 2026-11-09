@@ -367,3 +367,4 @@ fn dynamic_limits_and_unsupported_enrollment_roll_back() {
 mod rebound;
 
 mod falling;
+mod loads;

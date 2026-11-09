@@ -7,7 +7,7 @@ fn falling_world(x: f32, v: f32) -> PhysicsWorld {
     w.set_velocity(body(11), Vec2::X * v, 0.0, true);
     w
 }
-fn samples() -> Vec<PhysicsWorld> {
+pub(super) fn samples() -> Vec<PhysicsWorld> {
     let mut w = falling_world(-1.0 / 16.0, 0.5);
     w.step_material_dynamic_compression(0.001).unwrap();
     let mut result = vec![w.clone()];
@@ -193,7 +193,11 @@ fn falling_rejects_corrupt_balance_phase_and_live_witnesses() {
                     w.remove_entity(body(2).entity);
                 }
                 change(state(&mut w));
-                assert!(PhysicsWorld::from_snapshot_bytes(&w.snapshot_bytes().unwrap()).is_err());
+                assert!(
+                    w.snapshot_bytes()
+                        .and_then(|bytes| PhysicsWorld::from_snapshot_bytes(&bytes))
+                        .is_err()
+                );
             }
         }
         for change in [

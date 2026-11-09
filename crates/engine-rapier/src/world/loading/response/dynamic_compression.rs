@@ -3,12 +3,15 @@ use super::*;
 use compression::{CompressionEvent, CompressionLoad, CompressionRejection as R};
 use engine_material::{CRUSH_TIME_CONSTANT, SustainedLoad, sustained};
 
+mod loads;
 mod model;
 mod step;
 use model::{History, MaterialCurve};
 
 /// Largest number of internal midpoint reaction solves per public call.
 pub const MAX_DYNAMIC_COMPRESSION_STEPS: usize = 1024;
+/// Maximum accepted changes of normal acceleration in one physical history.
+pub const MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES: usize = 32;
 
 /// Physical totals and fixed numerical allowances, retained after invalidation.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -70,6 +73,7 @@ enum Status {
     // Appended variant: preserve the v15 Active/Invalidated tags and layout.
     Rebound(Box<ReboundActive>),
     Falling(Box<FallingActive>),
+    ChangingLoad(Box<FallingActive>),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct FallingActive {
@@ -138,8 +142,10 @@ impl Continuation {
             DYNAMIC_COMPRESSION_SNAPSHOT_VERSION
         } else if self.revision == 2 {
             REBOUND_SNAPSHOT_VERSION
-        } else {
+        } else if self.revision == 3 {
             FALLING_SUPPORT_SNAPSHOT_VERSION
+        } else {
+            CHANGING_LOAD_SNAPSHOT_VERSION
         }
     }
     pub(in crate::world) fn snapshot_tag(&self) -> u64 {
@@ -147,11 +153,13 @@ impl Continuation {
             DYNAMIC_COMPRESSION_SNAPSHOT_TAG
         } else if self.revision == 2 {
             REBOUND_SNAPSHOT_TAG
-        } else {
+        } else if self.revision == 3 {
             FALLING_SUPPORT_SNAPSHOT_TAG
+        } else {
+            CHANGING_LOAD_SNAPSHOT_TAG
         }
     }
-    pub(in crate::world) fn serialize_incoming(
+    pub(in crate::world) fn serialize_extensions(
         &self,
         bytes: &mut Vec<u8>,
     ) -> Result<(), PhysicsWorldError> {
@@ -163,15 +171,22 @@ impl Continuation {
                 .ok_or_else(|| PhysicsWorldError("missing falling initial motion".into()))?;
             bincode::serialize_into(bytes, incoming)
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
+        } else if self.revision == 4 {
+            self.history.serialize_loads(bytes)?;
         }
         Ok(())
     }
-    pub(in crate::world) fn deserialize_incoming(
+    pub(in crate::world) fn deserialize_extensions(
         &mut self,
         reader: &mut impl std::io::Read,
     ) -> Result<(), PhysicsWorldError> {
-        self.history.incoming =
-            Some(bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?);
+        if self.revision == 3 {
+            self.history.incoming = Some(
+                bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?,
+            );
+        } else if self.revision == 4 {
+            self.history.deserialize_loads(reader)?;
+        }
         Ok(())
     }
     fn active(&self) -> Option<(&Scene, Option<EpisodeId>)> {
@@ -180,6 +195,13 @@ impl Continuation {
             Status::Rebound(a) if self.revision == 2 => Some((&a.scene, a.owner)),
             Status::Falling(a)
                 if self.revision == 3 && (!a.pending_support || a.owner.is_some()) =>
+            {
+                Some((&a.scene, a.owner))
+            }
+            Status::ChangingLoad(a)
+                if self.revision == 4
+                    && (!a.pending_support
+                        || (a.owner.is_some() && self.history.incoming.is_some())) =>
             {
                 Some((&a.scene, a.owner))
             }
@@ -204,7 +226,7 @@ impl Continuation {
         pair.sort();
         scene == *saved
             && scene.mass == self.history.mass
-            && scene.acceleration == self.history.acceleration
+            && scene.acceleration == self.history.current_acceleration()
             && scene.plates.x == self.history.summary.indentation
             && f64::from(scene.plates.speed) == self.history.summary.velocity
             && scene.plates.material == self.history.current_material()
@@ -226,7 +248,9 @@ impl PhysicsWorld {
     /// Uses the driven-compression rectangle/source/section/frame restrictions,
     /// with one dynamic, rotation-locked, nonsleeping body of refreshed mass
     /// `[5,80]` and gravity scale 1. The support alone has a material. Gravity is
-    /// constant along local +x, including zero for release or incoming motion.
+    /// along local +x, including zero for release or incoming motion. Once
+    /// enrolled, `set_material_dynamic_compression_acceleration` can change it
+    /// while retaining the same physical history and numerical allowances.
     /// Resting touching/preloaded starts retain their v15/v16 contracts.
     /// Revision 3 also admits -depth/4 <= x0 <= 0 with normal speed `[0,64]`
     /// and weight <= 2Y. A detached start needs positive speed or gravity;
@@ -244,7 +268,8 @@ impl PhysicsWorld {
     /// elastic/viscous timescales. Actual intervals sum exactly to dt. Physical
     /// and numerical limits refuse atomically. Pause clears ephemeral output
     /// without enrollment. Public edits/other stepping permanently invalidate
-    /// retained history. Snapshot v17 preserves v1-v16 selection and layouts.
+    /// retained history, except the explicit acceleration API. Snapshot v18
+    /// supports changing loads; unchanged histories retain their v1-v17 layouts.
     pub fn step_material_dynamic_compression(
         &mut self,
         dt: f32,

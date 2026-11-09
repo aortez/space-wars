@@ -146,8 +146,10 @@ slow touching approach, and exact saved replay before/at/after the handoff.
 Hostile-save, mode/edit invalidation, late material/event/identity failure and
 cumulative numerical exhaustion tests verify atomic refusal.
 
+The [changing-load extension](material-changing-load.md) adds bounded changes of
+normal gravity while retaining attributable work in this same history.
 Remaining work includes transferring histories between older loading modes,
-changing applied forces while retaining attributable work, multiple finite
+general externally driven work, multiple finite
 material bodies, moving/oblique/angular contact geometry, connection loads and
 #328 failure consequences. This completes the first bounded falling-platen
 handoff, not all of #327.
