@@ -141,10 +141,6 @@ const LASER_BASE_DAMAGE: f32 = 10.0;
 const ASTEROID_RNG_SALT: u64 = 0xA57E_201D_5EED;
 const MAX_ASTEROIDS: usize = 1_000;
 const ASTEROID_SPAWN_RADIUS_FACTOR: f32 = 0.99;
-const ASTEROID_MIN_RADIUS: f32 = 2.5;
-const ASTEROID_RADIUS_VARIATION: f32 = 5.0;
-const ASTEROID_HUGE_CHANCE: f32 = 0.98;
-const ASTEROID_HUGE_SIZE_MAX_SCALE: f32 = 10.0;
 const ASTEROID_MAX_AIM_ANGLE: f32 = core::f32::consts::FRAC_PI_2;
 const ASTEROID_MAX_SPEED: f32 = 200.0;
 const ASTEROID_DAMAGE_SCALAR: f32 = 0.01;
@@ -2105,6 +2101,52 @@ fn random_color(rng: &mut SpacewarsRng) -> Color {
     )
 }
 
+/// Natural debris by radius in world units, in four size classes against a
+/// hull five units wide and eight long: grit well under the hull, pebbles up
+/// to a third of it, rocks about its size and boulders beyond it. Most of what
+/// flies by is grit; a rock is occasional and a boulder rare.
+const DEBRIS_GRIT_RADIUS: (f32, f32) = (0.5, 1.25);
+const DEBRIS_PEBBLE_RADIUS: (f32, f32) = (1.25, 2.5);
+const DEBRIS_ROCK_RADIUS: (f32, f32) = (2.5, 4.0);
+const DEBRIS_BOULDER_RADIUS: (f32, f32) = (4.0, 6.0);
+
+/// The shares of the size classes a debris source draws from.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct DebrisScale {
+    /// Cumulative shares of grit, pebbles and rocks; boulders take the rest.
+    shares: [f32; 3],
+}
+
+impl DebrisScale {
+    /// Grit and pebbles alone, nine to one.
+    pub(crate) const LIGHT: Self = Self {
+        shares: [0.9, 1.0, 1.0],
+    };
+    /// What space fields on its own: three in four grit, one in six a pebble,
+    /// one in sixteen a rock and one in fifty a boulder.
+    pub(crate) const NATURAL: Self = Self {
+        shares: [0.75, 0.92, 0.98],
+    };
+    /// A stress setting with a rock or a boulder in every third arrival.
+    pub(crate) const HEAVY: Self = Self {
+        shares: [0.35, 0.65, 0.88],
+    };
+
+    pub(crate) fn radius(self, rng: &mut SpacewarsRng) -> f32 {
+        let class = random_unit_f32(rng);
+        let (low, high) = if class < self.shares[0] {
+            DEBRIS_GRIT_RADIUS
+        } else if class < self.shares[1] {
+            DEBRIS_PEBBLE_RADIUS
+        } else if class < self.shares[2] {
+            DEBRIS_ROCK_RADIUS
+        } else {
+            DEBRIS_BOULDER_RADIUS
+        };
+        random_range_f32(rng, low, high)
+    }
+}
+
 fn spawn_random_asteroid(state: &mut SpacewarsState, dt: f32) {
     if asteroid_count(state) >= MAX_ASTEROIDS {
         return;
@@ -2121,10 +2163,7 @@ fn spawn_random_asteroid(state: &mut SpacewarsState, dt: f32) {
     let position =
         center + Vec2::from_radians(spawn_angle) * (universe_radius * ASTEROID_SPAWN_RADIUS_FACTOR);
 
-    let mut radius = ASTEROID_MIN_RADIUS + ASTEROID_RADIUS_VARIATION * random_unit_f32(&mut rng);
-    if random_unit_f32(&mut rng) > ASTEROID_HUGE_CHANCE {
-        radius *= ASTEROID_HUGE_SIZE_MAX_SCALE * random_unit_f32(&mut rng);
-    }
+    let radius = DebrisScale::NATURAL.radius(&mut rng);
 
     let aim = (center - position)
         .normalized()
@@ -10883,10 +10922,46 @@ mod tests {
                 .distance_to(universe_center(universe_radius)),
             universe_radius * ASTEROID_SPAWN_RADIUS_FACTOR,
         );
-        assert!(asteroid.radius >= ASTEROID_MIN_RADIUS);
+        assert!((DEBRIS_GRIT_RADIUS.0..=DEBRIS_BOULDER_RADIUS.1).contains(&asteroid.radius));
         assert!(asteroid.velocity.length() <= ASTEROID_MAX_SPEED);
         assert_eq!(asteroid.damage_scalar, ASTEROID_DAMAGE_SCALAR);
         assert!(!asteroid.dead);
+    }
+
+    #[test]
+    fn natural_debris_is_mostly_grit_with_the_occasional_rock() {
+        let classes = [
+            DEBRIS_GRIT_RADIUS,
+            DEBRIS_PEBBLE_RADIUS,
+            DEBRIS_ROCK_RADIUS,
+            DEBRIS_BOULDER_RADIUS,
+        ];
+        let mut rng = seeded_rng(0xDEB2_15);
+        let mut counts = [0usize; 4];
+        for _ in 0..20_000 {
+            let radius = DebrisScale::NATURAL.radius(&mut rng);
+            let class = classes
+                .iter()
+                .position(|(low, high)| (*low..=*high).contains(&radius))
+                .expect("a radius within the classes");
+            counts[class] += 1;
+        }
+        let shares = counts.map(|count| count as f32 / 20_000.0);
+        for (share, expected, tolerance) in [
+            (shares[0], 0.75, 0.02),
+            (shares[1], 0.17, 0.02),
+            (shares[2], 0.06, 0.01),
+            (shares[3], 0.02, 0.01),
+        ] {
+            assert!((share - expected).abs() < tolerance, "{counts:?}");
+        }
+        for _ in 0..2_000 {
+            assert!(DebrisScale::LIGHT.radius(&mut rng) <= DEBRIS_PEBBLE_RADIUS.1);
+        }
+        let boulders = (0..2_000)
+            .filter(|_| DebrisScale::HEAVY.radius(&mut rng) >= DEBRIS_BOULDER_RADIUS.0)
+            .count();
+        assert!(boulders > 160, "{boulders}");
     }
 
     #[test]
@@ -10912,7 +10987,7 @@ mod tests {
                     DebrisKind::Asteroid,
                     center,
                     Vec2::ZERO,
-                    ASTEROID_MIN_RADIUS,
+                    DEBRIS_GRIT_RADIUS.0,
                     ASTEROID_DAMAGE_SCALAR,
                     Color::DIM_GREY,
                 )

@@ -75,16 +75,19 @@ pub enum ClockSurfaceRetirement {
     Exited,
     /// Solid material Meltdown reclaimed when the face refilled.
     Reclaimed,
+    /// Carried out of view by a guest, with the coin it was.
+    Taken,
 }
 
 impl ClockSurfaceRetirement {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Replaced,
         Self::Interrupted,
         Self::MergedAway,
         Self::Melted,
         Self::Exited,
         Self::Reclaimed,
+        Self::Taken,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -95,6 +98,7 @@ impl ClockSurfaceRetirement {
             Self::Melted => "melted",
             Self::Exited => "exited",
             Self::Reclaimed => "reclaimed",
+            Self::Taken => "taken",
         }
     }
 }
@@ -175,6 +179,8 @@ pub struct ClockSurfaceRetirements {
     pub melted: u64,
     pub exited: u64,
     pub reclaimed: u64,
+    #[serde(default)]
+    pub taken: u64,
 }
 
 impl ClockSurfaceRetirements {
@@ -186,6 +192,7 @@ impl ClockSurfaceRetirements {
             ClockSurfaceRetirement::Melted => self.melted,
             ClockSurfaceRetirement::Exited => self.exited,
             ClockSurfaceRetirement::Reclaimed => self.reclaimed,
+            ClockSurfaceRetirement::Taken => self.taken,
         }
     }
 

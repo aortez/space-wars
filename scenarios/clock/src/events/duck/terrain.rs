@@ -184,6 +184,52 @@ impl ArenaTerrain {
             + self.radius * 0.05
     }
 
+    /// What holds a foot at world `x`: the top of the surface under it, or
+    /// nothing over the pit, a panel's opening, the drain or beyond the view.
+    /// Retained soil never raises a surface, so it adds nothing here.
+    pub fn support_at(&self, x: f32) -> Option<f32> {
+        let layout = self.layout;
+        if x < layout.bounds_min.x || x > layout.bounds_max.x {
+            return None;
+        }
+        if let Some(floor) = &self.responsive_floor {
+            return (f64::from(x.abs()) > floor.opening * floor.shape.max_gap)
+                .then(|| floor.shape.surface_y(f64::from(x), floor.opening) as f32);
+        }
+        if let Some(drain) = self.drain_floor {
+            return drain
+                .slabs()
+                .find(|(min, max)| min.x <= x && x <= max.x)
+                .map(|(_, max)| max.y);
+        }
+        // The course and the hurdles run from 0 to `width` and are mirrored
+        // by `direction`, as `insert_bodies` places them.
+        let local = x * self.direction + self.width * 0.5;
+        let floor = layout.floor_y;
+        let (ground, raised) = if let Some(course) = &self.course {
+            let raised = course
+                .surfaces
+                .iter()
+                .filter(|surface| surface.start <= local && local <= surface.end)
+                .map(|surface| floor + surface.height)
+                .fold(f32::NEG_INFINITY, f32::max);
+            (None, raised)
+        } else {
+            let [first, pit, last] = self.obstacles;
+            let raised = [first, last]
+                .into_iter()
+                .filter(|hurdle| hurdle.start <= local && local <= hurdle.end)
+                .map(|hurdle| floor + hurdle.height)
+                .fold(f32::NEG_INFINITY, f32::max);
+            (
+                (local < pit.start || local > pit.end).then_some(floor),
+                raised,
+            )
+        };
+        let top = ground.map_or(raised, |ground| ground.max(raised));
+        top.is_finite().then_some(top)
+    }
+
     pub fn door_floor(&self, local_x: f32) -> f32 {
         self.responsive_floor
             .as_ref()

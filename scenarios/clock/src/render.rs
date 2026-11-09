@@ -23,6 +23,7 @@ mod floor;
 mod frame;
 mod glow;
 pub(crate) mod grass_inspection;
+mod magpie;
 mod marquee;
 mod meltdown;
 mod meridiem;
@@ -498,8 +499,14 @@ pub(crate) fn plant_face_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
 
 pub(crate) fn plant_actor_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
     let mut frame = RenderFrame::default();
+    let layout = Layout::new(state.aspect_ratio());
     if let Some(visit) = &state.crow_visit {
-        crow::render(&mut frame, visit, Layout::new(state.aspect_ratio()));
+        crow::render(&mut frame, visit, layout);
+    }
+    if let Some(crate::events::ActiveEvent::Coins(event)) = &state.active_event
+        && let Some(magpie) = event.magpie().filter(|magpie| magpie.in_view())
+    {
+        magpie::render(&mut frame, magpie, layout);
     }
     let mut polygons = filled_polygons(frame, 8);
     if let Some(crate::events::ActiveEvent::Aquarium(event)) = &state.active_event {

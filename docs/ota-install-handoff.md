@@ -140,14 +140,27 @@ a currently verified candidate on a device with qualified recovery admission.
 Updates is reachable from launcher and paused-game App Settings using touch,
 keyboard, gamepad or the existing guarded UI control interface. It displays the
 exact channel, generation, build and image identity, with an explicit
-**Install & restart** or **End game, install & restart** confirmation. Desktop
-installation remains unavailable. The UI does not claim write progress or
-success from an in-memory acknowledgement.
+**Install & restart** or **End game, install & restart** confirmation. The
+cursor opens on Back and reaches Install only while an offer stands: it stays on
+Back during the availability check, does not move when the offer arrives, and
+returns to Back once the offer is consumed, withdrawn or expired, so a button
+that turns live under a resting cursor cannot take the next press. Desktop
+installation remains unavailable. While the service reports an installation
+phase, the panel shows an activity bar under the phase message: the native
+writer's byte counts fill it during the write and flush stages, and it sweeps in
+the other phases, so a long write on a slow card does not look like a hang. The
+UI does not claim success from an in-memory acknowledgement.
 
 The app listener hands requests to the UI thread. It records the full settings
 snapshot, scene and input revisions, establishes a launch/input fence, and asks
 `SettingsWriter::save_exact` for an ordered barrier receipt. Ordinary saves may
 still coalesce; this exact document cannot be replaced by a newer queued save.
+
+On the trial boot that commits an update, the committed outcome says the device
+restarts once more to confirm the new software, because the recovery service
+requests that normal reboot itself. A panel opened on a committed trial boot
+that was not confirmed yet is told that a normal restart is pending rather than
+that installation is unavailable.
 A valid launcher draft is included and retained in memory when preparation
 starts. Settings changes, other queued saves, scene changes, focus loss and
 preparation expiry revoke an unacknowledged handoff. A failed save cannot ack.

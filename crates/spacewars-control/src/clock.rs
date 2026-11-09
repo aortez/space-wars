@@ -1049,11 +1049,23 @@ mod tests {
         state.event_kind = Some(ClockEventKind::Coins);
         state.coins = Some(engine_common::ClockCoinsState {
             cells: 88,
-            live_cells: 88,
+            live_cells: 85,
             max_cells: 239,
             shared_arena: false,
+            taken: 3,
+            magpie: Some(engine_common::ClockMagpieState {
+                phase: engine_common::ClockMagpiePhase::Leaving,
+                phase_tick: 40,
+                position_milli: [120_000, -150_000],
+                facing_right: true,
+                home_right: true,
+                target: None,
+                carrying: true,
+                trips: 2,
+                abandoned: 0,
+            }),
         });
-        for phase in ["minting", "cascading", "reforming"] {
+        for phase in ["minting", "cascading", "gathering", "reforming"] {
             state.phase = Some(phase.into());
             state.phase_tick = 12;
             let predicate = ClockStatePredicate {

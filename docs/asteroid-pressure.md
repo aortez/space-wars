@@ -52,11 +52,11 @@ Launcher Settings in material combat and duel expose **Asteroid arrivals**
 Existing settings default to Off. The mean interval can also be set to an
 integer from 1 to 60 seconds by the headless runner.
 
-| Strength | Radius, world units | Initial speed, units/second |
-| --- | ---: | ---: |
-| Light | 1.5–2.5 | 25–60 |
-| Mixed | 2–4 | 40–120 |
-| Heavy | 3–5 | 80–160 |
+| Strength | Size classes by radius, world units | Initial speed, units/second |
+| --- | --- | ---: |
+| Light | grit of 0.5–1.25 nine in ten, pebbles to 2.5 one in ten | 25–60 |
+| Mixed | the natural shares: grit three in four, pebbles to 2.5 one in six, rocks to 4 one in sixteen, boulders to 6 one in fifty | 40–120 |
+| Heavy | grit and pebbles two in three, rocks and boulders to 6 one in three | 80–160 |
 
 At each fixed step an independent seed/tick random draw decides whether to
 spawn. Arrivals start 220 units above the planet's nominal radius, distributed
@@ -64,6 +64,37 @@ around the planet, with a broad impact parameter that includes misses. The
 generator never reads a player's location, selected site, flag or mission phase.
 This is a controlled one-planet environmental distribution, not yet generated
 world hazard balancing.
+
+### Debris scale, 2026-11-08
+
+Until this date the stream drew radii of 1.5 to 2.5, 2 to 4 and 3 to 5 units
+for the three strengths, and ordinary Spacewars drew 2.5 to 7.5 with one
+arrival in fifty scaled by up to ten, against a hull five units wide and
+eight long: a rock the ship's size or larger was the common sight. At the
+client's default of twenty arrivals a second, a five-minute census of the
+ordinary game found a median radius of 5.0, seven arrivals in ten over 4,
+three in ten over 6 and the largest 67. Both generators now draw from one
+law of four size classes, grit of 0.5 to 1.25 units, pebbles to 2.5, rocks
+to 4 and boulders to 6 and nothing larger, with the shares in the table
+above; the ordinary generator uses the natural shares. The same census now
+finds a median of 1.0, one arrival in twelve a rock or a boulder and one in
+fifty a boulder, with about a hundred live at a time as before. Arrival
+rates, speeds, the cap of twenty-four live arrivals, the damage law and the
+terrain rules are unchanged, so a boulder still cuts a brush of up to five
+cells while grit scratches one. The validation below ran with the earlier
+sizes, and match records flown under the asteroid streams before this date
+are not comparable with later ones. The census is
+`cargo run --release -p scenario-spacewars --example asteroid_census`.
+
+The three-minute generated-duel regression keeps seeds 2 and 3 at both survey
+cadences. With Rust 1.89 on Ubuntu 24.04, seed 2 completes three sorties, but
+seed 3 completes none: one pilot loses grounded hatch access and the other
+times out on its ground route. Both duels pass the physical and material
+audits; the workstation build gives seed 3 two completions.
+The test therefore requires a completed sortie across the seeds at each
+cadence, reports each seat's count, and checks full duration, bounded live
+arrivals, real terrain contacts and excavation in every duel. This records
+seed 3's gameplay failure without treating it as a physics failure.
 
 The rocks use ordinary asteroid collision, damage, gravity and breakup. Fresh
 material contacts closing at least 12 units/second can queue terrain damage:

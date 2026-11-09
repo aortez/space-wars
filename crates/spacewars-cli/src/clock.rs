@@ -57,7 +57,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering", "minting", "cascading", "raising", "beam-down", "settling", "fighting", "finishing-shots", "crumbling", "beam-up", "withdrawing"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering", "minting", "cascading", "gathering", "raising", "beam-down", "settling", "fighting", "finishing-shots", "crumbling", "beam-up", "withdrawing"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -300,9 +300,23 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
         if let Some(coins) = &state.coins {
             println!(
-                "Coins: {} cells, {} live (cap {}), shared arena={}",
-                coins.cells, coins.live_cells, coins.max_cells, coins.shared_arena
+                "Coins: {} cells, {} live (cap {}), shared arena={}, taken={}",
+                coins.cells, coins.live_cells, coins.max_cells, coins.shared_arena, coins.taken
             );
+            if let Some(magpie) = &coins.magpie {
+                println!(
+                    "Magpie: {}, phase tick={}, position={:?}, facing right={}, home right={}, target={:?}, carrying={}, trips={}, abandoned={}",
+                    magpie.phase.as_str(),
+                    magpie.phase_tick,
+                    magpie.position_milli,
+                    magpie.facing_right,
+                    magpie.home_right,
+                    magpie.target,
+                    magpie.carrying,
+                    magpie.trips,
+                    magpie.abandoned
+                );
+            }
         }
         if let Some(crow) = &state.crow {
             println!(

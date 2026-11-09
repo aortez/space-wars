@@ -15,8 +15,9 @@ Player and automatic duck visits can already share one timed event's scene.
 Crow (#84) adds a lightweight, independent visitor to the digit face.
 Explosion (#76) scatters individual lit cells as bouncing rigid-body debris;
 its reassembly (#135) brings the blocks back into the latest clock face.
-Coins (#581) turns the lit cells into coins that drop, pile and fly home by
-the same reassembly; the guest that gathers them is still to come.
+Coins (#581) turns the lit cells into coins that drop and pile, a magpie
+carries a few of them off, and the rest fly home by the same reassembly,
+which grows back what the bird kept.
 
 ## Layout
 
@@ -325,7 +326,7 @@ the Off profile still disables every automatic event.
 | `crow` | One visitor with wingbeat flight, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 | `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
-| `coins` | Lit cells turn into coins that drop, roll and pile, then fly home | 0.6 s minting + 4 s cascade + 1.5 s reform | 45 s |
+| `coins` | Lit cells turn into coins that drop, roll and pile; a magpie carries three or four off, and the rest fly home | 0.6 s minting + 4 s cascade + 23 s gathering + 1.5 s reform | 45 s |
 | `tanks` | Two CPU tanks duel on destructible hills below the reading | At most 84 s, including entry, one transport retry and departure | 120 s |
 
 ### Tanks
@@ -543,13 +544,16 @@ Explosion, with the same 45-second reuse delay, and it is Explosion's batch
 made of round pieces (`events::explosion::Debris`): the same cells, the same
 cap of **239** (Classic at most 119), the same room in the run's arena and the
 same return. Only the launch, the shape and the drawing differ, so the arena's
-capacity and its capacity demonstrations do not move.
+capacity and its capacity demonstrations do not move. What Coins adds is a
+guest: once the coins lie still, a magpie comes for them, and the coins it
+carries off are the return's shortfall.
 
 | Phase | Ticks | What happens |
 | --- | --- | --- |
 | `minting` | 36 | Each lit cell and AM/PM pixel turns about its vertical axis where it stands: the cell's face until it is edge-on, a gold coin from then on. The dim anchors stay put. |
 | `cascading` | 240 | The coins drop as round rigid bodies with a little seeded sideways jitter, so a column does not land as one stack, land dead and pile on the floor. |
-| `reforming` | 90 | The pieces fly home by Explosion's reassembly, squaring up from discs into cells on the way, and the ordinary face takes over once they have arrived. |
+| `gathering` | 1380 | The coins lie where they landed, live bodies still, and the magpie makes its trips: in from its home side, down beside the heap, a hop up to the top coin, the coin into its beak and out of view with it. Three or four coins go this way. |
+| `reforming` | 90 | The pieces that remain fly home by Explosion's reassembly, squaring up from discs into cells on the way, a replacement for each coin the magpie kept grows from the nearest coin that remains, and the ordinary face takes over once they have arrived. |
 
 The drain stays open, as it does for Falling and Explosion: a coin that rolls
 into it drops out of view and flies home from below at the return. Closing it
@@ -575,6 +579,46 @@ its coins are still falling when the return begins, exactly as Explosion's
 debris is there. `coins_tests::coins_come_to_rest_before_they_fly_home` holds
 these with half a second to spare.
 
+The magpie is the crow's kind of visitor: a drawn bird on the crow's flight
+controller (`events::explosion::magpie`), never a rigid body, that reacts to
+the pile as it actually lies. It is quicker than the crow, at one and a half
+times the controller's pace, since nothing between the frame and the pile is
+in its way, and it flies low, four and a half pitches over the floor. Each
+visit has a home side, chosen by its seed, that the bird comes from and
+carries its coins to. A trip goes: in from home to the floor beside the heap,
+on the nearest level stretch of what holds a foot there, which is the batch's
+own floor clear of the drain, or beside a duck the course the coins fell
+onto, the top of a platform or the floor between, never over its pit; the
+coin it has picked is one of the highest lying in view with such a stretch
+beside it; a seeded look of a quarter to three quarters of a second; a hop
+up to stand next to the coin; forty ticks with its head down, the coin
+leaving the pile for its beak twenty-two ticks in; and out toward home with
+the coin, which is gone with it once the bird is out of view. A coin that is
+kicked, rolls off or goes down the drain between being chosen and being
+reached is given up for another, from wherever the bird is, and whatever is
+under the bird holds its feet up wherever they come down: a descent cut
+short that way keeps its momentum, but the floor, or the platform under it,
+catches the feet and the wings start again from there. The bird starts a
+trip only while the gathering has room for it, estimated from
+the crossing distances at its cruising speed plus a measured overhead, so it
+is away before the return begins and is never cut off in the air; inside
+the last two and a half seconds it leaves whatever it was doing, and it would
+keep flying through the return if it had to. Measured with seeds 1 to 12 at
+4:3, 800×480, 480×800, 4:1 and 3:4, a trip takes **270 to 414 ticks**, the
+bird carries off **three or four coins**, and it is out of view **1.4 to 3.8
+seconds** before the coins fly home.
+
+A taken coin leaves the world the tick it leaves the pile, so nothing can
+kick it any more, and its surface retires as `taken`, a reason of its own in
+the surface accounting. The coins left in the pile stay live bodies the whole
+while, so a duck beside the pile still scatters them, and the magpie takes
+them from wherever they come to rest. When the return begins the taken coins
+leave the batch, and the reassembly's shortfall rule grows a replacement for
+each from the nearest coin that remains, from nothing, never appearing at its
+cell; a second after the return the face is pixel-identical to the ordinary
+face, which the capture test holds. The bird is drawn over everything, as the
+crow is, and the coin in its beak with it.
+
 The pieces carry the cells' surfaces out and home as Explosion's blocks do.
 The published footprint follows the drawn shape, which the surface contract
 checks frame by frame: a round piece supports the square inside its disc, and a
@@ -590,13 +634,19 @@ whole event measures **330 draw primitives** across wide, 4:3, portrait and
 the 0.25 strip, and it is the first minting frame, the face itself with its
 glow; Explosion's bursts are held under 1000 and the clock's ceiling is 1800.
 
-`clock state` exposes `coins.cells`, `live_cells`, `max_cells` and
-`shared_arena`, alongside the ordinary event/phase/tick diagnostics. From idle:
+`clock state` exposes `coins.cells`, `live_cells`, `max_cells`,
+`shared_arena` and `taken`, and the bird as `coins.magpie`: its `phase`
+(`away`, `entering`, `flying`, `landed`, `hopping`, `taking`, `leaving`),
+`phase_tick`, `position_milli`, `facing_right`, `home_right`, `target` (the
+coin's place in the batch), `carrying`, `trips` and `abandoned`, alongside the
+ordinary event/phase/tick diagnostics. From idle:
 
 ```sh
 spacewars-cli clock trigger coins
 spacewars-cli clock wait --event coins --phase cascading --min-phase-tick 60
 spacewars-cli screenshot /tmp/clock-coins.png
+spacewars-cli clock wait --event coins --phase gathering --min-phase-tick 240
+spacewars-cli screenshot /tmp/clock-magpie.png
 spacewars-cli clock wait --lifecycle idle
 ```
 
@@ -604,13 +654,13 @@ The pictures come from the production raster adapter through the real UI, by
 a capture test that always runs a sample at 800×480, 1024×768 and 480×800 and
 checks that the face a second after the return is pixel-identical to the
 ordinary face with the same reading. Given a directory, it also writes the
-stills, the control pages and every other frame of the 800×480 film:
+stills, the control pages and every third frame of the 800×480 film:
 
 ```sh
 SPACEWARS_COINS_ARTIFACTS=/tmp/clock-coins \
   cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client ui_render_tests::coins
 cd /tmp/clock-coins/film
-ffmpeg -framerate 30 -i frame-%04d.png -vf "scale=400:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../coins-800x480.gif
+ffmpeg -framerate 20 -i frame-%04d.png -vf "scale=400:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../coins-800x480.gif
 ```
 
 | Edge-on, half-way through the turn | Half a second into the cascade |
@@ -619,31 +669,50 @@ ffmpeg -framerate 30 -i frame-%04d.png -vf "scale=400:-1:flags=lanczos,split[a][
 
 | The pile | Half-way home |
 | --- | --- |
-| ![Sixty-three coins piled on the floor either side of the drain, one going down it](screenshots/clock/coins-800x480-piled.png) | ![The pieces fly home from where they lay, square again before they arrive](screenshots/clock/coins-800x480-reforming.png) |
+| ![Sixty-three coins piled on the floor either side of the drain, one going down it](screenshots/clock/coins-800x480-piled.png) | ![The pieces fly home from where they lay, square again before they arrive, with the replacements for the coins the magpie kept growing among them](screenshots/clock/coins-800x480-reforming.png) |
 
-![The whole event at 800×480, every other frame](screenshots/clock/coins-800x480.gif)
+The magpie's first trip, in the same run:
+
+| Landed by the heap | The coin in its beak | Off home with it |
+| --- | --- | --- |
+| ![The magpie on the floor beside the heap, looking at the top coin](screenshots/clock/coins-800x480-landed.png) | ![The magpie with its head down and a coin at the tip of its beak](screenshots/clock/coins-800x480-taking.png) | ![The magpie in the air with the coin, climbing toward the edge of the view](screenshots/clock/coins-800x480-carrying.png) |
+
+![The whole event at 800×480, every third frame](screenshots/clock/coins-800x480.gif)
 
 In the portrait view the face is 28 pitches up, and the pile gathers far
 below it:
 
 ![The pile under the face in the 480×800 view](screenshots/clock/coins-480x800-piled.png)
 
-The switch ends the pause page's preview row after Crow and Explosion, and
-the launcher's Events row, which became five columns like the two below it:
+The switch sits in the pause page's lower row of five, after Spider and
+before Tanks, and in the launcher's Events row, six columns since Tanks.
+Left and Right walk the row's switches, as they do on every switch, and
+adjust the selectors. The pause page keeps its height with six rows of 44px;
+the recipe takes a row of its own, the preview selector drops its label
+under 480px so the event's name keeps its room, and
+`tools/audit-clock-control-layout.py` holds every selector on the page to the
+room its value needs:
 
-| Clock Controls | Scenario Settings |
-| --- | --- |
-| ![Coins On at the end of the pause page's preview row](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On at the end of the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) |
+| Clock Controls | Scenario Settings | Portrait |
+| --- | --- | --- |
+| ![Coins On between Spider and Tanks in the pause page's lower row](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On in the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) | ![The 480×800 view, the preview selector without its label](screenshots/clock/coins-480x800-live-controls.png) |
 
 `coins_tests` cover the cap and the batch's own identities, seeded replay at
-six aspect ratios in both formats, the settle measurement below, the return
-from where the pieces lie at full opacity, the shared arena's lifecycle and a
-real coin-duck contact. The reassembly they share keeps its tests under
+six aspect ratios in both formats, the settle measurement above, the return
+from where the pieces lie at full opacity with the replacements grown from
+nothing, the shared arena's lifecycle and a real coin-duck contact. For the
+magpie they cover its trips at every device layout (three or four coins, no
+body, the coin in its beak drawn there, away before the return), a coin that
+leaves the pile being chosen again, a gathering cut short by a resize or a
+replacing preview with a coin in the beak, coins taken out of the shared
+arena, the bird never below the floor through a retarget on the way down, and
+its landings on a player's course set down on what is there, never over the
+pit or inside a platform. The reassembly they share keeps its tests under
 Explosion.
 
-A special guest that gathers the coins is the second half of
-[#581](https://github.com/aortez/space-wars/issues/581) and is not in this
-version; every coin comes home.
+The event and its return were the first half of
+[#581](https://github.com/aortez/space-wars/issues/581); the magpie is the
+second.
 
 ### Crow visitor
 
@@ -2424,7 +2493,7 @@ Conformance, measured rather than read:
 | Cell swaps | Per-cell quadratic bezier with opposing bow; the 15-tick fade only corrects a reading that changed mid-swap | Met |
 | Digit Slide | The old glyph slides out and the new one slides in, clipped per cell | Met |
 | Slot Machine | Every reel opens on the glyph the face was showing and turns, clipped to its own slot, onto a whole stop; nothing is faded on | Met |
-| Coins | Explosion's flights, with the pieces squaring up from discs into cells over the return; a coin the drain took comes home from below the floor | Met |
+| Coins | Explosion's flights, with the pieces squaring up from discs into cells over the return; a coin the drain took comes home from just below the view, and each coin the magpie kept is grown back from the nearest coin that remains, by the shortfall rule | Met |
 | Meltdown | Cells liquefy on real floor contact, and the face refills bottom-up and row-staggered as the puddle drains | Met by refill |
 | Aquarium | The face stays anchored and solid throughout; nothing comes apart | Not applicable |
 | Marquee, clock recipes | The reading dissolves into its own animation, which opens on the anchored pose | Met |

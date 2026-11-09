@@ -11,6 +11,7 @@ fn status() -> ServiceReply {
         status: Status {
             phase: Phase::Idle,
             ticket: None,
+            written: None,
         },
         offer: None,
         aborted: None,

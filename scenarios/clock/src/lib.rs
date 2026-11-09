@@ -742,12 +742,12 @@ impl ClockState {
             .filter(|id| id.entity.value() == grass::SOIL_PHYSICS_ID)
             .collect();
         let geometry = world.map(|w| w.query_snapshot());
-        let crow = render::plant_actor_polygons(self);
+        let actors = render::plant_actor_polygons(self);
         let soil = self.soil.as_ref().unwrap();
-        self.plants.crush_polygons(soil, &crow);
+        self.plants.crush_polygons(soil, &actors);
         if self.plants.biology_due(dt) {
             self.plants.host_polygons = render::plant_face_polygons(self);
-            self.plants.host_polygons.extend(crow);
+            self.plants.host_polygons.extend(actors);
         }
         self.plants
             .advance(dt, soil, geometry.as_ref(), &transparent, Vec::new());

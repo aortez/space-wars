@@ -116,6 +116,9 @@ mod native {
                 }
                 Failure::NotReady => "no verified candidate or eligible live app is ready",
                 Failure::Unavailable => "installation is unavailable on this device",
+                Failure::NormalBootRequired => {
+                    "the last update awaits its confirming normal restart; restart the device first"
+                }
                 Failure::SaveFailed => {
                     "app settings could not be saved; installation did not start"
                 }

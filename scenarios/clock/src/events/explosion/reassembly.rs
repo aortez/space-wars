@@ -166,6 +166,7 @@ impl Reassembly {
                     angle: donor.map_or(0.0, |cell| cell.angle),
                     side: 0.0,
                     label: target.label,
+                    taken: false,
                     home: target.home,
                     velocity: Vec2::ZERO,
                     spin: 0.0,
