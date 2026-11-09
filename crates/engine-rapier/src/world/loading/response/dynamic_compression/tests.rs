@@ -2,13 +2,13 @@
 use super::*;
 use engine_material::WOOD;
 
-fn body(n: u64) -> BodyId {
+pub(super) fn body(n: u64) -> BodyId {
     BodyId::new(PhysicsId::new(n), BodyRole::PRIMARY)
 }
 fn collider(n: u64) -> ColliderId {
     ColliderId::new(PhysicsId::new(n), ColliderRole::PRIMARY, 0)
 }
-fn world() -> PhysicsWorld {
+pub(super) fn world() -> PhysicsWorld {
     let mut w = PhysicsWorld::new(PhysicsWorldConfig {
         gravity: Vec2::X * 400.0,
         ..Default::default()

@@ -223,7 +223,7 @@ fn falling_rejects_corrupt_balance_phase_and_live_witnesses() {
 fn falling_late_handoff_record_limit_and_identity_exhaustion_are_atomic() {
     let mut w = falling_world(0.0, 1.0);
     let dt = 1.0 / 240.0;
-    let count = History::new(&Scene::read(&w).unwrap())
+    let count = History::new(&Scene::read(&w).unwrap(), &w)
         .unwrap()
         .subdivision(dt)
         .unwrap()

@@ -95,7 +95,7 @@ The #327 audit still leaves the following work before general tank/wood contacts
 | --- | --- |
 | Canonical sources, episodes and pre-solve capture | Existing [record stream](material-contact-records.md); broader response remains restricted. |
 | Impact, support, unloading and changing force | One retained history for the admitted two-body layer; other loading-mode transfers remain. |
-| Real tank/wood contacts | Multiple finite material bodies, moving supports, oblique/angular geometry and connection loads remain. |
+| Real tank/wood contacts | [Free moving supports](material-moving-support.md) now have a restricted normal-contact path. Multiple finite materials, driven supports, oblique/angular geometry and connection loads remain. |
 | Soft vegetation | Attributable swept/nonblocking loading remains. |
 | Failure and gameplay | Persistent region/failure lifecycle (#328), weapon deposition (#329), then Scorched integration (#331). |
 

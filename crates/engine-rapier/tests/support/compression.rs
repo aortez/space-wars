@@ -49,10 +49,31 @@ pub fn fixture(
     frame: (QuarterTurn, Vec2),
     remaining: f64,
 ) -> (PhysicsWorld, RegionToken) {
+    bodies_fixture([mass, mass], false, weight, layout, frame, remaining)
+}
+
+#[allow(dead_code)] // The shared fixture is also compiled by fixed-support tests.
+pub fn moving_scene(
+    masses: [f32; 2],
+    layout: (u16, u16, bool),
+    frame: (QuarterTurn, Vec2),
+    remaining: f64,
+) -> (PhysicsWorld, RegionToken) {
+    bodies_fixture(masses, true, 0.0, layout, frame, remaining)
+}
+
+fn bodies_fixture(
+    masses: [f32; 2],
+    moving: bool,
+    weight: f32,
+    layout: (u16, u16, bool),
+    frame: (QuarterTurn, Vec2),
+    remaining: f64,
+) -> (PhysicsWorld, RegionToken) {
     let (parts, copies, reverse) = layout;
     let (turn, offset) = frame;
     let mut w = PhysicsWorld::new(PhysicsWorldConfig {
-        gravity: turn.rotate(Vec2::X * (weight / mass)),
+        gravity: turn.rotate(Vec2::X * (weight / masses[0])),
         ..Default::default()
     });
     w.enable_loading_capture(CaptureConfig::default()).unwrap();
@@ -61,7 +82,7 @@ pub fn fixture(
     for role in if reverse { [1, 0] } else { [0, 1] } {
         let mut shapes = Vec::new();
         for part in 0..parts * copies {
-            let mut c = shape(role, part, mass, parts * copies);
+            let mut c = shape(role, part, masses[role as usize], parts * copies);
             c.shape = engine_rapier::world::ColliderShape::Cuboid {
                 half_width: 0.5,
                 half_height: 1.0 / f32::from(parts),
@@ -76,7 +97,7 @@ pub fn fixture(
         w.insert_body(
             body(role),
             BodySpec {
-                kind: if role == 0 {
+                kind: if role == 0 || moving {
                     BodyKind::Dynamic
                 } else {
                     BodyKind::Fixed

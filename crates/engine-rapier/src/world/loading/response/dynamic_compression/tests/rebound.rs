@@ -220,7 +220,7 @@ fn rebound_late_event_limit_and_identity_exhaustion_roll_back() {
     w.raw.colliders[h].set_mass(5.0);
     w.refresh_mass_properties(body(11));
     w.set_gravity(Vec2::X * 200.0);
-    let count = History::new(&Scene::read(&w).unwrap())
+    let count = History::new(&Scene::read(&w).unwrap(), &w)
         .unwrap()
         .subdivision(1.0 / 30.0)
         .unwrap()

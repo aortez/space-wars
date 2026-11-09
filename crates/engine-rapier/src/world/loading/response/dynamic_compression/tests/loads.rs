@@ -1,6 +1,74 @@
 use super::*;
 
 #[test]
+fn changing_load_keeps_frozen_v18_bytes_and_replay_with_moving_support_available() {
+    for mut w in falling::samples() {
+        w.set_material_dynamic_compression_acceleration(0.0)
+            .unwrap();
+        for terminal in [false, true] {
+            let mut w = w.clone();
+            if terminal {
+                w.loading
+                    .as_mut()
+                    .unwrap()
+                    .invalidate_gravity(gravity::Invalidation::ExternalEdit);
+            }
+            let c = state(&mut w);
+            let mut frozen = bincode::serialize(&4_u32).unwrap();
+            frozen.extend(model::frozen_v15_history(&c.history));
+            match &c.status {
+                Status::ChangingLoad(a) => {
+                    bincode::serialize_into(&mut frozen, &4_u32).unwrap();
+                    frozen.extend(compression::scene::frozen_v14_scene(&a.scene.plates));
+                    bincode::serialize_into(
+                        &mut frozen,
+                        &(
+                            a.scene.mass,
+                            a.scene.acceleration,
+                            a.owner,
+                            a.pending_support,
+                        ),
+                    )
+                    .unwrap();
+                }
+                Status::Invalidated(_) => {
+                    bincode::serialize_into(&mut frozen, &(1_u32, 0_u32)).unwrap();
+                }
+                _ => panic!("v18 lifecycle changed"),
+            }
+            assert_eq!(bincode::serialize(&c).unwrap(), frozen);
+            bincode::serialize_into(
+                &mut frozen,
+                &c.history.incoming.as_ref().map(|v| v.velocity),
+            )
+            .unwrap();
+            let loads = c.history.loads.as_ref().unwrap();
+            bincode::serialize_into(&mut frozen, &(loads.len() as u32)).unwrap();
+            for load in loads {
+                bincode::serialize_into(
+                    &mut frozen,
+                    &(load.elapsed, load.indentation, load.acceleration),
+                )
+                .unwrap();
+            }
+            let bytes = w.snapshot_bytes().unwrap();
+            assert_eq!(&bytes[..4], &18_u32.to_le_bytes());
+            assert!(bytes.ends_with(&frozen));
+            let mut restored = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+            assert_eq!(restored.snapshot_bytes().unwrap(), bytes);
+            assert_eq!(
+                restored.step_material_dynamic_compression(0.001),
+                w.step_material_dynamic_compression(0.001)
+            );
+            assert_eq!(
+                restored.snapshot_bytes().unwrap(),
+                w.snapshot_bytes().unwrap()
+            );
+        }
+    }
+}
+
+#[test]
 fn unchanged_falling_histories_keep_frozen_v17_bytes_and_replay() {
     for original in falling::samples() {
         for reason in [

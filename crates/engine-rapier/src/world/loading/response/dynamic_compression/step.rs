@@ -34,7 +34,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     let mut history = if let Some(s) = saved {
         s.history.clone()
     } else {
-        History::new(&scene)?
+        History::new(&scene, world)?
     };
     let (count, h) = history.subdivision(dt)?;
     let loading = world.loading.as_ref().unwrap();
@@ -54,7 +54,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     pair.sort();
     let mut owner = if let Some(c) = saved {
         c.active().unwrap().1
-    } else if revision == 3 {
+    } else if revision == 3 || revision == 5 {
         None
     } else {
         Some(enter(
@@ -67,9 +67,9 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         )?)
     };
     let mut pending_support = saved.is_some_and(
-        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) if a.pending_support),
+        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) if a.pending_support),
     );
-    let impact_arrivals = history.incoming.is_some();
+    let impact_arrivals = history.incoming.is_some() || history.moving.is_some();
     let mut current = scene;
     let mut intervals = Vec::with_capacity(count);
     for i in 0..count {
@@ -87,20 +87,41 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             pending_support = false;
         }
         let dx = history.displacement(f64::from(h))?;
-        let middle = (dx / f64::from(h)) as f32;
-        if !middle.is_finite() {
+        let middle = history
+            .moving
+            .as_ref()
+            .map_or([(dx / f64::from(h)) as f32, 0.0], |m| {
+                m.midpoint(dx / f64::from(h))
+            });
+        if !middle.iter().all(|v| v.is_finite()) {
             return Err(R::Numerical);
         }
         let normal = Vector::new(current.plates.normal[0], current.plates.normal[1]);
         let handle = staged
             .body_handle(current.plates.bodies[0])
             .ok_or(R::UnsupportedScene)?;
-        staged.raw.bodies[handle].set_linvel(normal * middle, true);
+        let support_handle = staged
+            .body_handle(current.plates.bodies[1])
+            .ok_or(R::UnsupportedScene)?;
+        staged.raw.bodies[handle].set_linvel(normal * middle[0], true);
+        if history.moving.is_some() {
+            staged.raw.bodies[support_handle].set_linvel(normal * middle[1], true);
+        }
+        let iterations = staged.raw.integration_parameters.num_solver_iterations;
+        if history.moving.is_some() {
+            // This drift has no forces, joints or solver contacts. One backend
+            // subdivision avoids repeatedly rounding both translating centers.
+            staged.raw.integration_parameters.num_solver_iterations = 1;
+        }
         gravity::phase::auxiliary_step(&mut staged, h, &CompliantPair);
+        staged.raw.integration_parameters.num_solver_iterations = iterations;
         let mut after = Scene::read(&staged)?;
         let mut expected = current.clone();
         expected.plates.x = after.plates.x;
-        expected.plates.speed = middle;
+        expected.plates.speed = middle[0] - middle[1];
+        if history.moving.is_some() {
+            expected.plates.origin = after.plates.origin;
+        }
         if after != expected || (revision == 1 && dx > 0.0 && after.plates.x <= current.plates.x) {
             return Err(R::Numerical);
         }
@@ -111,9 +132,18 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             after.plates.x,
             f64::from(h),
         );
-        let next = (f64::from(current.plates.speed)
-            + f64::from(h) * (f64::from(current.acceleration) - q.mean / f64::from(current.mass)))
-            as f32;
+        let next = history.moving.as_ref().map_or_else(
+            || {
+                [
+                    (f64::from(current.plates.speed)
+                        + f64::from(h)
+                            * (f64::from(current.acceleration) - q.mean / f64::from(current.mass)))
+                        as f32,
+                    0.0,
+                ]
+            },
+            |m| m.endpoint(q.mean * f64::from(h)),
+        );
         // Ownership follows the actual monotone backend drift, not a predicted
         // endpoint or a raw contact manifold on the undeformed envelope.
         let old_p = history.summary.plastic_indentation;
@@ -128,7 +158,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
                 } else {
                     crossing()
                 },
-                middle.max(0.0),
+                (middle[0] - middle[1]).max(0.0),
                 if impact_arrivals {
                     EpisodeTransition::Impact
                 } else {
@@ -138,7 +168,19 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             )?);
             pending_support = impact_arrivals;
         }
-        let interval = history.finish(&current, after.plates.x, next, h, at, owner)?;
+        if let Some(moving) = &mut history.moving {
+            let mut motion = moving::Motion::read(&staged, &after)?;
+            motion.velocities = next;
+            moving.finish(motion, q.work, q.mean * f64::from(h), f64::from(h))?;
+        }
+        let interval = history.finish(
+            &current,
+            after.plates.x,
+            f64::from(next[0]) - f64::from(next[1]),
+            h,
+            at,
+            owner,
+        )?;
         if after.plates.x < history.summary.plastic_indentation
             && let Some(id) = owner.take()
         {
@@ -157,8 +199,11 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         if count + events.len() > staged.loading.as_ref().unwrap().config.max_records_per_step {
             return Err(R::Limit);
         }
-        staged.raw.bodies[handle].set_linvel(normal * next, true);
-        after.plates.speed = next;
+        staged.raw.bodies[handle].set_linvel(normal * next[0], true);
+        if history.moving.is_some() {
+            staged.raw.bodies[support_handle].set_linvel(normal * next[1], true);
+        }
+        after.plates.speed = next[0] - next[1];
         after.plates.material = history.current_material();
         staged
             .loading
@@ -183,6 +228,12 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             Status::Active(Box::new(Active {
                 scene: current,
                 owner: owner.ok_or(R::Numerical)?,
+            }))
+        } else if revision == 5 {
+            Status::MovingSupport(Box::new(FallingActive {
+                scene: current,
+                owner,
+                pending_support,
             }))
         } else if revision == 4 {
             Status::ChangingLoad(Box::new(FallingActive {
