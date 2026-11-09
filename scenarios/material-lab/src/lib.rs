@@ -1,9 +1,12 @@
-//! A bounded, slow-motion application of the native falling-platen material path.
+//! A bounded, slow-motion application of native material loading and unloading.
 use bincode::Options;
 use engine_common::{Action, Observation, RenderFrame, Scenario, StepResult, TickModel};
 use engine_rapier::world::{
     PhysicsWorld,
-    loading::response::dynamic_compression::DynamicCompressionSummary,
+    loading::response::compression::CompressionRejection,
+    loading::response::dynamic_compression::{
+        DynamicCompressionSummary, MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES,
+    },
     loading::{EpisodeTransition, RegionToken},
 };
 use serde::{Deserialize, Serialize};
@@ -18,6 +21,7 @@ mod tests;
 pub const PHYSICS_DT: f32 = 1.0 / 4096.0;
 pub const MAX_SAVE_BYTES: u64 = 1_048_576;
 const SAVE_MAGIC: &[u8; 8] = b"MATLAB01";
+const LOAD_SAVE_MAGIC: &[u8; 8] = b"MATLAB02";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Case {
@@ -26,13 +30,15 @@ pub enum Case {
     PlasticReturn,
     Support,
     Overload,
+    LoadRelease,
 }
 impl Case {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Elastic,
         Self::PlasticReturn,
         Self::Support,
         Self::Overload,
+        Self::LoadRelease,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -40,6 +46,7 @@ impl Case {
             Self::PlasticReturn => "Yield, rebound & return",
             Self::Support => "Yield & continuing support",
             Self::Overload => "Overloaded support",
+            Self::LoadRelease => "Load, release & return",
         }
     }
     fn parameters(self) -> (f32, f32, u32) {
@@ -48,11 +55,33 @@ impl Case {
             Self::PlasticReturn => (1000.0, 1.0 / 16.0, 716),
             Self::Support => (4000.0, 1.0 / 64.0, 512),
             Self::Overload => (8000.0, 1.0 / 64.0, 272),
+            Self::LoadRelease => (8000.0, 1.0 / 64.0, 768),
         }
     }
     pub fn next(self) -> Self {
         Self::ALL[(Self::ALL.iter().position(|c| *c == self).unwrap() + 1) % Self::ALL.len()]
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Load {
+    Released,
+    Light,
+    Heavy,
+}
+impl Load {
+    pub fn weight(self) -> f32 {
+        match self {
+            Self::Released => 0.0,
+            Self::Light => 1000.0,
+            Self::Heavy => 8000.0,
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct LoadChange {
+    step: u32,
+    load: Load,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -91,6 +120,7 @@ pub struct MaterialLabState {
     pub separations: u32,
     pub events: Vec<Event>,
     pub stopped: Option<String>,
+    load_changes: Vec<LoadChange>,
 }
 impl MaterialLabState {
     pub fn new(case: Case) -> Self {
@@ -105,6 +135,7 @@ impl MaterialLabState {
             separations: 0,
             events: Vec::new(),
             stopped: None,
+            load_changes: Vec::new(),
         }
     }
     pub fn summary(&self) -> DynamicCompressionSummary {
@@ -119,6 +150,58 @@ impl MaterialLabState {
         self.world
             .loading_material_remaining(self.material)
             .unwrap()
+    }
+    pub fn weight(&self) -> f32 {
+        -self.world.gravity().y * 20.0
+    }
+    pub fn gravity_impulse(&self) -> f64 {
+        self.world
+            .material_dynamic_compression_gravity_impulse()
+            .unwrap_or(0.0)
+    }
+    /// A load command owns no tick and never resets an existing physical history.
+    pub fn set_load(&mut self, load: Load) -> Result<(), String> {
+        if self.stopped.is_some() {
+            return Err("Run ended. Restart the case to change its load.".into());
+        }
+        if self.steps == 0 {
+            return Err("Start the run or single step before changing the load.".into());
+        }
+        let changed = self.weight() != load.weight();
+        self.world
+            .set_material_dynamic_compression_acceleration(load.weight() / 20.0)
+            .map_err(|reason| {
+                if reason == CompressionRejection::Limit {
+                    "Load-change limit reached. Restart the case for a new run.".into()
+                } else {
+                    "This run cannot accept that load. Last valid state retained.".to_string()
+                }
+            })?;
+        if changed {
+            self.load_changes.push(LoadChange {
+                step: self.steps,
+                load,
+            });
+        }
+        Ok(())
+    }
+    pub fn guidance(&self) -> Option<&'static str> {
+        if self.case != Case::LoadRelease || self.stopped.is_some() {
+            return None;
+        }
+        Some(
+            if self.steps < 128 && self.weight() == Load::Heavy.weight() {
+                "Run until the wood yields; the lab will pause."
+            } else if self.weight() == Load::Heavy.weight() {
+                "Release load, then Run to watch elastic recovery."
+            } else if self.weight() == 0.0 && self.separations == 0 {
+                "Run to separation; the lab will pause."
+            } else if self.weight() == 0.0 {
+                "Apply light load, then Run to return to the dent."
+            } else {
+                "Run to watch the return; permanent damage stays spent."
+            },
+        )
     }
     pub fn phase(&self) -> Phase {
         let s = self.summary();
@@ -144,6 +227,7 @@ impl MaterialLabState {
         match self.world.step_material_dynamic_compression(PHYSICS_DT) {
             Ok(result) => {
                 self.steps += 1;
+                let mut separated = false;
                 for e in result.events {
                     let label = match e.event.transition {
                         EpisodeTransition::Impact => {
@@ -153,6 +237,7 @@ impl MaterialLabState {
                         EpisodeTransition::Support => "Support",
                         EpisodeTransition::End => {
                             self.separations += 1;
+                            separated = true;
                             "Separation"
                         }
                     };
@@ -165,7 +250,14 @@ impl MaterialLabState {
                         episode: self.impacts,
                     });
                 }
-                if self.steps == self.case.parameters().2 {
+                if self.case == Case::LoadRelease
+                    && (self.steps == 128 || (separated && self.weight() == 0.0))
+                {
+                    self.paused = true;
+                }
+                if self.steps == self.case.parameters().2
+                    || (self.case == Case::LoadRelease && self.impacts >= 2)
+                {
                     self.stopped = Some("Run complete — restart or choose another case".into());
                     self.paused = true;
                 }
@@ -182,7 +274,9 @@ impl MaterialLabState {
         serde_json::json!({ "case": self.case.name(), "paused": self.paused, "steps": self.steps,
             "impacts": self.impacts, "separations": self.separations, "phase": self.phase(),
             "summary": self.summary(), "remaining": self.remaining(), "events": self.events,
-            "stopped": self.stopped })
+            "stopped": self.stopped, "weight": self.weight(),
+            "gravity_impulse": self.gravity_impulse(), "load_changes": self.load_changes,
+            "guidance": self.guidance() })
     }
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, String> {
         let save = Save {
@@ -194,39 +288,66 @@ impl MaterialLabState {
             stopped: self.stopped.clone(),
             world: self.world.snapshot_bytes().map_err(|e| e.to_string())?,
         };
-        let mut bytes = SAVE_MAGIC.to_vec();
-        bytes.extend(codec().serialize(&save).map_err(|e| e.to_string())?);
+        let mut bytes;
+        if self.load_changes.is_empty() && self.case != Case::LoadRelease {
+            bytes = SAVE_MAGIC.to_vec();
+            bytes.extend(codec().serialize(&save).map_err(|e| e.to_string())?);
+        } else {
+            bytes = LOAD_SAVE_MAGIC.to_vec();
+            bytes.extend(
+                codec()
+                    .serialize(&(save, &self.load_changes))
+                    .map_err(|e| e.to_string())?,
+            );
+        }
         Ok(bytes)
     }
     /// Restore paused. The native snapshot owns physical history and numerical allowances.
     /// The bounded wrapper additionally verifies all saved display metadata by replay.
     pub fn from_snapshot_bytes(bytes: &[u8]) -> Result<Self, String> {
-        if bytes.len() as u64 > MAX_SAVE_BYTES || !bytes.starts_with(SAVE_MAGIC) {
+        if bytes.len() as u64 > MAX_SAVE_BYTES {
             return Err("Not a supported Material Lab save".into());
         }
-        let save: Save = codec()
-            .deserialize(&bytes[8..])
-            .map_err(|e| e.to_string())?;
-        if save.steps > save.case.parameters().2 || save.events.len() > 8 {
+        let (save, changes): (Save, Vec<LoadChange>) = if bytes.starts_with(SAVE_MAGIC) {
+            let save: Save = codec()
+                .deserialize(&bytes[8..])
+                .map_err(|e| e.to_string())?;
+            if save.case == Case::LoadRelease {
+                return Err("Load/release case requires a newer lab save".into());
+            }
+            (save, Vec::new())
+        } else if bytes.starts_with(LOAD_SAVE_MAGIC) {
+            codec()
+                .deserialize(&bytes[8..])
+                .map_err(|e| e.to_string())?
+        } else {
+            return Err("Not a supported Material Lab save".into());
+        };
+        if save.steps > save.case.parameters().2
+            || save.events.len() > 8
+            || changes.len() > MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES
+            || changes.iter().any(|c| c.step == 0 || c.step > save.steps)
+            || changes.windows(2).any(|c| c[0].step > c[1].step)
+        {
             return Err("Invalid run history".into());
         }
         let world = PhysicsWorld::from_snapshot_bytes(&save.world).map_err(|e| e.to_string())?;
         let mut expected = Self::new(save.case);
-        for _ in 0..save.steps {
-            expected.advance();
+        let mut commands = changes.iter().peekable();
+        for step in 0..=save.steps {
+            while commands.peek().is_some_and(|c| c.step == step) {
+                expected.set_load(commands.next().unwrap().load)?;
+            }
+            if step < save.steps {
+                expected.advance();
+            }
         }
         if save.stopped.is_some() && expected.stopped.is_none() {
             // A saved numerical refusal retains the last successful tick. Verify
             // that the next tick actually refuses, without accepting a time reset.
             expected.advance();
         }
-        if expected.steps != save.steps
-            || expected.impacts != save.impacts
-            || expected.separations != save.separations
-            || expected.events != save.events
-            || expected.stopped != save.stopped
-            || expected.world.snapshot_bytes().map_err(|e| e.to_string())? != save.world
-        {
+        if expected.snapshot_bytes()? != bytes {
             return Err("Save history does not match this supported run".into());
         }
         expected.world = world;

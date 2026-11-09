@@ -99,6 +99,8 @@ The #327 audit still leaves the following work before general tank/wood contacts
 | Soft vegetation | Attributable swept/nonblocking loading remains. |
 | Failure and gameplay | Persistent region/failure lifecycle (#328), weapon deposition (#329), then Scorched integration (#331). |
 
-The existing [Material Lab](material-lab.md) continues to exercise its constant-load
-cases. Adding a visible load/release case is an application follow-up. This slice
-does not complete #327 or enable material damage in Clock or Scorched gameplay.
+The [Material Lab](material-lab.md) exercises constant-load cases and a guided
+load/release/return case, with visible force, work and retained damage. Its load
+controls and saved command replay use this API without broadening its physical
+limits. This does not complete #327 or enable material damage in Clock or Scorched
+gameplay.

@@ -43,7 +43,7 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         &mut f,
         -17.0,
         10.3,
-        "MATERIAL LAB  /  FALLING PLATEN",
+        "MATERIAL LAB  /  LOAD & RECOVERY",
         22.0,
         CYAN,
     );
@@ -64,6 +64,32 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
     let platen = 1.0 - a.indentation as f32 * 20.0;
     let permanent = 1.0 - a.plastic_indentation as f32 * 20.0;
     let surface = permanent.min(platen);
+    text(
+        &mut f,
+        -14.0,
+        5.2,
+        format!(
+            "Load: {:.0}  |  changes: {}/{}",
+            s.weight(),
+            s.load_changes.len(),
+            crate::MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES
+        ),
+        14.0,
+        if s.weight() == 0.0 { AMBER } else { CYAN },
+    );
+    if s.weight() > 0.0 {
+        let tip = platen + 1.5;
+        line(
+            &mut f,
+            -8.5,
+            tip + 0.5 + s.weight() / 8000.0,
+            -8.5,
+            tip,
+            AMBER,
+        );
+        line(&mut f, -8.8, tip + 0.3, -8.5, tip, AMBER);
+        line(&mut f, -8.2, tip + 0.3, -8.5, tip, AMBER);
+    }
     rect(
         &mut f,
         -14.0,
@@ -107,25 +133,27 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         format!("Elastic energy  {:.3}", a.elastic_energy),
         format!("Motion energy   {:.3}", a.kinetic_energy),
         format!("Viscous loss    {:.3}", a.viscous_loss),
+        format!("Gravity work    {:.3}", a.gravity_work),
+        format!("Gravity impulse  {:.3}", s.gravity_impulse()),
     ];
     for (i, l) in lines.into_iter().enumerate() {
         text(&mut f, 0.5, 5.8 - i as f32 * 0.75, l, 14.0, INK);
     }
-    rect(&mut f, 0.5, -0.9, 14.5, 0.25, C::rgb(0.2, 0.23, 0.27));
+    rect(&mut f, 0.5, -2.1, 14.5, 0.25, C::rgb(0.2, 0.23, 0.27));
     rect(
         &mut f,
         0.5,
-        -0.9,
+        -2.1,
         14.5 * (s.remaining() / 1200.0) as f32,
         0.25,
         CYAN,
     );
-    text(&mut f, 0.5, -2.0, "CONTACT HISTORY", 13.0, CYAN);
+    text(&mut f, 0.5, -2.8, "CONTACT HISTORY", 13.0, CYAN);
     for (i, e) in s.events.iter().rev().take(4).enumerate() {
         text(
             &mut f,
             0.5,
-            -3.0 - i as f32 * 0.8,
+            -3.6 - i as f32 * 0.7,
             format!("{:.4}s  {}  #{}", e.time, e.label, e.episode),
             13.0,
             INK,
@@ -133,6 +161,8 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
     }
     if let Some(reason) = &s.stopped {
         text(&mut f, -17.0, 6.5, reason, 13.0, AMBER);
+    } else if let Some(hint) = s.guidance() {
+        text(&mut f, -17.0, 6.5, hint, 13.0, AMBER);
     }
     f
 }

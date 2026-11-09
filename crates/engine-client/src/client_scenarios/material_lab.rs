@@ -7,7 +7,7 @@ use crate::{
     render::{FrameLayout, Viewport},
 };
 use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickModel};
-use scenario_material_lab::{Case, MaterialLabScenario, MaterialLabState};
+use scenario_material_lab::{Case, Load, MaterialLabScenario, MaterialLabState};
 use std::{cell::Cell, path::PathBuf, sync::mpsc, time::Duration};
 mod storage;
 use storage::{Operation, Outcome};
@@ -25,17 +25,20 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Material Lab: falling-platen impact, compression and rebound in slow motion. Starts paused. Up/down chooses Run/Pause, Single step, Restart case, Next case, Save or Load; Space or gamepad bottom face activates. Save pauses and replaces one persistent slot; Load restores paused. Saves survive restarting the application. Each case ends after a bounded observation window. Esc/Start opens host pause; R restarts the lab. The schematic magnifies vertical displacement 20x; displayed time and work are physical values.",
+    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Vertical displacement is magnified 20x; displayed time and work are physical values.",
     create,
 };
 const COMMAND_KIND: u32 = 1;
-const CONTROLS: [&str; 6] = [
+const CONTROLS: [&str; 9] = [
     "Run / Pause",
     "Single step",
     "Restart case",
     "Next case",
     "Save",
     "Load",
+    "Release load (0)",
+    "Apply light load (1000)",
+    "Apply heavy load (8000)",
 ];
 pub(crate) struct MaterialLabClientScenario {
     state: MaterialLabState,
@@ -138,6 +141,17 @@ impl MaterialLabClientScenario {
                     Err(e) => self.message = e,
                 }
             }
+            6..=8 => {
+                self.state.paused = true;
+                let load = [Load::Released, Load::Light, Load::Heavy][self.selected - 6];
+                self.message = match self.state.set_load(load) {
+                    Ok(()) => format!(
+                        "Load set to {:.0}. Use Run or Single step to observe the response.",
+                        load.weight()
+                    ),
+                    Err(reason) => reason,
+                };
+            }
             _ => unreachable!(),
         }
     }
@@ -211,6 +225,7 @@ impl ClientScenario for MaterialLabClientScenario {
     fn runtime_diagnostics(&self) -> String {
         let mut v = self.state.diagnostics();
         v["control"] = serde_json::json!(self.selected);
+        v["control_count"] = serde_json::json!(CONTROLS.len());
         v["storage_busy"] = serde_json::json!(self.pending.is_some());
         v["storage_status"] = serde_json::json!(self.message);
         format!("material_lab={v}")
@@ -270,6 +285,16 @@ mod tests {
         assert_eq!(s.state.steps, 1);
         for _ in 0..250 {
             tick(s, false);
+        }
+        let summary = s.state.summary();
+        let steps = s.state.steps;
+        for (control, weight) in [(6, 0.0), (7, 1000.0), (8, 8000.0), (6, 0.0)] {
+            s.selected = control;
+            tick(s, true);
+            assert!(s.state.paused);
+            assert_eq!(s.state.steps, steps);
+            assert_eq!(s.state.summary(), summary);
+            assert_eq!(s.state.weight(), weight);
         }
         s.selected = 4;
         tick(s, true);

@@ -12,10 +12,13 @@ fn press(h: &mut FunctionalHarness, s: &mut UiState, b: InputButton) {
     thread::sleep(Duration::from_millis(150));
 }
 fn choose(h: &mut FunctionalHarness, s: &mut UiState, target: u64) {
-    let mut current = snapshot(h, |_| true)["control"].as_u64().unwrap();
+    let state = snapshot(h, |_| true);
+    let mut current = state["control"].as_u64().unwrap();
+    let count = state["control_count"].as_u64().unwrap();
+    assert!(target < count);
     while current != target {
         press(h, s, InputButton::Down);
-        current = (current + 1) % 6;
+        current = (current + 1) % count;
     }
     press(h, s, InputButton::South);
 }
@@ -37,7 +40,7 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
     }
 }
 fn physics(v: &Value) -> Value {
-    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"]})
+    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"]})
 }
 fn launch(h: &mut FunctionalHarness, mut s: UiState, renderer: &str) -> UiState {
     s = h.activate_until_scenario("material-lab", s);
@@ -63,9 +66,13 @@ fn material_lab_pause_save_load_and_both_renderers() {
         let mut s = launch(h, ready, "vector");
         let initial = snapshot(h, |v| v["paused"] == true);
         assert_eq!(initial["steps"], 0);
+        for _ in 0..3 {
+            choose(h, &mut s, 3);
+        }
+        assert_eq!(snapshot(h, |_| true)["case"], "Load, release & return");
         h.capture_screenshot("material-initial-vector.png");
         choose(h, &mut s, 0);
-        snapshot(h, |v| v["steps"].as_u64().unwrap() > 210);
+        snapshot(h, |v| v["steps"].as_u64().unwrap() > 80);
         h.pause_guarded(&s);
         let paused = h.wait_for(
             UiStatePredicate {
@@ -85,6 +92,13 @@ fn material_lab_pause_save_load_and_both_renderers() {
             },
             TRANSITION_TIMEOUT,
         );
+        let yielded = snapshot(h, |v| v["steps"] == 128 && v["paused"] == true);
+        h.capture_screenshot("material-yielded-vector.png");
+        choose(h, &mut s, 6);
+        let released = snapshot(h, |v| v["weight"] == 0.0);
+        assert_eq!(released["steps"], yielded["steps"]);
+        assert_eq!(released["summary"], yielded["summary"]);
+        assert_eq!(released["load_changes"].as_array().unwrap().len(), 1);
         choose(h, &mut s, 4);
         let saved = snapshot(h, |v| {
             v["storage_status"].as_str().unwrap().starts_with("Saved")
@@ -148,10 +162,23 @@ fn material_lab_pause_save_load_and_both_renderers() {
         assert_eq!(physics(&saved), physics(&loaded));
         h.capture_screenshot("material-loaded-raster.png");
         choose(h, &mut s, 0);
+        let separated = snapshot(h, |v| v["paused"] == true && v["separations"] == 1);
+        assert!(separated["stopped"].is_null());
+        h.capture_screenshot("material-separated-raster.png");
+        choose(h, &mut s, 7);
+        let light = snapshot(h, |v| v["weight"] == 1000.0);
+        assert_eq!(light["summary"], separated["summary"]);
+        assert_eq!(light["steps"], separated["steps"]);
+        assert_eq!(light["load_changes"].as_array().unwrap().len(), 2);
+        choose(h, &mut s, 0);
         let end = snapshot(h, |v| v["stopped"].is_string());
         assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
         assert!(end["impacts"].as_u64().unwrap() >= 2);
         assert!(end["separations"].as_u64().unwrap() >= 1);
+        assert_eq!(
+            end["summary"]["damage_work"],
+            separated["summary"]["damage_work"]
+        );
         h.capture_screenshot("material-complete-raster.png");
         // Malformed input never replaces the visible, valid physical state.
         fs::write(h.run_path().join("config/material-lab.bin"), b"corrupt").unwrap();
