@@ -974,8 +974,6 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             "pause.clock.preview-event",
             "pause.clock.crow",
             "pause.clock.explosion",
-            "pause.clock.coins",
-            "pause.clock.aquarium",
             "pause.clock.marquee",
         ] {
             page = harness.press_guarded(UiAction::Down, &page);
@@ -990,10 +988,15 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             page.selected_control.as_deref(),
             Some("pause.clock.aquarium")
         );
-        // Spider sits between Aquarium and the recipe in the Marquee row.
+        // Spider, Coins and Tanks follow Aquarium in the Marquee row, and Down
+        // from the row's end reaches the recipe on the row below.
         page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(page.selected_control.as_deref(), Some("pause.clock.spider"));
         page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.coins"));
+        page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.tanks"));
+        page = harness.press_guarded(UiAction::Down, &page);
         assert_eq!(
             page.selected_control.as_deref(),
             Some("pause.clock.marquee-preset")

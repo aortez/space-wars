@@ -127,15 +127,17 @@ pub(crate) fn moved_ingame_selection(current: i32, extra_row_item: bool, action:
 pub(crate) fn moved_clock_selection(current: i32, action: UiAction) -> i32 {
     // Stable indices across layout changes. Left/Right move between switches;
     // choice rows use those actions to adjust their value. Coins and Tanks
-    // follow Spider; the recipe occupies the last row.
+    // follow Spider; the recipe occupies the last row. Up and Down walk every
+    // control in turn: the preview row, then Marquee to Tanks, then the recipe
+    // and Preview & Resume.
     let current = current.clamp(0, 23) as usize;
     match action {
         UiAction::Up => [
-            5, 0, 12, 12, 2, 9, 10, 12, 12, 17, 17, 18, 18, 16, 4, 14, 1, 22, 13, 18, 19, 22, 15,
+            5, 0, 12, 12, 2, 10, 10, 12, 12, 15, 23, 18, 18, 16, 4, 14, 1, 9, 13, 18, 19, 17, 21,
             22,
         ][current],
         UiAction::Down => [
-            1, 16, 4, 4, 14, 0, 0, 4, 4, 5, 6, 4, 2, 18, 15, 22, 13, 9, 12, 2, 2, 6, 17, 6,
+            1, 16, 4, 4, 14, 0, 0, 4, 4, 17, 6, 4, 2, 18, 15, 9, 13, 21, 12, 2, 2, 22, 23, 10,
         ][current],
         UiAction::Left => [
             0, 1, 11, 2, 4, 6, 5, 3, 7, 23, 23, 8, 12, 13, 4, 14, 1, 9, 13, 18, 19, 17, 21, 22,
@@ -191,12 +193,17 @@ mod tests {
         assert_eq!(moved_clock_selection(12, UiAction::Up), 18);
         assert_eq!(moved_clock_selection(4, UiAction::Down), 14);
         assert_eq!(moved_clock_selection(14, UiAction::Down), 15);
-        assert_eq!(moved_clock_selection(15, UiAction::Down), 22);
-        assert_eq!(moved_clock_selection(22, UiAction::Down), 17);
-        assert_eq!(moved_clock_selection(17, UiAction::Down), 9);
-        assert_eq!(moved_clock_selection(9, UiAction::Up), 17);
-        assert_eq!(moved_clock_selection(17, UiAction::Up), 22);
-        assert_eq!(moved_clock_selection(22, UiAction::Up), 15);
+        assert_eq!(moved_clock_selection(15, UiAction::Down), 9);
+        assert_eq!(moved_clock_selection(9, UiAction::Down), 17);
+        assert_eq!(moved_clock_selection(17, UiAction::Down), 21);
+        assert_eq!(moved_clock_selection(22, UiAction::Down), 23);
+        assert_eq!(moved_clock_selection(23, UiAction::Down), 10);
+        assert_eq!(moved_clock_selection(9, UiAction::Up), 15);
+        assert_eq!(moved_clock_selection(17, UiAction::Up), 9);
+        assert_eq!(moved_clock_selection(22, UiAction::Up), 21);
+        assert_eq!(moved_clock_selection(23, UiAction::Up), 22);
+        assert_eq!(moved_clock_selection(10, UiAction::Up), 23);
+        assert_eq!(moved_clock_selection(5, UiAction::Up), 10);
         assert_eq!(moved_clock_selection(15, UiAction::Right), 4);
         assert_eq!(moved_clock_selection(22, UiAction::Right), 23);
         assert_eq!(moved_clock_selection(22, UiAction::Left), 21);
@@ -209,8 +216,8 @@ mod tests {
         assert_eq!(moved_clock_selection(21, UiAction::Right), 22);
         assert_eq!(moved_clock_selection(21, UiAction::Left), 17);
         assert_eq!(moved_clock_selection(10, UiAction::Left), 23);
-        assert_eq!(moved_clock_selection(21, UiAction::Up), 22);
-        assert_eq!(moved_clock_selection(21, UiAction::Down), 6);
+        assert_eq!(moved_clock_selection(21, UiAction::Up), 17);
+        assert_eq!(moved_clock_selection(21, UiAction::Down), 22);
         assert_eq!(moved_clock_selection(10, UiAction::Down), 6);
         assert_eq!(moved_clock_selection(6, UiAction::Up), 10);
     }
