@@ -160,7 +160,8 @@ On the trial boot that commits an update, the committed outcome says the device
 restarts once more to confirm the new software, because the recovery service
 requests that normal reboot itself. A panel opened on a committed trial boot
 that was not confirmed yet is told that a normal restart is pending rather than
-that installation is unavailable.
+that installation is unavailable. Generation 26 on `sw-picade-2` restarted this
+way on 2026-11-08 (`ota-picade2-generation26-install-20261108`).
 A valid launcher draft is included and retained in memory when preparation
 starts. Settings changes, other queued saves, scene changes, focus loss and
 preparation expiry revoke an unacknowledged handoff. A failed save cannot ack.

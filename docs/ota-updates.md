@@ -1506,7 +1506,11 @@ against the committed record and the completed watchdog; a service restart on
 the same boot asks again, and the normal boot asks for nothing. If the request
 fails, the service reports `healthy` with the reason, the Updates panel says a
 normal restart is pending instead of "not available", and the install CLI
-returns `normal-boot-required`. Running trial identity comes from the loaded
+returns `normal-boot-required`. The first device run was Nightly generation 26
+on `sw-picade-2` on 2026-11-08: the trial committed and the service's normal
+reboot followed 72 s into the trial boot, so the unit came up on a normal boot
+of the new slot with no manual restart (`ota-picade2-generation26-install-20261108`).
+Running trial identity comes from the loaded
 command line; replacing the next trial selector cannot change it. Interruption
 during the later update still quarantines the new attempt.
 
