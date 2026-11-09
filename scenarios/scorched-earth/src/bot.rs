@@ -60,6 +60,10 @@ pub(super) struct Flight {
 }
 
 impl Flight {
+    pub(crate) fn source_id(&self) -> u64 {
+        self.launch.id
+    }
+
     pub fn observe(&mut self, from: Vec2, to: Vec2, target: Vec2) {
         self.target_moved |= target.distance_to(self.launch.target) > 1.5;
         self.closest = self
@@ -137,14 +141,20 @@ impl Bot {
         self.hit_serial += 1;
     }
 
-    fn finish_relocation(&mut self, state: &ScorchedState, player: usize, reason: &'static str) {
+    fn finish_relocation(
+        &mut self,
+        state: &Duel,
+        physics: &PhysicsWorld,
+        player: usize,
+        reason: &'static str,
+    ) {
         let relocation = self.relocation.take().unwrap();
         self.last_relocation = Some(RelocationOutcome {
             started: relocation.started,
             ended: state.tick,
             origin: relocation.origin,
             destination_x: relocation.destination_x,
-            position: Geometry::read(state, player).shooter,
+            position: Geometry::read(state, physics, player).shooter,
             reason,
         });
         self.relocate_after = state.tick + 600;
@@ -155,7 +165,7 @@ impl Bot {
 
     // Call after refreshing aim against the current poses. This is also the
     // checkpoint boundary used by the lab; it does not reset learned history.
-    fn wants_relocation(&self, state: &ScorchedState, player: usize) -> bool {
+    fn wants_relocation(&self, state: &Duel, player: usize) -> bool {
         state.config.cpu_policy[player] == CpuPolicy::Reactive
             && self.relocation.is_none()
             && self
@@ -171,14 +181,20 @@ impl Bot {
                 .is_some_and(|(tick, _)| state.tick.saturating_sub(tick) <= 180)
     }
 
-    fn consider_relocation(&mut self, state: &ScorchedState, player: usize, x: Option<f32>) {
+    fn consider_relocation(
+        &mut self,
+        state: &Duel,
+        physics: &PhysicsWorld,
+        player: usize,
+        x: Option<f32>,
+    ) {
         self.considered_hit = self.hit_serial;
         if let Some(x) = x {
             self.relocation = Some(Relocation {
                 goal: driving::TravelGoal::new(x, 2.5),
                 deadline: state.tick + 240,
                 started: state.tick,
-                origin: Geometry::read(state, player).shooter,
+                origin: Geometry::read(state, physics, player).shooter,
                 destination_x: x,
             });
             self.relocations += 1;
@@ -192,19 +208,19 @@ impl Bot {
         }
     }
 
-    fn react_to_hit(&mut self, state: &ScorchedState, player: usize) {
-        let destination = state.escape_destination(player, self.aim.elevation);
-        if destination.is_some() && self.try_shot_priority(state, player) {
+    fn react_to_hit(&mut self, state: &Duel, physics: &PhysicsWorld, player: usize) {
+        let destination = state.escape_destination(physics, player, self.aim.elevation);
+        if destination.is_some() && self.try_shot_priority(state, physics, player) {
             self.considered_hit = self.hit_serial;
         } else {
-            self.consider_relocation(state, player, destination);
+            self.consider_relocation(state, physics, player, destination);
         }
     }
 
-    fn drive(&mut self, state: &ScorchedState, player: usize) -> Option<f32> {
-        self.aim.refresh(Geometry::read(state, player));
+    fn drive(&mut self, state: &Duel, physics: &PhysicsWorld, player: usize) -> Option<f32> {
+        self.aim.refresh(Geometry::read(state, physics, player));
         if let Some(move_goal) = &mut self.relocation {
-            let decision = move_goal.goal.decide(state, player);
+            let decision = move_goal.goal.decide_in(state, physics, player);
             if state.tick >= move_goal.deadline
                 || matches!(
                     decision.mode,
@@ -216,22 +232,22 @@ impl Bot {
                 } else {
                     decision.mode
                 };
-                self.finish_relocation(state, player, reason);
+                self.finish_relocation(state, physics, player, reason);
                 return Some(0.0);
             }
             self.mode = "relocating after hit";
             return Some(decision.axis);
         }
-        if self.protect_correction(state, player) {
+        if self.protect_correction(state, physics, player) {
             return Some(0.0);
         }
         if self.wants_relocation(state, player) {
-            self.react_to_hit(state, player);
-            if self.protect_correction(state, player) {
+            self.react_to_hit(state, physics, player);
+            if self.protect_correction(state, physics, player) {
                 return Some(0.0);
             }
             if self.relocation.is_some() {
-                return self.drive(state, player);
+                return self.drive(state, physics, player);
             }
         }
         if state.tick < self.hold_until || self.pending.is_some() {
@@ -251,7 +267,7 @@ impl Bot {
     }
 }
 
-impl ScorchedState {
+impl Duel {
     pub(super) fn calibrated_cpu(&self, player: usize) -> bool {
         self.config.cpu_policy[player] != CpuPolicy::Sweep
             && self.config.course.is_none()
@@ -270,12 +286,12 @@ impl ScorchedState {
         serde_json::to_value(&self.bots).expect("finite bot state")
     }
 
-    pub(super) fn bot_drive(&mut self, player: usize) -> Option<f32> {
+    pub(super) fn bot_drive(&mut self, physics: &mut PhysicsWorld, player: usize) -> Option<f32> {
         if !self.calibrated_cpu(player) {
             return None;
         }
         let mut bot = std::mem::take(&mut self.bots[player]);
-        let axis = bot.drive(self, player);
+        let axis = bot.drive(self, physics, player);
         if axis.is_some() {
             self.driving[player].diagnostics.mode = bot.mode;
         }
@@ -283,8 +299,13 @@ impl ScorchedState {
         axis
     }
 
-    fn escape_destination(&self, player: usize, elevation: f32) -> Option<f32> {
-        self.relocation_sites(player, elevation)
+    fn escape_destination(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+        elevation: f32,
+    ) -> Option<f32> {
+        self.relocation_sites(physics, player, elevation)
             .into_iter()
             .filter(|site| site.rejection.is_none())
             .min_by(|a, b| a.score.unwrap().total_cmp(&b.score.unwrap()))
@@ -297,8 +318,8 @@ impl ScorchedState {
                 && (!self.config.cpu_driving || self.bots[player].relocation.is_none()))
     }
 
-    pub(super) fn aim_calibrated(&mut self, player: usize) {
-        let geometry = Geometry::read(self, player);
+    pub(super) fn aim_calibrated(&mut self, physics: &mut PhysicsWorld, player: usize) {
+        let geometry = Geometry::read(self, physics, player);
         let aim = &mut self.bots[player].aim;
         aim.refresh(geometry);
         self.tanks[player].facing = (geometry.target.x - geometry.shooter.x).signum();
@@ -308,12 +329,13 @@ impl ScorchedState {
 
     pub(super) fn record_launch(
         &mut self,
+        physics: &mut PhysicsWorld,
         player: usize,
         origin: Vec2,
         velocity: Vec2,
         blocked_barrel: bool,
     ) -> Flight {
-        let geometry = Geometry::read(self, player);
+        let geometry = Geometry::read(self, physics, player);
         let calibrated =
             self.calibrated_cpu(player) && (self.config.demo || player != self.selected);
         let launch = Launch {
@@ -389,5 +411,20 @@ impl ScorchedState {
             self.shot_observations.remove(0);
         }
         self.shot_observations.push(result);
+    }
+}
+
+impl ScorchedState {
+    #[cfg(test)]
+    pub(super) fn bot_drive(&mut self, player: usize) -> Option<f32> {
+        self.duel.bot_drive(&mut self.physics, player)
+    }
+    fn escape_destination(&self, player: usize, elevation: f32) -> Option<f32> {
+        self.duel
+            .escape_destination(&self.physics, player, elevation)
+    }
+    #[cfg(test)]
+    pub(super) fn aim_calibrated(&mut self, player: usize) {
+        self.duel.aim_calibrated(&mut self.physics, player)
     }
 }

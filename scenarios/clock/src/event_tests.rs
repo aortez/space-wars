@@ -22,6 +22,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 slot_machine: false,
                 spider: false,
                 coins: false,
+                tanks: false,
             },
             ..ClockConfig::default()
         },
@@ -290,7 +291,12 @@ fn timed_events_obey_the_same_lifecycle_and_cleanup_contract() {
         // Time correction during any event must not restore stale digits/color.
         let reading = ClockAction::set_reading(ClockReading::new(0, 1, 0).unwrap());
         ClockScenario::step(&mut state, std::slice::from_ref(&reading), Duration::ZERO);
-        ticks(&mut state, definition.duration_ticks - partial);
+        for _ in partial..definition.duration_ticks {
+            if state.event_kind().is_none() {
+                break;
+            }
+            ticks(&mut state, 1);
+        }
         assert_eq!(state.lifecycle(), EventLifecycle::Cooldown);
         assert_eq!(state.event_kind(), None);
         assert_eq!(state.event_phase(), None);
@@ -852,6 +858,7 @@ fn slot_machine_reports_a_preview_only_when_a_person_asked_for_one() {
         slot_machine: true,
         spider: true,
         coins: false,
+        tanks: false,
     };
     let mut state = ready(ClockEventProfile::Demo, 7);
     let mut settings = state.settings();

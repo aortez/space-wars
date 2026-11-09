@@ -82,7 +82,7 @@ pub(super) fn spec(tuning: WheelTuning) -> RoverSpec {
     }
 }
 
-pub(super) fn enabled(config: ScorchedConfig) -> bool {
+pub(super) const fn enabled(config: ScorchedConfig) -> bool {
     config.suspension
         && !config.undercut
         && config.drop_height.is_none()
@@ -90,18 +90,45 @@ pub(super) fn enabled(config: ScorchedConfig) -> bool {
         && !((config.hillside || config.roof) && config.demo)
 }
 
+#[cfg(test)]
 pub(super) fn insert(
     physics: &mut PhysicsWorld,
     entity: PhysicsId,
     position: Vec2,
     tuning: WheelTuning,
 ) -> RoverAssembly {
-    let spec = spec(tuning);
+    insert_scaled(physics, entity, position, tuning, 1.0)
+}
+
+pub(super) fn insert_scaled(
+    physics: &mut PhysicsWorld,
+    entity: PhysicsId,
+    position: Vec2,
+    tuning: WheelTuning,
+    scale: f32,
+) -> RoverAssembly {
+    let mut spec = spec(tuning);
+    spec.chassis_half_width *= scale;
+    spec.chassis_half_height *= scale;
+    spec.wheel_radius *= scale;
+    spec.wheel_offset *= scale;
+    spec.suspension_anchor_height *= scale;
+    spec.suspension_rest_length *= scale;
+    spec.suspension_travel *= scale;
+    // Density stays fixed: masses scale with area, forces with length cubed,
+    // and torques/inertias with length to the fourth. Time stays in seconds.
+    spec.suspension_stiffness *= scale.powi(2);
+    spec.suspension_damping *= scale.powi(2);
+    spec.suspension_max_force *= scale.powi(3);
+    spec.wheel_motor_torque *= scale.powi(4);
+    spec.wheel_brake_torque *= scale.powi(4);
+    spec.wheel_motor_damping *= scale.powi(4);
     RoverAssembly::insert_at(
         physics,
         entity,
         RoverSpawnPose {
-            wheel_center: position + Vec2::Y * (tuning.radius - WheelTuning::default().radius)
+            wheel_center: position
+                + Vec2::Y * (tuning.radius - WheelTuning::default().radius) * scale
                 - Vec2::Y * (spec.suspension_rest_length - spec.suspension_anchor_height),
             up_angle: std::f32::consts::FRAC_PI_2,
         },

@@ -1971,6 +1971,79 @@ fluids and napalm remain later work. The driving pass adds basic native traction
 and local CPU repositioning; additional weapons, sound and broader round
 progression remain outside this slice.
 
+### Host-owned duel
+
+[`host::HostedDuel`](../scenarios/scorched-earth/src/host.rs) runs the same
+`Duel` used by standalone `ScorchedState` in a borrowed `PhysicsWorld`.
+Attachment inserts the hills and two CPU tanks without stepping the world.
+Each fixed tick has three parts:
+
+1. `prepare_step` prepares CPU commands, surface drives and impact-motion capture.
+2. The host combines those drives with its other actors and advances the
+   canonical world once at `1 / FIXED_HZ` seconds.
+3. `finish_step` resolves swept shells, craters, collapse and deposition.
+   The host then consumes `impacts()` before the next preparation clears it.
+
+The host reserves an exclusive ID range and `Budget::required(config)` before
+attachment. Budget counts cover the existing grain and fragment limits, both
+hulls and optional running gear, and one compound collider per terrain chunk,
+including temporary source/destination overlap during material commits.
+The collider reservation conservatively permits every cropped fragment to have
+as many chunks as the original field; it does not allocate empty colliders or
+increase the simulation's workload. Invalid configuration, occupied IDs or an
+insufficient allowance are refused before insertion. A consumed ID is not reused
+within a duel; namespace exhaustion refuses further material releases.
+
+Hosts can set `Placement::terrain_width` (193–2049 half-unit columns) and
+`spawn_x` in native coordinates. Wider fields stretch the hill profile
+horizontally without stretching tanks or cells. Reserve their chunks with
+`Budget::for_terrain`; attachment rejects the ordinary field's smaller allowance.
+The maximum shot speed grows with the square root of the width ratio, so its
+ballistic range grows with the field. Native standalone defaults stay unchanged.
+
+`Placement::reserved_grains` withholds grain, body and collider slots from blasts
+for later loser conversion. `conversion_ids()` exposes the matching reserved
+tail of the namespace. The host owns bodies it creates there and their cleanup.
+The host performs conversion; Clock uses this reservation for its ending.
+
+Placement maps native coordinates into host units using an origin and a uniform
+scale between 0.5 and 8, with positive Y upward. Shell retirement bounds stay in
+native coordinates; exposed poses, barrels, shells and impacts use host units.
+Collision geometry, dirt cells, linear velocities, support probes and material
+forces scale together. Time and angles stay unchanged, densities stay fixed,
+and masses therefore scale with area. Sprung tanks also scale their joint forces
+and torques. A downward host gravity is supported without changing the world's
+settings: owned bodies use gravity scales to retain the scaled Scorched
+acceleration, and material queries use that same force law. The host retains
+its solver settings and must collect contact events when enabling contact
+fracture. Arbitrary gravity directions and planetary driving remain outside this
+boundary.
+
+`set_driving(false)` and `set_firing(false)` permit a physical settling phase.
+Stopping fire leaves existing shots alive under the exported `MAX_SHELLS` and
+`SHELL_LIFETIME_TICKS` limits. Tank motion, real hull/wheel bounds, support, health,
+barrels, terrain ownership, grains and world-space shells are readable without
+advancing the simulation. `retire_tank` preserves the final hull pose and source
+identity for airborne-shot bookkeeping. `retire` cancels the remaining owned
+state, including wheel joints, and is idempotent; unrelated bodies survive.
+Inspect `material_balance` before retirement to audit conserved dirt.
+
+Each swept hard hit publishes its collider, world-space point, incoming velocity
+and stable shot source. Native tank/terrain processing has already happened when
+the host receives it. A host material adapter must route only its own targets
+and consume each hit once. This does not implement plant damage or replace the
+current radial tank-health rule; that migration is tracked in
+[#331](https://github.com/aortez/space-wars/issues/331).
+
+Clone `HostedDuel` together with its canonical world for a same-build replay
+checkpoint. `observe` retains the standalone diagnostic payload in duel-local
+coordinates; it is not a serialized restore format. The host tests compare
+1,200 ticks of seeded standalone/shared observations for Round and Angular dirt,
+including driving, damage, cratering and deposition. They also exercise foreign
+shot obstacles and supports, repeated rigid/sprung cleanup, capacity refusal,
+reserved conversion IDs, host-gravity changes, phase ordering and replay after
+removing a firing tank with a shell airborne.
+
 ## Repeatable development
 
 ```sh

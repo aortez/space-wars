@@ -289,7 +289,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, **Slot Machine**, **Spider**, and **Coins** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, **Slot Machine**, **Spider**, **Coins**, and **Tanks** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -327,6 +327,70 @@ the Off profile still disables every automatic event.
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 | `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
 | `coins` | Lit cells turn into coins that drop, roll and pile; a magpie carries three or four off, and the rest fly home | 0.6 s minting + 4 s cascade + 23 s gathering + 1.5 s reform | 45 s |
+| `tanks` | Two CPU tanks duel on destructible hills below the reading | At most 84 s, including entry, one transport retry and departure | 120 s |
+
+### Tanks
+
+Tanks uses the shared Scorched duel in Clock's existing physics world. Enable
+**Tanks** in scenario settings or Clock Controls; select it in the preview list,
+or run `spacewars-cli clock trigger tanks`. It participates in Calm and Demo's
+ordinary periodic selection. Off permits manual requests only. Completion and
+cancellation start its 120-second reuse delay and the ordinary two-second event
+cooldown; deliberate previews may bypass reuse delays.
+
+The hills span the entire inner clock width, with a cell size independent of
+that width. Two tank scales are tried against the available space. Entry lanes
+come from the current font's lit cells, with clearance for the whole hull and
+beam, the blinking colon, and the AM/PM label. Each tank prefers a gap through
+its half of the face; the outer margins are fallbacks. The landing positions
+therefore vary with the reading. Terrain and full-height lanes are checked
+against current resident shapes before insertion; if none fits, admission leaves
+the current scene intact. Tanks excludes Duck, Crow and Spider in both directions,
+including controlled ducks. Its terrain
+reservation is separate from the existing visitor combinations; inspection
+reports the capacity for the current composition. Residents keep their bodies
+and world, and cleanup removes only identities in the Tanks namespace.
+
+| Phase | Maximum time | Behavior |
+| --- | --- | --- |
+| `raising` | 2 s | Physical hills rise from beneath the floor. |
+| `beam-down` | 2 s, plus at most one 2 s retry | Tanks descend from above the frame, through clear digit gaps, to supported hill positions. A reading/font change that closes a lane replans and restarts transport; a second closure withdraws. |
+| `settling` | 2 s | Both hulls must actually be upright and supported before driving or firing. Failure withdraws the hills. |
+| `fighting` | 60 s | Shared CPU driving, swept shells, craters, loose dirt and weak-bank collapse. |
+| `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
+| `crumbling` | 1 s | Each in-view loser becomes physical dirt at its actual pose. |
+| `beam-up` | 2 s | Surviving winners depart. |
+| `withdrawing` | 3 s | The remaining owned battlefield moves below the frame and is removed. |
+
+One living tank wins. If both remain alive at timeout, higher health wins and
+exact equality is a draw; if neither survives, neither wins. A living timeout
+loser converts too. Each loser has an authored conversion of 24 half-unit cells:
+six native area/mass units at dirt density one, scaled by the square of placement
+scale. This is a declared material substitution, not conservation of metal hull
+mass. Inspection records the removed hull mass and emitted dirt area separately
+from the hill's conserved material balance. The two conversions reserve 48 of
+the existing 192 grain slots before combat, leaving 144 for battle debris. An
+already off-screen loser retires without bringing its pile back into view.
+
+Once the last shell resolves, the result is latched. Rapier continues to move
+the aftermath, while duel AI, damage and terrain topology stop changing. Pausing
+freezes all phases. Reading updates continue throughout, and both render adapters
+clip combat geometry below the face. Entry hulls and beams use the full-height
+clear lanes. Layout changes cancel through the normal owned cleanup path.
+
+`clock state` includes phase, support, world positions, hull and terrain IDs,
+health, shell/shot counts, conversion accounting and any settling failure in
+`tanks`. Values with a `_milli` suffix use thousandths of their inspection
+unit (positions, area and mass use host units). The common damage-material migration
+and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does
+not yet route the exposed impact notifications into plant tissue. Contact-driven
+bank fracture is disabled in Clock's arena; blast destruction and weak-bank
+collapse remain active.
+
+The local render test `tanks_render_both_adapters_and_controls_without_covering_the_reading`
+exports captures when `SPACEWARS_TANKS_ARTIFACTS` names a directory outside the
+repository. It exercises the production raster adapter and the production vector
+paths rasterized through Slint's SVG loader; it is not a live GPU/device test.
 
 ### Cell swaps
 
@@ -620,18 +684,18 @@ below it:
 
 ![The pile under the face in the 480×800 view](screenshots/clock/coins-480x800-piled.png)
 
-The switch ends the pause page's preview row after Crow and Explosion, and
-the launcher's Events row, which became five columns like the two below it.
+The switch sits in the pause page's lower row of five, after Spider and
+before Tanks, and in the launcher's Events row, six columns since Tanks.
 Left and Right walk the row's switches, as they do on every switch, and
-adjust the selector. On a portrait panel the preview and recipe selectors
-take rows of their own above their switches, so their names keep their room,
-and the panel grows by two rows; `tools/audit-clock-control-layout.py`
-measures both arrangements and holds every selector on the page to the room
-its value needs:
+adjust the selectors. The pause page keeps its height with six rows of 44px;
+the recipe takes a row of its own, the preview selector drops its label
+under 480px so the event's name keeps its room, and
+`tools/audit-clock-control-layout.py` holds every selector on the page to the
+room its value needs:
 
 | Clock Controls | Scenario Settings | Portrait |
 | --- | --- | --- |
-| ![Coins On at the end of the pause page's preview row](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On at the end of the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) | ![The preview and recipe selectors on rows of their own in the 480×800 view](screenshots/clock/coins-480x800-live-controls.png) |
+| ![Coins On between Spider and Tanks in the pause page's lower row](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On in the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) | ![The 480×800 view, the preview selector without its label](screenshots/clock/coins-480x800-live-controls.png) |
 
 `coins_tests` cover the cap and the batch's own identities, seeded replay at
 six aspect ratios in both formats, the settle measurement above, the return
@@ -2991,7 +3055,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **23** and reports scenario-instance revision,
+`clock state` uses schema version **24** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
@@ -3115,7 +3179,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 23, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 24, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -3132,8 +3196,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 23, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, or `coins`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 24, `event`
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, `coins`, or `tanks`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification

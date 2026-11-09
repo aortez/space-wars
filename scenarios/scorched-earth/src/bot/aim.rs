@@ -5,19 +5,21 @@ pub(super) struct Geometry {
     pub shooter: Vec2,
     pub target: Vec2,
     pub pitch: f32,
+    #[serde(skip)]
+    max_power: f32,
 }
 
 impl Geometry {
-    pub fn read(state: &ScorchedState, player: usize) -> Self {
-        let shooter = state.physics.motion(state.tanks[player].body).unwrap();
+    pub fn read(state: &Duel, physics: &PhysicsWorld, player: usize) -> Self {
+        let shooter = state.motion(physics, state.tanks[player].body).unwrap();
         Self {
             shooter: shooter.position,
             target: state
-                .physics
-                .motion(state.tanks[1 - player].body)
+                .motion(physics, state.tanks[1 - player].body)
                 .unwrap()
                 .position,
             pitch: shooter.angle,
+            max_power: state.placement.max_power(),
         }
     }
 
@@ -66,7 +68,7 @@ fn rough_power(geometry: Geometry, elevation: f32) -> f32 {
     // intervening terrain and launch motion are resolved through observations.
     let distance = (geometry.target.x - geometry.shooter.x).abs().max(1.0);
     let estimate = (GRAVITY * distance / (2.0 * elevation).sin().max(0.1)).sqrt();
-    ((estimate / 4.0).round() * 4.0).clamp(12.0, 48.0)
+    ((estimate / 4.0).round() * 4.0).clamp(12.0, geometry.max_power)
 }
 
 impl Aim {
@@ -82,8 +84,8 @@ impl Aim {
             self.lower_power = None;
             self.upper_power = None;
             self.confident = false;
-            self.power =
-                (rough_power(geometry, self.elevation) * self.range_scale).clamp(12.0, 48.0);
+            self.power = (rough_power(geometry, self.elevation) * self.range_scale)
+                .clamp(12.0, geometry.max_power);
             self.correction = "new firing geometry";
         }
     }
@@ -121,7 +123,7 @@ impl Aim {
                 self.elevation =
                     (self.elevation + 10.0_f32.to_radians()).min(80.0_f32.to_radians());
                 self.power = (rough_power(current.unwrap(), self.elevation) * self.range_scale)
-                    .clamp(12.0, 48.0);
+                    .clamp(12.0, current.unwrap().max_power);
                 return;
             }
             _ => return,
@@ -148,7 +150,7 @@ impl Aim {
                         }
                 }
             }
-            .clamp(12.0, 48.0);
+            .clamp(12.0, current.unwrap().max_power);
         }
         self.range_scale =
             (self.power / rough_power(current.unwrap(), self.elevation)).clamp(0.65, 1.4);

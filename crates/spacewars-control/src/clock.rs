@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 23;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 24;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -25,6 +25,8 @@ pub struct ClockEventInfo {
     pub blocked_by_duck: bool,
     #[serde(default)]
     pub blocked_by_crow: bool,
+    #[serde(default)]
+    pub blocked_by_tanks: bool,
     /// A spider is visiting, and this event waits for it to leave, or is
     /// another spider.
     #[serde(default)]
@@ -74,6 +76,8 @@ pub struct ClockState {
     pub explosion: Option<engine_common::ClockExplosionState>,
     #[serde(default)]
     pub coins: Option<engine_common::ClockCoinsState>,
+    #[serde(default)]
+    pub tanks: Option<engine_common::ClockTanksState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
     /// Visitor compatibility leaves no enabled automatic event kinds. Profile
     /// Off is distinct; per-event restrictions also apply to manual requests.
@@ -459,6 +463,7 @@ mod tests {
             spider: None,
             explosion: None,
             coins: None,
+            tanks: None,
             player_duck: None,
             automatic_events_suspended: false,
             marquee: None,
@@ -555,6 +560,7 @@ mod tests {
             blocked_by_player: false,
             blocked_by_duck: false,
             blocked_by_crow: false,
+            blocked_by_tanks: false,
             blocked_by_spider: false,
             blocked_by_arena: Some(ClockArenaUnavailable::LayoutIncompatible),
             automatic_ready_at_tick: 0,
@@ -1489,6 +1495,7 @@ mod tests {
             blocked_by_player: false,
             blocked_by_duck: false,
             blocked_by_crow: false,
+            blocked_by_tanks: false,
             blocked_by_spider: false,
             blocked_by_arena: None,
             automatic_ready_at_tick: 0,

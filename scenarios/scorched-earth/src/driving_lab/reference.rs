@@ -2,18 +2,30 @@
 //! Keep this out of the default driving path; the course runner explicitly opts in.
 use super::*;
 
-pub(super) fn safe_drive_direction(state: &ScorchedState, player: usize, direction: f32) -> bool {
-    ground_check(state, player, direction).reason.is_none()
+pub(super) fn safe_drive_direction(
+    state: &Duel,
+    physics: &PhysicsWorld,
+    player: usize,
+    direction: f32,
+) -> bool {
+    ground_check(state, physics, player, direction)
+        .reason
+        .is_none()
 }
 
-pub(super) fn ground_check(state: &ScorchedState, player: usize, direction: f32) -> GroundCheck {
+pub(super) fn ground_check(
+    state: &Duel,
+    physics: &PhysicsWorld,
+    player: usize,
+    direction: f32,
+) -> GroundCheck {
     let mut result = GroundCheck {
         direction,
         reason: None,
         probes: [None; driving::ROUTE_SAMPLES],
     };
     let tank = state.tanks[player];
-    let motion = state.physics.motion(tank.body).unwrap();
+    let motion = state.motion(physics, tank.body).unwrap();
     let clearance = if state.running_gear[player].is_some() {
         1.2
     } else {
@@ -32,7 +44,8 @@ pub(super) fn ground_check(state: &ScorchedState, player: usize, direction: f32)
             result.reason = Some("world edge");
             return result;
         }
-        let Some(hit) = state.physics.cast_ray(
+        let Some(hit) = state.cast_ray(
+            physics,
             Vec2::new(x, foot.y + 3.0),
             -Vec2::Y,
             RayCastOptions {

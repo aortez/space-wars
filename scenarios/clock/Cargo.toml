@@ -12,6 +12,7 @@ engine-core = { workspace = true }
 engine-rapier = { workspace = true }
 engine-terrain = { workspace = true }
 engine-water = { workspace = true }
+scenario-scorched-earth = { workspace = true }
 rand = { workspace = true }
 
 [build-dependencies]

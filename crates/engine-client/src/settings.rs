@@ -611,6 +611,7 @@ enabled = true
                 slot_machine: false,
                 spider: false,
                 coins: false,
+                tanks: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -742,6 +743,7 @@ enabled = true
                         | engine_common::ClockEventKind::SlotMachine
                         | engine_common::ClockEventKind::Spider
                         | engine_common::ClockEventKind::Coins
+                        | engine_common::ClockEventKind::Tanks
                 )
             );
         }
@@ -771,6 +773,7 @@ enabled = true
                         | engine_common::ClockEventKind::SlotMachine
                         | engine_common::ClockEventKind::Spider
                         | engine_common::ClockEventKind::Coins
+                        | engine_common::ClockEventKind::Tanks
                 )
             );
         }

@@ -569,6 +569,7 @@ pub(crate) fn only(kind: ClockEventKind) -> ClockEvents {
         slot_machine: kind == ClockEventKind::SlotMachine,
         spider: kind == ClockEventKind::Spider,
         coins: kind == ClockEventKind::Coins,
+        tanks: kind == ClockEventKind::Tanks,
     }
 }
 

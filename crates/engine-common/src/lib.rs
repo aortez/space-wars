@@ -684,10 +684,11 @@ pub enum ClockEventKind {
     SlotMachine = 12,
     Spider = 13,
     Coins = 14,
+    Tanks = 15,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -703,6 +704,7 @@ impl ClockEventKind {
         Self::SlotMachine,
         Self::Spider,
         Self::Coins,
+        Self::Tanks,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -722,6 +724,7 @@ impl ClockEventKind {
             Self::SlotMachine => "slot-machine",
             Self::Spider => "spider",
             Self::Coins => "coins",
+            Self::Tanks => "tanks",
         }
     }
 
@@ -742,6 +745,7 @@ impl ClockEventKind {
             Self::SlotMachine => "Slot Machine",
             Self::Spider => "Spider",
             Self::Coins => "Coins",
+            Self::Tanks => "Tanks",
         }
     }
 }
@@ -765,6 +769,7 @@ pub struct ClockEvents {
     pub slot_machine: bool,
     pub spider: bool,
     pub coins: bool,
+    pub tanks: bool,
 }
 
 impl Default for ClockEvents {
@@ -785,6 +790,7 @@ impl Default for ClockEvents {
             slot_machine: true,
             spider: true,
             coins: true,
+            tanks: true,
         }
     }
 }
@@ -807,6 +813,7 @@ impl ClockEvents {
             ClockEventKind::SlotMachine => self.slot_machine,
             ClockEventKind::Spider => self.spider,
             ClockEventKind::Coins => self.coins,
+            ClockEventKind::Tanks => self.tanks,
         }
     }
 }
@@ -1036,6 +1043,31 @@ pub struct ClockMagpieState {
     pub trips: u32,
     /// Trips it gave up: the coin was gone, or the approach ran out of time.
     pub abandoned: u32,
+}
+
+/// The two CPU tanks and their bounded event-owned material in Clock's arena.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockTanksState {
+    pub seed: u64,
+    pub tick: u64,
+    pub combat_ticks: u64,
+    pub scale_milli: u32,
+    pub health_milli: [u32; 2],
+    pub present: [bool; 2],
+    pub supported: [bool; 2],
+    pub positions_milli: [[i32; 2]; 2],
+    pub tank_ids: [u64; 2],
+    pub terrain_ids: Vec<u64>,
+    pub bodies: u32,
+    pub terrain_cells: u64,
+    pub loose_cells: u32,
+    pub shells: u32,
+    pub shots: u64,
+    pub result: Option<String>,
+    pub converted_cells: u32,
+    pub retired_tank_mass_milli: u32,
+    pub conversion_area_milli: u32,
+    pub entry_failure: Option<String>,
 }
 
 /// Bounded Crow visitor diagnostics, independent of the timed animation.

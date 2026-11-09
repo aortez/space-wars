@@ -30,16 +30,17 @@ class ClockControlLayoutTests(unittest.TestCase):
                 self.assertGreaterEqual(len(measured), 15, '%s measured only %d controls at %d' % (name, len(measured), width))
                 self.assertIn('Slot Machine', [item[0] for item in measured])
 
-    def test_the_pause_grid_stacks_its_selectors_on_a_portrait_panel(self):
-        # Conditional geometry is measured on both sides of the threshold.
+    def test_the_pause_grid_keeps_its_height_with_six_rows(self):
+        # Tanks made the lower row five switches and gave the recipe a row of
+        # its own; rows of 44px hold the six in the height five of 48px took.
         lines = SLINT.read_text().split('\n')
         [(start, end)] = [(start, end) for name, start, end in L.panels(lines) if name == 'ingame-clock']
-        for width, stacked in ((400, True), (552, False)):
+        for width in L.WIDTHS:
             rows = {item[0]: item for item in L.boxes(lines, start, end, width)}
-            preview, recipe, coins = rows['Preview'], rows['Recipe'], rows['Coins']
-            self.assertEqual(preview[3], width if stacked else width - 262)
-            self.assertEqual((coins[2], recipe[2]), (224, 336) if stacked else (168, 224))
-            self.assertEqual(recipe[3], width if stacked else 2 * (width - 24) / 5)
+            self.assertEqual({rows[name][2] for name in ('Crow', 'Explosion')}, {138})
+            self.assertEqual({rows[name][2] for name in ('Marquee', 'Aquarium', 'Spider', 'Coins', 'Tanks')}, {184})
+            self.assertEqual((rows['Recipe'][2], rows['Recipe'][3]), (230, width))
+            self.assertEqual({item[4] for item in rows.values()}, {44})
 
     def test_every_selector_keeps_room_for_its_value(self):
         report = L.audit_values(SLINT)
@@ -48,9 +49,11 @@ class ClockControlLayoutTests(unittest.TestCase):
             self.assertFalse(found, '%s squeezed: %s' % (panel, [(w, item[0], item[5], room) for w, item, room in found]))
 
     def test_a_squeezed_selector_is_reported(self):
-        # Give the recipe two fifths of the row on a portrait panel again.
+        # Give the recipe two fifths of its row, as it had before Tanks.
         source = SLINT.read_text()
-        squeezed = source.replace('width: clock-grid.stacked ? parent.width : 2 * (parent.width - 24px) / 5;', 'width: 2 * (parent.width - 24px) / 5;', 1)
+        squeezed = source.replace('''                    y: 230px;
+                    width: parent.width;''', '''                    y: 230px;
+                    width: 2 * (parent.width - 24px) / 5;''', 1)
         self.assertNotEqual(source, squeezed)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'main.slint'
@@ -62,8 +65,8 @@ class ClockControlLayoutTests(unittest.TestCase):
         # A guard that cannot fail is no guard: move one button onto another.
         source = SLINT.read_text()
         moved = source.replace('''                    x: 4 * (parent.width + 10px) / 5;
-                    y: 56px;''', '''                    x: 0px;
-                    y: 112px;''', 1)
+                    y: 46px;''', '''                    x: 0px;
+                    y: 92px;''', 1)
         self.assertNotEqual(source, moved)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'main.slint'

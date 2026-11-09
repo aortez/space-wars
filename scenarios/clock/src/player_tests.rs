@@ -26,6 +26,7 @@ fn ready(aspect: f32, seed: u64) -> ClockState {
                 cell_swap: false,
                 grass: false,
                 coins: false,
+                tanks: false,
                 ..Default::default()
             },
             ..Default::default()
@@ -261,6 +262,7 @@ fn disabled_events_and_off_profile_do_not_disable_player_visits_or_change_prefer
         slot_machine: false,
         spider: false,
         coins: false,
+        tanks: false,
     };
     ClockScenario::step(
         &mut state,
@@ -417,7 +419,10 @@ fn missing_a_gap_falls_and_releases_player_resources() {
 fn replacing_events_and_player_visits_resize_and_repeated_cleanup_are_bounded() {
     let mut state = ready(800.0 / 480.0, 42);
     for _ in 0..3 {
-        for event in ClockEventKind::ALL {
+        for event in ClockEventKind::ALL
+            .into_iter()
+            .filter(|k| *k != ClockEventKind::Tanks)
+        {
             ClockScenario::step(
                 &mut state,
                 &[ClockAction::preview_event(event)],

@@ -93,8 +93,8 @@ impl DrivingCourse {
     }
 }
 
-impl ScorchedState {
-    pub(super) fn release_course_rubble(&mut self) {
+impl Duel {
+    pub(super) fn release_course_rubble(&mut self, physics: &mut PhysicsWorld) {
         let body = &mut self.terrain[0];
         let edits: Vec<_> = (0..body.terrain.height())
             .flat_map(|y| {
@@ -124,7 +124,7 @@ impl ScorchedState {
         let release = self
             .loose
             .commit(
-                &mut self.physics,
+                physics,
                 TerrainBodyMut {
                     terrain: &mut body.terrain,
                     geometry: &mut body.geometry,
@@ -142,3 +142,9 @@ impl ScorchedState {
 
 #[cfg(test)]
 mod tests;
+
+impl ScorchedState {
+    pub(super) fn release_course_rubble(&mut self) {
+        self.duel.release_course_rubble(&mut self.physics)
+    }
+}

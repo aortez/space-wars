@@ -9,13 +9,14 @@ pub struct MaterialBalance {
     pub loose: u64,
 }
 
-impl ScorchedState {
+impl Duel {
     /// Development capture, outside simulation timing. No scenario state changes.
     pub fn capture_packing(
         &mut self,
+        physics: &mut PhysicsWorld,
     ) -> Result<Vec<engine_rapier::terrain::PackingSnapshot>, TerrainError> {
         self.loose.capture_packing(
-            &self.physics,
+            physics,
             self.terrain.iter_mut().map(|body| TerrainBodyMut {
                 terrain: &mut body.terrain,
                 geometry: &mut body.geometry,
@@ -24,22 +25,26 @@ impl ScorchedState {
         )
     }
 
-    fn release_material(&mut self, point: Vec2) -> bool {
+    fn release_material(&mut self, physics: &mut PhysicsWorld, point: Vec2) -> bool {
+        if !self.material_ids_available() {
+            self.rejected_blasts += 1;
+            return false;
+        }
         let mut plans = Vec::new();
         let mut grains = 0;
         let mut fragments = 0;
         let mut emptied = 0;
         for (index, body) in self.terrain.iter().enumerate() {
-            let motion = self.physics.motion(body.assembly.body()).unwrap();
-            let Some(center) = body
-                .terrain
-                .local_to_cell((point - motion.position).rotate_radians(-motion.angle))
-            else {
+            let motion = self.motion(physics, body.assembly.body()).unwrap();
+            let Some(center) = body.terrain.local_to_cell(
+                ((point - motion.position) * self.placement.scale).rotate_radians(-motion.angle),
+            ) else {
                 continue;
             };
             let brush = Brush::Circle {
                 center,
-                radius: (BLAST_RADIUS / body.terrain.cell_size()).round() as u32,
+                radius: (BLAST_RADIUS * self.placement.scale / body.terrain.cell_size()).round()
+                    as u32,
             };
             if body
                 .terrain
@@ -60,13 +65,14 @@ impl ScorchedState {
             .expect("valid release plan");
             grains += plan.grain_count();
             fragments += plan.fragment_count();
-            emptied += usize::from(body.id != GROUND && plan.source_empty());
+            emptied += usize::from(body.id != self.placement.ground() && plan.source_empty());
             plans.push((index, plan));
         }
         // Admit the whole material transfer before touching any field or ID.
         // The caller still applies the impact to existing bodies if it cannot fit.
         let capacity = self.loose.release_capacity(grains);
-        if !capacity.fits() || self.terrain.len() - 1 - emptied + fragments > 64 {
+        if !capacity.fits() || self.terrain.len() - 1 - emptied + fragments > MAX_TERRAIN_FRAGMENTS
+        {
             if !capacity.fits() {
                 self.last_capacity_rejection = Some(capacity);
             }
@@ -81,7 +87,7 @@ impl ScorchedState {
             let commit = self
                 .loose
                 .commit(
-                    &mut self.physics,
+                    physics,
                     TerrainBodyMut {
                         terrain: &mut body.terrain,
                         geometry: &mut body.geometry,
@@ -96,8 +102,8 @@ impl ScorchedState {
             new_fragments.extend(commit.fragments);
         }
         self.terrain.retain(|body| {
-            if body.id != GROUND && body.geometry.shape_count() == 0 {
-                self.physics.remove_entity(body.id);
+            if body.id != self.placement.ground() && body.geometry.shape_count() == 0 {
+                physics.remove_entity(body.id);
                 false
             } else {
                 true
@@ -108,14 +114,19 @@ impl ScorchedState {
         true
     }
 
-    pub(super) fn explode(&mut self, point: Vec2) {
-        self.explode_from(point, None);
+    pub(super) fn explode(&mut self, physics: &mut PhysicsWorld, point: Vec2) {
+        self.explode_from(physics, point, None);
     }
 
-    pub(super) fn explode_from(&mut self, point: Vec2, owner: Option<usize>) {
+    pub(super) fn explode_from(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        point: Vec2,
+        owner: Option<usize>,
+    ) {
         self.impacts += 1;
         self.flashes.push((point, self.tick));
-        self.release_material(point);
+        self.release_material(physics, point);
         // A refused crater retains its cells, but cannot shield existing dirt.
         // Apply once after admission so newly released bodies share the impulse.
         let bodies: Vec<_> = self
@@ -125,20 +136,24 @@ impl ScorchedState {
             .chain(
                 self.terrain
                     .iter()
-                    .filter(|b| b.id != GROUND)
+                    .filter(|b| b.id != self.placement.ground())
                     .map(|b| b.assembly.body()),
             )
             .collect();
         RadialImpulse {
-            center: point,
-            radius: BLAST_RADIUS + 1.0,
-            speed: 16.0,
+            center: self.placement.point_to_world(point),
+            radius: (BLAST_RADIUS + 1.0) * self.placement.scale,
+            speed: 16.0 * self.placement.scale,
         }
-        .apply(&mut self.physics, bodies);
+        .apply(physics, bodies);
         // Combat damage is independent of whether the bounded material pool
         // admitted this edit. Capacity cannot make a tank invulnerable.
         for (player, tank) in self.tanks.iter_mut().enumerate() {
-            let motion = self.physics.motion(tank.body).unwrap();
+            if self.retired[player].is_some() {
+                continue;
+            }
+            let mut motion = physics.motion(tank.body).unwrap();
+            motion.position = self.placement.point_from_world(motion.position);
             let distance = motion.position.distance_to(point);
             if distance < 6.0 {
                 let before = tank.health;
@@ -149,11 +164,11 @@ impl ScorchedState {
             }
         }
         RadialImpulse {
-            center: point,
-            radius: 6.0,
-            speed: 4.0,
+            center: self.placement.point_to_world(point),
+            radius: 6.0 * self.placement.scale,
+            speed: 4.0 * self.placement.scale,
         }
-        .apply(&mut self.physics, self.tanks.iter().map(|t| t.body));
+        .apply(physics, self.tanks.iter().map(|t| t.body));
     }
 
     pub fn slumping_diagnostics(&self) -> engine_rapier::terrain::SlumpingDiagnostics {
@@ -168,15 +183,18 @@ impl ScorchedState {
         self.loose.impact_diagnostics()
     }
 
-    pub(super) fn fracture_impacts(&mut self) {
+    pub(super) fn fracture_impacts(&mut self, physics: &mut PhysicsWorld) {
+        if !self.material_ids_available() {
+            return;
+        }
         if self.loose.config().impact_fracture.is_none() {
             return;
         }
-        let capacity = 64usize.saturating_sub(self.terrain.len() - 1);
+        let capacity = MAX_TERRAIN_FRAGMENTS.saturating_sub(self.terrain.len() - 1);
         let commit = self
             .loose
             .fracture_impacts(
-                &mut self.physics,
+                physics,
                 self.terrain.iter_mut().map(|body| TerrainBodyMut {
                     terrain: &mut body.terrain,
                     geometry: &mut body.geometry,
@@ -187,58 +205,68 @@ impl ScorchedState {
             )
             .expect("valid shared impact fracture");
         if let Some(commit) = commit {
-            self.register_yield(commit);
+            self.register_yield(physics, commit);
         }
     }
 
-    pub(super) fn fracture_banks(&mut self) {
+    pub(super) fn fracture_banks(&mut self, physics: &mut PhysicsWorld) {
+        if !self.material_ids_available() {
+            return;
+        }
         if self.loose.config().cohesion.is_none() {
             return;
         }
-        let capacity = 64usize.saturating_sub(self.terrain.len() - 1);
+        let capacity = MAX_TERRAIN_FRAGMENTS.saturating_sub(self.terrain.len() - 1);
         let commit = self
             .loose
             .fracture_banks(
-                &mut self.physics,
+                physics,
                 self.terrain.iter_mut().map(|body| TerrainBodyMut {
                     terrain: &mut body.terrain,
                     geometry: &mut body.geometry,
                     assembly: &mut body.assembly,
                 }),
-                |_, _| Vec2::new(0.0, -GRAVITY),
+                |_, _| Vec2::new(0.0, -GRAVITY * self.placement.scale),
                 &mut self.next_id,
                 capacity,
                 DT,
             )
             .expect("valid shared bank failure");
         if let Some(commit) = commit {
-            self.register_yield(commit);
+            self.register_yield(physics, commit);
         }
     }
 
-    pub(super) fn slump(&mut self) {
-        let capacity = 64usize.saturating_sub(self.terrain.len() - 1);
+    pub(super) fn slump(&mut self, physics: &mut PhysicsWorld) {
+        if !self.material_ids_available() {
+            return;
+        }
+        let capacity = MAX_TERRAIN_FRAGMENTS.saturating_sub(self.terrain.len() - 1);
         let commit = self
             .loose
             .slump(
-                &mut self.physics,
+                physics,
                 self.terrain.iter_mut().map(|body| TerrainBodyMut {
                     terrain: &mut body.terrain,
                     geometry: &mut body.geometry,
                     assembly: &mut body.assembly,
                 }),
-                |_, _| Vec2::new(0.0, -GRAVITY),
+                |_, _| Vec2::new(0.0, -GRAVITY * self.placement.scale),
                 &mut self.next_id,
                 capacity,
                 DT,
             )
             .expect("valid shared slumping");
         if let Some(commit) = commit {
-            self.register_yield(commit);
+            self.register_yield(physics, commit);
         }
     }
 
-    fn register_yield(&mut self, commit: engine_rapier::terrain::SlumpCommit) {
+    fn register_yield(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        commit: engine_rapier::terrain::SlumpCommit,
+    ) {
         let body = self
             .terrain
             .iter_mut()
@@ -247,8 +275,8 @@ impl ScorchedState {
         body.hash = body.terrain.hash();
         body.edited_chunks = commit.release.dirty_chunks;
         self.terrain.retain(|body| {
-            if body.id != GROUND && body.geometry.shape_count() == 0 {
-                self.physics.remove_entity(body.id);
+            if body.id != self.placement.ground() && body.geometry.shape_count() == 0 {
+                physics.remove_entity(body.id);
                 false
             } else {
                 true
@@ -257,16 +285,17 @@ impl ScorchedState {
         self.terrain.extend(commit.release.fragments);
     }
 
-    pub(super) fn settle(&mut self) {
+    pub(super) fn settle(&mut self, physics: &mut PhysicsWorld) {
         let commits = self
             .loose
-            .settle(
-                &mut self.physics,
+            .settle_with_gravity(
+                physics,
                 self.terrain.iter_mut().map(|body| TerrainBodyMut {
                     terrain: &mut body.terrain,
                     geometry: &mut body.geometry,
                     assembly: &mut body.assembly,
                 }),
+                |_, _| Vec2::new(0.0, -GRAVITY * self.placement.scale),
                 DT,
             )
             .expect("valid shared deposition");
@@ -282,8 +311,8 @@ impl ScorchedState {
     }
 
     /// Kept outside timed simulation steps. Offscreen dirt remains conserved.
-    pub fn audit(&self) -> Result<MaterialBalance, TerrainError> {
-        self.loose.audit(&self.physics)?;
+    pub fn audit(&self, physics: &PhysicsWorld) -> Result<MaterialBalance, TerrainError> {
+        self.loose.audit(physics)?;
         let mut solid = 0;
         for body in &self.terrain {
             if !body.geometry.is_current(&body.terrain) || body.hash != body.terrain.hash() {
@@ -296,8 +325,10 @@ impl ScorchedState {
                 .filter(|c| c.material != MaterialId::VOID)
                 .count() as u64;
         }
-        for motion in self.physics.motions() {
-            let m = motion.motion;
+        for body in self.body_ids() {
+            let m = physics
+                .motion(body)
+                .ok_or(TerrainError("missing owned body"))?;
             if !m.position.x.is_finite()
                 || !m.position.y.is_finite()
                 || !m.angle.is_finite()
@@ -317,5 +348,26 @@ impl ScorchedState {
             return Err(TerrainError("material conservation failed"));
         }
         Ok(balance)
+    }
+}
+
+impl ScorchedState {
+    pub fn capture_packing(
+        &mut self,
+    ) -> Result<Vec<engine_rapier::terrain::PackingSnapshot>, TerrainError> {
+        self.duel.capture_packing(&mut self.physics)
+    }
+
+    #[cfg(test)]
+    pub(super) fn explode(&mut self, point: Vec2) {
+        self.duel.explode(&mut self.physics, point)
+    }
+    #[cfg(test)]
+    pub(super) fn explode_from(&mut self, point: Vec2, owner: Option<usize>) {
+        self.duel.explode_from(&mut self.physics, point, owner)
+    }
+
+    pub fn audit(&self) -> Result<MaterialBalance, TerrainError> {
+        self.duel.audit(&self.physics)
     }
 }

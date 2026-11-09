@@ -189,12 +189,17 @@ fn clock_state_publishes_the_arena_and_why_it_refuses_an_event() {
     assert_eq!(arena.claims[0].owner, ClockArenaOwner::Fixture { index: 0 });
     assert_eq!(arena.claims[0].population.bodies, 2);
     assert!(arena.last_step.is_some());
-    assert!(
-        clock
-            .events
-            .iter()
-            .all(|event| event.blocked_by_arena.is_none())
-    );
+    // The fixture rests on the floor the hills would take, so Tanks alone is
+    // refused, and by placement rather than by room.
+    for event in &clock.events {
+        let tanks = event.kind == engine_common::ClockEventKind::Tanks;
+        assert_eq!(
+            event.blocked_by_arena,
+            tanks.then_some(ClockArenaUnavailable::Placement),
+            "{:?}",
+            event.kind
+        );
+    }
 
     scenario.set_viewport(Viewport::new(480.0, 480.0));
     let clock = scenario.clock_state().unwrap();

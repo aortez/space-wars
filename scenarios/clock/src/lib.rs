@@ -65,7 +65,7 @@ pub use arena::{
 /// that widened the field without widening this check would make every
 /// `configure` fail to decode, and the dropped action would leave the client
 /// waiting on a request the host never applied.
-const MAX_EVENT_FLAGS_HIGH_BYTE: u8 = (((1u16 << ClockEventKind::ALL.len()) - 1) >> 8) as u8;
+const _: () = assert!(ClockEventKind::ALL.len() == u16::BITS as usize);
 
 pub use digit_surfaces::{
     DigitSurface, Footprint, Retirement, SurfaceAccounting, SurfaceChange, SurfaceChangeKind,
@@ -266,9 +266,7 @@ impl ClockAction {
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
             (CLOCK_ACTION_CONFIGURE, 14..=MAX_CONFIGURE_BYTES)
-                if payload[5] <= MAX_EVENT_FLAGS_HIGH_BYTE
-                    && payload[8] <= 1
-                    && payload[10] <= 1 =>
+                if payload[8] <= 1 && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
                     fonts: ClockFontSettings {
@@ -303,6 +301,7 @@ impl ClockAction {
                         slot_machine: payload[5] & 16 != 0,
                         spider: payload[5] & 32 != 0,
                         coins: payload[5] & 64 != 0,
+                        tanks: payload[5] & 128 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
@@ -1278,6 +1277,7 @@ impl ClockState {
         let adding = match kind {
             ClockEventKind::Duck => vec![arena::Owner::Visit],
             ClockEventKind::Spider => vec![arena::Owner::Spider],
+            ClockEventKind::Tanks => vec![arena::Owner::Event(kind)],
             ClockEventKind::Aquarium
             | ClockEventKind::Explosion
             | ClockEventKind::Coins
@@ -1310,6 +1310,16 @@ impl ClockState {
         if self.arena.layout_incompatible() && EVENT_CATALOG[kind as usize].uses_floor() {
             return Some(Unavailable::LayoutIncompatible);
         }
+        if kind == ClockEventKind::Tanks
+            && events::tanks::placement(
+                Layout::new(self.aspect_ratio()),
+                self.display,
+                self.arena.world(),
+            )
+            .is_none()
+        {
+            return Some(Unavailable::Placement);
+        }
         let owners = self.arena_owners_for_event(kind)?;
         self.arena.admissible(&owners).err()
     }
@@ -1341,6 +1351,13 @@ impl ClockState {
         }
     }
 
+    pub fn tanks_state(&self) -> Option<engine_common::ClockTanksState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Tanks(event) => Some(event.diagnostics(&self.arena)),
+            _ => None,
+        }
+    }
+
     pub fn coins_state(&self) -> Option<engine_common::ClockCoinsState> {
         match self.active_event.as_ref()? {
             ActiveEvent::Coins(event) => Some(event.coins_diagnostics()),
@@ -1349,7 +1366,14 @@ impl ClockState {
     }
 
     pub fn event_blocked_by_crow(&self, kind: ClockEventKind) -> bool {
-        kind == ClockEventKind::Crow && self.crow_visit.is_some()
+        matches!(kind, ClockEventKind::Crow | ClockEventKind::Tanks) && self.crow_visit.is_some()
+    }
+
+    pub fn event_blocked_by_tanks(&self, kind: ClockEventKind) -> bool {
+        matches!(
+            kind,
+            ClockEventKind::Duck | ClockEventKind::Crow | ClockEventKind::Spider
+        ) && self.event_kind() == Some(ClockEventKind::Tanks)
     }
 
     /// The spider visit as Clock's state publishes it, while there is one.
@@ -1392,7 +1416,8 @@ impl ClockState {
     }
 
     fn event_blocked(&self, kind: ClockEventKind) -> bool {
-        self.event_blocked_by_duck(kind)
+        self.event_blocked_by_tanks(kind)
+            || self.event_blocked_by_duck(kind)
             || self.event_blocked_by_crow(kind)
             || self.event_blocked_by_spider(kind)
             || self.event_blocked_by_arena(kind).is_some()
@@ -1444,11 +1469,21 @@ impl ClockState {
     fn trigger_event(&mut self, kind: ClockEventKind) {
         if self.can_trigger_event() && !self.event_blocked(kind) {
             self.start_event(kind);
+        } else if kind == ClockEventKind::Tanks {
+            let notice = self.event_blocked_by_arena(kind).map_or(
+                "Tanks is waiting for the current visitor or event",
+                Unavailable::notice,
+            );
+            self.event_notice = Some((notice, self.schedule.tick + 120));
         }
     }
 
     fn preview_event(&mut self, kind: ClockEventKind) {
         if self.reading.is_some() {
+            if self.event_blocked_by_tanks(kind) {
+                self.event_notice = Some(("Tanks is using the arena", self.schedule.tick + 120));
+                return;
+            }
             if kind == ClockEventKind::Grass && !self.config.events.grass {
                 self.grass_refusal = Some("Future grass seeding is disabled");
                 return;
@@ -1609,6 +1644,20 @@ impl ClockState {
             self.event_notice = Some(("Ceiling opening", self.schedule.tick + 360));
         }
         let layout = Layout::new(self.aspect_ratio());
+        if kind == ClockEventKind::Tanks {
+            match events::tanks::TanksEvent::new(&mut self.arena, layout, self.display, seed) {
+                Ok(event) => {
+                    self.floor.acquire(kind);
+                    self.active_event = Some(ActiveEvent::Tanks(Box::new(event)));
+                }
+                Err(reason) => {
+                    self.schedule.finish(kind);
+                    self.event_notice = Some((reason.notice(), self.schedule.tick + 120));
+                }
+            }
+            self.sync_event_schedule();
+            return;
+        }
         if kind == ClockEventKind::Duck {
             let mut duck =
                 events::duck::DuckEvent::new_course(layout, seed, self.config.duck_course_pattern);
@@ -1730,6 +1779,9 @@ impl ClockState {
             );
             self.schedule.finish(kind);
             self.floor.release(kind);
+            if kind == ClockEventKind::Tanks {
+                self.sync_event_schedule();
+            }
         }
         // Visual-event cleanup never releases the visit's physical arena.
         for segment in &mut self.segments {
@@ -1741,6 +1793,10 @@ impl ClockState {
 
     fn advance_tick(&mut self) {
         self.schedule.advance_tick();
+        // Resident motion can open or close a placement without changing owners.
+        if self.active_event.is_none() && self.schedule.tick.is_multiple_of(FIXED_HZ as u64) {
+            self.sync_event_schedule();
+        }
         self.surfaces.set_tick(self.schedule.tick);
         if self
             .event_notice
@@ -1988,6 +2044,9 @@ impl ClockState {
             // A control-only update may transfer wet support into free water,
             // but never advances time, consumes rain RNG, or integrates motion.
             event.synchronize(self.display, &mut self.segments);
+        }
+        if let Some(ActiveEvent::Tanks(event)) = &mut self.active_event {
+            event.synchronize_entry(&mut self.arena, self.display);
         }
         if !self
             .active_event

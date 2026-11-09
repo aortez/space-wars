@@ -319,6 +319,7 @@ fn automatic_falling_is_available_and_its_first_frame_matches_shared_physics() {
         slot_machine: false,
         spider: false,
         coins: false,
+        tanks: false,
     };
     state.configure(settings);
     assert!(!state.automatic_events_suspended());

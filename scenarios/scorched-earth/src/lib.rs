@@ -27,7 +27,9 @@ mod course;
 mod driving;
 pub mod driving_lab;
 mod drop_test;
+mod duel;
 mod hillside;
+pub mod host;
 mod material;
 mod render;
 mod roof;
@@ -49,8 +51,21 @@ const GRAVITY: f32 = 18.0;
 const GROUND: PhysicsId = PhysicsId::new(1);
 const DIRT: MaterialId = MaterialId(1);
 const CELL_SIZE: f32 = 0.5;
+const FIELD_WIDTH: u32 = 193;
+const FIELD_HEIGHT: u32 = 129;
 const BLAST_RADIUS: f32 = 2.5;
-const MAX_SHELLS: usize = 8;
+pub const MAX_SHELLS: usize = 8;
+pub const SHELL_LIFETIME_TICKS: u32 = 10 * FIXED_HZ;
+pub const MAX_TERRAIN_FRAGMENTS: usize = 64;
+/// Native rigid-hull geometry shared by collision and embedded presentation.
+pub const RIGID_TANK_HULL: [Vec2; 6] = [
+    Vec2::new(-1.5, -0.8),
+    Vec2::new(1.5, -0.8),
+    Vec2::new(1.9, -0.3),
+    Vec2::new(1.6, 0.6),
+    Vec2::new(-1.6, 0.6),
+    Vec2::new(-1.9, -0.3),
+];
 
 #[derive(Debug, Clone, Copy)]
 pub struct ScorchedConfig {
@@ -141,7 +156,9 @@ struct Shell {
 }
 
 #[derive(Clone)]
-pub struct ScorchedState {
+/// World-independent simulation state. Standalone inspection fields remain
+/// available through `ScorchedState`; hosts use `host::HostedDuel`.
+pub struct Duel {
     pub tick: u64,
     pub config: ScorchedConfig,
     pub impacts: u64,
@@ -152,7 +169,10 @@ pub struct ScorchedState {
     pub shots: u64,
     pub last_physics: PhysicsStepMetrics,
     seed: u64,
-    physics: PhysicsWorld,
+    placement: host::Placement,
+    firing: bool,
+    retired: [Option<engine_rapier::world::BodyMotion>; 2],
+    impact_events: Vec<host::Impact>,
     terrain: Vec<TerrainFragment>,
     loose: LooseTerrain,
     next_id: u64,
@@ -176,6 +196,24 @@ pub struct ScorchedState {
     status: &'static str,
 }
 
+#[derive(Clone)]
+pub struct ScorchedState {
+    physics: PhysicsWorld,
+    duel: Duel,
+}
+
+impl std::ops::Deref for ScorchedState {
+    type Target = Duel;
+    fn deref(&self) -> &Duel {
+        &self.duel
+    }
+}
+impl std::ops::DerefMut for ScorchedState {
+    fn deref_mut(&mut self) -> &mut Duel {
+        &mut self.duel
+    }
+}
+
 pub struct ScorchedScenario;
 
 fn hill(x: f32, seed: u64) -> f32 {
@@ -184,69 +222,7 @@ fn hill(x: f32, seed: u64) -> f32 {
 }
 
 impl ScorchedState {
-    pub fn new(mut config: ScorchedConfig, seed: u64) -> Self {
-        config.wheel_tuning = config.wheel_tuning.bounded();
-        config.max_grains = config.max_grains.clamp(1, 512);
-        config.bombardment_seconds = config.bombardment_seconds.min(600);
-        if config.course.is_some() {
-            config.roof = false;
-            config.hillside = false;
-            config.undercut = false;
-            config.drop_height = None;
-            config.bombardment_seconds = 0;
-        }
-        if config.roof {
-            config.hillside = false;
-        }
-        if config.hillside || config.roof {
-            config.undercut = false;
-            config.drop_height = None;
-            config.bombardment_seconds = 0;
-        }
-        if config.drop_height.is_some() {
-            config.undercut = false;
-        }
-        if config.undercut || config.drop_height.is_some() {
-            config.demo = false;
-            config.bombardment_seconds = 0;
-        }
-        let field = if let Some(course) = config.course {
-            course.terrain()
-        } else if config.roof {
-            roof::terrain()
-        } else if config.hillside {
-            hillside::terrain(seed)
-        } else if config.drop_height.is_some() {
-            drop_test::floor()
-        } else if config.undercut {
-            bank::terrain()
-        } else {
-            Terrain::generate(
-                193,
-                129,
-                CELL_SIZE,
-                vec![Material {
-                    id: DIRT,
-                    hardness: 100,
-                }],
-                |c| {
-                    let x = (c.x as f32 + 0.5 - 193.0 * 0.5) * CELL_SIZE;
-                    let y = (c.y as f32 + 0.5 - 129.0 * 0.5) * CELL_SIZE;
-                    if y <= hill(x, seed) {
-                        DIRT
-                    } else {
-                        MaterialId::VOID
-                    }
-                },
-            )
-            .expect("bounded hill field")
-        };
-        let mut initial_cells = field
-            .cells()
-            .iter()
-            .filter(|c| c.material != MaterialId::VOID)
-            .count() as u64;
-        let geometry = TerrainGeometry::with_surface(&field, TerrainSurface::Interpolated);
+    pub fn new(config: ScorchedConfig, seed: u64) -> Self {
         let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -GRAVITY),
             solver_iterations: 8,
@@ -254,167 +230,12 @@ impl ScorchedState {
             max_ccd_substeps: 4,
             ..Default::default()
         });
-        let assembly = TerrainAssembly::insert(
-            &mut physics,
-            GROUND,
-            BodySpec {
-                kind: BodyKind::Fixed,
-                ..Default::default()
-            },
-            &field,
-            &geometry,
-            TerrainSpec {
-                surface: TerrainSurface::Interpolated,
-                ..Default::default()
-            },
-        )
-        .expect("valid ground");
-        let ground = TerrainFragment {
-            id: GROUND,
-            hash: field.hash(),
-            terrain: field,
-            geometry,
-            assembly,
-            edited_chunks: Vec::new(),
-        };
-        let mut running_gear = [None, None];
-        let tanks = std::array::from_fn(|index| {
-            let id = PhysicsId::new(10 + index as u64);
-            let mut body = BodyId::new(id, BodyRole::PRIMARY);
-            let x = if config.course.is_some() {
-                if index == 0 { course::START_X } else { 38.0 }
-            } else if config.roof {
-                if index == 0 { 0.0 } else { 4.0 }
-            } else if index == 0 {
-                if config.hillside { -1.0 } else { -27.0 }
-            } else {
-                27.0
-            };
-            let mut collider = ColliderSpec::convex_polygon(
-                ColliderId::new(id, ColliderRole::PRIMARY, 0),
-                vec![
-                    Vec2::new(-1.5, -0.8),
-                    Vec2::new(1.5, -0.8),
-                    Vec2::new(1.9, -0.3),
-                    Vec2::new(1.6, 0.6),
-                    Vec2::new(-1.6, 0.6),
-                    Vec2::new(-1.9, -0.3),
-                ],
-            );
-            collider.density = 8.0;
-            collider.friction = 1.0;
-            let position = Vec2::new(
-                x,
-                if let Some(course) = config.course {
-                    course.floor(x) + 2.0
-                } else if config.roof {
-                    if index == 0 { 15.0 } else { -8.7 }
-                } else if config.drop_height.is_some() {
-                    -8.0
-                } else if config.undercut || config.hillside {
-                    if index == 0 {
-                        9.0
-                    } else if config.hillside {
-                        -8.7
-                    } else {
-                        -8.0
-                    }
-                } else {
-                    hill(x, seed) + 2.0
-                },
-            );
-            if suspension::enabled(config) {
-                let assembly = suspension::insert(&mut physics, id, position, config.wheel_tuning);
-                body = assembly.bodies()[0];
-                running_gear[index] = Some(assembly);
-            } else {
-                assert!(physics.insert_body(
-                    body,
-                    BodySpec {
-                        position,
-                        angular_damping: 2.0,
-                        ccd_enabled: true,
-                        ..Default::default()
-                    },
-                    &[collider]
-                ));
-            }
-            Tank {
-                body,
-                elevation: 50.0_f32.to_radians(),
-                speed: 32.0,
-                facing: if index == 0 { 1.0 } else { -1.0 },
-                health: 100.0,
-                next_shot: if config.course.is_some() {
-                    u64::MAX
-                } else if config.hillside || config.roof {
-                    0
-                } else {
-                    index as u64 * 300
-                },
-                shots: 0,
-            }
-        });
-        let mut terrain = vec![ground];
-        if let Some(height) = config.drop_height {
-            let clump = drop_test::clump(&mut physics, height);
-            initial_cells += clump
-                .terrain
-                .cells()
-                .iter()
-                .filter(|c| c.material != MaterialId::VOID)
-                .count() as u64;
-            terrain.push(clump);
-        }
+        let mut duel = Duel::insert(&mut physics, config, seed, host::Placement::standalone());
         physics.step(DT);
-        let driving = std::array::from_fn(|i| {
-            driving::TankDrive::new(physics.motion(tanks[i].body).unwrap().position)
+        duel.driving = std::array::from_fn(|i| {
+            driving::TankDrive::new(physics.motion(duel.tanks[i].body).unwrap().position)
         });
-        let mut state = Self {
-            tick: 0,
-            config,
-            impacts: 0,
-            rejected_blasts: 0,
-            last_capacity_rejection: None,
-            shots: 0,
-            last_physics: PhysicsStepMetrics::default(),
-            seed,
-            physics,
-            terrain,
-            loose: LooseTerrain::new(LooseTerrainConfig {
-                max_grains: config.max_grains,
-                shape: config.shape,
-                slumping: config.slumping.then(Default::default),
-                cohesion: config.cohesion.config(),
-                impact_fracture: config
-                    .breakup
-                    .then(|| config.cohesion.impact_config())
-                    .flatten(),
-                ..Default::default()
-            })
-            .expect("bounded loose material"),
-            next_id: 100,
-            initial_cells,
-            tanks,
-            shells: Vec::new(),
-            bots: Default::default(),
-            shot_observations: Vec::new(),
-            selected: if config.hillside || config.roof { 1 } else { 0 },
-            previous: Controls::default(),
-            driving,
-            course_goal: config
-                .course
-                .map(|course| driving_lab::TravelGoal::new(course.finish_x(), 2.5)),
-            course_decision: None,
-            running_gear,
-            manual_drive_armed: false,
-            select_used: false,
-            pointer_drive: 0.0,
-            nudge_drive: 0.0,
-            nudge_until: 0,
-            flashes: Vec::new(),
-            status: "Drive into position, aim and fire. Demo controls both tanks.",
-        };
+        let mut state = Self { physics, duel };
         if state.config.course == Some(DrivingCourse::Rubble) {
             state.release_course_rubble();
         }
@@ -425,21 +246,30 @@ impl ScorchedState {
         }
         state
     }
+    pub fn world(&self) -> &PhysicsWorld {
+        &self.physics
+    }
+    fn advance(&mut self, drive: f32) {
+        let drives = self.duel.prepare_controls(&mut self.physics, drive);
+        self.duel.last_physics = self.physics.step_with_surface_drives(DT, &drives);
+        self.duel.finish_step(&mut self.physics);
+    }
+    fn advance_with_drive_override(
+        &mut self,
+        drive: f32,
+        axis: Option<(usize, f32)>,
+        ground: [driving::GroundCheckFn; 2],
+        support: [driving::SupportCheckFn; 2],
+    ) {
+        let drives =
+            self.duel
+                .prepare_with_drive_override(&mut self.physics, drive, axis, ground, support);
+        self.duel.last_physics = self.physics.step_with_surface_drives(DT, &drives);
+        self.duel.finish_step(&mut self.physics);
+    }
 
     pub fn camera(&self) -> Camera2 {
         Camera2::new(RenderPoint::new(0.0, 0.0), 64.0)
-    }
-    pub fn loose_cells(&self) -> usize {
-        self.loose.len()
-    }
-    pub fn deposited_cells(&self) -> u64 {
-        self.loose.deposited_cells()
-    }
-    pub fn settling_diagnostics(&self) -> engine_rapier::terrain::SettlingDiagnostics {
-        self.loose.settling_diagnostics()
-    }
-    pub fn settling_work(&self) -> engine_rapier::terrain::SettlingWork {
-        self.loose.settling_work()
     }
     pub fn body_count(&self) -> usize {
         self.physics.body_count()
@@ -447,261 +277,14 @@ impl ScorchedState {
     pub fn collider_count(&self) -> usize {
         self.physics.collider_count()
     }
-    pub fn winner(&self) -> Option<usize> {
-        match (self.tanks[0].health > 0.0, self.tanks[1].health > 0.0) {
-            (true, false) => Some(0),
-            (false, true) => Some(1),
-            _ => None,
-        }
-    }
-    fn fighting(&self) -> bool {
-        self.tanks.iter().all(|t| t.health > 0.0)
-    }
-    fn muzzle(&self, player: usize) -> (Vec2, Vec2) {
-        let tank = self.tanks[player];
-        let motion = self.physics.motion(tank.body).unwrap();
-        let pivot = motion.position + Vec2::Y.rotate_radians(motion.angle) * 0.85;
-        (pivot, pivot + tank.direction() * 2.8)
-    }
-    fn fire(&mut self, player: usize) {
-        if self.config.undercut
-            || self.config.course.is_some()
-            || self.config.drop_height.is_some()
-            || self.config.bombardment_seconds > 0
-            || !self.fighting()
-            || self.tick < self.tanks[player].next_shot
-            || self.shells.len() >= MAX_SHELLS
-        {
-            return;
-        }
-        let tank = self.tanks[player];
-        let motion = self.physics.motion(tank.body).unwrap();
-        let (pivot, muzzle) = self.muzzle(player);
-        // The barrel cannot shoot through the ground or another actor.
-        let position = self
-            .physics
-            .cast_ray(
-                pivot,
-                muzzle - pivot,
-                RayCastOptions {
-                    max_distance: (muzzle - pivot).length(),
-                    exclude_entity: Some(tank.body.entity),
-                    ..Default::default()
-                },
-            )
-            .map_or(muzzle, |hit| hit.point);
-        let velocity = tank.direction() * tank.speed + motion.linear_velocity;
-        let flight = self.record_launch(player, position, velocity, position != muzzle);
-        self.shells.push(Shell {
-            owner: player,
-            position,
-            velocity,
-            age: 0,
-            flight: Some(flight),
-        });
-        self.tanks[player].next_shot = self.tick + 75;
-        self.tanks[player].shots += 1;
-        self.shots += 1;
-    }
-    fn aim_bot(&mut self, player: usize) {
-        if self.calibrated_cpu(player) {
-            self.aim_calibrated(player);
-            return;
-        }
-        let origin = self
-            .physics
-            .motion(self.tanks[player].body)
-            .unwrap()
-            .position
-            + Vec2::Y;
-        let target = self
-            .physics
-            .motion(self.tanks[1 - player].body)
-            .unwrap()
-            .position;
-        // A repeatable aiming sweep, not privileged perfect targeting. Ground
-        // deformation and intervening loose material can intercept any shot.
-        let phase = (self.tanks[player].shots % 5 + self.seed % 5 + player as u64) % 5;
-        let angle = (46.0 + phase as f32 * 3.0).to_radians();
-        let dx = (target.x - origin.x).abs().max(1.0);
-        let dy = target.y - origin.y;
-        let denominator = 2.0 * angle.cos().powi(2) * (dx * angle.tan() - dy);
-        let speed = if denominator > 0.0 {
-            (GRAVITY * dx * dx / denominator).sqrt()
-        } else {
-            40.0
-        };
-        self.tanks[player].facing = if target.x >= origin.x { 1.0 } else { -1.0 };
-        self.tanks[player].elevation = angle;
-        self.tanks[player].speed = (speed * (0.93 + phase as f32 * 0.025)).clamp(12.0, 48.0);
-    }
-    fn advance(&mut self, drive: f32) {
-        let goal_axis = if self.config.course.is_some()
-            && self.config.course_goal_driving
-            && self.config.demo
-            && self.config.cpu_driving
-        {
-            let mut goal = self.course_goal.take().expect("course has a goal");
-            let decision = goal.decide(self, 0);
-            let axis = decision.axis;
-            self.driving[0].diagnostics.mode = decision.mode;
-            self.course_decision = Some(decision);
-            self.course_goal = Some(goal);
-            Some((0, axis))
-        } else {
-            None
-        };
-        self.advance_with_drive_override(
-            drive,
-            goal_axis,
-            driving::CURRENT_GROUND_CHECKS,
-            driving::CURRENT_SUPPORT_CHECKS,
-        );
-    }
-
-    // The diagnostic fork changes only one drive axis. Physics, controller
-    // history, shot scheduling and the other tank continue from the same clone.
-    fn advance_with_drive_override(
-        &mut self,
-        drive: f32,
-        override_axis: Option<(usize, f32)>,
-        ground_checks: [driving::GroundCheckFn; 2],
-        support_checks: [driving::SupportCheckFn; 2],
-    ) {
-        let drives = self.prepare_driving(drive, override_axis, ground_checks, support_checks);
-        if self.config.roof {
-            self.advance_roof();
-        } else if self.config.hillside {
-            self.advance_hillside();
-        } else if self.config.drop_height.is_some() {
-            if self.tick == 120 {
-                self.physics
-                    .set_body_kind(drop_test::BODY, BodyKind::Dynamic, true);
-            }
-        } else if self.config.undercut {
-            if self.tick == 120 {
-                self.cut_bank_support();
-            }
-        } else if self.config.bombardment_seconds > 0 {
-            // Health-independent rain exercises the real swept-shell impact
-            // path. Later shots encounter the already deformed terrain.
-            if self.tick < u64::from(self.config.bombardment_seconds) * u64::from(FIXED_HZ)
-                && self.tick.is_multiple_of(120)
-                && self.shells.len() < MAX_SHELLS
-            {
-                let phase = (self.shots % 9 + self.seed % 9) % 9;
-                self.shells.push(Shell {
-                    owner: (self.shots % 2) as usize,
-                    position: Vec2::new(-24.0 + phase as f32 * 6.0, 24.0),
-                    velocity: Vec2::new(0.0, -8.0),
-                    age: 10,
-                    flight: None,
-                });
-                self.shots += 1;
-            }
-        } else if self.config.course.is_none() && self.fighting() {
-            for (player, support_check) in support_checks.into_iter().enumerate() {
-                if (self.config.demo || player != self.selected)
-                    && self.tick >= self.tanks[player].next_shot
-                    && self.bot_allows_fire(player)
-                    && (!self.config.cpu_driving || self.ready_to_shoot(player, support_check))
-                {
-                    self.aim_bot(player);
-                    self.fire(player);
-                    self.tanks[player].next_shot = self.tick + 300;
-                }
-            }
-        }
-        self.loose.capture_impact_motion(
-            &self.physics,
-            self.terrain.iter().map(|f| (f.assembly.body(), &f.terrain)),
-            DT,
-        );
-        self.last_physics = self.physics.step_with_surface_drives(DT, &drives);
-        self.loose.sample_impact_contacts(&self.physics);
-        let mut finished = Vec::new();
-        self.shells.retain_mut(|shell| {
-            let movement = shell.velocity * DT + Vec2::new(0.0, -0.5 * GRAVITY * DT * DT);
-            let hit = self.physics.cast_ray(
-                shell.position,
-                movement,
-                RayCastOptions {
-                    max_distance: movement.length(),
-                    exclude_entity: (shell.age < 8).then_some(self.tanks[shell.owner].body.entity),
-                    ..Default::default()
-                },
-            );
-            let end = hit
-                .as_ref()
-                .map_or(shell.position + movement, |hit| hit.point);
-            if let Some(flight) = &mut shell.flight {
-                let target = self
-                    .physics
-                    .motion(self.tanks[1 - shell.owner].body)
-                    .unwrap()
-                    .position;
-                flight.observe(shell.position, end, target);
-            }
-            if let Some(hit) = hit {
-                let kind = if hit.collider.entity == self.tanks[1 - shell.owner].body.entity {
-                    "opponent"
-                } else if hit.collider.entity == self.tanks[shell.owner].body.entity {
-                    "self"
-                } else {
-                    "terrain"
-                };
-                finished.push((*shell, hit.point, kind, true));
-                return false;
-            }
-            shell.position += movement;
-            shell.velocity.y -= GRAVITY * DT;
-            shell.age += 1;
-            let alive =
-                shell.age < 600 && shell.position.y > -50.0 && shell.position.x.abs() < 100.0;
-            if !alive {
-                finished.push((
-                    *shell,
-                    shell.position,
-                    if shell.age >= 600 {
-                        "expired"
-                    } else {
-                        "out of bounds"
-                    },
-                    false,
-                ));
-            }
-            alive
-        });
-        for (shell, point, kind, impact) in finished {
-            let health = self.tanks.map(|tank| tank.health);
-            if impact {
-                if shell.flight.is_some() {
-                    self.explode_from(point, Some(shell.owner));
-                } else {
-                    self.explode(point);
-                }
-            }
-            self.record_outcome(shell, point, kind, health);
-        }
-        self.slump();
-        self.fracture_banks();
-        self.fracture_impacts();
-        self.settle();
-        for tank in &mut self.tanks {
-            let position = self.physics.motion(tank.body).unwrap().position;
-            if position.y < -45.0 {
-                tank.health = 0.0
-            }
-        }
-        self.tick += 1;
-        self.flashes.retain(|(_, tick)| self.tick - tick < 22);
-    }
     pub fn command(&mut self, command: Command) {
         match command {
-            Command::AimDown => self.tanks[self.selected].elevation -= 3.0_f32.to_radians(),
-            Command::AimUp => self.tanks[self.selected].elevation += 3.0_f32.to_radians(),
-            Command::PowerDown => self.tanks[self.selected].speed -= 1.0,
-            Command::PowerUp => self.tanks[self.selected].speed += 1.0,
+            Command::AimDown => {
+                self.duel.tanks[self.duel.selected].elevation -= 3.0_f32.to_radians()
+            }
+            Command::AimUp => self.duel.tanks[self.duel.selected].elevation += 3.0_f32.to_radians(),
+            Command::PowerDown => self.duel.tanks[self.duel.selected].speed -= 1.0,
+            Command::PowerUp => self.duel.tanks[self.duel.selected].speed += 1.0,
             Command::Fire => self.fire(self.selected),
             Command::Select => {
                 if self.config.course.is_none() {
@@ -894,13 +477,6 @@ impl ScorchedState {
         }
         self.clamp_aim();
     }
-    fn clamp_aim(&mut self) {
-        let tank = &mut self.tanks[self.selected];
-        tank.elevation = tank
-            .elevation
-            .clamp(5.0_f32.to_radians(), 85.0_f32.to_radians());
-        tank.speed = tank.speed.clamp(12.0, 48.0);
-    }
     pub fn observation_hash(&self) -> u64 {
         ScorchedScenario::observe(self)
             .payload
@@ -1017,8 +593,9 @@ impl Scenario for ScorchedScenario {
             0.0
         };
         if !state.config.demo {
-            state.tanks[state.selected].elevation += controls.aim * DT * 40.0_f32.to_radians();
-            state.tanks[state.selected].speed += controls.power * DT * 12.0;
+            state.duel.tanks[state.duel.selected].elevation +=
+                controls.aim * DT * 40.0_f32.to_radians();
+            state.duel.tanks[state.duel.selected].speed += controls.power * DT * 12.0;
             state.clamp_aim();
             if controls.fire {
                 state.fire(state.selected)
@@ -1029,99 +606,7 @@ impl Scenario for ScorchedScenario {
         StepResult::default()
     }
     fn observe(state: &Self::State) -> Observation {
-        let motion = |body| {
-            let m = state
-                .physics
-                .motion(body)
-                .expect("retained physical entity");
-            [
-                m.position.x,
-                m.position.y,
-                m.angle,
-                m.linear_velocity.x,
-                m.linear_velocity.y,
-                m.angular_velocity,
-            ]
-        };
-        let fields: Vec<_> = state
-            .terrain
-            .iter()
-            .map(|b| (b.id.value(), b.terrain.hash(), motion(b.assembly.body())))
-            .collect();
-        let grains: Vec<_> = state
-            .loose
-            .iter()
-            .map(|g| (g.body(), g.cell(), motion(g.body())))
-            .collect();
-        let tanks: Vec<_> = state.tanks.iter().map(|t| (t, motion(t.body))).collect();
-        let mut payload = serde_json::json!({
-            "seed": state.seed, "tick": state.tick, "shape": format!("{:?}", state.config.shape),
-            "limit": state.config.max_grains, "demo": state.config.demo, "selected": state.selected,
-            "bombardment_seconds": state.config.bombardment_seconds,
-            "settling_hash": state.loose.settling_hash(), "next_id": state.next_id,
-            "shots": state.shots, "impacts": state.impacts, "rejected": state.rejected_blasts,
-            "deposited": state.deposited_cells(), "fields": fields, "grains": grains,
-            "tanks": tanks, "shells": state.shells,
-        });
-        // Preserve existing observations when the experiment is disabled.
-        if let Some(course) = state.config.course {
-            payload["course"] = serde_json::json!(course);
-            // History remains part of replay even while manual/range driving
-            // suspends the goal. Only Reset or a new course creates a new goal.
-            if state.config.course_goal_driving || state.course_decision.is_some() {
-                payload["course_goal_driving"] =
-                    serde_json::json!(state.config.course_goal_driving);
-                payload["course_goal"] = serde_json::json!(state.course_goal);
-                payload["course_decision"] = serde_json::json!(state.course_decision);
-            }
-        }
-        if state.config.roof {
-            payload["roof"] = serde_json::json!(true);
-        }
-        if state.config.hillside {
-            payload["hillside"] = serde_json::json!(true);
-        }
-        if state.config.undercut {
-            payload["undercut"] = serde_json::json!(true);
-        }
-        if let Some(height) = state.config.drop_height {
-            payload["drop_height"] = serde_json::json!(height.label());
-        }
-        if state.config.breakup {
-            payload["breakup"] = serde_json::json!(true);
-        }
-        if state.config.cpu_driving || state.driving.iter().any(|d| d.has_history()) {
-            payload["cpu_driving"] = serde_json::json!(state.config.cpu_driving);
-            payload["driving"] = serde_json::json!(state.driving);
-        }
-        if state.config.cpu_footing.iter().any(|enabled| *enabled) {
-            payload["cpu_footing"] = serde_json::json!(state.config.cpu_footing);
-        }
-        if state.config.cpu_policy != [CpuPolicy::Sweep; 2] {
-            payload["cpu_policy"] = serde_json::json!(state.config.cpu_policy);
-            payload["bots"] = serde_json::json!(state.bots);
-            payload["flight_observations"] =
-                serde_json::json!(state.shells.iter().map(|s| s.flight).collect::<Vec<_>>());
-            payload["shot_observations"] = serde_json::json!(state.shot_observations);
-        }
-        if state.config.suspension {
-            payload["suspension"] = serde_json::json!(true);
-            // Keep legacy capture identities; record every changed tuning,
-            // including a new default, rather than silently relabeling it.
-            if state.config.wheel_tuning != WheelTuning::REFERENCE {
-                payload["wheel_tuning"] = serde_json::json!(state.config.wheel_tuning);
-            }
-            payload["wheel_motion"] = serde_json::json!(
-                state
-                    .running_gear
-                    .iter()
-                    .map(|gear| { gear.as_ref().map(|gear| gear.bodies().map(motion)) })
-                    .collect::<Vec<_>>()
-            );
-        }
-        Observation {
-            payload: serde_json::to_vec(&payload).expect("finite scenario observation"),
-        }
+        state.duel.observe(&state.physics)
     }
     fn render_frame(state: &Self::State) -> RenderFrame {
         render::frame(state)

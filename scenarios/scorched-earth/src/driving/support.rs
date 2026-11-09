@@ -6,33 +6,39 @@ pub(crate) struct SupportContext {
     angle: f32,
     allowed: bool,
     min_up: f32,
+    separation: f32,
 }
 
 impl SupportContext {
     pub(crate) fn accepts(self, contact: SurfaceContact) -> bool {
         self.allowed
-            && contact.separation <= 0.03
+            && contact.separation <= self.separation
             && contact.normal.y > 0.0
             && contact.normal.y >= self.min_up
             && contact.normal.rotate_radians(-self.angle).y >= 0.5
     }
 }
 
-impl ScorchedState {
-    pub(crate) fn reference_support_context(&self, player: usize) -> SupportContext {
+impl Duel {
+    pub(crate) fn reference_support_context(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+    ) -> SupportContext {
         SupportContext {
-            angle: self.physics.motion(self.tanks[player].body).unwrap().angle,
+            angle: self.motion(physics, self.tanks[player].body).unwrap().angle,
             allowed: true,
+            separation: 0.03 * self.placement.scale,
             min_up: 40.0_f32.to_radians().cos(),
         }
     }
 
-    pub(crate) fn support_context(&self, player: usize) -> SupportContext {
-        let mut context = self.reference_support_context(player);
+    pub(crate) fn support_context(&self, physics: &PhysicsWorld, player: usize) -> SupportContext {
+        let mut context = self.reference_support_context(physics, player);
         if let Some(gear) = &self.running_gear[player] {
             let [_, left, right] = gear.bodies();
-            let span = self.physics.motion(right).unwrap().position
-                - self.physics.motion(left).unwrap().position;
+            let span = self.motion(physics, right).unwrap().position
+                - self.motion(physics, left).unwrap().position;
             // Cell corners may have 45° contact normals on a shallow hill.
             // Limit the grade across the actual wheelbase instead, and retain
             // live contacts below an upright chassis. Neither proximity rays
@@ -59,23 +65,53 @@ impl ScorchedState {
         )
     }
 
-    fn has_support_with_context(&self, player: usize, context: SupportContext) -> bool {
+    fn has_support_with_context(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+        context: SupportContext,
+    ) -> bool {
         self.support_colliders(player)
             .into_iter()
             .flatten()
             .any(|collider| {
-                self.physics
+                physics
                     .surface_contacts(collider)
                     .any(|c| context.accepts(c))
             })
     }
 
-    pub(crate) fn has_track_support(&self, player: usize) -> bool {
-        self.has_support_with_context(player, self.support_context(player))
+    pub(crate) fn has_track_support(&self, physics: &PhysicsWorld, player: usize) -> bool {
+        self.has_support_with_context(physics, player, self.support_context(physics, player))
     }
 
     /// Retained solely for exact diagnostic prefixes and same-state controls.
+    pub(crate) fn has_reference_track_support(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+    ) -> bool {
+        self.has_support_with_context(
+            physics,
+            player,
+            self.reference_support_context(physics, player),
+        )
+    }
+}
+
+impl ScorchedState {
+    pub(crate) fn reference_support_context(&self, player: usize) -> SupportContext {
+        self.duel.reference_support_context(&self.physics, player)
+    }
+    pub(crate) fn support_context(&self, player: usize) -> SupportContext {
+        self.duel.support_context(&self.physics, player)
+    }
+
+    pub(crate) fn has_track_support(&self, player: usize) -> bool {
+        self.duel.has_track_support(&self.physics, player)
+    }
+    #[cfg(test)]
     pub(crate) fn has_reference_track_support(&self, player: usize) -> bool {
-        self.has_support_with_context(player, self.reference_support_context(player))
+        self.duel.has_reference_track_support(&self.physics, player)
     }
 }

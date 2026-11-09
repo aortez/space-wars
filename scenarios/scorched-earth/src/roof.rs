@@ -24,10 +24,10 @@ pub(super) fn terrain() -> Terrain {
     .unwrap()
 }
 
-impl ScorchedState {
-    pub(super) fn aim_at_roof(&mut self) {
+impl Duel {
+    pub(super) fn aim_at_roof(&mut self, physics: &mut PhysicsWorld) {
         self.tanks[1].elevation = 65.0_f32.to_radians();
-        let (_, muzzle) = self.muzzle(1);
+        let (_, muzzle) = self.muzzle(physics, 1);
         let target = Vec2::new(-4.0, 8.0);
         let dx = (muzzle.x - target.x).abs();
         let dy = target.y - muzzle.y;
@@ -37,10 +37,16 @@ impl ScorchedState {
             self.tanks[1].speed = (GRAVITY * dx * dx / denominator).sqrt().clamp(12.0, 48.0);
         }
     }
-    pub(super) fn advance_roof(&mut self) {
+    pub(super) fn advance_roof(&mut self, physics: &mut PhysicsWorld) {
         if self.config.demo && self.tick == 120 {
-            self.aim_at_roof();
-            self.fire(1);
+            self.aim_at_roof(physics);
+            self.fire(physics, 1);
         }
+    }
+}
+
+impl ScorchedState {
+    pub(super) fn aim_at_roof(&mut self) {
+        self.duel.aim_at_roof(&mut self.physics)
     }
 }

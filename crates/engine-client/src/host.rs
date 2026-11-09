@@ -218,6 +218,8 @@ impl ScenarioControls {
                 && state.events.iter().any(|entry| {
                     entry.kind == event
                         && !entry.blocked_by_duck
+                        && entry.blocked_by_arena.is_none()
+                        && !entry.blocked_by_tanks
                         && !entry.blocked_by_crow
                         && !entry.blocked_by_spider
                 })

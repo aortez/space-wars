@@ -33,6 +33,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_slot_machine_enabled(settings.events.slot_machine);
     window.set_launcher_clock_spider_enabled(settings.events.spider);
     window.set_launcher_clock_coins_enabled(settings.events.coins);
+    window.set_launcher_clock_tanks_enabled(settings.events.tanks);
     window.set_launcher_clock_grass_enabled(settings.events.grass);
     window.set_launcher_clock_rain_enabled(settings.events.rain);
     window.set_launcher_clock_rain_amount(settings.rain_amount.label().into());
@@ -184,6 +185,7 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         20 => settings.events.slot_machine = !settings.events.slot_machine,
         21 => settings.events.spider = !settings.events.spider,
         22 => settings.events.coins = !settings.events.coins,
+        23 => settings.events.tanks = !settings.events.tanks,
         0 => {
             settings.time_format = match settings.time_format {
                 ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
@@ -263,7 +265,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             // navigation table keeps them on.
             if matches!(
                 index,
-                2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 15 | 17 | 18 | 19 | 20 | 21 | 22
+                2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 15 | 17 | 18 | 19 | 20 | 21 | 22 | 23
             ) {
                 window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
                     index, action,
@@ -275,7 +277,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=22) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=23) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),

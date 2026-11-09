@@ -25,11 +25,18 @@ pub(super) struct FootingDriver {
     rejected_at: Option<f32>,
 }
 
-impl ScorchedState {
+impl Duel {
     /// A terrain-profile estimate, not a promise of future support. Native
     /// contacts and the current route are checked again while travelling.
-    pub(crate) fn firing_footing_target(&self, player: usize) -> Option<FootingTarget> {
-        if !self.fighting() || self.config.course.is_some() || !self.has_track_support(player) {
+    pub(crate) fn firing_footing_target(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+    ) -> Option<FootingTarget> {
+        if !self.fighting()
+            || self.config.course.is_some()
+            || !self.has_track_support(physics, player)
+        {
             return None;
         }
         let drive = &self.driving[player];
@@ -38,14 +45,13 @@ impl ScorchedState {
         {
             return None;
         }
-        let motion = self.physics.motion(self.tanks[player].body).unwrap();
+        let motion = self.motion(physics, self.tanks[player].body).unwrap();
         let pitch = motion.angle.to_degrees().abs();
         if pitch < 20.0 || motion.linear_velocity.length() > 0.6 {
             return None;
         }
         let enemy_x = self
-            .physics
-            .motion(self.tanks[1 - player].body)
+            .motion(physics, self.tanks[1 - player].body)
             .unwrap()
             .position
             .x;
@@ -57,13 +63,13 @@ impl ScorchedState {
         let mut best: Option<FootingTarget> = None;
         for direction in [toward, -toward] {
             let x = motion.position.x + direction * MOVE_DISTANCE;
-            if x.abs() > 44.0
+            if x.abs() > self.placement.drive_limit()
                 || (drive.diagnostics.mode == "hold range"
                     && !(18.0..=32.0).contains(&(enemy_x - x).abs()))
             {
                 continue;
             }
-            let ground = self.check_drive_direction(player, direction);
+            let ground = self.check_drive_direction(physics, player, direction);
             if ground.reason.is_some() {
                 continue;
             }
@@ -91,28 +97,38 @@ impl ScorchedState {
         best
     }
 
-    pub(super) fn seek_firing_footing(&mut self, player: usize, range_axis: f32) -> f32 {
+    pub(super) fn seek_firing_footing(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        player: usize,
+        range_axis: f32,
+    ) -> f32 {
         let mut driver = self.driving[player].footing.take().unwrap_or_default();
-        let axis = driver.decide(self, player, range_axis);
+        let axis = driver.decide(self, physics, player, range_axis);
         self.driving[player].footing = Some(driver);
         axis
     }
 
-    fn better_firing_footing(&self, player: usize, original_pitch: f32) -> bool {
+    fn better_firing_footing(
+        &self,
+        physics: &PhysicsWorld,
+        player: usize,
+        original_pitch: f32,
+    ) -> bool {
         let pitch = self
-            .physics
-            .motion(self.tanks[player].body)
+            .motion(physics, self.tanks[player].body)
             .unwrap()
             .angle
             .to_degrees()
             .abs();
-        if pitch > 18.0 || pitch + 8.0 > original_pitch || !self.has_track_support(player) {
+        if pitch > 18.0 || pitch + 8.0 > original_pitch || !self.has_track_support(physics, player)
+        {
             return false;
         }
-        let context = self.support_context(player);
+        let context = self.support_context(physics, player);
         self.running_gear[player].as_ref().is_none_or(|gear| {
             gear.wheel_colliders().iter().all(|c| {
-                self.physics
+                physics
                     .surface_contacts(*c)
                     .any(|contact| context.accepts(contact))
             })
@@ -126,7 +142,7 @@ impl FootingDriver {
             goal.suspend_progress();
         }
     }
-    fn finish(&mut self, state: &mut ScorchedState, player: usize) {
+    fn finish(&mut self, state: &mut Duel, player: usize) {
         self.goal = None;
         self.target = None;
         self.brake_since = None;
@@ -146,9 +162,15 @@ impl FootingDriver {
         self.rejected_at = Some(x);
     }
 
-    fn decide(&mut self, state: &mut ScorchedState, player: usize, range_axis: f32) -> f32 {
+    fn decide(
+        &mut self,
+        state: &mut Duel,
+        physics: &PhysicsWorld,
+        player: usize,
+        range_axis: f32,
+    ) -> f32 {
         let mode = state.driving[player].diagnostics.mode;
-        let motion = state.physics.motion(state.tanks[player].body).unwrap();
+        let motion = state.motion(physics, state.tanks[player].body).unwrap();
         if self
             .rejected_at
             .is_some_and(|x| (motion.position.x - x).abs() >= 4.0)
@@ -173,7 +195,7 @@ impl FootingDriver {
             && range_axis == 0.0
         {
             self.next_check = state.tick + CHECK_TICKS;
-            if let Some(target) = state.firing_footing_target(player) {
+            if let Some(target) = state.firing_footing_target(physics, player) {
                 self.target = Some(target);
                 self.goal = Some(TravelGoal::new(target.x, DRIVE_SPEED));
                 self.started += 1;
@@ -191,8 +213,8 @@ impl FootingDriver {
             goal.suspend_progress();
             return range_axis;
         }
-        let decision = goal.decide(state, player);
-        let better = state.better_firing_footing(player, self.origin_pitch);
+        let decision = goal.decide_in(state, physics, player);
+        let better = state.better_firing_footing(physics, player, self.origin_pitch);
         state.driving[player].cpu_direction = 0.0;
         if self
             .brake_since
@@ -250,3 +272,15 @@ impl FootingDriver {
 
 #[cfg(test)]
 mod tests;
+
+impl ScorchedState {
+    pub(crate) fn firing_footing_target(&self, player: usize) -> Option<FootingTarget> {
+        self.duel.firing_footing_target(&self.physics, player)
+    }
+
+    #[cfg(test)]
+    fn better_firing_footing(&self, player: usize, original_pitch: f32) -> bool {
+        self.duel
+            .better_firing_footing(&self.physics, player, original_pitch)
+    }
+}

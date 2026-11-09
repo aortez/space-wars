@@ -56,7 +56,10 @@ fn next_cycles_enabled_events_in_all_profiles_without_changing_preferences() {
         // The spider waits for the duck and the crow, which visit throughout.
         let enabled: Vec<_> = ClockEventKind::ALL
             .into_iter()
-            .filter(|kind| settings.events.enabled(*kind) && *kind != ClockEventKind::Spider)
+            .filter(|kind| {
+                settings.events.enabled(*kind)
+                    && !matches!(kind, ClockEventKind::Spider | ClockEventKind::Tanks)
+            })
             .collect();
         let repeated = enabled
             .iter()
@@ -97,6 +100,7 @@ fn no_enabled_events_is_a_bounded_noop_and_feedback_expires_only_while_running()
         slot_machine: false,
         spider: false,
         coins: false,
+        tanks: false,
     };
     next(&mut state);
     assert_eq!(state.event_id(), 0);
@@ -149,6 +153,7 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
             slot_machine: false,
             spider: false,
             coins: false,
+            tanks: false,
         };
         ClockScenario::step(
             &mut state,
@@ -223,6 +228,7 @@ fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
             slot_machine: true,
             spider: true,
             coins: true,
+            tanks: true,
         };
         ClockScenario::step(
             &mut state,

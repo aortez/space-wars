@@ -26,13 +26,17 @@ pub enum SupportCheck {
 impl SupportCheck {
     pub fn supported(self, state: &ScorchedState, player: usize) -> bool {
         assert!(player < 2);
-        self.function()(state, player)
+        self.function()(state, &state.physics, player)
+    }
+
+    pub(crate) fn supported_in(self, state: &Duel, physics: &PhysicsWorld, player: usize) -> bool {
+        self.function()(state, physics, player)
     }
 
     fn function(self) -> driving::SupportCheckFn {
         match self {
-            Self::Current => ScorchedState::has_track_support,
-            Self::Reference => ScorchedState::has_reference_track_support,
+            Self::Current => Duel::has_track_support,
+            Self::Reference => Duel::has_reference_track_support,
         }
     }
 }
@@ -181,7 +185,7 @@ pub fn step_reference_trial(
     assert!(player < 2 && axis.is_none_or(|v| v.is_finite() && v.abs() <= 1.0));
     let mut checks: [driving::GroundCheckFn; 2] = [reference::safe_drive_direction; 2];
     if candidate {
-        checks[player] = ScorchedState::safe_drive_direction;
+        checks[player] = Duel::safe_drive_direction;
     }
     state.advance_with_drive_override(
         0.0,
@@ -202,13 +206,13 @@ pub fn step_reference_support_trial(
     assert!(player < 2 && axis.is_none_or(|v| v.is_finite() && v.abs() <= 1.0));
     let mut checks: [driving::GroundCheckFn; 2] = [reference::safe_drive_direction; 2];
     if candidate {
-        checks[player] = ScorchedState::safe_drive_direction;
+        checks[player] = Duel::safe_drive_direction;
     }
     state.advance_with_drive_override(
         0.0,
         axis.map(|v| (player, v)),
         checks,
-        [ScorchedState::has_reference_track_support; 2],
+        [Duel::has_reference_track_support; 2],
     );
 }
 
@@ -221,7 +225,7 @@ pub fn step_support_trial(
     support: SupportCheck,
 ) {
     assert!(player < 2 && axis.is_none_or(|v| v.is_finite() && v.abs() <= 1.0));
-    let mut checks: [driving::SupportCheckFn; 2] = [ScorchedState::has_reference_track_support; 2];
+    let mut checks: [driving::SupportCheckFn; 2] = [Duel::has_reference_track_support; 2];
     checks[player] = support.function();
     state.advance_with_drive_override(
         0.0,
@@ -234,7 +238,7 @@ pub fn step_support_trial(
 /// Inspect the same two probes used by the retained controller.
 pub fn reference_ground_check(state: &ScorchedState, player: usize, direction: f32) -> GroundCheck {
     assert!(player < 2 && direction.is_finite() && direction.abs() == 1.0);
-    reference::ground_check(state, player, direction)
+    reference::ground_check(state, &state.physics, player, direction)
 }
 
 /// Captures the native bodies, contacts and joints, including current motor

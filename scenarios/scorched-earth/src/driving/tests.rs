@@ -139,8 +139,8 @@ fn cpu_drives_both_tanks_and_stops_to_fire() {
         let mut state = fixture(shape, BankStrength::Off, |_| -5.0);
         state.config.demo = true;
         state.config.cpu_driving = true;
-        for tank in &mut state.tanks {
-            tank.next_shot = state.tick + 240;
+        for tank in &mut state.duel.tanks {
+            tank.next_shot = state.duel.tick + 240;
         }
         let before = state
             .tanks
