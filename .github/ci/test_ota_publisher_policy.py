@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class PublisherPolicyTests(unittest.TestCase):
     def test_reviewed_workflows_require_all_jobs_and_pinned_actions(self):
-        for path, events, jobs in (('.github/workflows/ota-build.yml', ('schedule', 'workflow_dispatch'), helper.BUILD_JOBS),
+        for path, events, jobs in (('.github/workflows/ota-build.yml', ('workflow_dispatch',), helper.BUILD_JOBS),
                                    ('.github/workflows/ci.yml', ('push', 'workflow_dispatch'), helper.CI_JOBS)):
             raw = (ROOT / path).read_bytes()
             result = helper.workflow(raw, path, events, jobs)
@@ -100,7 +100,7 @@ class PublisherPolicyTests(unittest.TestCase):
                 step['continue-on-error'] = 'true'
             with self.assertRaises(ValueError):
                 helper.workflow(yaml.safe_dump(value).encode(), path,
-                                ('schedule', 'workflow_dispatch'), helper.BUILD_JOBS)
+                                ('workflow_dispatch',), helper.BUILD_JOBS)
 
     def test_mutable_actions_missing_tests_or_additional_authority_require_review(self):
         path = '.github/workflows/ota-build.yml'
@@ -117,7 +117,7 @@ class PublisherPolicyTests(unittest.TestCase):
             change(value)
             with self.assertRaises(ValueError):
                 helper.workflow(yaml.safe_dump(value).encode(), path,
-                                 ('schedule', 'workflow_dispatch'), helper.BUILD_JOBS)
+                                 ('workflow_dispatch',), helper.BUILD_JOBS)
 
     def test_policy_requires_exact_clean_independently_selected_tooling_checkout(self):
         with tempfile.TemporaryDirectory() as temporary:
