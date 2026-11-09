@@ -1318,6 +1318,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.slot-machine", "Off", &page);
         page = harness.change_clock_setting("pause.clock.spider", "Off", &page);
         page = harness.change_clock_setting("pause.clock.coins", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.tanks", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -1755,6 +1756,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.slot-machine.next",
             "launcher.settings.clock.spider.next",
             "launcher.settings.clock.coins.next",
+            "launcher.settings.clock.tanks.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);
@@ -2420,12 +2422,17 @@ fn arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run() 
         let arena = resting.arena.as_ref().unwrap();
         assert_eq!(arena.claims, initial.arena.as_ref().unwrap().claims);
         assert!(arena.last_step.is_some());
-        assert!(
-            resting
-                .events
-                .iter()
-                .all(|event| event.blocked_by_arena.is_none())
-        );
+        // The residents rest on the floor the hills would take, so Tanks
+        // alone is refused, by placement.
+        for event in &resting.events {
+            let tanks = event.kind == ClockEventKind::Tanks;
+            assert_eq!(
+                event.blocked_by_arena,
+                tanks.then_some(ClockArenaUnavailable::Placement),
+                "{:?}",
+                event.kind
+            );
+        }
         harness.capture_screenshot("clock-arena-residents.png");
 
         // A visit joins their world. Beside it, the two leave no room for the
@@ -2456,22 +2463,23 @@ fn arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run() 
         assert!(owners.contains(&(ClockArenaOwner::Visit, false)));
         let run = refused.arena.as_ref().unwrap().accounting;
         assert_eq!((run.refused, run.worlds), (0, 1));
-        // The spider's room is Meltdown's, so it is refused with them.
+        // The spider's room is Meltdown's, so it is refused with them; Tanks
+        // is refused by placement before its room is counted.
         for event in &refused.events {
-            let largest = matches!(
-                event.kind,
-                ClockEventKind::Aquarium
-                    | ClockEventKind::Explosion
-                    | ClockEventKind::Coins
-                    | ClockEventKind::Meltdown
-                    | ClockEventKind::Spider
-            );
-            assert_eq!(
-                event.blocked_by_arena,
-                largest.then_some(ClockArenaUnavailable::Capacity),
-                "{:?}",
-                event.kind
-            );
+            let expected = if event.kind == ClockEventKind::Tanks {
+                Some(ClockArenaUnavailable::Placement)
+            } else {
+                matches!(
+                    event.kind,
+                    ClockEventKind::Aquarium
+                        | ClockEventKind::Explosion
+                        | ClockEventKind::Coins
+                        | ClockEventKind::Meltdown
+                        | ClockEventKind::Spider
+                )
+                .then_some(ClockArenaUnavailable::Capacity)
+            };
+            assert_eq!(event.blocked_by_arena, expected, "{:?}", event.kind);
         }
         harness.capture_screenshot("clock-arena-visit.png");
 
